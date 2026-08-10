@@ -83,7 +83,7 @@ function stepProvenance(
 ): ProvKind {
   const recordIds = new Set<string>();
   const paperIds = new Set<string>();
-  for (const ref of step.refs ?? []) (ref.startsWith('ex-') ? recordIds : paperIds).add(ref);
+  for (const ref of step.refs ?? []) (ref.startsWith('r-') ? recordIds : paperIds).add(ref);
   for (const m of step.text.matchAll(PLACEHOLDER_SCAN)) {
     const mat = version.materials.find((x) => x.name === m[1]);
     if (mat?.sourceRecordId) recordIds.add(mat.sourceRecordId);
@@ -93,7 +93,7 @@ function stepProvenance(
 
 /** Chip for a step/version reference id — records are `ex-…`, papers `SP-…`. */
 function RefChip({ id }: { id: string }) {
-  return id.startsWith('ex-') ? <CitationChip recordId={id} /> : <CitationChip paperId={id} />;
+  return id.startsWith('r-') ? <CitationChip recordId={id} /> : <CitationChip paperId={id} />;
 }
 
 // ── batch-size parsing (unit-aware, tolerant of non-metric base units) ──

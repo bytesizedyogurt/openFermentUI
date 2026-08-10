@@ -127,8 +127,8 @@ function Checkpoint({
               <div className="mt-2 flex items-center gap-2">
                 <span className="text-caption text-ink-soft">Evidence:</span>
                 <CitationChip
-                  paperId={q.evidenceChip.startsWith('SP-') ? q.evidenceChip : undefined}
-                  recordId={q.evidenceChip.startsWith('ex-') ? q.evidenceChip : undefined}
+                  paperId={q.evidenceChip.startsWith('r-') ? undefined : q.evidenceChip}
+                  recordId={q.evidenceChip.startsWith('r-') ? q.evidenceChip : undefined}
                 />
               </div>
             )}

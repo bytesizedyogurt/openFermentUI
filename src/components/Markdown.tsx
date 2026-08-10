@@ -16,7 +16,7 @@ export function inlineMarkdown(text: string, key = ''): ReactNode[] {
     if (idx % 2 === 1) {
       const id = part;
       out.push(
-        id.startsWith('ex-') ? (
+        id.startsWith('r-') ? (
           <CitationChip key={`${key}-c${idx}`} recordId={id} />
         ) : (
           <CitationChip key={`${key}-c${idx}`} paperId={id} />

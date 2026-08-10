@@ -23,13 +23,13 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
-import { useStore } from '@/store';
+import { useStore, provenanceOf } from '@/store';
 import { navigate, useRoute } from '@/router';
 import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 import { SUGGESTED_PROMPTS } from '@/data/flows';
 import { send, sendFlow } from '@/sim/chat';
 import { fieldName } from '@/data/ontology';
-import { convert, fmt } from '@/engine/units';
+import { convert, fmt, asNumber } from '@/engine/units';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { exportText } from '@/lib/csv';
 import { Button, Card, cx, EmptyState, Callout } from '@/components/ui';
@@ -51,7 +51,7 @@ function AnswerStrip({ md }: { md: string }) {
   const color = useSeriesColor();
 
   const cited = useMemo(() => {
-    const ids = [...md.matchAll(/\[\[(ex-\d+)\]\]/g)].map((m) => m[1]);
+    const ids = [...md.matchAll(/\[\[(r-[A-Za-z0-9]+-\d+)\]\]/g)].map((m) => m[1]);
     const recs = ids
       .map((id) => records.find((r) => r.id === id))
       .filter(Boolean) as typeof records;
@@ -71,7 +71,10 @@ function AnswerStrip({ md }: { md: string }) {
             try {
               return {
                 r,
-                v: def.canonicalUnit === '' ? r.value : convert(r.value, r.unit, def.canonicalUnit),
+                v:
+                  def.canonicalUnit === ''
+                    ? (asNumber(r.value) ?? 0)
+                    : convert(asNumber(r.value) ?? 0, r.unit, def.canonicalUnit),
               };
             } catch {
               return null;
@@ -108,7 +111,7 @@ function AnswerStrip({ md }: { md: string }) {
               onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
               title={`${fmt(p.v)} ${cited.def.canonicalUnit} — ${p.r.paperId} (${p.r.status})`}
             >
-              <ProvDot p={p.r.gold ? 'gold' : p.r.status === 'verified' ? 'verified' : 'unverified'} size={9} />
+              <ProvDot p={provenanceOf(p.r)} size={9} />
             </button>
           );
         })}

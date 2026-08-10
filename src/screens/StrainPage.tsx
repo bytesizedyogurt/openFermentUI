@@ -26,7 +26,7 @@ import type { ExtractionRecord, FieldId, ParameterDef, Protocol, Scenario } from
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
-import { convert, fmt } from '@/engine/units';
+import { convert, fmt, asNumber } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -91,7 +91,9 @@ function provOf(r: ExtractionRecord): ProvKind {
 /** Convert into the ontology's canonical unit; null when the families disagree. */
 function toCanonical(rec: ExtractionRecord, canonicalUnit: string): number | null {
   try {
-    const v = convert(rec.value, rec.unit, canonicalUnit);
+    const n = asNumber(rec.value);
+    if (n === null) return null; // categorical record — not plottable
+    const v = convert(n, rec.unit, canonicalUnit);
     return Number.isFinite(v) ? v : null;
   } catch {
     return null;

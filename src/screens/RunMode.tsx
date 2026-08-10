@@ -540,8 +540,8 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
                 {step.refs.map((r) => (
                   <CitationChip
                     key={r}
-                    paperId={r.startsWith('SP-') ? r : undefined}
-                    recordId={r.startsWith('ex-') ? r : undefined}
+                    paperId={r.startsWith('r-') ? undefined : r}
+                    recordId={r.startsWith('r-') ? r : undefined}
                   />
                 ))}
               </div>

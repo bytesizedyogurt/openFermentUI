@@ -117,6 +117,15 @@ const REFUSALS: { a: string; b: string; because: string }[] = [
   },
 ];
 
+/**
+ * Narrow a record value to a number, or null if it is categorical. Call sites
+ * that convert or compute MUST go through this rather than casting — a
+ * categorical value silently coerced to NaN would poison a median.
+ */
+export function asNumber(v: number | string): number | null {
+  return typeof v === 'number' && isFinite(v) ? v : null;
+}
+
 /** If a refusal is a known trap, explain it; otherwise return null. */
 export function explainRefusal(fromUnit: string, toUnit: string): string | null {
   const f = U[normalizeUnit(fromUnit) ?? ''];
@@ -289,7 +298,13 @@ export function parseQuantity(text: string): { value: number; unit: string } | n
 }
 
 /** Format a number for display: sensible significant digits, no trailing noise. */
-export function fmt(value: number, maxDecimals = 3): string {
+/**
+ * Format a value for display. Categorical records (kinase_identity,
+ * glycan_species) carry a string, and the right rendering for those is the
+ * string itself — so this passes them through rather than producing NaN.
+ */
+export function fmt(value: number | string, maxDecimals = 3): string {
+  if (typeof value === 'string') return value;
   if (!isFinite(value)) return '—';
   if (value === 0) return '0';
   const abs = Math.abs(value);

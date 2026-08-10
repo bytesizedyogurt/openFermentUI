@@ -185,7 +185,7 @@ export function protocolProvenance(version: ProtocolVersion, records: Extraction
     if (r.paperId) paperIds.add(r.paperId);
   }
   for (const s of version.steps)
-    for (const ref of s.refs ?? []) (ref.startsWith('ex-') ? recordIds : paperIds).add(ref);
+    for (const ref of s.refs ?? []) (ref.startsWith('r-') ? recordIds : paperIds).add(ref);
   return provenanceFromRefs(recordIds, paperIds, records);
 }
 
