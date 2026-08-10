@@ -182,12 +182,22 @@ for (const r of RECORDS) {
   if (def.canonicalUnit !== '') {
     try {
       const canonical = convert(r.value, r.unit, def.canonicalUnit);
-      if (canonical < def.range[0] || canonical > def.range[1])
+      if (canonical < def.range[0] || canonical > def.range[1]) {
+        const note = r.status === 'unverified' ? ' (seeded extractor error, awaiting review)' : '';
         warn(
-          `${r.id}: ${r.field} = ${canonical.toPrecision(3)} ${def.canonicalUnit} is outside the ontology range ${def.range[0]}–${def.range[1]}`,
+          `${r.id}: ${r.field} = ${canonical.toPrecision(3)} ${def.canonicalUnit} is outside the ontology range ${def.range[0]}–${def.range[1]}${note}`,
         );
+      }
     } catch {
-      fail(`${r.id}: unit "${r.unit}" is not dimensionally compatible with ${def.canonicalUnit}`);
+      // A dimensionally-wrong unit on an *unverified* record is legitimate seed
+      // content: it is exactly the failure the review queue exists to catch
+      // (a dropped OD basis, a rate recorded per the wrong time unit). The same
+      // mistake on a verified or gold record is a defect in the seed itself.
+      const msg = `${r.id}: unit "${r.unit}" is not dimensionally compatible with ${def.canonicalUnit} (${def.name})`;
+      if (r.status === 'unverified' && !r.gold) warn(`${msg} — seeded extractor error, awaiting review`);
+      else if (r.gold && r.gold.unit !== r.unit)
+        warn(`${msg} — gold annotation corrects it to ${r.gold.unit}`);
+      else fail(msg);
     }
   }
   if (r.organism && !strainIds.has(r.organism)) warn(`${r.id}: organism "${r.organism}" is not a seeded strain`);

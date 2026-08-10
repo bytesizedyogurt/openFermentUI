@@ -51,6 +51,7 @@ export function DataTable<T>({
   searchOf,
   bulkActions,
   toolbar,
+  onFilteredChange,
   emptyTitle = 'Nothing here yet',
   emptyBody = 'No rows to show.',
   dense,
@@ -67,6 +68,12 @@ export function DataTable<T>({
   searchOf?: (row: T) => string;
   bulkActions?: (selected: T[], clear: () => void) => ReactNode;
   toolbar?: ReactNode;
+  /**
+   * Fired whenever the facet/search/sort result changes, so a host screen can
+   * act on exactly what the user is looking at (e.g. "review these rows").
+   * Memoize the callback — it is called on every recompute.
+   */
+  onFilteredChange?: (rows: T[]) => void;
   emptyTitle?: string;
   emptyBody?: string;
   dense?: boolean;
@@ -137,6 +144,10 @@ export function DataTable<T>({
   useEffect(() => {
     setFocusIdx((i) => Math.min(i, Math.max(0, filtered.length - 1)));
   }, [filtered.length]);
+
+  useEffect(() => {
+    onFilteredChange?.(filtered);
+  }, [filtered, onFilteredChange]);
 
   const narrowingFacet = useMemo(() => {
     for (const f of facets) {
@@ -352,7 +363,7 @@ export function DataTable<T>({
                     className={cx(
                       'text-caption font-medium text-ink-soft px-2 py-2 whitespace-nowrap',
                       c.numeric ? 'text-right' : 'text-left',
-                      c.priority && c.priority > 2 && 'hidden xl:table-cell',
+                      !!c.priority && c.priority > 2 && 'hidden xl:table-cell',
                     )}
                     style={{ width: c.width }}
                   >
@@ -424,7 +435,7 @@ export function DataTable<T>({
                         className={cx(
                           'px-2 py-1 align-middle',
                           c.numeric && 'text-right font-num',
-                          c.priority && c.priority > 2 && 'hidden xl:table-cell',
+                          !!c.priority && c.priority > 2 && 'hidden xl:table-cell',
                           ci === 0 && !bulkActions && tickOf && 'tick-cell pl-3',
                         )}
                       >

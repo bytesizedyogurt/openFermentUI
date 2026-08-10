@@ -1226,13 +1226,16 @@ export const RECORDS_B: ExtractionRecord[] = [
     confidence: 0.9,
     status: 'verified',
     organism: 'cw15',
-    gold: { value: 0.45, unit: 'g g⁻¹' },
     extractorRun: 'v0.4r',
     reviewer: 'S. Creighton',
     audit: [
       { at: '2026-07-14 14:40', who: 'phycoextract v0.4r', action: 'extracted' },
       { at: '2026-07-15 17:05', who: 'S. Creighton', action: 'verified' },
-      { at: '2026-07-15 17:05', who: 'S. Creighton', action: 'flagged for gold set' },
+      {
+        at: '2026-07-15 17:06',
+        who: 'S. Creighton',
+        action: 'not promoted to gold — baseline design assumption, not a measurement',
+      },
     ],
   },
   {

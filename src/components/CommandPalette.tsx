@@ -15,6 +15,7 @@ import {
   Search,
   Sparkles,
   CornerDownLeft,
+  type LucideIcon,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import { navigate } from '@/router';
@@ -25,7 +26,7 @@ interface Item {
   group: 'Navigate' | 'Actions' | 'Ask';
   label: string;
   hint?: string;
-  icon?: React.ComponentType<{ size?: number; className?: string }>;
+  icon?: LucideIcon;
   run: () => void;
 }
 

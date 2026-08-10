@@ -7,6 +7,7 @@
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
 const DIST = join(process.cwd(), 'dist');
@@ -74,7 +75,12 @@ const IGNORE = [/Download the React DevTools/i, /favicon/i];
 
 async function main() {
   await new Promise((r) => server.listen(PORT, r));
-  const browser = await chromium.launch();
+  // Use the environment's pre-installed Chromium rather than downloading one;
+  // its build number need not match the npm playwright version.
+  const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+  const browser = await chromium.launch(
+    existsSync(executablePath) ? { executablePath } : {},
+  );
   const failures = [];
 
   for (const [route, label] of ROUTES) {

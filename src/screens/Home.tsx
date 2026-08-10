@@ -27,15 +27,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
-import {
-  Bar,
-  Card,
-  EmptyState,
-  Explain,
-  PageHeader,
-  SectionTitle,
-  cx,
-} from '@/components/ui';
+import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -44,15 +36,8 @@ import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Pro
 function dominant(list: ProvKind[], fallback: ProvKind): ProvKind {
   const counts = new Map<ProvKind, number>();
   for (const p of list) counts.set(p, (counts.get(p) ?? 0) + 1);
-  let best: ProvKind | null = null;
-  let n = 0;
-  counts.forEach((c, p) => {
-    if (c > n) {
-      best = p;
-      n = c;
-    }
-  });
-  return best ?? fallback;
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  return ranked.length > 0 ? ranked[0][0] : fallback;
 }
 
 /** A failing tile degrades to a labelled error card; the page never dies (§9.7). */
@@ -193,6 +178,33 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
   warn: AlertTriangle,
   pin: Pin,
 };
+
+const ENTRY_CARDS: { to: string; title: string; desc: string; Icon: LucideIcon }[] = [
+  {
+    to: '/ask',
+    title: 'Ask a question',
+    desc: 'Get a cited answer with the plan, tool calls and retrieved passages shown.',
+    Icon: MessagesSquare,
+  },
+  {
+    to: '/extract/review',
+    title: 'Review extractions',
+    desc: 'Triage machine-extracted parameters against the span they came from.',
+    Icon: Table2,
+  },
+  {
+    to: '/protocols',
+    title: 'Run a protocol',
+    desc: 'Scale a verified procedure to your batch size and execute it at the bench.',
+    Icon: ClipboardList,
+  },
+  {
+    to: '/simulate',
+    title: 'Model a process',
+    desc: 'Sweep a scenario and see where the cost per kilogram actually goes.',
+    Icon: LineChart,
+  },
+];
 
 const COLD_START_QUESTIONS = [
   'What specific growth rate does Chlorella vulgaris reach in mixotrophic culture?',
@@ -547,34 +559,7 @@ export default function Home() {
             <span id="home-start">Start something</span>
           </SectionTitle>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {(
-              [
-                {
-                  to: '/ask',
-                  title: 'Ask a question',
-                  desc: 'Get a cited answer with the plan, tool calls and retrieved passages shown.',
-                  Icon: MessagesSquare,
-                },
-                {
-                  to: '/extract/review',
-                  title: 'Review extractions',
-                  desc: 'Triage machine-extracted parameters against the span they came from.',
-                  Icon: Table2,
-                },
-                {
-                  to: '/protocols',
-                  title: 'Run a protocol',
-                  desc: 'Scale a verified procedure to your batch size and execute it at the bench.',
-                  Icon: ClipboardList,
-                },
-                {
-                  to: '/simulate',
-                  title: 'Model a process',
-                  desc: 'Sweep a scenario and see where the cost per kilogram actually goes.',
-                  Icon: LineChart,
-                },
-              ] as const
-            ).map((c) => (
+            {ENTRY_CARDS.map((c) => (
               <a
                 key={c.to}
                 href={href(c.to)}
@@ -671,7 +656,7 @@ export default function Home() {
             </>
           )}
         </Card>
-        <p className={cx('text-caption text-ink-soft mt-2')}>
+        <p className="text-caption text-ink-soft mt-2">
           Activity is session-only and resets on refresh.
         </p>
       </aside>
