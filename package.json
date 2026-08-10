@@ -8,7 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "check:seed": "tsx scripts/check-seed.ts"
+    "check:seed": "tsx scripts/check-seed.ts",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:golden": "node scripts/golden-path.mjs",
+    "verify": "pnpm typecheck && pnpm check:seed && pnpm build && pnpm test:smoke && pnpm test:golden"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

@@ -205,6 +205,15 @@ export function Markdown({ md, className }: { md: string; className?: string }) 
       para.push(lines[i]);
       i++;
     }
+    // Guarantee forward progress. A line the paragraph loop refuses to consume
+    // and no earlier branch claimed — most often a table's header row that has
+    // streamed in before its |---| separator — would otherwise spin here
+    // forever, allocating empty blocks until the tab dies. Render it as plain
+    // text; the next token completes the table and it re-renders properly.
+    if (para.length === 0) {
+      para.push(lines[i]);
+      i++;
+    }
     blocks.push(
       <p key={k++} className="my-2 leading-relaxed">
         {inlineMarkdown(para.join(' '), `p${k}`)}
