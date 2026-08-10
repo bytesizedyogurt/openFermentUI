@@ -326,19 +326,18 @@ export default function Home() {
           </SectionTitle>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <TileBoundary label="Papers ingested">
+            <TileBoundary label="Papers catalogued">
               <VitalTile
                 to="/library"
-                label="Papers ingested"
-                prov="demo"
-                tickTitle="Synthetic demonstration corpus — fictional papers, authors and venues"
+                label="Papers catalogued"
+                prov="curated"
+                tickTitle="Real literature, curated by hand — metadata and a curator note, no full text retrieved"
                 sub={
                   papers.length === 0 ? (
                     'No corpus loaded'
                   ) : (
                     <>
-                      <span className="font-num">{shelved}</span> held on the demo shelf for
-                      ingest
+                      <span className="font-num">{shelved}</span> awaiting full-text ingest
                     </>
                   )
                 }

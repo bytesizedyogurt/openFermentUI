@@ -7,6 +7,8 @@ import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '
 import { FLOWS } from '@/data/flows';
 import { useStore, nextId } from '@/store';
 import { tokenize, expandQuery, searchCorpus } from '@/engine/retrieval';
+import { PAPERS } from '@/data/papers';
+import { STRAINS } from '@/data/strains';
 import { ONTOLOGY, fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { delay, scaled, streamInterval } from './latency';
@@ -14,6 +16,79 @@ import { delay, scaled, streamInterval } from './latency';
 // ── Intent matching (§16.3) ────────────────────────────────────────────
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9µ⁻¹\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * Every token the corpus can actually speak about: paper titles and curator
+ * prose, strain names and aliases, ontology field names, and the flow triggers
+ * themselves. ~2.5k tokens — small enough that a word missing from it is real
+ * evidence the question is about something else entirely.
+ */
+const CORPUS_VOCAB: Set<string> = (() => {
+  const v = new Set<string>();
+  const add = (text: unknown) => {
+    if (typeof text !== 'string') return;
+    for (const tok of tokenize(text)) v.add(tok);
+  };
+  for (const p of PAPERS) {
+    add(p.title);
+    add(p.venue);
+    for (const sec of p.sections) {
+      add(sec.heading);
+      add(sec.text);
+    }
+  }
+  for (const st of STRAINS) {
+    add(st.binomial);
+    add(st.designation);
+    add(st.description);
+    for (const t of st.taxonomy) add(t);
+  }
+  for (const d of ONTOLOGY) {
+    add(d.name);
+    add(d.definition);
+  }
+  for (const f of FLOWS) for (const t of f.triggers) add(t);
+  return v;
+})();
+
+/**
+ * How much to trust a match given words the corpus has never seen. "max
+ * secreted yield from tomatoes" overlaps a titer trigger on three tokens out of
+ * four and used to answer, confidently, about Chlamydomonas. Each unseen token
+ * is one more reason to hand the turn to the fallback ladder, which declines
+ * and names what the corpus does cover.
+ */
+const CORPUS_DF: Map<string, number> = (() => {
+  const df = new Map<string, number>();
+  for (const p of PAPERS) {
+    for (const sec of p.sections) {
+      const seen = new Set(tokenize(`${sec.heading} ${sec.text} ${p.title}`));
+      for (const tok of seen) df.set(tok, (df.get(tok) ?? 0) + 1);
+    }
+  }
+  return df;
+})();
+
+/**
+ * How much a query token counts when asking "did the trigger account for this?".
+ * A rare, specific term carries the question's subject; a common one is
+ * connective tissue. "maximum secreted protein yield from soybean" shares four
+ * common tokens with a titer trigger and differs on the one word that says what
+ * the question is actually about — so that word has to outweigh the other four.
+ */
+function salience(tok: string): number {
+  const df = CORPUS_DF.get(tok) ?? 0;
+  if (df === 0) return 4;
+  if (df <= 3) return 10;
+  if (df <= 10) return 3;
+  return 1;
+}
+
+function domainConfidence(qTokens: string[]): number {
+  if (qTokens.length === 0) return 1;
+  const unseen = qTokens.filter((t) => !CORPUS_VOCAB.has(t)).length;
+  return Math.pow(0.4, unseen);
+}
 
 /**
  * Score input against a flow's triggers: exact match beats whole-phrase
@@ -25,21 +100,51 @@ export function scoreFlow(input: string, flow: ChatFlow): number {
   let best = 0;
   const qTokens = tokenize(q);
   const qExpanded = expandQuery(qTokens);
+  const confidence = domainConfidence(qTokens);
 
   for (const trigger of flow.triggers) {
     const t = norm(trigger);
     if (t === q) return 100;
-    if (q.includes(t) || t.includes(q)) {
-      best = Math.max(best, 70 + Math.min(10, t.length / 8));
-      continue;
-    }
+
     const tTokens = tokenize(t);
     if (tTokens.length === 0) continue;
+
+    // Whole-phrase containment, but only in the direction that carries
+    // evidence. A user who typed a superset of the trigger meant it. A user who
+    // typed two characters that happen to occur inside the trigger did not:
+    // "hi" sits inside "which host", and scoring that as a phrase match let
+    // single words select a flow and answer with total confidence.
+    const contains =
+      (q.includes(t) && tTokens.length >= 2) ||
+      (t.includes(q) && qTokens.length >= 2 && q.length >= t.length * 0.6);
+    if (contains) {
+      best = Math.max(best, (70 + Math.min(10, t.length / 8)) * confidence);
+      continue;
+    }
+
+    // Keyword overlap, scored on BOTH directions of coverage. Trigger coverage
+    // alone rewards a query for the tokens it happens to share and ignores the
+    // ones it does not: "max secreted yield from tomatoes" covers two thirds of
+    // a titer trigger and says "tomatoes" for free. Weighing how much of the
+    // *query* the trigger accounts for is what makes an out-of-domain noun
+    // cost something.
     let overlap = 0;
     for (const tok of tTokens) overlap += qExpanded.get(tok) ?? 0;
-    // Normalize by the trigger's length so long triggers are not advantaged.
-    const ratio = overlap / tTokens.length;
-    best = Math.max(best, ratio * 60);
+    const triggerCoverage = overlap / tTokens.length;
+
+    const tExpanded = expandQuery(tTokens);
+    let qHit = 0;
+    let qTotal = 0;
+    for (const tok of qTokens) {
+      const w = salience(tok);
+      qTotal += w;
+      if ((tExpanded.get(tok) ?? 0) > 0) qHit += w;
+    }
+    const queryCoverage = qTotal > 0 ? qHit / qTotal : 0;
+
+    const denom = triggerCoverage + queryCoverage;
+    const f1 = denom > 0 ? (2 * triggerCoverage * queryCoverage) / denom : 0;
+    best = Math.max(best, f1 * 70 * confidence);
   }
   return best;
 }
@@ -53,7 +158,12 @@ export function matchFlow(input: string, flows: ChatFlow[] = FLOWS): { flow: Cha
   return best;
 }
 
-export const MATCH_THRESHOLD = 34;
+// Raised from 34. Everything between the old bar and this one was a weak
+// keyword coincidence — "cost" alone selecting the TEA flow, a soybean question
+// answered with a Chlamydomonas titer. Below this the turn goes to the fallback
+// ladder, which looks the entity up for real and otherwise declines by name.
+// Declining a question we half-recognised is the cheaper error.
+export const MATCH_THRESHOLD = 48;
 
 // ── Entity recognition for the fallback ladder (§16.3a) ────────────────
 
