@@ -1,211 +1,61 @@
-// Extractor run outputs against the gold set (OF-DES-001 §14.3, §8.8).
+// Extractor runs against the gold set (OF-DES-001 §8.8).
 //
-// SYNTHETIC. These are seeded confusion data, not the output of a real model —
-// the Sim computes metrics over them but does not train or run an extractor
-// (fidelity matrix rows 8 and 9).
+// EMPTY, AND THAT IS THE POINT.
 //
-// The story the dashboard should tell:
-//   * Precision climbs sharply across the three runs (0.44 → 0.65 → 0.86), and
-//     unit-normalization failures are the visible driver — five of them in
-//     v0.3, two in v0.4, none in v0.4+rules.
-//   * Recall barely moves and stays low. Fifteen gold parameters were annotated
-//     by a curator and have never been produced by any configuration; they are
-//     'miss' in every run. That ceiling is real and the screen says so rather
-//     than hiding it.
-import type { RunOutput, ExtractorRun } from './types';
+// The synthetic corpus shipped three seeded extractor runs with authored
+// confusion data. The real corpus cannot: no extractor has been run against
+// these papers, because their full texts have not been ingested (every entry is
+// `catalogued`, with the curator's notes standing in for the source). Scoring
+// precision and recall now would mean scoring an extractor that never ran,
+// against a gold set that was never annotated from source spans.
+//
+// So the validation dashboard shows an honest empty state instead of a number.
+// That is a better artifact than a fabricated F1: it tells a faculty reader
+// exactly where the project is, which is *catalogued and planned, not yet
+// measured* (OF-COR-001 §22, actions 6 and 7).
+//
+// This file is populated after tranche-1 ingest, when:
+//   1. the 40 open-access core papers have real parsed text,
+//   2. the 60-record gold set of OF-COR-001 §18 has been annotated against
+//      those source spans by a human, and
+//   3. an extractor has actually been run.
+import type { RunOutput } from './types';
 
-/** Every gold-annotated record, in id order. */
-const GOLD_IDS = [
-  'ex-0001', 'ex-0005', 'ex-0006', 'ex-0010', 'ex-0011', 'ex-0018', 'ex-0019',
-  'ex-0020', 'ex-0021', 'ex-0027', 'ex-0028', 'ex-0030', 'ex-0033', 'ex-0035',
-  'ex-0036', 'ex-0042', 'ex-0043', 'ex-0046', 'ex-0051', 'ex-0052', 'ex-0057',
-  'ex-0061', 'ex-0062', 'ex-0069', 'ex-0070', 'ex-0071', 'ex-0079', 'ex-0080',
-  'ex-0082', 'ex-0086', 'ex-0090', 'ex-0091', 'ex-0095', 'ex-0099', 'ex-0108',
-  'ex-0109', 'ex-0115', 'ex-0117', 'ex-0118', 'ex-0125', 'ex-0132',
-];
+export const RUN_OUTPUTS: RunOutput[] = [];
 
 /**
- * Curator-annotated parameters with no extraction from any run. These are the
- * platform's honest recall ceiling: 15 of 41 gold entries have never been found.
+ * The gold set planned in OF-COR-001 §18, kept here so the validation screen
+ * can report progress against it rather than against nothing. These counts are
+ * a plan, not an achievement — the screen must say so.
  */
-const NEVER_FOUND = [
-  'ex-0010', 'ex-0019', 'ex-0035', 'ex-0042', 'ex-0051', 'ex-0061', 'ex-0069',
-  'ex-0079', 'ex-0086', 'ex-0090', 'ex-0099', 'ex-0108', 'ex-0117', 'ex-0125',
-  'ex-0132',
+export const GOLD_SET_PLAN: {
+  paperId: string;
+  fields: string;
+  records: number;
+  rationale: string;
+}[] = [
+  { paperId: 'H1', fields: 'expression_pct_tsp, titer_*, phosphorylation status + method, kinase_identity', records: 18, rationale: 'Tables 1–3 are already structured; the highest-density extraction target and the best test of table parsing.' },
+  { paperId: 'H4', fields: 'expression_pct_tsp, titer, secreted_fraction, phosphate_count, glycan_species', records: 6, rationale: 'Multi-field, single paper, all numeric — an ideal precision test.' },
+  { paperId: 'I1', fields: 'micellar_fraction, gelation_ph, calcium_binding, phosphorylation_degree', records: 6, rationale: 'The functional-threshold anchor.' },
+  { paperId: 'C2', fields: 'titer_secreted, fold_improvement', records: 4, rationale: 'The algal secretion benchmark.' },
+  { paperId: 'K1', fields: 'titer_secreted, glycan_species', records: 4, rationale: 'Cross-host benchmark.' },
+  { paperId: 'F1', fields: 'gene length, exon count, precursor/mature length, variant count', records: 5, rationale: 'Tests non-quantity structured extraction.' },
+  { paperId: 'J10', fields: 'disruption_protein_yield', records: 3, rationale: 'Includes a comparison pair (mutant vs WT) — tests whether extraction preserves the contrast.' },
+  { paperId: 'O4', fields: 'minimum_selling_price, productivity', records: 4, rationale: 'Two cost points in one paper — tests scale-conditional extraction.' },
+  { paperId: 'O2', fields: 'minimum_selling_price, titer, production volume', records: 5, rationale: 'Tests distribution-valued extraction (ranges, not points).' },
+  { paperId: 'M5', fields: 'final_biomass_density, volumetric_productivity', records: 2, rationale: 'Per-field statistics backbone.' },
+  { paperId: 'M6', fields: 'final_biomass_density', records: 2, rationale: 'Per-field statistics backbone.' },
+  { paperId: 'M7', fields: 'growth_rate_mu', records: 2, rationale: 'The corpus’s cleanest growth-rate record.' },
+  { paperId: 'A1', fields: 'expression_pct_tsp', records: 2, rationale: 'The canonical 0.2% figure.' },
+  { paperId: 'B5', fields: 'time_to_colony', records: 3, rationale: 'Three strains, one field — tests entity-conditional extraction.' },
 ];
 
-type Exception = {
-  outcome: 'value_mismatch' | 'unit_error' | 'span_error';
-  extracted: { value: number; unit: string };
-};
-
-/** Per-run deviations from 'match'; everything else in GOLD_IDS is a match. */
-const EXCEPTIONS: Record<ExtractorRun, Record<string, Exception>> = {
-  // v0.3 — no unit normalization at all. Rates published per day are carried
-  // through verbatim; the OD basis is dropped from conversion factors.
-  'v0.3': {
-    'ex-0033': { outcome: 'unit_error', extracted: { value: 0.038, unit: 'd⁻¹' } },
-    'ex-0071': { outcome: 'unit_error', extracted: { value: 0.038, unit: 'd⁻¹' } },
-    'ex-0082': { outcome: 'unit_error', extracted: { value: 0.31, unit: 'g L⁻¹' } },
-    'ex-0095': { outcome: 'unit_error', extracted: { value: 2.1, unit: 'mg g⁻¹ d⁻¹' } },
-    'ex-0115': { outcome: 'unit_error', extracted: { value: 0.248, unit: 'g L⁻¹ d⁻¹' } },
-    'ex-0027': { outcome: 'value_mismatch', extracted: { value: 0.079, unit: 'h⁻¹' } },
-    'ex-0018': { outcome: 'span_error', extracted: { value: 7, unit: '' } },
-  },
-  // v0.4 — a unit dictionary lands, fixing the per-day rate cases. The
-  // dimensionally-silent failures (a dropped OD basis) survive it.
-  'v0.4': {
-    'ex-0082': { outcome: 'unit_error', extracted: { value: 0.31, unit: 'g L⁻¹' } },
-    'ex-0115': { outcome: 'unit_error', extracted: { value: 0.248, unit: 'g L⁻¹ d⁻¹' } },
-    'ex-0027': { outcome: 'value_mismatch', extracted: { value: 0.079, unit: 'h⁻¹' } },
-    'ex-0018': { outcome: 'span_error', extracted: { value: 7, unit: '' } },
-  },
-  // v0.4+rules — dimensional rules keyed to the parameter definition catch the
-  // remaining unit failures. What is left is a genuinely hard reading: a rate
-  // quoted for the wrong growth interval.
-  'v0.4r': {
-    'ex-0027': { outcome: 'value_mismatch', extracted: { value: 0.079, unit: 'h⁻¹' } },
-  },
-};
-
-function results(run: ExtractorRun): RunOutput['results'] {
-  return GOLD_IDS.map((goldRecordId) => {
-    if (NEVER_FOUND.includes(goldRecordId)) return { goldRecordId, outcome: 'miss' as const };
-    const ex = EXCEPTIONS[run][goldRecordId];
-    if (ex) return { goldRecordId, outcome: ex.outcome, extracted: ex.extracted };
-    return { goldRecordId, outcome: 'match' as const };
-  });
-}
-
-export const RUN_OUTPUTS: RunOutput[] = [
-  {
-    run: 'v0.3',
-    results: results('v0.3'),
-    falsePositives: [
-      {
-        id: 'fp-v03-01',
-        paperId: 'SP-001',
-        field: 'final_biomass_density',
-        extracted: { value: 0.05, unit: 'g L⁻¹' },
-        note: 'Read the inoculation optical density as a final biomass density.',
-      },
-      {
-        id: 'fp-v03-02',
-        paperId: 'SP-002',
-        field: 'growth_rate_mu',
-        extracted: { value: 0.112, unit: 'h⁻¹' },
-        note: 'Extracted a rate from the Introduction’s summary of prior work rather than this study’s result.',
-      },
-      {
-        id: 'fp-v03-03',
-        paperId: 'SP-003',
-        field: 'medium_component_conc',
-        extracted: { value: 20, unit: 'g L⁻¹' },
-        note: 'Captured an agar concentration from a plating method as a liquid-medium component.',
-      },
-      {
-        id: 'fp-v03-04',
-        paperId: 'SP-006',
-        field: 'disruption_efficiency',
-        extracted: { value: 100, unit: '%' },
-        note: 'Took a rhetorical “complete disruption” as a measured efficiency.',
-      },
-      {
-        id: 'fp-v03-05',
-        paperId: 'SP-007',
-        field: 'light_intensity',
-        extracted: { value: 2000, unit: 'µmol m⁻² s⁻¹' },
-        note: 'Read an instrument’s stated measurement ceiling as a culture setpoint.',
-      },
-      {
-        id: 'fp-v03-06',
-        paperId: 'SP-010',
-        field: 'od_dcw_factor',
-        extracted: { value: 750, unit: 'g L⁻¹ OD⁻¹' },
-        note: 'Parsed the 750 nm wavelength as the conversion coefficient.',
-      },
-      {
-        id: 'fp-v03-07',
-        paperId: 'SP-012',
-        field: 'product_titer',
-        extracted: { value: 30, unit: 'g L⁻¹' },
-        note: 'Extracted a target titer from the Discussion’s outlook as a measured result.',
-      },
-      {
-        id: 'fp-v03-08',
-        paperId: 'SP-014',
-        field: 'temperature',
-        extracted: { value: 30, unit: '°C' },
-        note: 'Attributed a cited literature condition to this study’s process.',
-      },
-    ],
-  },
-  {
-    run: 'v0.4',
-    results: results('v0.4'),
-    falsePositives: [
-      {
-        id: 'fp-v04-01',
-        paperId: 'SP-002',
-        field: 'growth_rate_mu',
-        extracted: { value: 0.112, unit: 'h⁻¹' },
-        note: 'Still reading prior-work rates from the Introduction as this study’s own.',
-      },
-      {
-        id: 'fp-v04-02',
-        paperId: 'SP-006',
-        field: 'disruption_efficiency',
-        extracted: { value: 100, unit: '%' },
-        note: 'Took a rhetorical “complete disruption” as a measured efficiency.',
-      },
-      {
-        id: 'fp-v04-03',
-        paperId: 'SP-010',
-        field: 'od_dcw_factor',
-        extracted: { value: 750, unit: 'g L⁻¹ OD⁻¹' },
-        note: 'Parsed the 750 nm wavelength as the conversion coefficient.',
-      },
-      {
-        id: 'fp-v04-04',
-        paperId: 'SP-012',
-        field: 'product_titer',
-        extracted: { value: 30, unit: 'g L⁻¹' },
-        note: 'Extracted a target titer from the Discussion’s outlook as a measured result.',
-      },
-      {
-        id: 'fp-v04-05',
-        paperId: 'SP-015',
-        field: 'protein_content',
-        extracted: { value: 70, unit: '% DW' },
-        note: 'Captured a genus-level range from the Introduction as a measurement of this culture.',
-      },
-    ],
-  },
-  {
-    run: 'v0.4r',
-    results: results('v0.4r'),
-    falsePositives: [
-      {
-        id: 'fp-v04r-01',
-        paperId: 'SP-002',
-        field: 'growth_rate_mu',
-        extracted: { value: 0.112, unit: 'h⁻¹' },
-        note: 'Section-aware rules cut most of these, but an Introduction rate stated without hedging still passes.',
-      },
-      {
-        id: 'fp-v04r-02',
-        paperId: 'SP-012',
-        field: 'product_titer',
-        extracted: { value: 30, unit: 'g L⁻¹' },
-        note: 'A forward-looking target phrased in the past tense still reads as a result.',
-      },
-      {
-        id: 'fp-v04r-03',
-        paperId: 'SP-015',
-        field: 'protein_content',
-        extracted: { value: 70, unit: '% DW' },
-        note: 'Genus-level literature range attributed to the measured culture.',
-      },
-    ],
-  },
+/** The six deliberate difficulty cases the gold set must include (§18). */
+export const GOLD_SET_DIFFICULTY_CASES: string[] = [
+  'A value reported only as a range ($4–6/kg) — does the extractor produce a range or invent a midpoint?',
+  'A value with a compound unit requiring conversion (24.30 mg L⁻¹ h⁻¹ against daily productivity elsewhere).',
+  'A comparative claim ("12-fold higher than Venus without the glycomodule") — the extractor must capture the baseline or mark the record incomplete.',
+  'A negative result ("not phosphorylated") — does the extractor record it as a value or drop the row?',
+  'An "undetermined" cell from Mora Vásquez Table 1 — the correct extraction is a null with a reason, not a null.',
+  'The D1/D4 sialylation conflict — two papers, contradictory claims, both gold-annotated as stated. The metric must not penalise an extractor for reproducing a real disagreement.',
 ];

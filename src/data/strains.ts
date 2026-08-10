@@ -1,17 +1,56 @@
-// openFerment Sim — seeded strains (cw15, cc1690, gs115, aplat).
-//
-// SYNTHETIC CONTENT. The binomials and taxonomic lineages below are real taxa,
-// which is deliberate: taxonomy is not attribution. Everything authored — the
-// curator descriptions and every CuratorNote — is written for the working
-// simulation by the fictional demo curator "S. Creighton" and describes bench
-// experience that did not happen (BUILD-SPEC §20).
+// Host organisms and the reference molecule's source species (OF-COR-001 §20).
+// Replaces the four synthetic strains with the real host-comparison set.
 import type { Strain } from './types';
+
+/**
+ * Strain alias table (OF-COR-001 §19, third trap).
+ *
+ * "Cell wall deficient" spans several distinct genotypes, and the literature
+ * uses the names inconsistently: cw15, cw15-302, CC-4350, cwd mt+ arg7,
+ * Elow47, UVM4 and UVM11 are related but NOT interchangeable. Normalising on
+ * ingest prevents the platform from silently merging measurements made on
+ * different organisms.
+ */
+export const STRAIN_ALIASES: Record<string, string> = {
+  cw15: 'cw15',
+  'cw15-302': 'cw15',
+  'cc-4350': 'cw15',
+  cc4350: 'cw15',
+  'cwd mt+ arg7': 'cw15',
+  'cell-wall-deficient': 'cw15',
+  elow47: 'uvm4',
+  uvm4: 'uvm4',
+  uvm11: 'uvm4',
+  'cc-137c': 'creinhardtii-wt',
+  '137c': 'creinhardtii-wt',
+  cc124: 'creinhardtii-wt',
+  cc1690: 'creinhardtii-wt',
+  wt12: 'creinhardtii-wt',
+  gs115: 'gs115',
+  'k. phaffii': 'gs115',
+  'p. pastoris': 'gs115',
+  'komagataella phaffii': 'gs115',
+  'pichia pastoris': 'gs115',
+  treesei: 'treesei',
+  't. reesei': 'treesei',
+  'trichoderma reesei': 'treesei',
+  ecoli: 'ecoli',
+  'e. coli': 'ecoli',
+  bl21: 'ecoli',
+  bovine: 'bovine',
+  'bos taurus': 'bovine',
+};
+
+/** Normalise a strain name found in prose to a canonical id, or null. */
+export function normalizeStrain(raw: string): string | null {
+  return STRAIN_ALIASES[raw.trim().toLowerCase()] ?? null;
+}
 
 export const STRAINS: Strain[] = [
   {
     id: 'cw15',
     binomial: 'Chlamydomonas reinhardtii',
-    designation: 'cw15',
+    designation: 'cw15 (cell-wall-deficient)',
     taxonomy: [
       'Eukaryota',
       'Viridiplantae',
@@ -22,31 +61,36 @@ export const STRAINS: Strain[] = [
       'Chlamydomonas',
     ],
     description:
-      'A cell-wall-deficient mutant lacking most of the hydroxyproline-rich glycoprotein wall of the wild type. The missing wall is why it dominates bioprocess work: cells lyse at a fraction of the specific energy a walled strain demands, so protein and pigment release cheaply and reproducibly. The same absence makes cultures shear-sensitive, and impeller tip speed, pump selection and sparge rate become process variables rather than details. It remains the reference eukaryotic phototroph for transformation, photosynthesis and product-formation work.',
-    badges: ['cell-wall deficient', 'model organism', 'BSL-1'],
+      'The cell-wall-deficient chassis at the centre of this program. The missing glycoprotein wall makes transformation efficient and, more importantly, makes disruption cheap: pulsed electric field releases roughly three times the protein of a walled strain under mild conditions. The same absence makes cultures shear-sensitive, so impeller tip speed, pump selection and sparge rate become process variables rather than details. The parent genotype cw15-302 (= CC-4350, cwd mt+ arg7) is arginine-auxotrophic.',
+    badges: ['cell-wall deficient', 'GRAS (US)', 'BSL-1', 'model organism'],
     bsl: 1,
     notes: [
       {
-        at: '2026-06-04',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'cw15 lyses under handling a walled strain shrugs off — we lost most of a 2 L culture to a peristaltic transfer at 300 rpm, visible as green supernatant within minutes of the pump starting. Read the disruption notes in PR-HARV-01 as a shear budget for the whole line rather than for the disruption step alone; SP-006 is the record of how little energy this strain actually needs.',
+        text: 'Alias discipline matters here. cw15, cw15-302, CC-4350 and "cwd mt+ arg7" all name the same lineage; Elow47, UVM4 and UVM11 are derivatives with different expression behaviour. Records normalise through STRAIN_ALIASES on ingest so measurements on different organisms are never silently merged.',
       },
       {
-        at: '2026-05-12',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'The OD-to-dry-weight factor everyone reaches for is an exponential-phase, 750 nm number, and stationary cultures read low against it. Re-calibrate at harvest density before quoting a volumetric productivity, or the two ends of the growth curve end up biased in opposite directions.',
+        text: 'KNOWN UNKNOWN — does C. reinhardtii have a Fam20-family secretory kinase? No retrieved source answers this. The indirect evidence points to absence: Fam20 kinases are described as conserved across the animal kingdom, and plants neither express FAM20C nor phosphorylate recombinant caseins with endogenous machinery. Chlamydomonas sits outside the animal lineage. Resolvable in an afternoon with an HMM search of the v6.1 proteome against Pfam PF03881. Until then the platform records the gap rather than guessing (OF-COR-001 §5 D5).',
       },
       {
-        at: '2026-03-27',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'Inoculate from mid-exponential precultures only. A stationary-phase inoculum adds four to six hours of lag and carries enough storage carbon to distort the early yield calculation, which is the most common reason a repeat of the flask kinetics comes back slow.',
+        text: 'The honest counterweight to this whole chassis argument: nuclear transgene expression here is historically weak (~0.2% TSP for intracellular reporters), secreted yields are ~65× below Trichoderma β-lactoglobulin, and mixotrophic density tops out near 1–2 g/L against 100+ g/L for Pichia fed-batch. This is a research bet, not an engineering exercise.',
+      },
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'Regulatory position is split. FDA GRAS for human consumption in the US; but EFSA concluded in 2025 that the safety of C. reinhardtii THN 6 dried biomass could not be established, after the applicant did not answer repeated data requests. That failure was procedural, not a finding of harm — but US GRAS does not transfer to the EU (OF-COR-001 §15 N3).',
       },
     ],
   },
   {
-    id: 'cc1690',
+    id: 'uvm4',
     binomial: 'Chlamydomonas reinhardtii',
-    designation: 'CC-1690 (wild type)',
+    designation: 'UVM4 / UVM11 (expression mutants)',
     taxonomy: [
       'Eukaryota',
       'Viridiplantae',
@@ -57,68 +101,102 @@ export const STRAINS: Strain[] = [
       'Chlamydomonas',
     ],
     description:
-      'The walled wild-type reference against which cw15 results are checked. An intact glycoprotein wall makes it slower, denser per unit optical density and far more tolerant of pumping and sparging, at the cost of a much higher specific energy demand for disruption. Use it whenever a claim has to hold for walled cells — settling behaviour, shear tolerance, protein partitioning — and never assume a rate or a conversion factor measured on cw15 transfers across.',
-    badges: ['walled wild type', 'reference strain', 'BSL-1'],
+      'UV-mutagenized derivatives of Elow47 selected for high nuclear transgene expression. The causative lesion is a Sir2-type histone deacetylase (SRTA), so the gain is relief from epigenetic silencing rather than a transcriptional boost — which predicts, but does not prove, that a second transgene inherits the same benefit. Both reach roughly 0.2% of total soluble protein for intracellular reporters.',
+    badges: ['silencing-relieved', 'cell-wall deficient', 'BSL-1'],
     bsl: 1,
     notes: [
       {
-        at: '2026-04-21',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'cc1690 settles cleanly enough to concentrate by gravity overnight, which cw15 will not do, and it reads consistently higher in Lowry protein at matched growth phase. Budget substantially more disruption energy for it: the wall is the point of the comparison and it is not free to break.',
+        text: 'Design constraint for a two-gene build: UVM4 and UVM11 can hardly be crossed, so each transgene needs a separate transformation with a distinct marker. Three ways out — two markers, an FMDV 2A self-cleaving linker carrying CSN2-2A-FAM20C on one transcript, or the walled mating-competent UVM11 derivative. The 2A route has published precedent in this host.',
+      },
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'The strongest argument against the secretion route. UVM4 secretes unassembled cell wall glycoproteins that form extracellular aggregates, and recombinant product becomes trapped in that matrix. Intracellular accumulation plus mild disruption may be the better architecture for this host, which is where the PEF result earns its weight.',
       },
     ],
   },
   {
     id: 'gs115',
     binomial: 'Komagataella phaffii',
-    designation: 'GS115',
-    taxonomy: [
-      'Eukaryota',
-      'Fungi',
-      'Ascomycota',
-      'Saccharomycetes',
-      'Saccharomycetales',
-      'Pichiaceae',
-      'Komagataella',
-    ],
+    designation: 'GS115 (formerly Pichia pastoris)',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes', 'Saccharomycetales', 'Komagataella'],
     description:
-      'The methylotrophic yeast host used here for recombinant protein production, formerly classified as Pichia pastoris. Growth proceeds on glycerol to high cell density, after which the AOX1 promoter is induced by a controlled methanol feed and the product accumulates over a defined induction window. It secretes into a low-protein background, tolerates stirred-tank shear without difficulty, and reaches biomass densities an order of magnitude above the phototrophs in this corpus.',
-    badges: ['methylotrophic yeast', 'recombinant protein host', 'BSL-1'],
+      'The eukaryotic benchmark host, and the source of the closest precedent for this program: bovine β-casein accumulated at 15–18% of total soluble protein (0.7–1.0 g/L) and carried the same degree of phosphorylation as animal-derived protein. Reaches fed-batch densities two orders of magnitude above mixotrophic Chlamydomonas.',
+    badges: ['methylotrophic yeast', 'high cell density', 'secretory pathway', 'BSL-1'],
     bsl: 1,
     notes: [
       {
-        at: '2026-05-30',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'The hazard here is the carbon source, not the organism. Run the AOX1 induction feed on a gravimetric loop with a dissolved-oxygen interlock — a stalled or overshooting feed shows up as a DO excursion long before the offline assay sees it, and residual methanol accumulating in the broth costs viability well before it costs titer.',
+        text: 'The Choi & Jiménez-Flores result contains the program’s most useful warning: they used the NATIVE bovine β-casein signal peptide and got 0.005% secretion. A non-mammalian eukaryote will not recognise it. Any CSN2 construct must carry a host-native signal peptide.',
       },
       {
-        at: '2026-02-16',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'Take the glycerol batch to genuine exhaustion before switching to methanol; carried-over glycerol represses AOX1 and produces the flat first hours of induction that get misread as a bad clone. The sharp DO spike at glycerol depletion is the cleanest transition trigger available.',
+        text: 'Open question that the corpus does not settle: if this yeast phosphorylated bovine β-casein to native degree, what enzyme did it? No Fam20C homolog is named. Worth resolving alongside D5, because the answer bears directly on whether a Golgi-bearing host needs FAM20C co-expression at all.',
       },
     ],
   },
   {
-    id: 'aplat',
-    binomial: 'Arthrospira platensis',
-    designation: 'PCC-style filamentous cyanobacterium',
-    taxonomy: [
-      'Bacteria',
-      'Cyanobacteriota',
-      'Cyanophyceae',
-      'Oscillatoriales',
-      'Microcoleaceae',
-      'Arthrospira',
-    ],
+    id: 'treesei',
+    binomial: 'Trichoderma reesei',
+    designation: 'industrial secretion host',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Sordariomycetes', 'Hypocreales', 'Hypocreaceae', 'Trichoderma'],
     description:
-      'A filamentous cyanobacterium cultivated in strongly alkaline, high-bicarbonate medium, where the pH itself suppresses most competing organisms and makes open-pond operation practical. The helical trichomes are large enough to harvest by screen filtration rather than centrifugation, and the biomass is the established food-grade protein reference for photosynthetic production. Included here mainly as a contrast case for medium chemistry, carbon supply and harvest cost.',
-    badges: ['cyanobacterium', 'alkaliphilic', 'BSL-1'],
+      'The current titer benchmark for precision-fermented milk proteins: 1 g/L β-lactoglobulin and 2 g/L ovalbumin, with circular dichroism confirming native secondary structure and comparable emulsification. Secreted product carries fungal five-sugar mannose glycans.',
+    badges: ['filamentous fungus', 'industrial secretion', 'BSL-1'],
     bsl: 1,
     notes: [
       {
-        at: '2026-06-22',
+        at: '2026-08-10',
         who: 'S. Creighton',
-        text: 'Corpus coverage for this organism is thin, and the platform should not be read as if it were not: there are few records, none in the gold set, and effectively nothing on harvest recovery or downstream processing. Treat anything returned for Arthrospira platensis as the starting point for a literature search rather than as a defensible process number.',
+        text: 'The number to beat, and the one that sets expectations honestly: 1 g/L secreted here against 15 mg/L from UVM4 is a ~65× gap. No casein has been reported in this host, so the comparison is against a whey protein, not a like-for-like target.',
+      },
+    ],
+  },
+  {
+    id: 'ecoli',
+    binomial: 'Escherichia coli',
+    designation: 'expression strains (BL21 and derivatives)',
+    taxonomy: ['Bacteria', 'Pseudomonadota', 'Gammaproteobacteria', 'Enterobacterales', 'Enterobacteriaceae', 'Escherichia'],
+    description:
+      'Where nearly all casein expression has actually happened — seventeen published studies. Reaches the highest phosphorylated casein titer on record (500 mg/L human β-casein co-expressed with CK2) but has no secretory compartment, which is why FAM20C cannot be expressed in it.',
+    badges: ['prokaryote', 'no secretory pathway', 'BSL-1'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'The cleanest evidence pair in the corpus lives here. CK2 co-expression phosphorylates HUMAN β-casein well (500 mg/L, near-complete) but BOVINE β-casein only partially, because only some bovine cluster serines sit in canonical CK2 sites. That is the argument for FAM20C over CK2 in a bovine program, and it is why the kinase question cannot be sidestepped.',
+      },
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'FAM20C expression in E. coli has been attempted and failed; success to date is reported only in human cell lines. The kinase folds with disulfide bridges and N-glycans, so it needs a secretory compartment. This is the single strongest reason to look at a eukaryotic host with a Golgi.',
+      },
+    ],
+  },
+  {
+    id: 'bovine',
+    binomial: 'Bos taurus',
+    designation: 'β-casein source (CSN2)',
+    taxonomy: ['Eukaryota', 'Metazoa', 'Chordata', 'Mammalia', 'Artiodactyla', 'Bovidae', 'Bos'],
+    description:
+      'Not a host — the source of the target molecule and of every reference value the product is measured against. CSN2 spans 10,338 bp on chromosome 6 across nine exons; the primary translation product is 224 residues including a signal peptide, giving a 209-residue mature protein carrying about five phosphates clustered at the N-terminus.',
+    badges: ['reference molecule', 'not a host'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'NUMBERING TRAP. β-casein is 224 residues as translated and 209 after signal-peptide removal. Phospho-site positions, the A1/A2 codon-67 SNP and the β(28–40) assay peptide are all quoted in MATURE numbering. Every record carrying a residue position must also carry its convention, or the platform mislocates every site by 15.',
+      },
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'A2 versus A1 is a product decision, not a technical one, and it cuts against us: A1 is reported to give better curd consistency, coagulation and micelle size, while A2 is the health-positioning choice. Worth stating in any faculty brief rather than presenting A2 as obviously correct.',
       },
     ],
   },

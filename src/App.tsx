@@ -134,9 +134,10 @@ function DemoBanner() {
         }}
         aria-hidden
       />
-      <span className="text-signal-warn font-medium">Synthetic demonstration corpus</span>
+      <span className="text-signal-warn font-medium">Real literature · modeled economics</span>
       <span className="text-ink-soft hidden sm:inline">
-        — all papers, authors, and values are fictional. Session state resets on refresh.
+        — papers and values are real and citable. Simulation outputs are illustrative models,
+        not validated economics. Session state resets on refresh.
       </span>
       <a href="#/settings/about" className="text-accent hover:underline hidden md:inline">
         Read the colophon

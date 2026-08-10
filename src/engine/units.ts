@@ -62,10 +62,83 @@ const U: Record<string, UnitDef> = {
   'µm': { family: 'length', factor: 0.000001, label: 'µm' },
   cm: { family: 'length', factor: 0.01, label: 'cm' },
   m: { family: 'length', factor: 1, label: 'm' },
+  nm: { family: 'length', factor: 1e-9, label: 'nm' },
+  mm: { family: 'length', factor: 0.001, label: 'mm' },
+
+  // ── OF-COR-001 §17 ontology v1 ──────────────────────────────────────
+  // Expression share. Deliberately its OWN family, not `percent`: a share of
+  // total soluble protein is not interconvertible with a concentration, and
+  // keeping it separate makes the engine refuse by construction (Rule 2).
+  '% TSP': { family: 'proteinShare', factor: 1, label: '% TSP' },
+  '% TCP': { family: 'proteinShare', factor: 1, label: '% TCP' },
+  '% of native sites': { family: 'percent', factor: 1, label: '% of native sites' },
+  '% sedimentable': { family: 'percent', factor: 1, label: '% sedimentable' },
+  '% of total expressed': { family: 'percent', factor: 1, label: '% of total expressed' },
+  '% of total protein': { family: 'percent', factor: 1, label: '% of total protein' },
+
+  'mol mol⁻¹': { family: 'stoichiometry', factor: 1, label: 'mol mol⁻¹' },
+  '×': { family: 'fold', factor: 1, label: '×' },
+  'colonies µg⁻¹': { family: 'transformationEff', factor: 1, label: 'colonies µg⁻¹ DNA' },
+  residue: { family: 'position', factor: 1, label: 'residue' },
+  'kWh kg⁻¹': { family: 'energyPerMass', factor: 1, label: 'kWh kg⁻¹' },
+  'MJ kg⁻¹': { family: 'energyPerMass', factor: 1 / 3.6, label: 'MJ kg⁻¹' },
+
+  // Currency is per-family on purpose. Converting EUR/kg to USD/kg needs an
+  // exchange rate with a date, which a unit engine has no business inventing —
+  // and OF-COR-001 §16 carries costs in both (Acién 69 €/kg, GFI $4–6/kg).
+  'USD kg⁻¹': { family: 'costUSD', factor: 1, label: 'USD kg⁻¹' },
+  'EUR kg⁻¹': { family: 'costEUR', factor: 1, label: 'EUR kg⁻¹' },
 };
+
+/**
+ * Conversions the engine refuses *with an explanation* rather than a bare
+ * dimension error (OF-COR-001 §17 Rule 2). Dimensional analysis already blocks
+ * these; the point of this table is that the UI can say why, turning the unit
+ * engine from a convenience into an epistemic guardrail.
+ */
+const REFUSALS: { a: string; b: string; because: string }[] = [
+  {
+    a: 'proteinShare',
+    b: 'massConc',
+    because:
+      'A share of total soluble protein and a concentration are not interconvertible without the cell density and the total-protein fraction of the biomass. Record those two values and the conversion becomes possible; guessing them would fabricate a titer.',
+  },
+  {
+    a: 'proteinShare',
+    b: 'percent',
+    because:
+      'Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error.',
+  },
+  {
+    a: 'costUSD',
+    b: 'costEUR',
+    because:
+      'Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.',
+  },
+];
+
+/** If a refusal is a known trap, explain it; otherwise return null. */
+export function explainRefusal(fromUnit: string, toUnit: string): string | null {
+  const f = U[normalizeUnit(fromUnit) ?? ''];
+  const t = U[normalizeUnit(toUnit) ?? ''];
+  if (!f || !t || f.family === t.family) return null;
+  for (const r of REFUSALS) {
+    if ((r.a === f.family && r.b === t.family) || (r.b === f.family && r.a === t.family))
+      return r.because;
+  }
+  return null;
+}
 
 // The SI/canonical display unit chosen per family for the "SI twin".
 const SI_UNIT: Record<string, string> = {
+  proteinShare: '% TSP',
+  stoichiometry: 'mol mol⁻¹',
+  fold: '×',
+  transformationEff: 'colonies µg⁻¹',
+  position: 'residue',
+  energyPerMass: 'kWh kg⁻¹',
+  costUSD: 'USD kg⁻¹',
+  costEUR: 'EUR kg⁻¹',
   rate: 'h⁻¹',
   time: 'h',
   massConc: 'kg m⁻³',

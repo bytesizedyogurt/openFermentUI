@@ -1,7 +1,7 @@
 // Provenance badge (explicit) and evidence tick (ambient) — both derive from
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
-import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban } from 'lucide-react';
+import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, TrendingUp } from 'lucide-react';
 import type { Provenance } from '@/data/types';
 import { cx } from './ui';
 
@@ -9,7 +9,19 @@ export type ProvKind = Provenance | 'rejected';
 
 const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string; tick: string }> = {
   gold: { label: 'Curated · gold set', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
-  verified: { label: 'Extracted · verified', Icon: ShieldCheck, color: 'text-accent', tick: 'tick-verified' },
+  verified: { label: 'Verified against source', Icon: ShieldCheck, color: 'text-accent', tick: 'tick-verified' },
+  curated: {
+    label: 'Curated · pending source check',
+    Icon: BookMarked,
+    color: 'text-accent/70',
+    tick: 'tick-curated',
+  },
+  'industry-estimate': {
+    label: 'Industry estimate · not evidence',
+    Icon: TrendingUp,
+    color: 'text-ink-soft',
+    tick: 'tick-industry-estimate',
+  },
   unverified: {
     label: 'Extracted · unverified',
     Icon: CircleDashed,
@@ -17,7 +29,7 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     tick: 'tick-unverified',
   },
   user: { label: 'User-entered', Icon: UserPen, color: 'text-signal-info', tick: 'tick-user' },
-  demo: { label: 'Demo data', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-demo' },
+  demo: { label: 'Modeled · not measured', Icon: FlaskConical, color: 'text-signal-warn', tick: 'tick-demo' },
   rejected: { label: 'Rejected', Icon: Ban, color: 'text-signal-error', tick: 'tick-rejected' },
 };
 
@@ -71,6 +83,8 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
   const bg: Record<ProvKind, string> = {
     gold: 'bg-gold',
     verified: 'bg-accent',
+    curated: 'bg-accent/45',
+    'industry-estimate': 'bg-ink-soft/60',
     unverified: 'bg-ink-soft',
     user: 'bg-signal-info',
     demo: 'bg-signal-warn',
@@ -88,7 +102,9 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
 export function ProvenanceLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft">
-      {(['gold', 'verified', 'unverified', 'user', 'demo'] as ProvKind[]).map((p) => (
+      {(
+        ['gold', 'verified', 'curated', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
+      ).map((p) => (
         <span key={p} className="inline-flex items-center gap-1.5">
           <ProvDot p={p} />
           {META[p].label}

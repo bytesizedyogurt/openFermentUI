@@ -2,10 +2,25 @@
 // launder synthetic data into a real analysis (OF-DES-001 §20.7).
 import { useStore } from '@/store';
 
+/**
+ * Export disclosure (OF-DES-001 §20.7, revised by OF-COR-001 §20).
+ *
+ * The corpus is real, so a blanket "this is fictional" header would now be a
+ * lie in the other direction. What a downstream reader actually needs to know
+ * is which rows carry what weight — hence the per-class note.
+ */
 export const DISCLOSURE = [
-  '# openFerment demonstration export',
-  '# SYNTHETIC DATA — all papers, authors, venues, and values in this file are',
-  '# fictional and were generated for demonstration. Do not cite or reuse as evidence.',
+  '# openFerment export — corpus OF-COR-001 v1.0',
+  '# Literature entries, authors, venues and DOIs are REAL and citable.',
+  '# Provenance classes in this file:',
+  '#   gold              hand-curated reference annotation',
+  '#   verified          checked against the source document',
+  '#   curated           transcribed from the curation document, NOT yet checked',
+  '#                     against the source PDF — verify before citing',
+  '#   unverified        extractor output, not reviewed',
+  '#   industry-estimate non-peer-reviewed market/vendor figure — not evidence',
+  '#   demo              modeled, not measured (simulation outputs)',
+  '# Simulation economics are illustrative models, not validated.',
 ];
 
 function esc(v: unknown): string {

@@ -99,7 +99,21 @@ body {
 .tick-user::before {
   background: rgb(var(--signal-info));
 }
-/* Demo/synthetic is the only dashed tick — unmistakable (§6.2) */
+/* Curated: transcribed from the curation document, not yet checked against
+   the source PDF. Reads as "on its way to verified" rather than as a peer of it. */
+.tick-curated::before {
+  background: rgb(var(--accent) / 0.45);
+}
+/* Industry estimate: dashed grey. Useful for framing, useless as evidence —
+   excluded from the gold set and from aggregate statistics by default. */
+.tick-industry-estimate::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(var(--ink-soft)) 0 3px,
+    transparent 3px 6px
+  );
+}
+/* Demo/synthetic — now only simulation grids and scripted agent text (§20) */
 .tick-demo::before {
   background: repeating-linear-gradient(
     to bottom,

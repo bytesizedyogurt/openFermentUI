@@ -735,27 +735,53 @@ export const useStore = create<OFState>()((set, get) => ({
 
 // ── derived selectors ──────────────────────────────────────────────────
 
+/**
+ * A record's display provenance. The stored `provenance` field is
+ * authoritative — a curated or industry-estimate record does not become
+ * 'verified' just because someone accepted it in the queue without opening the
+ * source. Review promotes 'curated' → 'verified'; nothing promotes
+ * 'industry-estimate'.
+ */
 export function provenanceOf(r: ExtractionRecord): Provenance {
   if (r.gold) return 'gold';
+  if (r.provenance === 'industry-estimate') return 'industry-estimate';
   if (r.status === 'verified') return 'verified';
   if (r.status === 'rejected') return 'unverified';
-  return 'unverified';
+  return r.provenance ?? 'unverified';
+}
+
+/**
+ * Records that may enter aggregate statistics and strip plots (OF-COR-001
+ * §16 O8 and §19). Industry estimates are excluded by default, and so are
+ * non-primary records — a paper reciting someone else's number is not an
+ * independent measurement, and counting it overstates consensus.
+ */
+export function isAggregatable(r: ExtractionRecord): boolean {
+  return (
+    r.status !== 'rejected' &&
+    r.provenance !== 'industry-estimate' &&
+    r.isPrimary !== false
+  );
 }
 
 export const tickClass = (p: Provenance | 'rejected'): string =>
   ({
     gold: 'tick tick-gold',
     verified: 'tick tick-verified',
+    curated: 'tick tick-curated',
     unverified: 'tick tick-unverified',
     user: 'tick tick-user',
+    'industry-estimate': 'tick tick-industry-estimate',
     demo: 'tick tick-demo',
     rejected: 'tick tick-rejected',
   })[p];
 
 export const PROVENANCE_LABEL: Record<Provenance, string> = {
   gold: 'Curated · gold set',
-  verified: 'Extracted · verified',
+  verified: 'Verified against source',
+  curated: 'Curated · pending source check',
   unverified: 'Extracted · unverified',
   user: 'User-entered',
-  demo: 'Demo data',
+  'industry-estimate': 'Industry estimate · not evidence',
+  demo: 'Modeled · not measured',
 };
