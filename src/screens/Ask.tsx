@@ -544,7 +544,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                                 'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
                             }}
                           />
-                          synthetic demonstration corpus
+                          scripted answer prose
                         </span>
                       </div>
 
@@ -563,7 +563,28 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                           onClick={() =>
                             exportText(
                               `answer-${m.id}.md`,
-                              `# openFerment answer — SYNTHETIC DEMO CORPUS\n\n${m.md}\n`,
+                              [
+                                // A markdown file, so the disclosure is written as markdown. '#'
+                                // is a heading marker here, not a comment: the CSV header's
+                                // shape would render as a stack of H1s split mid-sentence.
+                                '# openFerment answer',
+                                '',
+                                '> **Corpus OF-COR-001 v1.0.** Cited papers, venues and',
+                                '> identifiers are real, though coverage is uneven — 36 of 132',
+                                '> entries carry a DOI and 73 carry no persistent identifier at all.',
+                                '>',
+                                '> Every entry is catalogued, not ingested: metadata plus a curator',
+                                '> note, no full text. A cited span quotes that note rather than the',
+                                '> paper, and curated values have not been checked against the source',
+                                '> PDF. Verify before citing. Figures marked `industry-estimate` are',
+                                '> vendor or market claims with no source document behind them.',
+                                '>',
+                                '> The prose below is authored for this build, not model output.',
+                                '> Any simulation economics it quotes are illustrative, not validated.',
+                                '',
+                                m.md,
+                                '',
+                              ].join('\n'),
                             )
                           }
                         >

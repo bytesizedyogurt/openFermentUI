@@ -750,7 +750,10 @@ export const useStore = create<OFState>()((set, get) => ({
 
   resetDemo: () => {
     set({ ...seedState(), grids: seedGrids(), toasts: [] });
-    get().toast({ text: 'Demo data restored to seeded state', kind: 'info' });
+    get().toast({
+      text: 'Workspace restored to the seeded corpus — review decisions, runs and scenario edits discarded',
+      kind: 'info',
+    });
   },
 }));
 
@@ -772,18 +775,36 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
 }
 
 /**
- * Records that may enter aggregate statistics and strip plots (OF-COR-001
- * §16 O8 and §19). Industry estimates are excluded by default, and so are
- * non-primary records — a paper reciting someone else's number is not an
- * independent measurement, and counting it overstates consensus.
+ * Why a record is held out of aggregate statistics, or null when nothing holds
+ * it out (OF-COR-001 §16 O8 and §19). Industry estimates are not evidence, and
+ * a paper reciting someone else's number is not an independent measurement —
+ * counting either one overstates consensus.
+ *
+ * This is the reason, not just the verdict, so a screen can say which records
+ * it left out of a median instead of silently dropping them. Exclusion applies
+ * to the statistic only: the records stay visible in per-record tables and
+ * plots, because they are real values, just not independent evidence.
  */
-export function isAggregatable(r: ExtractionRecord): boolean {
-  return (
-    r.status !== 'rejected' &&
-    r.provenance !== 'industry-estimate' &&
-    r.isPrimary !== false
-  );
+export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'not-primary';
+
+export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
+  if (r.status === 'rejected') return 'rejected';
+  if (r.provenance === 'industry-estimate') return 'industry-estimate';
+  if (r.isPrimary === false) return 'not-primary';
+  return null;
 }
+
+/** Records that may enter a median, range or count-based summary. */
+export function isAggregatable(r: ExtractionRecord): boolean {
+  return aggregateExclusion(r) === null;
+}
+
+/** Short phrase a per-record view can print next to a held-out value. */
+export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
+  rejected: 'rejected — excluded from statistics',
+  'industry-estimate': 'industry estimate — excluded from statistics',
+  'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
+};
 
 export const tickClass = (p: Provenance | 'rejected'): string =>
   ({

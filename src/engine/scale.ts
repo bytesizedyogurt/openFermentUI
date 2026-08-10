@@ -54,7 +54,10 @@ export function batchLabel(version: ProtocolVersion, scale: number): string {
 export function materialsChecklist(version: ProtocolVersion, scale: number, title: string): string {
   const lines = [
     `# ${title} — materials at ${batchLabel(version, scale)}`,
-    `# openFerment demo export — synthetic content, illustrative values only`,
+    `# openFerment export — corpus OF-COR-001 v1.0`,
+    `# Protocol content is real: drawn from the catalogued literature and standard bench practice.`,
+    `# Amounts here are computed by scaling the base batch, not measured at this scale.`,
+    `# Cited figures are curator transcriptions, not yet checked against the source PDFs.`,
     '',
   ];
   for (const m of scaleMaterials(version, scale)) {

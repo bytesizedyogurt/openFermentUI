@@ -3,7 +3,7 @@
 // here propagates to the strain pages and the validation metrics.
 import { useMemo, useState } from 'react';
 import { ArrowRight, Check, SkipForward, X } from 'lucide-react';
-import { useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
 import { navigate } from '@/router';
 import type { FieldId, LessonBlock } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
@@ -344,24 +344,37 @@ function StripPlot({ field }: { field: FieldId }) {
   const hi = Math.max(...values);
   const span = hi - lo || 1;
 
+  // Every record is drawn — the plot is how you reach a single span. The count
+  // below separates the ones that may enter a statistic from the ones that may
+  // not, because two dots for one measurement is exactly the reading error the
+  // primacy flag exists to prevent.
+  const held = points.filter((p) => !isAggregatable(p.r)).length;
+
   return (
     <Frame label={`Live strip plot — ${def.name}`}>
       <div className="relative h-16">
         <div className="absolute left-0 right-0 top-7 h-px bg-line" />
         {points
           .filter((p) => p.v >= def.range[0] && p.v <= def.range[1])
-          .map((p, i) => (
-            <button
-              key={p.r.id}
-              className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
-              style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
-              onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
-              title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}`}
-              aria-label={`${fmt(p.v)} ${def.canonicalUnit} from ${p.r.paperId}`}
-            >
-              <ProvDot p={provenanceOf(p.r)} size={9} />
-            </button>
-          ))}
+          .map((p, i) => {
+            const excl = aggregateExclusion(p.r);
+            return (
+              <button
+                key={p.r.id}
+                className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
+                style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
+                onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
+                title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}${
+                  excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
+                }`}
+                aria-label={`${fmt(p.v)} ${def.canonicalUnit} from ${p.r.paperId}${
+                  excl ? ', excluded from the statistics' : ''
+                }`}
+              >
+                <ProvDot p={provenanceOf(p.r)} size={9} />
+              </button>
+            );
+          })}
         <span className="absolute left-0 bottom-0 text-caption font-num text-ink-soft">
           {fmt(lo)} {def.canonicalUnit}
         </span>
@@ -372,6 +385,13 @@ function StripPlot({ field }: { field: FieldId }) {
       <p className="text-caption text-ink-soft mt-1">
         {points.length} records, every one clickable through to its source span. Colour is
         provenance, not value.
+        {held > 0 && (
+          <>
+            {' '}
+            {held} of them never enter a median or range — industry estimates, and records quoting
+            another paper&rsquo;s measurement rather than reporting their own.
+          </>
+        )}
       </p>
     </Frame>
   );

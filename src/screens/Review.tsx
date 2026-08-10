@@ -387,7 +387,13 @@ export default function Review() {
       if (r.corrected) {
         lines.push(`  correction: ${fmt(r.corrected.value)} ${r.corrected.unit}`);
       }
-      lines.push(`  extractor: openFerment demo extractor ${r.extractorRun}`);
+      lines.push(
+        r.extractorRun
+          ? `  origin: extractor run ${r.extractorRun}`
+          : `  origin: transcribed from the curation document${
+              r.curationRef ? ` ${r.curationRef}` : ''
+            } — no extractor produced it`,
+      );
       lines.push(`  quote: “${r.quote}”`);
       for (const a of r.audit) {
         const delta =
@@ -398,7 +404,9 @@ export default function Review() {
       }
     }
     lines.push('');
-    lines.push('End of log. Synthetic demonstration data — not evidence.');
+    lines.push('End of log. The literature entries are real and citable; the values were');
+    lines.push('transcribed from the curation document and not yet checked against the');
+    lines.push('source PDF. These are one session of review decisions, not a validated result.');
     exportText('openferment-review-session.txt', lines.join('\n'));
   };
 
@@ -850,7 +858,7 @@ export default function Review() {
             ) : (
               <Callout kind="warn" title="Quote not located in the parsed section">
                 <p className="mb-2">
-                  The extractor recorded this span, but the exact string is not present in{' '}
+                  This record carries the span, but the exact string is not present in{' '}
                   {section ? (
                     <>
                       <span className="font-serif">{section.heading}</span>
@@ -868,12 +876,12 @@ export default function Review() {
           </div>
         </Card>
 
-        {/* ── right rail: audit + extractor ──────────────────────────── */}
+        {/* ── right rail: audit + origin ─────────────────────────────── */}
         <Card className="p-4">
           <SectionTitle>Audit trail</SectionTitle>
           {record.audit.length === 0 ? (
             <p className="text-body text-ink-soft">
-              Nothing has happened to this record beyond the extraction that created it.
+              Nothing has happened to this record beyond the transcription that created it.
             </p>
           ) : (
             <ol className="space-y-2.5 max-h-[42vh] overflow-y-auto pr-1">
@@ -903,17 +911,22 @@ export default function Review() {
 
           <div className="mt-4 pt-3 border-t border-line">
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-              Extractor
+              Where this record came from
             </div>
-            <Tick p="demo" title="Synthetic demonstration extractor">
-              <div className="text-body">openFerment demo extractor</div>
+            <Tick
+              p={provOf(record)}
+              title="Transcribed from the curation document — no extractor produced it"
+            >
+              <div className="text-body">Hand-transcribed from the corpus document</div>
               <div className="font-num text-caption text-ink-soft">
-                run {record.extractorRun} · field {record.field}
+                {record.curationRef ? `${record.curationRef} · ` : ''}field {record.field}
               </div>
             </Tick>
             <p className="text-caption text-ink-soft mt-2">
-              No model is executed in this Sim. The run label identifies which seeded extraction
-              pass produced the record; confidence is authored, not inferred.
+              No extractor has been run against this corpus, so what you are reviewing is a
+              transcription, not an extraction: the value was typed in from the curation document
+              and has not yet been checked against the source PDF. Confidence is authored, not
+              inferred.
             </p>
           </div>
 
@@ -1003,7 +1016,7 @@ export default function Review() {
 
       {record.confidence < 0.7 && !editing && (
         <div className="mt-3 max-w-3xl">
-          <Callout kind="warn" title="Low extractor confidence">
+          <Callout kind="warn" title="Low confidence on this record">
             <span className="inline-flex items-start gap-1.5">
               <AlertTriangle size={13} className="mt-[3px] shrink-0" aria-hidden />
               <span>

@@ -1501,8 +1501,9 @@ export const RECORDS_MNO: ExtractionRecord[] = [
   },
 
   // ── O8m — market and vendor claims. provenance 'industry-estimate', and
-  // never gold: §16's handling rule is that these are ingested for framing and
-  // are not evidence. records.ts filters them out of AGGREGATABLE.
+  // never gold: §16's handling rule is that these are catalogued for framing
+  // and are not evidence. `aggregateExclusion` in store.ts holds them out of
+  // every median, range and count-based summary; they stay visible per record.
   {
     id: 'r-O8m-1',
     paperId: 'O8m',

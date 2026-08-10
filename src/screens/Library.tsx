@@ -511,7 +511,7 @@ export default function Library() {
       title="Library"
       subtitle={
         <>
-          The demonstration corpus — <span className="font-num">{allRows.length}</span> papers carrying{' '}
+          Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
           <span className="font-num">{records.length}</span> extraction records. Filters combine with AND
           across groups and OR inside a group.
         </>
@@ -636,7 +636,7 @@ export default function Library() {
           `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')} ${r.paper.topics.join(' ')}`
         }
         exportName="openferment-library"
-        exportNote="CSV exports carry the synthetic-data disclosure header."
+        exportNote="CSV exports carry the provenance disclosure header — the citations are real, and a per-class note says what each provenance value is worth."
         emptyTitle={activeCollection ? 'This collection is empty' : 'No papers match'}
         emptyBody={
           activeCollection

@@ -34,7 +34,7 @@ import { QuantityField, Quantity, type QuantityValue } from '@/components/Quanti
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import type { FieldId, ParameterDef } from '@/data/types';
 import { convert, fmt, toSI } from '@/engine/units';
-import { exportCSV } from '@/lib/csv';
+import { DISCLOSURE, exportCSV } from '@/lib/csv';
 
 // Seed counts are captured once, at module load, before any session edit — so
 // the reset confirmation describes what will actually be restored.
@@ -66,7 +66,7 @@ const SECTIONS: SectionDef[] = [
     id: 'units',
     label: 'Units & display',
     blurb:
-      'Choose how quantities are shown, and inspect the 16-field parameter ontology every number is validated against.',
+      'Choose how quantities are shown, and inspect the 24-field parameter ontology every number is validated against.',
   },
   {
     id: 'corpus',
@@ -416,10 +416,10 @@ function UnitsSection() {
         <SectionTitle
           right={
             <Explain label="What does the SI setting change?">
-              Records store the number exactly as the paper published it, plus a canonical SI twin
-              computed at ingest. Switching to SI changes which of the two is displayed in tables,
-              chips and protocol references — it never rewrites the stored value, and the published
-              figure is always one hover away.
+              Records store the number in the unit the source reported it in, plus a canonical SI
+              twin recomputed from that pair when the corpus loads. Switching to SI changes which of
+              the two is displayed in tables, chips and protocol references — it never rewrites the
+              stored value, and the reported figure is always one hover away.
             </Explain>
           }
         >
@@ -462,7 +462,7 @@ function UnitsSection() {
         <SectionTitle
           right={
             <span className="text-caption text-ink-soft inline-flex items-center gap-1.5">
-              <Ruler size={13} aria-hidden /> parameter ontology v0
+              <Ruler size={13} aria-hidden /> parameter ontology v1
             </span>
           }
         >
@@ -551,15 +551,21 @@ function UnitsSection() {
       </section>
 
       <section>
-        <SectionTitle>The 16 fields</SectionTitle>
+        <SectionTitle>The {ONTOLOGY.length} fields</SectionTitle>
+        {/*
+          'curated', not 'demo': these definitions, canonical units and ranges were written by
+          hand from the catalogued literature, so nothing in this table is modeled. They carry
+          the same weight as any other curated row — real, and not yet checked back against the
+          source PDFs.
+        */}
         <DataTable<ParameterDef>
           rows={ONTOLOGY}
           columns={columns}
           rowKey={(d) => d.id}
-          tickOf={() => 'demo'}
+          tickOf={() => 'curated'}
           searchOf={(d) => `${d.name} ${d.id} ${d.canonicalUnit} ${d.notes} ${d.definition}`}
-          exportName="openferment-ontology-v0"
-          exportNote="Ranges are authored for this demonstration and are not a published standard. Values outside a range are warned about, never blocked — a paper may report a genuine outlier."
+          exportName="openferment-ontology-v1"
+          exportNote="Ranges are the curator's, drawn from the catalogued literature, and are not a published standard. Values outside a range are warned about, never blocked — a paper may report a genuine outlier."
           maxHeight="520px"
           emptyTitle="No fields"
           emptyBody="The ontology module is empty, which should never happen in this build."
@@ -625,7 +631,9 @@ function CorpusSection() {
           <p className="text-body text-ink-soft mt-3 max-w-3xl">
             Every extracted value is typed to one of these fields, converted to the field's
             canonical unit, and range-checked at entry. Extending the ontology is a schema change,
-            not a setting — this build ships v0 and does not allow adding fields.
+            not a setting — this build ships v1 and does not allow adding fields. Real values the
+            corpus holds that v1 has no field for are listed on the validation screen rather than
+            forced into a neighbouring field.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <LinkButton to="/settings/units" size="sm">
@@ -635,7 +643,7 @@ function CorpusSection() {
               size="sm"
               onClick={() =>
                 exportCSV(
-                  'openferment-ontology-v0.csv',
+                  'openferment-ontology-v1.csv',
                   ['Field id', 'Name', 'Canonical unit', 'Range low', 'Range high', 'Definition', 'Notes'],
                   ONTOLOGY.map((d) => [
                     d.id,
@@ -668,9 +676,11 @@ function CorpusSection() {
         <Card className="p-3">
           {gold.length === 0 ? (
             <div className="text-body text-ink-soft">
-              No records are flagged for the gold set yet. Flag one with{' '}
-              <span className="kbd">g</span> in the review queue and it becomes part of the
-              evaluation baseline immediately.
+              No records are flagged for the gold set, and none ship flagged: a gold annotation
+              has to be made against the paper's own words, and no full text has been retrieved.
+              Flag one with <span className="kbd">g</span> in the review queue and it joins the
+              baseline immediately — but nothing scores against that baseline until an extractor
+              has actually been run.
             </div>
           ) : (
             <>
@@ -715,7 +725,7 @@ function CorpusSection() {
               </ul>
               <div className="mt-3">
                 <LinkButton to="/extract/validation" size="sm">
-                  <Beaker size={13} /> See how the extractor scores against it
+                  <Beaker size={13} /> See the validation plan
                 </LinkButton>
               </div>
             </>
@@ -836,8 +846,15 @@ function ExportSection() {
           emptyBody="Session state lives in memory and disappears on refresh — export is how anything leaves this build. Any table with a CSV button writes a row here."
         />
         <Callout kind="warn" title="Every file is stamped">
-          Exports open with a three-line disclosure header naming the contents as synthetic
-          demonstration data, so a CSV cannot quietly become evidence in someone else's analysis.
+          Every CSV opens with the same <span className="font-num">{DISCLOSURE.length}</span>-line
+          disclosure header. It names the literature entries as real, then defines each provenance
+          class that can appear in the file — including that a curated row was transcribed from the
+          curation document and not yet checked against the source PDF, that an industry estimate
+          has no source document behind it, and that simulation outputs are modeled rather than
+          measured. The text and markdown exports — run logs, review sessions, materials
+          checklists, agent answers — carry their own headers saying the same thing in the shape
+          their format allows. Nothing leaves here unweighted, so a file cannot quietly become
+          evidence in someone else's analysis.
         </Callout>
       </section>
 
@@ -920,13 +937,13 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Citation chips and reader span anchoring',
     fidelity: 'Full',
     notes:
-      'Every chip resolves to a real section; the quote is located in the section text by string match and highlighted in place.',
+      'Every chip resolves to a section, and the quote is found in that section by string match and highlighted in place. The section holds the curator’s catalogue note, so a span anchors to curator prose rather than to the paper’s own words.',
   },
   {
     feature: 'Unit-aware fields and the SI toggle',
     fidelity: 'Full',
     notes:
-      'Parsing, dimension checking, conversion and range validation run for all 16 ontology fields, including temperature offsets.',
+      'Parsing, dimension checking, conversion and range validation run for all 24 ontology fields, including temperature offsets and the conversions the engine refuses outright.',
   },
   {
     feature: 'Review queue',
@@ -936,9 +953,9 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Validation metrics',
-    fidelity: 'Full computation over scripted confusion data',
+    fidelity: 'Visual — nothing has been scored',
     notes:
-      'Precision, recall and F1 are computed live from the outcome table; the per-record outcomes themselves are authored, not measured.',
+      'No extractor has been run against this corpus, so no precision, recall or F1 figure exists anywhere in the build. The scoring code is real and sits unused; the screen shows the planned gold set, the one row an ontology gap blocks, and the difficulty cases the set has to include.',
   },
   {
     feature: 'Leave-one-out methodology',
@@ -1004,13 +1021,13 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Retrieval inspector and tool traces',
     fidelity: 'Scripted, mirroring the flow’s actual data',
     notes:
-      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the real section text.',
+      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — which, every entry being catalogued, is the curator’s note rather than the paper.',
   },
   {
     feature: 'Ingest pipeline',
     fidelity: 'Scripted',
     notes:
-      'Fetch, parse, chunk, embed and extract are timed stages over papers already present in the build, including one authored parse failure.',
+      'Fetch, parse, chunk, embed and extract are timed stages over entries already present in the build, including one authored parse failure. No document is retrieved and no text is added: every entry is still catalogued when the run finishes.',
   },
   {
     feature: 'Learn lessons and checkpoints',
@@ -1036,7 +1053,8 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   {
     feature: 'Real PDF rendering',
     fidelity: 'Visual',
-    notes: 'Papers are structured text in the build. No PDF is fetched, parsed or displayed.',
+    notes:
+      'Each entry carries the curator’s catalogue note as its text. No PDF is fetched, parsed or displayed, and no paper’s full text is present in this build.',
   },
 ];
 
@@ -1062,6 +1080,34 @@ function AboutSection() {
     return c;
   }, []);
 
+  // Identifier coverage is partial and the colophon must not round it up, so
+  // every figure below is counted from the corpus rather than written down.
+  const corpus = useMemo(() => {
+    let doi = 0;
+    let noId = 0;
+    let noAuthors = 0;
+    let verify = 0;
+    const threads = new Set<string>();
+    for (const p of papers) {
+      if (p.doi) doi++;
+      if (!p.doi && !p.pmcid && !p.pmid) noId++;
+      if (p.authors.length === 0) noAuthors++;
+      if (p.verifyNeeded) verify++;
+      threads.add(p.thread);
+    }
+    return { doi, noId, noAuthors, verify, threads: threads.size };
+  }, [papers]);
+
+  const prov = useMemo(() => {
+    let curated = 0;
+    let estimate = 0;
+    for (const r of records) {
+      if (r.provenance === 'curated') curated++;
+      else if (r.provenance === 'industry-estimate') estimate++;
+    }
+    return { curated, estimate };
+  }, [records]);
+
   return (
     <div className="space-y-6">
       <section>
@@ -1069,12 +1115,34 @@ function AboutSection() {
         <Callout kind="warn" title="Read this before you believe a number on this site">
           <ul className="space-y-1.5 mt-1">
             <li>
-              <span className="font-medium">Everything in the corpus is fictional.</span> All{' '}
-              <span className="font-num">{papers.length}</span> papers, every author name, every
-              journal and venue, and every one of the{' '}
-              <span className="font-num">{records.length}</span> extracted values were invented for
-              this demonstration. They are plausible, they are internally consistent, and they are
-              not real. Nothing here should be cited, quoted, or used as evidence.
+              <span className="font-medium">The literature is real.</span> All{' '}
+              <span className="font-num">{papers.length}</span> entries are real papers, theses,
+              patents and reports, spread over{' '}
+              <span className="font-num">{corpus.threads}</span> corpus threads, with real titles,
+              real venues and real DOIs where one exists. They are citable. Identifier coverage is
+              partial and the corpus does not pretend otherwise:{' '}
+              <span className="font-num">{corpus.doi}</span> of{' '}
+              <span className="font-num">{papers.length}</span> entries carry a DOI,{' '}
+              <span className="font-num">{corpus.noId}</span> carry no DOI, PMCID or PMID at all,{' '}
+              <span className="font-num">{corpus.noAuthors}</span> have no author list yet, and{' '}
+              <span className="font-num">{corpus.verify}</span> are flagged for verification.
+            </li>
+            <li>
+              <span className="font-medium">Every entry is catalogued, not ingested.</span> No full
+              text has been retrieved. Each entry is metadata plus a hand-written curator note, so a
+              highlighted extraction span anchors to the curator&rsquo;s prose, not to the
+              paper&rsquo;s own words. Of the{' '}
+              <span className="font-num">{records.length}</span> extraction records,{' '}
+              <span className="font-num">{prov.curated}</span> are curated: transcribed from the
+              curation document and not yet checked against the source PDF. The remaining{' '}
+              <span className="font-num">{prov.estimate}</span> are industry estimates, which are
+              not evidence. Read a value against its source before you cite it.
+            </li>
+            <li>
+              <span className="font-medium">No extractor has ever been run.</span> There is no
+              extractor output in this build, so no precision, recall or F1 figure appears anywhere.
+              Validation shows the gold set that is planned, the difficulty cases it has to include,
+              and the values the ontology cannot yet hold — and states that nothing has been scored.
             </li>
             <li>
               <span className="font-medium">Session state is held in memory only.</span> Reviews,
@@ -1085,8 +1153,15 @@ function AboutSection() {
             <li>
               <span className="font-medium">Simulation economics are illustrative.</span> The cost
               models are authored spreadsheets swept over a grid — Demo model v0, illustrative
-              economics, not validated. Treat a minimum selling price here as a shape to reason
-              about, never as a number to plan against.
+              economics, not validated. This is the part of the build that really is synthetic.
+              Treat a minimum selling price here as a shape to reason about, never as a number to
+              plan against.
+            </li>
+            <li>
+              <span className="font-medium">The agent&rsquo;s answers are written, not generated.</span>{' '}
+              Plans, tool calls and answer prose come from authored flows matched to the question,
+              so the same question always returns the same answer. No language model is called from
+              this build.
             </li>
           </ul>
         </Callout>
@@ -1114,7 +1189,7 @@ function AboutSection() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft mb-2">
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-accent border-accent/45">Full</span>
-            computed here, from the demo corpus —{' '}
+            computed here, from the corpus in memory —{' '}
             <span className="font-num">{counts.Full}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -1177,26 +1252,28 @@ function AboutSection() {
         <Card className="p-3">
           <Row label="App version">
             <span className="font-num">openFerment Sim {APP_VERSION}</span> — implements design
-            OF-DES-001 v0.1
+            OF-DES-001 v0.1 over corpus OF-COR-001 v1.0
           </Row>
           <Row label="Corpus">
-            <span className="font-num">{papers.length}</span> synthetic papers,{' '}
-            <span className="font-num">{records.length}</span> extraction records, ontology v0 with{' '}
+            <span className="font-num">{papers.length}</span> catalogued papers across{' '}
+            <span className="font-num">{corpus.threads}</span> threads,{' '}
+            <span className="font-num">{records.length}</span> extraction records, ontology v1 with{' '}
             <span className="font-num">{ONTOLOGY.length}</span> fields
           </Row>
           <Row label="Extractor">
-            <span className="font-num">PhycoExtract v0.4r</span> — a fictional extractor. Records
-            carry run labels <span className="font-num">v0.3</span>,{' '}
-            <span className="font-num">v0.4</span> and <span className="font-num">v0.4r</span> so
-            runs can be compared, but every record was authored by hand. No model produced them.
+            None. No extractor has been run against this corpus, so no record carries a run label
+            and no screen reports precision, recall or F1. Every record was transcribed by hand from
+            the curation document; the run field on a record stays empty until there is a run to
+            fill it.
           </Row>
           <Row label="Agent">
             Scripted flow player. Plans, tool calls and answers are matched from authored flows; no
             language model is called from this build, and the live mode is labelled inactive.
           </Row>
           <Row label="Retrieval">
-            Local lexical scorer over section text. No embedding model, no vector store, no network
-            request — the &ldquo;Embed&rdquo; stage in ingest is a timed animation.
+            Local lexical scorer over the section text held in the build, which for every entry is
+            the curator&rsquo;s note. No embedding model, no vector store, no network request — the
+            &ldquo;Embed&rdquo; stage in ingest is a timed animation.
           </Row>
           <Row label="Storage">
             In-memory only. No localStorage, no sessionStorage, no cookies, no telemetry.

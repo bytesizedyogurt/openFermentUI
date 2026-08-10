@@ -33,13 +33,14 @@ export const RECORDS_BY_ID: Record<string, ExtractionRecord> = Object.fromEntrie
   RECORDS.map((r) => [r.id, r]),
 );
 
-/** Hand-curated reference annotations. Empty until tranche-1 ingest. */
+/**
+ * Hand-curated reference annotations. Empty in the seed: no paper's full text
+ * has been retrieved, so there are no source spans to annotate a gold set
+ * against. The gold set exists as a plan (Validation) plus whatever a reviewer
+ * flags during a session.
+ */
 export const GOLD_RECORDS: ExtractionRecord[] = RECORDS.filter((r) => r.gold);
 
-/**
- * Records that may enter aggregate statistics: primary measurements only,
- * excluding industry estimates and rejected rows (OF-COR-001 §16 O8, §19).
- */
-export const AGGREGATABLE: ExtractionRecord[] = RECORDS.filter(
-  (r) => r.isPrimary !== false && r.provenance !== 'industry-estimate' && r.status !== 'rejected',
-);
+// Which records may enter a statistic is decided by `aggregateExclusion` in
+// store.ts, applied at each aggregation site. A precomputed array here would be
+// a second, silently divergent answer to the same question.

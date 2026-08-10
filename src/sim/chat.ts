@@ -5,7 +5,7 @@
 // the answer — honest by construction rather than reconstructed afterward.
 import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '@/data/types';
 import { FLOWS } from '@/data/flows';
-import { useStore, nextId } from '@/store';
+import { useStore, nextId, isAggregatable } from '@/store';
 import { tokenize, expandQuery, searchCorpus } from '@/engine/retrieval';
 import { PAPERS } from '@/data/papers';
 import { STRAINS } from '@/data/strains';
@@ -354,7 +354,13 @@ export async function playFlow(flow: ChatFlow, sessionId: string): Promise<void>
 function summarizeRecords(records: ExtractionRecord[], field: string): string {
   const def = ONTOLOGY.find((d) => d.id === field);
   if (!def) return '';
+  // Same gate as the strain pages and the strip plots: an industry estimate or a
+  // paper reciting someone else's number can be listed, but must not shift a
+  // median. Answering with a statistic built from a citation-of-a-citation is
+  // exactly the error this fallback exists to avoid.
+  const held = records.filter((r) => !isAggregatable(r)).length;
   const converted = records
+    .filter(isAggregatable)
     .map((r) => {
       try {
         const n = asNumber(r.value);
@@ -370,13 +376,16 @@ function summarizeRecords(records: ExtractionRecord[], field: string): string {
   const values = converted.map((c) => c.v);
   const median = values[Math.floor(values.length / 2)];
   const verified = converted.filter((c) => c.r.status === 'verified').length;
+  const heldNote = held
+    ? ` ${held} further record${held === 1 ? ' is' : 's are'} held out of the median — industry estimates, or a paper reporting another study's measurement.`
+    : '';
 
   const rows = converted
     .slice(0, 8)
     .map((c) => `| [[${c.r.paperId}]] | ${fmt(c.v)} | ${c.r.status} | [[${c.r.id}]] |`)
     .join('\n');
 
-  return `The corpus has **${converted.length} record${converted.length === 1 ? '' : 's'}** for ${def.name.toLowerCase()}${verified ? ` (${verified} verified)` : ''}, spanning **${fmt(values[values.length - 1])}–${fmt(values[0])} ${def.canonicalUnit}** with a median of **${fmt(median)} ${def.canonicalUnit}**.
+  return `The corpus has **${converted.length} record${converted.length === 1 ? '' : 's'}** for ${def.name.toLowerCase()}${verified ? ` (${verified} verified)` : ''}, spanning **${fmt(values[values.length - 1])}–${fmt(values[0])} ${def.canonicalUnit}** with a median of **${fmt(median)} ${def.canonicalUnit}**.${heldNote}
 
 | Paper | ${def.canonicalUnit || 'Value'} | Status | Record |
 |---|---:|---|---|

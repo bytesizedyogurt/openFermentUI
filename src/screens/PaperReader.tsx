@@ -356,17 +356,23 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         ))}
       </div>
 
-      <div className="mt-2 text-caption text-signal-warn flex items-center gap-1.5">
-        <span
-          className="inline-block w-[3px] h-3 rounded-[1px]"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
-          }}
-          aria-hidden
-        />
-        Synthetic demonstration paper — fictional authors, venue, and values.
-      </div>
+      {paper.textSource === 'curation-note' && (
+        <div className="mt-2 text-caption text-signal-warn flex items-start gap-1.5">
+          <span
+            className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px]"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
+            }}
+            aria-hidden
+          />
+          <span>
+            Catalogued from OF-COR-001: a real, citable paper whose full text has not been ingested.
+            The abstract and the highlighted spans below are the curator&rsquo;s note, not the
+            paper&rsquo;s own words.
+          </span>
+        </div>
+      )}
 
       {onShelf && (
         <div className="mt-4">

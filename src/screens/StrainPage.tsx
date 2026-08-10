@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, ParameterDef, Protocol, Scenario } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
 import { href, navigate } from '@/router';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
@@ -76,12 +76,24 @@ interface FieldGroup {
   rejected: SPoint[];
   usable: SPoint[]; // live and convertible
   rejectedUsable: SPoint[];
+  /** Usable but held out of the statistics — industry estimates and recitations. */
+  held: SPoint[];
+  heldIndustry: number;
+  heldSecondary: number;
   unconvertible: number;
   stats: { n: number; median: number; min: number; max: number } | null;
   verified: number;
   gold: number;
   unverified: number;
   viaPaper: number;
+}
+
+/** Plain-language reason a set of records sits outside the median and range. */
+function heldReason(industry: number, secondary: number): string {
+  const parts: string[] = [];
+  if (industry > 0) parts.push(`${industry} industry estimate${industry === 1 ? '' : 's'}`);
+  if (secondary > 0) parts.push(`${secondary} quoting another record's measurement`);
+  return parts.join(' and ');
 }
 
 function provOf(r: ExtractionRecord): ProvKind {
@@ -199,6 +211,7 @@ function StripPlot({
   const active = hover !== null ? hover : idx;
   const activePoint = sorted[active];
   const activePaper = activePoint ? papers.find((p) => p.id === activePoint.rec.paperId) : undefined;
+  const activeExclusion = activePoint ? aggregateExclusion(activePoint.rec) : null;
 
   const move = (delta: number) => {
     if (sorted.length === 0) return;
@@ -298,6 +311,7 @@ function StripPlot({
             })
           : sorted.map((p, i) => {
               const rejected = p.rec.status === 'rejected';
+              const excl = aggregateExclusion(p.rec);
               return (
                 <button
                   key={p.rec.id}
@@ -316,10 +330,12 @@ function StripPlot({
                     rejected && 'opacity-45',
                   )}
                   style={{ left: `${posOf(p.canonical)}%`, top: lanes[i] * LANE_H }}
-                  title={`${fmt(p.canonical)} ${def.canonicalUnit} · ${p.rec.paperId} · ${p.rec.id}`}
+                  title={`${fmt(p.canonical)} ${def.canonicalUnit} · ${p.rec.paperId} · ${p.rec.id}${
+                    excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
+                  }`}
                   aria-label={`${fmt(p.canonical)} ${unitLabel(def.canonicalUnit)}, ${p.rec.paperId}, record ${p.rec.id}, ${
                     rejected ? 'rejected' : p.prov
-                  }. Opens the quoted span.`}
+                  }${excl && !rejected ? ', excluded from the statistics' : ''}. Opens the quoted span.`}
                 >
                   <ProvDot p={p.prov} size={i === active ? 11 : 9} />
                 </button>
@@ -349,8 +365,14 @@ function StripPlot({
               {activePaper && activePaper.title.length > 68 ? '…' : ''}
             </span>
             <span className="font-num text-ink-soft">{activePoint.rec.id}</span>
-            {activePoint.rec.status === 'rejected' && (
-              <span className="text-signal-error">rejected — excluded from statistics</span>
+            {activeExclusion && (
+              <span
+                className={activeExclusion === 'rejected' ? 'text-signal-error' : 'text-signal-warn'}
+              >
+                {activeExclusion === 'not-primary' && activePoint.rec.citesRecordId
+                  ? `quotes ${activePoint.rec.citesRecordId} — excluded from statistics`
+                  : EXCLUSION_NOTE[activeExclusion]}
+              </span>
             )}
             {activePoint.viaPaper && (
               <span className="text-ink-soft">attributed via the paper&rsquo;s organism list</span>
@@ -449,9 +471,21 @@ function FieldRow({
                 </span>
               </div>
             </div>
+          ) : g.usable.length > 0 ? (
+            <div className="mt-1.5 text-caption text-signal-warn">
+              No median — every convertible record for this field is held out of the statistics.
+            </div>
           ) : (
             <div className="mt-1.5 text-caption text-signal-warn">
               No convertible values — nothing to summarize.
+            </div>
+          )}
+
+          {g.held.length > 0 && (
+            <div className="mt-1.5 text-caption text-ink-soft">
+              <span className="font-num">{g.held.length}</span> record
+              {g.held.length === 1 ? ' is' : 's are'} drawn but held out of the median and range —{' '}
+              {heldReason(g.heldIndustry, g.heldSecondary)}.
             </div>
           )}
 
@@ -581,6 +615,10 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       const live = all.filter((p) => p.rec.status !== 'rejected');
       const usable = live.filter((p) => p.canonical !== null);
       const rejectedUsable = rejected.filter((p) => p.canonical !== null);
+      // The statistics run over independent evidence only; the held-out records
+      // stay in `usable` so they are still drawn and still clickable.
+      const aggregatable = usable.filter((p) => isAggregatable(p.rec));
+      const held = usable.filter((p) => !isAggregatable(p.rec));
       return {
         def,
         all,
@@ -588,8 +626,11 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         rejected,
         usable,
         rejectedUsable,
+        held,
+        heldIndustry: held.filter((p) => aggregateExclusion(p.rec) === 'industry-estimate').length,
+        heldSecondary: held.filter((p) => aggregateExclusion(p.rec) === 'not-primary').length,
         unconvertible: live.length - usable.length,
-        stats: summarize(usable.map((p) => p.canonical as number)),
+        stats: summarize(aggregatable.map((p) => p.canonical as number)),
         verified: live.filter((p) => p.rec.status === 'verified').length,
         gold: live.filter((p) => !!p.rec.gold).length,
         unverified: live.filter((p) => p.rec.status === 'unverified').length,
@@ -692,10 +733,12 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     return [...by.entries()]
       .map(([tag, ps]) => {
         const usable = ps.filter((p) => p.canonical !== null);
+        const aggregatable = usable.filter((p) => isAggregatable(p.rec));
         return {
           tag,
           points: ps,
-          stats: summarize(usable.map((p) => p.canonical as number)),
+          stats: summarize(aggregatable.map((p) => p.canonical as number)),
+          held: usable.length - aggregatable.length,
           unconvertible: ps.length - usable.length,
           verified: ps.filter((p) => p.rec.status === 'verified').length,
           prov: aggregateProv(ps),
@@ -742,6 +785,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         'Unverified',
         'Rejected (excluded)',
         'Unconvertible (excluded)',
+        'Held out of statistics (industry estimate or quoting another record)',
         'Median (canonical)',
         'Min (canonical)',
         'Max (canonical)',
@@ -759,6 +803,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         g.unverified,
         g.rejected.length,
         g.unconvertible,
+        g.held.length,
         g.stats ? g.stats.median : '',
         g.stats ? g.stats.min : '',
         g.stats ? g.stats.max : '',
@@ -915,7 +960,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           <EmptyState
             icon={<Microscope size={22} />}
             title={`No strain with the id “${strainId}”`}
-            body="The organism index lists every strain this demo corpus covers. Open it to pick one."
+            body="The organism index lists every strain this corpus covers. Open it to pick one."
             action={<LinkButton to="/organisms">Back to organisms</LinkButton>}
           />
         </Card>
@@ -1080,9 +1125,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           <Explain label="How these statistics are computed">
             Records arrive in whatever unit the paper used. Each value is converted with the shared
             unit engine into the field&rsquo;s canonical unit, then the median and range are taken
-            over the converted set. Rejected records and records whose unit belongs to a different
-            dimensional family are excluded and counted separately. Verifying a record in the review
-            queue changes these numbers immediately — nothing here is precomputed.
+            over the converted set. Four kinds of record are excluded from that statistic and
+            counted separately: rejected ones, ones whose unit belongs to a different dimensional
+            family, industry estimates, and ones quoting another paper&rsquo;s measurement rather
+            than reporting their own. The last two are still drawn — they are real values, just not
+            independent evidence, and counting a recitation twice would manufacture agreement.
+            Verifying a record in the review queue changes these numbers immediately — nothing here
+            is precomputed.
           </Explain>{' '}
           One dot is one record; click a dot to open the quoted span in its paper.
         </p>
@@ -1228,6 +1277,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                       need a molar mass the corpus does not carry, or a unit error still awaiting
                       review. Those records are counted but never averaged.
                     </span>
+                  </div>
+                )}
+                {components.some((c) => c.held > 0) && (
+                  <div className="text-caption text-ink-soft mt-2">
+                    Some records are listed and counted in n but held out of the median and range —
+                    industry estimates, and records quoting another paper&rsquo;s measurement rather
+                    than reporting their own.
                   </div>
                 )}
               </div>
@@ -1465,7 +1521,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           <span id="band-notes">Curator notes</span>
         </SectionTitle>
         <p className="text-caption text-ink-soft mb-2 max-w-3xl">
-          Free text written by the demo curator. Not extracted, not scored — hand-authored bench
+          Free text written by the corpus curator. Not extracted, not scored — hand-authored bench
           judgement, carried with the gold tick because a person put their name on it.
         </p>
         <Card className="p-4">
@@ -1499,9 +1555,10 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           Every number above is a summary of{' '}
           <span className="font-num">{points.length}</span> extraction record
           {points.length === 1 ? '' : 's'} drawn from{' '}
-          <span className="font-num">{strainPapers.length}</span> synthetic paper
-          {strainPapers.length === 1 ? '' : 's'} — not a claim about the published literature. Medians
-          over a handful of records are descriptions of this corpus and nothing more.{' '}
+          <span className="font-num">{strainPapers.length}</span> catalogued paper
+          {strainPapers.length === 1 ? '' : 's'} — real, citable sources, but most records are
+          transcribed from the curation document and not yet checked against the source PDF. Medians
+          over a handful of records are descriptions of this corpus, not of the published literature.{' '}
           <a className="text-accent hover:underline" href={href('/extract')}>
             Open the full extraction table
           </a>{' '}

@@ -72,7 +72,7 @@ const OUTCOME_EXPLAIN: Record<string, string> = {
   unit_error:
     'The magnitude was read correctly and the unit was not, so the normalised value is wrong. Counts once as a false positive and once as a false negative.',
   span_error:
-    'The run attributed the value to a different sentence. The demo run output records the outcome but not the rejected span, so only the curated span can be shown below.',
+    'The run attributed the value to a different sentence. The run output records the outcome but not the rejected span, so only the curated span can be shown below.',
   miss: 'The run produced no record for this gold annotation. Counts as a false negative only.',
   spurious:
     'The run produced a record the curated set does not contain. Counts as a false positive only; there is no gold annotation to compare against.',
@@ -412,7 +412,7 @@ export default function Validation() {
     <PageHeader
       eyebrow="Module 0 · Evidence"
       title="Extraction validation"
-      subtitle="Precision and recall of each extractor run against the hand-curated gold set, under leave-one-out evaluation."
+      subtitle="What the extractor would be scored on, and what it has been scored on so far."
       actions={actions}
     />
   );
@@ -614,8 +614,7 @@ export default function Validation() {
               on your own tuning data.
             </p>
             <p className="text-signal-warn">
-              This Sim trains and runs no models. The scheme is described here, not executed — the
-              run outputs are authored fixtures.
+              This Sim trains and runs no models. The scheme is described here, not executed.
             </p>
           </Explain>
         </div>
@@ -652,7 +651,11 @@ export default function Validation() {
 
       {/* ── band 1: headline ─────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 mb-2">
-        <Tick p="demo" className="card py-3 pr-3" title="Computed from the synthetic gold set">
+        <Tick
+          p="demo"
+          className="card py-3 pr-3"
+          title="Micro-averaged over this run's matched records against the gold-set annotations"
+        >
           <div className="text-caption uppercase tracking-wide text-ink-soft">Precision</div>
           <MetricValue value={metrics.micro.precision} defined={precisionDefined} />
           <div className="mt-0.5">
@@ -667,7 +670,11 @@ export default function Validation() {
           </div>
         </Tick>
 
-        <Tick p="demo" className="card py-3 pr-3" title="Computed from the synthetic gold set">
+        <Tick
+          p="demo"
+          className="card py-3 pr-3"
+          title="Micro-averaged over this run's matched records against the gold-set annotations"
+        >
           <div className="text-caption uppercase tracking-wide text-ink-soft">Recall</div>
           <MetricValue value={metrics.micro.recall} defined={recallDefined} />
           <div className="mt-0.5">
@@ -682,7 +689,11 @@ export default function Validation() {
           </div>
         </Tick>
 
-        <Tick p="demo" className="card py-3 pr-3" title="Computed from the synthetic gold set">
+        <Tick
+          p="demo"
+          className="card py-3 pr-3"
+          title="Micro-averaged over this run's matched records against the gold-set annotations"
+        >
           <div className="text-caption uppercase tracking-wide text-ink-soft">F1 (micro)</div>
           <MetricValue value={metrics.micro.f1} defined={f1Defined} />
           <div className="mt-0.5">
@@ -736,7 +747,7 @@ export default function Validation() {
         <span className="font-num">fn {metrics.micro.fn}</span>. A value or unit mismatch is counted
         twice — once as a false positive for the wrong record produced, once as a false negative for
         the gold record missed — which is why F1 falls faster than a raw error count suggests. The
-        gold set is the same fixture for every run, so its size and paper coverage only move when you
+        same gold set is used for every run, so its size and paper coverage only move when you
         promote a record in the review queue.
       </p>
 
@@ -887,7 +898,7 @@ export default function Validation() {
         {mismatches.length === 0 ? (
           <EmptyState
             title="No mismatches in this run"
-            body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the fixture, not about the extractor."
+            body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the gold set, not about the extractor."
           />
         ) : visibleMismatches.length === 0 ? (
           <EmptyState
@@ -994,9 +1005,10 @@ export default function Validation() {
 
       <p className="text-caption text-ink-soft mt-3 max-w-4xl">
         Every row above is a disagreement between the curated gold annotation and what the run
-        produced. Open one to read both sides against the source text. Nothing on this screen is
-        evidence about a real extraction system — the corpus, the annotations and the run outputs are
-        all synthetic fixtures.
+        produced. Open one to read both sides against the text held for that paper — for a
+        catalogued entry that text is the curator&rsquo;s note, not the paper&rsquo;s own words. The
+        literature is real and citable, but a curated annotation has not yet been checked against
+        the source PDF, so a row here is a lead to check, not a verdict.
       </p>
 
       {/* ── comparison sheet ─────────────────────────────────────────── */}
@@ -1208,10 +1220,10 @@ function ComparisonBody({
           ) : (
             <div className="text-caption text-ink-soft rounded-input border border-line bg-surface-0 p-2">
               {row.outcome === 'span_error'
-                ? 'The run attributed the value to a different sentence. The demo run output stores the outcome but not the rejected span, so it cannot be shown.'
+                ? 'The run attributed the value to a different sentence. The run output stores the outcome but not the rejected span, so it cannot be shown.'
                 : row.outcome === 'miss'
                   ? 'The run produced no record here, so there is no span.'
-                  : 'Spurious extractions are recorded at paper level in this fixture; no span is retained.'}
+                  : 'Spurious extractions are recorded at paper level, not span level; no span is retained.'}
             </div>
           )}
 

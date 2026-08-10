@@ -260,7 +260,10 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
       `Version ${version.version} · ${batchLabel(version, run.scale)}`,
       `Started ${new Date(run.startedAt).toLocaleString()} · duration ${elapsedLabel(Date.now() - run.startedAt)}`,
       '',
-      '# openFerment demo export — synthetic protocol content, illustrative values only',
+      '# openFerment export — corpus OF-COR-001 v1.0',
+      '# Protocol content is real: drawn from the catalogued literature and standard bench practice.',
+      '# Amounts are computed by scaling the base batch, not measured at this scale.',
+      '# Timings below are wall-clock from a walkthrough in the app, not a record of bench work.',
       '',
       'STEPS',
       ...steps.map((s, i) => {

@@ -42,7 +42,7 @@ const STOPS: Stop[] = [
   {
     route: '/extract/validation',
     title: 'How we know, and how we’re honest when we’re wrong',
-    body: 'PhycoExtract is judged against a hand-curated gold set under leave-one-out evaluation. Precision, recall, and F1 recompute live from the confusion data — and every mismatch opens to two inspectable spans.',
+    body: 'No extractor has been run against this corpus, so this screen shows no precision, recall or F1 — it shows the gold-set plan those numbers would be earned against, the six cases chosen to be hard, and the real values the ontology has no field for. Refusing to display a metric it has not earned is the point of the screen.',
   },
 ];
 

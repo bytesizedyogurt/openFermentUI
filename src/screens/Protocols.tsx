@@ -154,8 +154,8 @@ export function capabilityReason(key: CapabilityKey, c: Capabilities): string {
 
 /**
  * The strongest provenance among a set of cited records and papers. Anything
- * citing nothing at all has no literature ancestry, so it is demo data and
- * gets the dashed tick (§20).
+ * citing nothing at all has no literature ancestry, so it falls to 'demo' —
+ * modeled, not measured — and gets the dashed tick (§20).
  */
 export function provenanceFromRefs(
   recordIds: Iterable<string>,
@@ -880,7 +880,7 @@ export default function Protocols() {
               onOpen={(r) => navigate(`/protocols/${r.protocol.id}`)}
               searchOf={undefined}
               exportName="openferment-protocols"
-              exportNote="CSV exports carry the synthetic-data disclosure header. Capability columns are computed from protocol content."
+              exportNote="CSV exports carry the corpus disclosure header, which states what each provenance class means. Capability columns are computed from protocol content."
               emptyTitle="Nothing matches these filters"
               emptyBody="Clear a filter above to widen the view."
               maxHeight="calc(100vh - 300px)"
