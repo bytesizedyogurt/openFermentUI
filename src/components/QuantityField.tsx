@@ -133,7 +133,8 @@ export function Quantity({
   mode = 'published',
   className,
 }: {
-  value: number;
+  /** Categorical records carry a string; fmt() passes it through. */
+  value: number | string;
   unit: string;
   si?: { value: number; unit: string };
   mode?: 'published' | 'si';

@@ -33,6 +33,8 @@ export interface FacetDef<T> {
 const TICK_BG: Record<ProvKind, string> = {
   gold: 'rgb(var(--gold))',
   verified: 'rgb(var(--accent))',
+  curated: 'rgb(var(--accent) / 0.45)',
+  'industry-estimate': 'rgb(var(--ink-soft) / 0.6)',
   unverified: 'rgb(var(--ink-soft))',
   user: 'rgb(var(--signal-info))',
   demo: 'rgb(var(--signal-warn))',
@@ -448,7 +450,9 @@ export function DataTable<T>({
                               backgroundImage:
                                 tickOf(row) === 'demo'
                                   ? `repeating-linear-gradient(to bottom, ${TICK_BG.demo} 0 3px, transparent 3px 6px)`
-                                  : undefined,
+                                  : tickOf(row) === 'industry-estimate'
+                                    ? `repeating-linear-gradient(to bottom, ${TICK_BG['industry-estimate']} 0 3px, transparent 3px 6px)`
+                                    : undefined,
                             }}
                           />
                         )}

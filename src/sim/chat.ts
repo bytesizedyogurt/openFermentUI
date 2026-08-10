@@ -8,7 +8,7 @@ import { FLOWS } from '@/data/flows';
 import { useStore, nextId } from '@/store';
 import { tokenize, expandQuery, searchCorpus } from '@/engine/retrieval';
 import { ONTOLOGY, fieldName } from '@/data/ontology';
-import { convert, fmt } from '@/engine/units';
+import { convert, fmt, asNumber } from '@/engine/units';
 import { delay, scaled, streamInterval } from './latency';
 
 // ── Intent matching (§16.3) ────────────────────────────────────────────
@@ -68,46 +68,71 @@ const ORGANISM_ALIASES: Record<string, string> = {
   cw15: 'cw15',
   chlamydomonas: 'cw15',
   reinhardtii: 'cw15',
-  'cc-1690': 'cc1690',
-  cc1690: 'cc1690',
+  uvm4: 'uvm4',
+  uvm11: 'uvm4',
   gs115: 'gs115',
   phaffii: 'gs115',
   pichia: 'gs115',
   komagataella: 'gs115',
-  platensis: 'aplat',
-  arthrospira: 'aplat',
-  spirulina: 'aplat',
+  trichoderma: 'treesei',
+  reesei: 'treesei',
+  'e. coli': 'ecoli',
+  ecoli: 'ecoli',
+  coli: 'ecoli',
+  bovine: 'bovine',
+  casein: 'bovine',
 };
 
+/** Synonyms onto ontology v1. "casein kinase" is deliberately absent: it names
+ *  three different enzymes, so it must disambiguate rather than resolve. */
 const FIELD_ALIASES: Record<string, string> = {
   'growth rate': 'growth_rate_mu',
   mu: 'growth_rate_mu',
   µ: 'growth_rate_mu',
-  'doubling time': 'doubling_time',
-  yield: 'yield_biomass_substrate',
   density: 'final_biomass_density',
   biomass: 'final_biomass_density',
-  protein: 'protein_content',
-  titer: 'product_titer',
-  titre: 'product_titer',
   productivity: 'volumetric_productivity',
-  od: 'od_dcw_factor',
-  dcw: 'od_dcw_factor',
-  ph: 'ph_setpoint',
-  temperature: 'temperature',
-  light: 'light_intensity',
-  co2: 'co2_enrichment',
-  recovery: 'harvest_recovery',
-  disruption: 'disruption_efficiency',
   medium: 'medium_component_conc',
   media: 'medium_component_conc',
+  'total soluble protein': 'expression_pct_tsp',
+  tsp: 'expression_pct_tsp',
+  expression: 'expression_pct_tsp',
+  titer: 'titer_secreted',
+  titre: 'titer_secreted',
+  secreted: 'titer_secreted',
+  secretion: 'secreted_fraction',
+  intracellular: 'titer_intracellular',
+  'fold improvement': 'fold_improvement',
+  transformation: 'transformation_efficiency',
+  colony: 'time_to_colony',
+  phosphate: 'phosphate_count',
+  phosphorylation: 'phosphorylation_degree',
+  phosphorylated: 'phosphorylation_degree',
+  glycan: 'glycan_species',
+  glycosylation: 'glycan_species',
+  sialyl: 'glycan_species',
+  kinase: 'kinase_identity',
+  fam20c: 'kinase_identity',
+  micelle: 'micelle_diameter',
+  micellar: 'micellar_fraction',
+  gelation: 'gelation_ph',
+  coagulation: 'gelation_ph',
+  calcium: 'calcium_binding',
+  melt: 'melt_stretch_length',
+  stretch: 'melt_stretch_length',
+  disruption: 'disruption_protein_yield',
+  'cell disruption': 'disruption_protein_yield',
+  energy: 'disruption_energy',
+  cost: 'minimum_selling_price',
+  price: 'minimum_selling_price',
+  msp: 'minimum_selling_price',
 };
 
 export function recognizeEntities(input: string): Entities {
   const q = ' ' + norm(input) + ' ';
   const out: Entities = {};
 
-  const paper = input.match(/\bSP-\d{3}\b/i);
+  const paper = input.match(/\b[A-O]\d{1,2}m?\b/);
   if (paper) out.paperId = paper[0].toUpperCase();
 
   const protocol = input.match(/\bPR-[A-Z]+-\d+\b/i);
@@ -222,7 +247,9 @@ function summarizeRecords(records: ExtractionRecord[], field: string): string {
   const converted = records
     .map((r) => {
       try {
-        return { r, v: def.canonicalUnit === '' ? r.value : convert(r.value, r.unit, def.canonicalUnit) };
+        const n = asNumber(r.value);
+        if (n === null) return null; // categorical — not summarisable as a range
+        return { r, v: def.canonicalUnit === '' ? n : convert(n, r.unit, def.canonicalUnit) };
       } catch {
         return null;
       }

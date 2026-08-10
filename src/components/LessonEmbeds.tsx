@@ -7,7 +7,7 @@ import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import type { FieldId, LessonBlock } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { convert, fmt } from '@/engine/units';
+import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
 import { evaluateGrid } from '@/engine/grids';
 import { Card, Button, cx, Callout } from './ui';
@@ -290,7 +290,10 @@ function StripPlot({ field }: { field: FieldId }) {
         try {
           return {
             r,
-            v: def.canonicalUnit === '' ? r.value : convert(r.value, r.unit, def.canonicalUnit),
+            v:
+              def.canonicalUnit === ''
+                ? asNumber(r.value)
+                : convert(asNumber(r.value) ?? NaN, r.unit, def.canonicalUnit),
           };
         } catch {
           return null;

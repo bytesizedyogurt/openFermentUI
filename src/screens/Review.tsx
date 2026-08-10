@@ -233,6 +233,10 @@ export default function Review() {
     const state = useStore.getState();
     const target = state.records.find((r) => r.id === state.reviewQueue[state.reviewIndex]);
     if (!target) return;
+    // Inline editing is numeric-only; categorical records (kinase_identity,
+    // glycan_species) are corrected by rejecting with a reason, not by typing
+    // a number into a unit-aware field.
+    if (typeof target.value !== 'number') return;
     setEditBase({ value: target.value, unit: target.unit });
     setDraft({ value: target.value, unit: target.unit });
     setRejecting(false);

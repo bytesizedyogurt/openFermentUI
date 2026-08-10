@@ -180,7 +180,7 @@ interface MismatchRow {
   field: FieldId;
   paperId: string;
   recordId?: string;
-  gold?: { value: number; unit: string };
+  gold?: { value: number | string; unit: string };
   extracted?: { value: number; unit: string };
   note?: string;
 }
@@ -1062,9 +1062,12 @@ function ComparisonBody({
   onNoteText: (v: string) => void;
   onFile: () => void;
 }) {
-  const goldSI = row.gold ? toSI(row.gold.value, row.gold.unit) : null;
+  const goldSI = row.gold && typeof row.gold.value === 'number' ? toSI(row.gold.value, row.gold.unit) : null;
   const extractedSI = row.extracted ? toSI(row.extracted.value, row.extracted.unit) : null;
-  const gap = row.gold && row.extracted ? relativeGap(row.gold, row.extracted) : null;
+  const gap =
+    row.gold && row.extracted && typeof row.gold.value === 'number'
+      ? relativeGap({ value: row.gold.value, unit: row.gold.unit }, row.extracted)
+      : null;
   const showExtractedSpan = row.outcome === 'value_mismatch' || row.outcome === 'unit_error';
 
   return (
