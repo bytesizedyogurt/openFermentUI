@@ -27,16 +27,40 @@ function Frame({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ChipDemo({ paperId }: { paperId: string }) {
+  // The sentence is built from the paper's own record rather than hardcoded, so
+  // the lesson cannot drift away from what the source actually reports. A demo
+  // that misquotes a real paper to teach citation would be self-refuting.
+  const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
+  const record = useStore((s) =>
+    s.records.find((r) => r.paperId === paperId && r.isPrimary) ??
+    s.records.find((r) => r.paperId === paperId),
+  );
+
+  if (!paper || !record) {
+    return (
+      <Frame label="Live component — citation chip">
+        <p className="text-body text-ink-soft">
+          No catalogued record for {paperId} in this session — it may have been reset.
+        </p>
+      </Frame>
+    );
+  }
+
   return (
     <Frame label="Live component — hover the chip">
       <p className="text-reading font-serif">
-        Mixotrophic cw15 cultures reached a specific growth rate of 0.118 h⁻¹ in acetate-limited
-        flask culture <CitationChip paperId={paperId} />.
+        {paper.title} reports {fieldName(record.field)} of{' '}
+        <span className="font-mono text-body">
+          {record.value} {record.unit}
+        </span>{' '}
+        <CitationChip paperId={paperId} />.
       </p>
       <p className="text-caption text-ink-soft mt-2">
         That chip is the same component used in agent answers, protocol references, and simulation
-        assumptions. Hover it for the source span; click through to read the paper with the span
-        highlighted in place.
+        assumptions. Hover it for the source, click through to read the paper. The sentence above is
+        assembled from record{' '}
+        <span className="font-mono">{record.id}</span> at render time — change the record and this
+        line changes with it.
       </p>
     </Frame>
   );
@@ -89,7 +113,12 @@ function RecordCard({ recordId }: { recordId: string }) {
 function UnitPlayground() {
   const [field, setField] = useState<FieldId>('growth_rate_mu');
   const def = ONTOLOGY_BY_ID[field];
-  const [value, setValue] = useState<{ value: number; unit: string }>({ value: 0.118, unit: 'h⁻¹' });
+  // Seeded the same way switching fields reseeds it, so the starting value is a
+  // point in the ontology's declared range rather than a leftover literal.
+  const [value, setValue] = useState<{ value: number; unit: string }>(() => ({
+    value: Number(((def.range[0] + def.range[1]) / 4).toPrecision(2)),
+    unit: def.canonicalUnit,
+  }));
 
   return (
     <Frame label="Live unit field — type into it">
@@ -453,9 +482,9 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
 export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) {
   switch (embed) {
     case 'chip-demo':
-      return <ChipDemo paperId={arg ?? 'SP-001'} />;
+      return <ChipDemo paperId={arg ?? 'M7'} />;
     case 'record-card':
-      return <RecordCard recordId={arg ?? 'ex-0001'} />;
+      return <RecordCard recordId={arg ?? 'r-C2-1'} />;
     case 'unit-playground':
       return <UnitPlayground />;
     case 'mini-queue':
