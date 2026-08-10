@@ -1,9 +1,21 @@
-// openFerment Sim — protocol library (OF-DES-001 §8.11, §15).
+// openFerment — protocol library (OF-DES-001 §8.11, §15), rewired onto the
+// real literature corpus of OF-COR-001 §20.
 //
-// SYNTHETIC CONTENT. These are executable-shaped bench procedures written for
-// the working simulation. Every literature reference points at the synthetic
-// corpus in src/data/corpus/*; no real publication, DOI or researcher is cited
-// anywhere in this file (BUILD-SPEC §20).
+// WHAT IS AND IS NOT SOURCED HERE. Every `paperId`, `recordId`, `sourceRecordId`
+// and step `ref` below resolves to a real entry in src/data/corpus/*, and every
+// claim attributed to one of those entries is a claim OF-COR-001 actually makes.
+// The papers themselves have NOT been ingested — each holds a single section of
+// curator's notes — so nothing here quotes a paper's own words, and no finding,
+// number or condition has been invented to fill a gap.
+//
+// Bench procedure is not the same thing as a literature claim. Volumes, speeds,
+// vessel sizes, wash steps and timings below are ordinary laboratory craft,
+// written so a competent undergraduate can execute them. They are NOT
+// transcriptions from the cited sources and are not presented as such. Where a
+// step needs a number the corpus does not supply — an electroporation pulse
+// setting, a precipitation temperature, an OD-to-dry-weight factor, a PEF field
+// strength — the step says so plainly and instructs the operator to determine,
+// use and record their own value. That refusal is the feature, not a gap.
 //
 // Scaling contract (src/engine/scale.ts):
 //   'per_batch_volume'  scales with the run multiplier
@@ -16,23 +28,25 @@ import type { Protocol } from './types';
 
 export const PROTOCOLS: Protocol[] = [
   // ───────────────────────────────────────────────────────────────────────
-  // PR-TAP-01 — TAP medium, two versions so the diff view has real content.
+  // PR-TAP-01 — TAP medium. Two versions, so the diff view has real content:
+  // the v1.1 change is a change of cited trace-element source (M1 → M3).
   // ───────────────────────────────────────────────────────────────────────
   {
     id: 'PR-TAP-01',
     title: 'TAP medium preparation (1 L base)',
     category: 'media',
-    organisms: ['cw15', 'cc1690'],
+    organisms: ['cw15', 'uvm4'],
     bsl: 1,
     purpose:
-      'Prepare Tris-acetate-phosphate medium for mixotrophic culture of Chlamydomonas reinhardtii from dry Tris and three concentrated stocks, with the acetate charge set so the finished medium lands at pH 7.0 without back-titration.',
+      'Prepare Tris-acetate-phosphate medium for mixotrophic culture of cell-wall-deficient Chlamydomonas reinhardtii from dry Tris and three concentrated stocks, at whatever scale the run needs.',
     currentVersion: '1.1',
-    provenanceNote: 'Derived from SP-001, SP-002 · curated by SMKC',
+    provenanceNote:
+      'Grounded in M1 (Harris, The Chlamydomonas Sourcebook — the TAP reference), M2 (Gorman & Levine 1965 — the original Tris-acetate-phosphate formulation) and M3 (Kropat et al. 2011 — the revised trace-element supplement). OF-COR-001 catalogues all three bibliographically and transcribes exactly one composition figure: standard TAP contains 0.38 g L⁻¹ NH₄Cl (r-M8-3). Every other charge below is this laboratory’s working sheet, not a transcription, and must be checked against the Sourcebook table before first use.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Composition transcribed from the fully specified flask formulation in SP-001 §Materials and Methods, with the acetate charge rounded to 1.00 g L⁻¹ and a conventional titrate-to-setpoint pH step.',
+          'Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8).',
         baseBatch: { value: 1, unit: 'L', label: 'batch' },
         materials: [
           {
@@ -41,23 +55,22 @@ export const PROTOCOLS: Protocol[] = [
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.01,
-            sourceRecordId: 'ex-0005',
           },
           {
             name: 'Glacial acetic acid',
             amount: 1.0,
-            unit: 'g',
+            unit: 'mL',
             scaling: 'per_batch_volume',
-            precision: 0.01,
+            precision: 0.05,
           },
           {
             name: 'Ammonium chloride',
-            amount: 0.375,
+            amount: 0.38,
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.005,
-            stock: { conc: 0.015, unit: 'mL' },
-            sourceRecordId: 'ex-0006',
+            stock: { conc: 0.0152, unit: 'mL' },
+            sourceRecordId: 'r-M8-3',
           },
           {
             name: 'Magnesium sulfate heptahydrate',
@@ -66,7 +79,6 @@ export const PROTOCOLS: Protocol[] = [
             scaling: 'per_batch_volume',
             precision: 0.001,
             stock: { conc: 0.004, unit: 'mL' },
-            sourceRecordId: 'ex-0019',
           },
           {
             name: 'Calcium chloride dihydrate',
@@ -75,19 +87,17 @@ export const PROTOCOLS: Protocol[] = [
             scaling: 'per_batch_volume',
             precision: 0.001,
             stock: { conc: 0.002, unit: 'mL' },
-            sourceRecordId: 'ex-0017',
           },
           {
-            name: 'Potassium phosphate',
+            name: 'Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)',
             amount: 1.61,
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.01,
             stock: { conc: 0.161, unit: 'mL' },
-            sourceRecordId: 'ex-0010',
           },
           {
-            name: 'Chelated trace element solution',
+            name: 'Hutner trace element solution',
             amount: 1,
             unit: 'mL',
             scaling: 'per_batch_volume',
@@ -136,7 +146,7 @@ export const PROTOCOLS: Protocol[] = [
           'Glacial acetic acid is corrosive and its vapour is a respiratory irritant. Dispense it in a fume hood in nitrile gloves and splash goggles, and add the acid to the bulk medium — never medium to acid.',
           'Autoclave at 121 °C on a liquids cycle with slow exhaust. Do not open the chamber until the display reads below 80 °C and the pressure gauge has fully returned to zero; bottles of hot medium boil over violently when depressurised.',
           'Cap media bottles one quarter turn back from finger tight before autoclaving. A fully sealed bottle can rupture in the chamber.',
-          'The chelated trace element stock contains soluble copper, zinc and molybdenum salts. Collect rinse water in the heavy-metal waste carboy rather than the sink.',
+          'The trace element stock carries soluble copper, zinc, manganese and molybdenum salts. Collect rinse water in the heavy-metal waste carboy rather than the sink.',
         ],
         steps: [
           {
@@ -151,22 +161,22 @@ export const PROTOCOLS: Protocol[] = [
           {
             id: 'p3',
             text: 'Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.',
-            refs: ['ex-0005'],
+            note: 'OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.',
+            refs: ['M1'],
           },
           {
             id: 'p4',
             text: 'Add {{stock:Ammonium chloride}} of salt stock S. That single addition delivers the whole salt charge: {{qty:Ammonium chloride}} ammonium chloride, {{qty:Magnesium sulfate heptahydrate}} magnesium sulfate heptahydrate and {{qty:Calcium chloride dihydrate}} calcium chloride dihydrate.',
             note: 'Invert the stock bottle three times before drawing. Magnesium settles out of stock S within a week at bench temperature.',
-            refs: ['ex-0006', 'ex-0019'],
+            refs: ['r-M8-3'],
           },
           {
             id: 'p5',
-            text: 'Add {{stock:Potassium phosphate}} of phosphate stock P, delivering {{qty:Potassium phosphate}} of potassium phosphate. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears.',
-            refs: ['ex-0010'],
+            text: 'Add {{stock:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate stock P, delivering {{qty:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate salts. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears.',
           },
           {
             id: 'p6',
-            text: 'Add {{qty:Chelated trace element solution}} of chelated trace element solution. The stock should be clear amber; discard any bottle showing a rust-coloured precipitate, which means the chelate has broken down and the iron is no longer bioavailable.',
+            text: 'Add {{qty:Hutner trace element solution}} of Hutner trace element solution. The stock should be clear amber; discard any bottle showing a rust-coloured precipitate, which means the chelate has broken down and the iron is no longer bioavailable.',
           },
           {
             id: 'p7',
@@ -174,7 +184,8 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'p8',
-            text: 'Read the pH and adjust to 7.0 by dropwise addition of 1 M hydrochloric acid or 1 M sodium hydroxide as required.',
+            text: 'Read the pH and adjust to the setpoint on your medium sheet by dropwise addition of 1 M hydrochloric acid or 1 M sodium hydroxide. Record the setpoint you used and the volume of titrant.',
+            note: 'OF-COR-001 records no pH setpoint for TAP. Whatever value your sheet carries, write it on the batch record — a medium released against an unrecorded setpoint cannot be compared with the next batch.',
           },
           {
             id: 'p9',
@@ -198,7 +209,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'p13',
-            text: 'Withdraw 5 mL from one bottle into a clean tube and confirm that the pH of the cooled medium lies between 6.8 and 7.2.',
+            text: 'Withdraw 5 mL from one bottle into a clean tube and confirm the pH of the cooled medium is within 0.2 units of the setpoint recorded at step p8.',
           },
           {
             id: 'p14',
@@ -209,17 +220,23 @@ export const PROTOCOLS: Protocol[] = [
         estMinutes: { active: 40, total: 105 },
         references: [
           {
-            paperId: 'SP-001',
-            note: 'Fully specified TAP composition used for the reference flask configuration.',
+            paperId: 'M1',
+            note: 'The Chlamydomonas Sourcebook — the TAP reference this recipe descends from. Catalogued only; OF-COR-001 transcribes its cultivation conditions (22 °C, 50–100 µE m⁻² s⁻¹, mixotrophic) but not its medium composition.',
           },
-          { recordId: 'ex-0005', note: 'Tris base at 2.42 g L⁻¹ — verified, gold.' },
-          { recordId: 'ex-0010', note: 'Potassium phosphate to 1.61 g L⁻¹ — gold annotation.' },
+          {
+            paperId: 'M2',
+            note: 'Gorman & Levine 1965 — the original Tris-acetate-phosphate formulation. Author string flagged [verify] in the corpus; no composition transcribed.',
+          },
+          {
+            recordId: 'r-M8-3',
+            note: 'Standard TAP contains 0.38 g L⁻¹ NH₄Cl — the only TAP composition figure in the corpus. Curated, unverified against the source PDF.',
+          },
         ],
       },
       {
         version: '1.1',
         changelog:
-          'Acetate charge revised from 1.00 to 1.05 g L⁻¹, and the titrate-to-setpoint pH step replaced by a pass/fail check. Rationale: in this recipe acetic acid is not an additive trimmed against a pH target, it is stoichiometrically paired with the Tris. SP-002 makes the pairing explicit by doubling acetate to 2.10 g L⁻¹ alongside 4.84 g L⁻¹ Tris in the TAP-2T variant (record ex-0016, still unverified — the extractor transcribed the unit as mg L⁻¹). Setting acetate to 1.05 g L⁻¹ against 2.42 g L⁻¹ Tris lands the medium at pH 7.0 unaided, matching SP-001. Back-titrating with hydrochloric acid, which v1.0 permitted, added up to 4 mmol L⁻¹ of chloride and left the acetate charge short, shortening the carbon-limited batch by roughly 3 h.',
+          'Trace-element supplement changed from the Hutner solution to the revised mineral nutrient supplement of Kropat et al. 2011 (M3), which OF-COR-001 §14 records as the modern trace-element recipe and whose title states that it increases biomass and growth rate in C. reinhardtii. The corpus transcribes neither recipe, so this is a change of cited source and stock identity, not a change of transcribed numbers: the volume added per litre is unchanged and the operator makes the stock to the published Kropat table. Second change: the titrate-to-setpoint pH step is replaced by a pass/fail check. Acetic acid in this medium is stoichiometrically paired with the Tris rather than trimmed against a target, and back-titrating with hydrochloric acid loads the medium with chloride while leaving the acetate carbon charge short.',
         baseBatch: { value: 1, unit: 'L', label: 'batch' },
         materials: [
           {
@@ -228,23 +245,22 @@ export const PROTOCOLS: Protocol[] = [
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.01,
-            sourceRecordId: 'ex-0005',
           },
           {
             name: 'Glacial acetic acid',
-            amount: 1.05,
-            unit: 'g',
+            amount: 1.0,
+            unit: 'mL',
             scaling: 'per_batch_volume',
-            precision: 0.01,
+            precision: 0.05,
           },
           {
             name: 'Ammonium chloride',
-            amount: 0.375,
+            amount: 0.38,
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.005,
-            stock: { conc: 0.015, unit: 'mL' },
-            sourceRecordId: 'ex-0006',
+            stock: { conc: 0.0152, unit: 'mL' },
+            sourceRecordId: 'r-M8-3',
           },
           {
             name: 'Magnesium sulfate heptahydrate',
@@ -253,7 +269,6 @@ export const PROTOCOLS: Protocol[] = [
             scaling: 'per_batch_volume',
             precision: 0.001,
             stock: { conc: 0.004, unit: 'mL' },
-            sourceRecordId: 'ex-0019',
           },
           {
             name: 'Calcium chloride dihydrate',
@@ -262,19 +277,17 @@ export const PROTOCOLS: Protocol[] = [
             scaling: 'per_batch_volume',
             precision: 0.001,
             stock: { conc: 0.002, unit: 'mL' },
-            sourceRecordId: 'ex-0017',
           },
           {
-            name: 'Potassium phosphate',
+            name: 'Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)',
             amount: 1.61,
             unit: 'g',
             scaling: 'per_batch_volume',
             precision: 0.01,
             stock: { conc: 0.161, unit: 'mL' },
-            sourceRecordId: 'ex-0010',
           },
           {
-            name: 'Chelated trace element solution',
+            name: 'Revised trace element solution (Kropat 2011)',
             amount: 1,
             unit: 'mL',
             scaling: 'per_batch_volume',
@@ -324,7 +337,7 @@ export const PROTOCOLS: Protocol[] = [
           'Autoclave at 121 °C on a liquids cycle with slow exhaust. Do not open the chamber until the display reads below 80 °C and the pressure gauge has fully returned to zero; bottles of hot medium boil over violently when depressurised.',
           'Cap media bottles one quarter turn back from finger tight before autoclaving. A fully sealed bottle can rupture in the chamber.',
           'Weigh Tris inside a draught shield and wipe the balance pan afterwards. The dust is an eye irritant and it carries into the next weighing.',
-          'The chelated trace element stock contains soluble copper, zinc and molybdenum salts. Collect rinse water in the heavy-metal waste carboy rather than the sink.',
+          'The revised trace element stock is a set of individually complexed transition-metal salts. Make it up in a fume hood, keep the concentrates labelled separately until they are combined, and collect all rinse water in the heavy-metal waste carboy.',
         ],
         steps: [
           {
@@ -339,33 +352,34 @@ export const PROTOCOLS: Protocol[] = [
           {
             id: 'p3',
             text: 'Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.',
-            refs: ['ex-0005'],
+            refs: ['M2'],
+            note: 'The Tris–acetate pairing is the defining feature of the formulation M2 introduced. OF-COR-001 does not transcribe M2’s numbers, so treat the charges on this sheet as local values traceable to the Sourcebook, not as figures read from the 1965 paper.',
           },
           {
             id: 'p4',
             text: 'Add {{stock:Ammonium chloride}} of salt stock S. That single addition delivers the whole salt charge: {{qty:Ammonium chloride}} ammonium chloride, {{qty:Magnesium sulfate heptahydrate}} magnesium sulfate heptahydrate and {{qty:Calcium chloride dihydrate}} calcium chloride dihydrate.',
             note: 'Invert the stock bottle three times before drawing. Magnesium settles out of stock S within a week at bench temperature.',
-            refs: ['ex-0006', 'ex-0019'],
+            refs: ['r-M8-3'],
           },
           {
             id: 'p5',
-            text: 'Add {{stock:Potassium phosphate}} of phosphate stock P, delivering {{qty:Potassium phosphate}} of potassium phosphate. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears.',
-            refs: ['ex-0010'],
+            text: 'Add {{stock:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate stock P, delivering {{qty:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate salts. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears.',
           },
           {
             id: 'p6',
-            text: 'Add {{qty:Chelated trace element solution}} of chelated trace element solution. The stock should be clear amber; discard any bottle showing a rust-coloured precipitate, which means the chelate has broken down and the iron is no longer bioavailable.',
+            text: 'Add {{qty:Revised trace element solution (Kropat 2011)}} of the revised trace element solution, made up to the Kropat table with each metal complexed separately before combining. Do not substitute the Hutner stock at this step: the two supplements are not interchangeable and the batch record must say which was used.',
+            refs: ['M3'],
+            note: 'OF-COR-001 §14 records M3 as the modern trace-element recipe and its title claims increased biomass and growth rate; the corpus does not transcribe the table itself, and this platform holds no measured comparison between the two supplements. If you want that comparison, it is an experiment, not a lookup.',
           },
           {
             id: 'p7',
-            text: 'In the fume hood, add {{qty:Glacial acetic acid}} of glacial acetic acid straight into the vortex (about 1.00 mL per litre of batch at 20 °C, ρ = 1.049 g mL⁻¹). This addition is both the acetate carbon charge and the titrant for the Tris.',
+            text: 'In the fume hood, add {{qty:Glacial acetic acid}} of glacial acetic acid straight into the vortex. This addition is both the acetate carbon charge and the titrant for the Tris.',
             note: 'Weigh the acid rather than pipetting it at any scale above 2 L. Glacial acetic acid wets a polypropylene tip badly and volumetric delivery carries a 3–4 % error that propagates straight into the starting pH.',
           },
           {
             id: 'p8',
-            text: 'Stir for 2 min, then read the pH. The medium must land at 7.0 ± 0.1 with no further addition. Do not titrate to a setpoint: a reading outside that window means the Tris or the acetate was weighed wrong, and the batch is remade rather than corrected.',
-            note: 'A batch reading 7.3–7.5 has usually had Tris weighed against the formula weight of the hydrochloride salt. A batch reading below 6.8 has had acid added twice.',
-            refs: ['ex-0018', 'ex-0016'],
+            text: 'Stir for 2 min, then read the pH and record it. Do not titrate to a setpoint. A reading outside the window on your medium sheet means the Tris or the acetate was weighed wrong, and the batch is remade rather than corrected.',
+            note: 'A batch reading high has usually had Tris weighed against the formula weight of the hydrochloride salt. A batch reading low has had acid added twice. Neither is fixed by titration — both are fixed by reweighing.',
           },
           {
             id: 'p9',
@@ -389,29 +403,31 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'p13',
-            text: 'Withdraw 5 mL from one bottle into a clean tube and read the pH of the cooled medium. Release the batch only if it reads between 6.9 and 7.1 and the medium is water-clear. A faint white haze is calcium phosphate; discard the batch and repeat step 5 more slowly.',
+            text: 'Withdraw 5 mL from one bottle into a clean tube and read the pH of the cooled medium. Release the batch only if it is within 0.1 units of the pre-autoclave reading and the medium is water-clear. A faint white haze is calcium phosphate; discard the batch and repeat step p5 more slowly.',
           },
           {
             id: 'p14',
-            text: 'Label each bottle with the medium name, this protocol version, the preparation date and your initials. Store at room temperature in the dark and use within 8 weeks.',
-            note: 'Discard at the first sign of turbidity. TAP is unbuffered against microbial growth and a contaminated bottle will not always look cloudy until it is heavily overgrown.',
+            text: 'Label each bottle with the medium name, this protocol version, the trace-element supplement used, the preparation date and your initials. Store at room temperature in the dark and use within 8 weeks.',
+            note: 'The supplement identity belongs on the label, not only on the batch sheet. A growth difference between two campaigns is uninterpretable if nobody can tell which bottles carried which trace elements.',
           },
         ],
         estMinutes: { active: 35, total: 100 },
         references: [
           {
-            paperId: 'SP-001',
-            note: 'Fully specified TAP composition; glacial acetic acid to 1.05 g L⁻¹ sets the initial pH to 7.0 without further adjustment.',
-          },
-          { recordId: 'ex-0005', note: 'Tris base at 2.42 g L⁻¹ — verified, gold.' },
-          { recordId: 'ex-0006', note: 'Ammonium chloride at 0.375 g L⁻¹ — verified, gold.' },
-          {
-            recordId: 'ex-0016',
-            note: 'Acetate doubled to 2.10 g L⁻¹ alongside doubled Tris in the TAP-2T variant. Unverified: the extractor transcribed the unit as mg L⁻¹, so treat the value and not the unit as the evidence.',
+            paperId: 'M3',
+            note: 'Kropat et al. 2011, the revised mineral nutrient supplement — the source this version switches to. Author string flagged [verify] in OF-COR-001; the table itself is not transcribed, so the recipe must be taken from the paper.',
           },
           {
-            paperId: 'SP-002',
-            note: 'Buffer and nitrogen variants; terminal pH reaches 8.4 in standard medium, which is why the starting point matters.',
+            paperId: 'M1',
+            note: 'The Sourcebook baseline the v1.0 formulation descends from, retained as the cultivation reference.',
+          },
+          {
+            paperId: 'M2',
+            note: 'The original Tris-acetate-phosphate formulation. Cited for provenance of the Tris–acetate pairing, not for any number.',
+          },
+          {
+            recordId: 'r-M8-3',
+            note: 'Standard TAP contains 0.38 g L⁻¹ NH₄Cl. Curated from OF-COR-001 §14 M8 and unverified against the source PDF — note that M8 quotes it as the standard against which it reduced nitrogen, not as its own measurement.',
           },
         ],
       },
@@ -419,178 +435,25 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-TAP-02 — plates and stock maintenance. Fixed vs scalable quantities.
-  // ───────────────────────────────────────────────────────────────────────
-  {
-    id: 'PR-TAP-02',
-    title: 'TAP agar plates and cw15 stock maintenance',
-    category: 'media',
-    organisms: ['cw15'],
-    bsl: 1,
-    purpose:
-      'Pour TAP agar plates from prepared medium and use them to hold a cw15 working stock by monthly streak transfer, with a defined retirement point back to the cryopreserved bank.',
-    currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-001, SP-003 · curated by SMKC',
-    versions: [
-      {
-        version: '1.0',
-        changelog:
-          'Initial release. Pour temperature and plate-drying practice follow the maintenance regime described in SP-001 §Materials and Methods.',
-        baseBatch: { value: 500, unit: 'mL', label: 'of agar' },
-        materials: [
-          {
-            name: 'TAP medium (prepared per PR-TAP-01)',
-            amount: 500,
-            unit: 'mL',
-            scaling: 'per_batch_volume',
-            precision: 10,
-          },
-          {
-            name: 'Bacteriological agar',
-            amount: 7.5,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 0.1,
-          },
-          {
-            name: '90 mm Petri dishes',
-            amount: 22,
-            unit: 'dishes',
-            scaling: 'per_batch_volume',
-            precision: 1,
-          },
-          {
-            name: 'Autoclave indicator tape',
-            amount: 1,
-            unit: 'strip',
-            scaling: 'fixed',
-            precision: 1,
-          },
-          {
-            name: 'Parafilm',
-            amount: 1,
-            unit: 'roll',
-            scaling: 'fixed',
-            precision: 1,
-          },
-          {
-            name: 'Sterile disposable inoculation loops',
-            amount: 4,
-            unit: 'loops',
-            scaling: 'fixed',
-            precision: 1,
-          },
-          {
-            name: 'cw15 working stock slant',
-            amount: 1,
-            unit: 'slant',
-            scaling: 'fixed',
-            precision: 1,
-          },
-        ],
-        equipment: [
-          '1 L borosilicate bottle with a vented closure',
-          'Autoclave with a 121 °C liquids cycle',
-          'Water bath set to 50 °C with a rack that takes a 1 L bottle',
-          'Laminar flow hood, or a clean bench with a Bunsen burner',
-          'Infrared thermometer',
-          'Level pouring surface or a plate carousel',
-          '25 °C illuminated incubator and a 22 °C dim maintenance rack',
-        ],
-        safety: [
-          'Molten agar at 90 °C adheres to skin and causes deep scalds. Carry the bottle two-handed in a heat-resistant carrier and never pour above shoulder height.',
-          'Autoclave at 121 °C for 20 min on a liquids cycle and do not open the chamber until it reads below 80 °C and the pressure has fully released.',
-          'Never re-melt agar in a microwave in a capped bottle. Superheated agar erupts when the bottle is moved; use the water bath, or an uncapped vessel with the closure resting loose.',
-          'cw15 is a BSL-1 organism, but used plates still go to the autoclave at 121 °C for 20 min before disposal, not into general refuse.',
-        ],
-        steps: [
-          {
-            id: 'g1',
-            text: 'Add {{qty:TAP medium (prepared per PR-TAP-01)}} of prepared TAP medium to a 1 L bottle and swirl in {{qty:Bacteriological agar}} of bacteriological agar. The agar will not dissolve at room temperature; wet the powder evenly and leave it as a suspension.',
-          },
-          {
-            id: 'g2',
-            text: 'Cap loosely, mark the cap with {{qty:Autoclave indicator tape}} of indicator tape and autoclave at 121 °C for 20 min. The agar dissolves during the cycle, so do not attempt to melt it beforehand.',
-            timerSec: 1200,
-            timerLabel: 'Autoclave 121 °C, 20 min',
-          },
-          {
-            id: 'g3',
-            text: 'Move the bottle to the 50 °C water bath and hold it there until an infrared thermometer reads 50–55 °C on the bottle shoulder and the glass is comfortable to hold through a glove.',
-            timerSec: 2400,
-            timerLabel: 'Temper agar to 50 °C',
-            note: 'Pouring above 60 °C warps the dishes and drives condensation onto the lids. Below 45 °C the agar sets on the way out of the neck and leaves a ridged surface that cannot be streaked cleanly.',
-          },
-          {
-            id: 'g4',
-            text: 'Lay out {{qty:90 mm Petri dishes}} Petri dishes in the hood in overlapping rows with the lids on, and let the airflow run for 5 min before the first pour.',
-          },
-          {
-            id: 'g5',
-            text: 'Pour each dish to a depth of about 4 mm, roughly 22 mL, until the base is just covered with no meniscus climbing the wall. Flame the bottle neck between rows.',
-            note: 'Pass a lit burner flame briefly across the surface of any plate carrying bubbles, before the agar sets. A bubble at the surface becomes a false colony under the dissecting scope.',
-          },
-          {
-            id: 'g6',
-            text: 'Leave the poured plates undisturbed on a level surface until fully set, then dry them lid-ajar in the hood with the airflow running.',
-            timerSec: 1800,
-            timerLabel: 'Dry plates in the hood, 30 min',
-          },
-          {
-            id: 'g7',
-            text: 'Invert the dried plates, sleeve them and store at 4 °C in the dark. Use within 6 weeks; a plate that has dried enough to show a shrunken edge gives false-negative growth.',
-          },
-          {
-            id: 'g8',
-            text: 'To transfer the working stock, take the {{qty:cw15 working stock slant}} cw15 slant from the 22 °C maintenance rack and let it reach room temperature. Using one of the {{qty:Sterile disposable inoculation loops}} sterile loops, lift a loopful of green biomass from the slant surface without cutting into the agar.',
-            refs: ['SP-001'],
-          },
-          {
-            id: 'g9',
-            text: 'Streak a fresh plate in three sectors, discarding the loop between sectors, then seal the plate edge with {{qty:Parafilm}} of parafilm stretched only lightly.',
-            note: 'A fully occlusive parafilm seal starves the culture of CO₂ and the colonies stay pinpoint. One light turn that still admits gas is the intent.',
-          },
-          {
-            id: 'g10',
-            text: 'Incubate at 25 °C under continuous illumination at 40–60 µmol m⁻² s⁻¹ until single colonies reach 1–2 mm, typically 5–7 d, then move the plate to the 22 °C dim maintenance rack. Transfer monthly, and retire the lineage back to a cryopreserved vial after ten serial transfers.',
-            refs: ['ex-0004', 'ex-0007'],
-            note: 'Serial transfer on acetate selects steadily for faster heterotrophic growth. Ten passages is the point at which the drift becomes measurable against the bank in a flask growth check.',
-          },
-        ],
-        estMinutes: { active: 55, total: 150 },
-        references: [
-          {
-            paperId: 'SP-001',
-            note: 'Maintenance on TAP agar slants at 22 °C under continuous dim illumination, subcultured every three weeks.',
-          },
-          { recordId: 'ex-0004', note: 'Culture temperature 25 °C — verified.' },
-          {
-            recordId: 'ex-0007',
-            note: 'Flask illumination 60 µmol m⁻² s⁻¹ at the vessel base — unverified.',
-          },
-        ],
-      },
-    ],
-  },
-
-  // ───────────────────────────────────────────────────────────────────────
-  // PR-SEED-01 — multi-day seed train with an inoculation-density calculation.
+  // PR-SEED-01 — seed train. Every density target is operator-determined:
+  // the corpus holds no growth rate and no OD factor for cw15 itself.
   // ───────────────────────────────────────────────────────────────────────
   {
     id: 'PR-SEED-01',
     title: 'cw15 seed train: plate to 50 mL to 400 mL',
     category: 'culture',
-    organisms: ['cw15'],
+    organisms: ['cw15', 'uvm4'],
     bsl: 1,
     purpose:
-      'Raise a 400 mL mid-exponential cw15 seed from a single colony through a 50 mL intermediate, timed so the seed reaches the production vessel inside its exponential window rather than after it.',
+      'Raise a 400 mL mid-exponential cw15 or UVM4 seed from a single colony through a 50 mL intermediate, timed so the seed reaches the production vessel inside its exponential window rather than after it.',
     currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-001, SP-010 · curated by SMKC',
+    provenanceNote:
+      'Grounded in M1 (standard cultivation: 22 °C, continuous light at 50–100 µE m⁻² s⁻¹, mixotrophic), M7 (the corpus’s only specific-growth-rate record, r-M7-1) and B5 (wall-deficient strains are much more susceptible to shear and osmotic stress). OF-COR-001 holds no growth rate, doubling time or OD-to-dry-weight factor for cw15 or UVM4 themselves, so every density target below is one the operator measures and records rather than one this protocol supplies.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Stage timings, illumination geometry and the mid-exponential harvest rule follow the reference flask configuration in SP-001; the OD-to-dry-weight factors come from SP-010.',
+          'Initial release. Illumination and temperature follow the standard cultivation conditions catalogued for M1. Stage timings are scheduling conventions, not measured figures, and are labelled as such at the steps where it matters.',
         baseBatch: { value: 400, unit: 'mL', label: 'production seed' },
         materials: [
           {
@@ -652,7 +515,7 @@ export const PROTOCOLS: Protocol[] = [
         ],
         equipment: [
           'Orbital shaker with a 25 mm orbit and an LED illumination panel beneath the platform',
-          'Temperature-controlled shaker enclosure or a 25 °C warm room',
+          'Temperature-controlled shaker enclosure or a 22 °C warm room',
           'Class II cabinet or clean bench with a Bunsen burner',
           'Spectrophotometer reading at 750 nm with 10 mm cuvettes',
           'Spherical quantum sensor for photon flux verification',
@@ -660,91 +523,101 @@ export const PROTOCOLS: Protocol[] = [
         safety: [
           '70 % ethanol is flammable. Let sprayed surfaces flash off completely before lighting the burner, and never spray toward an open flame.',
           'Silicone foam plugs must stay dry. A plug wetted by a splash or by condensate is a contamination path; replace it rather than drying it.',
-          'Baffled flasks at 130 rpm walk on a shaker platform. Check every clamp before starting and never reach into a moving platform to reseat a flask.',
-          'Autoclave all spent cw15 culture at 121 °C for 20 min before it goes to drain, even though the strain is BSL-1.',
+          'Baffled flasks walk on a shaker platform. Check every clamp before starting and never reach into a moving platform to reseat a flask.',
+          'The illumination panel runs hot under the platform. Do not rest a gloved hand on it while reseating flasks, and keep the ethanol spray off it entirely.',
+          'Autoclave all spent culture at 121 °C for 20 min before it goes to drain. cw15 is BSL-1, but a transformed seed carries a selectable marker and leaves the building only through the autoclave.',
         ],
         steps: [
           {
             id: 's1',
-            text: 'Day 1. Verify the shaker: 25 °C in the enclosure, 130 rpm, and 60 ± 5 µmol m⁻² s⁻¹ measured with the quantum sensor held at the working liquid depth above the platform. Record all three on the batch sheet before any medium is dispensed.',
-            refs: ['ex-0004', 'ex-0007'],
+            text: 'Day 1. Set and verify the shaker before any medium is dispensed: 22 °C in the enclosure, continuous illumination measured with the quantum sensor at the working liquid depth, and a shaking speed you have recorded. Record all three on the batch sheet.',
+            refs: ['M1'],
+            note: 'OF-COR-001 §14 records standard cultivation for this organism as liquid or agar-solidified TAP at 22 °C under continuous light at 50–100 µE m⁻² s⁻¹, mixotrophic. Set the flux inside that band and write down the number you measured, not the number you intended.',
           },
           {
             id: 's2',
-            text: 'Dispense {{qty:TAP medium — stage 1 charge}} of TAP medium into the {{qty:250 mL baffled flask with silicone foam plug}} 250 mL baffled flask, plug it, and equilibrate it on the running shaker.',
-            timerSec: 3600,
-            timerLabel: 'Equilibrate stage 1 medium to 25 °C',
+            text: 'Choose the shaking speed for the geometry you are running and keep it modest. Wall-deficient strains are much more susceptible to shear and osmotic stress than the walled wild type, and a seed train is the cheapest place in the process to discover that. Record the speed; it is a process parameter, not a preference.',
+            refs: ['B5'],
           },
           {
             id: 's3',
-            text: 'Select one well-isolated green colony 1–2 mm across from the {{qty:TAP agar plate with single colonies}} plate.',
-            note: 'Avoid colonies at the plate edge and any colony inside a confluent streak. Both carry a different light and nutrient history from the plate interior, and that history shows up as a longer lag.',
+            text: 'Dispense {{qty:TAP medium — stage 1 charge}} of TAP medium into the {{qty:250 mL baffled flask with silicone foam plug}} 250 mL baffled flask, plug it, and equilibrate it on the running shaker.',
+            timerSec: 3600,
+            timerLabel: 'Equilibrate stage 1 medium to 22 °C',
           },
           {
             id: 's4',
-            text: 'Lift the colony with a sterile loop and swirl the loop in the stage 1 medium until no visible green remains on the plastic. Return the flask to the shaker and note the clock time as the start of stage 1.',
+            text: 'Select one well-isolated green colony 1–2 mm across from the TAP agar plate carrying single colonies ({{qty:TAP agar plate with single colonies}} for this seed train).',
+            note: 'Avoid colonies at the plate edge and any colony inside a confluent streak. Both carry a different light and nutrient history from the plate interior, and that history shows up as a longer lag.',
           },
           {
             id: 's5',
-            text: 'Incubate stage 1 for 48 h. The culture should reach OD750 0.6–1.0. If it is below 0.4 at 48 h, discard it and restart from a fresh colony rather than extending the incubation.',
-            timerSec: 172800,
-            timerLabel: 'Stage 1 incubation, 48 h',
-            note: 'A slow start almost always reflects a colony that was already past exponential phase on the plate. Extending the incubation recovers the density but not the physiology.',
+            text: 'Lift the colony with a sterile loop and swirl the loop in the stage 1 medium until no visible green remains on the plastic. Return the flask to the shaker and note the clock time as the start of stage 1.',
           },
           {
             id: 's6',
-            text: 'Day 3. Read the OD750 of the stage 1 culture against a TAP medium blank, diluting into the 0.1–0.8 linear range and multiplying back. Record the reading; the stage 2 inoculum volume is computed from it.',
-            refs: ['ex-0080'],
+            text: 'Incubate stage 1 for 48 h, then read it. Read the culture rather than the clock: if it is still visually pale, give it longer and record the extension rather than carrying a thin seed forward.',
+            timerSec: 172800,
+            timerLabel: 'Stage 1 incubation, 48 h',
+            note: '48 h is a scheduling convention for this flask geometry, not a measured figure. OF-COR-001 records no lag phase, doubling time or growth rate for cw15 or UVM4, so there is no literature value to schedule against — build your own growth curve on your own hardware and replace this interval with it.',
           },
           {
             id: 's7',
-            text: 'Compute the stage 2 inoculum volume for a target starting OD750 of 0.05: V_seed (mL) = 0.05 × 400 / OD_seed. A stage 1 culture at OD750 0.80 therefore contributes 25 mL, and the medium charge is reduced by that volume so the working volume stays at 400 mL.',
-            refs: ['ex-0001', 'ex-0080'],
-            note: 'Inoculating high to save a day does not work. Above a starting OD750 of about 0.1 the culture enters the light-limited region of the flask before it has finished its lag, and the fitted growth rate falls by roughly 15 % against the 0.118 h⁻¹ reference.',
+            text: 'Day 3. Read the OD750 of the stage 1 culture against a TAP medium blank, diluting into the linear range of your instrument and multiplying back. Record the reading; the stage 2 inoculum volume is computed from it.',
           },
           {
             id: 's8',
-            text: 'Dispense {{qty:TAP medium — stage 2 charge}} of TAP medium, less the computed inoculum volume, into the {{qty:2 L baffled flask with silicone foam plug}} 2 L baffled flask using the {{qty:Sterile 10 mL serological pipettes}} sterile serological pipettes.',
+            text: 'Compute the stage 2 inoculum volume from your measured OD and your chosen starting OD: V_seed (mL) = OD_target × 400 / OD_seed. Reduce the stage 2 medium charge by that volume so the working volume stays at 400 mL.',
+            note: 'Pick OD_target from your own growth curve and keep it constant across a campaign. Inoculating high to save a day does not work: above the point where the flask becomes light-limited the culture enters that regime before it has finished its lag, and the fitted growth rate falls.',
           },
           {
             id: 's9',
-            text: 'Transfer the computed volume of stage 1 culture into the stage 2 flask, working within 150 mm of the burner. Swirl once, reseat the foam plug and return the flask to the shaker at 130 rpm.',
+            text: 'Dispense {{qty:TAP medium — stage 2 charge}} of TAP medium, less the computed inoculum volume, into the {{qty:2 L baffled flask with silicone foam plug}} 2 L baffled flask using the {{qty:Sterile 10 mL serological pipettes}} sterile serological pipettes.',
           },
           {
             id: 's10',
+            text: 'Transfer the computed volume of stage 1 culture into the stage 2 flask, working within 150 mm of the burner. Swirl once, reseat the foam plug and return the flask to the shaker at the recorded speed.',
+          },
+          {
+            id: 's11',
             text: 'Incubate stage 2 for 24 h without sampling. Opening the flask during the first day costs more in contamination risk than an early reading is worth.',
             timerSec: 86400,
             timerLabel: 'Stage 2 incubation, 24 h',
           },
           {
-            id: 's11',
-            text: 'Day 4. Read OD750 hourly from 20 h. Harvest the seed at OD750 1.2–1.6, which is 0.50–0.67 g L⁻¹ dry cell weight at the exponential-phase cw15 factor of 0.42 g L⁻¹ OD⁻¹ and lies inside the exponential window.',
-            refs: ['ex-0001', 'ex-0080'],
+            id: 's12',
+            text: 'Day 4. Read OD750 at intervals short enough to place the harvest point on your own curve, and harvest at the OD750 your curve puts in mid-exponential. Do not use a number from this protocol: there isn’t one.',
+            refs: ['r-M7-1'],
+            note: 'For sampling-interval planning only: the corpus’s single specific-growth-rate record is 0.087 h⁻¹, measured on the walled strain cc124 in TAP with a 0 % CO₂ feed (r-M7-1). It is a different strain in a different flask and it is a planning aid, not a prediction for cw15. Sample at least four times an estimated doubling.',
           },
           {
-            id: 's12',
-            text: 'Deliver the seed to the production vessel within 30 min of the final reading, at ambient temperature and without centrifugation. Record the harvest OD750, the elapsed time from colony pick and the flask identifier on the batch sheet.',
-            refs: ['ex-0086'],
-            note: 'Never inoculate from a stationary-phase seed. Stationary cw15 carries a starch load that lengthens the lag by 6–10 h, and its OD-to-dry-weight factor has already shifted from 0.42 to about 0.55 g L⁻¹ OD⁻¹, so the inoculum is heavier than the optical reading suggests.',
+            id: 's13',
+            text: 'Convert the harvest OD to dry cell weight only if you have determined the factor yourself under PR-OD-01. There is no literature factor to fall back on for this strain, so an unconverted OD with its wavelength stated is a more honest seed record than a converted one with a borrowed factor.',
+          },
+          {
+            id: 's14',
+            text: 'Deliver the seed to the production vessel within 30 min of the final reading, at ambient temperature and without centrifugation. Record the harvest OD750, the elapsed time from colony pick, the flask identifier and the measured photon flux on the batch sheet.',
+            refs: ['B5'],
+            note: 'Do not centrifuge a wall-deficient seed to concentrate it before inoculation. The strain’s shear and osmotic fragility is exactly the property that makes it attractive downstream, and it is a liability here.',
           },
         ],
         estMinutes: { active: 80, total: 4400 },
         references: [
           {
-            paperId: 'SP-001',
-            note: 'Mid-exponential preculture, 60 µmol m⁻² s⁻¹ from below, 130 rpm, inoculation to OD750 0.05.',
+            paperId: 'M1',
+            note: 'Standard cultivation for C. reinhardtii: TAP at 22 °C under continuous light at 50–100 µE m⁻² s⁻¹, mixotrophic.',
           },
           {
-            recordId: 'ex-0001',
-            note: 'μ = 0.118 h⁻¹ for cw15 under this flask configuration — verified, gold.',
+            recordId: 'r-M7-1',
+            note: 'Specific growth rate 0.087 h⁻¹ — strain cc124, TAP, 0 % CO₂ feed. The corpus’s cleanest growth-rate record, and not a cw15 measurement. Curated, unverified.',
           },
           {
-            recordId: 'ex-0080',
-            note: 'OD750→DCW factor 0.42 g L⁻¹ OD⁻¹ for exponential cw15 — verified, gold.',
+            paperId: 'B5',
+            note: 'Records that cell-wall-deficient strains have reduced motility and mating ability and are much more susceptible to shear and osmotic stress — the constraint behind the shaking-speed and no-centrifugation rules here.',
           },
           {
-            recordId: 'ex-0086',
-            note: 'Stationary-phase cw15 requires 0.55 g L⁻¹ OD⁻¹ — gold annotation.',
+            recordId: 'r-M5-1',
+            note: 'Maximum density 1.23 ± 0.13 g L⁻¹ within 96 h for wild-type CC-137c in TAP. Included as an order-of-magnitude sanity bound for a mixotrophic batch; it is a walled wild-type figure, not a seed-train target.',
           },
         ],
       },
@@ -752,240 +625,223 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-PBR-01 — 2 L stirred vessel, sampling sub-checklist, concurrent timers.
+  // PR-TRANS-01 — NEW. Nuclear transformation by electroporation. Selection
+  // concentration from A1 (r-A1-2); time to colony from B5 (r-B5-1/2/3);
+  // the NHEJ screening caveat from A4. Pulse parameters are operator-set.
   // ───────────────────────────────────────────────────────────────────────
   {
-    id: 'PR-PBR-01',
-    title: 'Mixotrophic batch culture, 2 L stirred vessel',
+    id: 'PR-TRANS-01',
+    title: 'Nuclear transformation of cw15 by electroporation',
     category: 'culture',
-    organisms: ['cw15'],
+    organisms: ['cw15', 'uvm4'],
     bsl: 1,
     purpose:
-      'Run a mixotrophic cw15 batch in a 2 L jacketed stirred vessel under controlled temperature, pH, dissolved oxygen and illumination, with a fixed sampling schedule that supports a defensible growth-rate fit and a closed carbon balance.',
+      'Introduce a linearised nuclear expression cassette into cell-wall-deficient C. reinhardtii by electroporation, select on paromomycin, and screen enough independent transformants that random-locus integration is accounted for rather than assumed away.',
     currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-001, SP-002, SP-003 · curated by SMKC',
+    provenanceNote:
+      'Grounded in A1 (paromomycin selection at 10 µg mL⁻¹ for this lineage, r-A1-2), B5 (colonies appear on selection in 7–10 days for cw15 and UVM4 against 15–20 days for walled WT12, r-B5-1/r-B5-2/r-B5-3) and A4 (integration proceeds by non-homologous end joining at random loci, with homologous recombination at much lower frequency). OF-COR-001 transcribes no pulse parameters, DNA masses, cell densities or transformation efficiencies, so those are set, measured and recorded by the operator — this protocol does not supply values it does not have.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Illumination and pH control follow SP-003; the acid-only pH strategy and the nitrogen-versus-carbon termination diagnostic follow SP-002.',
-        baseBatch: { value: 2, unit: 'L', label: 'working volume' },
+          'Initial release. Replaces nothing; the platform previously had no transformation protocol. Selection concentration and the incubation window are the two literature-backed numbers in the procedure and are cited at the steps that use them.',
+        baseBatch: { value: 8, unit: 'reactions', label: 'electroporation set' },
         materials: [
           {
-            name: 'TAP medium (prepared per PR-TAP-01)',
-            amount: 1800,
-            unit: 'mL',
-            scaling: 'per_batch_volume',
-            precision: 50,
-          },
-          {
-            name: 'cw15 seed culture (from PR-SEED-01)',
+            name: 'Mid-exponential cw15 culture',
             amount: 200,
             unit: 'mL',
             scaling: 'per_batch_volume',
             precision: 10,
           },
           {
-            name: 'Antifoam emulsion, 10 % v/v silicone',
-            amount: 0.4,
-            unit: 'mL',
+            name: 'Linearised expression cassette DNA',
+            amount: 4,
+            unit: 'µg',
             scaling: 'per_batch_volume',
             precision: 0.1,
+            stock: { conc: 0.5, unit: 'µL' },
           },
           {
-            name: '1 M sulfuric acid',
-            amount: 100,
+            name: 'TAP–sucrose electroporation buffer',
+            amount: 25,
             unit: 'mL',
             scaling: 'per_batch_volume',
-            precision: 10,
+            precision: 1,
           },
           {
-            name: '0.5 M sodium hydroxide',
-            amount: 100,
+            name: '0.4 cm electroporation cuvettes',
+            amount: 8,
+            unit: 'cuvettes',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'TAP recovery medium',
+            amount: 80,
             unit: 'mL',
             scaling: 'per_batch_volume',
-            precision: 10,
+            precision: 5,
           },
           {
-            name: 'Sterile 10 mL sampling syringes',
-            amount: 16,
-            unit: 'syringes',
-            scaling: 'per_batch_volume',
-            precision: 1,
-          },
-          {
-            name: '0.2 µm syringe filters',
-            amount: 16,
-            unit: 'filters',
-            scaling: 'per_batch_volume',
-            precision: 1,
-          },
-          {
-            name: 'Pre-dried 0.7 µm glass-fibre filters',
-            amount: 48,
-            unit: 'filters',
-            scaling: 'per_batch_volume',
-            precision: 1,
-          },
-          {
-            name: 'pH calibration buffer sachets, 7.00 and 4.01',
-            amount: 2,
-            unit: 'sachets',
-            scaling: 'fixed',
-            precision: 1,
-          },
-          {
-            name: 'Dissolved-oxygen probe electrolyte',
+            name: 'Paromomycin sulfate',
             amount: 5,
-            unit: 'mL',
-            scaling: 'fixed',
-            precision: 0.5,
+            unit: 'mg',
+            scaling: 'per_batch_volume',
+            precision: 0.1,
+            stock: { conc: 10, unit: 'mL' },
+            sourceRecordId: 'r-A1-2',
           },
           {
-            name: '0.2 µm inlet air filter',
+            name: 'TAP agar selection plates, 25 mL each',
+            amount: 20,
+            unit: 'plates',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Sterile 50 mL conical tubes',
+            amount: 10,
+            unit: 'tubes',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Sterile 3 mm glass plating beads',
             amount: 1,
-            unit: 'filter',
+            unit: 'bottle',
+            scaling: 'fixed',
+            precision: 1,
+          },
+          {
+            name: 'Untransformed recipient control aliquot',
+            amount: 1,
+            unit: 'aliquot',
             scaling: 'fixed',
             precision: 1,
           },
         ],
         equipment: [
-          '2 L jacketed glass bioreactor with headplate, Rushton impeller and ring sparger',
-          'Bench controller with temperature, pH, dissolved-oxygen and agitation loops',
-          'Gel-filled pH electrode and a polarographic dissolved-oxygen electrode',
-          'Dimmable white LED panel and a spherical quantum sensor',
-          'Recirculating chiller/heater set to 25 °C',
-          'Peristaltic pumps for acid, base and antifoam',
-          'Autoclave with a chamber that takes the assembled 2 L vessel',
-          'Spectrophotometer at 750 nm, vacuum filtration manifold, 105 °C drying oven',
+          'Square-wave electroporator with a 0.4 cm cuvette chamber, a lid interlock and a time-constant readout',
+          'Swing-out benchtop centrifuge capable of 1,000 × g with the brake disabled',
+          'Class II cabinet or clean bench',
+          'Spectrophotometer reading at 750 nm',
+          '22 °C illuminated incubator with a shelf that can be shaded for the recovery period',
+          'Haemocytometer or automated cell counter',
+          'Gridded plate template or a colony counter',
         ],
         safety: [
-          'Torque the headplate bolts in a diagonal sequence to the manufacturer figure. An unevenly loaded glass vessel can fail on the pressure rise in the autoclave.',
-          'Confirm the vessel vents through the 0.2 µm inlet filter and that the exhaust line is unclamped before autoclaving. A sealed bioreactor is a pressure vessel.',
-          'Sterilise the assembled vessel at 121 °C for 45 min and do not move it until the chamber reads below 80 °C and the internal pressure has equalised through the vent filter.',
-          '1 M sulfuric acid and 0.5 M sodium hydroxide are corrosive. Prime both pumps into a waste beaker inside a spill tray, in goggles, before connecting the lines to the headplate.',
-          'The rear face of the LED panel reaches 55 °C. Keep the acid, base and antifoam lines clear of it and never drape tubing across the panel.',
-          'Do not open the sample port while the vessel is at positive pressure. Reduce the sparge to zero and let the headspace equalise first.',
+          'The electroporator stores lethal energy in its capacitor bank. Load and unload cuvettes only with the chamber lid closed and the charge-ready lamp dark, and never bridge the cuvette electrodes with a tip, forceps or a finger to investigate a failed pulse — discharge through the instrument’s own bleed circuit.',
+          'Paromomycin sulfate is an aminoglycoside: nephrotoxic and ototoxic, and the dry powder is readily airborne. Weigh it in a balance enclosure wearing nitrile gloves and eye protection, make the 10 mg mL⁻¹ stock behind a sash, and mark every plate so the next user knows it carries antibiotic.',
+          'A cuvette that arcs sprays hot buffer and aerosolised cells when the lid is opened. If the time constant collapses or you hear a snap, leave the lid closed for 30 s before opening, then discard the cuvette into the autoclave stream.',
+          'Wall-deficient recipients lyse on osmotic shock. Treat the resulting lysate as an aerosol source: cap tubes before vortexing and wipe the cuvette holder down between reactions.',
+          'Everything that has held transgenic algae — plates, cuvettes, tubes, pipettes — is autoclaved at 121 °C for 20 min before disposal, and transformation waste is kept in a stream separate from untransformed culture so a containment question can be answered from the log.',
         ],
         steps: [
           {
-            id: 'b1',
-            text: 'Assemble the 2 L vessel: fit the Rushton impeller 20 mm above the ring sparger, install the sparger, baffles and exhaust condenser, and torque the headplate bolts in a diagonal sequence to the manufacturer figure.',
+            id: 't1',
+            text: 'Grow the recipient to mid-exponential phase under PR-SEED-01, in TAP at 22 °C under continuous light in the 50–100 µE m⁻² s⁻¹ band recorded as standard cultivation for this organism. Use {{qty:Mid-exponential cw15 culture}} of culture for the set.',
+            refs: ['M1'],
           },
           {
-            id: 'b2',
-            text: 'Charge the vessel with {{qty:TAP medium (prepared per PR-TAP-01)}} of TAP medium and add {{qty:Antifoam emulsion, 10 % v/v silicone}} of antifoam emulsion. Leave the remaining working volume for the seed.',
+            id: 't2',
+            text: 'Confirm the construct before the cells are touched: linearised outside the expression cassette, sequence-verified, and carrying a selectable marker that matches the selection you are about to apply.',
+            refs: ['A5'],
+            note: 'If this is the second cassette of a two-gene programme, it needs its own distinct marker. OF-COR-001 §2 records that UVM4 and UVM11 can hardly be crossed, so each transgene has to be introduced by a separate transformation rather than combined by mating.',
           },
           {
-            id: 'b3',
-            text: 'Calibrate the pH electrode on the bench with the {{qty:pH calibration buffer sachets, 7.00 and 4.01}} buffer sachets, then install it. Charge the dissolved-oxygen electrode with {{qty:Dissolved-oxygen probe electrolyte}} of fresh electrolyte and install it, but do not calibrate it yet.',
-            note: 'pH is calibrated before sterilisation and never after. The gel electrode drifts by up to 0.15 units through a liquids cycle, and recalibrating inside a sterile vessel is not possible.',
+            id: 't3',
+            text: 'Harvest the cells gently: 1,000 × g for 5 min at room temperature in a swing-out rotor with the brake off. Do not use a fixed-angle rotor at higher speed to save time.',
+            refs: ['B5'],
+            timerSec: 300,
+            timerLabel: 'Harvest spin, 1,000 × g, 5 min',
+            note: 'Wall-deficient strains are much more susceptible to shear and osmotic stress than walled strains. Cells lost here are lost invisibly — the pellet still looks right.',
           },
           {
-            id: 'b4',
-            text: 'Fit the {{qty:0.2 µm inlet air filter}} inlet air filter, clamp every addition line except the vent, and sterilise the assembled vessel at 121 °C for 45 min on a liquids cycle.',
-            timerSec: 2700,
-            timerLabel: 'Sterilise vessel, 121 °C, 45 min',
+            id: 't4',
+            text: 'Resuspend the pellet in {{qty:TAP–sucrose electroporation buffer}} of TAP–sucrose electroporation buffer, to the cell density your electroporator’s validated Chlamydomonas programme calls for. Count the suspension and record the density: it is a denominator you will need later.',
           },
           {
-            id: 'b5',
-            text: 'Move the cooled vessel to the controller skid, connect the jacket to the chiller at 25 °C and start agitation at 200 rpm. Polarise the dissolved-oxygen electrode for 6 h before calibration; carry out steps b6 and b7 while it polarises.',
-            timerSec: 21600,
-            timerLabel: 'Polarise DO electrode, 6 h',
-            refs: ['ex-0004'],
+            id: 't5',
+            text: 'Assemble the set on ice. Distribute the resuspended cells evenly between the {{qty:0.4 cm electroporation cuvettes}} in the set, and deliver {{stock:Linearised expression cassette DNA}} of the 500 ng µL⁻¹ DNA stock across the set — {{qty:Linearised expression cassette DNA}} of DNA in total. Reserve one cuvette as a no-DNA mock and hold the {{qty:Untransformed recipient control aliquot}} untransformed aliquot unpulsed.',
+            note: 'Both controls earn their place. The mock tells you whether your selection is tight; the unpulsed aliquot tells you whether the cells were viable before the instrument touched them.',
           },
           {
-            id: 'b6',
-            text: 'Mount the LED panel 120 mm from the vessel wall and let it warm up before measuring. Set the incident photon flux density to 150 µmol m⁻² s⁻¹ at the vessel surface with the spherical quantum sensor, and record both the reading and the panel-to-glass distance.',
-            timerSec: 1800,
-            timerLabel: 'LED panel warm-up, 30 min',
-            refs: ['ex-0023'],
-            note: 'White LED output falls 5–8 % over the first 20 min as the junction warms. A flux set from a cold panel is systematically high, and it is the single most common reason two runs on the same rig disagree.',
+            id: 't6',
+            text: 'Pulse each cuvette on your electroporator’s validated C. reinhardtii programme. Record the field strength, capacitance, pulse length and the measured time constant for every reaction on the batch sheet.',
+            refs: ['A4'],
+            note: 'This protocol deliberately specifies no pulse parameters. OF-COR-001 catalogues A4’s systematic review of transformation methods, selection genes and efficiency factors but does not transcribe any settings, and inventing them here would be worse than useless. A run without recorded settings cannot be repeated, so the recording is the requirement.',
           },
           {
-            id: 'b7',
-            text: 'Prime the acid and base pumps with {{qty:1 M sulfuric acid}} of 1 M sulfuric acid and {{qty:0.5 M sodium hydroxide}} of 0.5 M sodium hydroxide, then set the pH loop to 7.0 with a 0.1 unit dead band. Expect acid demand only: acetate uptake drives this culture alkaline.',
-            refs: ['ex-0018'],
-            note: 'Deviation-prone. If the base pump runs at all in the first 12 h, either the electrode is reading low or the medium was back-titrated during preparation. Stop and resolve it before the culture is committed.',
+            id: 't7',
+            text: 'Recover without selection. Dilute each reaction into {{qty:TAP recovery medium}} of TAP recovery medium split between {{qty:Sterile 50 mL conical tubes}}, and hold at 22 °C in dim light with very gentle agitation for 16 h.',
+            timerSec: 57600,
+            timerLabel: 'Non-selective recovery, 16 h',
+            note: 'Selection applied straight after the pulse kills cells that would have recovered. Dim light, not darkness: the recovery is mixotrophic and acetate does most of the work, but the culture should not be light-starved on top of being electroporated.',
           },
           {
-            id: 'b8',
-            text: 'With polarisation complete, sparge nitrogen at 0.2 vvm until the dissolved-oxygen signal is flat and set that point to 0 %. Switch to air at 0.2 vvm and 400 rpm, wait for a stable reading and set it to 100 %.',
-            timerSec: 900,
-            timerLabel: 'Nitrogen zero, 15 min',
+            id: 't8',
+            text: 'Plate the recovered cells on {{qty:TAP agar selection plates, 25 mL each}} selection plates containing paromomycin at 10 µg mL⁻¹, the concentration A1 records for this strain lineage. Deliver it from {{stock:Paromomycin sulfate}} of 10 mg mL⁻¹ stock — {{qty:Paromomycin sulfate}} of paromomycin across the set — added to molten agar below 55 °C. Spread with {{qty:Sterile 3 mm glass plating beads}} of sterile glass beads.',
+            refs: ['r-A1-2'],
+            note: 'A1 also records zeocin as a selection agent for this lineage, but OF-COR-001 gives no zeocin concentration. If you select on zeocin, the concentration is yours to determine and record — there is nothing in the corpus to copy.',
           },
           {
-            id: 'b9',
-            text: 'Set the dissolved-oxygen cascade to hold 30 % of air saturation on agitation between 200 and 700 rpm, at a fixed 0.2 vvm air sparge. Confirm the loop responds by dropping the setpoint to 20 % and watching agitation move within 60 s, then restore it.',
+            id: 't9',
+            text: 'Incubate the plates at 22 °C under continuous light and start counting at day 5. Colonies appear on selection in 7–10 days for cw15 and UVM4; the walled strain WT12 takes 15–20 days in the same comparison, so a cw15 plate still blank at day 12 points at a failed pulse or dead selection rather than at slow growth.',
+            refs: ['r-B5-1', 'r-B5-2', 'r-B5-3'],
+            note: 'That 7–10 versus 15–20 day contrast is one of the concrete operational advantages of a wall-deficient host, and it is worth logging the actual day of first appearance every time so the platform accumulates its own distribution rather than repeating the corpus figure.',
           },
           {
-            id: 'b10',
-            text: 'Inoculate with {{qty:cw15 seed culture (from PR-SEED-01)}} of mid-exponential seed through the septum port, to a starting OD750 of 0.10–0.15 in a 2.0 L final working volume. Record the clock time as t = 0.',
-            refs: ['ex-0001'],
+            id: 't10',
+            text: 'Pick at least 24 independent colonies and re-streak each to a fresh selection plate. Do not pool them and do not treat colonies from one plate as replicates of one another.',
+            refs: ['A4'],
+            note: 'Integration proceeds by non-homologous end joining at random loci, with homologous recombination occurring at much lower frequency, and insertional events can cause deletion, recombination or translocation near the integration site. Every transformant is therefore a different strain with a different genomic context, and screening is mandatory rather than good practice.',
           },
           {
-            id: 'b11',
-            text: 'Sample at t = 0, then every 3 h to 36 h and every 6 h thereafter, using one of the {{qty:Sterile 10 mL sampling syringes}} sampling syringes each time. Complete every line below before the sample leaves the bench.',
-            multiCheck: [
-              'Reduce the sparge to zero and let the headspace equalise before opening the port',
-              'Discard the first 5 mL as line hold-up',
-              'Withdraw 10 mL and record controller time, temperature, pH, dissolved oxygen and agitation',
-              'Read OD750 against a TAP blank, diluting to fall between 0.1 and 0.8',
-              'Filter 5 mL through a 0.2 µm syringe filter into a labelled vial and freeze at −20 °C for acetate',
-              'Filter 10 mL onto a pre-dried glass-fibre filter, wash twice with ammonium formate, dry at 105 °C',
-              'Restore the sparge and confirm the dissolved-oxygen trace recovers within 5 min',
-            ],
-            refs: ['ex-0080'],
+            id: 't11',
+            text: 'Screen the re-streaked clones for expression and rank them. Carry at least the top three forward, not just the best one.',
+            refs: ['r-A1-1'],
+            note: 'For calibration of expectations only: A1 records that UVM4 and UVM11 reach about 0.2 % of total soluble protein for intracellular GFP/YFP reporters. That is a reporter figure in this lineage, not a target for a casein cassette, and OF-COR-001 contains no algal casein expression figure of any kind — there has never been a published one.',
           },
           {
-            id: 'b12',
-            text: 'Dry the gravimetric filters to constant mass and weigh them against filter blanks carried through the identical wash and dry cycle. Subtract the blank before computing dry cell weight.',
-            refs: ['ex-0080'],
-            note: 'At the dilute end of the run the filter blank is the largest single source of bias. Two blanks per sampling day, from the same filter lot, is the minimum that makes the early points usable.',
-          },
-          {
-            id: 'b13',
-            text: 'Fit the specific growth rate by unweighted linear regression of ln(DCW) against time, over the window in which the residuals show no systematic trend — typically 6 h to 30 h. Expect 0.09–0.12 h⁻¹ for cw15 in this configuration.',
-            refs: ['ex-0001', 'ex-0011', 'ex-0070'],
-            note: 'A fitted rate below 0.07 h⁻¹ points at light or oxygen limitation in the vessel, not at the strain. Check the recorded photon flux and whether agitation ever hit its ceiling on the dissolved-oxygen cascade before blaming the inoculum.',
-          },
-          {
-            id: 'b14',
-            text: 'Track culture pH against the cumulative acid demand. A culture that stops consuming acid before 40 h has exhausted its acetate; a culture whose pH climbs above 7.5 despite acid addition has a failed pump or a blocked line. Log either as a deviation with the elapsed time and the last good reading.',
-            refs: ['SP-002'],
-            note: 'Deviation-prone. Standard TAP terminates on nitrogen at around 52 h and on carbon later, and which limit you hit is diagnostic of the batch. Do not correct it silently by topping up.',
-          },
-          {
-            id: 'b15',
-            text: 'Harvest when dry cell weight has been flat across two consecutive samples, typically 54–60 h at 1.5–2.0 g L⁻¹. Record the final dry cell weight, the terminal pH and the total acid consumed.',
-            refs: ['ex-0003', 'ex-0022'],
-          },
-          {
-            id: 'b16',
-            text: 'Shut down: stop the LED panel and all pumps, drain the culture to the harvest carboy through the bottom port, and pass the vessel to the clean-in-place SOP within 2 h. Culture left standing in a warm vessel is markedly harder to clean.',
+            id: 't12',
+            text: 'Archive the clones and close the record. Compute transformation efficiency as colonies per µg of DNA per cell plated, using the density recorded at step t4 and the DNA mass at step t5, and enter it with both denominators stated.',
+            note: 'OF-COR-001 records no transformation-efficiency value for this lineage, so your figure is the first one this platform holds in the transformation_efficiency field. Report it with the pulse settings, the recipient strain and the marker — an efficiency without those is not comparable to anything, including your own next run.',
           },
         ],
-        estMinutes: { active: 430, total: 4320 },
+        estMinutes: { active: 210, total: 15840 },
         references: [
           {
-            paperId: 'SP-003',
-            note: 'Matched-illumination photoautotrophic and mixotrophic culture; 150 µmol m⁻² s⁻¹ at the vessel surface.',
+            paperId: 'A1',
+            note: 'The foundational strain paper for this lineage: cw15-302 → Elow47 → UVM4/UVM11, and the source of the selection concentration used here.',
           },
           {
-            paperId: 'SP-002',
-            note: 'Nitrogen-versus-carbon termination diagnostic and the alkaline pH drift of standard TAP.',
+            recordId: 'r-A1-2',
+            note: 'Selection used paromomycin at 10 µg mL⁻¹. Curated from OF-COR-001 §2 A1, unverified against the source PDF.',
           },
           {
-            recordId: 'ex-0023',
-            note: 'Incident photon flux density 150 µmol m⁻² s⁻¹ — verified.',
+            recordId: 'r-A1-1',
+            note: '~0.2 % of total soluble protein for intracellular GFP/YFP in UVM4/UVM11 — the reporter ceiling this lineage is quoted at.',
           },
           {
-            recordId: 'ex-0070',
-            note: 'μ = 0.094 h⁻¹ for mixotrophic cw15 in a stirred vessel — verified, gold.',
+            paperId: 'B5',
+            note: 'Direct comparison of transformation in cw15, UVM4 and walled WT12, and the statement of the shear and osmotic fragility trade-off.',
           },
           {
-            recordId: 'ex-0003',
-            note: 'Final biomass density 1.62 g L⁻¹ at 54 h under acetate limitation — verified.',
+            recordId: 'r-B5-1',
+            note: 'Time to colony 7–10 d for cw15 on selection (point value entered as the midpoint).',
+          },
+          {
+            recordId: 'r-B5-3',
+            note: 'Time to colony 15–20 d for walled WT12 — the contrast that makes the wall-deficient host operationally cheaper.',
+          },
+          {
+            paperId: 'A4',
+            note: 'Review of nuclear transformation: NHEJ integration at random loci, low-frequency homologous recombination, and insertional deletion, recombination or translocation near the integration site. The reason step t10 exists.',
+          },
+          {
+            paperId: 'A5',
+            note: 'The UVM4/UVM11 mating limitation: strains can hardly be crossed, so each transgene needs a separate transformation with a distinct marker.',
           },
         ],
       },
@@ -993,23 +849,25 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-OD-01 — analytics SOP; the coefficient step carries the od_dcw_factor.
+  // PR-OD-01 — analytics. The corpus holds no OD-to-dry-weight factor for any
+  // strain, so this SOP determines one rather than looking one up.
   // ───────────────────────────────────────────────────────────────────────
   {
     id: 'PR-OD-01',
     title: 'OD750 and dry cell weight SOP',
     category: 'analytics',
-    organisms: ['cw15', 'cc1690'],
+    organisms: ['cw15', 'uvm4'],
     bsl: 1,
     purpose:
-      'Measure optical density at 750 nm and gravimetric dry cell weight on the same sample, and convert between them using a factor determined for this strain, wavelength and growth phase rather than a literature default.',
+      'Measure optical density at 750 nm and gravimetric dry cell weight on the same sample, and derive the conversion factor between them for this strain, wavelength and growth phase — because there is no literature factor for this host to borrow.',
     currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-010 · curated by SMKC',
+    provenanceNote:
+      'OF-COR-001 contains no OD-to-dry-weight factor for cw15, UVM4 or any C. reinhardtii strain. It does contain gravimetric biomass densities (M5, M8) that bound what a plausible result looks like. This SOP is therefore laboratory method, cited to the corpus only for those sanity bounds; the factor it produces is a measurement the operator makes, and the platform treats it as user provenance rather than literature.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Blanking against spent medium, the filter-blank subtraction and the through-origin regression follow SP-010 §Materials and Methods.',
+          'Initial release. Blanking against spent medium, filter-blank subtraction and a through-origin regression, with the corpus biomass records used as plausibility bounds on the gravimetric result rather than as targets.',
         baseBatch: { value: 12, unit: 'samples', label: 'per run' },
         materials: [
           {
@@ -1065,6 +923,7 @@ export const PROTOCOLS: Protocol[] = [
         safety: [
           'The 105 °C oven and its trays cause contact burns. Move filters with forceps into a room-temperature desiccator and never weigh a hot filter — convection over the pan makes it read light by up to 0.4 mg.',
           'Vacuum flasks implode if scratched. Inspect the sidearm flask before each run and keep it inside a mesh sleeve while under vacuum.',
+          'Ammonium formate decomposes to ammonia in the drying oven. Run the oven vented, and do not leave a large batch of freshly washed filters in a closed oven overnight in an unventilated room.',
           'Culture filtrate and spent medium go to the autoclave waste stream, not to drain.',
         ],
         steps: [
@@ -1081,13 +940,12 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'o3',
-            text: 'Invert each culture sample three times immediately before reading. Settled cw15 re-suspends completely, but a sample read 30 s after mixing has already lost 2–3 % of its absorbance to sedimentation.',
+            text: 'Invert each culture sample three times immediately before reading. Settled cells re-suspend completely, but a sample read well after mixing has already lost absorbance to sedimentation.',
           },
           {
             id: 'o4',
-            text: 'Read OD750 in a 10 mm cuvette against {{qty:Spent cell-free medium}} of spent cell-free medium as the blank. Dilute any sample reading above 0.85 into the same spent medium and multiply back.',
-            refs: ['ex-0080'],
-            note: 'Blank against spent medium from the same culture, not against fresh medium. Above OD750 0.85 multiple scattering bends the response and the reading stops being proportional to biomass, which is why the dilution is mandatory rather than optional.',
+            text: 'Read OD750 in a 10 mm cuvette against {{qty:Spent cell-free medium}} of spent cell-free medium as the blank. Establish the top of your instrument’s linear range once, with a dilution series, and dilute every sample that exceeds it into the same spent medium before reading.',
+            note: 'Blank against spent medium from the same culture, not against fresh medium. Above the linear limit, multiple scattering bends the response and the reading stops being proportional to biomass — which is why the dilution is mandatory rather than optional.',
           },
           {
             id: 'o5',
@@ -1095,7 +953,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'o6',
-            text: 'Wash each filter twice with 10 mL of ammonium formate isotonic with the medium; a full run consumes {{qty:Ammonium formate wash solution}}. Ammonium formate removes medium salts and volatilises in the oven, whereas a deionised water wash lyses cw15 and loses soluble solids.',
+            text: 'Wash each filter twice with 10 mL of ammonium formate isotonic with the medium; a full run consumes {{qty:Ammonium formate wash solution}}. Ammonium formate removes medium salts and volatilises in the oven, whereas a deionised water wash lyses wall-deficient cells and loses soluble solids.',
           },
           {
             id: 'o7',
@@ -1109,28 +967,36 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'o9',
-            text: 'Regress dry cell weight on OD750 through the origin, over the range in which the residuals show no curvature. Exponential-phase cw15 should return 0.42 g L⁻¹ OD⁻¹; stationary-phase cw15 returns about 0.55 and the walled wild type cc1690 about 0.47. Re-determine the factor whenever the strain, the wavelength or the growth phase changes.',
-            refs: ['ex-0080', 'ex-0086', 'ex-0081', 'ex-0082'],
-            note: 'Do not carry a 680 nm factor into a 750 nm workflow. Pigment absorbance inflates the optical reading at 680 nm, giving 0.31 g L⁻¹ OD⁻¹, and that factor drifts a further 11 % with light acclimation. Record ex-0082 also has the OD basis dropped from its unit string, so it reads as a plain concentration.',
+            text: 'Sanity-check the magnitude before you trust it. A mixotrophic TAP batch of walled wild-type CC-137c reached a maximum density of 1.23 ± 0.13 g L⁻¹ within 96 h, and a nutrient-optimised culture 1.68 g L⁻¹; heterotrophic microalgal cultures reach 50–100 g L⁻¹ and autotrophic ones around 30 g L⁻¹. A flask result far outside the low single digits is a weighing artefact until it is repeated.',
+            refs: ['r-M5-1', 'r-M8-4', 'r-M8-7', 'r-M8-8'],
+          },
+          {
+            id: 'o10',
+            text: 'Regress dry cell weight on OD750 through the origin, over the range in which the residuals show no curvature. Report the slope with its confidence interval, the strain, the wavelength, the growth phase and the number of points behind it, and re-determine it whenever any of those change.',
+            note: 'OF-COR-001 holds no OD-to-dry-weight factor for cw15, UVM4 or any other C. reinhardtii strain, so there is no literature default and no fallback. Do not carry a factor across wavelengths either: pigment absorbance inflates the optical reading at 680 nm relative to 750 nm, and the two are not interconvertible by a constant.',
+          },
+          {
+            id: 'o11',
+            text: 'Enter the factor in the platform as a user measurement, with the run identifier attached. It is your number, not a literature value, and anything computed from it inherits that provenance.',
           },
         ],
         estMinutes: { active: 90, total: 480 },
         references: [
           {
-            paperId: 'SP-010',
-            note: 'Wavelength and growth phase dominate OD-to-dry-weight error; spent-medium blanking and filter-blank subtraction.',
+            recordId: 'r-M5-1',
+            note: 'Maximum density 1.23 ± 0.13 g L⁻¹ within 96 h, wild-type CC-137c in TAP. Used here as a plausibility bound on a gravimetric result, not as a target.',
           },
           {
-            recordId: 'ex-0080',
-            note: 'cw15 exponential-phase factor 0.42 g L⁻¹ OD⁻¹ — verified, gold.',
+            recordId: 'r-M8-4',
+            note: '1.68 g L⁻¹ biomass at the response-surface nutrient optimum — the upper end of the flask-scale range in this corpus.',
           },
           {
-            recordId: 'ex-0086',
-            note: 'Stationary-phase cw15 factor 0.55 g L⁻¹ OD⁻¹ — gold annotation.',
+            recordId: 'r-M8-7',
+            note: 'Heterotrophic microalgal cultures can reach 50–100 g L⁻¹ dry biomass — the other end of the scale, and the reason a mixotrophic flask result in that range means a weighing error.',
           },
           {
-            recordId: 'ex-0081',
-            note: 'Walled wild type cc1690 requires 0.47 g L⁻¹ OD⁻¹ — verified.',
+            paperId: 'M5',
+            note: 'Source of the mixotrophic TAP density and productivity figures used as bounds.',
           },
         ],
       },
@@ -1138,38 +1004,34 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-HARV-01 — per_unit_biomass consumables; disruption reference chips.
+  // PR-DISRUPT-01 — NEW, replacing the old bead-mill harvest protocol. The
+  // economic keystone: J10's 31 ± 6 % vs 11 ± 3 % against J11's mechanical
+  // ceiling. Treatment conditions are operator-set; the yields are cited.
   // ───────────────────────────────────────────────────────────────────────
   {
-    id: 'PR-HARV-01',
-    title: 'Harvest and bead-mill disruption of cw15',
+    id: 'PR-DISRUPT-01',
+    title: 'Harvest and mild PEF disruption of cw15',
     category: 'harvest',
-    organisms: ['cw15'],
+    organisms: ['cw15', 'uvm4'],
     bsl: 1,
     purpose:
-      'Concentrate a mixotrophic cw15 culture by centrifugation and disrupt the paste in a single bead-mill pass, scoring both the disruption efficiency and the soluble protein release against an undisrupted control drawn from the same feed.',
+      'Concentrate a cw15 culture and release intracellular protein by pulsed electric field under mild conditions, scored against a bead-milled arm of the same paste. This is the comparison the cost case for a wall-deficient host rests on: cell-wall deficiency is only an asset if it is cheaper to open the cells.',
     currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-006, SP-010 · curated by SMKC',
+    provenanceNote:
+      'Grounded in J10 (PEF on a cell-wall-deficient mutant gave an average protein yield of 31 ± 6 % against 11 ± 3 % for the walled wild type, p < 0.05 — r-J10-1, r-J10-2, roughly three-fold, r-J10-3) and J11 (bead milling and high-pressure homogenisation gave >95 % cell disintegration, approximately 50 % w/w release of total proteins, at under 0.5 kWh per kg biomass — r-J11-1, r-J11-2, r-J11-3; and PEF on walled Chlorella vulgaris released at most 13 % even at 10–100× the energy of bead milling — r-J11-4). OF-COR-001 transcribes those yields but none of the treatment conditions behind them: field strength, pulse width, frequency, specific energy and residence time are set, measured and recorded by the operator.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Chamber charge, tip speed, residence time and the cytometric disruption score follow SP-006 §Materials and Methods; the recovery target is the gravimetric closure reported there.',
-        baseBatch: { value: 10, unit: 'L', label: 'culture at 2.6 g L⁻¹' },
+          'Initial release. Replaces the previous bead-mill-only harvest protocol, which treated mechanical disruption as the process route. Bead milling is retained here as the comparator arm rather than the product route, because the corpus case for this host is specifically that mild PEF on wall-deficient cells reaches mechanical-scale release without mechanical-scale energy.',
+        baseBatch: { value: 10, unit: 'L', label: 'culture' },
         materials: [
           {
-            name: 'Wash buffer, 50 mM potassium phosphate pH 7.0',
+            name: 'Low-conductivity resuspension buffer, 1 mM potassium phosphate pH 7.0',
             amount: 1000,
             unit: 'mL',
             scaling: 'per_unit_biomass',
             precision: 50,
-          },
-          {
-            name: 'Ammonium formate wash solution',
-            amount: 200,
-            unit: 'mL',
-            scaling: 'per_unit_biomass',
-            precision: 10,
           },
           {
             name: 'Protease inhibitor tablets, EDTA-free',
@@ -1193,8 +1055,8 @@ export const PROTOCOLS: Protocol[] = [
             precision: 0.1,
           },
           {
-            name: 'Lowry assay reactions',
-            amount: 24,
+            name: 'Bradford assay reactions',
+            amount: 32,
             unit: 'reactions',
             scaling: 'per_unit_biomass',
             precision: 1,
@@ -1208,7 +1070,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             name: '0.4 mm yttria-stabilised zirconia beads',
-            amount: 1.12,
+            amount: 0.2,
             unit: 'L',
             scaling: 'fixed',
             precision: 0.01,
@@ -1220,116 +1082,143 @@ export const PROTOCOLS: Protocol[] = [
             scaling: 'fixed',
             precision: 0.5,
           },
+          {
+            name: 'Conductivity standard, 1413 µS cm⁻¹',
+            amount: 50,
+            unit: 'mL',
+            scaling: 'fixed',
+            precision: 5,
+          },
         ],
         equipment: [
-          'Fixed-angle floor centrifuge accepting 500 mL bottles, rated to 6,000 × g',
-          '1.4 L horizontal bead mill with a jacketed grinding chamber and a variable-speed drive',
-          'Recirculating chiller for the mill jacket',
-          'Peristaltic feed pump rated to 40 L h⁻¹',
+          'Fixed-angle floor centrifuge accepting 500 mL bottles',
+          'Continuous pulsed-electric-field treatment chamber with a pulse generator, in-line conductivity measurement and inlet/outlet thermocouples',
+          'Peristaltic feed pump rated to 20 L h⁻¹ with a pulsation damper',
+          'Recirculating chiller for the treatment loop',
+          '0.25 L laboratory bead mill with a jacketed chamber, for the comparator arm',
           'Flow cytometer with a 488 nm excitation line',
-          'Spectrophotometer for the Lowry assay',
-          'Top-pan balance readable to 0.01 g for gravimetric closure',
+          'Spectrophotometer for the Bradford assay',
+          'Conductivity meter and an energy meter or the generator’s own kWh log',
         ],
         safety: [
-          'Balance opposing centrifuge bottles to within 1 g on a top-pan balance, and use only sealing caps. A leaking rotor at 4,000 × g is both an aerosol event and a corrosion event.',
-          'The mill chamber holds 1.12 L of 0.4 mm zirconia beads under pressure. Isolate the drive and vent the chamber before opening the end plate, and never open it while the jacket is cold and the chamber under vacuum.',
-          'Hold the mill jacket at 12 °C and confirm the outlet stream never exceeds 21 °C. Released protein denatures above that and the Lowry result stops tracking the disruption score.',
-          'Spilled zirconia beads behave like ball bearings underfoot. Sweep them up immediately and do not rinse them to drain.',
-          'cw15 lysate is a nutrient-rich broth. Chill it to 4 °C within 30 min of milling or it will not be microbiologically stable long enough to assay.',
+          'The PEF generator charges to several kilovolts and the treatment chamber and wetted lines sit at electrode potential during a pulse train. Break no union in the loop until the generator reads discharged and the earthing stick has been applied to the chamber.',
+          'Interlock the pulse train to flow. A stalled pump under an active train boils the liquid in the treatment gap within seconds and can rupture the chamber; confirm the interlock trips before the first real batch of the day.',
+          'Feed conductivity is a safety parameter, not only a process one. High-conductivity feed draws current the generator was not sized for. Measure and log the conductivity of every batch of resuspension buffer against the 1413 µS cm⁻¹ standard before the pump starts.',
+          'The comparator bead mill holds 0.2 L of 0.4 mm zirconia beads under pressure. Isolate the drive and vent the chamber before opening the end plate, and sweep spilled beads immediately — they behave like ball bearings underfoot and must not be rinsed to drain.',
+          'Balance opposing centrifuge bottles to within 1 g and use only sealing caps. A leaking rotor is both an aerosol event and a corrosion event.',
+          'Fresh lysate is a nutrient-rich broth. Hold it below 4 °C from the moment of release, assay it the same day, and autoclave all spent material at 121 °C for 20 min.',
         ],
         steps: [
           {
-            id: 'h1',
-            text: 'Confirm the culture is ready to harvest: dry cell weight 2.4–2.8 g L⁻¹ and residual acetate below 0.2 g L⁻¹. Draw a 50 mL reference aliquot, hold it at 4 °C as the undisrupted control, and determine its dry cell weight with the filters washed using {{qty:Ammonium formate wash solution}} of ammonium formate wash solution.',
-            refs: ['ex-0050'],
-            note: 'Every disruption score in this protocol is referenced to that aliquot. A control drawn on a different day, or from a different vessel, invalidates the score no matter how carefully the cytometry is gated.',
+            id: 'd1',
+            text: 'Record the feed before touching it. Measure the culture’s dry cell weight under PR-OD-01 and write it on the batch sheet: OF-COR-001 gives no harvest density for cw15, so every yield below is expressed against your measured figure rather than an assumed one.',
           },
           {
-            id: 'h2',
-            text: 'Chill the culture to 12 °C in the vessel before harvest. Warm cw15 paste compacts poorly and re-suspends into a stringy slurry that blocks the mill inlet.',
+            id: 'd2',
+            text: 'Draw a 100 mL reference aliquot and hold it at 4 °C undisrupted. Split it: half is the untreated control for soluble protein, half the intact-cell control that sets the cytometry gate.',
+            note: 'Every release figure in this protocol is referenced to that aliquot. A control drawn on another day or from another vessel invalidates the score no matter how carefully the gate is drawn.',
           },
           {
-            id: 'h3',
-            text: 'Fill {{qty:500 mL centrifuge bottles with sealing caps}} centrifuge bottles, balancing opposing pairs to within 1 g and seating every cap fully.',
-          },
-          {
-            id: 'h4',
-            text: 'Centrifuge at 4,000 × g for 15 min at 12 °C with the brake set low. A hard brake re-suspends the pellet edge and costs 2–4 percentage points of recovery.',
-            timerSec: 900,
-            timerLabel: 'Centrifuge 4,000 × g, 15 min',
-          },
-          {
-            id: 'h5',
-            text: 'Decant the supernatant into a tared carboy and weigh it, then weigh the bottles with their pellets. Close the mass balance across feed, concentrate and centrate. Expect 92–97 % recovery against the 96.4 % reported for continuous disc-stack harvest of this strain.',
-            refs: ['ex-0046', 'ex-0047'],
-            note: 'Gravimetric closure is what makes a recovery figure defensible. A recovery computed from pellet volume alone routinely overstates by five points because it counts interstitial medium as biomass.',
-          },
-          {
-            id: 'h6',
-            text: 'Dissolve {{qty:Protease inhibitor tablets, EDTA-free}} inhibitor tablets in {{qty:Wash buffer, 50 mM potassium phosphate pH 7.0}} of cold wash buffer, then resuspend the combined pellets in it to a target paste concentration of 40–45 g L⁻¹ dry solids.',
-            note: 'Use the EDTA-free formulation. Chelated divalent metals carried into the Lowry assay depress the colour development and the protein figure comes back low for a reason unrelated to disruption.',
-          },
-          {
-            id: 'h7',
-            text: 'Charge the mill chamber to 80 % of its free volume with {{qty:0.4 mm yttria-stabilised zirconia beads}} of 0.4 mm zirconia beads. This charge is a property of the 1.4 L chamber and does not change with batch size.',
-          },
-          {
-            id: 'h8',
-            text: 'Start the jacket chiller with {{qty:Chamber coolant, 30 % v/v propylene glycol}} of coolant and hold the chamber at 12 °C. Circulate cold wash buffer through the mill until the outlet reads within 1 °C of the jacket.',
-            timerSec: 1200,
-            timerLabel: 'Pre-chill mill chamber, 20 min',
-          },
-          {
-            id: 'h9',
-            text: 'Mill the paste in a single pass at a tip speed of 12 m s⁻¹, with the feed rate set for a 3.5 min residence time — 24 L h⁻¹ for the 1.4 L chamber. Log the outlet temperature every minute and abort the pass if it exceeds 21 °C.',
-            refs: ['ex-0043'],
-            note: 'Disruption rises steeply with residence time to about 3 min and then flattens. Pushing tip speed past 12 m s⁻¹ buys under two percentage points at a disproportionate energy cost and a real thermal one.',
-          },
-          {
-            id: 'h10',
-            text: 'Draw a 5 mL lysate sample and a matched aliquot of the undisrupted control. Stain both with {{qty:Membrane-impermeant nucleic acid stain}} of the impermeant nucleic acid stain and count intact cells by flow cytometry on the same day, against the same gate.',
-            refs: ['ex-0043'],
-          },
-          {
-            id: 'h11',
-            text: 'Score disruption as the fractional loss of intact cells relative to the control. A single bead-mill pass on this feed should return 92–96 %. For context, a single homogeniser pass at 1,200 bar returns about 88.6 % and 20 min of bath sonication only 61.5 %, which is why sonication is a reference and not a process step.',
-            refs: ['ex-0043', 'ex-0044', 'ex-0051', 'ex-0045'],
-          },
-          {
-            id: 'h12',
-            text: 'Clarify 20 mL of lysate at 10,000 × g for 10 min and assay soluble protein in the supernatant by Lowry, using {{qty:Lowry assay reactions}} reactions against a standard curve built from {{qty:Bovine serum albumin standard, 2 mg mL⁻¹}} of albumin standard diluted in the identical buffer. Dilute every lysate to fall in the middle third of the curve.',
+            id: 'd3',
+            text: 'Concentrate the culture: 4,000 × g for 10 min at 10 °C with the brake set low. Decant into a tared carboy and weigh both fractions so the mass balance across feed, concentrate and centrate closes.',
             timerSec: 600,
-            timerLabel: 'Clarify lysate, 10,000 × g, 10 min',
-            refs: ['ex-0048'],
+            timerLabel: 'Harvest spin, 4,000 × g, 10 min',
+            note: 'A hard brake re-suspends the pellet edge, and a wall-deficient pellet resuspends more readily than a walled one. Gravimetric closure is what makes a recovery figure defensible; recovery computed from pellet volume counts interstitial medium as biomass.',
           },
           {
-            id: 'h13',
-            text: 'Report the chain rather than the endpoints: culture → paste → clarified lysate, with recovery, disruption efficiency and soluble protein at each transition. Expect overall soluble-protein recovery near 88 % for the bead-mill route.',
-            refs: ['ex-0046', 'ex-0048'],
-            note: 'A protein figure that outruns the disruption score means the cytometry gate is counting permeabilised cells as disrupted. Those cells exclude the dye but still hold their chloroplast-associated protein.',
+            id: 'd4',
+            text: 'Dissolve {{qty:Protease inhibitor tablets, EDTA-free}} inhibitor tablets in {{qty:Low-conductivity resuspension buffer, 1 mM potassium phosphate pH 7.0}} of cold low-conductivity buffer and resuspend the pellets in it. Measure the conductivity of the finished suspension and log it.',
+            note: 'Use the EDTA-free formulation: chelated divalent metals carried into a protein assay depress colour development, and the protein figure comes back low for a reason unrelated to disruption. Low conductivity is a PEF requirement — the specific energy delivered per pulse depends on it, so a suspension whose conductivity is not recorded produces a yield that cannot be interpreted.',
+          },
+          {
+            id: 'd5',
+            text: 'Split the suspension into a PEF arm and a bead-mill comparator arm from the same paste, on the same day, with the same inhibitor batch.',
+            refs: ['r-J10-3', 'r-J11-2'],
+            note: 'The comparison is only meaningful within one paste. Note what each arm is for: J10’s roughly three-fold contrast is between wall-deficient and walled cells under PEF, not between PEF and milling. The milling arm here supplies the mechanical ceiling from J11, so that the PEF result can be read against both.',
+          },
+          {
+            id: 'd6',
+            text: 'Run the PEF arm on your chamber’s validated microalgae programme. Record field strength, pulse width, frequency, specific energy, flow rate and both inlet and outlet temperatures for the whole pass.',
+            refs: ['J10'],
+            note: 'This protocol specifies no treatment conditions. OF-COR-001 §11 records J10’s protein yield but not the field strength, pulse parameters or energy input that produced it, so there is nothing to copy and inventing a setting would misrepresent the source. Hold the outlet below 25 °C: "mild" is the entire claim of this route, and a thermal excursion converts it into thermal lysis with a different selectivity.',
+          },
+          {
+            id: 'd7',
+            text: 'Hold the treated stream at 4 °C with gentle stirring for 30 min before separation. Release after permeabilisation is diffusive rather than instantaneous, so separating immediately understates the yield.',
+            timerSec: 1800,
+            timerLabel: 'Post-PEF diffusive hold, 30 min',
+          },
+          {
+            id: 'd8',
+            text: 'Run the comparator arm through the bead mill in a single pass, with the chamber charged to 80 % of free volume with {{qty:0.4 mm yttria-stabilised zirconia beads}} of 0.4 mm zirconia beads and the jacket held cold using {{qty:Chamber coolant, 30 % v/v propylene glycol}} of coolant. Log the motor energy and the outlet temperature every minute.',
+            refs: ['r-J11-1', 'r-J11-3'],
+            note: 'The published mechanical benchmark this arm is standing in for is >95 % cell disintegration at under 0.5 kWh per kg biomass. If your mill does not approach that on this feed, the comparator is mis-set and the PEF arm has nothing to be compared against.',
+          },
+          {
+            id: 'd9',
+            text: 'Stain a sample from each arm and from the intact-cell control with {{qty:Membrane-impermeant nucleic acid stain}} of the impermeant stain and count intact cells by flow cytometry, same day, same gate. Score disintegration as fractional loss of intact cells against the control.',
+          },
+          {
+            id: 'd10',
+            text: 'Clarify both arms at 10,000 × g for 15 min at 4 °C and assay soluble protein in the supernatants and in the untreated control by Bradford, using {{qty:Bradford assay reactions}} against a curve built from {{qty:Bovine serum albumin standard, 2 mg mL⁻¹}} of albumin standard diluted in the identical buffer.',
+            timerSec: 900,
+            timerLabel: 'Clarify lysate, 10,000 × g, 15 min',
+            note: 'Express release as a percentage of total cell protein and state on the record how total protein was determined. A release percentage whose denominator is undefined is not comparable with the corpus figures or with your own previous run.',
+          },
+          {
+            id: 'd11',
+            text: 'Score the PEF arm against the corpus. PEF on cell-wall-deficient cells gave an average protein yield of 31 ± 6 % of total protein, against 11 ± 3 % for the walled wild type; bead milling gives >95 % disintegration and approximately 50 % w/w release. A PEF arm landing near 10 % on a wall-deficient feed is a process fault to be diagnosed, not a strain result to be reported.',
+            refs: ['r-J10-1', 'r-J10-2', 'r-J11-1', 'r-J11-2'],
+          },
+          {
+            id: 'd12',
+            text: 'Score the energy, which is the half of the argument that decides the cost case. Compute kWh per kg dry biomass for both arms from the generator log and the mill motor log, against the dry cell weight recorded at step d1.',
+            refs: ['r-J11-3', 'r-J11-4'],
+            note: 'The mechanical benchmark is under 0.5 kWh per kg biomass. A PEF pass that matches the release figure but not the energy figure has not made the economic case. The corpus is explicit about the failure mode: PEF released a maximum of 13 % of protein from walled Chlorella vulgaris even at 10–100× the energy of bead milling — energy without wall deficiency buys nothing.',
+          },
+          {
+            id: 'd13',
+            text: 'Report the chain rather than the endpoints: culture → concentrate → treated stream → clarified supernatant, with mass recovery, disintegration score, soluble protein and specific energy at each transition, for both arms.',
+            note: 'A protein figure that outruns the disintegration score means the cytometry gate is counting permeabilised cells as intact, or vice versa. Reconcile the two before either number leaves the bench.',
           },
         ],
-        estMinutes: { active: 245, total: 430 },
+        estMinutes: { active: 260, total: 470 },
         references: [
           {
-            paperId: 'SP-006',
-            note: 'Bead milling versus high-pressure homogenisation on the same cw15 feed; chamber charge, tip speed and residence time.',
+            paperId: 'J10',
+            note: 'Mild and selective protein release from cell-wall-deficient microalgae by pulsed electric field — the record that converts "cw15 is easy to transform" into "cw15 is cheap to process". Treatment conditions are not transcribed in OF-COR-001.',
           },
           {
-            recordId: 'ex-0043',
-            note: 'Single-pass bead milling at 12 m s⁻¹ disrupts 94.2 % of cells — verified, gold.',
+            recordId: 'r-J10-1',
+            note: 'Average protein yield 31 ± 6 % from the cell-wall-deficient mutant under PEF. Point value entered; the spread is a standard deviation, not a range.',
           },
           {
-            recordId: 'ex-0046',
-            note: 'Continuous disc-stack centrifugation recovers 96.4 % of culture biomass — verified, gold.',
+            recordId: 'r-J10-2',
+            note: '11 ± 3 % for the walled wild type — the control that makes the 31 % meaningful. Kept as its own record so the contrast survives aggregation.',
           },
           {
-            recordId: 'ex-0051',
-            note: 'Bath sonication reference, 61.5 % after 20 min — gold annotation.',
+            recordId: 'r-J10-3',
+            note: 'Roughly three-fold. A ratio of the two records above, not an independent measurement — do not count it as a third data point.',
           },
           {
-            recordId: 'ex-0050',
-            note: 'Harvest dry cell weight 2.6 g L⁻¹ at 96 h — verified.',
+            paperId: 'J11',
+            note: 'Mechanical disruption benchmarks: bead milling and high-pressure homogenisation on Nannochloropsis gaditana, plus the PEF-on-walled-cells counterexample. Author string flagged [verify] for one of the two gathered sources.',
+          },
+          {
+            recordId: 'r-J11-1',
+            note: '>95 % cell disintegration by bead milling or high-pressure homogenisation.',
+          },
+          {
+            recordId: 'r-J11-2',
+            note: 'Approximately 50 % w/w release of total proteins — the mechanical ceiling the PEF arm is measured against.',
+          },
+          {
+            recordId: 'r-J11-3',
+            note: 'Under 0.5 kWh per kg biomass — the energy benchmark. Different organism (N. gaditana), so treat it as an order-of-magnitude comparator.',
+          },
+          {
+            recordId: 'r-J11-4',
+            note: 'PEF released at most 13 % of protein from walled Chlorella vulgaris at 10–100× the energy of bead milling.',
           },
         ],
       },
@@ -1337,140 +1226,524 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-PICH-01 — longest run; rescaling feed table, induction-phase timers.
+  // PR-BCN-01 — NEW. Isoelectric capture at pH 4.6. E1 says 4.65, J7 says
+  // 4.6; the protocol holds the disagreement rather than averaging it away.
   // ───────────────────────────────────────────────────────────────────────
   {
-    id: 'PR-PICH-01',
-    title: 'Fed-batch K. phaffii, methanol induction (10 L)',
-    category: 'fermentation',
-    organisms: ['gs115'],
+    id: 'PR-BCN-01',
+    title: 'Isoelectric precipitation of β-casein at pH 4.6',
+    category: 'harvest',
+    organisms: ['cw15', 'bovine'],
     bsl: 1,
     purpose:
-      'Run a three-phase fed-batch of Komagataella phaffii GS115 at a 10 L working volume — glycerol batch, glycerol transition feed, then methanol induction under a transfer-limited feed law — to produce a secreted recombinant protein at high cell density.',
+      'Capture recombinant β-casein from a clarified cw15 lysate by acidifying to the isoelectric point, then redissolve the pellet at neutral pH — the cheapest capture step available for a bulk food protein, and one whose precipitation pH doubles as an early phosphorylation readout.',
     currentVersion: '1.0',
-    provenanceNote: 'Derived from SP-012, SP-014 · curated by SMKC',
+    provenanceNote:
+      'Grounded in E1 (caseins are heat-stable but precipitate readily at their isoelectric point, pH 4.65, on acidification — r-E1-2) and J7 (solubility surfaces in temperature × pH, quoted in OF-COR-001 §11 as directly usable for isoelectric precipitation of recombinant β-casein at pI 4.6 — r-J7-1). J1 supplies the strategy: conventional chromatography is too costly for bulk food proteins, and cost-effective production means prioritising functionality over purity. The corpus does not transcribe J7’s solubility surface, so the working temperature is chosen, bracketed and recorded by the operator.',
     versions: [
       {
         version: '1.0',
         changelog:
-          'Initial release. Batch salts and the induction temperature shift follow SP-014; the transfer-limited feed law and the residual-methanol interlock follow SP-014 §Materials and Methods, with the induction ramp shaped after the DO-stat policy in SP-012.',
-        baseBatch: { value: 10, unit: 'L', label: 'working volume' },
+          'Initial release. Written as a capture step, not a polishing step. The two corpus values for the isoelectric point (4.65 and 4.6) are carried through to the bench rather than reconciled on paper, and the operator records the pH actually held.',
+        baseBatch: { value: 2, unit: 'L', label: 'clarified lysate' },
         materials: [
           {
-            name: 'Glycerol, batch charge',
+            name: 'Clarified cw15 lysate',
+            amount: 2000,
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 50,
+          },
+          {
+            name: 'Hydrochloric acid, 1 M',
+            amount: 60,
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Sodium hydroxide, 1 M',
+            amount: 40,
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Wash water adjusted to pH 4.6',
             amount: 400,
-            unit: 'g',
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 10,
+          },
+          {
+            name: 'Resuspension buffer, 20 mM sodium phosphate pH 7.0',
+            amount: 200,
+            unit: 'mL',
             scaling: 'per_batch_volume',
             precision: 5,
           },
           {
-            name: 'Potassium sulfate',
-            amount: 182,
-            unit: 'g',
+            name: '250 mL centrifuge bottles',
+            amount: 8,
+            unit: 'bottles',
             scaling: 'per_batch_volume',
             precision: 1,
           },
           {
-            name: 'Magnesium sulfate heptahydrate',
-            amount: 149,
-            unit: 'g',
+            name: 'Bradford assay reactions',
+            amount: 24,
+            unit: 'reactions',
             scaling: 'per_batch_volume',
             precision: 1,
           },
           {
-            name: 'Calcium sulfate dihydrate',
-            amount: 9.3,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 0.1,
-          },
-          {
-            name: 'Phosphoric acid, 85 % w/w',
-            amount: 267,
-            unit: 'mL',
-            scaling: 'per_batch_volume',
-            precision: 1,
-          },
-          {
-            name: 'PTM1 trace metal solution',
-            amount: 43.5,
-            unit: 'mL',
-            scaling: 'per_batch_volume',
+            name: 'Native bovine β-casein reference standard',
+            amount: 10,
+            unit: 'mg',
+            scaling: 'fixed',
             precision: 0.5,
           },
           {
-            name: 'Biotin',
-            amount: 0.004,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 0.001,
-            stock: { conc: 0.0002, unit: 'mL' },
+            name: 'pH 4.01 calibration buffer sachet',
+            amount: 1,
+            unit: 'sachet',
+            scaling: 'fixed',
+            precision: 1,
           },
           {
-            name: 'Ammonium hydroxide, 28 % w/w',
-            amount: 1500,
-            unit: 'mL',
+            name: 'pH 7.00 calibration buffer sachet',
+            amount: 1,
+            unit: 'sachet',
+            scaling: 'fixed',
+            precision: 1,
+          },
+        ],
+        equipment: [
+          'Jacketed 3 L glass vessel with a circulating water bath covering 4–40 °C',
+          'Overhead stirrer with a pitched-blade impeller',
+          'pH meter with an ATC probe and a low-temperature-capable electrode',
+          'Syringe pump or peristaltic pump for controlled acid addition',
+          'Refrigerated centrifuge accepting 250 mL bottles, rated to 10,000 × g',
+          'SDS-PAGE rig and gel imager',
+          'Spectrophotometer for the Bradford assay',
+        ],
+        safety: [
+          '1 M hydrochloric acid and 1 M sodium hydroxide are both corrosive and are used within minutes of one another here. Keep the two bottles on opposite sides of the bench so a mis-grab is physically awkward, add acid to the stirred bulk rather than bulk to acid, and wear a face shield for the acidification.',
+          'Do not seal the vessel while acidifying. Carbonate carried in from the lysate buffer releases CO₂ as the pH falls, and a closed jacketed vessel will pressurise.',
+          'Acidified lysate near room temperature at pH 4.6 is a selective medium for lactic acid bacteria. Work cold, complete the redissolution the same day, and never hold the acidified slurry overnight.',
+          'Casein pellets are dense and slippery, and a decanted 250 mL bottle is heavy and wet. Decant over a tray, not over the floor.',
+          'The redissolved product is a food protein preparation from a genetically modified organism. It stays inside the process stream — it is not tasted, and it leaves the laboratory only as autoclaved waste or as a labelled analytical sample.',
+        ],
+        steps: [
+          {
+            id: 'b1',
+            text: 'Calibrate the pH meter at the temperature at which you intend to precipitate, using {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer and {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer.',
+            note: 'A meter calibrated warm and used cold will miss the isoelectric point by more than the useful window is wide. Calibrate at the working temperature, not at bench temperature.',
+          },
+          {
+            id: 'b2',
+            text: 'Choose and record the precipitation temperature. Bracket it first: run three 50 mL trials at three temperatures on your own material and carry the best forward.',
+            refs: ['J7'],
+            note: 'This protocol names no temperature deliberately. OF-COR-001 records that J7 maps casein solubility across temperature and pH and that the surface is directly usable for isoelectric precipitation, but it does not transcribe the surface. Casein solubility is strongly temperature-dependent near the isoelectric point, so the choice is real and it is yours.',
+          },
+          {
+            id: 'b3',
+            text: 'Charge {{qty:Clarified cw15 lysate}} of clarified lysate into the jacketed vessel, equilibrate to the chosen temperature and stir at 150–200 rpm — enough to keep the vessel uniform, not enough to draw in air.',
+          },
+          {
+            id: 'b4',
+            text: 'Acidify slowly with {{qty:Hydrochloric acid, 1 M}} of 1 M hydrochloric acid, pumped in beneath the liquid surface at no more than 1 mL min⁻¹ per litre of charge, down to pH 4.60.',
+            refs: ['r-E1-2', 'r-J7-1'],
+            note: 'Caseins are heat-stable but precipitate readily at their isoelectric point on acidification — the transition is sharp and local over-acidification at the addition point produces fines that never sediment. Slow beats stirring harder.',
+          },
+          {
+            id: 'b5',
+            text: 'Stop at pH 4.60 and record the value you actually held, to two decimal places, together with the temperature.',
+            refs: ['r-E1-2', 'r-J7-1'],
+            note: 'The corpus does not speak with one voice here: E1 states the isoelectric point as pH 4.65 and J7 is quoted for precipitation at pI 4.6. The difference is small but it sits on the steep shoulder of the solubility curve, so "about 4.6" is not a record. Write down the number.',
+          },
+          {
+            id: 'b6',
+            text: 'Hold at the setpoint for 30 min with gentle stirring so the precipitate coarsens before separation.',
+            timerSec: 1800,
+            timerLabel: 'Isoelectric hold, 30 min',
+          },
+          {
+            id: 'b7',
+            text: 'Transfer to {{qty:250 mL centrifuge bottles}} and centrifuge at 5,000 × g for 15 min at the precipitation temperature. Keep the supernatant — it is assayed, not discarded.',
+            timerSec: 900,
+            timerLabel: 'Recover precipitate, 5,000 × g, 15 min',
+          },
+          {
+            id: 'b8',
+            text: 'Wash the pellet twice by resuspending in {{qty:Wash water adjusted to pH 4.6}} of water pre-adjusted to pH 4.6 and re-centrifuging. Washing with unadjusted water redissolves product at the pellet surface.',
+          },
+          {
+            id: 'b9',
+            text: 'Redissolve the washed pellet in {{qty:Resuspension buffer, 20 mM sodium phosphate pH 7.0}} of phosphate buffer, adding {{qty:Sodium hydroxide, 1 M}} of 1 M sodium hydroxide dropwise with stirring until the suspension clears at pH 7.0. Do not overshoot past pH 8.',
+          },
+          {
+            id: 'b10',
+            text: 'Assay the redissolved product, the pooled supernatant and the wash by Bradford using {{qty:Bradford assay reactions}}, and run all three on SDS-PAGE beside {{qty:Native bovine β-casein reference standard}} of the native bovine β-casein standard.',
+            note: 'The supernatant assay is what tells you whether the step worked. A clean pellet with most of the target still in the supernatant is a failed capture that looks like a successful one.',
+          },
+          {
+            id: 'b11',
+            text: 'Read an unexpected precipitation pH as data, not as a failure of this protocol. If the bulk of the material comes down nearer pH 5.5 than 4.6, stop and run PR-PHOS-01 before changing anything here.',
+            refs: ['r-I1-2'],
+            note: 'Fully dephosphorylated caseins precipitate at their isoelectric point around pH 5.5 and hardly form micelle structures at all. A shifted precipitation pH is the cheapest early indication available that the phosphorylation programme has not worked — cheaper than a gel and far cheaper than an assembly run.',
+          },
+          {
+            id: 'b12',
+            text: 'Close the record: mass in, mass out, precipitation pH, temperature, and the fraction of feed protein captured. State the concentration the product came in at.',
+            refs: ['r-E1-1', 'J1'],
+            note: 'Scale context: β-casein is present in bovine milk at roughly 2.6 g L⁻¹, and a cw15 lysate is orders of magnitude below that. This step is capture from a dilute stream, not polishing of a concentrated one — which is exactly why J1 argues that bulk food proteins cannot carry conventional chromatography and that functionality, not purity, is the specification to design against.',
+          },
+        ],
+        estMinutes: { active: 180, total: 330 },
+        references: [
+          {
+            paperId: 'E1',
+            note: 'Bovine β-casein review: isolation, properties and functionality. The corpus’s most useful reference-value source for this molecule.',
+          },
+          {
+            recordId: 'r-E1-2',
+            note: 'Caseins precipitate readily at their isoelectric point, pH 4.65, on acidification. Curated, unverified.',
+          },
+          {
+            recordId: 'r-E1-1',
+            note: 'β-casein present at roughly 2.6 g L⁻¹ in bovine milk — the concentration scale this unit operation was developed at.',
+          },
+          {
+            paperId: 'J7',
+            note: 'Solubility of caseins as a function of temperature and pH. The surface itself is not transcribed in OF-COR-001, which is why step b2 brackets rather than specifies.',
+          },
+          {
+            recordId: 'r-J7-1',
+            note: 'Quoted for isoelectric precipitation of recombinant β-casein at pI 4.6 — the second, slightly different value the protocol deliberately preserves.',
+          },
+          {
+            recordId: 'r-I1-2',
+            note: 'Fully dephosphorylated caseins precipitate at their isoelectric point around pH 5.5 — the diagnostic behind step b11.',
+          },
+          {
+            paperId: 'J1',
+            note: 'Downstream processing of food proteins from precision fermentation: chromatography is too costly for bulk food proteins; prioritise functionality over purity.',
+          },
+        ],
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────
+  // PR-PHOS-01 — NEW. The assay the whole programme is judged on. Phos-tag
+  // from H1's method review; urea-PAGE + phosphatase because H4 used exactly
+  // that pairing (r-H4-4). A mobility shift is never a phosphate count.
+  // ───────────────────────────────────────────────────────────────────────
+  {
+    id: 'PR-PHOS-01',
+    title: 'Phos-tag phosphorylation analysis of recombinant β-casein',
+    category: 'analytics',
+    organisms: ['cw15', 'gs115', 'bovine'],
+    bsl: 1,
+    purpose:
+      'Establish whether a recombinant β-casein preparation carries phosphate, and how heterogeneous the population is, by Phos-tag SDS-PAGE against a phosphatase-treated companion, with urea-PAGE ± phosphatase as the orthogonal check. This is the assay that says whether the programme worked: an unphosphorylated casein will not reassemble into micelles, will not bind calcium as it should, and will not gel.',
+    currentVersion: '1.0',
+    provenanceNote:
+      'Grounded in H1, which reviews the four phosphorylation-analysis methods used across the heterologous-casein literature — MALDI-MS / LC-ESI-MS, SDS-PAGE with Ethyl Stains-All, urea-PAGE with phosphatase treatment, and Phos-tag — and records "undetermined" for most bacterial studies because the analysis was never done. The orthogonal check is the pairing H4 used: phosphatase treatment plus urea-PAGE, showing its Pichia-expressed bovine β-casein carried the same degree of phosphorylation as animal-derived β-casein (r-H4-4). OF-COR-001 transcribes no gel recipe or run condition, so acrylamide percentage, Phos-tag and Mn²⁺ concentrations and run conditions come from the reagent supplier and are recorded per run.',
+    versions: [
+      {
+        version: '1.0',
+        changelog:
+          'Initial release. Written so that the result it produces is interpretable in this platform’s ontology: every phosphorylation value entered from this protocol carries its analysis method, and "undetermined" remains available and legitimate for anything the run did not actually measure.',
+        baseBatch: { value: 10, unit: 'lanes', label: 'per gel pair' },
+        materials: [
+          {
+            name: 'Purified recombinant β-casein sample',
+            amount: 100,
+            unit: 'µg',
+            scaling: 'per_batch_volume',
+            precision: 5,
+          },
+          {
+            name: 'Native bovine β-casein reference standard',
+            amount: 50,
+            unit: 'µg',
+            scaling: 'per_batch_volume',
+            precision: 5,
+          },
+          {
+            name: 'Phos-tag acrylamide',
+            amount: 50,
+            unit: 'µL',
+            scaling: 'per_batch_volume',
+            precision: 5,
+          },
+          {
+            name: 'Manganese(II) chloride, 10 mM',
+            amount: 500,
+            unit: 'µL',
             scaling: 'per_batch_volume',
             precision: 10,
           },
           {
-            name: 'Glycerol transition feed, 500 g L⁻¹ with PTM1',
-            amount: 700,
-            unit: 'mL',
+            name: 'Alkaline phosphatase, calf intestinal',
+            amount: 40,
+            unit: 'units',
             scaling: 'per_batch_volume',
-            precision: 10,
+            precision: 1,
+            stock: { conc: 10, unit: 'µL' },
           },
           {
-            name: 'Methanol charge, induction hours 0–6',
-            amount: 105,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 5,
-          },
-          {
-            name: 'Methanol charge, induction hours 6–24',
-            amount: 630,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 5,
-          },
-          {
-            name: 'Methanol charge, induction hours 24–90',
-            amount: 2770,
-            unit: 'g',
-            scaling: 'per_batch_volume',
-            precision: 5,
-          },
-          {
-            name: 'Antifoam, polypropylene glycol P2000',
+            name: 'Acrylamide/bis solution, 30 % 37.5:1',
             amount: 20,
             unit: 'mL',
             scaling: 'per_batch_volume',
             precision: 1,
           },
           {
-            name: 'Seed culture in buffered glycerol complex medium',
-            amount: 1000,
+            name: 'Urea, molecular biology grade',
+            amount: 25,
+            unit: 'g',
+            scaling: 'per_batch_volume',
+            precision: 0.1,
+          },
+          {
+            name: 'EDTA soak solution, 10 mM',
+            amount: 200,
             unit: 'mL',
             scaling: 'per_batch_volume',
-            precision: 50,
+            precision: 10,
           },
           {
-            name: 'Methanol sensor calibration standard',
-            amount: 1,
-            unit: 'vial',
+            name: 'Coomassie R-250 staining solution',
+            amount: 100,
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 10,
+          },
+          {
+            name: 'Ethyl Stains-All reagent',
+            amount: 25,
+            unit: 'mL',
             scaling: 'fixed',
-            precision: 1,
+            precision: 5,
           },
           {
-            name: 'pH calibration buffer sachets, 4.01 and 7.00',
+            name: 'Protein ladder, 10–250 kDa',
+            amount: 100,
+            unit: 'µL',
+            scaling: 'fixed',
+            precision: 10,
+          },
+        ],
+        equipment: [
+          'Two mini-gel casting and running rigs, so the Phos-tag and urea gels run in parallel',
+          'Power supply capable of a constant 100 V for an extended cold run',
+          '4 °C cabinet or cold room large enough to hold a running gel rig',
+          'Gel documentation system with white-light and fluorescence capture',
+          'Heat block at 37 °C and a second at 95 °C',
+          'Orbital shaker for gel soaks and staining',
+        ],
+        safety: [
+          'Unpolymerised acrylamide is a cumulative neurotoxin and is absorbed through intact skin. Cast gels in a fume hood in double nitrile gloves, use only the pre-made 30 % solution rather than weighing powder, and treat casting waste and every unpolymerised drop as hazardous.',
+          'Phos-tag gels are manganese-loaded. Collect the EDTA soak, the run buffer and the gel itself as heavy-metal waste rather than pouring them to drain.',
+          'Ethyl Stains-All is light-sensitive and stains skin, bench surfaces and clothing persistently. Work in subdued light over a bench liner and dispose of the used stain into organic solvent waste.',
+          'Do not heat urea gels or urea-containing samples above 55 °C at any point. Urea decomposes to cyanate, which carbamylates lysine residues and shifts the very mobility this assay is reading — a carbamylation artefact looks exactly like partial phosphorylation.',
+          'Methanol in the staining and destaining solutions is toxic by inhalation and skin contact. Stain and destain in a fume hood or a ducted staining box, with the lid on the tray whenever it is not being handled.',
+        ],
+        steps: [
+          {
+            id: 'f1',
+            text: 'Build the panel before touching a gel. You need four things on one gel: the recombinant sample, the {{qty:Native bovine β-casein reference standard}} native standard, a phosphatase-treated aliquot of each, and a mock-treated aliquot that has seen the phosphatase buffer but no enzyme.',
+            note: 'The mock is not optional. Phosphatase buffer alone changes casein mobility on a Phos-tag gel enough to be misread as partial dephosphorylation, and without the mock you cannot tell the two apart.',
+          },
+          {
+            id: 'f2',
+            text: 'Dephosphorylate the treated aliquots: add {{stock:Alkaline phosphatase, calf intestinal}} of calf intestinal alkaline phosphatase ({{qty:Alkaline phosphatase, calf intestinal}} across the panel) and incubate at 37 °C for 2 h. Run the mock alongside on the same block.',
+            timerSec: 7200,
+            timerLabel: 'Phosphatase digest, 37 °C, 2 h',
+          },
+          {
+            id: 'f3',
+            text: 'Cast the Phos-tag gel from {{qty:Acrylamide/bis solution, 30 % 37.5:1}} of 30 % acrylamide/bis with {{qty:Phos-tag acrylamide}} of Phos-tag acrylamide and {{qty:Manganese(II) chloride, 10 mM}} of 10 mM manganese chloride, at the supplier’s stated ratio for a protein of this size. Cast a matched conventional gel with no Phos-tag as the mobility reference.',
+            refs: ['H1'],
+            note: 'OF-COR-001 records only that H1 reviews Phos-tag as one of four phosphorylation-analysis methods; it transcribes no gel composition, no Phos-tag concentration and no run conditions. Take them from the supplier’s table, write the numbers you used onto the gel image, and hold them constant between runs — mobilities from differently composed gels are not comparable.',
+          },
+          {
+            id: 'f4',
+            text: 'Run both gels cold and slow: 100 V at 4 °C until the dye front reaches the bottom. Heat is what smears a Phos-tag gel, and a smeared ladder is uninterpretable rather than merely ugly.',
+          },
+          {
+            id: 'f5',
+            text: 'Soak the Phos-tag gel three times for 10 min each in {{qty:EDTA soak solution, 10 mM}} of 10 mM EDTA before staining or transfer. Manganese left in the gel blocks transfer and stains unevenly.',
+            timerSec: 600,
+            timerLabel: 'EDTA soak, 10 min (repeat ×3)',
+          },
+          {
+            id: 'f6',
+            text: 'Stain both gels with {{qty:Coomassie R-250 staining solution}} of Coomassie R-250, destain to a clear background and image them under identical settings with the {{qty:Protein ladder, 10–250 kDa}} ladder in view.',
+          },
+          {
+            id: 'f7',
+            text: 'Read the Phos-tag gel as a mobility ladder, and say so in the record. A phosphorylated preparation resolves into a retarded ladder that collapses to a single fast band on phosphatase treatment; the ladder establishes that phosphate is present and that the population is heterogeneous.',
+            refs: ['H1'],
+            note: 'It does not establish how many phosphates. Only mass spectrometry counts them. H1 records "undetermined" for most of the bacterial studies it tabulates precisely because the analysis was never done — and in this platform "undetermined" means the measurement was not made, which is a different claim from a measured zero.',
+          },
+          {
+            id: 'f8',
+            text: 'Run the orthogonal check: urea-PAGE with {{qty:Urea, molecular biology grade}} of urea, loading the untreated and phosphatase-treated pairs of both the sample and the native standard on one gel, and read the mobility shift on dephosphorylation.',
+            refs: ['r-H4-4', 'H6'],
+            note: 'This is the exact pairing H4 used — phosphatase treatment plus urea-PAGE — to establish that its Pichia-expressed bovine β-casein carried the same degree of phosphorylation as animal-derived β-casein. H6 reports the same style of result in S. cerevisiae: identical urea-gel mobilities before and after dephosphorylation. Two independent readouts agreeing is the standard this assay is held to.',
+          },
+          {
+            id: 'f9',
+            text: 'Optionally confirm band identity as phosphoprotein with {{qty:Ethyl Stains-All reagent}} of Ethyl Stains-All on a conventional SDS-PAGE gel. Treat it as a fast qualitative confirmation and never as a quantity.',
+            refs: ['H1'],
+          },
+          {
+            id: 'f10',
+            text: 'State the target explicitly when you report. Fully phosphorylated bovine β-casein carries about 5 phosphates, clustered at the N-terminus; a preparation whose ladder tops out well short of the native standard’s is partially phosphorylated.',
+            refs: ['r-F5-1', 'H3'],
+            note: 'Partial phosphorylation is a published outcome, not an anomaly: H3 co-expressed bovine β-casein with CK2 in E. coli and reached much lower phosphorylation than the native 5P state, because only some of the bovine cluster serines sit in canonical CK2 sites. H4 is the full-phosphorylation outcome. Knowing which of the two you have is the entire point of this protocol.',
+          },
+          {
+            id: 'f11',
+            text: 'Escalate to mass spectrometry when the programme needs a number rather than a comparison, or when the ladder is ambiguous. Send material for LC-ESI-MS or MALDI-MS and record which was used.',
+            refs: ['H1'],
+          },
+          {
+            id: 'f12',
+            text: 'Enter the result with its method attached, and with the residue-numbering convention if you report site positions. A phosphorylation value without its analysis method is not interpretable in this platform and will be rejected at entry.',
+            refs: ['F1'],
+            note: 'Numbering matters: bovine β-casein is 224 residues as translated and 209 after signal-peptide removal, so mature and precursor positions differ by 15. Every site position must say which convention it uses.',
+          },
+        ],
+        estMinutes: { active: 300, total: 620 },
+        references: [
+          {
+            paperId: 'H1',
+            note: 'The keystone review of heterologous caseins and phosphorylation. Source of the four-method framing used here, and of the finding that most bacterial studies record "undetermined" because the analysis was never performed.',
+          },
+          {
+            paperId: 'H4',
+            note: 'Bovine β-casein in Pichia pastoris — the closest eukaryotic precedent, and the study whose phosphatase + urea-PAGE pairing step f8 reproduces.',
+          },
+          {
+            recordId: 'r-H4-4',
+            note: 'Recombinant protein carried the same degree of phosphorylation as animal-derived β-casein, by urea-PAGE with phosphatase treatment. Curated, unverified.',
+          },
+          {
+            paperId: 'H6',
+            note: 'Bovine β-casein in S. cerevisiae: identical urea-gel mobilities before and after dephosphorylation — the second precedent for the orthogonal check.',
+          },
+          {
+            paperId: 'H3',
+            note: 'The companion negative result: bovine β-casein co-expressed with CK2 in E. coli reached much lower phosphorylation than the native 5P state.',
+          },
+          {
+            recordId: 'r-F5-1',
+            note: 'β-casein carries approximately 5 phosphates concentrated at the N-terminus — the success criterion stated numerically. Method recorded as undetermined in the corpus.',
+          },
+          {
+            paperId: 'F1',
+            note: '224-residue primary translation product, 209-residue mature protein — the source of the numbering caveat in step f12.',
+          },
+        ],
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────
+  // PR-ACM-01 — NEW. Artificial casein micelle assembly. I3 for rate control,
+  // I4 for the scalable routes; scored against I1's 87 % sedimentable.
+  // ───────────────────────────────────────────────────────────────────────
+  {
+    id: 'PR-ACM-01',
+    title: 'Artificial casein micelle assembly',
+    category: 'harvest',
+    organisms: ['bovine', 'cw15'],
+    bsl: 1,
+    purpose:
+      'Assemble purified β-casein with κ-casein and calcium phosphate into artificial casein micelles by a rate-controlled, scalable route, then score the product by particle size and sedimentable fraction — the functional test that separates a recombinant casein that behaves like a dairy ingredient from one that merely runs at the right size on a gel.',
+    currentVersion: '1.0',
+    provenanceNote:
+      'Grounded in I3 (micellar diameter is controllable by preparation rate during assembly) and I4 (casein micelle formation treated as a calcium phosphate phase separation process, with vacuum evaporation and membrane routes replacing the unscalable dropwise-mixing method). The reference geometry is E2 (approximately spherical, radius ~70 nm — r-E2-1); the scoring benchmark is I1 (roughly 87 % of total protein sedimentable in the fully phosphorylated case — r-I1-1); the failure signature is I2 (predominantly dephosphorylated casein forms irregular structures roughly three times larger than normal — r-I2-1). OF-COR-001 transcribes no rate–diameter relationship and no mixing recipe, so the rate ladder is built on your own material.',
+    versions: [
+      {
+        version: '1.0',
+        changelog:
+          'Initial release. Dropwise mixing is excluded as a route on the corpus’s own grounds — I4 replaces it precisely because it does not scale — so the protocol offers the two scalable alternatives and requires the operator to record which was used.',
+        baseBatch: { value: 500, unit: 'mL', label: 'assembly batch' },
+        materials: [
+          {
+            name: 'Purified β-casein (recombinant or native)',
+            amount: 2.5,
+            unit: 'g',
+            scaling: 'per_batch_volume',
+            precision: 0.05,
+          },
+          {
+            name: 'Purified κ-casein',
+            amount: 0.37,
+            unit: 'g',
+            scaling: 'per_batch_volume',
+            precision: 0.01,
+            sourceRecordId: 'r-F4-3',
+          },
+          {
+            name: 'Sodium phosphate buffer, 20 mM pH 7.0',
+            amount: 500,
+            unit: 'mL',
+            scaling: 'per_batch_volume',
+            precision: 10,
+          },
+          {
+            name: 'Calcium chloride dihydrate',
+            amount: 1.47,
+            unit: 'g',
+            scaling: 'per_batch_volume',
+            precision: 0.01,
+            stock: { conc: 0.0735, unit: 'mL' },
+          },
+          {
+            name: 'Dipotassium hydrogen phosphate',
+            amount: 0.87,
+            unit: 'g',
+            scaling: 'per_batch_volume',
+            precision: 0.01,
+            stock: { conc: 0.087, unit: 'mL' },
+          },
+          {
+            name: '0.22 µm bottle-top filter units',
             amount: 2,
-            unit: 'sachets',
-            scaling: 'fixed',
+            unit: 'units',
+            scaling: 'per_batch_volume',
             precision: 1,
           },
           {
-            name: 'Dissolved-oxygen probe electrolyte',
+            name: 'Diafiltration cassette, 10 kDa cut-off',
+            amount: 1,
+            unit: 'cassette',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Low-volume DLS cuvettes',
+            amount: 12,
+            unit: 'cuvettes',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Bradford assay reactions',
+            amount: 24,
+            unit: 'reactions',
+            scaling: 'per_batch_volume',
+            precision: 1,
+          },
+          {
+            name: 'Sodium azide preservative, 2 % w/v',
             amount: 5,
             unit: 'mL',
             scaling: 'fixed',
@@ -1478,157 +1751,119 @@ export const PROTOCOLS: Protocol[] = [
           },
         ],
         equipment: [
-          '15 L stirred-tank fermenter with a 10 L working volume, two Rushton impellers and a ring sparger',
-          'In-situ sterilisable vessel with steam-in-place jacket and vent condenser',
-          'Controller with temperature, pH, dissolved-oxygen, agitation, air and oxygen-enrichment loops',
-          'Off-gas analyser: paramagnetic oxygen and infrared carbon dioxide',
-          'Headspace methanol sensor with a daily calibration routine',
-          'Gravimetric feed station: methanol reservoir on a load cell inside a bunded tray',
-          'Peristaltic feed pumps for glycerol, methanol and antifoam',
-          'Oxygen enrichment line with a flow controller and a hard enrichment cap',
+          'Jacketed stirred vessel with an overhead stirrer and a circulating bath',
+          'Calibrated syringe pump or metering peristaltic pump for rate-controlled delivery',
+          'Rotary evaporator or vacuum concentrator with a bath controllable below 40 °C',
+          'Tangential-flow filtration rig with a 10 kDa membrane and inlet/retentate gauges',
+          'Dynamic light scattering instrument',
+          'Refrigerated centrifuge capable of 25,000 × g',
+          'pH meter with an ATC probe',
+          'Spectrophotometer for the Bradford assay',
         ],
         safety: [
-          'Methanol is highly flammable, toxic by inhalation and absorbed through skin, and its vapour is invisible. Feed it from an earthed, bunded reservoir with a bonding strap to the skid, and keep the feed line off the floor and away from traffic.',
-          'The methanol reservoir sits on a load cell inside a spill tray of at least 110 % of its volume. Gravimetric verification is a safety control here, not only an analytical one: a stopped pump and a dead-heading pump look identical on the controller trace.',
-          'A methanol-adapted culture above 100 g L⁻¹ dry cell weight outruns the vessel oxygen supply within minutes of an agitation trip. Interlock the feed to suspend on loss of agitation and never bypass that interlock to ride out a fault.',
-          'Ammonium hydroxide at 28 % releases ammonia vapour. Connect and disconnect the base line in the fume hood with the pump stopped and the vessel vented.',
-          'Do not open the vessel while methanol feeding is active. Residual methanol above 6 g L⁻¹ produces a flammable headspace on depressurisation.',
-          'Cap oxygen enrichment at the value on the vessel data sheet. Enriched headspace over a methanol-fed broth widens the flammability envelope.',
-          'Sterilise in situ at 121 °C for 45 min and break no connection until the vessel is below 80 °C and pressure has released through the vent filter.',
+          'Sodium azide is acutely toxic and forms shock-sensitive heavy-metal azides in copper and lead plumbing. Add it only to material destined for storage, never to anything that will be poured to drain, and label every azide-containing bottle at the moment it is made.',
+          'Rotary evaporation of a protein solution foams without warning and a foam-over contaminates the vacuum line and destroys the batch. Keep the bath below 40 °C, fit a bump trap, and do not leave the flask under full vacuum unattended.',
+          'Dissolving calcium chloride is strongly exothermic. Make the stock in a beaker standing in a water bath, never directly in the assembly vessel with protein present.',
+          'The TFF pump develops several bar behind a blinded membrane. Confirm the retentate valve is open before starting and watch the inlet gauge through the first minute of every run.',
+          'Micelle suspensions containing recombinant protein are process material, not food. They are not tasted; they leave the laboratory as labelled analytical samples or as autoclaved waste.',
         ],
         steps: [
           {
-            id: 'k1',
-            text: 'Prepare the batch salts in about 7 L of deionised water in the vessel: {{qty:Potassium sulfate}} potassium sulfate, {{qty:Magnesium sulfate heptahydrate}} magnesium sulfate heptahydrate and {{qty:Calcium sulfate dihydrate}} calcium sulfate dihydrate. Stir until dissolved; the calcium sulfate will remain as a fine suspension and that is expected.',
+            id: 'a1',
+            text: 'Dissolve {{qty:Purified β-casein (recombinant or native)}} of β-casein and {{qty:Purified κ-casein}} of κ-casein in {{qty:Sodium phosphate buffer, 20 mM pH 7.0}} of 20 mM sodium phosphate buffer at pH 7.0, stirring gently at 4 °C overnight, then filter through the {{qty:0.22 µm bottle-top filter units}} filter units.',
+            refs: ['r-F4-3', 'E6'],
+            note: 'β-casein alone does not make a micelle that stops growing. κ-casein makes up about 13 % of total caseins, sits mostly at the micelle surface and is the calcium-insensitive fraction that caps growth; the ratio here follows that proportion. Leave it out and you get aggregates, not micelles.',
           },
           {
-            id: 'k2',
-            text: 'Add {{qty:Phosphoric acid, 85 % w/w}} of 85 % phosphoric acid slowly, with agitation, then add {{qty:Glycerol, batch charge}} of glycerol and {{qty:Antifoam, polypropylene glycol P2000}} of antifoam. Make up to 9.0 L, leaving the balance of the working volume for the seed and the base demand.',
+            id: 'a2',
+            text: 'Equilibrate the solution at the assembly temperature you have chosen and record it, together with the measured pH after equilibration.',
           },
           {
-            id: 'k3',
-            text: 'Calibrate the pH electrode with the {{qty:pH calibration buffer sachets, 4.01 and 7.00}} buffer sachets and install it. Charge the dissolved-oxygen electrode with {{qty:Dissolved-oxygen probe electrolyte}} of electrolyte and install it. Calibrate the headspace methanol sensor against {{qty:Methanol sensor calibration standard}} calibration standard vial.',
-            note: 'The methanol sensor is an interlock, not the controlled variable. It is calibrated daily throughout induction because a drifting sensor silently raises the residual methanol at which the feed will actually cut.',
+            id: 'a3',
+            text: 'Choose the assembly route and write it on the batch sheet: Route A, vacuum evaporation (step a4), or Route B, membrane transport (step a5). Do not assemble by dropwise mixing.',
+            refs: ['I4'],
+            note: 'OF-COR-001 §10 records that I4 treats micelle formation as a calcium phosphate phase separation process and replaces the dropwise-mixing method with vacuum evaporation and membrane routes specifically because dropwise mixing does not scale. A method excluded on scalability grounds should not be the one a process protocol teaches.',
           },
           {
-            id: 'k4',
-            text: 'Sterilise in situ at 121 °C for 45 min, with the vent filter open and the exhaust condenser running. Confirm the sterilisation hold on the batch record before the chart is filed.',
-            timerSec: 2700,
-            timerLabel: 'Sterilise in situ, 121 °C, 45 min',
+            id: 'a4',
+            text: 'Route A — vacuum evaporation. Make the protein solution up to twice its final volume, add {{stock:Calcium chloride dihydrate}} of 0.5 M calcium chloride ({{qty:Calcium chloride dihydrate}} as the salt) and {{stock:Dipotassium hydrogen phosphate}} of 0.5 M dipotassium hydrogen phosphate ({{qty:Dipotassium hydrogen phosphate}} as the salt) while the mineral is still undersaturated, then concentrate under vacuum below 40 °C at a controlled rate until the target protein concentration is reached.',
+            note: 'The supersaturation that drives phase separation is generated by removing water, not by adding reagent. That is the whole point of the route: the mineral arrives everywhere at once instead of at the tip of a dropper.',
           },
           {
-            id: 'k5',
-            text: 'Cool to 30.0 °C, start agitation at 400 rpm and air at 0.5 vvm, and polarise the dissolved-oxygen electrode for 6 h. Complete steps k6 and k7 while it polarises, then set 100 % against air at the run agitation and aeration.',
-            timerSec: 21600,
-            timerLabel: 'Polarise DO electrode, 6 h',
+            id: 'a5',
+            text: 'Route B — membrane. Hold the protein solution in the retentate of the {{qty:Diafiltration cassette, 10 kDa cut-off}} 10 kDa cassette and diafiltrate against a permeate carrying calcium and phosphate at the target activity, so that mineral arrives at the protein by transport across the membrane at a rate you set with the permeate flux.',
+            refs: ['I4'],
           },
           {
-            id: 'k6',
-            text: 'Add {{qty:PTM1 trace metal solution}} of filter-sterilised PTM1 trace metal solution and {{stock:Biotin}} of biotin stock, delivering {{qty:Biotin}} of biotin. Both are added after sterilisation; autoclaved PTM1 precipitates and the biotin degrades.',
+            id: 'a6',
+            text: 'Build a rate ladder rather than running one condition. Run at least three preparation rates spanning an order of magnitude, on the same material, on the same day, with everything else held constant.',
+            refs: ['I3'],
+            note: 'I3 records that micellar diameter is controllable by preparation rate during assembly. OF-COR-001 does not transcribe the relationship — no slope, no direction, no range — so the ladder is how you obtain it for your own material rather than assuming it.',
           },
           {
-            id: 'k7',
-            text: 'Connect the base line and set the pH loop to 5.0, controlled by on-demand addition of {{qty:Ammonium hydroxide, 28 % w/w}} of 28 % ammonium hydroxide. The base is also the sole nitrogen source, so its consumption is a process measurement and not just a control action.',
-            refs: ['ex-0097'],
+            id: 'a7',
+            text: 'Measure particle size by DLS in {{qty:Low-volume DLS cuvettes}}, diluting in the assembly buffer and never in water. Report the z-average diameter and the polydispersity index against the preparation rate that produced them.',
+            refs: ['r-E2-1'],
+            note: 'Reference geometry: native casein micelles are approximately spherical with a radius of about 70 nm — a diameter near 140 nm — containing on the order of 10,000 casein molecules. Diluting into water strips the mineral phase and you will measure the dissociation, not the micelle.',
           },
           {
-            id: 'k8',
-            text: 'Inoculate with {{qty:Seed culture in buffered glycerol complex medium}} of seed culture at 10 % of the working volume. Record the time as batch t = 0 and start the off-gas analyser logging.',
+            id: 'a8',
+            text: 'Score the micellar fraction. Centrifuge at 25,000 × g for 60 min, assay protein in the supernatant by Bradford ({{qty:Bradford assay reactions}} across the batch), and express the sedimentable fraction as a percentage of the protein charged.',
+            timerSec: 3600,
+            timerLabel: 'Sediment micelles, 25,000 × g, 60 min',
+            refs: ['r-I1-1'],
+            note: 'The benchmark: in I1’s reassembly experiments roughly 87 % of total protein was sedimentable in the fully phosphorylated case, across all three systems, while fully dephosphorylated caseins hardly formed micelle structures at all and remained in the serum. That 87 % is the number this step is scored against.',
           },
           {
-            id: 'k9',
-            text: 'Run the glycerol batch phase at 30.0 °C, holding dissolved oxygen above 25 % of air saturation by cascading agitation, then air flow, then oxygen enrichment. The batch glycerol exhausts at 18–24 h and announces itself as a sharp dissolved-oxygen rise.',
-            timerSec: 300,
-            timerLabel: 'Confirm DO spike, 5 min',
-            note: 'Wait the full 5 min before acting on the spike. A transient rise from a foam collapse or an antifoam shot looks identical for the first 60 s, and starting the transition feed early leaves unconsumed glycerol to repress the promoter.',
+            id: 'a9',
+            text: 'Read a bad batch correctly before you change the mixing. A large diameter with a wide polydispersity index and a low sedimentable fraction is a phosphorylation result, not a mixing result — go back to PR-PHOS-01 rather than re-tuning the pump.',
+            refs: ['r-I2-1'],
+            note: 'Artificial micelles built predominantly from dephosphorylated casein form irregular structures roughly three times larger than normal. Micelle reassembly ability is proportional to phosphorylation degree; the assembly rig cannot compensate for a protein that lacks its phosphate centre.',
           },
           {
-            id: 'k10',
-            text: 'Start the glycerol transition feed: {{qty:Glycerol transition feed, 500 g L⁻¹ with PTM1}} of 500 g L⁻¹ glycerol with PTM1, delivered over 4 h at a rate that holds dissolved oxygen above 25 %. This phase brings the vessel to a common biomass before induction.',
-            timerSec: 14400,
-            timerLabel: 'Glycerol transition feed, 4 h',
-            refs: ['ex-0099'],
+            id: 'a10',
+            text: 'Record the result as a complete claim or not at all: phosphorylation state and the method that established it, protein source and purity, assembly route, preparation rate, temperature, pH, diameter, polydispersity and sedimentable fraction.',
+            refs: ['r-I9-2'],
+            note: 'OF-COR-001 §10 records that artificial-micelle formation from recombinant caseins has so far been unsuccessful, largely for post-translational-modification reasons. A successful assembly here would be a novel result, and a novel result reported without its phosphorylation method attached is not evidence of anything.',
           },
           {
-            id: 'k11',
-            text: 'Stop the glycerol feed and hold the culture carbon-starved for 30 min. Confirm the dissolved oxygen has risen and settled, and record the dry cell weight; it should be 40–45 g L⁻¹ at this point.',
-            timerSec: 1800,
-            timerLabel: 'Carbon starvation before induction, 30 min',
-            note: 'Deviation-prone. Inducing over residual glycerol is the most common cause of a low first-day titre, because the AOX1 promoter stays repressed while the methanol feed is already running and residual methanol climbs.',
-          },
-          {
-            id: 'k12',
-            text: 'Ramp the temperature from 30.0 °C to 26.0 °C over 30 min and hold it there for the rest of the run. The lower induction temperature reduces proteolytic clipping of the secreted product at the cost of a slightly lower specific rate.',
-            timerSec: 1800,
-            timerLabel: 'Temperature ramp to 26 °C, 30 min',
-            refs: ['ex-0112'],
-          },
-          {
-            id: 'k13',
-            text: 'Start methanol induction and follow the feed schedule below. Rates are per litre of working volume and do not change with batch size; the charges do.\n\n| Induction window | Methanol feed rate | Charge at this batch size |\n| --- | --- | --- |\n| 0–6 h | 1.0 → 2.5 g L⁻¹ h⁻¹ linear ramp | {{qty:Methanol charge, induction hours 0–6}} |\n| 6–24 h | 3.5 g L⁻¹ h⁻¹ held | {{qty:Methanol charge, induction hours 6–24}} |\n| 24–90 h | 4.2 g L⁻¹ h⁻¹, trimmed on oxygen uptake | {{qty:Methanol charge, induction hours 24–90}} |',
-            note: 'The 0–6 h ramp is an adaptation phase, not a productivity phase. Cells arriving from glycerol have no alcohol oxidase pool and a full-rate feed simply accumulates methanol.',
-            refs: ['ex-0091'],
-          },
-          {
-            id: 'k14',
-            text: 'Set the residual-methanol interlock to suspend the feed above 6 g L⁻¹ in the broth, and verify it once by raising the threshold alarm and confirming the pump stops. Log every suspension with its clock time and duration.',
-          },
-          {
-            id: 'k15',
-            text: 'From 24 h, trim the feed every 90 s to hold the oxygen uptake rate at 90 % of the transfer capacity estimated for the current agitation, aeration and enrichment state. Recompute transfer capacity from the off-gas oxygen balance at least once per shift.',
-            refs: ['ex-0117'],
-            note: 'This is what makes the run transfer-limited rather than kinetically limited, and it is the reason the same feed law reproduces across vessel scales that have different transfer coefficients.',
-          },
-          {
-            id: 'k16',
-            text: 'Sample every 12 h through induction. Complete each line before the sample leaves the bench.',
-            multiCheck: [
-              'Record elapsed induction time, temperature, pH, dissolved oxygen, agitation and enrichment',
-              'Read cumulative methanol and base mass from the load cells and log both',
-              'Withdraw 20 mL through the sample port after a 10 mL discard',
-              'Determine dry cell weight in quadruplicate on washed, oven-dried pellets',
-              'Clarify 5 mL at 10,000 × g and freeze the supernatant at −20 °C for titre',
-              'Check the broth for foam carryover into the exhaust condenser',
-            ],
-          },
-          {
-            id: 'k17',
-            text: 'Assay the frozen supernatants at the end of the run by reversed-phase chromatography against a purified reference, with monomer content checked in parallel by size exclusion. Expect 90–130 g L⁻¹ dry cell weight and a titre in the 10–26 g L⁻¹ range depending on the construct.',
-            refs: ['ex-0091', 'ex-0109', 'ex-0111', 'ex-0096'],
-            note: 'Report titre alongside biomass and induction time, never alone. A titre quoted without the biomass it was made on cannot be compared with anything, which is the whole difficulty the corpus records document.',
-          },
-          {
-            id: 'k18',
-            text: 'End the run at 90 h of induction: stop the feed, hold agitation and cooling for 20 min to consume residual methanol, then chill the broth to 12 °C and confirm headspace methanol has fallen below 0.5 g L⁻¹ before opening the vessel. Pass the vessel to the clean-in-place SOP the same day.',
-            timerSec: 1200,
-            timerLabel: 'Consume residual methanol, 20 min',
+            id: 'a11',
+            text: 'Preserve only what is going to analysis: add {{qty:Sodium azide preservative, 2 % w/v}} of 2 % sodium azide to a final 0.02 % w/v in analytical samples held beyond the working day, and keep those samples physically separate from any material destined for functional or sensory work.',
           },
         ],
-        estMinutes: { active: 960, total: 8280 },
+        estMinutes: { active: 330, total: 1500 },
         references: [
           {
-            paperId: 'SP-014',
-            note: 'High-cell-density fed-batch with a transfer-limited methanol feed law and a 6 g L⁻¹ residual interlock.',
+            paperId: 'I3',
+            note: 'Preparation rate and coagulation properties: micellar diameter is controllable by preparation rate during assembly. The relationship itself is not transcribed in OF-COR-001.',
           },
           {
-            paperId: 'SP-012',
-            note: 'Methanol feeding policy governs specific productivity at matched biomass and medium history.',
+            paperId: 'I4',
+            note: 'Casein micelle formation as a calcium phosphate phase separation process; vacuum evaporation and membrane routes replace the unscalable dropwise-mixing method. The unit operation that would sit downstream of a cw15 fermentation.',
           },
           {
-            recordId: 'ex-0091',
-            note: 'Titre 12.4 g L⁻¹ of RlpB-3 after 72 h of induction under a DO-stat policy — verified, gold.',
+            recordId: 'r-I1-1',
+            note: 'Roughly 87 % of total protein sedimentable in the fully phosphorylated case — the scoring benchmark for step a8.',
           },
           {
-            recordId: 'ex-0109',
-            note: 'Titre 25.8 g L⁻¹ of rALB-7 at the 1,200 L scale — verified, gold.',
+            recordId: 'r-I2-1',
+            note: 'Predominantly dephosphorylated artificial micelles form irregular structures roughly three times larger than normal — the failure signature in step a9.',
           },
           {
-            recordId: 'ex-0117',
-            note: 'Biomass yield on methanol during induction 0.39 g g⁻¹ — gold annotation.',
+            recordId: 'r-E2-1',
+            note: 'Native micelle geometry: approximately spherical, radius ~70 nm (entered as a 140 nm diameter). Method recorded as undetermined.',
           },
           {
-            recordId: 'ex-0112',
-            note: 'Induction temperature 26 °C — verified.',
+            recordId: 'r-F4-3',
+            note: 'κ-casein ≈ 13 % of total caseins — the basis for the κ:β ratio charged at step a1.',
+          },
+          {
+            paperId: 'E6',
+            note: 'κ-casein sits mostly at the micelle surface and limits micelle growth; α- and β-caseins sit inside and bind calcium phosphate.',
+          },
+          {
+            recordId: 'r-I9-2',
+            note: 'ACM formation from recombinant caseins has so far been unsuccessful, largely for PTM reasons. The prior this protocol is run against.',
           },
         ],
       },
@@ -1636,7 +1871,9 @@ export const PROTOCOLS: Protocol[] = [
   },
 
   // ───────────────────────────────────────────────────────────────────────
-  // PR-CIP-01 — pure checklist SOP; every material fixed, safety-dense.
+  // PR-CIP-01 — the pure-checklist pattern, kept. Laboratory practice rather
+  // than literature: cited to N3 because a production-process record is
+  // exactly what the EFSA dossier was found to be missing.
   // ───────────────────────────────────────────────────────────────────────
   {
     id: 'PR-CIP-01',
@@ -1648,7 +1885,7 @@ export const PROTOCOLS: Protocol[] = [
       'Clean, inspect, reassemble and sterilise a benchtop bioreactor between runs, and record the checks that make the next batch’s sterility failure diagnosable rather than mysterious.',
     currentVersion: '1.0',
     provenanceNote:
-      'Derived from SP-007, SP-014 · curated by SMKC · procedural detail is demo content with no literature value',
+      'This SOP is laboratory practice, not a literature transcription: OF-COR-001 contains no cleaning or sterilisation procedure and this protocol claims none. It is cited to N3 because EFSA could not establish the safety of a C. reinhardtii novel food after identifying data gaps across identity, production process and specifications — a production-process record is precisely what a dossier of that kind stands on — and to B5 for the shear constraint that governs impeller and sparger choice on this line.',
     versions: [
       {
         version: '1.0',
@@ -1831,36 +2068,44 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c9',
+            text: 'Refit the impeller and sparger to the configuration recorded for the line this vessel serves, and record which configuration was fitted.',
+            refs: ['B5'],
+            note: 'For the algal line this is not housekeeping. Cell-wall-deficient strains are much more susceptible to shear than walled strains, so a high-shear impeller left in from a fermentation run is a process change that nobody logged.',
+          },
+          {
+            id: 'c10',
             text: 'Service the probes: calibrate the pH electrode with the {{qty:pH calibration buffer sachets, 4.01 and 7.00}} buffer sachets and install it; charge the dissolved-oxygen electrode with {{qty:Dissolved-oxygen probe electrolyte}} of fresh electrolyte, fit a new membrane and install it. Record the pH slope on the vessel log.',
             note: 'A slope that has dropped more than three points since the previous cycle predicts a mid-run pH failure. Replace the electrode now rather than after it has cost a batch.',
           },
           {
-            id: 'c10',
+            id: 'c11',
             text: 'Fit the {{qty:0.2 µm inlet air filter}} inlet filter and the {{qty:0.2 µm exhaust filter}} exhaust filter, charge the vessel with 1 L of deionised water, place the {{qty:Biological indicator spore strip}} biological indicator spore strip in the vessel, mark the headplate with {{qty:Autoclave indicator tape}} of indicator tape, and sterilise at 121 °C for 45 min with the vent open.',
             timerSec: 2700,
             timerLabel: 'Sterilise 121 °C, 45 min',
           },
           {
-            id: 'c11',
+            id: 'c12',
             text: 'Cool in the closed chamber to below 80 °C, then hold the sterilised vessel at 30 °C for 24 h as a sterility hold. Incubate the spore strip at 55 °C for 48 h and read it. Release the vessel only when the hold water is clear, the spore strip is negative, and both results are on the vessel log.',
             timerSec: 3600,
             timerLabel: 'Cool below 80 °C',
-            note: 'A vessel that fails the hold goes back to step c2, not to step c10. A failed hold after a passing spore strip means a post-sterilisation ingress point, and re-sterilising will pass again while the ingress point remains.',
+            note: 'A vessel that fails the hold goes back to step c2, not to step c11. A failed hold after a passing spore strip means a post-sterilisation ingress point, and re-sterilising will pass again while the ingress point remains.',
+          },
+          {
+            id: 'c13',
+            text: 'Sign the cycle off on the vessel log: date, operator, detergent lot, elastomer lot, probe slopes, sterilisation cycle number, spore strip result and the configuration fitted at step c9.',
+            refs: ['N3'],
+            note: 'Keep this log as if it will be read by an assessor, because for a food application it will be. EFSA could not establish the safety of a C. reinhardtii novel food after identifying data gaps across identity, production process, composition and specifications and receiving no reply to repeated requests — a procedural failure, not a finding of harm, and exactly the kind of gap a signed cycle record closes.',
           },
         ],
-        estMinutes: { active: 180, total: 1560 },
+        estMinutes: { active: 190, total: 1580 },
         references: [
           {
-            paperId: 'SP-014',
-            note: 'In-situ sterilisation and vessel preparation practice at 30 L to 1,200 L scale.',
+            paperId: 'N3',
+            note: 'EFSA NDA Panel 2025 on dried C. reinhardtii biomass: safety could not be established after data gaps across identity, production process, composition and specifications went unanswered. Cited for why this record exists, not for any procedure — OF-COR-001 contains no cleaning or sterilisation method.',
           },
           {
-            paperId: 'SP-007',
-            note: 'Flat-panel and bubble-column hardware whose sparger and probe-port fouling this SOP is written against.',
-          },
-          {
-            recordId: 'ex-0112',
-            note: 'Induction-phase temperature 26 °C — the setpoint the sterility hold is checked against for the fermentation line.',
+            paperId: 'B5',
+            note: 'Cell-wall-deficient strains are much more susceptible to shear and osmotic stress — the constraint behind the impeller-configuration check at step c9.',
           },
         ],
       },

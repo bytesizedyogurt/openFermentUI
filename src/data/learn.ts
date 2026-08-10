@@ -1,8 +1,21 @@
-// Curriculum (OF-DES-001 §8.14, §14.8). Module 0 is fully built; modules 1–5
-// carry one seeded lesson each plus an outline of what is not yet written.
+// Curriculum (OF-DES-001 §8.14, §14.8), rebuilt on the real corpus of
+// OF-COR-001. Module 0 is fully built; modules 1–5 carry one seeded lesson
+// each plus an outline of what is not yet written.
+//
+// HONESTY CONTRACT FOR THIS FILE. The papers chipped here are real papers by
+// real authors, and the platform does NOT hold their full texts — every entry
+// is `catalogued`, its single section (id 's1') carrying the curator's note
+// from OF-COR-001 rather than the paper's own words. So every claim in this
+// curriculum is traceable to the curation document, no sentence is written as
+// though the paper said it, and where the corpus does not settle a question
+// the lesson says so instead of filling the gap. That refusal is teachable
+// material, not a shortfall: lessons 0.4 and 5.1 are built on it.
 //
 // The embeds are live components, not screenshots — the pedagogy is the
-// product. SYNTHETIC content; see BUILD-SPEC.md.
+// product. Two of them will render empty states against this corpus
+// ('metrics-tiles' certainly, 'mini-queue' once a session's records are all
+// decided), and the surrounding prose is written so that the empty state is
+// the lesson rather than an accident.
 import type { LearnModule } from './types';
 
 export const MODULES: LearnModule[] = [
@@ -16,78 +29,104 @@ export const MODULES: LearnModule[] = [
       {
         id: 'l0-1',
         title: 'Why extraction',
-        minutes: 8,
+        minutes: 9,
         blocks: [
           {
             kind: 'prose',
-            md: `## The problem is not that the numbers are missing
+            md: `## The numbers are not missing. They are stuck.
 
-Open any bioprocess paper and the numbers you need are right there. A specific growth rate in the Results. A medium composition in the Methods. A protein content in a table. Nothing is hidden.
+This platform carries one argument: that a cell-wall-deficient *Chlamydomonas reinhardtii* strain could be made to produce phosphorylated bovine β-casein. It is assembled from 125 catalogued entries across fifteen threads, running from host platform and expression through the molecule, the kinase, prior art in other hosts, downstream processing and techno-economics.
 
-The problem is that they are in *prose*. A sentence like "regression over the interval from 6 h to 30 h gave a specific growth rate of 0.118 h⁻¹" is perfectly clear to you and completely opaque to a spreadsheet. To do anything computational with that number — compare it against nine other papers, feed it to a process model, decide a seed-train schedule — a human has to read the sentence, decide what the number means, decide what units it is in, and type it somewhere.
+Not one of those threads gives you a number you can compute with. They give you sentences.
 
-That transcription happens thousands of times a year, in every lab, into spreadsheets that die with the semester. It is slow, it is unrewarding, and it is where the errors come from.
+Two sentences in particular decide the whole architecture of the programme. The strain-lineage paper [[A1]] records that the UVM4 and UVM11 expression mutants reach about 0.2% of total soluble protein for intracellular reporters. The secretion benchmark [[C2]] records a maximum secreted yield of 15 mg/L. Whether you build an intracellular process with a disruption step or a secreted process with a clarification step turns on how those two numbers relate.
 
-## What gets lost in transcription
+You cannot subtract them, divide them, or put them on the same axis — lesson 0.2 is about exactly why not. But before any of that, somebody has to get them out of the prose.
 
-Three things, in increasing order of seriousness.
+## What transcription destroys
 
-**The units.** Growth rates get published per hour and per day, and the difference is a factor of 24. A number typed into a column headed "mu" has already lost the information needed to catch that mistake.
+Type "0.2" and "15" into a spreadsheet and four things die on the way in.
 
-**The conditions.** A growth rate means nothing without the light intensity, the temperature, and the carbon source that produced it. Spreadsheets flatten those into a comment cell, if they survive at all.
+**The unit.** 0.2% of total soluble protein is not a concentration at all, and a column headed "yield" has already lost the information needed to notice.
 
-**The provenance.** This is the one that matters most. Once a number is in a spreadsheet, you cannot ask it where it came from. Six months later, looking at "0.118", you cannot tell whether that was measured, estimated, copied from a review article, or typed wrong. The number has been separated from its evidence, and there is no way back.`,
+**The organism.** [[A1]]'s 0.2% is measured on UVM4, a UV-mutagenised derivative selected for high transgene expression — not on cw15, and the corpus keeps them separate for that reason.
+
+**The method.** The keystone review [[H1]] records "undetermined" for most of the bacterial studies it tabulates, because nobody ran the analysis, and a spreadsheet cell cannot hold the difference between *measured to be absent* and *never measured*.
+
+**The provenance.** The one that ruins corpora. Six months later, looking at "15", you cannot tell whether it was measured here, quoted from elsewhere, estimated by a vendor, or typed wrong. The number has been separated from its evidence and there is no road back.
+
+## A chip is a road back
+
+Everywhere the platform prints a claim, it prints the route to the source alongside it.`,
           },
-          { kind: 'embed', embed: 'chip-demo', arg: 'SP-001' },
+          { kind: 'embed', embed: 'chip-demo', arg: 'M7' },
           {
             kind: 'prose',
-            md: `## Extraction with provenance
+            md: `The chip is real: hover it for the source, click through to the entry with the span highlighted. The sentence *around* it is component boilerplate — illustrative framing supplied by the widget, not a quotation from [[M7]]. Which is exactly the habit this module is trying to build: **the rendered sentence is never the evidence; the resolved record is.**
 
-An extraction record is a number that never loses its source. It carries the value, the unit as published, the SI-normalized twin, the exact span of text that supports it, the paper it came from, and a status saying whether a human has checked it.
+## Anatomy of an extraction record
 
-That last part is what makes the whole thing usable. A verified record is evidence. An unverified one is a machine's guess, and the interface has to show you which is which without making you ask.`,
+An extraction record is a number that cannot lose its source: the value and unit as published, an SI-normalised twin for computation, the exact span that supports it, the entry it came from, the organism it was measured on, the analytical method where one is required, whether this source measured it or repeated someone else's measurement, and a provenance class saying how far it has been checked.`,
           },
-          { kind: 'embed', embed: 'record-card', arg: 'ex-0001' },
+          { kind: 'embed', embed: 'record-card', arg: 'r-C2-1' },
           {
             kind: 'prose',
-            md: `Look at what that card gives you that a spreadsheet cell cannot. The quote is the actual sentence from [[SP-001]]. The paper chip opens the source with the span highlighted in place. The status tells you a human has looked at it. If any of that turned out to be wrong, you could find out — which is the whole difference between a number and a claim.
+            md: `Look at what that card gives you that a cell in a spreadsheet cannot.
 
-## Why a machine, and why a human after it
+The value appears as published *and* normalised, so comparison arithmetic and verification arithmetic are both available without redoing either. The quote is the span that supports it. The chip opens the entry. And the provenance tick says **curated** — a precise, deliberately modest claim: the value was transcribed from the curation document OF-COR-001, not read off the source PDF. It is real and attributable, it has not been checked against the paper itself, and the interface refuses to let it pass as if it had.
 
-Automation is the only way to get through a corpus of any size, and it is not reliable enough to trust unsupervised. Extraction models confuse a target with a result, attach a value to the wrong parameter, carry a per-day rate through as per-hour, or pick up a number from an introduction summarizing someone else's work.
+That distinction exists because of the state this corpus is in. Every entry is *catalogued*: bibliographically real, full text not yet ingested, each holding a single section whose body is the curator's note. The spans you can highlight today are spans of the curation document — and none of that is hidden anywhere in this build. It is printed on every record.
 
-So the design is not "automate extraction." It is **extract automatically, verify cheaply, and measure how often the machine was wrong.** The next three lessons are those three things: the ontology that makes verification possible, the review workflow that makes it fast, and the metrics that make the error rate visible instead of assumed.`,
+So the design is not "automate extraction" — extractors attach values to the wrong parameter, carry a per-day rate through as per-hour, and quietly merge measurements on strains that share a nickname. It is **extract automatically, verify cheaply, and measure how often the machine was wrong.**`,
           },
         ],
         checkpoint: [
           {
             id: 'c0-1-1',
-            prompt: 'What is the single most important thing an extraction record carries that a spreadsheet cell does not?',
+            prompt:
+              'A record on this platform carries the provenance class "curated". What does that claim, and what does it deliberately not claim?',
             kind: 'mc',
             options: [
-              'A link back to the exact source span that supports the value',
-              'A larger number of decimal places',
-              'The name of the person who typed it in',
-              'An automatic unit conversion',
+              'The value was transcribed from the curation document — real and attributable, but not yet checked against the source paper',
+              'The value was checked against the source PDF by two independent reviewers',
+              'The value was invented for demonstration purposes',
+              'The value is a reference measurement suitable for scoring extractors',
             ],
             answerIndex: 0,
             explanation:
-              'Provenance is the spine of the whole platform. Unit conversion and precision matter, but they are recoverable if you have the source; a number separated from its evidence cannot be checked by anyone, ever, and so cannot be trusted.',
-            evidenceChip: 'ex-0001',
+              'Curated sits between unverified machine output and verified human-checked evidence. It says a real curator wrote this down about a real paper, and it says nothing at all about whether the paper actually contains it in that form. Collapsing that distinction is how a literature database quietly becomes fiction: the claim is transitively sourced, and until someone opens the PDF it has to be rendered as such.',
+            evidenceChip: 'r-C2-1',
           },
           {
             id: 'c0-1-2',
-            prompt: 'A colleague reports that a paper gives a growth rate of 0.118. Why is this not yet a usable number?',
+            prompt:
+              'A spreadsheet column headed "yield" contains 0.015 and 0.85, both from casein-programme papers. What is the most consequential thing that column has already lost?',
             kind: 'mc',
             options: [
-              'It has no unit, so it could differ by a factor of 24 depending on whether it is per hour or per day',
-              'It has too few significant figures',
-              'Growth rates are never comparable between papers',
-              'It has not been rounded to two decimal places',
+              'Whether each number is a secreted or an intracellular quantity, and which host it was measured in',
+              'The number of significant figures the authors reported',
+              'The publication year of each paper',
+              'The alphabetical ordering of the sources',
             ],
             answerIndex: 0,
             explanation:
-              'Rates are published both per hour and per day. Without the unit the value is ambiguous by a factor of 24 — which is exactly the class of error the ontology and the unit engine exist to catch.',
+              'Both numbers are in grams per litre and neither is comparable to the other: 0.015 g/L is protein that reached the medium of an algal culture, and 0.85 g/L is protein that stayed inside a yeast cell and needs disruption to recover. The ontology splits secreted and intracellular titer into separate fields precisely so that a column heading cannot fuse two different process architectures into one average.',
+            evidenceChip: 'r-H4-2',
+          },
+          {
+            id: 'c0-1-3',
+            prompt:
+              'Why does the platform store both the as-published value and its SI-normalised twin, rather than only the normalised one?',
+            kind: 'mc',
+            options: [
+              'Verification compares the record against the span, which quotes the original unit; keeping only the conversion would make conversion errors invisible',
+              'SI units are less precise than the units papers publish in',
+              'Because the corpus contains fields that have no canonical unit',
+              'To reduce the storage footprint of the corpus',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The two values serve different jobs. As-published is what a reviewer checks against the source span; normalised is what a strip plot or a cost model consumes. Discard the first and every review has to redo the arithmetic by hand — at which point a conversion error is no longer detectable, because the only surviving witness to it has been deleted.',
           },
         ],
       },
@@ -95,85 +134,104 @@ So the design is not "automate extraction." It is **extract automatically, verif
       {
         id: 'l0-2',
         title: 'The ontology and units',
-        minutes: 10,
+        minutes: 12,
         blocks: [
           {
             kind: 'prose',
-            md: `## Sixteen fields, deliberately
+            md: `## Twenty-four fields, in five families
 
-An ontology is a controlled list of the things you are willing to extract. This platform's is small on purpose: sixteen parameters, each with a definition, a canonical unit, and a validation range.
+An ontology is a controlled list of the things you are willing to extract. Version 1 has twenty-four parameters in five families — **expression performance** (share of total soluble protein, intracellular and secreted titer, secreted fraction, fold improvement, transformation efficiency, time to colony), **post-translational modification** (phosphate count, phosphorylation degree, phospho-site position, glycan species, kinase identity), **functional performance** (micelle diameter, micellar fraction, gelation pH, calcium binding, melt–stretch length), **cultivation** (growth rate, final biomass density, volumetric productivity, medium component concentration) and **downstream and economics** (disruption protein yield, disruption energy, minimum selling price). Each carries a definition precise enough to settle an argument, a canonical unit, and a validation range.
 
-Smallness is a feature. A large ontology sounds more capable but makes every downstream job harder — reviewers have to remember more distinctions, extractors have more ways to pick the wrong field, and cross-paper comparison fragments across near-duplicate categories. Sixteen fields cover what a bioprocess model actually consumes.
+Two fields are categorical rather than numeric, and both are enums on purpose: glycan species, and kinase identity — the latter for a reason lesson 0.3 returns to, that "casein kinase" is the common name of three different enzymes.
 
-Each field carries three things beyond its name:
+The validation range warns rather than blocks. A value outside it is *suspicious*, not *wrong*; sometimes a source really does report an anomalous number, and the reviewer's job is to record what the source says. Blocking would force a choice between falsifying and abandoning the record, and both are worse than an honest outlier.
 
-- **A definition** precise enough to settle a disagreement. "Specific growth rate" is defined as the first-order rate constant of exponential biomass increase — the slope of ln(X) against time during unrestricted growth. That definition tells a reviewer whether a rate averaged over a whole batch qualifies. It does not.
-- **A canonical unit** that every value is normalized to for comparison. For growth rate, h⁻¹.
-- **A validation range** — for growth rate, 0.005 to 0.35 h⁻¹. Not a hard limit. A gate that makes you look twice.
+## Rule 1 — a PTM value without its method is not a value
 
-## Units are sacred
+Every field in the post-translational-modification and functional families carries a mandatory method qualifier. "Phosphorylated: yes" means one thing from LC-ESI-MS, another from Phos-tag or urea-PAGE with phosphatase treatment, and something considerably weaker from an SDS-PAGE mobility inference.
 
-The platform stores every quantity twice: as published, and SI-normalized. Both are kept, and the interface always says which one you are looking at.
+The value \`undetermined\` is first-class and legitimate: *the analysis was never done*, which is a completely different statement from *the analysis was done and the answer was no*. The keystone review [[H1]] records undetermined for most of the bacterial casein studies it tabulates, and an ontology that could not express that would have to drop those rows or misrepresent them as negatives.
 
-This matters because both are true and they serve different purposes. The as-published value is what the paper says — the thing you would quote, the thing a reviewer checks against the source span. The normalized value is what you compute with. Throwing away the first makes verification impossible; throwing away the second makes comparison impossible.`,
+
+## Rule 2 — % TSP and g/L are not interconvertible
+
+This is the single most important thing in the ontology, and this corpus contains the exact trap it exists to catch.
+
+[[A1]] reports that UVM4 and UVM11 reach roughly 0.2% of total soluble protein for intracellular reporters ([[r-A1-1]]). [[C2]] reports secreted yields reaching a maximum of 15 mg/L ([[r-C2-1]]). Every student who meets these two numbers wants to compare them. It is the obvious question — is secretion better than intracellular accumulation in this host?
+
+You cannot do it, and the engine will not let you.
+
+A percentage of total soluble protein is a *share of a mixture*. A concentration is *mass per unit volume of broth*. Converting the first into the second needs two quantities neither paper supplies at that point: the biomass concentration of the culture, and the total-protein fraction of that biomass. Guess either and you have not performed a conversion — you have fabricated a titer and given it a provenance it did not earn.
+
+So the unit engine puts \`% TSP\` in its own family, structurally separate from mass concentration, and refuses with an explanation rather than a bare dimension error. The refusal is the feature: a silent failure teaches nothing, while one naming the two missing quantities tells you what to go and measure.
+
+Note the subtler barrier underneath. Even with those quantities in hand the comparison would still be wrong, because the measurements are not of the same thing: one is an intracellular reporter, the other a secreted protein carrying a synthetic glycomodule. Unit compatibility is necessary for a comparison, not sufficient.
+
+The same discipline applies inside the percent sign. This ontology carries \`% TSP\`, \`% of native sites\`, \`% sedimentable\`, \`% of total expressed\` and \`% of total protein\`, all with different denominators: 87% sedimentable ([[r-I1-1]]) and 0.005% secreted ([[r-H4-3]]) are both percentages and share nothing else. Currency is separated for the same reason — 69 €/kg ([[r-O4-1]]) does not become $5/kg ([[r-O2-1]]) without an exchange rate carrying a date, and a unit converter has no business inventing one.`,
           },
           { kind: 'embed', embed: 'unit-playground' },
           {
             kind: 'prose',
-            md: `Try entering \`3.6 d⁻¹\` above and watch the SI twin appear as \`0.15 h⁻¹\`. Then try \`0.9 h⁻¹\` and watch the range warning. Then try something dimensionally wrong, like \`5 g L⁻¹\` for a growth rate — the field rejects it, because grams per litre cannot be a rate no matter what number you put in front.
-
-That dimensional check is the highest-value validation in the system. It catches the error class that does the most damage, and it catches it without needing to know anything about biology.
-
-## Why the range warns instead of blocking
-
-A value outside the validation range is *suspicious*, not *wrong*. Sometimes a paper genuinely reports an anomalous number, and the reviewer's job is to record what the paper said — not to make it plausible.
-
-So an out-of-range value shows a warning with the expected range, and saves anyway, marked as anomalous. Blocking it would force the reviewer to either falsify the record or abandon it, and both are worse than an honest outlier.
-
-This is a general principle in the interface: validation that informs, rather than validation that obstructs. The reviewer knows things the schema does not.`,
-          },
-          { kind: 'embed', embed: 'strip-plot', arg: 'growth_rate_mu' },
-          {
-            kind: 'prose',
-            md: `Normalization is what makes that plot possible. Every dot is a record from a different paper, some published per hour and some per day, all converted to h⁻¹ so they share an axis. Without a canonical unit there is no plot — just a list of incomparable numbers.`,
+            md: `Work that field. Enter a per-day growth rate and watch the SI twin appear in per-hour. Push a value past the validation range and watch it warn without blocking. Then switch the parameter to expression level and try to type a concentration into it — the refusal you get back is the one this lesson is about, and it arrives with its reason rather than an error code. Dimensional checking is the highest-value validation in the system: it catches the error class that does the most damage, without needing to know any biology at all.`,
           },
         ],
         checkpoint: [
           {
             id: 'c0-2-1',
-            prompt: 'A paper reports a specific growth rate of 3.6 d⁻¹. What is this in the platform\'s canonical unit for that field?',
+            prompt:
+              'The corpus’s cleanest specific-growth-rate record is 0.087 h⁻¹. Suppose a second source reported the same kind of quantity as 3.6 d⁻¹. Express that in the ontology’s canonical unit for growth rate.',
             kind: 'numeric',
             answer: { value: 0.15, unit: 'h⁻¹', tolerancePct: 3 },
             explanation:
-              'Dividing by 24 gives 0.15 h⁻¹. The grader here is unit-aware, so answering 3.6 d⁻¹ is also accepted — they are the same quantity, and the platform stores both.',
+              'Divide by 24: 3.6 d⁻¹ = 0.15 h⁻¹. The grader is unit-aware, so answering 3.6 d⁻¹ is accepted too — they are the same quantity and the platform stores both. This is the cheapest of all the unit traps, and also the most common: rates are published both ways, and the two differ by a factor of 24 with no change in how the number looks.',
+            evidenceChip: 'r-M7-1',
           },
           {
             id: 'c0-2-2',
-            prompt: 'A reviewer enters a growth rate of 0.9 h⁻¹, well outside the 0.005–0.35 range. What should the interface do?',
+            prompt:
+              'UVM4 reporters reach about 0.2% TSP intracellularly; the best secreted yield reported from this host is 15 mg/L. A student divides one by the other and concludes secretion is the better route. What is wrong?',
             kind: 'mc',
             options: [
-              'Warn, show the expected range, and save it anyway marked as anomalous',
-              'Refuse to save until the value is inside the range',
-              'Silently clamp the value to 0.35',
-              'Save it without comment',
+              'A share of total soluble protein and a concentration are not interconvertible without biomass concentration and the total-protein fraction of that biomass',
+              'The two numbers were published in different decades',
+              'Nothing is wrong, provided both are converted to SI first',
+              '15 mg/L should first be rounded to 0.02 g/L',
             ],
             answerIndex: 0,
             explanation:
-              'The reviewer may be recording a genuinely unusual published value, and their job is to record what the paper says. Blocking forces a choice between falsifying and abandoning the record; silent clamping is worse still, because it destroys data without telling anyone.',
+              'Rule 2. The conversion needs two quantities neither source supplies, and inventing them manufactures a titer out of a percentage. The engine refuses and names the missing quantities, which turns a dead end into a measurement plan. There is a second problem underneath the first: an intracellular reporter and a secreted glycomodule fusion are not the same measured quantity, so even a licensed conversion would not license that conclusion.',
+            evidenceChip: 'r-C2-1',
           },
           {
             id: 'c0-2-3',
-            prompt: 'Why does the platform keep the as-published value instead of storing only the SI-normalized one?',
+            prompt:
+              'What two additional quantities would have to be recorded before a % TSP value could legitimately be turned into a titer?',
             kind: 'mc',
             options: [
-              'So a reviewer can check the record against the source span, which quotes the original unit',
-              'Because SI units are less accurate',
-              'To save storage space',
-              'Because some fields have no canonical unit',
+              'Biomass concentration of the culture, and the total-protein fraction of that biomass',
+              'Culture temperature, and the length of the batch',
+              'Optical density, and the specific growth rate',
+              'The molecular weight of the product, and the pH of the medium',
             ],
             answerIndex: 0,
             explanation:
-              'Verification compares the record against what the paper actually printed. If only the converted value survived, every review would require redoing the conversion by hand — and any conversion error would become invisible.',
+              'A percentage of total soluble protein tells you the product’s share of a mixture. To get to grams per litre of broth you need how many grams of biomass are in a litre, and what fraction of that biomass is soluble protein. Record those and the conversion becomes arithmetic; omit either and it becomes fiction. This is why refusals in the unit engine are phrased as instructions rather than errors.',
+          },
+          {
+            id: 'c0-2-4',
+            prompt:
+              'A record reads: phosphorylation degree = 0% of native sites. Which field decides whether this is a measured negative or an analysis that was never run?',
+            kind: 'mc',
+            options: [
+              'The method qualifier — "MALDI-MS" means measured and absent, "undetermined" means never assessed',
+              'The confidence score assigned by the extractor',
+              'The publication year of the source',
+              'The organism the record was measured on',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Rule 1 exists for this exact ambiguity. Measurement of absence is a finding; absence of measurement is a gap in the literature. Both render as a zero, and only the method distinguishes them. Aggregate a corpus that has lost that distinction and you will report a consensus that no one ever measured.',
+            evidenceChip: 'r-H15-2',
           },
         ],
       },
@@ -181,99 +239,121 @@ This is a general principle in the interface: validation that informs, rather th
       {
         id: 'l0-3',
         title: 'Reviewing like a curator',
-        minutes: 12,
+        minutes: 13,
         blocks: [
           {
             kind: 'prose',
-            md: `## The job is narrower than it looks
+            md: `## The question is narrower than it looks
 
-Reviewing an extraction is not "is this a good number." It is one question: **does the quoted span support this value, in this field, in this unit?**
+Reviewing an extraction is not "is this a good paper" or "is this number believable." It is one question, asked mechanically:
 
-That narrowness is what makes review fast. You are not evaluating the paper's methods, not deciding whether the result is believable, not comparing it against other papers. You are checking a correspondence between a piece of text and a structured record. A trained reviewer does one in ten to fifteen seconds.
+> Does the quoted span support **this value**, in **this field**, in **this unit**, for **this organism**, by **this method**, as **this source's own measurement**?
 
-## The four failure modes
+Six clauses, one span. That narrowness makes review fast enough to be worth doing — a trained reviewer clears a record in fifteen seconds — and it makes the result auditable, because every clause has a visible witness.
 
-Extractors fail in recognizable ways, and naming them makes them fast to spot.
+One thing this corpus changes. Because every entry is catalogued rather than ingested, the span you check today belongs to the *curation document*, not the paper. Review at this stage establishes transcription fidelity, and a record surviving it stays **curated**; promotion to **verified** is a separate, later act requiring somebody to open the PDF. Conflating the two would be the largest single lie this interface could tell, so it does not offer the option.
 
-**Wrong value.** The span supports a number, but not this one. Often an adjacent number from the same sentence — a confidence interval bound, a time point, a different condition's result.
+## Four failure modes this literature actually produces
 
-**Wrong unit.** The value is right and the unit is not. Usually a rate published per day recorded as per hour, or a compound unit that lost part of itself — a conversion factor of 0.42 g L⁻¹ OD⁻¹ recorded as 0.42 g L⁻¹, which is dimensionally a concentration rather than a factor.
+Generic extraction-error taxonomies are not much use. These four are the ones the curator flagged here.
 
-**Wrong span.** The value may even be correct, but the quoted text does not support it. The classic case is a sentence containing several numbers, where the extractor attached the value to a neighbouring clause. A pH of 7.0 pulled from a sentence about temperature is wrong even if the culture really was at pH 7.0.
+### 1. Precursor versus mature numbering
 
-**Not this field.** The span supports a real quantity that belongs to a different parameter. Chlorophyll in mg g⁻¹ captured as protein content in % DW.
+Bovine β-casein is **224 residues as translated** and **209 after the signal peptide is removed** ([[F1]]). Every residue position that matters here is quoted in mature numbering: the codon-67 SNP separating the A1 and A2 variants, the N-terminal phosphate cluster, and the β(28–40) kinase-assay peptide ([[G9]], [[r-G9-3]] and [[r-G9-4]]). A position without its convention mislocates every site by fifteen residues, which is why the field carries a mandatory convention flag and the seed checker fails the build if one is missing: 224 and 209 are both correct answers to "how long is β-casein", and they answer different questions.
 
-A fifth case is not an error at all: **duplicates**, where the same measurement appears in two sections. Reject one, keep the other, and do not agonize.`,
+### 2. "Casein kinase" names three different enzymes
+
+CK1, CK2 and FAM20C. CK1 and CK2 were named for casein in the 1960s and do not have the right localisation; the substratome analysis [[G9]] records that they do not recognise the S-x-E motifs at all ([[r-G9-1]]), and that a peptide corresponding to a bovine β-casein phosphorylation site was selectively phosphorylated by the Golgi casein kinase activity but not by CK1 or CK2 ([[r-G9-2]]). FAM20C is the authentic Golgi casein kinase ([[G1]], [[r-G1-1]]), phosphorylating within S-x-E/pS motifs ([[r-G2-1]]).
+
+The consequences are not academic. [[H2]] co-expressed **human** β-casein with CK2 in *E. coli* and reached 500 mg/L of phosphorylated product ([[r-H2-1]]); [[H3]] co-expressed **bovine** β-casein with CK2 and got much less phosphorylation than the native five-phosphate state ([[r-H3-2]]), because human serine clusters align well with CK2 consensus sites and bovine ones mostly do not. Flatten all three enzymes into "casein kinase" and that decisive pair of results becomes a contradiction. Hence the enum.
+
+### 3. Strain aliases
+
+cw15, cw15-302, CC-4350, "cwd mt+ arg7", Elow47, UVM4 and UVM11 are related and **not interchangeable**. The first four name one lineage; Elow47 is a transformant of it; UVM4 and UVM11 are UV-mutagenised derivatives selected for high transgene expression, the lesion behind that phenotype being a Sir2-type histone deacetylase ([[A2]]).
+
+So the 0.2% TSP figure ([[r-A1-1]]) belongs to the expression mutants, not the parental strain — filing it under cw15 credits a strain with a phenotype it was selected against, and the reverse error is as easy, since walled wild-type isolates carry most of the corpus's growth measurements. Every record therefore normalises its organism string through an explicit alias table on ingest.
+
+### 4. Citation of a citation
+
+The most common false-independence error in literature aggregation, and this corpus contains a textbook instance. The 15 mg/L secretion figure appears twice: in [[C2]] as the measurement ([[r-C2-1]]), and in [[C6]] as part of that paper's summary of prior work ([[r-C6-1]]). The 0.2% TSP figure appears the same way, in [[A1]] and again recited by [[C6]] ([[r-C6-2]]).
+
+Count both and a strip plot shows two independent sources agreeing. There is one measurement. Records therefore carry a primacy flag and, when non-primary, the identifier of the record they quote, and aggregates filter on it — the same rule that quarantines market and vendor figures ([[r-O8m-1]]).
+
+## Accept, edit, or reject
+
+**Accept** when the record is right as it stands. **Edit, then accept** when the span is right and the record misreads it — the highest-value action available, because it yields a corrected value *and* a labelled example of the extractor being wrong, and both are kept. **Reject** when the span does not support the value, or the value belongs in another field. Never repair a record by editing its value when the span is wrong: you would be manufacturing evidence, and the next reader would have no way to tell.`,
           },
           { kind: 'embed', embed: 'mini-queue' },
           {
             kind: 'prose',
-            md: `Work that queue above. It is the real review interface with real records, and your decisions persist — verify something here and its dot changes colour on the strain page.
-
-## Accept, reject, or fix
-
-Three outcomes, and choosing between them is mostly about whether the *span* is good.
-
-**Accept** when the record is right as it stands.
-
-**Edit, then accept** when the span is right and the record misreads it. This is the highest-value action in the system, because it produces a corrected value *and* a labelled example of the extractor being wrong. The platform keeps both the original extraction and your correction, which is what makes extractor-error analysis possible later.
-
-**Reject** when the span itself is wrong or the record belongs to another field. Do not repair a record by editing its value when the span does not support it — you would be manufacturing evidence, and the next reader would have no way to tell.
-
-## Promoting to the gold set
-
-Flagging a record for the gold set says something stronger than "this is correct." It says **this is a reference measurement worth scoring extractors against.**
-
-Good gold entries are unambiguous, clearly stated in the source, and cover parameters that matter downstream. A value that required judgement to interpret makes a poor gold entry — if two careful curators could disagree, an extractor's disagreement tells you nothing about the extractor.
-
-One caution the next lesson develops: a gold annotation created by *correcting an extraction* inherits that extraction's blind spots. The parameters an extractor never notices are exactly the ones that never enter a gold set built this way — and the recall number that results will be flattering and wrong.`,
+            md: `Whatever you decide there is real. The queue calls the same store actions the full review screen does, and the consequences propagate — organism pages, strip plots and the validation dashboard all read the records you just changed.
+`,
           },
         ],
         checkpoint: [
           {
             id: 'c0-3-1',
             prompt:
-              'A record claims a pH setpoint of 7.0. The quoted span reads "cultures were maintained at 25 °C throughout the batch". The culture really was at pH 7.0, stated elsewhere in the paper. What should you do?',
+              'A record gives a phospho-site position of 35 but carries no numbering convention. Why is the seed checker right to fail the build over it?',
             kind: 'mc',
             options: [
-              'Reject it as a wrong span — the quoted text does not support the value',
-              'Accept it, since the value is correct',
-              'Edit the value to 25 and accept it',
-              'Skip it and let another reviewer decide',
+              'β-casein is 224 residues as translated and 209 after signal-peptide removal, so a position without its convention is ambiguous by fifteen residues',
+              'Position 35 is outside the validation range for that field',
+              'Residue positions must always be recorded as ranges',
+              'The field requires an organism, and none was given',
             ],
             answerIndex: 0,
             explanation:
-              'A record is a value plus the evidence for it. Accepting a correct value on unsupporting evidence creates a record that cannot be checked — the next reader follows the chip, finds a sentence about temperature, and has no way to know whether the number was ever verified.',
+              'The literature quotes mature numbering — the codon-67 variant SNP and the β(28–40) assay peptide both do — but precursor numbering appears too, and the two differ by exactly the fifteen-residue signal peptide. A site recorded without its convention will be silently mislocated by any downstream consumer, and the error is invisible because both numbers are plausible residue indices.',
+            evidenceChip: 'r-G9-3',
           },
           {
             id: 'c0-3-2',
             prompt:
-              'An extraction reads 0.038 d⁻¹ where the source prose says 0.038 h⁻¹. What is the most useful action?',
+              'The UVM4 secretome paper states 12–15 mg/L in its summary of prior work. The secretion benchmark paper reports 15 mg/L as its own result. How should the first of these be recorded?',
             kind: 'mc',
             options: [
-              'Edit the unit to h⁻¹ and accept — this stores the correction and labels the extractor error',
-              'Reject it and move on',
-              'Accept it as published',
-              'Skip it, since the number itself is right',
+              'As non-primary, naming the record it is quoting, so aggregate statistics exclude it',
+              'As a second independent measurement, strengthening the consensus around 15 mg/L',
+              'It should not be recorded at all',
+              'As an average of the two, at 13.5 mg/L',
             ],
             answerIndex: 0,
             explanation:
-              'Editing then accepting produces both a usable record and a labelled instance of unit-normalization failure. That label is what lets the validation dashboard show unit errors as a distinct, shrinking failure mode across extractor versions.',
-            evidenceChip: 'ex-0071',
+              'Citation of a citation is how a single measurement becomes an apparent consensus. Counting both would put two dots on a strip plot where the literature contains one measurement, and the visual impression of agreement is exactly the thing a reader will take away without checking. Marking it non-primary and naming its source keeps the claim readable while removing it from every aggregate.',
+            evidenceChip: 'r-C6-1',
           },
           {
             id: 'c0-3-3',
-            prompt: 'What makes a record a good candidate for the gold set?',
+            prompt:
+              'Why is kinase identity a categorical enum in this ontology rather than a free-text field?',
             kind: 'mc',
             options: [
-              'It is unambiguous in the source and covers a parameter that matters downstream',
-              'It was difficult to interpret and required expert judgement',
-              'It has the highest extractor confidence score',
-              'It comes from the most recently published paper',
+              '"Casein kinase" names three distinct enzymes, and CK1 and CK2 do not recognise the S-x-E motifs that FAM20C does',
+              'Free-text fields cannot be indexed for retrieval',
+              'The corpus contains only one kinase, so a controlled list is trivial',
+              'Enums render more compactly in the review queue',
             ],
             answerIndex: 0,
             explanation:
-              'Gold entries are the yardstick. If two careful curators could disagree about a value, an extractor disagreeing with it tells you nothing about the extractor — the measurement is testing ambiguity rather than capability.',
+              'The naming collision is historical and the biology is not forgiving of it. CK2 co-expression phosphorylates human β-casein well and bovine β-casein only partially, because the bovine serine clusters mostly sit outside canonical CK2 sites. Merge the enzymes under one label and that decisive comparison collapses into an unexplained disagreement between two papers.',
+            evidenceChip: 'r-G9-1',
+          },
+          {
+            id: 'c0-3-4',
+            prompt:
+              'An extraction reports 0.2% TSP and tags the organism as cw15, based on a span describing UVM4 and UVM11. What should the reviewer do?',
+            kind: 'mc',
+            options: [
+              'Correct the organism to the expression mutant — UVM4 is a selected derivative, and filing its expression phenotype under the parental strain misattributes it',
+              'Accept it, since UVM4 was derived from the cw15 lineage',
+              'Reject the record entirely, since the span mentions two strains',
+              'Leave the organism blank, since the lineage is shared',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The alias table normalises names that genuinely denote the same organism; it does not merge a lineage with a mutant selected out of it. The entire point of UVM4 is that it expresses transgenes better than its parent, so crediting the parent with the figure asserts the opposite of what the strain paper reports. Blanking the organism is no better — an expression figure with no organism is not interpretable at all.',
+            evidenceChip: 'r-A1-1',
           },
         ],
       },
@@ -287,83 +367,107 @@ One caution the next lesson develops: a gold annotation created by *correcting a
             kind: 'prose',
             md: `## Two ways to be wrong
 
-An extractor can produce something wrong, or fail to produce something right. These are different failures with different consequences, and one number cannot describe both.
+An extractor can produce something wrong, or fail to produce something right. Different failures, different consequences, and no single number describes both.
 
-**Precision** answers: of everything the extractor produced, what fraction was correct? Low precision means the output is polluted — you cannot trust a record without checking it, so the automation has bought you nothing.
+**Precision** asks: of everything produced, what fraction was correct? Low precision means the output is polluted — you cannot use a record without checking it, so the automation has bought you nothing. **Recall** asks: of everything there was to find, what fraction did it produce? Low recall means the corpus is under-mined: what you have may be reliable, there is simply less of it than there should be.
 
-**Recall** answers: of everything that was there to find, what fraction did the extractor produce? Low recall means the corpus is under-mined. What you have may be perfectly reliable, and there is simply less of it than there should be.
-
-Formally, with TP correct extractions, FP spurious ones, and FN things missed:
+With TP correct extractions, FP spurious ones and FN things missed:
 
 - Precision = TP / (TP + FP)
 - Recall = TP / (TP + FN)
+- F1 = 2·P·R / (P + R)
 
-**F1** is their harmonic mean: F1 = 2·P·R / (P + R). The harmonic mean, not the arithmetic one, because it refuses to let a strong score on one axis paper over a weak score on the other. An extractor with precision 1.0 and recall 0.1 has an arithmetic mean of 0.55 — respectable-sounding for something that found a tenth of the data. Its F1 is 0.18.`,
+F1 is the *harmonic* mean, not the arithmetic one, because it refuses to let a strong score on one axis paper over a weak score on the other. An extractor with precision 1.0 and recall 0.1 has an arithmetic mean of 0.55, respectable-sounding for something that found a tenth of the data. Its F1 is 0.18.
+
+## Now look at what the platform shows you`,
           },
           { kind: 'embed', embed: 'metrics-tiles' },
           {
             kind: 'prose',
-            md: `Those tiles are computed live from this session's gold set and the seeded run outputs. Verify a record or promote one to gold in the review queue and they move.
+            md: `That empty state is the lesson.
 
-## Read the shape, not just the headline
+There is no precision, recall or F1 to display, because **no extractor has been run against this corpus and no gold set has been annotated from it.** Both follow from the state described in lesson 0.1: every entry is catalogued rather than ingested, and the only text the platform holds is the curator's note. A gold annotation is a value anchored to a span of the *paper*, and there are no such spans yet. Annotating against the curation document instead would produce an answer key measuring transcription of a summary.
 
-Look at the three runs on the validation dashboard and the interesting story is not that F1 went up. It is *which axis moved*.
+So the dashboard shows nothing, and says why. This is not modesty for its own sake. A fabricated F1 is worse than an absent one in a specific way: it is *load-bearing*. Somebody reads 0.82 and stops checking. Refusing to print a number the system has not earned is the same discipline as the unit engine refusing to convert % TSP into g/L, applied one level up — and if you take one habit from this module, take that one.
 
-Precision climbs steeply — most of that gain is unit-normalization failures disappearing between v0.4 and v0.4+rules. Recall barely moves at all.
+## What the numbers will mean when they exist
 
-The reason is visible in the gold set: **fifteen of the forty-one gold entries have never been produced by any run.** A curator read those parameters out of the papers; no extractor configuration has found them. No amount of precision tuning touches that, because precision only describes the things the extractor did produce.
+**Precision will describe pollution**: if it is low, the review queue is doing the extractor's job and the throughput argument collapses. **Recall will describe coverage**, and this corpus makes it the harder number, because so much of what matters is not in running prose — the keystone review [[H1]] carries its prior art in three tables. So read which axis moved, not the headline: a parameter no configuration ever produced will never enter a gold set built by correcting extractor output.
 
-That is an uncomfortable number to display, which is precisely why it is displayed. A dashboard that showed only F1 would let you feel good about a system that is missing over a third of what a human finds.
+The planned gold set spans fourteen papers, chosen so the difficult cases are deliberately included rather than avoided:
+
+- a value stated only as a range — $4–6/kg ([[r-O2-1]]) — where the correct output is a range, not an invented midpoint;
+- a comparative claim, up to 12-fold ([[r-C2-2]]), meaningless unless the extractor also captures the baseline;
+- a negative result, "not phosphorylated" ([[r-H15-2]]), recorded as a value rather than dropped as an empty cell, and an "undetermined" table cell, where the correct extraction is a null **with a reason**;
+- and a genuine disagreement about whether this host carries sialylated N-glycans ([[D1]] versus [[D4]]).
+
+That last deserves emphasis. The conflict is real. An extractor faithfully reproducing both claims has done its job, and a metric scoring it as making one error has misdefined the task. Aggregation must surface disagreement, not average it away.
 
 ## Leave-one-out, and why small gold sets lie
 
-Here is a trap. You build an extractor, tune it against your gold set until the numbers look good, and report those numbers. But you tuned on the answer key — the score measures how well the extractor learned *these particular papers*, not how well it will read the next one.
+Here is the trap. You build an extractor, tune it against your gold set until the numbers look good, and report those numbers. But you tuned on the answer key: the score measures how well the extractor learned *these particular papers*, not how well it will read the next one.
 
-**Leave-one-out** evaluation fixes this: each gold paper is scored by a configuration tuned *without* it. Every paper is judged by a version that has never seen it. With a small gold set this is far more honest than a single held-out split, because a 41-entry set cannot spare a test partition large enough to mean anything.
+**Leave-one-out** fixes this — each gold paper is scored by a configuration tuned *without* it, so every paper is judged by a version that has never seen it. With a few dozen records across fourteen papers this beats a single held-out split, because a set that size cannot spare a test partition large enough to mean anything: hold out a fifth and you are estimating performance from two or three papers.
 
-Two limits worth stating. It is expensive — one configuration per held-out paper. And it does not rescue a gold set that is biased in the first place: if your annotations were built by correcting extractor output, then leave-one-out faithfully measures performance against a target the extractor helped define.
-
-This simulation *describes* leave-one-out. It does not run it, because it does not train models. The dashboard says so rather than implying a rigour it does not have.`,
+Two limits: it costs one configuration per held-out paper, and it does not rescue a gold set biased to begin with. This build *describes* leave-one-out; it does not run it, because it does not train models, and the dashboard says so rather than implying a rigour it does not have.`,
           },
         ],
         checkpoint: [
           {
             id: 'c0-4-1',
             prompt:
-              'A run produces 30 correct extractions and 6 spurious ones, and misses 14 gold parameters entirely. What is its F1 score?',
+              'A run produces 24 correct extractions and 8 spurious ones, and misses 16 gold parameters entirely. What is its F1 score?',
             kind: 'numeric',
-            answer: { value: 0.75, unit: '', tolerancePct: 3 },
+            answer: { value: 0.667, unit: '', tolerancePct: 3 },
             explanation:
-              'Precision = 30/(30+6) = 0.833. Recall = 30/(30+14) = 0.682. F1 = 2·(0.833·0.682)/(0.833+0.682) = 0.75. Note how the 14 misses drag F1 well below precision — the harmonic mean will not let a strong precision hide a weak recall.',
+              'Precision = 24/(24+8) = 0.75. Recall = 24/(24+16) = 0.60. F1 = 2·(0.75·0.60)/(0.75+0.60) = 0.90/1.35 = 0.667. Notice that the sixteen misses drag F1 well below precision: the harmonic mean will not let a strong precision hide a weak recall, which is precisely why it is used instead of an average.',
           },
           {
             id: 'c0-4-2',
             prompt:
-              'An extractor achieves precision 0.95 and recall 0.30. What is the most accurate description of it?',
+              'Why does the validation dashboard show an empty state rather than a precision, recall and F1 figure?',
             kind: 'mc',
             options: [
-              'What it finds is trustworthy, but it is leaving most of the corpus unmined',
-              'It performs well overall, since precision is high',
-              'It is producing many spurious records',
-              'It is well balanced across both axes',
+              'No extractor has been run and no gold set annotated, because the corpus is catalogued rather than ingested — so any number would describe nothing',
+              'The metrics engine has not been implemented in this build',
+              'The gold set is too small for the metrics to be statistically meaningful',
+              'The papers are behind publisher access controls, so metrics cannot be computed legally',
             ],
             answerIndex: 0,
             explanation:
-              'High precision with low recall means the output is reliable but sparse — its F1 is 0.46. Whether that is acceptable depends entirely on your purpose: for seeding a review queue it may be fine, but for claiming corpus coverage it is not.',
+              'A gold annotation anchors a value to a span of the source paper, and no source paper has been parsed yet — the only text held is the curator’s note. Scoring now would mean scoring an extractor that never ran, against an answer key nobody wrote. The empty state tells a reader exactly where the project stands, which is more useful and considerably more honest than a plausible-looking number.',
+            evidenceChip: 'H1',
           },
           {
             id: 'c0-4-3',
-            prompt: 'Why does leave-one-out evaluation matter more when the gold set is small?',
+            prompt:
+              'Two papers in the corpus disagree about whether this host carries sialylated N-glycans. An extractor reproduces both claims faithfully. How should the metric treat it?',
             kind: 'mc',
             options: [
-              'A small gold set cannot spare a held-out test partition large enough to be meaningful',
-              'Small gold sets contain more errors',
-              'It makes evaluation run faster',
-              'It increases the number of gold annotations',
+              'As correct on both — the disagreement is real, and a metric that penalises reproducing it has misdefined the task',
+              'As one true positive and one false positive, since only one claim can be true',
+              'As two false positives, since contradictory records cannot both be extracted',
+              'As a miss, since the extractor failed to resolve the conflict',
             ],
             answerIndex: 0,
             explanation:
-              'Holding out 20% of 41 entries leaves 8 papers to score against — far too few for a stable estimate. Leave-one-out uses every paper as a test case exactly once, at the cost of tuning one configuration per paper.',
+              'The extractor’s job is to report what each source says, not to adjudicate between sources. Resolving the conflict is a curation decision that needs evidence the extractor does not have. A scoring scheme that rewards picking a side would train the system to hide genuine disagreement — the single most damaging thing a literature aggregator can do.',
+            evidenceChip: 'r-D4-1',
+          },
+          {
+            id: 'c0-4-4',
+            prompt:
+              'Why does leave-one-out evaluation matter more when the gold set is small?',
+            kind: 'mc',
+            options: [
+              'A small set cannot spare a held-out partition large enough to give a stable estimate, so every item has to serve as a test case exactly once',
+              'Small gold sets contain proportionally more annotation errors',
+              'It reduces the compute cost of evaluating an extractor',
+              'It increases the number of gold annotations available for tuning',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Hold out a fifth of a few dozen records and you are estimating performance from two or three papers, which is noise. Leave-one-out uses every item as a test case once, at the cost of tuning one configuration per held-out paper. It does not, however, fix a gold set whose contents were chosen by the extractor — that bias survives any resampling scheme you apply on top of it.',
           },
         ],
       },
@@ -373,321 +477,461 @@ This simulation *describes* leave-one-out. It does not run it, because it does n
   {
     id: 'm1',
     index: 1,
-    title: 'Strain and media',
+    title: 'Host and chassis',
     blurb:
-      'What a strain designation actually commits you to, and how a medium recipe encodes a set of decisions about limitation.',
+      'Why a cell-wall-deficient green alga is a defensible chassis for a milk protein — and the numbers that argue against it just as hard.',
     lessons: [
       {
         id: 'l1-1',
-        title: 'TAP, and why cw15 wants acetate',
-        minutes: 9,
+        title: 'Why cw15, and what it costs',
+        minutes: 11,
         blocks: [
           {
             kind: 'prose',
-            md: `## A medium is a set of decisions
+            md: `## The case is assembled, not inherited
 
-Tris-acetate-phosphate medium looks like a recipe. It is better understood as a set of decisions about what will run out first.
+Caseins have been expressed in bacteria, in yeast and in plants. The keystone review [[H1]] searched literature and patent databases systematically and tabulates every reported attempt — seventeen bacterial studies, five yeast, two plant. There is no algal row. The only algal mention anywhere in the corpus is a patent application that lists algae generically among possible hosts ([[H17e]]).
 
-*Chlamydomonas reinhardtii* can grow three ways: photoautotrophically on dissolved inorganic carbon, heterotrophically on acetate in darkness, and mixotrophically on both at once. TAP is built for the third. The acetate is not a supplement — it is the primary carbon source, and it is what makes cw15 grow roughly twice as fast in TAP as in a mineral medium under the same light.
+So there is no precedent to inherit. The case for a cell-wall-deficient *Chlamydomonas* chassis has to be assembled out of adjacent results, and it rests on four established facts: this host has a **real secretory pathway**, routing proteins through ER and Golgi, cleaving signal peptides and N-glycosylating, with secretion established at 12–15 mg/L ([[C2]]); it holds **US GRAS status** for human consumption, one of a short list of microalgae that do ([[N2]]); **cell-wall deficiency is a downstream asset**, releasing roughly three times the protein of walled cells under pulsed electric field ([[J10]]); and **the hard problem is the same everywhere**, since no yeast, plant or bacterial host natively phosphorylates bovine β-casein either. Nobody has an easy route. The question is which host makes the hard route survivable.
 
-The components divide into three jobs:
+## The lineage, and why the names matter
 
-- **Carbon.** Acetic acid, which also sets the starting pH.
-- **Nitrogen.** Ammonium chloride at 0.375 g L⁻¹ in standard TAP ([[ex-0006]]).
-- **Buffer.** Tris base at 2.42 g L⁻¹ ([[ex-0005]]), plus phosphate ([[ex-0010]]) doing double duty as buffer and nutrient.
+The strain-lineage paper [[A1]] is where the chassis comes from. The arginine-auxotrophic, cell-wall-deficient parent — cw15-302, also called CC-4350 and "cwd mt+ arg7" — was co-transformed to give Elow47, and UV mutagenesis of Elow47 followed by selection for high transgene expression yielded UVM4 and UVM11. Both reach about 0.2% of total soluble protein for intracellular reporters ([[r-A1-1]]).
 
-## Why so much buffer
+The follow-up [[A2]] identifies the lesion behind that phenotype as a Sir2-type histone deacetylase, making the mechanism relief from epigenetic silencing rather than a gain in transcription. That has a direct design consequence: if the benefit is silencing relief, a two-gene construct plausibly inherits it — recorded as an argument needing testing, not as a result. Two constraints come with the lineage: integration is by random non-homologous end joining ([[A4]]), though safe-harbour targeting reportedly gave an 8.6-fold increase ([[r-A7-1]]); and the mutants can hardly be crossed ([[A5]]), so a two-cassette build needs two markers or a self-cleaving 2A linker ([[C4]]).
 
-Acetate consumption is alkalinizing. As the culture eats its carbon source, pH climbs — and cw15 tolerates that poorly past about pH 8.5.
+## Transformability, measured against a walled strain
 
-This is why TAP carries an unusually heavy buffer load and why [[SP-002]] tests doubling it to 4.84 g L⁻¹ ([[ex-0012]]). The trade is real in both directions: more buffer holds pH longer, but Tris is not free, it contributes nothing nutritionally, and at high concentration it is itself mildly inhibitory.
+The terminator study [[B5]] is the one place in the corpus where wall-deficient and walled strains are compared side by side under matched conditions. Colonies appear on selection in 7–10 days for cw15 and UVM4 ([[r-B5-1]]) against 15–20 days for the walled WT12 ([[r-B5-3]]).
 
-The deeper point is that the buffer concentration is a *design parameter tied to batch length*. A 48-hour flask batch and a week-long fed-batch need different answers, and copying a recipe without knowing which one it was written for is how cultures crash on day four.`,
-          },
-          { kind: 'embed', embed: 'protocol-card', arg: 'PR-TAP-01' },
-          {
-            kind: 'prose',
-            md: `Open that protocol and change the batch size. Every quantity recomputes and rounds to a pipettable increment — which is the difference between a recipe you can read and one you can execute.`,
+That paper also states the trade plainly: cell-wall-deficient strains have reduced motility and mating ability, and are much more susceptible to shear and osmotic stress. That last clause is not a footnote — it propagates directly into bioreactor design, where impeller tip speed, pump selection and sparge rate become process variables rather than details.
+
+## The economic keystone
+
+The pulsed-electric-field study [[J10]] converts "easy to transform" into "cheap to process." Applied to a cell-wall-deficient mutant, PEF gave an average protein yield of 31 ± 6% of total protein against 11 ± 3% for the walled wild type ([[r-J10-1]], [[r-J10-2]]) — roughly three-fold ([[r-J10-3]]), comparable to mechanical disruption but under mild conditions. Read it alongside the mechanical benchmarks in [[J11]]: homogenisation and bead milling reach over 95% disintegration and release around 50% of total protein ([[r-J11-2]]) at under 0.5 kWh per kg biomass ([[r-J11-3]]), while PEF on *walled* cells released at most 13% ([[r-J11-4]]) even at many times that energy. Together they say something sharper than either alone — PEF is a bad technique on walled cells and a competitive one on wall-deficient cells, so the chassis choice is what makes the mild process available.
+
+## The honest counterweight
+
+A curriculum that stopped there would be advocacy. The same corpus supplies the case against.
+
+Expression is historically weak: 0.2% TSP for intracellular reporters is the known ceiling for this lineage, and since no casein has been expressed in any alga, every point above it is extrapolation. Secreted yield of 15 mg/L ([[r-C2-1]]) sits roughly sixty-five-fold below the 1 g/L of β-lactoglobulin secreted from a filamentous fungus ([[r-K1-1]]). Culture density is the harshest number: mixotrophic *Chlamydomonas* reaches about 1.23 g/L ([[r-M5-1]]), against 50–100 g/L for heterotrophic microalgal cultures ([[r-M8-7]]) and far higher for yeast fed-batch. And the expression mutants secrete unassembled cell wall glycoproteins that form extracellular aggregates in which recombinant product becomes trapped ([[C6]]).
+
+A methodological caveat sits underneath all of it: most growth and density figures were measured on walled wild-type isolates, not cw15, and whether they transfer is an assumption no retrieved source tests. The regulatory position is likewise split — US GRAS does not transfer to the EU, and a *C. reinhardtii* novel-food application failed on the EFSA record in 2025 after the applicant did not answer repeated data requests ([[N3]]), a procedural failure rather than a finding of harm.
+
+This is a research bet. The corpus supports calling it a defensible one. It does not support calling it an engineering exercise.`,
           },
         ],
         checkpoint: [
           {
             id: 'c1-1-1',
-            prompt: 'Why does TAP medium carry such a heavy Tris buffer load?',
+            prompt:
+              'Pulsed electric field released 31% of total protein from a cell-wall-deficient mutant against 11% from the walled wild type. What does that license you to claim?',
             kind: 'mc',
             options: [
-              'Acetate consumption raises pH, and cw15 tolerates pH above about 8.5 poorly',
-              'Tris is a nitrogen source for the culture',
-              'It prevents contamination',
-              'It increases the solubility of trace metals',
+              'That mild PEF recovers roughly three times more protein from wall-deficient cells than from walled ones — a statement about disruption, not about product yield',
+              'That the cell-wall-deficient strain produces three times more protein overall',
+              'That PEF is the best available disruption method for microalgae',
+              'That the wall-deficient strain will give three times the casein titer',
             ],
             answerIndex: 0,
             explanation:
-              'Consuming acetate is alkalinizing, so pH drifts upward over the batch. The buffer concentration is effectively a decision about how long the batch can run before pH becomes the limitation.',
-            evidenceChip: 'ex-0012',
+              'The measurement is protein *released by a given disruption method*, expressed as a share of total cellular protein. It says nothing about how much protein the cells contained, and nothing at all about a recombinant product neither strain was expressing. Read alongside the mechanical benchmarks, its real claim is narrower and more interesting: PEF is a poor technique on walled cells and a competitive one here, so the chassis is what makes the mild route available.',
+            evidenceChip: 'r-J10-1',
           },
           {
             id: 'c1-1-2',
-            prompt: 'Roughly what fold-advantage does mixotrophic growth give cw15 over photoautotrophic growth?',
+            prompt:
+              'Using the midpoints of the reported ranges, how many days sooner do colonies appear for cw15 than for the walled WT12 after transformation?',
             kind: 'numeric',
-            answer: { value: 2.2, unit: '', tolerancePct: 12 },
+            answer: { value: 9, unit: 'd', tolerancePct: 15 },
             explanation:
-              'SP-003 measures both modes under otherwise matched conditions: 0.132 h⁻¹ mixotrophic against 0.061 h⁻¹ photoautotrophic, a 2.2× advantage. The advantage is in rate, not necessarily in yield or cost.',
-            evidenceChip: 'ex-0020',
+              'Colonies appear in 7–10 days for cw15 and UVM4, and 15–20 days for WT12: midpoints 8.5 and 17.5 days, a difference of 9 days. Note what the record has to preserve to make this subtraction legitimate — both figures come from one study under matched conditions, and both carry their organism. Two time-to-colony numbers from different papers would not be subtractable at all.',
+            evidenceChip: 'r-B5-3',
+          },
+          {
+            id: 'c1-1-3',
+            prompt:
+              'Which statement about algal casein expression is actually supported by this corpus?',
+            kind: 'mc',
+            options: [
+              'No casein expression in a microalga has been published; the only algal mention is a patent listing algae generically among possible hosts',
+              'Algal casein expression has been attempted and failed',
+              'Casein has been expressed in microalgae but at low yield',
+              'The question has not been investigated by anyone',
+            ],
+            answerIndex: 0,
+            explanation:
+              'A systematic search of literature and patent databases produced seventeen bacterial, five yeast and two plant studies, and no algal row. That is a surveyed absence — it is evidence, and it is what makes the whitespace claim defensible. It is not the same as a failed attempt, which would be a result, nor the same as nobody having looked, which would be no information at all. Lesson 5.1 turns that three-way distinction into a rule for grounded answering.',
+            evidenceChip: 'H1',
           },
         ],
       },
     ],
     outline: [
-      'Strain designations and what they commit you to',
-      'Cell-wall mutants and downstream consequences',
-      'Defined vs complex media',
-      'Trace elements and chelation',
-      'Sterilization and its effect on composition',
+      'Reading a strain designation: what cw15, Elow47, UVM4 and UVM11 each commit you to',
+      'Silencing, position effects and why transformants vary',
+      'Safe-harbour integration and the routes upward from 0.2% TSP',
+      'Codon usage, GC content and a proline-rich mammalian gene',
+      'Two cassettes in a strain that cannot be crossed',
+      'Shear sensitivity as a bioreactor design constraint',
     ],
   },
 
   {
     id: 'm2',
     index: 2,
-    title: 'Upstream: growth and control',
-    blurb: 'What μ actually measures, why the growth curve has phases, and what you can control.',
+    title: 'Expression and localisation',
+    blurb:
+      'Keep the product inside the cell or push it into the medium — the fork that decides the whole downstream process.',
     lessons: [
       {
         id: 'l2-1',
-        title: 'What μ actually measures',
-        minutes: 10,
+        title: 'The intracellular–secretion fork',
+        minutes: 11,
         blocks: [
           {
             kind: 'prose',
-            md: `## The rate constant, not the speed
+            md: `## Why secretion is attractive for a casein
 
-The specific growth rate μ is the first-order rate constant of exponential biomass increase. Formally, dX/dt = μX — the rate of biomass production is proportional to how much biomass you already have.
+Secretion looks like the obvious answer. It avoids cell disruption and much of the purification train, which for a bulk food protein is where the cost lives — the most current review of the problem [[K5]] says exactly that.
 
-The word doing the work is *specific*: per unit biomass. A culture at 4 g L⁻¹ produces four times as much biomass per hour as one at 1 g L⁻¹ at the same μ. μ describes how fast each gram of cells is making more cells, not how fast the tank is filling.
+The corpus contains a strong demonstration that secretion works in this host, a strong warning about what the secreted material lands in, and a precedent from a different eukaryote showing how badly the obvious construct can fail. Together they define a fork, and it is a genuinely open decision.
 
-This is why μ is the parameter that propagates furthest into process design. It is the one growth quantity that is independent of scale and of how much you started with, so it is the only one that transfers between a flask and a 100 m³ vessel.
+## The benchmark
 
-Doubling time is the same information in more intuitive units: t_d = ln(2)/μ. At 0.118 h⁻¹ ([[ex-0001]]), that is 5.9 hours.
+[[C2]] is the number every secretion scenario in this platform is measured against. A putative gametolysin signal sequence directed a fluorescent reporter into the medium; C-terminal fusion to synthetic glycomodules of tandem Ser-Pro repeats raised yields up to twelve-fold ([[r-C2-2]]), reaching a maximum of 15 mg/L ([[r-C2-1]]), and conferred enhanced proteolytic stability.
 
-## The phases, and why only one of them counts
+Two things about that record deserve a curator's attention. The twelve-fold figure is a *comparative* claim, and a fold-improvement value without its baseline is not interpretable. And the 15 mg/L is a maximum achieved with a glycomodule fusion, not a generic expectation for any cargo.
 
-A batch culture goes through lag, exponential, deceleration, and stationary phase. μ is defined on the exponential phase alone — the interval where growth is unrestricted and ln(X) against t is genuinely a straight line.
+Around it sits a decision table: [[C3]] evaluated ten signal peptides, two newly identified ones outperforming the established set, and [[C7]] is a working example of the full architecture in the expression mutants.
 
-Which makes the measurement a judgement call, and this is where most cross-paper disagreement comes from. Regress over too wide a window and you pull in decelerating points, dragging the estimate down. Too narrow and you are fitting noise.
+## The warning
 
-The careful convention is to regress over the interval where the residuals show no systematic trend, and to state that interval. Compare [[ex-0001]] at 0.118 h⁻¹, measured over a residual-checked window, with [[ex-0070]] at 0.094 h⁻¹, averaged over the first 36 hours of batch. These are not the same measurement, and most of the gap between them is method rather than biology.
+[[C6]] is the most important cautionary entry in the corpus. Comparing the extracellular proteome of the UVM4 expression mutant with its walled ancestor under matched conditions, it reports a distinct profile with higher abundance of secreted cell wall glycoproteins — and the consequence that secreted recombinant proteins become trapped in a matrix of these aggregates, making isolation and purification difficult.
 
-When you see growth rates disagreeing across papers, suspect the regression window before you suspect the strain.`,
-          },
-          { kind: 'embed', embed: 'strip-plot', arg: 'growth_rate_mu' },
-          {
-            kind: 'prose',
-            md: `## What actually limits the rate
+So secretion in this host does not deliver product into clean medium. It delivers product into a glycoprotein sludge. The nearest analogue elsewhere is yeast mannan interference in downstream processing ([[J9]]) — a recognised problem rather than an exotic one, though recognising it does not make it free.
 
-Something is always limiting. The skill is knowing what.
+That paper also supplies the corpus's cleanest lesson in provenance discipline. Its recital of the yield history — 0.2% TSP intracellular, then 12–15 mg/L secreted — reads exactly like a result and is not one. Both figures are citations of earlier work ([[r-C6-1]] citing [[r-C2-1]], and [[r-C6-2]] citing [[r-A1-1]]). An aggregate counting them as independent shows a consensus that does not exist.
 
-**Light**, in photoautotrophic and mixotrophic culture, and it saturates — [[SP-005]] finds cw15 saturating near 150 µmol m⁻² s⁻¹ at 0.141 h⁻¹ ([[ex-0036]]), with photoinhibition above it. More light past saturation buys nothing and eventually costs.
+## The precedent that failed instructively
 
-**Carbon**, which announces itself by *how* growth stops: an abrupt halt rather than a taper is the signature of a carbon-limited culture.
+[[H4]] is the closest eukaryotic precedent to this programme and the sharpest warning in it. Bovine β-casein was expressed in a methylotrophic yeast, carrying mutations that introduced an N-glycosylation site. Despite using the **native bovine signal peptide** for secretion, the protein localised mostly intracellularly at roughly 15–18% of total soluble protein ([[r-H4-1]]), corresponding to 0.7–1.0 g/L ([[r-H4-2]]) — while secreted protein reached only 0.005% of the intracellular level ([[r-H4-3]]).
 
-**Nitrogen**, which does something more interesting — growth continues at a reduced rate while protein content collapses ([[ex-0028]] to [[ex-0029]], 38 % DW down to 17 % DW in 48 hours).
+Read that number twice. It is not a modest secretion yield; it is a secretion signal that essentially did not function in a non-mammalian eukaryote. Any casein construct for an algal host has to carry a host-native signal peptide, which is why the signal-peptide comparison work matters as much as it does.
 
-**pH**, the sneaky one, because it drifts rather than depletes.`,
+Two further findings carry forward. Phosphorylation matched animal-derived β-casein by phosphatase treatment plus urea-PAGE ([[r-H4-4]]) — a striking result whose mechanism the corpus does not explain, since no kinase in that host is named. And the protein was N-glycosylated with mannan ([[r-H4-5]]), a modification bovine β-casein does not natively carry: host glycosylation here is a risk, not a requirement.
+
+## Naming the fork
+
+**Intracellular.** Accept the 0.2%-TSP-class expression ceiling and recover the product with mild pulsed-electric-field disruption, which is the one place the wall-deficient chassis has a measured, three-fold advantage.
+
+**Secreted.** Take the 15 mg/L benchmark and the glycomodule and signal-peptide toolkit, and inherit a purification problem in an aggregate-loaded medium.
+
+The corpus does not settle this. What it does is state the comparison honestly: nobody has reported a recombinant casein in this host by either route, so the choice sits between one measured secretion benchmark for a different cargo and one measured disruption advantage for no cargo at all.`,
           },
         ],
         checkpoint: [
           {
             id: 'c2-1-1',
-            prompt: 'A culture grows with μ = 0.118 h⁻¹. What is its doubling time?',
-            kind: 'numeric',
-            answer: { value: 5.9, unit: 'h', tolerancePct: 4 },
-            explanation:
-              't_d = ln(2)/μ = 0.693/0.118 = 5.9 h. Answering in minutes or days is also accepted — the grader converts.',
-            evidenceChip: 'ex-0001',
-          },
-          {
-            id: 'c2-1-2',
-            prompt: 'Growth stops abruptly rather than tapering off. What does this suggest?',
+            prompt:
+              'In the closest eukaryotic precedent, secreted β-casein reached only 0.005% of the intracellular level despite using a secretion signal. What is the design lesson?',
             kind: 'mc',
             options: [
-              'A carbon source was exhausted — depletion of a consumed substrate stops growth sharply',
-              'The culture became light limited',
-              'The temperature control failed',
-              'The culture was contaminated',
+              'The construct used the native bovine signal peptide, which a non-mammalian eukaryote does not recognise — a casein cassette needs a host-native signal peptide',
+              'β-casein cannot be secreted by any eukaryotic host',
+              'The culture was harvested too early for secretion to be detected',
+              'Secretion always requires a glycomodule fusion to work',
             ],
             answerIndex: 0,
             explanation:
-              'Light limitation tightens gradually as cells shade each other, producing a taper. Substrate exhaustion removes the input entirely and stops growth sharply — the shape of the curve is diagnostic.',
+              'A signal peptide is read by the host’s own targeting machinery, and a mammalian secretion signal carries no guarantee of being recognised elsewhere. This is why the corpus keeps a whole thread on signal-peptide comparison rather than treating the choice as a formality — and why a two-thousandth-of-a-percent secretion figure is best read as a construct failure rather than as a property of the protein.',
+            evidenceChip: 'r-H4-3',
+          },
+          {
+            id: 'c2-1-2',
+            prompt:
+              'The 15 mg/L secretion figure appears in two different papers. Why is that not two independent measurements?',
+            kind: 'mc',
+            options: [
+              'The second paper is reciting the first in its summary of prior work — one measurement, quoted twice',
+              'The two papers used different strains, so the figures are not comparable',
+              'The second measurement was made under different conditions',
+              'The second paper reports a range rather than a point value',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The secretome paper’s yield history reads like a result and is a citation. Records therefore carry a primacy flag and name the record being quoted, so aggregates count the measurement once. The visual consequence of getting this wrong is a strip plot showing two agreeing sources where the literature contains one — and agreement is exactly what a reader takes away from a plot without checking.',
+            evidenceChip: 'r-C6-1',
+          },
+          {
+            id: 'c2-1-3',
+            prompt:
+              'A filamentous fungus secretes β-lactoglobulin at 1 g/L; the best secreted titer reported from the algal expression mutants is 15 mg/L. What is the ratio?',
+            kind: 'numeric',
+            answer: { value: 67, unit: '', tolerancePct: 8 },
+            explanation:
+              '1.0 / 0.015 ≈ 67, which the corpus rounds to roughly 65-fold. Two caveats keep this from being a like-for-like comparison: the fungal figure is for a whey protein, not a casein, and the algal figure is for a fluorescent reporter carrying a glycomodule. The gap is real and worth stating plainly; what it compares is two different cargoes in two different hosts.',
+            evidenceChip: 'r-C2-1',
           },
         ],
       },
     ],
     outline: [
-      'Batch, fed-batch and continuous culture',
-      'Oxygen transfer and kLa',
-      'pH and temperature control',
-      'Light delivery and photoinhibition',
-      'Scale-up: what transfers and what does not',
+      'Signal peptides: the comparison table and how to read it',
+      'Glycomodules, proteolytic stability and what fold-improvement claims require',
+      'Codon usage and GC content in a 68%-GC coding-region host',
+      'Introns, terminators and untranslated regions as expression levers',
+      'One transcript or two: 2A peptides against separate markers',
+      'What the UVM4 secretome does to a purification train',
     ],
   },
 
   {
     id: 'm3',
     index: 3,
-    title: 'Harvest and downstream',
-    blurb: 'Getting the product out of the cell, and why the cell wall decides how hard that is.',
+    title: 'The molecule and its modification',
+    blurb:
+      'β-casein is disordered, so folding is not the success criterion. Five phosphates in the right place is.',
     lessons: [
       {
         id: 'l3-1',
-        title: 'Why cw15 changes the downstream problem',
-        minutes: 9,
+        title: 'Five phosphates, N-terminally clustered',
+        minutes: 12,
         blocks: [
           {
             kind: 'prose',
-            md: `## The wall is the whole problem
+            md: `## The usual success criterion does not apply
 
-For an intracellular product, downstream processing has one hard step: getting through the cell wall. Everything else — concentration, clarification, polishing — is comparatively routine engineering.
+For most recombinant proteins, success means the chain folded correctly. β-casein does not fold. It is intrinsically disordered and stays disordered even when it self-assembles: the structural work collected in [[E9]] reports that self-association does not reduce monomer chain flexibility, and that micellisation involves few residues in transition rather than a large secondary-structure change.
 
-Microalgal walls are genuinely difficult. Bead milling and high-pressure homogenization work but are energy-intensive at scale, and the energy cost of disruption is often the largest single line in an algal process's operating budget.
+So the criterion has to be something else, and the corpus states it numerically. Fully phosphorylated bovine β-casein carries **about five phosphates, clustered at the N-terminus** ([[F5]], [[r-F5-1]]). That is the target specification. For comparison, αs1-casein carries about eight, concentrated centrally ([[r-F5-2]]), αs2 ten to thirteen, and κ typically one to three near the C-terminus — κ uniquely being able to carry phospho-threonine as well.
 
-This is why cw15 exists in bioprocess work at all. It is a cell-wall-deficient mutant: the glycoprotein wall is largely absent, so disruption takes far less specific energy. [[SP-006]] reaches **94.2 % disruption efficiency** ([[ex-0043]]) under conditions that leave a walled strain substantially intact.
+## Why the clustering, not just the count, matters
 
-## The trade you make
+The mature protein is 209 residues ([[E3]]): the most hydrophobic of the caseins by virtue of a large hydrophobic C-terminal domain, yet strongly amphipathic, because of a highly charged N-terminal domain carrying the phosphate centre.
 
-The wall was doing a job. Without it, cw15 is markedly shear-sensitive — it lyses under mild hydrodynamic stress that a walled strain shrugs off.
+That is the whole architecture in one sentence. The phosphates are not decoration; they are a charge block at one end of an amphipathic chain, and that block binds amorphous calcium phosphate. Native micelles are approximately spherical with a radius around 70 nm, holding on the order of ten thousand casein molecules bound to calcium phosphate nanoclusters ([[E2]], [[r-E2-1]]) — an assembly that prevents both the amyloid fibrils caseins otherwise form at high concentration and the precipitation calcium at milk concentrations would cause ([[E6]]).
 
-This shifts the difficulty upstream rather than removing it. Pump selection, impeller tip speed, and sparging rate all become constraints in cultivation. A centrifugal pump appropriate for a walled culture can cost you a meaningful fraction of your biomass before it reaches the disruption step.
+So "five phosphates" is the count and "N-terminally clustered" is what makes the count do work. Any record carrying a phospho-site position must also carry its numbering convention, because the protein is 224 residues as translated and 209 after the signal peptide is removed, and the literature quotes mature numbering ([[F1]]).
 
-The strain page carries a curator note to exactly this effect, because it is the kind of thing that is obvious in hindsight and expensive to learn.
+## The kinase
 
-## Recovery multiplies
+[[G1]] is the identification paper: Fam20C is the authentic Golgi casein kinase ([[r-G1-1]]). It phosphorylated recombinant β-casein in a time-dependent manner while a catalytically inactive mutant, unable to coordinate manganese, did not ([[r-G1-2]]), and [[G2]] establishes the motif — S-x-E/pS, generating the majority of the extracellular phosphoproteome ([[r-G2-1]]).
 
-Downstream yield is a product of stage efficiencies, and that arithmetic is unforgiving. [[SP-006]] reports harvest recovery of **96.4 %** ([[ex-0046]]) and disruption efficiency of 94.2 %. Chain those with a 90 % extraction and an 85 % polish:
+Three design complications follow, each a fork rather than a detail.
 
-0.964 × 0.942 × 0.90 × 0.85 = **0.69**
+**It may need a partner.** Fam20A is a pseudokinase acting as an allosteric activator of Fam20C ([[G3]], [[r-G3-1]]), and a Fam20C point mutant showed greatly reduced kinase activity toward casein. Co-expressing the kinase alone may not be enough.
 
-Four good stages, and nearly a third of the product is gone. This is why downstream yield dominates the economics of the fed-batch scenario, and why an apparently modest improvement at any one stage moves the minimum selling price more than most people expect.`,
+**It may need processing.** The kinase resides in the Golgi as a transmembrane protein, and site-1 protease cleaves its propeptide to promote secretion and activation ([[G7]]). A pre-cleaved construct may be necessary.
+
+**It needs a secretory pathway to fold at all.** The crystal structure shows an atypical kinase-like fold with disulfide bridges and N-linked glycosylation ([[G4]]) — which is why bacterial expression fails: attempts in *E. coli* failed outright for both human and bovine versions ([[H8]], [[r-H8-6]]), with success reported to date only in human cell lines. This is the strongest argument in the corpus for a eukaryotic host with a Golgi. The alternative built in parallel changes the target rather than solving it — a phosphomimetic route substituting all eight phosphoserine sites of an αs1-casein variant with aspartate ([[r-H8-7]]).
+
+And the honest gap: whether *Chlamydomonas* possesses a Fam20-family secretory kinase at all is **open** ([[D5]]). The indirect evidence points toward absence — Fam20 kinases are described as conserved across the animal kingdom, plants do not express FAM20C, and this host sits outside the animal lineage — but indirect evidence is what it is, and the corpus records the question rather than the guess.
+
+## Why any of it matters: the functional evidence
+
+[[I1]] is where the success criterion stops being a specification and becomes a measurement. Caseins purified from milk were enzymatically dephosphorylated to different degrees and reassembled into micelles across three systems. Reassembly ability was proportional to phosphorylation degree, with higher phosphorylation giving a greater micellar proportion and more calcium binding; roughly 87% of total protein was sedimentable in the fully phosphorylated case ([[r-I1-1]]), while fully dephosphorylated caseins hardly formed micelle structures at all and remained in serum ([[r-I1-3]]).
+
+The coagulation result is the one to remember. Gelation pH rose as phosphorylation fell, and fully dephosphorylated caseins **failed to gel entirely**, precipitating at their isoelectric point around pH 5.5 ([[r-I1-2]]). That is a binary product failure, not a quality gradient: an unphosphorylated β-casein does not make a slightly worse cheese, it makes a precipitate. Artificial micelles built predominantly from dephosphorylated casein likewise form irregular structures roughly three times larger than normal ([[I2]], [[r-I2-1]]).
+
+## The counterweight, and the product fork it creates
+
+The corpus also records evidence that phosphorylation is not universally required. [[I9]] collects the counter-case: recombinant non-phosphorylated αs1-casein can stabilise emulsion and foam interfaces ([[r-I9-1]]); functional artificial micelles can be built from two or three caseins rather than all four; and micelle formation from recombinant caseins has so far been unsuccessful, largely for post-translational-modification reasons. That produces a genuine product-strategy fork, cleaner than most technical arguments here — emulsifier and foaming applications appear reachable without solving the kinase problem, and cheese and yogurt are not.`,
           },
-          { kind: 'embed', embed: 'protocol-card', arg: 'PR-HARV-01' },
         ],
         checkpoint: [
           {
             id: 'c3-1-1',
-            prompt: 'What is the main downstream advantage of cw15 over a walled strain, and what does it cost?',
-            kind: 'mc',
-            options: [
-              'Far lower disruption energy, at the cost of marked shear sensitivity during cultivation',
-              'Higher protein content, at the cost of slower growth',
-              'Better harvest recovery, at the cost of a longer batch',
-              'Easier sterilization, at the cost of contamination risk',
-            ],
-            answerIndex: 0,
+            prompt:
+              'How many phosphates does fully phosphorylated bovine β-casein carry?',
+            kind: 'numeric',
+            answer: { value: 5, unit: 'mol mol⁻¹', tolerancePct: 5 },
             explanation:
-              'The absent glycoprotein wall makes disruption much cheaper but removes the cell\'s mechanical protection, moving the constraint upstream into pump and impeller selection.',
-            evidenceChip: 'ex-0043',
+              'About five, clustered at the N-terminus — against roughly eight for αs1 concentrated centrally, ten to thirteen for αs2, and one to three for κ. The count alone is not the specification: the clustering is what forms the charged block that binds calcium phosphate, so a construct achieving five phosphates in the wrong positions would satisfy the number and miss the target.',
+            evidenceChip: 'r-F5-1',
           },
           {
             id: 'c3-1-2',
-            prompt: 'Four downstream stages run at 96%, 94%, 90% and 85%. What is the overall recovery?',
-            kind: 'numeric',
-            answer: { value: 69, unit: '%', tolerancePct: 4 },
+            prompt:
+              'Why is "the protein folded correctly" not a usable success criterion for recombinant β-casein?',
+            kind: 'mc',
+            options: [
+              'β-casein is intrinsically disordered and stays flexible even on self-assembly, so the criterion is correct phosphorylation and assembly behaviour instead',
+              'Folding cannot be measured for proteins of this size',
+              'The protein folds only in the presence of calcium, which is absent in fermentation',
+              'Folding is guaranteed by any eukaryotic host with a Golgi',
+            ],
+            answerIndex: 0,
             explanation:
-              '0.96 × 0.94 × 0.90 × 0.85 = 0.69, or about 69%. Stage efficiencies multiply, so four individually respectable stages still lose nearly a third of the product.',
+              'Neutron and spectroscopic work reports that self-association does not reduce chain flexibility and that micellisation involves few residues in transition. There is no native fold to reproduce or to fail to reproduce. The consequence for the analytics plan is concrete: circular dichroism, the standard structural check for a recombinant protein, is answering a question this molecule does not pose.',
+            evidenceChip: 'E9',
+          },
+          {
+            id: 'c3-1-3',
+            prompt:
+              'What is the main risk in a design that co-expresses FAM20C on its own alongside the casein gene?',
+            kind: 'mc',
+            options: [
+              'A pseudokinase partner acts as an allosteric activator, and the kinase is a Golgi transmembrane protein requiring protease processing — the kinase alone may be inactive or mislocalised',
+              'FAM20C would phosphorylate every host protein indiscriminately',
+              'FAM20C cannot be expressed in any eukaryotic host',
+              'The casein would be phosphorylated at too many sites',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Three published complications stack: an allosteric activator partner, propeptide cleavage by site-1 protease promoting secretion and activation, and a fold that depends on disulfide bridges and N-glycans — which is why bacterial expression of the kinase failed and why a Golgi-bearing host is the credible route. Each of these is a construct decision, and the corpus records them as forks rather than as solved parameters.',
+            evidenceChip: 'r-G3-1',
+          },
+          {
+            id: 'c3-1-4',
+            prompt:
+              'What does the reassembly study license you to predict about an unphosphorylated cw15-derived β-casein?',
+            kind: 'mc',
+            options: [
+              'It would largely fail to form micelles and would not gel — it would precipitate near its isoelectric point',
+              'It would form micelles of normal size but with reduced calcium binding',
+              'It would gel at a slightly lower pH than native casein',
+              'It would behave identically to native casein in acid coagulation',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Fully dephosphorylated caseins hardly formed micelles at all, remained in serum, and failed to gel entirely, precipitating around pH 5.5. This is a threshold, not a slope: the product either assembles or it does not. That is why phosphorylation is treated as the programme’s central success metric rather than as one performance attribute among several — and why the emulsifier applications, which do not depend on assembly, form a separate product path.',
+            evidenceChip: 'r-I1-3',
           },
         ],
       },
     ],
     outline: [
-      'Harvest: centrifugation, filtration, flocculation',
-      'Disruption methods and their energy costs',
-      'Extraction and fractionation',
-      'Polishing and formulation',
-      'Yield accounting across the train',
+      'CSN2: exons, variants and the A1/A2 decision as a product choice',
+      'Precursor and mature numbering, and why every position record carries a convention',
+      'Analytical methods for phosphorylation, and what each one can and cannot show',
+      'The β(28–40) peptide as a construct-validation assay',
+      'Micelle assembly: calcium phosphate nanoclusters and the role of κ-casein',
+      'Host glycosylation as a risk rather than a requirement',
     ],
   },
 
   {
     id: 'm4',
     index: 4,
-    title: 'Techno-economics with BioSTEAM',
-    blurb: 'What a minimum selling price is, what dominates it, and how to read a sensitivity analysis.',
+    title: 'Techno-economics',
+    blurb:
+      'What a minimum selling price is, which two upstream parameters dominate it, and how to read a sensitivity chart without being misled by it.',
     lessons: [
       {
         id: 'l4-1',
         title: 'Reading a minimum selling price',
-        minutes: 11,
+        minutes: 12,
         blocks: [
           {
             kind: 'prose',
             md: `## One number, and what it hides
 
-The minimum selling price is the price per kilogram of product at which the process exactly breaks even over its lifetime — revenue covers operating costs and returns the capital at the required rate. Below it you lose money; above it you make some.
+A minimum selling price is the price per kilogram at which a process exactly breaks even over its lifetime — revenue covers operating costs and returns the capital at the required rate. Below it you lose money; above it you make some.
 
-MSP is useful because it collapses a whole process into one comparable number. It is dangerous for exactly the same reason. Two processes with the same MSP can have completely different risk profiles: one dominated by capital, the other by a feedstock whose price moves 30% a year.
+MSP is useful because it collapses a whole process into one comparable number, and dangerous for the same reason: two processes with the same MSP can have completely different risk profiles, and an MSP quoted without its assumption set is a rumour with a decimal point.
 
-So the MSP is where you *start* reading, not where you stop. The cost breakdown is the actual content.
+The corpus makes that vivid. A techno-economic analysis of industrial-scale protein production ([[O3]]) sized four scenarios to deliver the same 80,000 kg of pure protein per year and produced minimum selling prices for crude protein ranging from $2,300/kg in the small empirical case ([[r-O3-1]]) down to $75/kg in the optimistic case ([[r-O3-2]]) — and for purified protein, from $99,000/kg ([[r-O3-3]]) down to $970/kg ([[r-O3-4]]). Same product, same annual output, three orders of magnitude.
 
-## The lines, and how they scale
+## The two parameters that dominate
 
-**Capital, annualized.** Equipment cost scales sub-linearly with size — roughly as capacity to the power of about 0.6. Doubling scale costs about 52% more, not 100%. This is the single strongest argument for building big, and why capital per kilogram falls steeply along the scale axis.
+That analysis is the most transferable cost model in the corpus because it says *why* the spread is so wide. A clear inverse relationship held between levelised protein cost and two upstream parameters: **biomass cell density** and **target protein content**. The expensive case ran at 4.2 g/L biomass ([[r-O3-5]]) with target protein at 0.1% of cell mass ([[r-O3-6]]).
 
-**Media and feedstock.** You pay per litre processed and sell per kilogram produced, so this line is inversely proportional to titer or final biomass density. Doubling titer roughly halves media cost per kilogram — which is why titer dominates the fed-batch scenario at the low end.
+Hold that pair in mind and read it against the algal case. Mixotrophic *Chlamydomonas* reaches about 1.23 g/L ([[r-M5-1]]); intracellular reporter expression in the expression mutants reaches about 0.2% TSP ([[r-A1-1]]). Both sit below the expensive case on both dominant axes. That is not a reason to abandon the chassis, but it is the honest starting position — and it is why this platform's algal cost surface sweeps exactly those two variables plus recovery yield, rather than a longer and more impressive list.
 
-**Utilities.** Mixing, aeration, lighting, heating. Also per-litre, so it also falls with concentration.
+## What the wider literature converges on
 
-**Labor.** Broadly fixed against scale, so per-kilogram labor falls as you build bigger.
+The richest source in the thread is a meta-analysis of 55 published techno-economic models ([[O2]]). Biomass-fermentation protein costs converge around $4–6/kg ([[r-O2-1]]), against beef and pork market prices of $6–15/kg.
 
-**Downstream.** Inversely proportional to recovery yield, and the reason the yield arithmetic from the previous module matters economically.
+Then comes the finding that should change how you read any single model. Published models assume 50–2,500 t/y and an average titer around 24 g/L ([[r-O2-3]]), while private-sector benchmarks span 2,500–25,000 t/y and average around 42 g/L ([[r-O2-4]]) — a gap wide enough that the analysis concludes published models systematically overstate cost. Note those titers for scale: 24 g/L is an *assumption*, while the best secreted milk-protein titer reported is 1 g/L ([[r-K1-1]]) and the best from the algal mutants is 15 mg/L ([[r-C2-1]]).
 
-## Sensitivity, and reading a tornado
+## A real plant, and how to read a tornado
 
-A tornado chart varies one assumption at a time — typically ±20% — and plots the resulting swing in MSP, sorted by magnitude.
+For an algal process specifically, the anchor is two years of operating data from an actual production plant ([[O4]]): ten 3 m³ tubular photobioreactors in continuous mode, 3.8 t/y capacity, photosynthetic efficiency 3.6%, production cost 69 €/kg ([[r-O4-1]]) — **dominated by labour and depreciation**. Simplification plus scale-up to 200 t/y reduces that to 12.6 €/kg ([[r-O4-2]]).
 
-Read it for two things. Which assumptions actually matter, so you know where to spend effort reducing uncertainty. And **asymmetry**: a bar longer on one side means the risk is not symmetric, which is usually more decision-relevant than the bar's length.
+That is a factor of 5.5 from scale and simplification alone, with no biological improvement whatever, and it is measured rather than modelled. It is also a warning about which lever you are pulling: at 3.8 t/y the cost was dominated by two lines with almost nothing to do with the strain. A companion 100-hectare study ([[O5]]) adds a sensitivity analysis from real data — 6.7 €/kg at base case ([[r-O5-1]]), photosynthetic efficiency the most influential parameter, all improvements together projecting 3.3 €/kg ([[r-O5-2]]).
 
-The honest caveat, stated on the chart itself: one-at-a-time sensitivity is evaluated at a reference point and ignores interactions. Titer and downstream yield are not independent in reality, and a tornado will not tell you that.
+Read a tornado chart for two things. **Which assumptions actually matter**, so you know where to spend effort reducing uncertainty. And **asymmetry** — a bar longer on one side means the risk is not symmetric, which is usually more decision-relevant than its length. The standing caveat is that one-at-a-time sensitivity is evaluated at a reference point and ignores interactions: biomass density and product share are not independent in reality, and no tornado will tell you that.
 
-These models are illustrative. They are the right *shape* — the scaling laws and dependencies are real — but the absolute numbers are demonstration values, and every screen that shows them says so.`,
+One rule of hygiene closes the lesson: **market figures are not evidence.** Vendor sources put precision-fermentation whey protein at $25–30/kg in 2025 ([[r-O8m-1]]). These are ingested, rendered with a distinct provenance tick, and excluded from the gold set and default aggregates by construction — useful for framing, useless for supporting a claim. The peer-reviewed anchor in the same cluster ([[O8]]) is a different object and is treated differently.`,
           },
-          { kind: 'embed', embed: 'scenario-widget', arg: 'sc-s2' },
+          { kind: 'embed', embed: 'scenario-widget', arg: 'sc-s1' },
           {
             kind: 'prose',
-            md: `Move the titer slider and watch the MSP fall steeply below about 12 g L⁻¹ and then flatten. That knee is the whole argument for strain and feed-strategy work in this process: below it, titer is the cheapest lever available; above it, capital and downstream take over and further titer gains buy progressively less.`,
+            md: `Move the biomass density slider and watch the minimum selling price fall steeply at the low end and then flatten. The knee is the argument: while density is the binding constraint it is the cheapest lever available, and past it capital and downstream take over and further gains buy progressively less.
+
+Two things to keep in view. The reference point sits at 2 g/L — already optimistic against the 1.23 g/L actually measured for this organism in this medium. And the cost engine is an authored demonstration model: the scaling laws and dependencies are real and traceable, the absolute values are illustrative, and every screen that shows them says so. Literature-derived assumptions carry source chips; modelling conventions carry a demo tick. Check which is which before quoting anything from it.`,
           },
         ],
         checkpoint: [
           {
             id: 'c4-1-1',
-            prompt: 'Capital cost scales with capacity to the power of about 0.6. Doubling the scale increases capital cost by roughly what percentage?',
+            prompt:
+              'A real algal plant reported 69 €/kg at 3.8 t/y and 12.6 €/kg after simplification and scale-up to 200 t/y. What fold reduction is that?',
             kind: 'numeric',
-            answer: { value: 52, unit: '%', tolerancePct: 10 },
+            answer: { value: 5.5, unit: '×', tolerancePct: 6 },
             explanation:
-              '2^0.6 = 1.52, so capital rises about 52% for double the capacity — the economy-of-scale effect that makes capital per kilogram fall steeply with plant size.',
+              '69 / 12.6 ≈ 5.5×. What makes this figure valuable is that it comes from two years of operating data on a real plant rather than from a model, and that the original cost was dominated by labour and depreciation — so the improvement is a scale-and-simplification result, not a biological one. Any strain improvement would be multiplicative on top of it.',
+            evidenceChip: 'r-O4-2',
           },
           {
             id: 'c4-1-2',
-            prompt: 'Why does media cost per kilogram of product fall as titer rises?',
+            prompt:
+              'Which two upstream parameters did the industrial-scale fermentation analysis identify as inversely related to levelised protein cost?',
             kind: 'mc',
             options: [
-              'Media is consumed per litre processed while product is sold per kilogram, so higher titer spreads the same media cost over more product',
-              'Higher titer cultures need less concentrated media',
-              'Media becomes cheaper to buy at larger scale',
-              'Higher titer reduces the number of batches per year',
+              'Biomass cell density and target protein content as a share of cell mass',
+              'Fermenter volume and annual operating days',
+              'Downstream recovery yield and labour rate',
+              'Feedstock price and capital charge factor',
             ],
             answerIndex: 0,
             explanation:
-              'The denominator changes, not the numerator. You still pay for the same litre of medium; it simply yields more product — which is why titer is the dominant lever at the low end of the fed-batch scenario.',
+              'Both are upstream and both are where the algal case is currently weakest — about 1.23 g/L density and about 0.2% TSP expression. That is exactly why this platform’s algal cost surface sweeps those two axes plus recovery yield, rather than a longer list: a model whose dominant variables are not the ones the literature identifies will produce confident answers about the wrong things.',
+            evidenceChip: 'r-O3-5',
+          },
+          {
+            id: 'c4-1-3',
+            prompt:
+              'Why does the platform refuse to express a 69 €/kg production cost in dollars per kilogram?',
+            kind: 'mc',
+            options: [
+              'Currency conversion requires an exchange rate with a date attached, and a unit engine has no business inventing one',
+              'Euro-denominated costs are less reliable than dollar-denominated ones',
+              'The two figures were computed for different products',
+              'Currency is a categorical field and cannot be converted at all',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Currencies are separate unit families for the same reason % TSP and g/L are: the conversion needs information the record does not carry. Silently applying a rate would embed an undated, unattributed assumption inside a number that then looks like a measurement. If the comparison is needed, record the rate and its date as an explicit, citable assumption — which is a visible act rather than a hidden one.',
+            evidenceChip: 'r-O4-1',
+          },
+          {
+            id: 'c4-1-4',
+            prompt:
+              'Published techno-economic models average around 24 g/L titer and 50–2,500 t/y; private-sector benchmarks average around 42 g/L and 2,500–25,000 t/y. What did the meta-analysis conclude from that gap?',
+            kind: 'mc',
+            options: [
+              'That published models systematically overstate cost, because they assume lower titers and smaller plants than industry actually runs',
+              'That private-sector benchmarks are unreliable and should be discarded',
+              'That titer has no meaningful effect on production cost at scale',
+              'That the two populations are measuring different products',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Both dominant cost drivers — output scale and titer — sit higher in the private benchmarks, so the published population is biased toward expensive configurations. The practical consequence is that a published MSP should be read as conditional on its titer and volume assumptions rather than as a property of the technology, and the first question to ask of any cost figure is what it assumed rather than what it concluded.',
+            evidenceChip: 'r-O2-4',
           },
         ],
       },
     ],
     outline: [
-      'Capital cost estimation and scaling exponents',
-      'Operating cost structure',
-      'Discounting and annualization',
-      'Sensitivity and uncertainty analysis',
-      'Interpreting a flowsheet',
+      'Capital cost estimation and the six-tenths scaling rule',
+      'Operating cost structure: where labour and depreciation dominate',
+      'Discounting, annualisation and what a capital charge factor hides',
+      'Building a sensitivity analysis that survives interaction effects',
+      'Life-cycle claims and how to keep them separate from cost claims',
+      'Grading a cost source: peer-reviewed model, real plant data, or vendor estimate',
     ],
   },
 
@@ -695,12 +939,13 @@ These models are illustrative. They are the right *shape* — the scaling laws a
     id: 'm5',
     index: 5,
     title: 'Agentic literature methods',
-    blurb: 'Retrieval, grounding, and why "cite or decline" is the only workable contract.',
+    blurb:
+      'Retrieval, grounding, and why "cite or decline" is the only contract worth offering a reader.',
     lessons: [
       {
         id: 'l5-1',
         title: 'Cite or decline',
-        minutes: 10,
+        minutes: 11,
         blocks: [
           {
             kind: 'prose',
@@ -708,73 +953,111 @@ These models are illustrative. They are the right *shape* — the scaling laws a
 
 A language model asked a bioprocess question will answer it. Whether it *knows* the answer is a separate matter, and from the outside the two cases look identical — same fluency, same confidence, same specific-sounding numbers.
 
-Retrieval-augmented generation restructures the problem. Instead of asking the model what it knows, you retrieve passages from a corpus you control and ask it to answer *from those passages only*. The model's job shifts from recall to reading comprehension, which is a task it is far better at and, more importantly, one you can check.
-
-The checkable part is what matters. If the answer must come from retrieved passages, and the passages are shown, then a reader can verify any claim by following it back. The system stops asking for trust and starts offering evidence.
+Retrieval-augmented generation restructures the problem. Instead of asking a model what it knows, you retrieve passages from a corpus you control and ask it to answer from those passages only. The job shifts from recall to reading comprehension, and — this is the part that matters — a reader can verify any claim by following it back. The system stops asking for trust and starts offering evidence.
 
 ## The contract
 
-The instruction that makes this work is narrow and strict: **answer only from the provided passages; cite every quantitative claim; if the passages do not support an answer, say so.**
+**Answer only from the provided passages. Cite every quantitative claim. If the passages do not support an answer, say so.**
 
-That last clause does the heavy lifting. Without it a model faced with insufficient evidence will produce a plausible answer anyway — not from malice but because producing text is what it does. An explicit decline has to be an available, legitimate, unpunished output.
+The last clause does the heavy lifting. Without it, a model facing insufficient evidence will produce a plausible answer anyway — not from malice but because producing text is what it does. An explicit decline has to be an available, legitimate and unpunished output, and the interface has to make declining look like competence rather than failure.
 
-You can see this in the demo: ask about CRISPR editing of cw15, which nothing in this corpus covers, and the agent declines and names what the corpus does contain. That decline is more valuable than a fluent paragraph, because a fluent paragraph would be indistinguishable from a real answer.
+## The worked example: has anyone done this in an alga?
+
+Ask this corpus whether a casein has ever been expressed in a microalga and the honest answer is unusually instructive, because it contains three different kinds of "no" and they are not interchangeable.
+
+**A surveyed absence.** The keystone review [[H1]] searched literature and patent databases systematically and tabulates every reported attempt: seventeen bacterial studies, five yeast, two plant. There is no algal row. That absence was *looked for*, so it is evidence, and an agent may assert it — provided it cites the survey that licenses it. "No casein expression in a microalga has been published, per a 2025 systematic review" is a claim about the literature, and it is supported.
+
+**A generic prior-art mention.** The single algal appearance anywhere in the corpus is a patent application listing algae among possible hosts ([[H17e]]) — a claim, not data. Omitting it overstates the whitespace; presenting it as a precedent overstates the prior art. Both errors are easy and only one looks like caution.
+
+**An unresolved question.** Whether this host even possesses a Fam20-family secretory kinase is recorded as open ([[D5]]). No retrieved source establishes it either way. The indirect evidence points toward absence, and the corpus says so while explicitly declining to convert that into a finding — it records the resolving experiment instead. An agent answering "*Chlamydomonas* lacks FAM20C" has invented a result. The correct output is the open question, plus what would close it.
+
+That three-way distinction — *surveyed absence*, *weak prior art*, *unresolved* — is the substance of grounding. Everything else is formatting.
+
+## What catalogued text does to retrieval
+
+One limitation this build states rather than papers over. Because every entry is catalogued rather than ingested, retrieval scores against the curator's notes, not the papers. So false declines are likelier — a fact present in a paper but absent from its summary is unfindable, and the system will correctly report it cannot support a claim that is nonetheless true. Every answer inherits the curator's compression, and nothing retrieved is verified: a curated span is a transcription, not a check against the source PDF.
+
+## Three ways retrieval fails
+
+**The corpus does not contain it.** The honest case, handled by declining and naming what the corpus does cover instead.
+
+**Retrieval misses it.** The passage exists but scoring did not surface it. This produces a false decline — annoying, and safe.
+
+**Retrieval surfaces something misleading.** The dangerous case, and this corpus has a perfect specimen. The secretome paper's recital of prior yields ([[r-C6-1]]) reads exactly like a measurement and is a citation of someone else's. A retrieval system that surfaces it, and an agent that cites it, produce a confident, sourced, chip-decorated answer double-counting a single measurement — and the citation makes it look *more* trustworthy, not less.
+
+That is why the primacy flag is not bookkeeping. It stands between a grounded answer and a well-dressed error, and it is why an agent here should check whether a record is a source's own measurement before repeating the number.
 
 ## Showing the work
 
-Trust is earned by inspectability, not by tone. So the agent's plan, tool calls, and retrieved passages are all first-class interface elements — collapsed by default, one click away, never hidden.
-
-An important design constraint follows: the trace must be *the actual data that produced the answer*, not a reconstruction generated afterward. A plausible-looking trace assembled after the fact would be worse than no trace at all, because it would look like evidence while being decoration.
-
-## Where retrieval fails
-
-Three ways, worth recognizing.
-
-**The corpus does not contain it.** The honest case, handled by declining.
-
-**Retrieval misses it.** The passage exists but scoring did not surface it. This produces a false decline — annoying, but safe.
-
-**Retrieval surfaces something misleading.** The dangerous case. A passage from an introduction summarizing *other* work reads exactly like a result. This is the same failure the extractor makes, and it is why a paper's structure — which section a claim comes from — is information, not formatting.`,
+Trust is earned by inspectability, not by tone, so the agent's plan, tool calls and retrieved passages are first-class interface elements — and the trace must be *the actual data that produced the answer*, never a reconstruction assembled afterwards. A plausible after-the-fact trace would be worse than none: it would look like evidence while being decoration, the same failure as a fabricated F1 in lesson 0.4.`,
           },
-          { kind: 'embed', embed: 'ask-prompt', arg: 'How was the gold set built' },
+          {
+            kind: 'embed',
+            embed: 'ask-prompt',
+            arg: 'Has a casein ever been expressed in a microalga',
+          },
+          {
+            kind: 'prose',
+            md: `Ask it, then read the trace rather than the answer. Check which entries were retrieved, whether each cited number is that source's own measurement or a recital of someone else's, and whether any sentence in the reply asserts something no retrieved passage supports. That review — not the fluency of the prose — is the skill this module exists to build.`,
+          },
         ],
         checkpoint: [
           {
             id: 'c5-1-1',
-            prompt: 'Why is an explicit decline a valuable output from a retrieval-augmented agent?',
+            prompt:
+              'A systematic review found no algal row among reported casein expression studies. The corpus separately records that whether this host has a Fam20-family kinase is unresolved. Why must an agent treat these two "no" answers differently?',
             kind: 'mc',
             options: [
-              'Without it, a model facing insufficient evidence will produce a plausible answer indistinguishable from a real one',
-              'It reduces the compute cost of answering',
-              'It prevents the corpus from growing too large',
-              'It is required by the retrieval algorithm',
+              'The first is a surveyed absence and counts as evidence; the second is an unanswered question and counts as evidence for nothing',
+              'The first concerns patents and the second concerns papers',
+              'The second is older and therefore less reliable',
+              'They are equivalent, and both should be reported as negative findings',
             ],
             answerIndex: 0,
             explanation:
-              'Generating text is what the model does, so a decline has to be an explicitly available and unpunished output. A fluent unsupported answer is more dangerous than no answer because nothing about its surface reveals the difference.',
+              'Someone looked for algal casein studies and found none, so the absence is informative and citable. Nobody has established whether the kinase exists, so the honest output is the open question plus the experiment that would settle it — an HMM search of the proteome against the relevant Pfam family. Converting the second into a finding is the exact failure mode grounding is meant to prevent, and it is tempting precisely because the indirect evidence leans one way.',
+            evidenceChip: 'D5',
           },
           {
             id: 'c5-1-2',
-            prompt: 'Which retrieval failure is the most dangerous?',
+            prompt:
+              'Which retrieval failure is the most dangerous for a citing agent?',
             kind: 'mc',
             options: [
-              'Surfacing a passage that reads like a result but actually summarizes other work',
-              'Failing to find a passage that exists in the corpus',
-              'Returning no passages at all',
-              'Returning passages in the wrong order',
+              'Surfacing a passage that reads like a measurement but is a paper reciting someone else’s result',
+              'Failing to surface a passage that exists in the corpus',
+              'Returning no passages at all for a question',
+              'Returning passages ranked in a suboptimal order',
             ],
             answerIndex: 0,
             explanation:
-              'A miss produces a false decline, which is safe. A misleading hit produces a confident, cited, wrong answer — and the citation makes it look more trustworthy, not less. This is the same failure mode the extractor has with introduction sections.',
+              'A miss produces a false decline, which is safe and visible. A recital surfaced as a result produces a confident answer with a chip on it, and the chip makes it look better sourced rather than worse. This corpus contains the specimen: a secretome paper’s summary of prior yields reads exactly like its own data. The primacy flag exists for this, and an agent that repeats a number without checking it has skipped the only step that would catch the error.',
+            evidenceChip: 'r-C6-1',
+          },
+          {
+            id: 'c5-1-3',
+            prompt:
+              'Why does the agent state that retrieval currently runs over curators’ notes rather than paper full texts?',
+            kind: 'mc',
+            options: [
+              'Because it changes how the answers should be read — misses are likelier, and every answer inherits the curator’s compression',
+              'Because full-text retrieval is technically impossible for this corpus',
+              'Because the notes are more accurate than the papers',
+              'Because it reduces the number of citations each answer needs',
+            ],
+            answerIndex: 0,
+            explanation:
+              'A fact present in a paper but absent from its summary is unfindable, so a decline may be correct about the corpus and wrong about the literature. Stating the limitation costs one sentence and lets the reader calibrate; omitting it lets a decline read as a finding about the world. This is the same discipline as the empty validation dashboard — describe the state you are actually in, and let the reader decide what it is worth.',
           },
         ],
       },
     ],
     outline: [
-      'Chunking strategies and their trade-offs',
-      'Embeddings and hybrid retrieval',
-      'Reranking and result diversity',
-      'Grounding, attribution and citation validation',
+      'Chunking a catalogued corpus, and what changes after full-text ingest',
+      'Embeddings, lexical matching and hybrid retrieval',
+      'Reranking, result diversity and scoped retrieval within one entry',
+      'Citation validation: checking that every chip supports its sentence',
+      'Surfacing conflicts instead of averaging them',
       'Evaluating an agentic pipeline end to end',
     ],
   },

@@ -31,11 +31,13 @@ const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
 /** Scripted stage budgets — the same values `ingestPaper` puts on the job. */
 const DEFAULT_MS = [900, 1400, 700, 1100, 1800];
 /**
- * `IngestStatus` only models one failure, `failed:parse`, so the halt is pinned
+ * The halt is pinned to the stage that actually failed
  * to the Parse cell. The job's stageIndex can drift a cell past it (the failure
  * is scheduled on a timer, not on the stage boundary), so it is clamped here.
  */
-const FAIL_STAGE_INDEX = STAGE_KEYS.indexOf('parse');
+// Nothing gets past Fetch in this build: no network requests are made, so the
+// pipeline halts at the first stage rather than at Parse.
+const FAIL_STAGE_INDEX = STAGE_KEYS.indexOf('fetch');
 
 type RowState = 'running' | 'complete' | 'failed' | 'degraded' | 'stalled';
 type CellState = 'done' | 'active' | 'pending' | 'failed' | 'skipped' | 'notrun';
@@ -135,7 +137,13 @@ export default function Ingest() {
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
 
-  const shelf = useMemo(() => papers.filter((p) => p.ingest === 'shelf'), [papers]);
+  // The demo shelf is gone with the synthetic corpus. What sits here now is
+  // the real ingest queue: tranche-1 entries whose full text has not been
+  // parsed yet (OF-COR-001 §22.6).
+  const shelf = useMemo(
+    () => papers.filter((p) => p.tranche === 1 && p.textSource === 'curation-note'),
+    [papers],
+  );
 
   const rows = useMemo<BoardRow[]>(() => {
     const counts = new Map<string, number>();
@@ -145,7 +153,7 @@ export default function Ingest() {
     for (const paper of papers) {
       const job = ingestJobFor(jobs, paper.id);
       const ingesting = paper.ingest.startsWith('stage:');
-      const failed = paper.ingest === 'failed:parse';
+      const failed = paper.ingest.startsWith('failed:');
       if (!job && !ingesting && !failed) continue;
 
       const seededIndex = Math.max(
@@ -162,9 +170,7 @@ export default function Ingest() {
         state = 'running';
         stageIndex = Math.min(job.stageIndex, STAGE_LABELS.length - 1);
       } else if (job?.status === 'failed') {
-        // The job failed but the paper is in the corpus: the curator chose the
-        // degraded "abstract only" path.
-        state = 'degraded';
+        state = 'failed';
         stageIndex = Math.min(job.stageIndex, FAIL_STAGE_INDEX);
       } else if (job?.status === 'done' || paper.ingest === 'complete') {
         state = 'complete';
@@ -205,8 +211,11 @@ export default function Ingest() {
         title="Ingest papers"
         subtitle={
           <>
-            Papers move through five stages before they are searchable. Everything here runs locally
-            against the synthetic shelf — no network requests are made and no real documents are fetched.
+            Papers move through five stages before their spans anchor to the source rather than to a
+            curation note. Nothing in the corpus has been through them yet: this build makes no
+            network requests, so every run halts at Fetch with the reason it could not get the
+            document. Roughly 55% of the corpus is openly retrievable; the rest needs institutional
+            access.
           </>
         }
         actions={<LinkButton to="/library">Back to Library</LinkButton>}
@@ -221,7 +230,7 @@ export default function Ingest() {
                 <span className="text-caption text-ink-soft font-num">{shelf.length} available</span>
               }
             >
-              Add from demo shelf
+              Tranche 1 — ingest queue
             </SectionTitle>
             <p className="text-caption text-ink-soft mb-2">
               Papers held out of the seeded corpus. Adding one runs the full pipeline and genuinely joins
@@ -231,7 +240,7 @@ export default function Ingest() {
             {shelf.length === 0 ? (
               <EmptyState
                 title="The shelf is empty"
-                body="Every held-out paper has been sent through the pipeline this session. Resetting restocks the shelf and returns all session edits to their seeded state."
+                body="Every tranche-1 entry already has parsed full text."
                 action={
                   <Button size="sm" onClick={resetDemo}>
                     <RefreshCw size={13} /> Reset demo data
@@ -290,7 +299,7 @@ export default function Ingest() {
               </Button>
             </fieldset>
             <p className="text-caption text-ink-soft mt-2">
-              Not active in this demo — the shelf simulates the same pipeline.
+              Not active in this build — no network requests are made.
             </p>
           </Card>
 
@@ -309,7 +318,7 @@ export default function Ingest() {
               <Button size="sm">Choose files</Button>
             </fieldset>
             <p className="text-caption text-ink-soft mt-2">
-              Not active in this demo — the shelf simulates the same pipeline.
+              Not active in this build — no network requests are made.
             </p>
           </Card>
         </div>
@@ -455,7 +464,7 @@ export default function Ingest() {
                       <div className="mt-3">
                         <Callout kind="error" title="Parse failed">
                           <p className="mb-2">
-                            {row.job?.failReason ?? 'Section boundaries not detected — 2-column layout'}
+                            {row.job?.failReason ?? 'Source document could not be retrieved.'}
                           </p>
                           <p className="mb-2 text-ink-soft">
                             Retry re-runs the same parser. Continuing without full text admits the paper on
@@ -467,7 +476,7 @@ export default function Ingest() {
                               <RefreshCw size={12} /> Retry
                             </Button>
                             <Button size="sm" onClick={() => continueDegraded(row)}>
-                              Continue without full text
+                              Mark as needing manual retrieval
                             </Button>
                           </div>
                         </Callout>

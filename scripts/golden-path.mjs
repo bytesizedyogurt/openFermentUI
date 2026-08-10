@@ -79,18 +79,18 @@ async function main() {
   const homeText = await page.locator('body').innerText();
   check(
     'Home shows live corpus vitals',
-    /132|41/.test(homeText),
-    homeText.match(/\b(132|41)\b/g)?.join(', ') ?? '',
+    /1[23]\d/.test(homeText),
+    homeText.match(/\b1[23]\d\b/g)?.slice(0, 3).join(', ') ?? '',
   );
 
   // ── 2. Ask: a scripted flow plays and produces chips ────────────────
   await go('/ask');
-  const suggested = page.locator('button', { hasText: /growth rates are reported/i }).first();
+  const suggested = page.locator('button', { hasText: /titers have been achieved/i }).first();
   await suggested.click();
   await page.waitForTimeout(2500);
   const askText = await page.locator('body').innerText();
-  check('Ask plays a flow and renders an answer', /0\.14|0\.118|0\.132/.test(askText));
-  const chips = page.locator('button', { hasText: /^\[SP-\d+\]$/ });
+  check('Ask plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
+  const chips = page.locator('button', { hasText: /^\[[A-O]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
   const chipCount = await chips.count();
   check('Answer carries working citation chips', chipCount > 0, `${chipCount} chips`);
 
@@ -106,7 +106,7 @@ async function main() {
   }
 
   // ── 3. Chip → reader, anchored on the span ──────────────────────────
-  await go('/library/papers/SP-002?span=ex-0011');
+  await go('/library/papers/H4?span=r-H4-1');
   await page.waitForTimeout(700);
   const marks = await page.locator('mark').count();
   const activeMark = await page.locator('mark.span-active').count();
@@ -134,24 +134,19 @@ async function main() {
   const afterUndo = (await page.locator('body').innerText()).match(/(\d+)\s*\/\s*(\d+)/)?.[1];
   check('Undo restores queue position', afterUndo === progressBefore, `back to ${afterUndo}`);
 
-  // ── 5. Validation metrics recompute per run ─────────────────────────
+  // ── 5. Validation states the gap honestly ───────────────────────────
   await go('/extract/validation');
-  await page.waitForTimeout(500);
-  const v03 = page.getByRole('button', { name: /v0\.3/ }).first();
-  const v04r = page.getByRole('button', { name: /v0\.4 \+ rules|v0\.4r/i }).first();
-  let f1a = '';
-  let f1b = '';
-  if (await v03.count()) {
-    await v03.click();
-    await page.waitForTimeout(400);
-    f1a = (await page.locator('body').innerText()).match(/0\.\d{3}/g)?.join(',') ?? '';
-  }
-  if (await v04r.count()) {
-    await v04r.click();
-    await page.waitForTimeout(400);
-    f1b = (await page.locator('body').innerText()).match(/0\.\d{3}/g)?.join(',') ?? '';
-  }
-  check('Validation run selector changes the metrics', f1a !== '' && f1a !== f1b);
+  await page.waitForTimeout(600);
+  const valText = await page.locator('body').innerText();
+  check(
+    'Validation refuses to show metrics it has not earned',
+    /no extractor has been run/i.test(valText) && !/\bF1\s*0\.\d/.test(valText),
+  );
+  check('Validation shows the gold-set plan instead', /gold set — planned|0 of \d+ annotated/i.test(valText));
+  check(
+    'Validation surfaces values the ontology cannot hold',
+    /cannot hold/i.test(valText) && /Would need/i.test(valText),
+  );
 
   // ── 6. Protocol scaling recomputes materials ────────────────────────
   await go('/protocols/PR-TAP-01');
@@ -293,7 +288,7 @@ async function main() {
   await go('/ask');
   await page.waitForTimeout(400);
   const composer = page.locator('textarea').first();
-  await composer.fill('How do I do CRISPR editing of cw15?');
+  await composer.fill('What is the optimal sous-vide temperature for brisket?');
   await composer.press('Enter');
   // Wait for streaming to settle rather than guessing a duration.
   await page
@@ -304,7 +299,25 @@ async function main() {
   const declineText = await page.locator('body').innerText();
   check(
     'Out-of-corpus question gets an honest decline',
-    /outside this demo corpus/i.test(declineText),
+    /outside this|corpus does not|does not cover/i.test(declineText),
+  );
+
+  // The algal-casein question is NOT a decline — the corpus answers it with a
+  // substantive "no", which is the demo's whole point (OF-COR-001 §21 F6).
+  await go('/ask');
+  await page.waitForTimeout(400);
+  const c2 = page.locator('textarea').first();
+  await c2.fill('Has anyone expressed a casein in an alga?');
+  await c2.press('Enter');
+  await page
+    .locator('text=/no algal|never been|no.{0,12}alga/i')
+    .first()
+    .waitFor({ timeout: 25000 })
+    .catch(() => {});
+  const f6 = await page.locator('body').innerText();
+  check(
+    'The algal-casein absence is answered substantively, not declined',
+    /17 bacterial|Kiverdi|no algal/i.test(f6),
   );
 
   // ── 11. Command palette navigates ───────────────────────────────────

@@ -416,7 +416,11 @@ export const useStore = create<OFState>()((set, get) => ({
   ingestPaper: (paperId) => {
     const paper = get().papers.find((p) => p.id === paperId);
     if (!paper) return;
-    const fails = paper.title.includes('Two-Column') || paper.id === 'SP-020';
+    // With a real corpus, ingestion needs the source document — and this build
+    // has none. Open-access entries would be fetchable with network access;
+    // paywalled ones need institutional credentials. Either way the pipeline
+    // halts at Fetch rather than pretending to parse something it never got.
+    const fails = true;
     get().setPaperIngest(paperId, 'stage:fetch');
     const id = get().startJob({
       title: `Ingest ${paperId}`,
@@ -433,12 +437,15 @@ export const useStore = create<OFState>()((set, get) => ({
     if (fails) {
       // Scripted failure path (§8.5): halts at Parse with a specific reason.
       const speed = get().ui.simSpeed;
-      const wait = speed === Infinity ? 50 : 2400 / speed;
+      const wait = speed === Infinity ? 50 : 900 / speed;
+      const reason = paper.openAccess
+        ? `Source not retrieved — ${paper.doi ? `DOI ${paper.doi}` : paper.pmcid ?? 'the record'} is open access, but this build makes no network requests.`
+        : 'Source not retrieved — publisher requires institutional access. Fetch this one manually and re-run.';
       setTimeout(() => {
-        get().failJob(id, 'Section boundaries not detected — 2-column layout');
-        get().setPaperIngest(paperId, 'failed:parse');
+        get().failJob(id, reason);
+        get().setPaperIngest(paperId, 'failed:fetch');
         get().toast({
-          text: `Ingest ${paperId} failed at Parse`,
+          text: `Ingest ${paperId} halted at Fetch`,
           kind: 'error',
           href: '#/library/ingest',
           hrefLabel: 'Review',

@@ -1,7 +1,16 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
-// that has entered the pipeline; the demo shelf lives on the Ingest screen.
+// in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Download, FolderPlus, Layers, Loader2, Wand2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookMarked,
+  Download,
+  FolderPlus,
+  Layers,
+  Loader2,
+  Wand2,
+  X,
+} from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
@@ -42,7 +51,7 @@ interface LibRow {
   verifiedCount: number;
   collections: string[];
   prov: ProvKind;
-  ingestKey: 'complete' | 'ingesting' | 'failed';
+  ingestKey: 'complete' | 'catalogued' | 'ingesting' | 'failed';
 }
 
 /** Latest ingest job that references this paper (jobs carry the id in href). */
@@ -148,18 +157,21 @@ export default function Library() {
       .filter((p) => p.ingest !== 'shelf')
       .map((paper) => {
         const agg = byPaper.get(paper.id) ?? { total: 0, gold: 0, verified: 0 };
-        const ingestKey: LibRow['ingestKey'] =
-          paper.ingest === 'failed:parse'
-            ? 'failed'
-            : paper.ingest.startsWith('stage:')
-              ? 'ingesting'
+        const ingestKey: LibRow['ingestKey'] = paper.ingest.startsWith('failed:')
+          ? 'failed'
+          : paper.ingest.startsWith('stage:')
+            ? 'ingesting'
+            : paper.ingest === 'catalogued'
+              ? 'catalogued'
               : 'complete';
         const prov: ProvKind =
           ingestKey === 'failed'
             ? 'rejected'
             : ingestKey === 'ingesting'
               ? 'demo'
-              : agg.gold > 0
+              : ingestKey === 'catalogued' && agg.gold === 0 && agg.verified === 0
+                ? 'curated'
+                : agg.gold > 0
                 ? 'gold'
                 : agg.verified > 0
                   ? 'verified'
@@ -376,10 +388,10 @@ export default function Library() {
             <a
               href={href('/library/ingest')}
               className="chip text-signal-error border-signal-error/40 hover:bg-signal-error/10"
-              title="Parse failed — open the ingest board to retry or continue with abstract-only text"
+              title="Ingest halted — open the board for the reason and a retry"
               onClick={(e) => e.stopPropagation()}
             >
-              <AlertTriangle size={11} /> Parse failed
+              <AlertTriangle size={11} /> Ingest halted
             </a>
           );
         }
@@ -393,9 +405,23 @@ export default function Library() {
             </span>
           );
         }
+        if (r.ingestKey === 'catalogued') {
+          // Bibliographically real, full text not parsed. Saying "in corpus"
+          // here would imply the spans anchor to the paper's own words; they
+          // anchor to the curator's notes.
+          return (
+            <span
+              className="chip text-ink-soft"
+              title="Catalogued: real citation, full text not ingested. Spans anchor to the curation note."
+            >
+              <BookMarked size={11} /> Catalogued
+              {r.goldCount > 0 && <span className="text-gold">· gold</span>}
+            </span>
+          );
+        }
         return (
           <span className="chip text-ink-soft">
-            In corpus
+            Full text
             {r.goldCount > 0 && <span className="text-gold">· gold</span>}
           </span>
         );

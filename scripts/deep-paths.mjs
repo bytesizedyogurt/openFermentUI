@@ -24,20 +24,17 @@ const ck=(n,ok,d='')=>{res.push(ok);console.log((ok?'✓ ':'✗ ')+n+(d?' — '+
 await go('/library/ingest');
 const shelfBtns = p.locator('button[aria-label*="to the ingest pipeline"]');
 const n = await shelfBtns.count();
-ck('Demo shelf offers held-out papers', n>0, n+' papers');
-const addBtn = p.locator('button[aria-label*="Add SP-020"]').first();
+ck('Ingest queue lists tranche-1 entries', n>0, n+' entries');
+const addBtn = shelfBtns.first();
 if (await addBtn.count()) { await addBtn.click(); } else { await shelfBtns.last().click(); }
 await p.waitForTimeout(6000);
 const ingestTxt = await p.locator('body').innerText();
-ck('Parse failure surfaces its specific reason', /Section boundaries not detected/i.test(ingestTxt));
-ck('Failure offers a recovery path', /Retry/i.test(ingestTxt) && /without full text/i.test(ingestTxt));
-// take the degraded path
-const cont = p.locator('button',{hasText:/without full text/i}).first();
-if (await cont.count()){ await cont.click(); await p.waitForTimeout(900);
-  await go('/library');
-  const lib = await p.locator('body').innerText();
-  ck('Degraded paper joins the corpus', /Two-Column/i.test(lib));
-} else ck('Degraded paper joins the corpus', false, 'button missing');
+ck('Fetch failure names why the source could not be retrieved', /Source not retrieved/i.test(ingestTxt));
+ck('Failure offers a recovery path', /Retry/i.test(ingestTxt));
+// The corpus stays catalogued: nothing was fetched, so nothing joins as full text.
+await go('/library');
+const lib = await p.locator('body').innerText();
+ck('Corpus still reports entries as catalogued', /catalogued/i.test(lib) || /curation note/i.test(lib));
 
 // Protocol version diff
 await go('/protocols/PR-TAP-01');

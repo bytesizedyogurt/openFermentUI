@@ -127,6 +127,8 @@ export type IngestStatus =
    */
   | 'catalogued'
   | `stage:${IngestStage}`
+  /** The source document could not be retrieved at all. */
+  | 'failed:fetch'
   | 'failed:parse'
   | 'shelf';
 

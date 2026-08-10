@@ -59,9 +59,12 @@ export const ONTOLOGY: ParameterDef[] = [
     definition:
       'Recombinant protein released into the culture medium, per litre. Avoids cell disruption, which is why it is the preferred route for caseins.',
     canonicalUnit: 'g L⁻¹',
-    range: [1e-5, 10],
+    // Widened from the 10 g/L of OF-COR-001 §17: that ceiling reflected casein
+    // specifically, but the field also carries the general-fermentation titers
+    // the TEA sources quote (24 g/L published average, 42 g/L private benchmark).
+    range: [1e-5, 50],
     notes:
-      'C. reinhardtii UVM4 0.012–0.015; T. reesei β-lactoglobulin 1.0; ovalbumin 2.0 — a ~65× gap.',
+      'C. reinhardtii UVM4 0.012–0.015; T. reesei β-lactoglobulin 1.0; ovalbumin 2.0 — a ~65× gap. Industry fermentation averages run 24–42.',
   },
   {
     id: 'secreted_fraction',

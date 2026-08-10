@@ -205,10 +205,18 @@ for (const r of RECORDS) {
           );
       } catch {
         const why = explainRefusal(r.unit, def.canonicalUnit);
-        fail(
-          `${r.id}: unit "${r.unit}" is not compatible with ${def.canonicalUnit} (${def.name})` +
-            (why ? ` — ${why}` : ''),
-        );
+        // A refusal the engine can EXPLAIN is the guardrail working, not a
+        // defect in the seed: recording a cost in EUR is legitimate, and
+        // declining to convert it without a dated rate is the correct
+        // behaviour. Only an unexplained dimension mismatch is a real fault.
+        if (why)
+          warn(
+            `${r.id}: ${def.name} recorded in "${r.unit}", which the engine will not convert to ${def.canonicalUnit} — ${why}`,
+          );
+        else
+          fail(
+            `${r.id}: unit "${r.unit}" is not compatible with ${def.canonicalUnit} (${def.name})`,
+          );
       }
     }
   }
