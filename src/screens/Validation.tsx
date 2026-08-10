@@ -19,6 +19,7 @@ import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
 import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
+import { ONTOLOGY_GAPS } from '@/data/ontology';
 import { convert, fmt, sameFamily, toSI } from '@/engine/units';
 import { href } from '@/router';
 import { CitationChip } from '@/components/Chip';
@@ -462,7 +463,12 @@ export default function Validation() {
             </div>
             <p className="text-body text-ink-soft mb-3">
               {GOLD_SET_PLAN.length} papers, weighted toward fields with enough independent
-              measurements to make precision and recall mean something.
+              measurements to make precision and recall mean something.{' '}
+              {GOLD_SET_PLAN.some((p) => p.blocked) && (
+                <span className="text-signal-warn">
+                  One row is blocked: the ontology has no field for what it asks for.
+                </span>
+              )}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-body">
@@ -482,7 +488,9 @@ export default function Validation() {
                       </td>
                       <td className="text-caption text-ink-soft pr-3">{p.fields}</td>
                       <td className="text-right font-num px-2">{p.records}</td>
-                      <td className="text-caption text-ink-soft">{p.rationale}</td>
+                      <td className={cx('text-caption', p.blocked ? 'text-signal-warn' : 'text-ink-soft')}>
+                        {p.rationale}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -505,6 +513,28 @@ export default function Validation() {
                 </li>
               ))}
             </ul>
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="font-serif text-section-title font-semibold mb-1">
+              Values the ontology cannot hold
+            </h2>
+            <p className="text-body text-ink-soft mb-3">
+              These are real numbers in the corpus with no field to put them in. They were left
+              unrecorded rather than forced into an ill-fitting field, because an ontology that
+              quietly absorbs values it was not designed for produces confident nonsense.
+            </p>
+            <div className="space-y-2">
+              {ONTOLOGY_GAPS.map((g) => (
+                <div key={g.entry} className="tick tick-industry-estimate">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-num text-caption text-ink-soft">{g.entry}</span>
+                    <span className="text-body">{g.values}</span>
+                  </div>
+                  <div className="text-caption text-ink-soft mt-0.5">Would need: {g.wouldNeed}</div>
+                </div>
+              ))}
+            </div>
           </Card>
 
           <Card className="p-4">

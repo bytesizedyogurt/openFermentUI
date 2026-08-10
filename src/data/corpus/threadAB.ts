@@ -600,7 +600,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     confidence: 0.9,
     status: 'unverified',
     provenance: 'curated',
-    organism: 'wt12',
+    organism: 'creinhardtii-wt',
     isPrimary: true,
     range: { low: 15, high: 20 },
     comparativeBaseline: 'walled wild-type WT12, against cell-wall-deficient cw15 and UVM4',

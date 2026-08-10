@@ -118,6 +118,36 @@ export const STRAINS: Strain[] = [
     ],
   },
   {
+    id: 'creinhardtii-wt',
+    binomial: 'Chlamydomonas reinhardtii',
+    designation: 'walled wild type (CC-137c, cc124, WT12)',
+    taxonomy: [
+      'Eukaryota',
+      'Viridiplantae',
+      'Chlorophyta',
+      'Chlorophyceae',
+      'Chlamydomonadales',
+      'Chlamydomonadaceae',
+      'Chlamydomonas',
+    ],
+    description:
+      'The walled comparator. Almost every growth and cost number the cw15 case rests on was measured on a walled wild type rather than on cw15 itself — the density figures, the specific growth rate, the medium optima. Keeping it as a distinct organism rather than folding it into cw15 is what stops the platform from quietly attributing those measurements to a strain that was never tested.',
+    badges: ['walled wild type', 'growth reference', 'BSL-1'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'Read the cw15 case honestly and this strain is doing most of the work: μ = 0.087 h⁻¹, 1.23 g/L, 24.3 mg L⁻¹ h⁻¹ and the acetate/NH₄Cl optima are all walled-wild-type measurements. Whether they transfer to a wall-deficient mutant under the same conditions is an assumption, not a finding, and no retrieved source tests it.',
+      },
+      {
+        at: '2026-08-10',
+        who: 'S. Creighton',
+        text: 'The one place the two are measured side by side is transformation: colonies appear in 7–10 days for cw15 and UVM4 against 15–20 days for walled WT12. That contrast is real and it favours cw15 — but it is about transformability, not about growth or yield.',
+      },
+    ],
+  },
+  {
     id: 'gs115',
     binomial: 'Komagataella phaffii',
     designation: 'GS115 (formerly Pichia pastoris)',
