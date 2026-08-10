@@ -18,6 +18,7 @@ import type { ExtractionRecord, ExtractorRun, FieldId, RunOutput } from '@/data/
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
+import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
 import { convert, fmt, sameFamily, toSI } from '@/engine/units';
 import { href } from '@/router';
 import { CitationChip } from '@/components/Chip';
@@ -410,7 +411,7 @@ export default function Validation() {
     <PageHeader
       eyebrow="Module 0 · Evidence"
       title="Extraction validation"
-      subtitle="Precision and recall of each extractor run against the curated gold set. The corpus is synthetic, so these numbers describe the demo pipeline and nothing else."
+      subtitle="Precision and recall of each extractor run against the hand-curated gold set, under leave-one-out evaluation."
       actions={actions}
     />
   );
@@ -426,18 +427,100 @@ export default function Validation() {
     );
   }
 
+  // No extractor has been run against this corpus, and the screen says so
+  // rather than showing a number (OF-COR-001 §22, actions 6–7). Every entry is
+  // catalogued: the curator's notes stand in for source text, so there are no
+  // source spans to annotate a gold set against and nothing to score.
   if (!run || !metrics) {
+    const plannedRecords = GOLD_SET_PLAN.reduce((n, p) => n + p.records, 0);
     return (
       <>
-        {header(<LinkButton to="/extract">Back to Extract</LinkButton>)}
-        <Card className="max-w-2xl">
-          <EmptyState
-            icon={<Gauge size={22} />}
-            title="No extractor runs to score"
-            body="This session holds no run outputs, so there is nothing to compare against the gold set. Session state resets on refresh — reload the demo to restore the seeded runs."
-            action={<LinkButton to="/extract">Open Extract</LinkButton>}
-          />
-        </Card>
+        {header(<LinkButton to="/library">Open the Library</LinkButton>)}
+
+        <div className="max-w-3xl space-y-4">
+          <Callout kind="info" title="No extractor has been run against this corpus yet">
+            <p className="mb-2">
+              Every one of the{' '}
+              <span className="font-num">{papers.length}</span> entries is{' '}
+              <strong>catalogued</strong>, not ingested: the curator&rsquo;s notes stand in for the
+              source text. There are no parsed source spans to annotate a gold set against, and no
+              extractor output to compare with one.
+            </p>
+            <p>
+              Showing a precision or recall figure here would mean scoring a run that never happened
+              against annotations that were never made. So this screen shows the plan and the gap
+              instead.
+            </p>
+          </Callout>
+
+          <Card className="p-4">
+            <div className="flex items-baseline justify-between gap-3 mb-1">
+              <h2 className="font-serif text-section-title font-semibold">Gold set — planned</h2>
+              <span className="font-num text-caption text-ink-soft">
+                0 of {plannedRecords} annotated
+              </span>
+            </div>
+            <p className="text-body text-ink-soft mb-3">
+              {GOLD_SET_PLAN.length} papers, weighted toward fields with enough independent
+              measurements to make precision and recall mean something.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-body">
+                <thead>
+                  <tr className="border-b border-line text-caption text-ink-soft">
+                    <th className="text-left py-1.5">Paper</th>
+                    <th className="text-left">Field focus</th>
+                    <th className="text-right px-2">Records</th>
+                    <th className="text-left">Why chosen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {GOLD_SET_PLAN.map((p) => (
+                    <tr key={p.paperId} className="border-b border-line/60 align-top">
+                      <td className="py-1.5">
+                        <CitationChip paperId={p.paperId} />
+                      </td>
+                      <td className="text-caption text-ink-soft pr-3">{p.fields}</td>
+                      <td className="text-right font-num px-2">{p.records}</td>
+                      <td className="text-caption text-ink-soft">{p.rationale}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="font-serif text-section-title font-semibold mb-2">
+              Difficulty cases the gold set must include
+            </h2>
+            <p className="text-body text-ink-soft mb-2">
+              A benchmark that only contains easy cases measures nothing. These are the six the
+              corpus document calls for.
+            </p>
+            <ul className="space-y-1.5">
+              {GOLD_SET_DIFFICULTY_CASES.map((c, i) => (
+                <li key={i} className="tick tick-gold text-body">
+                  {c}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="font-serif text-section-title font-semibold mb-2">What unblocks this</h2>
+            <ol className="list-decimal pl-5 space-y-1 text-body">
+              <li>Ingest tranche 1 — the open-access core papers — so spans anchor to real text.</li>
+              <li>Hand-annotate the gold set against those spans.</li>
+              <li>Run an extractor and score it here.</li>
+            </ol>
+            <div className="mt-3">
+              <LinkButton to="/library/ingest" variant="primary">
+                Open the ingest pipeline
+              </LinkButton>
+            </div>
+          </Card>
+        </div>
       </>
     );
   }

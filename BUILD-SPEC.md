@@ -20,16 +20,57 @@ src/components/ shared primitives (§7)
 src/screens/   one file per screen (§8)
 ```
 
+## Corpus v1 (OF-COR-001) — what changed
+
+The synthetic corpus is gone. Papers, authors, venues and DOIs are now **real**,
+which makes the platform *more* demanding rather than less: an extraction error
+is now an error about a real paper, and the gold set is a research artifact
+rather than a demo prop.
+
+Three consequences worth internalising before touching seed data:
+
+1. **You may not invent content about a real paper.** Full texts have not been
+   ingested. Every entry is `ingest: 'catalogued'` with
+   `textSource: 'curation-note'`, and its single section holds the *curator's*
+   prose from `docs/OF-COR-001.md` — not the paper's own words. The reader says
+   so. If a fact is not in that document, it does not go in the seed.
+2. **`demo` no longer means "this is fake".** It is reserved for simulation
+   response grids and scripted agent text. Two new classes carry the real
+   distinctions: `curated` (transcribed, not yet checked against the source PDF)
+   and `industry-estimate` (market/vendor figures — never gold, never in
+   aggregates).
+3. **No extractor has run.** `RUN_OUTPUTS` is empty on purpose, and the
+   validation dashboard shows the gold-set plan and the gap instead of a
+   fabricated F1.
+
+### Ontology v1 rules
+
+- **Rule 1** — every PTM and functional field carries a `method`.
+  `'undetermined'` is a legitimate value meaning the analysis was never
+  reported, which is *not* the same as a negative result.
+- **Rule 2** — `% TSP` and `g L⁻¹` are not interconvertible without cell density
+  and total-protein fraction. `engine/units.ts` refuses **with an explanation**
+  (`explainRefusal`). Currency is likewise never auto-converted.
+
+### Traps the schema now guards (OF-COR-001 §19)
+
+| Trap | Guard |
+|---|---|
+| Precursor (224) vs mature (209) β-casein numbering | `numbering` required on `phospho_site_position` |
+| "Casein kinase" names CK1, CK2 and FAM20C | `kinase_identity` is categorical, not free text |
+| cw15 / cw15-302 / CC-4350 / Elow47 / UVM4 are not interchangeable | `STRAIN_ALIASES` normalises on ingest |
+| Citation-of-a-citation (C6 recites C2's 15 mg/L) | `isPrimary` + `citesRecordId`; aggregates filter on it |
+| Heterogeneous expression units | Rule 2 refusal |
+
 ## ID registry (stable, human-readable — never renumber)
 
 | Entity | IDs |
 |---|---|
-| Papers (corpus) | `SP-001` … `SP-016` |
-| Papers (demo shelf, held out for ingest) | `SP-017` … `SP-020`; **`SP-020` is the parse-hostile paper** whose ingest fails at Parse |
-| Extraction records | `ex-0001` … `ex-0132` (zero-padded to 4) |
-| Strains | `cw15`, `cc1690`, `gs115`, `aplat` |
+| Papers | corpus entry ids from OF-COR-001: `A1`…`A9`, `B1`…`B5`, … `O8`, plus `O8m` for the market-figure cluster |
+| Extraction records | `r-<paperId>-<n>`, e.g. `r-H4-1` |
+| Strains | `cw15`, `uvm4`, `gs115`, `treesei`, `ecoli`, `bovine` |
 | Protocols | `PR-TAP-01`, `PR-TAP-02`, `PR-SEED-01`, `PR-PBR-01`, `PR-OD-01`, `PR-HARV-01`, `PR-PICH-01`, `PR-CIP-01` |
-| Scenarios | `sc-s1` (model S1), `sc-s2` (S2), `sc-s3` (S3) |
+| Scenarios | `sc-s1` cw15 intracellular · `sc-s2` K. phaffii secreted · `sc-s3` conventional milk isolation |
 | Collections | `col-gold`, `col-kinetics`, `col-downstream` |
 | Learn modules | `m0` … `m5`; lessons `l0-1` … `l0-4`, `l1-1`, `l2-1`, `l3-1`, `l4-1`, `l5-1` |
 | Chat flows | `F1` … `F12` |
@@ -63,15 +104,19 @@ src/screens/   one file per screen (§8)
    only gold record IDs.
 5. Grid dim `values` arrays are ascending.
 
-## Content rules (§20 — non-negotiable)
+## Content rules (non-negotiable)
 
-- **All content is synthetic.** Fictional author names (globally diverse),
-  invented journal titles, no real DOIs, no real researcher names, no real
-  venue titles. Values must be plausible and inside the ontology ranges in
-  `src/data/ontology.ts`, but they are invented.
-- Never attribute a value to a real person or real publication.
-- Any datum with no literature ancestry is provenance `'demo'` and renders with
-  the dashed tick.
+- **Never invent content about a real paper.** No fabricated abstracts, no
+  paraphrase presented as a quotation, no author names you do not have. An
+  entry with unresolved authorship carries `authors: []` and
+  `verifyNeeded: true` — a guessed name is worse than an absent one.
+- **Never invent a value.** Everything traceable to `docs/OF-COR-001.md`, with
+  `curationRef` recording where.
+- Quantities with no home in the 24-field ontology are **left unrecorded**
+  rather than forced into an ill-fitting field. That gap is real and worth
+  surfacing.
+- Simulation outputs are modeled, not measured: provenance `'demo'`, dashed
+  tick, and the permanent "illustrative economics, not validated" subtitle.
 - No lorem ipsum anywhere. Every string is real, purposeful copy.
 
 ## Screen contract

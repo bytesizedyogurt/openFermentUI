@@ -13,12 +13,12 @@ import { STRAINS } from '../src/data/strains';
 import { PROTOCOLS } from '../src/data/protocols';
 import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
+import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
 import { ONTOLOGY_BY_ID } from '../src/data/ontology';
-import { toSI, normalizeUnit, convert } from '../src/engine/units';
+import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
-import { computeRunMetrics } from '../src/engine/metrics';
 
 const errors: string[] = [];
 const warnings: string[] = [];
@@ -83,12 +83,18 @@ for (const s of SCENARIOS) {
   for (const a of s.assumptions) {
     if (a.recordId && !recordIds.has(a.recordId))
       fail(`${s.id}: assumption "${a.label}" recordId ${a.recordId} unresolved`);
-    if (a.recordId && a.provenance === 'demo')
-      warn(`${s.id}: assumption "${a.label}" links a record but is marked demo`);
+    if (a.paperId && !paperIds.has(a.paperId))
+      fail(`${s.id}: assumption "${a.label}" paperId ${a.paperId} unresolved`);
+    if ((a.recordId || a.paperId) && a.provenance === 'demo')
+      warn(`${s.id}: assumption "${a.label}" cites a source but is marked demo`);
+    if (!a.recordId && !a.paperId && a.provenance !== 'demo' && a.provenance !== 'industry-estimate')
+      warn(`${s.id}: assumption "${a.label}" claims provenance '${a.provenance}' with no source`);
   }
   for (const d of s.dims) {
     if (d.sourceRecordId && !recordIds.has(d.sourceRecordId))
       fail(`${s.id}: dim ${d.key} sourceRecordId ${d.sourceRecordId} unresolved`);
+    if (d.paperId && !paperIds.has(d.paperId))
+      fail(`${s.id}: dim ${d.key} paperId ${d.paperId} unresolved`);
   }
   if (!COST_MODELS.some((m) => m.modelId === s.modelId))
     fail(`${s.id}: modelId ${s.modelId} has no cost model`);
@@ -164,56 +170,111 @@ for (const a of ACTIVITY) {
   if (!known) warn(`activity href does not look like a real route: ${a.href}`);
 }
 
-// ── 3. si equals the converter's output ────────────────────────────────
+// ── 3. record integrity for the real corpus ────────────────────────────
+const strainIdsCanonical = new Set(Object.values(STRAIN_ALIASES));
 for (const r of RECORDS) {
-  if (normalizeUnit(r.unit) === null) {
-    fail(`${r.id}: unit "${r.unit}" is not recognized by the converter`);
-    continue;
-  }
-  const expect = toSI(r.value, r.unit);
-  if (Math.abs(expect.value - r.si.value) > 1e-9 || expect.unit !== r.si.unit)
-    fail(`${r.id}: si mismatch — expected ${expect.value} ${expect.unit}, got ${r.si.value} ${r.si.unit}`);
-
   const def = ONTOLOGY_BY_ID[r.field];
   if (!def) {
     fail(`${r.id}: field "${r.field}" is not in the ontology`);
     continue;
   }
-  if (def.canonicalUnit !== '') {
-    try {
-      const canonical = convert(r.value, r.unit, def.canonicalUnit);
-      if (canonical < def.range[0] || canonical > def.range[1]) {
-        const note = r.status === 'unverified' ? ' (seeded extractor error, awaiting review)' : '';
-        warn(
-          `${r.id}: ${r.field} = ${canonical.toPrecision(3)} ${def.canonicalUnit} is outside the ontology range ${def.range[0]}–${def.range[1]}${note}`,
+
+  // Categorical fields carry a string; numeric fields must not.
+  if (def.categorical) {
+    if (typeof r.value !== 'string')
+      fail(`${r.id}: ${r.field} is categorical but the value is not a string`);
+  } else {
+    if (typeof r.value !== 'number') {
+      fail(`${r.id}: ${r.field} is numeric but the value is a string`);
+      continue;
+    }
+    if (normalizeUnit(r.unit) === null) {
+      fail(`${r.id}: unit "${r.unit}" is not recognized by the converter`);
+      continue;
+    }
+    const expect = toSI(r.value, r.unit);
+    if (Math.abs(expect.value - r.si.value) > 1e-9 || expect.unit !== r.si.unit)
+      fail(`${r.id}: si mismatch — expected ${expect.value} ${expect.unit}, got ${r.si.value} ${r.si.unit}`);
+
+    if (def.canonicalUnit !== '') {
+      try {
+        const canonical = convert(r.value, r.unit, def.canonicalUnit);
+        if (canonical < def.range[0] || canonical > def.range[1])
+          warn(
+            `${r.id}: ${r.field} = ${canonical.toPrecision(3)} ${def.canonicalUnit} is outside the ontology range ${def.range[0]}–${def.range[1]}`,
+          );
+      } catch {
+        const why = explainRefusal(r.unit, def.canonicalUnit);
+        fail(
+          `${r.id}: unit "${r.unit}" is not compatible with ${def.canonicalUnit} (${def.name})` +
+            (why ? ` — ${why}` : ''),
         );
       }
-    } catch {
-      // A dimensionally-wrong unit on an *unverified* record is legitimate seed
-      // content: it is exactly the failure the review queue exists to catch
-      // (a dropped OD basis, a rate recorded per the wrong time unit). The same
-      // mistake on a verified or gold record is a defect in the seed itself.
-      const msg = `${r.id}: unit "${r.unit}" is not dimensionally compatible with ${def.canonicalUnit} (${def.name})`;
-      if (r.status === 'unverified' && !r.gold) warn(`${msg} — seeded extractor error, awaiting review`);
-      else if (r.gold && r.gold.unit !== r.unit)
-        warn(`${msg} — gold annotation corrects it to ${r.gold.unit}`);
-      else fail(msg);
     }
   }
-  if (r.organism && !strainIds.has(r.organism)) warn(`${r.id}: organism "${r.organism}" is not a seeded strain`);
+
+  // OF-COR-001 §17 Rule 1 — a PTM or functional value without its method is
+  // not interpretable. 'undetermined' is a legitimate answer; absent is not.
+  if (def.requiresMethod && !r.method)
+    fail(`${r.id}: ${r.field} requires a \`method\` (use 'undetermined' if the source never reported one)`);
+
+  // §19 first trap — a residue position without its numbering convention
+  // mislocates every phospho-site by 15.
+  if (r.field === 'phospho_site_position' && !r.numbering)
+    fail(`${r.id}: phospho_site_position requires \`numbering\` ('mature' or 'precursor')`);
+
+  // §19 fifth trap — a record that recites someone else's measurement must say
+  // whose, or aggregates silently double-count it.
+  if (r.isPrimary === false && !r.citesRecordId)
+    warn(`${r.id}: marked non-primary but does not name the record it cites`);
+  if (r.citesRecordId && !recordIds.has(r.citesRecordId))
+    fail(`${r.id}: citesRecordId ${r.citesRecordId} does not resolve`);
+  if (r.citesRecordId && r.isPrimary !== false)
+    fail(`${r.id}: cites another record but is still marked primary`);
+
+  // §16 O8 — market figures are never evidence.
+  if (r.provenance === 'industry-estimate' && r.gold)
+    fail(`${r.id}: an industry estimate must never be in the gold set`);
+
+  // A curated value must say where it was transcribed from.
+  if (r.provenance === 'curated' && !r.curationRef)
+    warn(`${r.id}: curated but carries no curationRef`);
+
+  // §19 third trap — strain names must normalise, or measurements on different
+  // organisms get silently merged.
+  if (r.organism && !strainIdsCanonical.has(r.organism))
+    warn(`${r.id}: organism "${r.organism}" is not a canonical strain id`);
+
+  if (r.range && typeof r.value === 'number') {
+    if (r.range.low > r.range.high) fail(`${r.id}: range low > high`);
+    else if (r.value < r.range.low || r.value > r.range.high)
+      warn(`${r.id}: point value ${r.value} sits outside its own stated range`);
+  }
 }
 
-// ── 4. run outputs reference only gold records ─────────────────────────
+// No fabricated authorship: an entry either names real authors or names none.
+for (const p of PAPERS) {
+  if (p.authors.some((a) => !a.trim()))
+    fail(`${p.id}: empty author string — use [] and verifyNeeded rather than a blank`);
+  if (p.textSource === 'curation-note' && p.ingest !== 'catalogued')
+    fail(`${p.id}: curation-note text must be marked ingest 'catalogued'`);
+  if (p.sections.length === 0) fail(`${p.id}: has no sections`);
+}
+
+// ── 4. run outputs (may legitimately be empty) ─────────────────────────
 const goldIds = new Set(RECORDS.filter((r) => r.gold).map((r) => r.id));
-for (const run of RUN_OUTPUTS) {
-  for (const res of run.results)
-    if (!goldIds.has(res.goldRecordId))
-      fail(`run ${run.run}: result references ${res.goldRecordId}, which is not a gold record`);
-  const covered = new Set(run.results.map((r) => r.goldRecordId));
-  if (covered.size !== goldIds.size)
-    warn(`run ${run.run}: covers ${covered.size} of ${goldIds.size} gold records`);
-  for (const fp of run.falsePositives)
-    if (!paperIds.has(fp.paperId)) fail(`run ${run.run}: false positive ${fp.id} paperId unresolved`);
+if (RUN_OUTPUTS.length === 0) {
+  console.log(
+    '  note: no extractor runs — nothing has been ingested, so nothing has been scored (expected for corpus v1)',
+  );
+} else {
+  for (const run of RUN_OUTPUTS) {
+    for (const res of run.results)
+      if (!goldIds.has(res.goldRecordId))
+        fail(`run ${run.run}: result references ${res.goldRecordId}, which is not a gold record`);
+    for (const fp of run.falsePositives)
+      if (!paperIds.has(fp.paperId)) fail(`run ${run.run}: false positive ${fp.id} paperId unresolved`);
+  }
 }
 
 // ── 5. grid dims ascending; grids finite and positive ──────────────────
@@ -248,22 +309,20 @@ for (const m of COST_MODELS) {
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
-console.log(`  papers            ${PAPERS.length} (${PAPERS.filter((p) => p.ingest === 'complete').length} ingested, ${PAPERS.filter((p) => p.ingest === 'shelf').length} on the demo shelf)`);
+console.log(`  papers            ${PAPERS.length} catalogued (${PAPERS.filter((p) => p.textSource === 'full-text').length} full-text, ${PAPERS.filter((p) => p.openAccess).length} open access)`);
+console.log(`  threads           ${new Set(PAPERS.map((p) => p.thread)).size} · tranche 1: ${PAPERS.filter((p) => p.tranche === 1).length}, 2: ${PAPERS.filter((p) => p.tranche === 2).length}, 3: ${PAPERS.filter((p) => p.tranche === 3).length}`);
+console.log(`  needs [verify]    ${PAPERS.filter((p) => p.verifyNeeded).length} author strings`);
 console.log(`  sections          ${PAPERS.reduce((n, p) => n + p.sections.length, 0)}`);
-console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.status === 'verified').length} verified, ${RECORDS.filter((r) => r.status === 'unverified').length} unverified, ${RECORDS.filter((r) => r.status === 'rejected').length} rejected)`);
-console.log(`  gold set          ${goldIds.size} across ${new Set(RECORDS.filter((r) => r.gold).map((r) => r.paperId)).size} papers`);
+console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.provenance === 'curated').length} curated, ${RECORDS.filter((r) => r.provenance === 'industry-estimate').length} industry estimate)`);
+console.log(`  non-primary       ${RECORDS.filter((r) => r.isPrimary === false).length} (citations of other records, excluded from aggregates)`);
+console.log(`  with method       ${RECORDS.filter((r) => r.method).length}, of which ${RECORDS.filter((r) => r.method === 'undetermined').length} undetermined`);
+console.log(`  gold set          ${goldIds.size} annotated (60 planned across 14 papers — pending tranche-1 ingest)`);
 console.log(`  strains           ${STRAINS.length}`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);
 console.log(`  chat flows        ${FLOWS.length}`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 
-for (const run of RUN_OUTPUTS) {
-  const m = computeRunMetrics(run, RECORDS);
-  console.log(
-    `  extractor ${run.run.padEnd(5)}   P ${m.micro.precision.toFixed(3)}  R ${m.micro.recall.toFixed(3)}  F1 ${m.micro.f1.toFixed(3)}`,
-  );
-}
 
 if (warnings.length) {
   console.log(`\n⚠ ${warnings.length} warning(s):`);
