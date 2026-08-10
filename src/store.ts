@@ -365,7 +365,7 @@ export const useStore = create<OFState>()((set, get) => ({
   tickJobs: (dtMs) => {
     const speed = get().ui.simSpeed;
     const dt = speed === Infinity ? 1e9 : dtMs * speed;
-    let anyFinished: Job | null = null;
+    const finishedJobs: Job[] = [];
     set((s) => ({
       jobs: s.jobs.map((j) => {
         if (j.status !== 'running') return j;
@@ -385,14 +385,13 @@ export const useStore = create<OFState>()((set, get) => ({
         }
         if (stageIndex >= j.stages.length) {
           const done: Job = { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' };
-          anyFinished = done;
+          finishedJobs.push(done);
           return done;
         }
         return { ...j, stageIndex, stageProgress };
       }),
     }));
-    if (anyFinished) {
-      const j = anyFinished as Job;
+    for (const j of finishedJobs) {
       get().toast({
         text: `${j.title} — complete`,
         kind: 'success',
@@ -589,7 +588,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const speed = s.ui.simSpeed === Infinity ? 60 : s.ui.simSpeed;
     const dt = (dtMs / 1000) * speed;
-    let finished: TimerState | null = null;
+    const finishedTimers: TimerState[] = [];
     const runs = { ...s.runs };
     let changed = false;
     for (const [id, run] of Object.entries(runs)) {
@@ -600,14 +599,13 @@ export const useStore = create<OFState>()((set, get) => ({
         timers: run.timers.map((t) => {
           if (!t.running || t.remainingSec <= 0) return t;
           const remainingSec = Math.max(0, t.remainingSec - dt);
-          if (remainingSec === 0) finished = { ...t, remainingSec, running: false };
+          if (remainingSec === 0) finishedTimers.push({ ...t, remainingSec, running: false });
           return { ...t, remainingSec, running: remainingSec > 0 };
         }),
       };
     }
     if (changed) set({ runs });
-    if (finished) {
-      const f = finished as TimerState;
+    for (const f of finishedTimers) {
       get().toast({ text: `Timer complete — ${f.label}`, kind: 'success' });
     }
   },

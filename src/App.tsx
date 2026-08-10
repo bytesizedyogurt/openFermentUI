@@ -42,6 +42,7 @@ import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
+import ProtocolEditor from '@/screens/ProtocolEditor';
 import RunMode from '@/screens/RunMode';
 import Simulate from '@/screens/Simulate';
 import ScenarioWorkspace from '@/screens/ScenarioWorkspace';
@@ -88,6 +89,7 @@ function Screen() {
       return b ? <StrainPage strainId={b} /> : <Organisms />;
     case 'protocols':
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
+      if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
     case 'simulate':
       if (b === 'compare') return <Compare />;
