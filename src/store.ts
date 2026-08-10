@@ -196,12 +196,26 @@ const seedState = () => ({
   exports: [] as { name: string; at: string; rows: number }[],
 });
 
+/**
+ * Open in the viewer's theme rather than always in Bench. Night Shift exists
+ * for late lab sessions and projector-hostile rooms (§6.2); starting in the
+ * wrong one and making the user find the toggle is a small rudeness. The top
+ * bar toggle still wins once touched.
+ */
+function initialTheme(): Theme {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'bench';
+  const stamped = document.documentElement.dataset.theme;
+  if (stamped === 'dark') return 'night';
+  if (stamped === 'light') return 'bench';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
+}
+
 export const useStore = create<OFState>()((set, get) => ({
   ...seedState(),
   grids: seedGrids(),
   toasts: [],
   ui: {
-    theme: 'bench',
+    theme: initialTheme(),
     density: 'comfortable',
     simSpeed: 1,
     reducedMotion: false,
