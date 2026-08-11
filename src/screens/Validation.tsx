@@ -210,6 +210,7 @@ export default function Validation() {
   const runOutputs = useStore((s) => s.runOutputs);
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
+  const contradictions = useStore((s) => s.contradictions);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
@@ -434,6 +435,44 @@ export default function Validation() {
   // source spans to annotate a gold set against and nothing to score.
   if (!run || !metrics) {
     const plannedRecords = GOLD_SET_PLAN.reduce((n, p) => n + p.records, 0);
+
+    // Known-bad, derived rather than maintained. Three signals the corpus can
+    // answer on its own: a field the referee has contradicted, a field where
+    // most records are recitations rather than measurements, and a field the
+    // ontology cannot express what the literature actually reports.
+    const withRecords = new Set(records.map((r) => r.paperId));
+    const silentPapers = papers.filter((p) => !withRecords.has(p.id)).length;
+    const negativeResults = records.filter((r) => r.negativeResult).length;
+
+    const byField = new Map<string, typeof records>();
+    for (const r of records) {
+      const list = byField.get(r.field) ?? [];
+      list.push(r);
+      byField.set(r.field, list);
+    }
+
+    const knownBad: { field: string; why: string }[] = [];
+    for (const c of contradictions) {
+      for (const rid of c.recordIds) {
+        const rec = records.find((r) => r.id === rid);
+        if (!rec || knownBad.some((k) => k.field === rec.field)) continue;
+        knownBad.push({
+          field: rec.field,
+          why: 'the referee found a set of records here that cannot all be true',
+        });
+      }
+    }
+    for (const [field, list] of byField) {
+      if (knownBad.some((k) => k.field === field)) continue;
+      const secondary = list.filter((r) => r.isPrimary === false).length;
+      if (secondary > 0 && secondary >= list.length / 2) {
+        knownBad.push({
+          field,
+          why: `${secondary} of ${list.length} records here recite another study rather than measure — a median would count the same measurement twice`,
+        });
+      }
+    }
+
     return (
       <>
         {header(<LinkButton to="/library">Open the Library</LinkButton>)}
@@ -453,6 +492,79 @@ export default function Validation() {
               instead.
             </p>
           </Callout>
+
+          {/* Known-bad first (§8.3.2). Leading with the weakness is what makes
+              the rest of the screen credible, so this sits above the plan. */}
+          <Card className="p-4 border-signal-warn/50">
+            <h2 className="font-serif text-section-title font-semibold mb-1">
+              Known bad, before anything else
+            </h2>
+            <p className="text-body text-ink-soft mb-3">
+              Fields where this corpus is already known to be unreliable. Derived from the records
+              rather than a list someone maintains, so it cannot quietly go out of date.
+            </p>
+            <ul className="space-y-2">
+              {knownBad.map((k) => (
+                <li key={k.field} className="text-body">
+                  <a href={href(`/ledger/p/${k.field}`)} className="text-accent hover:underline">
+                    {fieldName(k.field as FieldId)}
+                  </a>
+                  <span className="text-signal-warn"> — {k.why}</span>
+                </li>
+              ))}
+              {knownBad.length === 0 && (
+                <li className="text-body text-ink-soft">
+                  No field currently trips a known-bad signal.
+                </li>
+              )}
+            </ul>
+          </Card>
+
+          {/* Negative controls (§8.3.1) — the cheapest high-value measurement
+              available, and the first thing a skeptic reaches for. */}
+          <Card className="p-4">
+            <h2 className="font-serif text-section-title font-semibold mb-1">
+              Negative controls — designed, not yet run
+            </h2>
+            <p className="text-body text-ink-soft mb-3">
+              The question a precision figure cannot answer: when a source contains no value for a
+              field, does the extractor invent one? Two populations in this corpus can answer it,
+              and neither needs new annotation work.
+            </p>
+            <div className="space-y-2 text-body">
+              <div>
+                <span className="font-num text-ink">{silentPapers}</span> catalogued sources carry
+                no record at all. An extractor run that returns a value for any of them has
+                fabricated it, and no gold set is needed to say so.
+              </div>
+              <div>
+                <span className="font-num text-ink">{negativeResults}</span> records are explicit
+                negative results — &ldquo;no detectable product&rdquo;, a catalytically dead mutant,
+                an assay that found nothing. Turning one of these into a positive number is the
+                failure mode that would most flatter a precision score, because the span is there
+                and only its polarity is wrong.
+              </div>
+            </div>
+          </Card>
+
+          {/* Intra-rater (§8.3.3) — measures gold-set noise, which leave-one-out
+              cannot see at all. */}
+          <Card className="p-4">
+            <h2 className="font-serif text-section-title font-semibold mb-1">
+              Intra-rater agreement — designed, not yet run
+            </h2>
+            <p className="text-body text-ink-soft">
+              A single curator built this corpus, so inter-rater agreement is unavailable. The
+              honest substitute is re-annotating a subset blind, weeks apart, and reporting
+              disagreement with oneself. It measures the noise floor of the gold set — the ceiling
+              any extractor score is really being read against — and leave-one-out cannot see it,
+              because it holds the annotations themselves fixed.
+            </p>
+            <p className="text-body text-ink-soft mt-2">
+              Nothing is reported here because no second pass has been done. A number would have to
+              be invented to fill the space.
+            </p>
+          </Card>
 
           <Card className="p-4">
             <div className="flex items-baseline justify-between gap-3 mb-1">
