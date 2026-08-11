@@ -30,6 +30,7 @@ import { convert, fmt, asNumber } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { ContradictionRail } from '@/components/ContradictionRail';
 import {
   Button,
   Callout,
@@ -406,6 +407,10 @@ function FieldRow({
   showRejected: boolean;
   onQueue: (ids: string[], label: string) => void;
 }) {
+  // Read from the store rather than thread a prop through every call site —
+  // the referee's findings are global, not something this row owns.
+  const contradictions = useStore((s) => s.contradictions);
+
   const plotted = useMemo(() => {
     const base = g.usable as PlotPoint[];
     return showRejected ? ([...base, ...g.rejectedUsable] as PlotPoint[]) : base;
@@ -454,7 +459,28 @@ function FieldRow({
           </div>
 
           {g.stats ? (
-            <div className="mt-1.5 text-caption">
+            <div className="mt-1.5 text-caption flex items-start gap-2">
+              <ContradictionRail
+                marks={g.usable.map((p) => ({ record: p.rec, value: p.canonical as number }))}
+                aggregate={{
+                  median: g.stats.median,
+                  p25: g.stats.median,
+                  p75: g.stats.median,
+                  min: g.stats.min,
+                  max: g.stats.max,
+                  n: g.usable.length,
+                  nPrimary: g.usable.filter((p) => p.rec.isPrimary).length,
+                  unit: g.def.canonicalUnit,
+                  strata: [],
+                  method: 'median-of-primary-v1',
+                }}
+                contradictions={contradictions.filter((c) =>
+                  c.recordIds.some((id: string) => g.all.some((p) => p.rec.id === id)),
+                )}
+                height={48}
+                onPick={(id) => navigate(`/ledger/records?record=${id}`)}
+              />
+              <div>
               <div>
                 median{' '}
                 <span className="font-num text-ink">
@@ -469,6 +495,13 @@ function FieldRow({
                     : `${fmt(g.stats.min)} – ${fmt(g.stats.max)}`}{' '}
                   {g.def.canonicalUnit}
                 </span>
+              </div>
+              <a
+                href={href(`/ledger/p/${g.def.id}`)}
+                className="text-accent hover:underline"
+              >
+                open the parameter
+              </a>
               </div>
             </div>
           ) : g.usable.length > 0 ? (

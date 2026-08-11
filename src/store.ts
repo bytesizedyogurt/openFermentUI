@@ -129,6 +129,13 @@ export interface OFState {
   setRecordStatus: (id: string, status: RecordStatus, reason?: string) => void;
   undoReview: () => void;
   advanceReview: (delta: number) => void;
+  /**
+   * File a coverage dispute against a source (OF-FE-003 §8.4). Recall failure
+   * is the failure that hides: a wrong value gets clicked and corrected, a
+   * missed one is invisible forever. Filing returns the source to the review
+   * queue rather than parking a passive annotation on it.
+   */
+  disputeCoverage: (paperId: string, note: string) => void;
 
   // jobs
   startJob: (job: Omit<Job, 'id' | 'stageIndex' | 'stageProgress' | 'status' | 'startedAt'>) => string;
@@ -743,6 +750,28 @@ export const useStore = create<OFState>()((set, get) => ({
     set((s) => ({ checkpointAnswers: { ...s.checkpointAnswers, [qid]: correct } })),
 
   // ── misc ─────────────────────────────────────────────────────────────
+  disputeCoverage: (paperId, note) => {
+    const at = stamp();
+    set((s) => ({
+      papers: s.papers.map((p) =>
+        p.id === paperId ? { ...p, coverageDisputed: { note, at } } : p,
+      ),
+      // Back into the queue, at the front — a source somebody has looked at and
+      // found wanting is a better use of review time than the next one in line.
+      reviewQueue: s.reviewQueue.includes(paperId)
+        ? s.reviewQueue
+        : [paperId, ...s.reviewQueue],
+    }));
+    get().logActivity({
+      at,
+      icon: 'flag',
+      text: `Coverage disputed on ${paperId}: ${note}`,
+      href: `/trawl/sources/${paperId}`,
+      provenance: 'user',
+    });
+    get().toast({ text: 'Filed. This source is back in the review queue.', kind: 'info' });
+  },
+
   logActivity: (e) => set((s) => ({ activity: [e, ...s.activity].slice(0, 40) })),
 
   logExport: (name, rows) =>

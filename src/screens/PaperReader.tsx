@@ -529,6 +529,8 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           Extractions <span className="font-num text-ink-soft">{railRecords.length}</span>
         </SectionTitle>
 
+        <CoverageDispute paper={paper} count={recs.length} />
+
         {railRecords.length === 0 ? (
           <EmptyState
             title="No extractions yet"
@@ -686,6 +688,86 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         {article}
       </div>
       {rail}
+    </div>
+  );
+}
+
+/**
+ * Coverage dispute (OF-FE-003 §8.4).
+ *
+ * A wrong value gets clicked and corrected. A missed one is invisible forever —
+ * nothing in the interface counts what was never extracted, and no metric on the
+ * Assay screen can see it either. This control is the only mechanism in the
+ * system that surfaces recall failure, and it costs an afternoon.
+ */
+function CoverageDispute({ paper, count }: { paper: Paper; count: number }) {
+  const disputeCoverage = useStore((s) => s.disputeCoverage);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+
+  if (paper.coverageDisputed) {
+    return (
+      <div className="mb-2 text-caption border-l-2 border-signal-warn pl-2 py-1">
+        <div className="text-signal-warn font-medium">Coverage disputed</div>
+        <div className="text-ink-soft mt-0.5">{paper.coverageDisputed.note}</div>
+        <div className="text-ink-soft mt-0.5">
+          Filed {paper.coverageDisputed.at} · back in the review queue
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <span className="text-caption text-ink-soft">
+          <span className="font-num text-ink">{count}</span> value
+          {count === 1 ? '' : 's'} recorded from this source.
+        </span>
+        <button
+          className="text-caption text-accent hover:underline"
+          onClick={() => setOpen((v) => !v)}
+        >
+          Something’s missing.
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 border border-line rounded-card p-2.5">
+          <label className="text-caption text-ink-soft block mb-1" htmlFor="cov-note">
+            What did the extractor miss? A value, a table, a figure — anything it should have
+            picked up and did not.
+          </label>
+          <textarea
+            id="cov-note"
+            className="input w-full text-body"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Table 2 reports a secreted titer that is not in the record list."
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <Button
+              disabled={note.trim().length === 0}
+              onClick={() => {
+                disputeCoverage(paper.id, note.trim());
+                setOpen(false);
+                setNote('');
+              }}
+            >
+              File it
+            </Button>
+            <button
+              className="text-caption text-ink-soft hover:text-ink"
+              onClick={() => {
+                setOpen(false);
+                setNote('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
