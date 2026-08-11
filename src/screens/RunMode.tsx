@@ -221,7 +221,7 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
         <EmptyState
           title="Protocol not found"
           body={`No protocol with id ${protocolId} exists in this session.`}
-          action={<Button onClick={() => navigate('/protocols')}>Back to protocols</Button>}
+          action={<Button onClick={() => navigate('/runbook')}>Back to protocols</Button>}
         />
       </div>
     );

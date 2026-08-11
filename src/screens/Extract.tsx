@@ -196,7 +196,7 @@ export default function Extract() {
       href: '#/extract/review',
       provenance: 'user',
     });
-    navigate('/extract/review');
+    navigate('/trawl/review');
   };
 
   const exportBoth = () => {
@@ -481,7 +481,7 @@ export default function Extract() {
           Scoped to <span className="font-num">{paperParam}</span>
           <button
             className="text-ink-soft hover:text-ink ml-1"
-            onClick={() => navigate('/extract')}
+            onClick={() => navigate('/ledger/records')}
             aria-label={`Clear the ${paperParam} scope`}
             title="Show every record again"
           >
@@ -558,7 +558,7 @@ export default function Extract() {
             action={
               paperParam ? (
                 <div className="flex gap-2">
-                  <Button onClick={() => navigate('/extract')}>Show every record</Button>
+                  <Button onClick={() => navigate('/ledger/records')}>Show every record</Button>
                   {scopedPaper && (
                     <LinkButton to={`/library/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
@@ -604,7 +604,7 @@ export default function Extract() {
             Showing only records extracted from{' '}
             <span className="font-serif">{scopedPaper.title}</span>. Facet counts below describe this
             subset.{' '}
-            <button className="text-accent hover:underline" onClick={() => navigate('/extract')}>
+            <button className="text-accent hover:underline" onClick={() => navigate('/ledger/records')}>
               Show every record
             </button>
             .

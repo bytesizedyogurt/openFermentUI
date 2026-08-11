@@ -196,7 +196,7 @@ function MiniQueue() {
               ? `${decided.length} decision${decided.length === 1 ? '' : 's'} recorded — they are live, and the strain pages and validation metrics have already moved.`
               : 'No unverified records left in this session.'}
           </p>
-          <Button className="mt-3" onClick={() => navigate('/extract/review')}>
+          <Button className="mt-3" onClick={() => navigate('/trawl/review')}>
             Open the full review queue <ArrowRight size={13} />
           </Button>
         </div>
@@ -299,7 +299,7 @@ function MetricsTiles() {
       <p className="text-caption text-ink-soft mt-2">
         Computed from this session's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
         {metrics.micro.fn}.{' '}
-        <button className="text-accent hover:underline" onClick={() => navigate('/extract/validation')}>
+        <button className="text-accent hover:underline" onClick={() => navigate('/assay')}>
           Open the full dashboard
         </button>
       </p>

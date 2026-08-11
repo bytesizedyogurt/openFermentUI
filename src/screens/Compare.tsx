@@ -79,7 +79,7 @@ export default function Compare() {
           title="Nothing pinned yet"
           body="Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once."
           icon={<GitCompare size={28} />}
-          action={<Button onClick={() => navigate('/simulate')}>Browse scenarios</Button>}
+          action={<Button onClick={() => navigate('/fermos')}>Browse scenarios</Button>}
         />
       </div>
     );

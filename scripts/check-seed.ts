@@ -7,6 +7,8 @@
  * a quote that isn't present silently loses its highlight rather than erroring.
  */
 import { PAPERS } from '../src/data/papers';
+import { CONTRADICTIONS } from '../src/data/contradictions';
+import { stillFails } from '../src/engine/balance';
 import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
 import { STRAINS } from '../src/data/strains';
@@ -321,6 +323,26 @@ console.log(`  papers            ${PAPERS.length} catalogued (${PAPERS.filter((p
 console.log(`  threads           ${new Set(PAPERS.map((p) => p.thread)).size} · tranche 1: ${PAPERS.filter((p) => p.tranche === 1).length}, 2: ${PAPERS.filter((p) => p.tranche === 2).length}, 3: ${PAPERS.filter((p) => p.tranche === 3).length}`);
 console.log(`  needs [verify]    ${PAPERS.filter((p) => p.verifyNeeded).length} author strings`);
 console.log(`  sections          ${PAPERS.reduce((n, p) => n + p.sections.length, 0)}`);
+// ── contradictions must still fail when recomputed (OF-FE-003 §9.3) ───
+// A contradiction that does not fail its tolerance is not a finding, it is a
+// claim — and a system that stages the exact error it exists to catch is worse
+// than one with no referee at all. These are derived rather than authored, so
+// this check is a genuine re-verification of the derivation, not a formality.
+for (const c of CONTRADICTIONS) {
+  for (const rid of c.recordIds) {
+    if (!recordIds.has(rid)) fail(`${c.id}: recordId ${rid} does not resolve`);
+  }
+  if (c.recordIds.length === 0) fail(`${c.id}: names no records`);
+  if (!stillFails(c, RECORDS)) {
+    fail(
+      `${c.id}: residual ${c.constraint.residual} does not exceed tolerance ${c.constraint.tolerance} — a contradiction that does not fail is a claim, not a finding`,
+    );
+  }
+  if (c.status !== 'open' && !c.note) {
+    fail(`${c.id}: status '${c.status}' requires a note explaining the resolution`);
+  }
+}
+
 // ── evidence class and the unsourced defect (OF-FE-003 §3, §9) ─────────
 // Invariant 1: every record declares what kind of thing produced it. Without
 // it a prediction and a measurement are indistinguishable in the store.

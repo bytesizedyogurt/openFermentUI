@@ -21,6 +21,12 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Import,
+  Gauge,
+  Scale,
+  Users,
+  Stamp,
+  type LucideIcon,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import { useRoute, navigate } from '@/router';
@@ -29,6 +35,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
 import { SHORTCUTS } from '@/data/shortcuts';
+import type { FieldId } from '@/data/types';
 
 import Home from '@/screens/Home';
 import Ask from '@/screens/Ask';
@@ -36,6 +43,7 @@ import Library from '@/screens/Library';
 import PaperReader from '@/screens/PaperReader';
 import Ingest from '@/screens/Ingest';
 import Extract from '@/screens/Extract';
+import { Ledger, ParameterPage, Contradictions, UnbuiltPart } from '@/screens/Ledger';
 import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
@@ -51,14 +59,31 @@ import Learn from '@/screens/Learn';
 import Lesson from '@/screens/Lesson';
 import Settings from '@/screens/Settings';
 
-const RAIL = [
-  { to: '/', label: 'Home', icon: HomeIcon, key: 'h' },
-  { to: '/ask', label: 'Ask', icon: MessagesSquare, key: 'a' },
-  { to: '/library', label: 'Library', icon: LibraryIcon, key: 'l' },
-  { to: '/extract', label: 'Extract', icon: Table2, key: 'e' },
-  { to: '/organisms', label: 'Organisms', icon: FlaskConical, key: 'o' },
-  { to: '/protocols', label: 'Protocols', icon: ClipboardList, key: 'p' },
-  { to: '/simulate', label: 'Simulate', icon: LineChart, key: 's' },
+/**
+ * The rail is the architecture (OF-FE-003 §6). Grouped as the whitepaper groups
+ * it — Read, Reason, Return — so a reviewer can learn the system by looking at
+ * the sidebar. Shortcuts are preserved wherever the destination is the same
+ * screen it was before the rename.
+ */
+type RailItem =
+  | { group: string }
+  | { to: string; label: string; icon: LucideIcon; key: string; pending?: boolean };
+
+const RAIL: RailItem[] = [
+  { to: '/', label: 'Bench', icon: HomeIcon, key: 'h' },
+  { group: 'Read' },
+  { to: '/trawl', label: 'Trawl', icon: Import, key: 't' },
+  { to: '/ledger', label: 'Ledger', icon: Table2, key: 'd' },
+  { to: '/assay', label: 'Assay', icon: Gauge, key: 'v' },
+  { group: 'Reason' },
+  { to: '/geneos', label: 'geneOS', icon: FlaskConical, key: 'o' },
+  { to: '/fermos', label: 'fermOS', icon: LineChart, key: 's' },
+  { to: '/parchment', label: 'Parchment', icon: Scale, key: 'c', pending: true },
+  { to: '/postdoc', label: 'Postdoc', icon: MessagesSquare, key: 'a' },
+  { group: 'Return' },
+  { to: '/runbook', label: 'Runbook', icon: ClipboardList, key: 'p' },
+  { to: '/openlab', label: 'openLab', icon: Users, key: 'b', pending: true },
+  { to: '/notary', label: 'Notary', icon: Stamp, key: 'y', pending: true },
   { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
 ];
 
@@ -69,30 +94,83 @@ function isActive(path: string, to: string) {
 
 // ── Route dispatch ─────────────────────────────────────────────────────
 
+/**
+ * Old paths keep working, permanently (OF-FE-003 §6.1). docs/, the guided tour,
+ * SHORTCUTS and the golden-path test all contain the pre-migration routes, and
+ * a rename that breaks a deep link costs more than the rename gains. Four lines.
+ */
+const ALIAS: Record<string, string> = {
+  library: 'trawl',
+  extract: 'ledger',
+  organisms: 'geneos',
+  simulate: 'fermos',
+  ask: 'postdoc',
+  protocols: 'runbook',
+};
+
+/**
+ * Map a pre-migration path onto its current one, or null when it is already
+ * canonical. Resolved synchronously so the target screen renders on the first
+ * pass: redirecting during render and returning null paints an empty frame
+ * first, which is a visible flash for a user and an empty measurement for the
+ * route smoke test.
+ */
+function canonicalize(segments: string[]): string[] | null {
+  const [a, b, ...rest] = segments;
+  if (!a) return null;
+  if (a === 'extract' && b === 'validation') return ['assay', ...rest];
+  if (a === 'library' && b === 'papers') return ['trawl', 'sources', ...rest];
+  if (a === 'extract' && b === 'review') return ['trawl', 'review', ...rest];
+  if (a === 'simulate' && b && b !== 'compare') return ['fermos', 's', b, ...rest];
+  if (ALIAS[a]) return [ALIAS[a], ...(b ? [b] : []), ...rest];
+  return null;
+}
+
 function Screen() {
   const route = useRoute();
-  const [a, b, c, d] = route.segments;
+  const canonical = canonicalize(route.segments);
+
+  // Render the target immediately; correct the address bar afterwards so a
+  // shared link updates itself without ever showing the wrong screen.
+  useEffect(() => {
+    if (!canonical) return;
+    const q = route.hash.includes('?') ? `?${route.hash.split('?')[1]}` : '';
+    navigate(`/${canonical.join('/')}${q}`, { replace: true });
+  }, [canonical?.join('/'), route.hash]);
+
+  const [a, b, c, d] = canonical ?? route.segments;
 
   if (!a) return <Home />;
   switch (a) {
-    case 'ask':
+    case 'postdoc':
       return <Ask sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
-    case 'library':
+    case 'trawl':
       if (b === 'ingest') return <Ingest />;
-      if (b === 'papers' && c) return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
-      return <Library />;
-    case 'extract':
       if (b === 'review') return <Review />;
-      if (b === 'validation') return <Validation />;
-      return <Extract />;
-    case 'organisms':
+      if (b === 'sources' && c) return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
+      return <Library />;
+    case 'ledger':
+      if (b === 'records') return <Extract />;
+      if (b === 'contradictions') return <Contradictions />;
+      if (b === 'p' && c) return <ParameterPage field={c as FieldId} />;
+      return <Ledger />;
+    case 'assay':
+      return <Validation />;
+    case 'parchment':
+      return <UnbuiltPart name="Parchment" blurb="Patent scope as structured bounds in the same ontology as the literature, so a Ledger record can be tested against a claim. Whitespace is the point: the negative space on the scope map is what has not been claimed." />;
+    case 'openlab':
+      return <UnbuiltPart name="openLab" blurb="A deposit feed where a failed run carries the same weight as a successful one — same card, same size, not greyed, not sorted down. A network reporting zero failures is hiding them." />;
+    case 'notary':
+      return <UnbuiltPart name="Notary" blurb="A disclosure queue gated on an enablement checklist. Publish stays disabled, with a specific reason, until a disclosure would actually teach someone to reproduce the result." />;
+    case 'geneos':
       return b ? <StrainPage strainId={b} /> : <Organisms />;
-    case 'protocols':
+    case 'runbook':
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
-    case 'simulate':
+    case 'fermos':
       if (b === 'compare') return <Compare />;
+      if (b === 's' && c) return <ScenarioWorkspace scenarioId={c} />;
       return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;
     case 'learn':
       return b && c ? <Lesson moduleId={b} lessonId={c} /> : <Learn />;
@@ -266,7 +344,10 @@ export default function App() {
         setGPressed(true);
         window.setTimeout(() => setGPressed(false), 1200);
       } else if (gPressed) {
-        const item = RAIL.find((r) => r.key === e.key.toLowerCase());
+        const item = RAIL.find(
+          (r): r is Extract<RailItem, { to: string }> =>
+            !('group' in r) && r.key === e.key.toLowerCase(),
+        );
         if (item) {
           e.preventDefault();
           navigate(item.to);
@@ -327,6 +408,21 @@ export default function App() {
 
           <div className="flex-1 py-2 space-y-0.5 px-2 overflow-y-auto">
             {RAIL.map((item) => {
+              if ('group' in item) {
+                // Group headers name the architecture's three movements. Not
+                // clickable — they are structure, not destinations.
+                if (ui.railCollapsed) {
+                  return <div key={item.group} className="h-px bg-line my-2 mx-2" aria-hidden />;
+                }
+                return (
+                  <div
+                    key={item.group}
+                    className="text-caption uppercase tracking-wide text-ink-soft px-2 pt-3 pb-1 select-none"
+                  >
+                    {item.group}
+                  </div>
+                );
+              }
               const active = isActive(route.path, item.to);
               const Icon = item.icon;
               return (
@@ -344,7 +440,24 @@ export default function App() {
                   aria-current={active ? 'page' : undefined}
                 >
                   <Icon size={ui.railCollapsed ? 18 : 16} className="shrink-0" />
-                  {!ui.railCollapsed && <span className="truncate">{item.label}</span>}
+                  {!ui.railCollapsed && (
+                    <>
+                      <span className={cx('truncate', item.pending && 'text-ink-soft/70')}>
+                        {item.label}
+                      </span>
+                      {item.pending && (
+                        // Named in the rail because the rail is the architecture,
+                        // marked because the surface does not exist yet. A link
+                        // that looks live and is not is worse than an honest gap.
+                        <span
+                          className="ml-auto text-caption text-ink-soft/60 shrink-0"
+                          title="Specified, not yet built"
+                        >
+                          soon
+                        </span>
+                      )}
+                    </>
+                  )}
                 </a>
               );
             })}

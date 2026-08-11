@@ -761,7 +761,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         href: '#/extract/review',
         provenance: 'user',
       });
-      navigate('/extract/review');
+      navigate('/trawl/review');
     },
     [startReview, logActivity, strainId],
   );
@@ -1298,7 +1298,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               <div className="text-body text-ink-soft">
                 No protocol in the <span className="font-num">media</span> category lists this
                 organism.{' '}
-                <a className="text-accent hover:underline" href={href('/protocols')}>
+                <a className="text-accent hover:underline" href={href('/runbook')}>
                   Browse all protocols
                 </a>
                 .
@@ -1367,7 +1367,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedProtocols.length === 0 ? (
               <div className="text-body text-ink-soft">
                 No protocol lists this organism yet.{' '}
-                <a className="text-accent hover:underline" href={href('/protocols')}>
+                <a className="text-accent hover:underline" href={href('/runbook')}>
                   Open the protocol library
                 </a>
                 .
@@ -1425,7 +1425,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedScenarios.length === 0 ? (
               <div className="text-body text-ink-soft">
                 No scenario draws on a record for this strain or names it.{' '}
-                <a className="text-accent hover:underline" href={href('/simulate')}>
+                <a className="text-accent hover:underline" href={href('/fermos')}>
                   Open the simulation index
                 </a>
                 .
@@ -1469,7 +1469,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedCollections.length === 0 ? (
               <div className="text-body text-ink-soft">
                 None of this strain&rsquo;s papers sit in a collection yet.{' '}
-                <a className="text-accent hover:underline" href={href('/library')}>
+                <a className="text-accent hover:underline" href={href('/trawl')}>
                   Open the library
                 </a>
                 .
@@ -1504,7 +1504,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 <span className="font-num text-ink">{strainPapers.length}</span> paper
                 {strainPapers.length === 1 ? '' : 's'} list this organism
               </span>
-              <a className="text-accent hover:underline" href={href('/library')}>
+              <a className="text-accent hover:underline" href={href('/trawl')}>
                 Open the library
               </a>
               <span className="w-full text-ink-soft">
@@ -1559,7 +1559,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           {strainPapers.length === 1 ? '' : 's'} — real, citable sources, but most records are
           transcribed from the curation document and not yet checked against the source PDF. Medians
           over a handful of records are descriptions of this corpus, not of the published literature.{' '}
-          <a className="text-accent hover:underline" href={href('/extract')}>
+          <a className="text-accent hover:underline" href={href('/ledger/records')}>
             Open the full extraction table
           </a>{' '}
           to audit the rows behind them.

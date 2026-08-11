@@ -215,6 +215,14 @@ export interface Paper {
   verifyNeeded?: boolean;
   /** Why this entry earns its place, from the corpus document. */
   corpusRole?: string;
+  /**
+   * A reader filed "something's missing" against this source (OF-FE-003 §8.4).
+   * Recall failure is the failure that hides: a wrong value gets clicked and
+   * corrected, a missed one is invisible forever. This flag is the only thing
+   * in the system that surfaces it, so it returns the source to the review
+   * queue rather than sitting as a passive annotation.
+   */
+  coverageDisputed?: { note: string; at: string };
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';

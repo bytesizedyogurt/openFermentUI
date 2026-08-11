@@ -150,7 +150,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
       if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
       if (!scenario) return;
       if (e.key === 'p') togglePin(scenario.id);
-      else if (e.key === 'c') navigate('/simulate/compare');
+      else if (e.key === 'c') navigate('/fermos/compare');
       else if (e.key === '[' || e.key === ']') {
         const d = scenario.dims[activeDim];
         if (!d) return;
@@ -176,7 +176,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
       <EmptyState
         title="Scenario not found"
         body={`No scenario with id ${scenarioId} exists in this session.`}
-        action={<Button onClick={() => navigate('/simulate')}>Back to Simulate</Button>}
+        action={<Button onClick={() => navigate('/fermos')}>Back to Simulate</Button>}
       />
     );
   }
@@ -280,7 +280,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
             <Button onClick={exportAll}>
               <Download size={14} /> Export CSV
             </Button>
-            <Button onClick={() => navigate('/simulate/compare')} title="Compare (c)">
+            <Button onClick={() => navigate('/fermos/compare')} title="Compare (c)">
               <GitCompare size={14} /> Compare
             </Button>
           </>

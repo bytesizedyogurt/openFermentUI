@@ -20,27 +20,27 @@ const STOPS: Stop[] = [
     body: 'Home answers three questions in five seconds: what is in the corpus, what needs your attention, and where you left off. Every tile is ticked by the provenance of the data behind it, and clicks through to its home screen.',
   },
   {
-    route: '/ask',
+    route: '/postdoc',
     title: 'Ask, with the work shown',
     body: 'The agent’s plan, tool calls, and retrieved passages are first-class UI — collapsed by default, never hidden. Every number in an answer carries a citation chip that resolves to a source span in two interactions.',
   },
   {
-    route: '/library/papers/SP-002',
+    route: '/trawl/sources/H4',
     title: 'Evidence in context',
     body: 'A chip’s promise is kept here: the span is highlighted in the source, and the right rail lists every extraction anchored to this paper. Hovering either side previews the other; clicking commits the scroll.',
   },
   {
-    route: '/extract/review',
+    route: '/trawl/review',
     title: 'Human-in-the-loop',
     body: 'Reviewers triage by keyboard: a accept, r reject, e edit, g flag for gold, u undo. Every decision lands in the record’s audit trail immediately — and propagates to the strain pages and the validation metrics.',
   },
   {
-    route: '/protocols/PR-TAP-01',
+    route: '/runbook/PR-TAP-01',
     title: 'Verified numbers become procedures',
     body: 'Scaling is real arithmetic: change the batch size and every bound quantity, stock volume, and materials row recomputes, rounded to each material’s precision so the recipe stays pipettable. Run Mode then executes it at the bench.',
   },
   {
-    route: '/extract/validation',
+    route: '/assay',
     title: 'How we know, and how we’re honest when we’re wrong',
     body: 'No extractor has been run against this corpus, so this screen shows no precision, recall or F1 — it shows the gold-set plan those numbers would be earned against, the six cases chosen to be hard, and the real values the ontology has no field for. Refusing to display a metric it has not earned is the point of the screen.',
   },

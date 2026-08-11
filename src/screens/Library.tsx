@@ -386,7 +386,7 @@ export default function Library() {
         if (r.ingestKey === 'failed') {
           return (
             <a
-              href={href('/library/ingest')}
+              href={href('/trawl/ingest')}
               className="chip text-signal-error border-signal-error/40 hover:bg-signal-error/10"
               title="Ingest halted — open the board for the reason and a retry"
               onClick={(e) => e.stopPropagation()}
@@ -558,7 +558,7 @@ export default function Library() {
           <Callout kind="error" title={`${brokenRows.length} paper${brokenRows.length === 1 ? '' : 's'} failed to parse`}>
             {brokenRows.map((r) => r.paper.id).join(', ')} could not be segmented into sections. Retry the
             ingest or continue with abstract-only text on the{' '}
-            <a href={href('/library/ingest')} className="text-accent hover:underline">
+            <a href={href('/trawl/ingest')} className="text-accent hover:underline">
               ingest board
             </a>
             .

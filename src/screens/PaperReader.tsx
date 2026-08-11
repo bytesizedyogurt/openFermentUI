@@ -326,7 +326,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
-        <a href={href('/library')} className="inline-flex items-center gap-1 hover:text-accent">
+        <a href={href('/trawl')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library
         </a>
         <span aria-hidden>/</span>

@@ -8,6 +8,7 @@ import type {
   ChatSession,
   Collection,
   Deviation,
+  Contradiction,
   ExtractionRecord,
   Job,
   LearnModule,
@@ -23,6 +24,7 @@ import type {
   TimerState,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
+import { CONTRADICTIONS } from '@/data/contradictions';
 import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
 import { STRAINS } from '@/data/strains';
@@ -65,6 +67,12 @@ export interface OFState {
   // ── seeded data (session-mutable) ────────────────────────────────────
   papers: Paper[];
   records: ExtractionRecord[];
+  /**
+   * Derived by the referee at load, not authored — see data/contradictions.ts.
+   * Held in the store so a review edit can re-run the checks and the queue can
+   * carry curator status alongside the finding.
+   */
+  contradictions: Contradiction[];
   runOutputs: RunOutput[];
   strains: Strain[];
   protocols: Protocol[];
@@ -176,6 +184,7 @@ const seedGrids = (): Record<string, ResultGrid> =>
 const seedState = () => ({
   papers: structuredClone(PAPERS),
   records: structuredClone(RECORDS),
+  contradictions: structuredClone(CONTRADICTIONS),
   runOutputs: structuredClone(RUN_OUTPUTS),
   strains: structuredClone(STRAINS),
   protocols: structuredClone(PROTOCOLS),

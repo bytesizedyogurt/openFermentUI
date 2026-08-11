@@ -84,7 +84,7 @@ async function main() {
   );
 
   // ── 2. Ask: a scripted flow plays and produces chips ────────────────
-  await go('/ask');
+  await go('/postdoc');
   const suggested = page.locator('button', { hasText: /titers have been achieved/i }).first();
   await suggested.click();
   await page.waitForTimeout(2500);
@@ -106,7 +106,7 @@ async function main() {
   }
 
   // ── 3. Chip → reader, anchored on the span ──────────────────────────
-  await go('/library/papers/H4?span=r-H4-1');
+  await go('/trawl/sources/H4?span=r-H4-1');
   await page.waitForTimeout(700);
   const marks = await page.locator('mark').count();
   const activeMark = await page.locator('mark.span-active').count();
@@ -114,7 +114,7 @@ async function main() {
   check('Deep link anchors the requested span', activeMark > 0);
 
   // ── 4. Review: keyboard triage mutates a record ─────────────────────
-  await go('/extract/review');
+  await go('/trawl/review');
   await page.waitForTimeout(600);
   const beforeReview = await page.locator('body').innerText();
   const progressBefore = beforeReview.match(/(\d+)\s*\/\s*(\d+)/)?.[1];
@@ -135,7 +135,7 @@ async function main() {
   check('Undo restores queue position', afterUndo === progressBefore, `back to ${afterUndo}`);
 
   // ── 5. Validation states the gap honestly ───────────────────────────
-  await go('/extract/validation');
+  await go('/assay');
   await page.waitForTimeout(600);
   const valText = await page.locator('body').innerText();
   check(
@@ -149,7 +149,7 @@ async function main() {
   );
 
   // ── 6. Protocol scaling recomputes materials ────────────────────────
-  await go('/protocols/PR-TAP-01');
+  await go('/runbook/PR-TAP-01');
   await page.waitForTimeout(600);
   const before = await page.locator('body').innerText();
   const x5 = page.locator('button', { hasText: /^(×5|5×|5x)$/i }).first();
@@ -220,7 +220,7 @@ async function main() {
   }
 
   // ── 8. Simulate: slider moves MSP; waterfall agrees with headline ───
-  await go('/simulate/sc-s2');
+  await go('/fermos/s/sc-s2');
   await page.waitForTimeout(800);
   const mspBefore = (await page.locator('body').innerText()).match(/\$([\d.]+)/)?.[1];
   const slider = page.locator('input[type=range]').first();
@@ -285,7 +285,7 @@ async function main() {
   }
 
   // ── 10. Agent declines an out-of-corpus question ────────────────────
-  await go('/ask');
+  await go('/postdoc');
   await page.waitForTimeout(400);
   const composer = page.locator('textarea').first();
   await composer.fill('What is the optimal sous-vide temperature for brisket?');
@@ -304,7 +304,7 @@ async function main() {
 
   // The algal-casein question is NOT a decline — the corpus answers it with a
   // substantive "no", which is the demo's whole point (OF-COR-001 §21 F6).
-  await go('/ask');
+  await go('/postdoc');
   await page.waitForTimeout(400);
   const c2 = page.locator('textarea').first();
   await c2.fill('Has anyone expressed a casein in an alga?');
@@ -330,7 +330,7 @@ async function main() {
     await page.waitForTimeout(300);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(700);
-    check('Palette navigates to the chosen route', page.url().includes('validation'), page.url().split('#')[1] ?? '');
+    check('Palette navigates to the chosen route', page.url().includes('assay'), page.url().split('#')[1] ?? '');
   }
 
   await browser.close();

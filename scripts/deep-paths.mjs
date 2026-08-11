@@ -21,7 +21,7 @@ const res=[];
 const ck=(n,ok,d='')=>{res.push(ok);console.log((ok?'✓ ':'✗ ')+n+(d?' — '+d:''));};
 
 // Ingest: the scripted SP-020 parse failure and its recovery
-await go('/library/ingest');
+await go('/trawl/ingest');
 const shelfBtns = p.locator('button[aria-label*="to the ingest pipeline"]');
 const n = await shelfBtns.count();
 ck('Ingest queue lists tranche-1 entries', n>0, n+' entries');
@@ -32,12 +32,12 @@ const ingestTxt = await p.locator('body').innerText();
 ck('Fetch failure names why the source could not be retrieved', /Source not retrieved/i.test(ingestTxt));
 ck('Failure offers a recovery path', /Retry/i.test(ingestTxt));
 // The corpus stays catalogued: nothing was fetched, so nothing joins as full text.
-await go('/library');
+await go('/trawl');
 const lib = await p.locator('body').innerText();
 ck('Corpus still reports entries as catalogued', /catalogued/i.test(lib) || /curation note/i.test(lib));
 
 // Protocol version diff
-await go('/protocols/PR-TAP-01');
+await go('/runbook/PR-TAP-01');
 const cmp = p.locator('button',{hasText:/compare version/i}).first();
 if (await cmp.count()){
   await cmp.click(); await p.waitForTimeout(800);
@@ -46,11 +46,11 @@ if (await cmp.count()){
 } else ck('Version diff shows real changes', false, 'compare button missing');
 
 // Compare: pin two scenarios and read the auto-summary
-await go('/simulate');
+await go('/fermos');
 const pins = p.locator('button[aria-pressed]');
 const pc = await pins.count();
 for (let i=0;i<Math.min(2,pc);i++){ const el=pins.nth(i); if((await el.getAttribute('aria-pressed'))!=='true'){ await el.click(); await p.waitForTimeout(200);} }
-await go('/simulate/compare');
+await go('/fermos/compare');
 const cmpTxt = await p.locator('body').innerText();
 ck('Compare renders pinned scenarios', /Minimum selling price/i.test(cmpTxt));
 ck('Compare generates an auto-summary sentence', /(undercuts|within a cent)/i.test(cmpTxt));
