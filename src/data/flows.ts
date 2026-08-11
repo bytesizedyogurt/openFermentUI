@@ -347,7 +347,7 @@ So emulsifier and foaming applications are reachable **without** solving phospho
         durationMs: 480,
       },
     ],
-    answerMd: `**15 mg/L** — and it is one measurement, not two.
+    answerMd: `**15 mg/L** [[r-C2-1]] — and it is one measurement, not two.
 
 [[C2]] is the source. A C-terminal fusion of synthetic glycomodules of tandem Ser-Pro repeats, (SP)10 and (SP)20, to Venus secreted via the putative gametolysin signal sequence raised yields up to **12-fold** [[r-C2-2]], reaching a maximum of **15 mg/L** [[r-C2-1]] with enhanced proteolytic stability.
 
@@ -445,7 +445,7 @@ For scale, [[K1]] reports **1 g/L** secreted β-lactoglobulin from *T. reesei* [
 
 **Counterweight 2 — the secretome.** [[C6]] found UVM4 secretes unassembled cell wall glycoproteins whose aggregates trap recombinant product, making isolation genuinely hard. Read together with reason 3, that argues for accumulating intracellularly and disrupting mildly rather than secreting.
 
-*Note what reason 2 does not say: 0.2 % TSP was measured on GFP/YFP reporters, never on a casein.*`,
+*Note what reason 2 does not say: 0.2 % TSP [[r-A1-1]] was measured on GFP/YFP reporters, never on a casein.*`,
     followups: [
       'flow:F4|What is the secretion ceiling here?',
       'flow:F12|Is it approved as food?',

@@ -323,6 +323,28 @@ console.log(`  papers            ${PAPERS.length} catalogued (${PAPERS.filter((p
 console.log(`  threads           ${new Set(PAPERS.map((p) => p.thread)).size} · tranche 1: ${PAPERS.filter((p) => p.tranche === 1).length}, 2: ${PAPERS.filter((p) => p.tranche === 2).length}, 3: ${PAPERS.filter((p) => p.tranche === 3).length}`);
 console.log(`  needs [verify]    ${PAPERS.filter((p) => p.verifyNeeded).length} author strings`);
 console.log(`  sections          ${PAPERS.reduce((n, p) => n + p.sections.length, 0)}`);
+// ── every quantity in an agent answer carries its source (§8.9, §9.6) ──
+// Rule 1 says no quantity may come from model weights, and an agent answer is
+// the most visible place in the app to break it.
+//
+// Scoped to quantities rather than to every numeral, deliberately. OF-FE-003
+// §8.9 asks that "every numeral" be a chip; run literally that flags 114 across
+// the 13 flows, most of them years, ordinals ("reason 2") and counts of rows on
+// the page — chipping those would make the answers worse, not more honest. A
+// numeral carrying a UNIT is the thing Rule 1 is about, and there the check is
+// strict: 28 such lines exist and every one must name a source.
+const QUANTITY =
+  /\d+(?:[.,]\d+)?\s*(mg|g|kg|L|mL|h|min|d|%|USD|EUR|€|\$|µ|mol|Da|nt|aa|t\/y|kg⁻¹|L⁻¹|h⁻¹)/;
+for (const f of FLOWS) {
+  for (const line of String(f.answerMd ?? '').split('\n')) {
+    if (!QUANTITY.test(line)) continue;
+    if (/\[\[[^\]]+\]\]/.test(line)) continue;
+    fail(
+      `flow ${f.id}: a quantity with no citation on its line — "${line.trim().slice(0, 80)}"`,
+    );
+  }
+}
+
 // ── contradictions must still fail when recomputed (OF-FE-003 §9.3) ───
 // A contradiction that does not fail its tolerance is not a finding, it is a
 // claim — and a system that stages the exact error it exists to catch is worse
