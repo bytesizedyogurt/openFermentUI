@@ -321,6 +321,30 @@ console.log(`  papers            ${PAPERS.length} catalogued (${PAPERS.filter((p
 console.log(`  threads           ${new Set(PAPERS.map((p) => p.thread)).size} · tranche 1: ${PAPERS.filter((p) => p.tranche === 1).length}, 2: ${PAPERS.filter((p) => p.tranche === 2).length}, 3: ${PAPERS.filter((p) => p.tranche === 3).length}`);
 console.log(`  needs [verify]    ${PAPERS.filter((p) => p.verifyNeeded).length} author strings`);
 console.log(`  sections          ${PAPERS.reduce((n, p) => n + p.sections.length, 0)}`);
+// ── evidence class and the unsourced defect (OF-FE-003 §3, §9) ─────────
+// Invariant 1: every record declares what kind of thing produced it. Without
+// it a prediction and a measurement are indistinguishable in the store.
+// Invariant 2: 'unsourced' is a defect class. Zero records may carry it — it
+// exists so the interface can show what a Rule 1 violation looks like, not so
+// data can ship in that state.
+const EVIDENCE_CLASSES = new Set([
+  'literature',
+  'patent',
+  'computed',
+  'experiment',
+  'correction',
+]);
+for (const r of RECORDS) {
+  if (!r.evidenceClass) {
+    fail(`${r.id}: no evidenceClass — every record must declare what produced it`);
+  } else if (!EVIDENCE_CLASSES.has(r.evidenceClass)) {
+    fail(`${r.id}: evidenceClass '${r.evidenceClass}' is not a known class`);
+  }
+  if (r.provenance === 'unsourced') {
+    fail(`${r.id}: provenance 'unsourced' is a defect class — no record may carry it`);
+  }
+}
+
 console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.provenance === 'curated').length} curated, ${RECORDS.filter((r) => r.provenance === 'industry-estimate').length} industry estimate)`);
 console.log(`  non-primary       ${RECORDS.filter((r) => r.isPrimary === false).length} (citations of other records, excluded from aggregates)`);
 console.log(`  with method       ${RECORDS.filter((r) => r.method).length}, of which ${RECORDS.filter((r) => r.method === 'undetermined').length} undetermined`);

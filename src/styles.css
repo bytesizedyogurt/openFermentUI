@@ -125,6 +125,55 @@ body {
   background: rgb(var(--signal-error));
 }
 
+/* UNSOURCED — a defect, not a value class. A quantity reached the interface
+   with no provenance record behind it, which Rule 1 of the agent contract
+   forbids. Deliberately louder than every other tick: 4px, hatched at 45 deg,
+   error red. Unreachable in the seeded build; check:seed enforces that. */
+.tick-unsourced {
+  padding-left: 11px;
+}
+.tick-unsourced::before {
+  width: 4px;
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgb(var(--signal-error)) 0 2px,
+    transparent 2px 4px
+  );
+}
+
+/* ── evidence class: geometry, never hue ─────────────────────────────────
+   Provenance owns colour. Evidence class rides on shape so the two axes can
+   be read at once, and so both survive greyscale and colour-blind viewing. */
+
+/* Patent — a 1px gap at mid-height. Reads as a boundary marker. */
+.tick-ev-patent::before {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 calc(50% - 0.5px), transparent calc(50% - 0.5px) calc(50% + 0.5px), #000 calc(50% + 0.5px) 100%);
+  mask-image: linear-gradient(to bottom, #000 0 calc(50% - 0.5px), transparent calc(50% - 0.5px) calc(50% + 0.5px), #000 calc(50% + 0.5px) 100%);
+}
+
+/* Computed — a 1px light stripe down the middle. Reads as hollow: derived,
+   not observed. */
+.tick-ev-computed::before {
+  -webkit-mask-image: linear-gradient(to right, #000 0 1px, transparent 1px 2px, #000 2px 3px);
+  mask-image: linear-gradient(to right, #000 0 1px, transparent 1px 2px, #000 2px 3px);
+}
+
+/* Experiment — overshoots the element by 2px top and bottom, like a bench
+   mark ruled past its box. Reads as measured. */
+.tick-ev-experiment::before {
+  top: -2px;
+  bottom: -2px;
+}
+
+/* Correction — a caret at the head. Reads as an amendment to something. */
+.tick-ev-correction::before {
+  -webkit-mask-image: linear-gradient(135deg, transparent 0 3px, #000 3px 100%);
+  mask-image: linear-gradient(135deg, transparent 0 3px, #000 3px 100%);
+}
+
 /* Tick applied to a table row's first cell */
 td.tick-cell {
   position: relative;
@@ -408,4 +457,29 @@ input[type='range']::-moz-range-thumb {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── contradiction rail marks (OF-FE-003 §7) ─────────────────────────────
+   Same vocabulary as the tick: colour is provenance, geometry is evidence
+   class. A mark is 7x1px, so each variant has to survive at that size. */
+
+/* Patent — gapped at the centre, like the tick's boundary marker. */
+.rail-mark-patent {
+  -webkit-mask-image: linear-gradient(to right, #000 0 3px, transparent 3px 4px, #000 4px 7px);
+  mask-image: linear-gradient(to right, #000 0 3px, transparent 3px 4px, #000 4px 7px);
+}
+/* Computed — ends only. Reads as hollow: derived, not observed. */
+.rail-mark-computed {
+  -webkit-mask-image: linear-gradient(to right, #000 0 2px, transparent 2px 5px, #000 5px 7px);
+  mask-image: linear-gradient(to right, #000 0 2px, transparent 2px 5px, #000 5px 7px);
+}
+/* Experiment — overshoots the others, like a bench mark ruled past its box. */
+.rail-mark-experiment {
+  width: 11px !important;
+  height: 2px !important;
+}
+/* Correction — a nick at the leading edge. */
+.rail-mark-correction {
+  -webkit-mask-image: linear-gradient(115deg, transparent 0 2px, #000 2px 100%);
+  mask-image: linear-gradient(115deg, transparent 0 2px, #000 2px 100%);
 }

@@ -39,6 +39,7 @@ const TICK_BG: Record<ProvKind, string> = {
   user: 'rgb(var(--signal-info))',
   demo: 'rgb(var(--signal-warn))',
   rejected: 'rgb(var(--signal-error))',
+  unsourced: 'rgb(var(--signal-error))',
 };
 
 export function DataTable<T>({

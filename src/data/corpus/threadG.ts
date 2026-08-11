@@ -303,6 +303,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§8 G1',
     audit: [
       {
@@ -325,6 +326,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     componentTag: 'FAM20C D478A',
@@ -351,6 +353,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'SDS-PAGE mobility',
     curationRef: '§8 G1',
     audit: [
@@ -376,6 +379,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§8 G2',
     audit: [
       {
@@ -400,6 +404,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§8 G3',
     audit: [
       {
@@ -425,6 +430,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     componentTag: 'FAM20C E306Q',
@@ -453,6 +459,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     componentTag: 'FAM20 kinase',
     curationRef: '§8 G4',
@@ -481,6 +488,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§8 G7',
     audit: [
       {
@@ -507,6 +515,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     negativeResult: true,
     curationRef: '§8 G9',
     audit: [
@@ -532,6 +541,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'bovine',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§8 G9',
     audit: [
@@ -558,6 +568,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'bovine',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     numbering: 'mature',
     componentTag: 'β(28–40) assay peptide, N-terminal bound',
@@ -586,6 +597,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'bovine',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     numbering: 'mature',
     componentTag: 'β(28–40) assay peptide, C-terminal bound',
@@ -613,6 +625,7 @@ export const RECORDS_G: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: false,
+    evidenceClass: 'literature',
     method: 'undetermined',
     range: { low: 50, high: 70 },
     curationRef: '§8 G9',

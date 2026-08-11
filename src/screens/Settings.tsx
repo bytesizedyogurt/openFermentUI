@@ -14,9 +14,10 @@ import {
   RotateCcw,
   Ruler,
   Sun,
+  TriangleAlert,
 } from 'lucide-react';
 import { useStore, provenanceOf, type Density, type Theme, type UnitMode } from '@/store';
-import { Tick } from '@/components/Provenance';
+import { EvidenceLegend, Tick, UnsourcedDemo } from '@/components/Provenance';
 import {
   Bar,
   Button,
@@ -326,6 +327,48 @@ function AppearanceSection() {
           numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so a
           demo audience is never misled about how fast the real thing would be.
         </p>
+      </section>
+
+      <section>
+        <SectionTitle
+          right={
+            <span className="text-caption text-ink-soft inline-flex items-center gap-1.5">
+              <Ruler size={13} aria-hidden /> two axes, one tick
+            </span>
+          }
+        >
+          Evidence class
+        </SectionTitle>
+        <p className="text-caption text-ink-soft mb-2.5 max-w-3xl">
+          Provenance answers how far a value has been checked, and owns the tick's colour.
+          Evidence class answers what kind of thing produced it, and rides on the tick's
+          geometry — because a prediction and a bench measurement can sit at the same
+          verification state and must never look alike. Every record in this corpus is{' '}
+          <span className="font-mono">literature</span>; the rest are shown here at one
+          provenance hue so the shapes are comparable.
+        </p>
+        <EvidenceLegend />
+      </section>
+
+      <section>
+        <SectionTitle
+          right={
+            <span className="text-caption text-signal-error inline-flex items-center gap-1.5">
+              <TriangleAlert size={13} aria-hidden /> fault state
+            </span>
+          }
+        >
+          What a violation looks like
+        </SectionTitle>
+        <p className="text-caption text-ink-soft mb-2.5 max-w-3xl">
+          Rule 1 of the agent contract is that no quantity may come from model weights. The
+          interface expression of that rule is the{' '}
+          <span className="font-mono">unsourced</span> class, and{' '}
+          <span className="font-mono">check:seed</span> fails the build if any record carries
+          it. Rather than ask you to believe a state is unreachable, here it is, rendered
+          deliberately — it is the only place in the app it can appear.
+        </p>
+        <UnsourcedDemo />
       </section>
     </div>
   );

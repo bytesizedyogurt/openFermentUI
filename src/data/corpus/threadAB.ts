@@ -429,6 +429,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§2 A1',
     audit: [
       {
@@ -452,6 +453,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     componentTag: 'paromomycin',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§2 A1',
     audit: [
       {
@@ -477,6 +479,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     negativeResult: true,
     curationRef: '§2 A2',
     audit: [
@@ -502,6 +505,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     comparativeBaseline:
       'random insertion of the same transgene (vs targeted integration at the LHCBM1 safe harbor)',
     curationRef: '§2 A7',
@@ -527,6 +531,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     comparativeBaseline:
       'baseline not stated in OF-COR-001; the entry contrasts targeted integration at the LHCBM1 safe harbor with random insertion',
     curationRef: '§2 A7',
@@ -554,6 +559,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 7, high: 10 },
     curationRef: '§3 B5',
     audit: [
@@ -578,6 +584,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 7, high: 10 },
     curationRef: '§3 B5',
     audit: [
@@ -602,6 +609,7 @@ export const RECORDS_AB: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'creinhardtii-wt',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 15, high: 20 },
     comparativeBaseline: 'walled wild-type WT12, against cell-wall-deficient cw15 and UVM4',
     curationRef: '§3 B5',

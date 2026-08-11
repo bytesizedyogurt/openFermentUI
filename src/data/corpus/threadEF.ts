@@ -452,6 +452,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'β-casein in bovine milk',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§6 E1',
     audit: [
       {
@@ -477,6 +478,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'casein, isoelectric precipitation on acidification',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§6 E1',
     audit: [
@@ -503,6 +505,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'total casein, as % of total bovine milk protein',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§6 E1',
     audit: [
       {
@@ -530,6 +533,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'native bovine casein micelle',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§6 E2',
     audit: [
@@ -558,6 +562,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'αs1-casein, as % of total caseins',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§7 F4',
     audit: [
       {
@@ -583,6 +588,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'β-casein, as % of total caseins',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§7 F4',
     audit: [
       {
@@ -608,6 +614,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'κ-casein, as % of total caseins',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§7 F4',
     audit: [
       {
@@ -633,6 +640,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'αs2-casein, as % of total caseins',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§7 F4',
     audit: [
       {
@@ -660,6 +668,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'β-casein (P02666)',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§7 F5',
     audit: [
@@ -686,6 +695,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'αs1-casein (P02662)',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§7 F5',
     audit: [
@@ -712,6 +722,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'αs2-casein (P02663)',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     range: { low: 10, high: 13 },
     curationRef: '§7 F5',
@@ -739,6 +750,7 @@ export const RECORDS_EF: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'κ-casein (P02668)',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     range: { low: 1, high: 3 },
     curationRef: '§7 F5',

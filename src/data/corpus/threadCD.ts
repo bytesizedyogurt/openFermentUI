@@ -429,6 +429,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§4 C2',
     audit: [
       {
@@ -452,6 +453,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: true,
+    evidenceClass: 'literature',
     comparativeBaseline: '(SP)10/(SP)20 glycomodule fusion vs unfused Venus',
     curationRef: '§4 C2',
     audit: [
@@ -478,6 +480,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: false,
+    evidenceClass: 'literature',
     citesRecordId: 'r-C2-1',
     range: { low: 0.012, high: 0.015 },
     curationRef: '§4 C6',
@@ -504,6 +507,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'uvm4',
     isPrimary: false,
+    evidenceClass: 'literature',
     citesRecordId: 'r-A1-1',
     curationRef: '§4 C6',
     audit: [
@@ -532,6 +536,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§5 D1',
     audit: [
@@ -556,6 +561,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§5 D1',
     audit: [
@@ -582,6 +588,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§5 D1',
     audit: [
@@ -608,6 +615,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§5 D2',
     audit: [
@@ -632,6 +640,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     curationRef: '§5 D2',
@@ -659,6 +668,7 @@ export const RECORDS_CD: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'cw15',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§5 D4',
     audit: [

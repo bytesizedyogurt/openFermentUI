@@ -677,6 +677,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: false,
+    evidenceClass: 'literature',
     range: { low: 0.6, high: 1000 },
     curationRef: '§9 H1',
     audit: [
@@ -701,6 +702,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: false,
+    evidenceClass: 'literature',
     citesRecordId: 'r-H15-3',
     curationRef: '§9 H1',
     audit: [
@@ -725,6 +727,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: false,
+    evidenceClass: 'literature',
     citesRecordId: 'r-H15-1',
     range: { low: 0.1, high: 0.4 },
     curationRef: '§9 H1',
@@ -750,6 +753,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: false,
+    evidenceClass: 'literature',
     citesRecordId: 'r-H15-2',
     method: 'undetermined',
     negativeResult: true,
@@ -779,6 +783,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H2',
     audit: [
       {
@@ -804,6 +809,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'LC-ESI-MS',
     curationRef: '§9 H2',
     audit: [
@@ -831,6 +837,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H3',
     audit: [
       {
@@ -856,6 +863,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'LC-ESI-MS',
     curationRef: '§9 H3',
     audit: [
@@ -883,6 +891,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'gs115',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 15, high: 18 },
     curationRef: '§9 H4',
     audit: [
@@ -908,6 +917,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'gs115',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 0.7, high: 1.0 },
     curationRef: '§9 H4',
     audit: [
@@ -933,6 +943,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'gs115',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H4',
     audit: [
       {
@@ -957,6 +968,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'gs115',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'urea-PAGE + phosphatase',
     comparativeBaseline: 'animal-derived bovine β-casein',
     curationRef: '§9 H4',
@@ -983,6 +995,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'gs115',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§9 H4',
     audit: [
@@ -1009,6 +1022,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H5',
     audit: [
       {
@@ -1034,6 +1048,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H7',
     audit: [
       {
@@ -1057,6 +1072,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 5, high: 10 },
     curationRef: '§9 H7',
     audit: [
@@ -1084,6 +1100,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H8',
     audit: [
       {
@@ -1108,6 +1125,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H8',
     audit: [
       {
@@ -1132,6 +1150,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H8',
     audit: [
       {
@@ -1155,6 +1174,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H8',
     audit: [
       {
@@ -1179,6 +1199,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'bovine',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H8',
     audit: [
       {
@@ -1203,6 +1224,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     curationRef: '§9 H8',
@@ -1230,6 +1252,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'αs1-casein variant B',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     curationRef: '§9 H8',
     audit: [
@@ -1257,6 +1280,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     provenance: 'curated',
     organism: 'ecoli',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     curationRef: '§9 H12',
@@ -1284,6 +1308,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'undetermined',
     negativeResult: true,
     curationRef: '§9 H13',
@@ -1311,6 +1336,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H14',
     audit: [
       {
@@ -1336,6 +1362,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     range: { low: 0.1, high: 0.4 },
     curationRef: '§9 H15',
     audit: [
@@ -1360,6 +1387,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     method: 'MALDI-MS',
     negativeResult: true,
     curationRef: '§9 H15',
@@ -1385,6 +1413,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H15',
     audit: [
       {
@@ -1410,6 +1439,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H17',
     audit: [
       {
@@ -1433,6 +1463,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     status: 'unverified',
     provenance: 'curated',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H17',
     audit: [
       {
@@ -1459,6 +1490,7 @@ export const RECORDS_H: ExtractionRecord[] = [
     organism: 'bovine',
     componentTag: 'pMOZ14',
     isPrimary: true,
+    evidenceClass: 'literature',
     curationRef: '§9 H17',
     audit: [
       {

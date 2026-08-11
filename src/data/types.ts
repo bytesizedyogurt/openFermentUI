@@ -17,6 +17,15 @@
  * 'industry-estimate' marks market and vendor figures (OF-COR-001 §16 O8).
  * They are useful for framing and useless as evidence: excluded from the gold
  * set and from aggregate statistics by default.
+ *
+ * 'unsourced' is a defect class, not a value class. It marks a quantity that
+ * reached the interface with no provenance record behind it — the interface
+ * expression of Rule 1 of the agent contract, that no quantity may come from
+ * model weights. It is unreachable in the seeded build, `check:seed` enforces
+ * that no record carries it, and `Tick` shouts in the console when one renders.
+ * It is kept reachable on one Settings route so a reviewer can see what the
+ * system does when the rule is broken rather than be asked to believe it cannot
+ * be.
  */
 export type Provenance =
   | 'gold'
@@ -25,7 +34,27 @@ export type Provenance =
   | 'unverified'
   | 'user'
   | 'industry-estimate'
-  | 'demo';
+  | 'demo'
+  | 'unsourced';
+
+/**
+ * Where a value came from, orthogonal to how far it has been verified.
+ * `Provenance` answers "how much has this been checked?";
+ * `EvidenceClass` answers "what kind of thing produced it?".
+ *
+ * Both are needed once the system holds predictions and bench results
+ * alongside literature: a `curated` prediction and a `curated` measurement
+ * are the same verification state and completely different claims.
+ *
+ * Encoded as tick *geometry*, never as a second hue — the ambient-texture
+ * property of the provenance palette depends on hue meaning one thing only.
+ */
+export type EvidenceClass =
+  | 'literature'    // a paper, thesis, report — today, every record
+  | 'patent'        // Parchment
+  | 'computed'      // geneOS / fermOS prediction
+  | 'experiment'    // openLab deposit
+  | 'correction';   // supersedes an earlier entry
 
 export type ParameterFamily =
   | 'expression'
@@ -237,6 +266,13 @@ export interface ExtractionRecord {
    * overstates consensus. Aggregate statistics must filter on this.
    */
   isPrimary: boolean;
+  /**
+   * What kind of thing produced this value. Every seeded record is
+   * 'literature'; the field is required so that a prediction written by geneOS
+   * or a measurement deposited by openLab cannot enter the store wearing the
+   * same face as a paper. `check:seed` enforces its presence.
+   */
+  evidenceClass: EvidenceClass;
   /** When not primary, the record this one is quoting. */
   citesRecordId?: string;
   /**
@@ -557,4 +593,68 @@ export interface Job {
   failReason?: string;
   href?: string;
   startedAt: number;
+}
+
+// ── OF-FE-003 §4 — Ledger, referee, aggregate ──────────────────────────
+
+/**
+ * A set of entries that cannot all be true. The referee flags the *set*;
+ * it does not need to identify which member is wrong to be useful.
+ */
+export interface Contradiction {
+  id: string;
+  kind: 'balance' | 'specification' | 'scale' | 'direct';
+  /** Every participating record. Minimum two. */
+  recordIds: string[];
+  /** One plain sentence a non-specialist can read. Rendered as the headline. */
+  statement: string;
+  /** Machine form for the referee panel. */
+  constraint: { expression: string; residual: number; tolerance: number; unit: string };
+  detectedBy: 'balance' | 'flux' | 'reactor' | 'ontology' | 'manual';
+  status: 'open' | 'explained' | 'resolved';
+  /** Required when status leaves 'open'. Displayed permanently. */
+  note?: string;
+}
+
+/**
+ * Never imply a check that did not run: 'unchecked' and 'consistent' are
+ * different claims, and 'consistent' has to name which checks it passed.
+ */
+export type RefereeStatus =
+  | { state: 'unchecked' }
+  | { state: 'consistent'; checks: string[] }
+  | { state: 'contradicted'; contradictionIds: string[] };
+
+/**
+ * Deliberately not a Bayesian posterior. With 134 curated records and none
+ * verified, a hierarchical fit would be false precision. Median-of-primary with
+ * a visible interquartile range is honest at this corpus size, and this shape
+ * lets a posterior replace the internals later without any screen changing.
+ */
+export interface Aggregate {
+  median: number;
+  p25: number;
+  p75: number;
+  min: number;
+  max: number;
+  n: number;
+  nPrimary: number;
+  unit: string;
+  /** Grouping actually used — by organism, by method, by year. */
+  strata: { key: string; label: string; n: number; median: number }[];
+  /** Named, so a screen can say how the number was produced. */
+  method: string;
+}
+
+/** Derived at load from RECORDS. Never seeded — see engine/posterior.ts. */
+export interface ParameterView {
+  field: FieldId;
+  def: ParameterDef;
+  recordIds: string[];
+  /** Only records passing isAggregatable() contribute. */
+  aggregate: Aggregate | null;
+  contradictions: Contradiction[];
+  referee: RefereeStatus;
+  /** Records held out of the aggregate, each with the reason. */
+  excluded: { recordId: string; reason: string }[];
 }
