@@ -53,14 +53,17 @@ export function ContradictionRail({
   contradictions = [],
   height = 48,
   onPick,
+  highlightId,
   className,
 }: {
   marks: RailMark[];
   aggregate: Aggregate | null;
   contradictions?: Contradiction[];
-  /** 48 inline, 160 on the parameter page. */
+  /** 48 inline, 160 on the parameter page, 28 inside a list row. */
   height?: number;
   onPick?: (recordId: string) => void;
+  /** Ring one mark — "this record, among its peers". */
+  highlightId?: string;
   className?: string;
 }) {
   // A single value is a value, not a spread. An empty frame around one mark
@@ -124,20 +127,31 @@ export function ContradictionRail({
         {marks.map(({ record, value }) => {
           const held = !isAggregatable(record);
           const why = aggregateExclusion(record);
+          const on = record.id === highlightId;
+          // A plain span unless something can be done with a click. The rail
+          // renders inside list rows that are themselves buttons, and nesting
+          // one button in another is invalid HTML that browsers resolve by
+          // dropping the inner element.
+          const Mark = onPick ? 'button' : 'span';
           return (
-            <button
+            <Mark
               key={record.id}
-              type="button"
-              tabIndex={-1}
-              onClick={onPick ? () => onPick(record.id) : undefined}
+              {...(onPick
+                ? { type: 'button' as const, tabIndex: -1, onClick: () => onPick(record.id) }
+                : {})}
               className={cx(
-                'absolute left-1/2 -translate-x-1/2 rounded-[0.5px]',
+                'absolute left-1/2 -translate-x-1/2 rounded-[0.5px] block',
                 PROV_BG[provenanceOf(record)] ?? 'bg-ink-soft',
                 markClass(record),
-                held && 'opacity-40',
+                held && !on && 'opacity-40',
+                on && 'ring-1 ring-ink ring-offset-0 z-10',
                 onPick && 'cursor-pointer',
               )}
-              style={{ top: project(value) - 0.5, width: 7, height: 1 }}
+              style={{
+                top: project(value) - (on ? 1 : 0.5),
+                width: on ? 11 : 7,
+                height: on ? 2 : 1,
+              }}
               title={`${fmt(value)} ${unit}${why ? ` · ${EXCLUSION_NOTE[why]}` : ''}`}
             />
           );

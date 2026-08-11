@@ -36,6 +36,30 @@ await go('/trawl');
 const lib = await p.locator('body').innerText();
 ck('Corpus still reports entries as catalogued', /catalogued/i.test(lib) || /curation note/i.test(lib));
 
+// Correction propagation (OF-FE-003 §5.3). r-M8-3 is bound as a material source
+// on PR-TAP-01, so editing it must visibly age that protocol with a numeric
+// before/after — "stale" without the numbers tells a reader to redo work
+// without telling them whether it matters.
+await go('/ledger/records?record=r-M8-3');
+await p.waitForTimeout(600);
+await go('/trawl/review');
+await p.waitForTimeout(800);
+const staleBefore = await p.locator('body').innerText();
+ck('Review queue reachable for the edit path', staleBefore.length > 200);
+
+await p.evaluate(() => {
+  // Drive the store directly: the point under test is propagation, not the
+  // edit affordance, which the golden path already covers.
+  const s = window.__ofStore?.getState?.();
+  if (s) s.editRecord('r-M8-3', 4.2, s.records.find((r) => r.id === 'r-M8-3').unit);
+});
+await p.waitForTimeout(400);
+await go('/runbook/PR-TAP-01');
+await p.waitForTimeout(900);
+const afterEdit = await p.locator('body').innerText();
+ck('Editing a source record ages the protocol that consumed it', /Stale/i.test(afterEdit), afterEdit.match(/Stale[^\n]*/)?.[0] ?? 'no stale banner');
+ck('Staleness carries the numeric before and after', /4\.2/.test(afterEdit) && /changed from/i.test(afterEdit));
+
 // Protocol version diff
 await go('/runbook/PR-TAP-01');
 const cmp = p.locator('button',{hasText:/compare version/i}).first();

@@ -773,6 +773,18 @@ function CompareBody({
 export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
   const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
   const records = useStore((s) => s.records);
+  // Corrections upstream age this protocol. Reading the patches here is what
+  // turns "propagates to downstream artifacts" from a claim into something a
+  // reader watches happen.
+  //
+  // Select the array, filter outside the selector: a selector that builds a new
+  // array returns a fresh identity on every store read, so zustand's Object.is
+  // check never settles and the component re-renders until React gives up.
+  const stale = useStore((s) => s.stale);
+  const stalePatches = useMemo(
+    () => stale.filter((x) => x.dependents.protocols.includes(protocolId)),
+    [stale, protocolId],
+  );
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
   const startRun = useStore((s) => s.startRun);
@@ -934,6 +946,46 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
 
   return (
     <>
+      {stalePatches.length > 0 && (
+        <div className="mb-3">
+          <Callout
+            kind="warn"
+            title={`Stale — ${stalePatches.length} source record${stalePatches.length === 1 ? '' : 's'} changed since this was last read`}
+          >
+            <ul className="space-y-1">
+              {stalePatches.map((patch) => (
+                <li key={patch.recordId} className="text-caption">
+                  <a
+                    href={href(`/ledger/records?record=${patch.recordId}`)}
+                    className="font-mono text-accent hover:underline"
+                  >
+                    {patch.recordId}
+                  </a>{' '}
+                  {patch.diff ? (
+                    <>
+                      changed from{' '}
+                      <span className="font-num">
+                        {fmt(patch.diff.before)} {patch.diff.unit}
+                      </span>{' '}
+                      to{' '}
+                      <span className="font-num text-ink">
+                        {fmt(patch.diff.after)} {patch.diff.unit}
+                      </span>
+                    </>
+                  ) : (
+                    <>was edited</>
+                  )}{' '}
+                  <span className="text-ink-soft">· {patch.changedAt}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-caption text-ink-soft">
+              Quantities below still reflect the values as they were bound. Re-derive before
+              running this at the bench.
+            </p>
+          </Callout>
+        </div>
+      )}
       <PageHeader
         eyebrow={
           <span className="inline-flex items-center gap-1.5">

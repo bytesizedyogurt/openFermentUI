@@ -25,6 +25,7 @@ import type {
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { CONTRADICTIONS } from '@/data/contradictions';
+import { markStale, type StalePatch } from '@/engine/stale';
 import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
 import { STRAINS } from '@/data/strains';
@@ -89,6 +90,12 @@ export interface OFState {
   jobs: Job[];
   toasts: Toast[];
   reviewQueue: string[];
+  /**
+   * Downstream artifacts aged by a record edit (OF-FE-003 §5.3). Session-only,
+   * like everything else here — the point is to show propagation happening, not
+   * to persist it.
+   */
+  stale: StalePatch[];
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
@@ -204,6 +211,7 @@ const seedState = () => ({
   activeRunId: null,
   jobs: [] as Job[],
   reviewQueue: [] as string[],
+  stale: [] as StalePatch[],
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
@@ -342,11 +350,31 @@ export const useStore = create<OFState>()((set, get) => ({
         ],
       };
     });
+    // A correction that does not visibly age what consumed it is a correction
+    // only in the record. Walk the dependency graph and mark the downstream
+    // artifacts with the numeric before/after, so a screen can say what changed
+    // rather than only that something did.
+    const before = s.records.find((r) => r.id === id);
+    const after = records.find((r) => r.id === id);
+    const patch =
+      before && after
+        ? markStale(before, after, { protocols: s.protocols, scenarios: s.scenarios }, stamp())
+        : null;
+
     set({
       records,
       undoStack: [...s.undoStack.slice(-25), frame],
       reviewStats: { ...s.reviewStats, edited: s.reviewStats.edited + 1 },
+      stale: patch ? [patch, ...s.stale.filter((x) => x.recordId !== id)] : s.stale,
     });
+
+    if (patch) {
+      const n = patch.dependents.protocols.length + patch.dependents.scenarios.length;
+      get().toast({
+        text: `${n} downstream artifact${n === 1 ? '' : 's'} now stale`,
+        kind: 'warn',
+      });
+    }
   },
 
   setRecordStatus: (id, status, reason) =>

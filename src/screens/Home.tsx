@@ -29,6 +29,7 @@ import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -217,6 +218,8 @@ const COLD_START_QUESTIONS = [
 export default function Home() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
+  const contradictions = useStore((s) => s.contradictions);
+  const disputed = papers.filter((p) => p.coverageDisputed).length;
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const sessions = useStore((s) => s.sessions);
@@ -438,6 +441,87 @@ export default function Home() {
 
           <div className="mt-3">
             <ProvenanceLegend />
+          </div>
+        </section>
+
+        {/* ── Band 1b · Trust and contradictions (OF-FE-003 §8.1) ────── */}
+        <section aria-labelledby="home-trust" className="mb-7">
+          <SectionTitle>
+            <span id="home-trust">Trust</span>
+          </SectionTitle>
+          <p className="text-caption text-ink-soft mb-2.5 max-w-3xl">
+            What this build has not measured, on the face of the screen rather than behind a
+            click. Leading with the weakness is what makes the rest of it credible.
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Card className="p-3">
+              <div className="text-caption uppercase tracking-wide text-ink-soft">
+                Extraction quality
+              </div>
+              <div className="mt-1.5 text-body">
+                <span className="text-signal-warn font-medium">Unmeasured.</span> No extractor has
+                been run against this corpus, so there is no precision, recall or F1 to report.
+              </div>
+              <div className="text-caption text-ink-soft mt-1.5">
+                <span className="font-num">{GOLD_SET_PLAN.reduce((n, g) => n + g.records, 0)}</span>{' '}
+                records are planned for the gold set across{' '}
+                <span className="font-num">{GOLD_SET_PLAN.length}</span> sources, and{' '}
+                <span className="font-num">{GOLD_SET_DIFFICULTY_CASES.length}</span> cases were
+                chosen to be hard.{' '}
+                <a href={href('/assay')} className="text-accent hover:underline">
+                  Open Assay
+                </a>
+              </div>
+              <div className="text-caption text-ink-soft mt-1.5">
+                Recall is the harder half and is not measured at all: nothing counts what was
+                never extracted. The only signal is a reader filing{' '}
+                <span className="text-ink">“Something’s missing”</span> on a source
+                {disputed > 0 ? (
+                  <>
+                    {' '}— <span className="font-num text-signal-warn">{disputed}</span> filed so
+                    far.
+                  </>
+                ) : (
+                  <>, and none has been filed yet.</>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-3">
+              <div className="text-caption uppercase tracking-wide text-ink-soft">
+                Contradictions
+              </div>
+              {contradictions.length === 0 ? (
+                <div className="mt-1.5 text-body text-ink-soft">
+                  The referee found no set of records that violates a constraint. That is a
+                  statement about the checks that exist, not a claim the corpus agrees with itself.
+                </div>
+              ) : (
+                <>
+                  <div className="mt-1.5 text-body">
+                    <span className="font-num text-signal-error">{contradictions.length}</span> open
+                    — sets of records that cannot all be true.
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    {contradictions.slice(0, 2).map((c) => (
+                      <div key={c.id} className="text-caption border-l-2 border-signal-error pl-2">
+                        {c.statement}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-caption text-ink-soft mt-2">
+                    <a href={href('/ledger/contradictions')} className="text-accent hover:underline">
+                      Open the queue
+                    </a>
+                  </div>
+                </>
+              )}
+              <div className="text-caption text-ink-soft mt-2.5 pt-2 border-t border-line">
+                Designs and scope are not built in this build, so the Bench has no panel for
+                them rather than an empty one.
+              </div>
+            </Card>
           </div>
         </section>
 

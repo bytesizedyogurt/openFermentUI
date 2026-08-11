@@ -10,8 +10,11 @@ import {
   MessageSquare,
   RefreshCw,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
-import { fieldName } from '@/data/ontology';
+import type { Contradiction, ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
+import { fieldName, ONTOLOGY_BY_ID } from '@/data/ontology';
+import { ContradictionRail } from '@/components/ContradictionRail';
+import { aggregate } from '@/engine/posterior';
+import { asNumber, convert } from '@/engine/units';
 import { useStore, provenanceOf, tickClass } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
@@ -90,6 +93,7 @@ function stageLabelOf(paper: Paper, job: Job | undefined): string {
 export default function PaperReader({ paperId, spanId }: { paperId: string; spanId?: string }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
+  const contradictions = useStore((s) => s.contradictions);
   const collections = useStore((s) => s.collections);
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
@@ -123,6 +127,33 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
   }, [paperId]);
 
   const recs = useMemo(() => records.filter((r) => r.paperId === paperId), [records, paperId]);
+
+  // Every corpus value for each field this paper touches, so a row can show
+  // where this paper sits among its peers. The question a reader actually has
+  // in front of a number is "is this one an outlier?", and until now the screen
+  // could not answer it without leaving.
+  const peersByField = useMemo(() => {
+    const wanted = new Set(recs.map((r) => r.field));
+    const m = new Map<FieldId, { record: ExtractionRecord; value: number }[]>();
+    for (const r of records) {
+      if (!wanted.has(r.field)) continue;
+      const def = ONTOLOGY_BY_ID[r.field];
+      const n = asNumber(r.value);
+      if (!def || n === null) continue;
+      let v = n;
+      if (def.canonicalUnit && r.unit !== def.canonicalUnit) {
+        try {
+          v = convert(n, r.unit, def.canonicalUnit);
+        } catch {
+          continue;
+        }
+      }
+      const list = m.get(r.field) ?? [];
+      list.push({ record: r, value: v });
+      m.set(r.field, list);
+    }
+    return m;
+  }, [records, recs]);
 
   const sectionSpans = useMemo(() => {
     const map = new Map<string, Span[]>();
@@ -591,7 +622,18 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                     <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
                   </span>
                   <span className="flex items-baseline justify-between gap-2 mt-0.5">
-                    <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
+                    <span className="flex items-center gap-1.5">
+                      <ContradictionRail
+                        marks={peersByField.get(r.field) ?? []}
+                        aggregate={aggregate(
+                          (peersByField.get(r.field) ?? []).map((x) => x.record),
+                        )}
+                        contradictions={contradictions.filter((c: Contradiction) => c.recordIds.includes(r.id))}
+                        height={28}
+                        highlightId={r.id}
+                      />
+                      <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
+                    </span>
                     <span className="text-caption text-ink-soft font-num shrink-0">
                       {r.status === 'unverified'
                         ? `conf ${r.confidence.toFixed(2)}`
