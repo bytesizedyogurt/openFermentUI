@@ -666,3 +666,39 @@ export interface ParameterView {
   /** Records held out of the aggregate, each with the reason. */
   excluded: { recordId: string; reason: string }[];
 }
+
+// ── OF-FE-003 §4.4 — Parchment ─────────────────────────────────────────
+
+export interface ClaimScope {
+  number: number;
+  independent: boolean;
+  /**
+   * Claim scope expressed in the SAME ontology as the literature. This
+   * comparability is the entire value of Parchment: it is what lets a Ledger
+   * record be tested against a claim instead of read beside it.
+   */
+  bounds: {
+    field: FieldId;
+    op: '<' | '<=' | '>' | '>=' | 'in' | 'eq';
+    value: number | [number, number] | string;
+    unit?: string;
+  }[];
+  rawText: string;
+  /** True when the parse is uncertain. Never render a shaky parse as confident. */
+  parseUncertain?: boolean;
+}
+
+export interface Patent {
+  id: string;
+  jurisdiction: string;
+  number: string;
+  title: string;
+  assignee: string;
+  priorityDate: string;
+  status: 'pending' | 'granted' | 'lapsed' | 'revoked';
+  claims: ClaimScope[];
+  /** Same discipline as papers: no invented identifiers, ever. */
+  verifyNeeded?: boolean;
+  /** The corpus entry this was catalogued from. */
+  paperId?: string;
+}

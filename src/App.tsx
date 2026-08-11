@@ -44,6 +44,7 @@ import PaperReader from '@/screens/PaperReader';
 import Ingest from '@/screens/Ingest';
 import Extract from '@/screens/Extract';
 import { Ledger, ParameterPage, Contradictions, UnbuiltPart } from '@/screens/Ledger';
+import { Parchment } from '@/screens/Parchment';
 import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
@@ -78,7 +79,7 @@ const RAIL: RailItem[] = [
   { group: 'Reason' },
   { to: '/geneos', label: 'geneOS', icon: FlaskConical, key: 'o' },
   { to: '/fermos', label: 'fermOS', icon: LineChart, key: 's' },
-  { to: '/parchment', label: 'Parchment', icon: Scale, key: 'c', pending: true },
+  { to: '/parchment', label: 'Parchment', icon: Scale, key: 'c' },
   { to: '/postdoc', label: 'Postdoc', icon: MessagesSquare, key: 'a' },
   { group: 'Return' },
   { to: '/runbook', label: 'Runbook', icon: ClipboardList, key: 'p' },
@@ -157,7 +158,7 @@ function Screen() {
     case 'assay':
       return <Validation />;
     case 'parchment':
-      return <UnbuiltPart name="Parchment" blurb="Patent scope as structured bounds in the same ontology as the literature, so a Ledger record can be tested against a claim. Whitespace is the point: the negative space on the scope map is what has not been claimed." />;
+      return <Parchment />;
     case 'openlab':
       return <UnbuiltPart name="openLab" blurb="A deposit feed where a failed run carries the same weight as a successful one — same card, same size, not greyed, not sorted down. A network reporting zero failures is hiding them." />;
     case 'notary':

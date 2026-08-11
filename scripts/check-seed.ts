@@ -8,6 +8,7 @@
  */
 import { PAPERS } from '../src/data/papers';
 import { CONTRADICTIONS } from '../src/data/contradictions';
+import { PATENTS } from '../src/data/patents';
 import { stillFails } from '../src/engine/balance';
 import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
@@ -18,7 +19,7 @@ import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
-import { ONTOLOGY_BY_ID } from '../src/data/ontology';
+import { ONTOLOGY, ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
 
@@ -342,6 +343,27 @@ for (const f of FLOWS) {
     fail(
       `flow ${f.id}: a quantity with no citation on its line — "${line.trim().slice(0, 80)}"`,
     );
+  }
+}
+
+// ── patent claim bounds name real fields (OF-FE-003 §9.4) ─────────────
+// A claim whose bound names a field the ontology does not have cannot be tested
+// against anything, and would sit on the screen looking like scope.
+const FIELD_IDS = new Set(ONTOLOGY.map((d) => d.id));
+for (const pt of PATENTS) {
+  if (pt.paperId && !paperIds.has(pt.paperId)) {
+    fail(`${pt.id}: paperId ${pt.paperId} does not resolve`);
+  }
+  for (const c of pt.claims) {
+    for (const b of c.bounds) {
+      if (!FIELD_IDS.has(b.field)) {
+        fail(`${pt.id} claim ${c.number}: bound names unknown field '${b.field}'`);
+      }
+    }
+    // A parsed bound and an "uncertain parse" flag are contradictory states.
+    if (c.bounds.length > 0 && c.parseUncertain) {
+      warn(`${pt.id} claim ${c.number}: has bounds but is still flagged parseUncertain`);
+    }
   }
 }
 
