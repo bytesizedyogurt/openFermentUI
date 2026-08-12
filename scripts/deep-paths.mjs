@@ -9,7 +9,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 const DIST = join(process.cwd(), 'dist');
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff':'font/woff','.woff2':'font/woff2'};
-const server=createServer(async(rq,rs)=>{try{const u=decodeURIComponent((rq.url??'/').split('?')[0]);let f=join(DIST,u==='/'?'index.html':u);try{if((await stat(f)).isDirectory())f=join(f,'index.html');}catch{f=join(DIST,'index.html');}rs.writeHead(200,{'Content-Type':MIME[extname(f)]??'application/octet-stream'});rs.end(await readFile(f));}catch{rs.writeHead(404).end('nf');}});
+const server=createServer(async(rq,rs)=>{try{const u=decodeURIComponent((rq.url??'/').split('?')[0]);let f=join(DIST,u==='/'?'index.html':u);try{if((await stat(f)).isDirectory())f=join(f,'index.html');}catch{f=join(DIST,'index.html');}const body=await readFile(f);rs.writeHead(200,{'Content-Type':MIME[extname(f)]??'application/octet-stream'});rs.end(body);}catch{if(!rs.headersSent)rs.writeHead(404);rs.end('nf');}});
 await new Promise(r=>server.listen(4324,r));
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
 const p=await b.newPage({viewport:{width:1600,height:1000}});
@@ -90,6 +90,37 @@ await go('/');
 await p.waitForTimeout(800);
 const bench = await p.locator('body').innerText();
 ck('Bench states how much of the corpus is wired to something executable', /feed something\s+executable|of 24 parameters are wired/i.test(bench.replace(/\s+/g,' ')));
+
+// Route-rename regressions. Both of these survived 48 golden-path checks because
+// the suite navigates to canonical routes and never exercises a legacy deep link
+// or asserts on the shell chrome.
+await go('/extract?paper=H4');
+await p.waitForTimeout(700);
+const aliasHash = await p.evaluate(() => location.hash);
+const aliasTxt = await p.locator('body').innerText();
+ck('A legacy /extract deep link lands on the record table, not the parameter index',
+   /#\/ledger\/records/.test(aliasHash), aliasHash);
+ck('...and keeps its ?paper= filter', /paper=H4/.test(aliasHash) && !/The 24 ontology fields/.test(aliasTxt));
+
+// Run Mode takes the whole screen (§8.12): no left rail, no top bar.
+await go('/runbook/PR-TAP-01');
+await p.waitForTimeout(600);
+const startBtn = p.locator('button', { hasText: /Start run/i }).first();
+if (await startBtn.count()) {
+  await startBtn.click();
+  await p.waitForTimeout(900);
+  const chrome = await p.evaluate(() => ({
+    hash: location.hash,
+    rail: Boolean(document.querySelector('a[href="#/ledger"]')),
+    search: Boolean(document.querySelector('input[placeholder*="Search"]')),
+  }));
+  ck('Run Mode is reachable', /\/run\//.test(chrome.hash), chrome.hash);
+  ck('Run Mode takes over the screen — rail and top bar are gone',
+     !chrome.rail && !chrome.search,
+     `rail=${chrome.rail} search=${chrome.search}`);
+} else {
+  ck('Run Mode is reachable', false, 'no Start run button');
+}
 
 // openLab deposit (OF-FE-003 §8.7). The argument of the part is that a failure
 // counts the same, so the check is that it deposits at all and renders in the

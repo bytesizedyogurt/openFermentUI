@@ -35,8 +35,11 @@ const server = createServer(async (req, res) => {
     const body = await readFile(file);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' });
     res.end(body);
-  } catch (e) {
-    res.writeHead(404).end('not found');
+  } catch {
+    // Guard: an exception after the 200 was written would otherwise throw
+    // ERR_HTTP_HEADERS_SENT and take the whole run down.
+    if (!res.headersSent) res.writeHead(404);
+    res.end('not found');
   }
 });
 
