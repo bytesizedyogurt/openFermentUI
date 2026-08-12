@@ -437,6 +437,26 @@ export interface ScenarioDim {
   sourceRecordId?: string;
 }
 
+/**
+ * Where a scenario assumption's number comes from (OF-FE-004 §1.1).
+ *
+ * The architecture's central circuit is: cost sensitivity names the dominant
+ * uncertainty, a protocol measures it, the result updates the record, every
+ * design re-scores. With assumptions citing papers rather than records that
+ * circuit is severed at its most important joint — a corrected record cannot
+ * reach an MSP. This discriminator is what closes it.
+ */
+export type AssumptionBasis =
+  /** Bound to a Ledger record. The value must equal that record's SI value. */
+  | { kind: 'record'; recordId: string }
+  /**
+   * A deliberate modeling choice, or a literature value the ontology has no
+   * field to hold. Legitimate, but must declare itself in writing.
+   */
+  | { kind: 'model'; justification: string }
+  /** DEFECT. A number with no record and no declared justification. */
+  | { kind: 'unsourced' };
+
 export interface ScenarioAssumption {
   /** Cite a paper when the assumption rests on a source but no single record. */
   paperId?: string;
@@ -445,6 +465,8 @@ export interface ScenarioAssumption {
   unit: string;
   provenance: Provenance;
   recordId?: string;
+  /** Required. `check:seed` verifies a record binding against the record. */
+  basis: AssumptionBasis;
   note: string;
 }
 
@@ -469,6 +491,13 @@ export interface SensitivityRow {
   assumption: string;
   lowPct: number;
   hiPct: number;
+  /**
+   * The parameter this row varies, when the assumption behind it is
+   * record-bound. Makes each tornado bar a link to its parameter page, which is
+   * the entry to the whole experiment loop and the single most valuable
+   * navigation in the app.
+   */
+  field?: FieldId;
 }
 
 /**

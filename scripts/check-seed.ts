@@ -346,6 +346,31 @@ for (const f of FLOWS) {
   }
 }
 
+// ── every assumption declares its basis (OF-FE-004 §1.1.5) ────────────
+// A record binding must actually match the record: an assumption that claims a
+// Ledger source and then carries a different number is worse than one that
+// admits it is a modelling choice, because it looks bound and is not.
+for (const sc of SCENARIOS) {
+  for (const a of sc.assumptions) {
+    if (!a.basis) {
+      fail(`${sc.id}: assumption "${a.label}" declares no basis`);
+      continue;
+    }
+    if (a.basis.kind === 'record') {
+      const bound = RECORDS.find((r) => r.id === (a.basis as { recordId: string }).recordId);
+      if (!bound) {
+        fail(`${sc.id}: assumption "${a.label}" binds unresolved record ${(a.basis as { recordId: string }).recordId}`);
+      } else if (typeof bound.value === 'number' && Math.abs(bound.value - a.value) > 1e-9) {
+        fail(
+          `${sc.id}: assumption "${a.label}" says ${a.value} but record ${bound.id} says ${bound.value} — a binding that does not match is worse than none`,
+        );
+      }
+    } else if (a.basis.kind === 'model' && !a.basis.justification.trim()) {
+      fail(`${sc.id}: assumption "${a.label}" is a model parameter with no justification`);
+    }
+  }
+}
+
 // ── patent claim bounds name real fields (OF-FE-003 §9.4) ─────────────
 // A claim whose bound names a field the ontology does not have cannot be tested
 // against anything, and would sit on the screen looking like scope.

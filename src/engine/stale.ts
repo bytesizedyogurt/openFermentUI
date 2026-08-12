@@ -34,10 +34,18 @@ export function dependents(recordId: string, s: StaleSource): Dependents {
     )
     .map((p) => p.id);
 
+  // Walk the assumption basis, not the legacy optional recordId. Before
+  // OF-FE-004 §1 every assumption cited a paper and none cited a record, so
+  // this branch matched nothing and a corrected record could not reach an MSP —
+  // the architecture's central circuit severed at its most important joint.
   const scenarios = s.scenarios
     .filter(
       (sc) =>
-        sc.assumptions.some((a) => a.recordId === recordId) ||
+        sc.assumptions.some(
+          (a) =>
+            (a.basis.kind === 'record' && a.basis.recordId === recordId) ||
+            a.recordId === recordId,
+        ) ||
         sc.dims.some((d) => d.sourceRecordId === recordId),
     )
     .map((sc) => sc.id);

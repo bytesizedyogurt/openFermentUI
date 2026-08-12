@@ -362,10 +362,23 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
             </div>
             <p className="text-caption text-ink-soft mb-3">
               <span className="font-num">
-                {scenario.assumptions.filter((a) => a.recordId).length}
+                {scenario.assumptions.filter((a) => a.basis.kind === 'record').length}
               </span>{' '}
-              are linked to corpus records; the rest are labelled demo assumptions.
+              bind to a Ledger record —{' '}
+              <span className="font-num">
+                {scenario.assumptions.filter((a) => a.basis.kind === 'model').length}
+              </span>{' '}
+              are declared modelling choices.
             </p>
+            {scenario.assumptions.some((a) => a.basis.kind === 'unsourced') && (
+              <p className="text-caption text-signal-error mb-3">
+                <span className="font-num">
+                  {scenario.assumptions.filter((a) => a.basis.kind === 'unsourced').length}
+                </span>{' '}
+                carries no record and no declared justification. That is a defect, not a
+                category — it is shown rather than averaged away.
+              </p>
+            )}
             <Button className="w-full justify-center" onClick={() => setAssumptionsOpen(true)}>
               Open assumptions drawer
             </Button>
@@ -668,17 +681,34 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
           {scenario.assumptions.map((a, i) => (
             <div key={i} className="card p-3">
               <div className="flex items-start justify-between gap-3">
-                <Tick p={a.provenance} className="flex-1 min-w-0">
+                <Tick
+                  p={a.basis.kind === 'unsourced' ? 'unsourced' : a.provenance}
+                  className="flex-1 min-w-0"
+                >
                   <div className="font-medium text-body">{a.label}</div>
                   <div className="font-num text-body">
                     {fmt(a.value)} <span className="text-ink-soft">{a.unit}</span>
                   </div>
                 </Tick>
                 <div className="shrink-0 flex flex-col items-end gap-1">
-                  <ProvenanceBadge p={a.provenance} compact />
-                  {a.recordId && <CitationChip recordId={a.recordId} />}
+                  <ProvenanceBadge
+                    p={a.basis.kind === 'unsourced' ? 'unsourced' : a.provenance}
+                    compact
+                  />
+                  {a.basis.kind === 'record' && <CitationChip recordId={a.basis.recordId} />}
                 </div>
               </div>
+              {a.basis.kind === 'model' && (
+                <p className="text-caption text-ink-soft mt-1.5 border-l-2 border-line pl-2">
+                  <span className="text-ink">Modelling choice.</span> {a.basis.justification}
+                </p>
+              )}
+              {a.basis.kind === 'unsourced' && (
+                <p className="text-caption text-signal-error mt-1.5">
+                  No record, no declared justification. This number is in the model and nothing
+                  in the corpus stands behind it.
+                </p>
+              )}
               <p className="text-caption text-ink-soft mt-1.5">{a.note}</p>
             </div>
           ))}

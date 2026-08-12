@@ -30,6 +30,7 @@ import { href } from '@/router';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
+import { blastRadius } from '@/engine/stale';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -220,8 +221,21 @@ export default function Home() {
   const records = useStore((s) => s.records);
   const contradictions = useStore((s) => s.contradictions);
   const disputed = papers.filter((p) => p.coverageDisputed).length;
+
+  // Executable-layer coverage (OF-FE-004 §1.2). A true statement about the
+  // corpus that belongs on the screen: hiding it would be the same error as
+  // fabricating an F1.
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
+
+  const { wiredRecords, wiredFields } = useMemo(() => {
+    const src = { protocols, scenarios };
+    const ids = records.filter((r) => blastRadius(r.id, src) > 0).map((r) => r.id);
+    const fields = new Set(
+      records.filter((r) => ids.includes(r.id)).map((r) => r.field),
+    );
+    return { wiredRecords: ids.length, wiredFields: fields.size };
+  }, [records, protocols, scenarios]);
   const sessions = useStore((s) => s.sessions);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -472,6 +486,15 @@ export default function Home() {
                 <a href={href('/assay')} className="text-accent hover:underline">
                   Open Assay
                 </a>
+              </div>
+              <div className="text-caption text-ink-soft mt-1.5 pt-1.5 border-t border-line">
+                <span className="font-num text-ink">{wiredRecords}</span> of{' '}
+                <span className="font-num">{records.length}</span> records feed something
+                executable — a protocol or a scenario.{' '}
+                <span className="font-num text-ink">{wiredFields}</span> of{' '}
+                <span className="font-num">24</span> parameters are wired; the rest are
+                catalogued only. The corpus is broad and the executable layer is narrow, and
+                that gap is the work.
               </div>
               <div className="text-caption text-ink-soft mt-1.5">
                 Recall is the harder half and is not measured at all: nothing counts what was

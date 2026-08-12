@@ -60,6 +60,37 @@ const afterEdit = await p.locator('body').innerText();
 ck('Editing a source record ages the protocol that consumed it', /Stale/i.test(afterEdit), afterEdit.match(/Stale[^\n]*/)?.[0] ?? 'no stale banner');
 ck('Staleness carries the numeric before and after', /4\.2/.test(afterEdit) && /changed from/i.test(afterEdit));
 
+// The joint (OF-FE-004 §1). Before assumptions carried an AssumptionBasis, no
+// scenario bound a record and a correction could not reach an MSP. r-M5-1 is
+// bound to sc-s1's biomass density, so editing it must age that scenario.
+await p.evaluate(() => {
+  const s = window.__ofStore?.getState?.();
+  if (s) s.editRecord('r-M5-1', 1.9, s.records.find((r) => r.id === 'r-M5-1').unit);
+});
+await p.waitForTimeout(400);
+const staleState = await p.evaluate(() => {
+  const s = window.__ofStore?.getState?.();
+  const patch = s.stale.find((x) => x.recordId === 'r-M5-1');
+  return patch ? { scenarios: patch.dependents.scenarios, diff: patch.diff } : null;
+});
+ck('Correcting a bound record ages the scenario that consumed it',
+   Boolean(staleState && staleState.scenarios.includes('sc-s1')),
+   staleState ? staleState.scenarios.join(', ') : 'no patch');
+ck('Scenario staleness carries the numeric before and after',
+   Boolean(staleState && staleState.diff && staleState.diff.before === 1.23 && staleState.diff.after === 1.9));
+
+// The unsourced assumption must be visible, not averaged away (§7.5).
+await go('/fermos/s/sc-s2');
+await p.waitForTimeout(900);
+const s2 = await p.locator('body').innerText();
+ck('An unsourced assumption is surfaced rather than suppressed', /no record and no declared justification/i.test(s2));
+
+// Bench states the executable-layer coverage (§1.2).
+await go('/');
+await p.waitForTimeout(800);
+const bench = await p.locator('body').innerText();
+ck('Bench states how much of the corpus is wired to something executable', /feed something\s+executable|of 24 parameters are wired/i.test(bench.replace(/\s+/g,' ')));
+
 // openLab deposit (OF-FE-003 §8.7). The argument of the part is that a failure
 // counts the same, so the check is that it deposits at all and renders in the
 // feed rather than being filtered, greyed or sorted away.
