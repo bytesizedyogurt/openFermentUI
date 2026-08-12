@@ -148,6 +148,44 @@ async function main() {
     /cannot hold/i.test(valText) && /Would need/i.test(valText),
   );
 
+  // ── 5b. Assay leads with the weakness (OF-FE-003 §8.3) ──────────────
+  check('Assay pins known-bad fields above the plan', /known bad, before anything else/i.test(valText));
+  check(
+    'Assay states the negative-control design it has not run',
+    /negative controls/i.test(valText) && /catalogued sources carry\s+no record/i.test(valText.replace(/\s+/g, ' ')),
+  );
+  check('Assay admits intra-rater agreement is unmeasured', /intra-rater/i.test(valText) && /not yet run/i.test(valText));
+
+  // ── 5c. Parameter page: the rail scatters, a mark opens its source ──
+  await go('/ledger/p/titer_secreted');
+  await page.waitForTimeout(700);
+  const paramText = await page.locator('body').innerText();
+  check('Parameter page reports a median over primary records only', /primary of/i.test(paramText));
+  check('Parameter page lists what it held out and why', /held out of the statistic/i.test(paramText));
+  check('Parameter page names the checks the referee ran', /consistent under|contradicted/i.test(paramText));
+
+  // ── 5d. Coverage dispute: recall failure gets a mechanism ───────────
+  await go('/trawl/sources/H4');
+  await page.waitForTimeout(700);
+  const disputeBtn = page.locator('button', { hasText: /Something’s missing|Something's missing/ }).first();
+  check('Source reader offers a coverage dispute', (await disputeBtn.count()) > 0);
+  if (await disputeBtn.count()) {
+    await disputeBtn.click();
+    await page.waitForTimeout(300);
+    await page.locator('#cov-note').fill('Table 2 reports a secreted titer that is not in the record list.');
+    await page.locator('button', { hasText: /^File it$/ }).first().click();
+    await page.waitForTimeout(500);
+    const filed = await page.locator('body').innerText();
+    check('Filing a dispute records it against the source', /coverage disputed/i.test(filed));
+  }
+
+  // ── 5e. Contradictions: real conflicts, with the residual shown ─────
+  await go('/ledger/contradictions');
+  await page.waitForTimeout(600);
+  const cxText = await page.locator('body').innerText();
+  check('Contradiction queue shows a real conflict', /cannot both stand|outside the/i.test(cxText));
+  check('Contradiction states its residual against a tolerance', /residual/i.test(cxText) && /tolerance/i.test(cxText));
+
   // ── 6. Protocol scaling recomputes materials ────────────────────────
   await go('/runbook/PR-TAP-01');
   await page.waitForTimeout(600);
@@ -318,6 +356,43 @@ async function main() {
   check(
     'The algal-casein absence is answered substantively, not declined',
     /17 bacterial|Kiverdi|no algal/i.test(f6),
+  );
+
+  // ── 10b. Design: the cascade is honest about what did not run ───────
+  await go('/fermos/d/sc-s1-d01');
+  await page.waitForTimeout(700);
+  const designText = await page.locator('body').innerText();
+  check('Design shows a four-tier cascade', /T0/.test(designText) && /T3/.test(designText));
+  check(
+    'Absent tiers are absent, not passed',
+    /absent/i.test(designText) && /no genome-scale metabolic model/i.test(designText),
+  );
+  check(
+    'A point estimate is labelled as one, not dressed as a distribution',
+    /point estimate, not a distribution/i.test(designText),
+  );
+  const tornadoLink = page.locator('a[href*="/ledger/p/"]').first();
+  check('The tornado links a bar back to its parameter page', (await tornadoLink.count()) > 0);
+  check(
+    'Scope reads as unevaluated rather than clear',
+    /unevaluated, not clear/i.test(designText),
+  );
+
+  // ── 10c. Notary: publication blocked, with the reasons itemised ─────
+  await go('/notary');
+  await page.waitForTimeout(700);
+  const notaryText = await page.locator('body').innerText();
+  check('Notary reports that nothing currently passes', /nothing currently passes/i.test(notaryText));
+  check(
+    'Publish is disabled with the missing items named, not counted',
+    /enablement item/i.test(notaryText) && /host and genotype/i.test(notaryText),
+  );
+  // The button renders an icon beside its label, so its text node is not an
+  // exact "Publish" — anchor the match loosely and assert on the DOM property.
+  const publishBtn = page.locator('button', { hasText: /Publish/ }).first();
+  check(
+    'The publish control is actually disabled',
+    (await publishBtn.count()) > 0 && (await publishBtn.isDisabled()),
   );
 
   // ── 11. Command palette navigates ───────────────────────────────────

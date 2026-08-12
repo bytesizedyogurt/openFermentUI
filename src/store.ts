@@ -813,6 +813,21 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   depositRun: (o) => {
+    // Invariant 7 (OF-FE-003 §9.7), enforced where it actually bites: deposits
+    // are made at runtime, not seeded, so check:seed can only guard the empty
+    // case. A record produced by a bench run must say so — anything else would
+    // put authored or extracted data in the class reserved for measurement.
+    const bad = o.producedRecordIds.filter((id) => {
+      const r = get().records.find((x) => x.id === id);
+      return !r || r.evidenceClass !== 'experiment';
+    });
+    if (bad.length) {
+      get().toast({
+        text: `Deposit refused: ${bad.length} produced record(s) are missing or not evidenceClass 'experiment'.`,
+        kind: 'error',
+      });
+      return;
+    }
     set((s) => ({ deposits: [{ ...o, depositedAt: stamp() }, ...s.deposits] }));
     get().logActivity({
       at: stamp(),

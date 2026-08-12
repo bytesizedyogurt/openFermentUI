@@ -10,6 +10,11 @@ import { PAPERS } from '../src/data/papers';
 import { CONTRADICTIONS } from '../src/data/contradictions';
 import { PATENTS } from '../src/data/patents';
 import { DESIGNS } from '../src/data/designs';
+import type { RunOutcome } from '../src/data/types';
+
+/** Deposits are never seeded (OF-FE-004 §7.1); the constant exists so the
+ *  invariant is written down rather than assumed. */
+const DEPOSITS: RunOutcome[] = [];
 import { stillFails } from '../src/engine/balance';
 import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
@@ -401,6 +406,23 @@ for (const d of DESIGNS) {
   }
   if (d.scope !== 'clear' && !d.scopeEvaluated) {
     fail(`${d.id}: scope '${d.scope}' claimed without evaluation`);
+  }
+}
+
+// ── deposits produce experiment records (OF-FE-003 §9.7) ──────────────
+// Vacuous today by design: §7.1 forbids seeding openLab deposits, so DEPOSITS
+// is empty and this guards the case where someone seeds one anyway. The check
+// that bites is in store.depositRun, because deposits are made at runtime.
+for (const d of DEPOSITS) {
+  for (const rid of d.producedRecordIds) {
+    const rec = RECORDS.find((r) => r.id === rid);
+    if (!rec) {
+      fail(`${d.runId}: producedRecordIds names unresolved record ${rid}`);
+    } else if (rec.evidenceClass !== 'experiment') {
+      fail(
+        `${d.runId}: produced record ${rid} carries evidenceClass '${rec.evidenceClass}' — a bench deposit must produce 'experiment'`,
+      );
+    }
   }
 }
 
