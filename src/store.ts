@@ -25,15 +25,11 @@ import type {
   Strain,
   TimerState,
 } from '@/data/types';
-import { PAPERS } from '@/data/papers';
+import { PAPERS, RECORDS, STRAINS, PROTOCOLS, SCENARIOS, MODULES } from '@/data/source';
+import { COST_MODELS } from '@/data/scenarios';
 import { CONTRADICTIONS } from '@/data/contradictions';
 import { markStale, type StalePatch } from '@/engine/stale';
-import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
-import { STRAINS } from '@/data/strains';
-import { PROTOCOLS } from '@/data/protocols';
-import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
-import { MODULES } from '@/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { clearPlantCache } from '@/engine/plant';

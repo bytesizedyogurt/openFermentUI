@@ -8,7 +8,7 @@
 //
 // Curator notes attach by id below, so a human explanation can survive without
 // the finding itself being hand-written.
-import { RECORDS } from './records';
+import { RECORDS } from '@/data/source';
 import { refereeAll } from '@/engine/balance';
 import type { Contradiction } from './types';
 

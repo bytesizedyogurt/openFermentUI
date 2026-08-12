@@ -12,9 +12,16 @@ license = { text = "MIT" }
 dependencies = ["pydantic>=2.9"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6"]
+# sqlglot parses the DDL that `seed/` generates. There is no Postgres server in
+# the repo's CI path, so an independent parser reading the emitted schema back is
+# the strongest available check on the Postgres half of it; the tests that use it
+# skip when it is absent, which is why it is declared rather than assumed.
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6", "sqlglot>=25"]
 
 [tool.hatch.build.targets.wheel]
+# `seed/` is deliberately not here, for the same reason `scripts/` is not: it is
+# run out of the tree, and a top-level module named `seed` in site-packages
+# would be a namespace landgrab. Import it as `seed` from `packages/core`.
 packages = ["openferment_core"]
 
 [tool.ruff]

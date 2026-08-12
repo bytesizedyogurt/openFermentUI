@@ -19,6 +19,12 @@
 // have no published cost correlation and are marked `authored` wherever they
 // appear; the whole surface remains provenance 'demo'; and the plant view
 // states what each flowsheet does not model before it shows the number.
+// The collection itself now comes from the adapter; this module keeps only
+// the derived views built on top of it.
+import { SCENARIOS } from '@/data/source';
+
+export { SCENARIOS };
+
 import type { CostLine, CostModel, Scenario } from './types';
 import { evaluatePlantCached } from '@/engine/plant';
 
@@ -100,79 +106,3 @@ export const COST_MODELS: CostModel[] = [S1, S2, S3];
 
 // ── Scenarios ─────────────────────────────────────────────────────────
 
-export const SCENARIOS: Scenario[] = [
-  {
-    id: 'sc-s1',
-    modelId: 'S1',
-    name: 'cw15 intracellular β-casein',
-    description:
-      'Mixotrophic Chlamydomonas accumulating β-casein intracellularly, recovered by mild pulsed-electric-field disruption. The reference point sits where the literature actually is today — which is the bottom-left corner of this surface.',
-    product: 'Bovine β-casein (intracellular)',
-    dims: S1.dims.map((d) =>
-      d.key === 'density'
-        ? { ...d, paperId: 'M5' }
-        : d.key === 'dispYield'
-          ? { ...d, paperId: 'J10' }
-          : { ...d, paperId: 'A1' },
-    ),
-    point: { ...S1.referencePoint },
-    pinned: false,
-    assumptions: [
-      { label: 'Biomass density achieved (CC-137c, TAP)', value: 1.23, unit: 'g L⁻¹', provenance: 'curated', paperId: 'M5', basis: { kind: 'record', recordId: 'r-M5-1' }, note: 'Wild-type C. reinhardtii in TAP reached 1.23 g/L in 96 h. The reference point assumes 2 g/L — already optimistic against this.' },
-      { label: 'Intracellular expression achieved (UVM4 reporters)', value: 0.2, unit: '% TSP', provenance: 'curated', paperId: 'A1', basis: { kind: 'record', recordId: 'r-A1-1' }, note: 'UVM4/UVM11 reach ~0.2% TSP for intracellular reporters. No casein has been expressed in any alga, so the % TSP axis is entirely extrapolation beyond this point.' },
-      { label: 'PEF protein release, cell-wall-deficient', value: 31, unit: '% of total protein', provenance: 'curated', paperId: 'J10', basis: { kind: 'record', recordId: 'r-J10-1' }, note: 'Versus 11% for the walled wild type. The single strongest economic argument for cw15 as the chassis.' },
-      { label: 'Safe-harbor integration uplift', value: 8.6, unit: '×', provenance: 'curated', paperId: 'A7', basis: { kind: 'record', recordId: 'r-A7-1' }, note: 'LHCBM1 locus integration gave 8.6-fold higher accumulation than random insertion — the most actionable published route up the % TSP axis.' },
-      { label: 'Capital charge factor', value: 0.12, unit: '', provenance: 'demo', basis: { kind: 'model', justification: 'Financial convention, not a measurement. The annualisation rate applied to CAPEX is a modelling choice the corpus has no opinion on.' }, note: 'Annualisation rate. A modelling convention, not a measurement.' },
-      { label: 'Operating days per year', value: 330, unit: 'd', provenance: 'demo', basis: { kind: 'model', justification: 'Plant availability assumption. A scheduling choice, not a property of the organism.' }, note: 'Standard availability assumption for a continuous plant.' },
-      { label: 'CAPEX scaling exponent', value: 0.6, unit: '', provenance: 'demo', basis: { kind: 'model', justification: 'The six-tenths rule, standard practice for capacity scaling. Convention, not literature.' }, note: 'Six-tenths rule. Doubling capacity costs ~52% more, which is the main argument for building big.' },
-      { label: 'Photobioreactor reference capital', value: 9500000, unit: 'USD', provenance: 'demo', basis: { kind: 'model', justification: 'Reference capital for the sizing basis. A vendor-class figure the corpus holds no record for.' }, note: 'Order-of-magnitude for a 120 m³ tubular installation, shaped by Acién’s real plant costs but not derived from them.' },
-      { label: 'TAP medium cost', value: 0.42, unit: 'USD L⁻¹', provenance: 'demo', basis: { kind: 'model', justification: 'Media cost basis, priced from components rather than measured. Ontology v1 has no field for a per-litre medium price.' }, note: 'Includes acetate as the dominant carbon cost. Demo assumption — no citable price was retrieved.' },
-      { label: 'Batch duration', value: 5, unit: 'd', provenance: 'curated', paperId: 'M6', basis: { kind: 'model', justification: 'From the M6 cultivation description. Ontology v1 has no field for batch duration, so no record exists to bind — an ontology gap, not an unsourced number.' }, note: 'Mixotrophic cultures reached maximum biomass in about 5 days.' },
-      { label: 'Real plant biomass cost, 3.8 t/y', value: 69, unit: 'EUR kg⁻¹', provenance: 'curated', paperId: 'O4', basis: { kind: 'record', recordId: 'r-O4-1' }, note: 'Two years of operating data from a real 30 m³ tubular plant. Currency deliberately not converted.' },
-      { label: 'Real plant biomass cost, scaled to 200 t/y', value: 12.6, unit: 'EUR kg⁻¹', provenance: 'curated', paperId: 'O4', basis: { kind: 'record', recordId: 'r-O4-2' }, note: 'The same plant simplified and scaled up — a 5.5× cost reduction from scale alone.' },
-    ],
-  },
-  {
-    id: 'sc-s2',
-    modelId: 'S2',
-    name: 'K. phaffii secreted comparator',
-    description:
-      'The incumbent precision-fermentation route: a secreting yeast at fed-batch density. Anchored on the two real eukaryotic data points — Choi & Jiménez-Flores for bovine β-casein and Aro et al. for what secretion achieves at its best.',
-    product: 'Bovine β-casein (secreted)',
-    dims: S2.dims.map((d) => (d.key === 'titer' ? { ...d, paperId: 'K1' } : d)),
-    point: { ...S2.referencePoint },
-    pinned: false,
-    assumptions: [
-      { label: 'β-lactoglobulin secreted titer (T. reesei)', value: 1.0, unit: 'g L⁻¹', provenance: 'curated', paperId: 'K1', basis: { kind: 'record', recordId: 'r-K1-1' }, note: 'The current benchmark for a secreted milk protein. No casein has reached this in any host.' },
-      { label: 'β-casein intracellular (P. pastoris)', value: 0.85, unit: 'g L⁻¹', provenance: 'curated', paperId: 'H4', basis: { kind: 'record', recordId: 'r-H4-2' }, note: 'Reported as 0.7–1.0 g/L at 15–18% TSP. Note this was intracellular: secretion with the native signal peptide reached only 0.005%.' },
-      { label: 'Secreted fraction, native signal peptide', value: 0.005, unit: '% of total expressed', provenance: 'curated', paperId: 'H4', basis: { kind: 'record', recordId: 'r-H4-3' }, note: 'The warning that a native bovine signal peptide will not work in a non-mammalian eukaryote.' },
-      { label: 'Fed-batch cycle time', value: 4, unit: 'd', provenance: 'demo', basis: { kind: 'model', justification: 'Process schedule for the comparator. A modelling choice, not a measured quantity.' }, note: 'Typical methanol-induction fed-batch duration. Demo assumption.' },
-      { label: 'Defined medium cost', value: 0.55, unit: 'USD L⁻¹', provenance: 'demo', basis: { kind: 'model', justification: 'Media cost basis for the yeast comparator. Priced, not measured, and outside the ontology.' }, note: 'Includes glycerol and methanol feed. Demo assumption.' },
-      { label: 'Media share of COGS (industry claim)', value: 42, unit: '%', provenance: 'industry-estimate', basis: { kind: 'unsourced' }, note: 'Vendor and market sources put media at 35–50% of cost of goods. Non-peer-reviewed — excluded from aggregate statistics and never gold.' },
-      { label: 'Published-model average titer', value: 24, unit: 'g L⁻¹', provenance: 'curated', paperId: 'O2', basis: { kind: 'record', recordId: 'r-O2-3' }, note: 'Across 55 published TEA models — an order of magnitude above anything achieved for casein.' },
-      { label: 'Private-benchmark average titer', value: 42, unit: 'g L⁻¹', provenance: 'curated', paperId: 'O2', basis: { kind: 'record', recordId: 'r-O2-4' }, note: 'The gap between this and the published average is why GFI concludes published models systematically overstate cost.' },
-      { label: 'Capital charge factor', value: 0.12, unit: '', provenance: 'demo', basis: { kind: 'model', justification: 'Financial convention, not a measurement. The annualisation rate applied to CAPEX is a modelling choice the corpus has no opinion on.' }, note: 'Annualisation rate, same convention as S1 so the two are comparable.' },
-      { label: 'CAPEX scaling exponent', value: 0.6, unit: '', provenance: 'demo', basis: { kind: 'model', justification: 'The six-tenths rule, standard practice for capacity scaling. Convention, not literature.' }, note: 'Six-tenths rule.' },
-    ],
-  },
-  {
-    id: 'sc-s3',
-    modelId: 'S3',
-    name: 'Conventional β-casein from milk',
-    description:
-      'The incumbent baseline. Cold microfiltration of micellar casein concentrate, exploiting β-casein’s dissociation from the micelle at low temperature. This is what any recombinant route has to beat.',
-    product: 'Bovine β-casein (dairy-derived)',
-    dims: S3.dims,
-    point: { ...S3.referencePoint },
-    pinned: false,
-    assumptions: [
-      { label: 'β-casein concentration in bovine milk', value: 2.6, unit: 'g L⁻¹', provenance: 'curated', paperId: 'E1', basis: { kind: 'record', recordId: 'r-E1-1' }, note: 'The feedstock concentration that sets the whole cost structure — you process a litre to recover a couple of grams.' },
-      { label: 'Casein share of total milk protein', value: 80, unit: '%', provenance: 'curated', paperId: 'E1', basis: { kind: 'record', recordId: 'r-E1-3' }, note: 'Caseins are ~80% of bovine milk protein; β-casein is ~36% of the casein fraction.' },
-      { label: 'Isoelectric point', value: 4.65, unit: '', provenance: 'curated', paperId: 'E1', basis: { kind: 'record', recordId: 'r-E1-2' }, note: 'Caseins precipitate readily at pI on acidification — the basis of the simplest isolation route.' },
-      { label: 'Cold microfiltration temperature', value: 4, unit: '°C', provenance: 'curated', paperId: 'J3', basis: { kind: 'model', justification: 'From the J3 process description. Ontology v1 has no field for a process temperature, so no record exists to bind — an ontology gap, not an unsourced number.' }, note: 'β-casein dissociates from the micelle into the serum phase at ≤4 °C, which is what makes the separation possible.' },
-      { label: 'Raw milk price', value: 0.45, unit: 'USD L⁻¹', provenance: 'demo', basis: { kind: 'model', justification: 'Commodity price input. Market data rather than literature, and outside the ontology.' }, note: 'Commodity price varies by region and season. Demo assumption — swept as a dimension because it dominates.' },
-      { label: 'Fractionation capital, annualised', value: 4.1, unit: 'USD kg⁻¹', provenance: 'demo', basis: { kind: 'model', justification: 'Annualised capital for the incumbent train. A modelling choice on the sizing basis.' }, note: 'Membrane plant capital per kg of β-casein. Demo assumption.' },
-      { label: 'Residual biomass co-product value', value: 0.44, unit: 'EUR kg⁻¹', provenance: 'curated', paperId: 'O6', basis: { kind: 'record', recordId: 'r-O6-1' }, note: 'Protein-rich residual streams are worth very little, which limits how much credit any process can claim for them.' },
-    ],
-  },
-];

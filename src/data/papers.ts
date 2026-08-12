@@ -1,14 +1,12 @@
 // Corpus assembly (OF-COR-001). Threads are authored separately and
 // concatenated here in entry-id order.
+// The collection itself now comes from the adapter; this module keeps only
+// the derived views built on top of it.
+import { PAPERS } from '@/data/source';
+
+export { PAPERS };
+
 import type { Paper } from './types';
-import { PAPERS_AB } from './corpus/threadAB';
-import { PAPERS_CD } from './corpus/threadCD';
-import { PAPERS_EF } from './corpus/threadEF';
-import { PAPERS_G } from './corpus/threadG';
-import { PAPERS_H } from './corpus/threadH';
-import { PAPERS_IJ } from './corpus/threadIJ';
-import { PAPERS_KL } from './corpus/threadKL';
-import { PAPERS_MNO } from './corpus/threadMNO';
 
 /** Sort by thread letter then numeric index, so H2 precedes H10. */
 function byEntryId(a: Paper, b: Paper): number {
@@ -20,16 +18,6 @@ function byEntryId(a: Paper, b: Paper): number {
   return pa[3].localeCompare(pb[3]);
 }
 
-export const PAPERS: Paper[] = [
-  ...PAPERS_AB,
-  ...PAPERS_CD,
-  ...PAPERS_EF,
-  ...PAPERS_G,
-  ...PAPERS_H,
-  ...PAPERS_IJ,
-  ...PAPERS_KL,
-  ...PAPERS_MNO,
-].sort(byEntryId);
 
 export const PAPERS_BY_ID: Record<string, Paper> = Object.fromEntries(
   PAPERS.map((p) => [p.id, p]),

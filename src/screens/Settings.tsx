@@ -32,7 +32,8 @@ import {
 } from '@/components/ui';
 import { DataTable, type Column } from '@/components/DataTable';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import { ONTOLOGY } from '@/data/source';
+import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import type { FieldId, ParameterDef } from '@/data/types';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';

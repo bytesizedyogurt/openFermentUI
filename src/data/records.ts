@@ -2,32 +2,20 @@
 // (value, unit) so the invariant holds by construction rather than by
 // authoring discipline. Categorical records carry a string value and are
 // passed through untouched.
+// The collection itself now comes from the adapter; this module keeps only
+// the derived views built on top of it.
+import { RECORDS } from '@/data/source';
+
+export { RECORDS };
+
 import type { ExtractionRecord } from './types';
 import { toSI } from '@/engine/units';
-import { RECORDS_AB } from './corpus/threadAB';
-import { RECORDS_CD } from './corpus/threadCD';
-import { RECORDS_EF } from './corpus/threadEF';
-import { RECORDS_G } from './corpus/threadG';
-import { RECORDS_H } from './corpus/threadH';
-import { RECORDS_IJ } from './corpus/threadIJ';
-import { RECORDS_KL } from './corpus/threadKL';
-import { RECORDS_MNO } from './corpus/threadMNO';
 
 function normalize(r: ExtractionRecord): ExtractionRecord {
   if (typeof r.value !== 'number') return { ...r, si: { value: 0, unit: r.unit } };
   return { ...r, si: toSI(r.value, r.unit) };
 }
 
-export const RECORDS: ExtractionRecord[] = [
-  ...RECORDS_AB,
-  ...RECORDS_CD,
-  ...RECORDS_EF,
-  ...RECORDS_G,
-  ...RECORDS_H,
-  ...RECORDS_IJ,
-  ...RECORDS_KL,
-  ...RECORDS_MNO,
-].map(normalize);
 
 export const RECORDS_BY_ID: Record<string, ExtractionRecord> = Object.fromEntries(
   RECORDS.map((r) => [r.id, r]),

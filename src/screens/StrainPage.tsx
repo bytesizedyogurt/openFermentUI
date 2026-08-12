@@ -23,7 +23,8 @@ import {
   X,
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, ParameterDef, Protocol, Scenario } from '@/data/types';
-import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
+import { ONTOLOGY } from '@/data/source';
+import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
 import { href, navigate } from '@/router';
 import { convert, fmt, asNumber } from '@/engine/units';

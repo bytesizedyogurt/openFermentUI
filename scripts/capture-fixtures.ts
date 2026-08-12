@@ -39,13 +39,15 @@ import {
 import { scaleMaterial, scaleMaterials, inoculumVolume } from '../src/engine/scale';
 import { diffVersions } from '../src/engine/diff';
 import { computeRunMetrics } from '../src/engine/metrics';
-import { PAPERS } from '../src/data/papers';
-import { RECORDS } from '../src/data/records';
-import { STRAINS } from '../src/data/strains';
-import { PROTOCOLS } from '../src/data/protocols';
-import { ONTOLOGY } from '../src/data/ontology';
-import { SCENARIOS } from '../src/data/scenarios';
-import { MODULES } from '../src/data/learn';
+import {
+  PAPERS,
+  RECORDS,
+  STRAINS,
+  PROTOCOLS,
+  ONTOLOGY,
+  SCENARIOS,
+  MODULES,
+} from '../src/data/source';
 import type { ExtractionRecord, FieldId, ProtocolVersion, RunOutput } from '../src/data/types';
 
 const OUT = join(process.cwd(), 'fixtures');

@@ -6,7 +6,6 @@
  * locates extraction spans by searching for `quote` inside the section text, so
  * a quote that isn't present silently loses its highlight rather than erroring.
  */
-import { PAPERS } from '../src/data/papers';
 import { CONTRADICTIONS } from '../src/data/contradictions';
 import { PATENTS } from '../src/data/patents';
 import { DESIGNS } from '../src/data/designs';
@@ -16,16 +15,14 @@ import type { RunOutcome } from '../src/data/types';
  *  invariant is written down rather than assumed. */
 const DEPOSITS: RunOutcome[] = [];
 import { stillFails } from '../src/engine/balance';
-import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
-import { STRAINS } from '../src/data/strains';
-import { PROTOCOLS } from '../src/data/protocols';
-import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
+import { PAPERS, RECORDS, STRAINS, PROTOCOLS, SCENARIOS, MODULES } from '../src/data/source';
+import { COST_MODELS } from '../src/data/scenarios';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
-import { MODULES } from '../src/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
-import { ONTOLOGY, ONTOLOGY_BY_ID } from '../src/data/ontology';
+import { ONTOLOGY } from '../src/data/source';
+import { ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
 

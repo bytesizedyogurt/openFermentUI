@@ -7,9 +7,9 @@ import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '
 import { FLOWS } from '@/data/flows';
 import { useStore, nextId, isAggregatable } from '@/store';
 import { tokenize, expandQuery, searchCorpus } from '@/engine/retrieval';
-import { PAPERS } from '@/data/papers';
-import { STRAINS } from '@/data/strains';
-import { ONTOLOGY, fieldName } from '@/data/ontology';
+import { PAPERS, STRAINS } from '@/data/source';
+import { ONTOLOGY } from '@/data/source';
+import { fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { delay, scaled, streamInterval } from './latency';
 

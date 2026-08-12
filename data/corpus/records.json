@@ -1,0 +1,3797 @@
+[
+  {
+    "id": "r-A1-1",
+    "paperId": "A1",
+    "sectionId": "s1",
+    "quote": "Both reach ~0.2% of total soluble protein for intracellular GFP/YFP",
+    "field": "expression_pct_tsp",
+    "value": 0.2,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.2,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §2 A1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§2 A1"
+  },
+  {
+    "id": "r-A1-2",
+    "paperId": "A1",
+    "sectionId": "s1",
+    "quote": "Selection used paromomycin at 10 µg/mL and zeocin",
+    "field": "medium_component_conc",
+    "value": 10,
+    "unit": "µg mL⁻¹",
+    "si": {
+      "value": 0.01,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "paromomycin",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §2 A1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§2 A1"
+  },
+  {
+    "id": "r-A2-1",
+    "paperId": "A2",
+    "sectionId": "s1",
+    "quote": "Untransformed CC-4350 and Elow47 show no detectable YFP",
+    "field": "expression_pct_tsp",
+    "value": 0,
+    "unit": "% TSP",
+    "si": {
+      "value": 0,
+      "unit": "% TSP"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §2 A2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§2 A2",
+    "negativeResult": true
+  },
+  {
+    "id": "r-A7-1",
+    "paperId": "A7",
+    "sectionId": "s1",
+    "quote": "an 8.6-fold increase in transgenic protein accumulation over random insertion",
+    "field": "fold_improvement",
+    "value": 8.6,
+    "unit": "×",
+    "si": {
+      "value": 8.6,
+      "unit": "×"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §2 A7 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§2 A7",
+    "comparativeBaseline": "random insertion of the same transgene (vs targeted integration at the LHCBM1 safe harbor)"
+  },
+  {
+    "id": "r-A7-2",
+    "paperId": "A7",
+    "sectionId": "s1",
+    "quote": "a 60-fold increase in valencene production when a sesquiterpene synthase was co-expressed there",
+    "field": "fold_improvement",
+    "value": 60,
+    "unit": "×",
+    "si": {
+      "value": 60,
+      "unit": "×"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §2 A7 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§2 A7",
+    "comparativeBaseline": "baseline not stated in OF-COR-001; the entry contrasts targeted integration at the LHCBM1 safe harbor with random insertion"
+  },
+  {
+    "id": "r-B5-1",
+    "paperId": "B5",
+    "sectionId": "s1",
+    "quote": "colonies appear on selection in 7–10 days for cw15 and UVM4",
+    "field": "time_to_colony",
+    "value": 8.5,
+    "unit": "d",
+    "si": {
+      "value": 204,
+      "unit": "h"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §3 B5 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§3 B5",
+    "range": {
+      "low": 7,
+      "high": 10
+    }
+  },
+  {
+    "id": "r-B5-2",
+    "paperId": "B5",
+    "sectionId": "s1",
+    "quote": "colonies appear on selection in 7–10 days for cw15 and UVM4",
+    "field": "time_to_colony",
+    "value": 8.5,
+    "unit": "d",
+    "si": {
+      "value": 204,
+      "unit": "h"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §3 B5 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§3 B5",
+    "range": {
+      "low": 7,
+      "high": 10
+    }
+  },
+  {
+    "id": "r-B5-3",
+    "paperId": "B5",
+    "sectionId": "s1",
+    "quote": "versus 15–20 days for WT12",
+    "field": "time_to_colony",
+    "value": 17.5,
+    "unit": "d",
+    "si": {
+      "value": 420,
+      "unit": "h"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §3 B5 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§3 B5",
+    "range": {
+      "low": 15,
+      "high": 20
+    },
+    "comparativeBaseline": "walled wild-type WT12, against cell-wall-deficient cw15 and UVM4"
+  },
+  {
+    "id": "r-C2-1",
+    "paperId": "C2",
+    "sectionId": "s1",
+    "quote": "reaching a maximum of 15 mg/L",
+    "field": "titer_secreted",
+    "value": 0.015,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.015,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §4 C2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§4 C2"
+  },
+  {
+    "id": "r-C2-2",
+    "paperId": "C2",
+    "sectionId": "s1",
+    "quote": "raised yields up to 12-fold",
+    "field": "fold_improvement",
+    "value": 12,
+    "unit": "×",
+    "si": {
+      "value": 12,
+      "unit": "×"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §4 C2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§4 C2",
+    "comparativeBaseline": "(SP)10/(SP)20 glycomodule fusion vs unfused Venus"
+  },
+  {
+    "id": "r-C6-1",
+    "paperId": "C6",
+    "sectionId": "s1",
+    "quote": "12–15 mg/L secreted",
+    "field": "titer_secreted",
+    "value": 0.0135,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.0135,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §4 C6 — recitation of C2, not an independent measurement; pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "citesRecordId": "r-C2-1",
+    "curationRef": "§4 C6",
+    "range": {
+      "low": 0.012,
+      "high": 0.015
+    }
+  },
+  {
+    "id": "r-C6-2",
+    "paperId": "C6",
+    "sectionId": "s1",
+    "quote": "0.2% TSP intracellular",
+    "field": "expression_pct_tsp",
+    "value": 0.2,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.2,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "uvm4",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §4 C6 — recitation of A1 (Neupert 2009), not an independent measurement; pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "citesRecordId": "r-A1-1",
+    "curationRef": "§4 C6"
+  },
+  {
+    "id": "r-D1-1",
+    "paperId": "D1",
+    "sectionId": "s1",
+    "quote": "Endogenous soluble and membrane-bound proteins carry predominantly oligomannosides from Man-2 to Man-5",
+    "field": "glycan_species",
+    "value": "predominantly oligomannosides, Man-2 to Man-5",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D1"
+  },
+  {
+    "id": "r-D1-2",
+    "paperId": "D1",
+    "sectionId": "s1",
+    "quote": "oligomannosidic N-glycans account for nearly 70% of the total N-glycan population",
+    "field": "glycan_species",
+    "value": "oligomannosidic N-glycans, ~70% of the total N-glycan population",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D1"
+  },
+  {
+    "id": "r-D1-3",
+    "paperId": "D1",
+    "sectionId": "s1",
+    "quote": "minor complex N-glycans are partially 6-O-methylated Man-3 to Man-5 bearing one or two xylose residues",
+    "field": "glycan_species",
+    "value": "minor complex N-glycans: partially 6-O-methylated Man-3 to Man-5 with one or two xylose residues",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D1"
+  },
+  {
+    "id": "r-D2-1",
+    "paperId": "D2",
+    "sectionId": "s1",
+    "quote": "proteins carry a linear Man5GlcNAc2 rather than the branched eukaryotic structure",
+    "field": "glycan_species",
+    "value": "linear Man5GlcNAc2 (from a Glc3Man5GlcNAc2 precursor, GnTI-independent Golgi processing)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D2"
+  },
+  {
+    "id": "r-D2-2",
+    "paperId": "D2",
+    "sectionId": "s1",
+    "quote": "Complementation with Arabidopsis or Phaeodactylum GnTI produced no glycan change",
+    "field": "glycan_species",
+    "value": "unchanged — no glycan change after heterologous GnTI complementation",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D2",
+    "negativeResult": true
+  },
+  {
+    "id": "r-D4-1",
+    "paperId": "D4",
+    "sectionId": "s1",
+    "quote": "reports mammalian-like sialylated N-glycans in total extracts",
+    "field": "glycan_species",
+    "value": "mammalian-like sialylated N-glycans in total extracts",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §5 D4 — conflicts with D1/D2; mass spectrometry named but not specified; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§5 D4"
+  },
+  {
+    "id": "r-E1-1",
+    "paperId": "E1",
+    "sectionId": "s1",
+    "quote": "β-casein is present at roughly 2.6 g/L",
+    "field": "titer_secreted",
+    "value": 2.6,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 2.6,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "β-casein in bovine milk",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §6 E1 — native concentration in bovine milk, i.e. the reference the recombinant secreted titers are compared against, not a recombinant titer; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§6 E1"
+  },
+  {
+    "id": "r-E1-2",
+    "paperId": "E1",
+    "sectionId": "s1",
+    "quote": "precipitate readily at their isoelectric point, pH 4.65, on acidification",
+    "field": "gelation_ph",
+    "value": 4.65,
+    "unit": "",
+    "si": {
+      "value": 4.65,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "casein, isoelectric precipitation on acidification",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §6 E1 — the source states an isoelectric precipitation pH on acidification; ontology v1 carries acid destabilisation pH under gelation_ph. OF-COR-001 names no analytical method, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§6 E1"
+  },
+  {
+    "id": "r-E1-3",
+    "paperId": "E1",
+    "sectionId": "s1",
+    "quote": "Casein is ~80% of total bovine milk protein",
+    "field": "expression_pct_tsp",
+    "value": 80,
+    "unit": "% TSP",
+    "si": {
+      "value": 80,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "total casein, as % of total bovine milk protein",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §6 E1 — a native protein share of bovine milk protein, not a recombinant expression level; the denominator is carried in componentTag because it is not the total soluble protein of a host. 80 sits above the ontology range for expression_pct_tsp (0.001–40), which is the ontology correctly signalling that no host expresses at this share; the value is a reference composition, so the range warning is expected rather than a transcription error. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§6 E1"
+  },
+  {
+    "id": "r-E2-1",
+    "paperId": "E2",
+    "sectionId": "s1",
+    "quote": "approximately spherical, radius ~70 nm",
+    "field": "micelle_diameter",
+    "value": 140,
+    "unit": "nm",
+    "si": {
+      "value": 1.4e-07,
+      "unit": "m"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "native bovine casein micelle",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §6 E2 — the source states a RADIUS of ~70 nm; micelle_diameter is a diameter field, so the value recorded is 2 × 70 = 140 nm and the quote is the radius statement it derives from. OF-COR-001 names no sizing method, so method is undetermined. Confidence 0.7 for the approximation and the derivation. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§6 E2"
+  },
+  {
+    "id": "r-F4-1",
+    "paperId": "F4",
+    "sectionId": "s1",
+    "quote": "αs1 ≈ 38% of total caseins",
+    "field": "expression_pct_tsp",
+    "value": 38,
+    "unit": "% TSP",
+    "si": {
+      "value": 38,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "αs1-casein, as % of total caseins",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F4 — native casein composition; denominator is total caseins, not total soluble protein, and is carried in componentTag. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§7 F4"
+  },
+  {
+    "id": "r-F4-2",
+    "paperId": "F4",
+    "sectionId": "s1",
+    "quote": "β ≈ 36%",
+    "field": "expression_pct_tsp",
+    "value": 36,
+    "unit": "% TSP",
+    "si": {
+      "value": 36,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "β-casein, as % of total caseins",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F4 — native casein composition; denominator is total caseins, not total soluble protein, and is carried in componentTag. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§7 F4"
+  },
+  {
+    "id": "r-F4-3",
+    "paperId": "F4",
+    "sectionId": "s1",
+    "quote": "κ ≈ 13%",
+    "field": "expression_pct_tsp",
+    "value": 13,
+    "unit": "% TSP",
+    "si": {
+      "value": 13,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "κ-casein, as % of total caseins",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F4 — native casein composition; denominator is total caseins, not total soluble protein, and is carried in componentTag. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§7 F4"
+  },
+  {
+    "id": "r-F4-4",
+    "paperId": "F4",
+    "sectionId": "s1",
+    "quote": "αs2 ≈ 10%",
+    "field": "expression_pct_tsp",
+    "value": 10,
+    "unit": "% TSP",
+    "si": {
+      "value": 10,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "αs2-casein, as % of total caseins",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F4 — native casein composition; denominator is total caseins, not total soluble protein, and is carried in componentTag. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§7 F4"
+  },
+  {
+    "id": "r-F5-1",
+    "paperId": "F5",
+    "sectionId": "s1",
+    "quote": "β-casein ≈ 5 phosphates concentrated at the N-terminus",
+    "field": "phosphate_count",
+    "value": 5,
+    "unit": "mol mol⁻¹",
+    "si": {
+      "value": 5,
+      "unit": "mol mol⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "β-casein (P02666)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F5 — the native phosphate count that defines \"fully phosphorylated\" for this programme. OF-COR-001 names no analytical method for the accession annotation, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§7 F5"
+  },
+  {
+    "id": "r-F5-2",
+    "paperId": "F5",
+    "sectionId": "s1",
+    "quote": "αs1 ≈ 8 phosphates concentrated centrally",
+    "field": "phosphate_count",
+    "value": 8,
+    "unit": "mol mol⁻¹",
+    "si": {
+      "value": 8,
+      "unit": "mol mol⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "αs1-casein (P02662)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F5 — OF-COR-001 names no analytical method for the accession annotation, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§7 F5"
+  },
+  {
+    "id": "r-F5-3",
+    "paperId": "F5",
+    "sectionId": "s1",
+    "quote": "αs2 ≈ 10–13",
+    "field": "phosphate_count",
+    "value": 11.5,
+    "unit": "mol mol⁻¹",
+    "si": {
+      "value": 11.5,
+      "unit": "mol mol⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "αs2-casein (P02663)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F5 — stated as a range 10–13; value is the midpoint and the range is carried explicitly. OF-COR-001 names no analytical method, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§7 F5",
+    "range": {
+      "low": 10,
+      "high": 13
+    }
+  },
+  {
+    "id": "r-F5-4",
+    "paperId": "F5",
+    "sectionId": "s1",
+    "quote": "κ typically 1–3 near the C-terminus",
+    "field": "phosphate_count",
+    "value": 2,
+    "unit": "mol mol⁻¹",
+    "si": {
+      "value": 2,
+      "unit": "mol mol⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "κ-casein (P02668)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §7 F5 — stated as a range 1–3; value is the midpoint and the range is carried explicitly. κ-casein uniquely carries phospho-threonine as well as phospho-serine. OF-COR-001 names no analytical method, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§7 F5",
+    "range": {
+      "low": 1,
+      "high": 3
+    }
+  },
+  {
+    "id": "r-G1-1",
+    "paperId": "G1",
+    "sectionId": "s1",
+    "quote": "Fam20C is the authentic Golgi casein kinase",
+    "field": "kinase_identity",
+    "value": "FAM20C (the authentic Golgi casein kinase)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§8 G1"
+  },
+  {
+    "id": "r-G1-2",
+    "paperId": "G1",
+    "sectionId": "s1",
+    "quote": "the catalytically inactive D478A mutant, unable to coordinate Mn²⁺, did not",
+    "field": "kinase_identity",
+    "value": "none — FAM20C D478A, catalytically inactive and unable to coordinate Mn²⁺",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "FAM20C D478A",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G1 — the catalytically-dead specificity control; assay not named in the curation note, method recorded as undetermined; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§8 G1",
+    "negativeResult": true
+  },
+  {
+    "id": "r-G1-3",
+    "paperId": "G1",
+    "sectionId": "s1",
+    "quote": "produced a mobility shift absent with D478A and reversed by λ-phosphatase",
+    "field": "kinase_identity",
+    "value": "FAM20C (αs1-casein mobility shift in U2OS cells, reversed by λ-phosphatase)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G1 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "SDS-PAGE mobility",
+    "curationRef": "§8 G1"
+  },
+  {
+    "id": "r-G2-1",
+    "paperId": "G2",
+    "sectionId": "s1",
+    "quote": "Fam20C phosphorylates secreted proteins within S-x-E/pS motifs",
+    "field": "kinase_identity",
+    "value": "FAM20C (S-x-E/pS motif specificity in secreted proteins)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G2 — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§8 G2"
+  },
+  {
+    "id": "r-G3-1",
+    "paperId": "G3",
+    "sectionId": "s1",
+    "quote": "Fam20A is a pseudokinase acting as an allosteric activator of Fam20C",
+    "field": "kinase_identity",
+    "value": "FAM20A (pseudokinase; allosteric activator of FAM20C)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G3 — the two-gene design warning; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§8 G3"
+  },
+  {
+    "id": "r-G3-2",
+    "paperId": "G3",
+    "sectionId": "s1",
+    "quote": "The Fam20C E306Q mutant showed greatly reduced in vitro kinase activity toward casein",
+    "field": "kinase_identity",
+    "value": "FAM20C E306Q — greatly reduced in vitro kinase activity toward casein, intrinsic ATPase abolished",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "FAM20C E306Q",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G3 — \"greatly reduced\" is not quantified in the curation note, so confidence is held at 0.7; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§8 G3",
+    "negativeResult": true
+  },
+  {
+    "id": "r-G4-1",
+    "paperId": "G4",
+    "sectionId": "s1",
+    "quote": "an atypical kinase-like fold with disulfide bridges, N-linked glycosylation",
+    "field": "glycan_species",
+    "value": "N-linked glycosylation carried by the Fam20 kinase itself",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "FAM20 kinase",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G4 — glycan is on the kinase, not on the product; componentTag carries the distinction. Structure gives no glycan composition, so no species is recorded and method is undetermined; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§8 G4"
+  },
+  {
+    "id": "r-G7-1",
+    "paperId": "G7",
+    "sectionId": "s1",
+    "quote": "site-1 protease cleaves the propeptide and promotes secretion and activation",
+    "field": "kinase_identity",
+    "value": "FAM20C (Golgi transmembrane form; activated by site-1 protease cleavage of the propeptide)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G7 — bears on whether a heterologous construct must be pre-cleaved; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§8 G7"
+  },
+  {
+    "id": "r-G9-1",
+    "paperId": "G9",
+    "sectionId": "s1",
+    "quote": "CK1 and CK2 were named for casein but lack the correct localization and do not recognize the SxE motifs",
+    "field": "kinase_identity",
+    "value": "CK1 and CK2 — wrong localization, no SxE recognition; not the Golgi casein kinase",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G9 — the \"casein kinase is three enzymes\" trap of §19; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§8 G9",
+    "negativeResult": true
+  },
+  {
+    "id": "r-G9-2",
+    "paperId": "G9",
+    "sectionId": "s1",
+    "quote": "was selectively phosphorylated by GCK but not CK1 or CK2",
+    "field": "kinase_identity",
+    "value": "GCK (Golgi casein kinase) — selective for the β(28–40) peptide over CK1 and CK2",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G9 — the curation note names GCK, not FAM20C, for this assay; the equation of the two is G1’s claim, not this entry’s. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§8 G9"
+  },
+  {
+    "id": "r-G9-3",
+    "paperId": "G9",
+    "sectionId": "s1",
+    "quote": "a synthetic peptide corresponding to a bovine β-casein phosphorylation site, β(28–40)",
+    "field": "phospho_site_position",
+    "value": 28,
+    "unit": "residue",
+    "si": {
+      "value": 28,
+      "unit": "residue"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "β(28–40) assay peptide, N-terminal bound",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G9 — start of the β(28–40) assay peptide; mature numbering per the §19 numbering trap; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "numbering": "mature",
+    "curationRef": "§8 G9"
+  },
+  {
+    "id": "r-G9-4",
+    "paperId": "G9",
+    "sectionId": "s1",
+    "quote": "a synthetic peptide corresponding to a bovine β-casein phosphorylation site, β(28–40)",
+    "field": "phospho_site_position",
+    "value": 40,
+    "unit": "residue",
+    "si": {
+      "value": 40,
+      "unit": "residue"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "β(28–40) assay peptide, C-terminal bound",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G9 — end of the β(28–40) assay peptide; mature numbering per the §19 numbering trap; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "numbering": "mature",
+    "curationRef": "§8 G9"
+  },
+  {
+    "id": "r-G9-5",
+    "paperId": "G9",
+    "sectionId": "s1",
+    "quote": "by 2010, 50–70% of secreted phosphosites in plasma and CSF matched the S/TxE consensus",
+    "field": "phosphorylation_degree",
+    "value": 60,
+    "unit": "%",
+    "si": {
+      "value": 60,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §8 G9 — dated to 2010 in a ~2025 entry, so recorded as a recitation of prior literature rather than this entry’s own measurement; no corpus record exists yet to cite, so citesRecordId is unset. Denominator is secreted phosphosites matching the S/TxE consensus, NOT native site count — check the field mapping at verification"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§8 G9",
+    "range": {
+      "low": 50,
+      "high": 70
+    }
+  },
+  {
+    "id": "r-H1-1",
+    "paperId": "H1",
+    "sectionId": "s1",
+    "quote": "Table 2 — 5 yeast studies, expression 0.6 mg/L to 1 g/L",
+    "field": "titer_intracellular",
+    "value": 500.3,
+    "unit": "mg L⁻¹",
+    "si": {
+      "value": 0.5003,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H1 — the span across five tabulated yeast studies, not one measurement; value is the midpoint of a three-order-of-magnitude range and should not be read as a central estimate. The review does not say whether the figures are intracellular or secreted; filed as intracellular at reduced confidence. isPrimary false: these are other groups’ measurements. Pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H1",
+    "range": {
+      "low": 0.6,
+      "high": 1000
+    }
+  },
+  {
+    "id": "r-H1-2",
+    "paperId": "H1",
+    "sectionId": "s1",
+    "quote": "potato 0.01%",
+    "field": "expression_pct_tsp",
+    "value": 0.01,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.01,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H1 Table 3 — a citation of the H15 potato measurement, not an independent one; excluded from aggregates via isPrimary. Pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "citesRecordId": "r-H15-3",
+    "curationRef": "§9 H1"
+  },
+  {
+    "id": "r-H1-3",
+    "paperId": "H1",
+    "sectionId": "s1",
+    "quote": "soybean 0.1–0.4%",
+    "field": "expression_pct_tsp",
+    "value": 0.25,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.25,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H1 Table 3 — a citation of the H15 soybean measurement; value is the midpoint of the stated range. Pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "citesRecordId": "r-H15-1",
+    "curationRef": "§9 H1",
+    "range": {
+      "low": 0.1,
+      "high": 0.4
+    }
+  },
+  {
+    "id": "r-H1-4",
+    "paperId": "H1",
+    "sectionId": "s1",
+    "quote": "soybean 0.1–0.4%, not phosphorylated",
+    "field": "phosphorylation_degree",
+    "value": 0,
+    "unit": "% of native sites",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H1 Table 3 — a reported negative, not an unperformed analysis. The review does not name the method behind the soybean row, so method is undetermined here even though H15 records MALDI-MS. Pending verification against source"
+      }
+    ],
+    "isPrimary": false,
+    "evidenceClass": "literature",
+    "citesRecordId": "r-H15-2",
+    "method": "undetermined",
+    "curationRef": "§9 H1",
+    "negativeResult": true
+  },
+  {
+    "id": "r-H2-1",
+    "paperId": "H2",
+    "sectionId": "s1",
+    "quote": "phosphorylated recombinant human β-casein at 500 mg/L",
+    "field": "titer_intracellular",
+    "value": 500,
+    "unit": "mg L⁻¹",
+    "si": {
+      "value": 0.5,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H2 — filed as intracellular: the host is E. coli, which has no secretory compartment. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H2"
+  },
+  {
+    "id": "r-H2-2",
+    "paperId": "H2",
+    "sectionId": "s1",
+    "quote": "Polycistronic construct encoding human β-casein with both α and β subunits of human CK2",
+    "field": "kinase_identity",
+    "value": "CK2",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H2 — human CK2, both α and β subunits, co-expressed polycistronically; phosphorylation characterized by negative-ion LC-ESI-MS. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "LC-ESI-MS",
+    "curationRef": "§9 H2"
+  },
+  {
+    "id": "r-H3-1",
+    "paperId": "H3",
+    "sectionId": "s1",
+    "quote": "Yield 200 mg/L",
+    "field": "titer_intracellular",
+    "value": 200,
+    "unit": "mg L⁻¹",
+    "si": {
+      "value": 0.2,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H3 — filed as intracellular: the host is E. coli, which has no secretory compartment. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H3"
+  },
+  {
+    "id": "r-H3-2",
+    "paperId": "H3",
+    "sectionId": "s1",
+    "quote": "Bovine β-casein co-expressed with CK2 achieved much lower phosphorylation than the native 5P state",
+    "field": "kinase_identity",
+    "value": "CK2 (partial phosphorylation of bovine β-casein)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H3 — the curation note states partial phosphorylation by infusion MS of purified phosphopeptides but gives no percentage, so no phosphorylation_degree record is created; the shortfall against the native 5P state is carried in the kinase value. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "LC-ESI-MS",
+    "curationRef": "§9 H3"
+  },
+  {
+    "id": "r-H4-1",
+    "paperId": "H4",
+    "sectionId": "s1",
+    "quote": "approximately 15–18% of total soluble protein",
+    "field": "expression_pct_tsp",
+    "value": 16.5,
+    "unit": "% TSP",
+    "si": {
+      "value": 16.5,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H4 — stated as a range; value is the midpoint. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H4",
+    "range": {
+      "low": 15,
+      "high": 18
+    }
+  },
+  {
+    "id": "r-H4-2",
+    "paperId": "H4",
+    "sectionId": "s1",
+    "quote": "corresponding to 0.7–1.0 g/L",
+    "field": "titer_intracellular",
+    "value": 0.85,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.85,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H4 — stated as a range; value is the midpoint. The paper supplies both this and the %TSP figure, which is why it is the one entry where the two are linked; ontology Rule 2 still forbids converting between them elsewhere. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H4",
+    "range": {
+      "low": 0.7,
+      "high": 1
+    }
+  },
+  {
+    "id": "r-H4-3",
+    "paperId": "H4",
+    "sectionId": "s1",
+    "quote": "secreted protein reached only 0.005% of the intracellular level",
+    "field": "secreted_fraction",
+    "value": 0.005,
+    "unit": "% of total expressed",
+    "si": {
+      "value": 0.005,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H4 — the note expresses this as a percentage of the INTRACELLULAR level rather than of total expressed protein; at 0.005% the two denominators are indistinguishable, but the wording should be checked against the paper. The construct used the native bovine signal peptide, which the yeast did not read. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H4"
+  },
+  {
+    "id": "r-H4-4",
+    "paperId": "H4",
+    "sectionId": "s1",
+    "quote": "carried the same degree of phosphorylation as animal-derived β-casein",
+    "field": "phosphorylation_degree",
+    "value": 100,
+    "unit": "% of native sites",
+    "si": {
+      "value": 100,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H4 — parity with animal-derived protein recorded as 100% of native sites; the claim is comparative, established by phosphatase treatment plus urea-PAGE, not by site-level mass spectrometry. Which enzyme did it is not stated anywhere in the corpus. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "urea-PAGE + phosphatase",
+    "curationRef": "§9 H4",
+    "comparativeBaseline": "animal-derived bovine β-casein"
+  },
+  {
+    "id": "r-H4-5",
+    "paperId": "H4",
+    "sectionId": "s1",
+    "quote": "The protein was N-glycosylated with mannan",
+    "field": "glycan_species",
+    "value": "mannan",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H4 — the glycan is stated, the analysis behind it is not, so method is undetermined. β-casein is not natively glycosylated, so this is host-added and a product risk. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§9 H4"
+  },
+  {
+    "id": "r-H5-1",
+    "paperId": "H5",
+    "sectionId": "s1",
+    "quote": "Reported at 1 g/L",
+    "field": "titer_intracellular",
+    "value": 1,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H5 — the document gives the figure with no host and no compartment; filed as intracellular at reduced confidence, and it is the upper end of the yeast span H1 Table 2 reports. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H5"
+  },
+  {
+    "id": "r-H7-1",
+    "paperId": "H7",
+    "sectionId": "s1",
+    "quote": "10 mg/L",
+    "field": "titer_intracellular",
+    "value": 10,
+    "unit": "mg L⁻¹",
+    "si": {
+      "value": 0.01,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H7 — the note gives the figure without a compartment; the accompanying 5–10% secreted fraction is what makes intracellular the better reading, but it is a reading, hence reduced confidence. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H7"
+  },
+  {
+    "id": "r-H7-2",
+    "paperId": "H7",
+    "sectionId": "s1",
+    "quote": "only 5–10% of total expressed casein reached the extracellular medium",
+    "field": "secreted_fraction",
+    "value": 7.5,
+    "unit": "% of total expressed",
+    "si": {
+      "value": 7.5,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H7 — stated as a range; value is the midpoint. Three orders of magnitude above the P. pastoris figure in H4, which is the comparison that matters. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H7",
+    "range": {
+      "low": 5,
+      "high": 10
+    }
+  },
+  {
+    "id": "r-H8-1",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "three prokaryotic Hanks-type Ser/Thr kinases from Bacillus subtilis (PrkC, PrkD, YabT)",
+    "field": "kinase_identity",
+    "value": "PrkC",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — one of five kinases screened for S-x-E/pS specificity; the note does not say which of them succeeded. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H8-2",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "three prokaryotic Hanks-type Ser/Thr kinases from Bacillus subtilis (PrkC, PrkD, YabT)",
+    "field": "kinase_identity",
+    "value": "PrkD",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — one of five kinases screened for S-x-E/pS specificity. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H8-3",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "three prokaryotic Hanks-type Ser/Thr kinases from Bacillus subtilis (PrkC, PrkD, YabT)",
+    "field": "kinase_identity",
+    "value": "YabT",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — one of five kinases screened for S-x-E/pS specificity. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H8-4",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "eukaryotic FAM20C from human and bovine",
+    "field": "kinase_identity",
+    "value": "FAM20C (human)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — screened as one of the five, and the version that could not be expressed in E. coli (see r-H8-6). Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H8-5",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "eukaryotic FAM20C from human and bovine",
+    "field": "kinase_identity",
+    "value": "FAM20C (bovine)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — the bovine ortholog, screened alongside the human one. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H8-6",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "Attempts to express both FAM20C versions in E. coli failed",
+    "field": "kinase_identity",
+    "value": "none — FAM20C not expressible in E. coli",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — a reported negative, not an unattempted experiment: both human and bovine FAM20C failed to express, and successful human FAM20C expression is reported to date only in human cell lines. This is the record the eukaryotic-host argument rests on. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§9 H8",
+    "negativeResult": true
+  },
+  {
+    "id": "r-H8-7",
+    "paperId": "H8",
+    "sectionId": "s1",
+    "quote": "all eight phosphoserine sites of αs1-casein variant B substituted with aspartate",
+    "field": "phosphate_count",
+    "value": 8,
+    "unit": "mol mol⁻¹",
+    "si": {
+      "value": 8,
+      "unit": "mol mol⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "αs1-casein variant B",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H8 — eight is the phosphoserine SITE count of αs1-casein variant B, all of which were replaced by aspartate in the phosphomimetic construct; the phosphomimetic protein itself carries no phosphate. The note names no analysis behind the site count, so method is undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§9 H8"
+  },
+  {
+    "id": "r-H12-1",
+    "paperId": "H12",
+    "sectionId": "s1",
+    "quote": "Not phosphorylated",
+    "field": "phosphorylation_degree",
+    "value": 0,
+    "unit": "% of native sites",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H12 — measurement of absence, not absence of measurement; the corpus document names no method for it. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§9 H12",
+    "negativeResult": true
+  },
+  {
+    "id": "r-H13-1",
+    "paperId": "H13",
+    "sectionId": "s1",
+    "quote": "recombinant non-phosphorylated human β-casein",
+    "field": "phosphorylation_degree",
+    "value": 0,
+    "unit": "% of native sites",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H13 — taken from the entry title rather than from curation prose, since the document supplies none; recorded at reduced confidence for that reason. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§9 H13",
+    "negativeResult": true
+  },
+  {
+    "id": "r-H14-1",
+    "paperId": "H14",
+    "sectionId": "s1",
+    "quote": "1.45 g/L",
+    "field": "titer_intracellular",
+    "value": 1.45,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1.45,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H14 — the highest bacterial casein titer in the corpus. The document names neither the host strain nor the compartment; filed as intracellular at reduced confidence on the ground that the note calls it bacterial. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H14"
+  },
+  {
+    "id": "r-H15-1",
+    "paperId": "H15",
+    "sectionId": "s1",
+    "quote": "Bovine β-casein in soybean (Glycine max), 0.1–0.4% of total soluble protein",
+    "field": "expression_pct_tsp",
+    "value": 0.25,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.25,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H15 — stated as a range; value is the midpoint. The measurement H1 Table 3 recites. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H15",
+    "range": {
+      "low": 0.1,
+      "high": 0.4
+    }
+  },
+  {
+    "id": "r-H15-2",
+    "paperId": "H15",
+    "sectionId": "s1",
+    "quote": "not phosphorylated by MALDI-MS",
+    "field": "phosphorylation_degree",
+    "value": 0,
+    "unit": "% of native sites",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H15 — a reported negative with the method named, which is what distinguishes it from the bacterial rows H1 records as undetermined. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "MALDI-MS",
+    "curationRef": "§9 H15",
+    "negativeResult": true
+  },
+  {
+    "id": "r-H15-3",
+    "paperId": "H15",
+    "sectionId": "s1",
+    "quote": "human β-casein in Solanum tuberosum, 0.01%",
+    "field": "expression_pct_tsp",
+    "value": 0.01,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.01,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H15 — the potato figure H1 Table 3 recites; the note reports the product migrating as a single band about 1–1.5 kDa smaller than the phosphorylated control, which the corpus does not convert into a phosphorylation value. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H15"
+  },
+  {
+    "id": "r-H17a-1",
+    "paperId": "H17a",
+    "sectionId": "s1",
+    "quote": "explicitly incorporates Fam20C",
+    "field": "kinase_identity",
+    "value": "FAM20C",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H17 — a patent claim, not a measurement: host cells comprising a recombinant casein and a recombinant kinase, with Fam20C named. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H17"
+  },
+  {
+    "id": "r-H17d-1",
+    "paperId": "H17d",
+    "sectionId": "s1",
+    "quote": "recombinant fusion milk proteins at ≥1% of total soluble protein",
+    "field": "expression_pct_tsp",
+    "value": 1,
+    "unit": "% TSP",
+    "si": {
+      "value": 1,
+      "unit": "% TSP"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H17 — a claimed lower bound (≥1%), not a measured point value, and asserted in a patent rather than a peer-reviewed result; no range is set because the document gives no upper end. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H17"
+  },
+  {
+    "id": "r-H17f-1",
+    "paperId": "H17f",
+    "sectionId": "s1",
+    "quote": "co-infiltration of N. benthamiana with bovine κ-casein (pMOZ700) and BtFam20C (pMOZ14) constructs",
+    "field": "kinase_identity",
+    "value": "FAM20C (bovine, BtFam20C)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "pMOZ14",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §9 H17 — the bovine FAM20C construct co-infiltrated with κ-casein; the closest published statement of the co-expression architecture this programme is considering. Pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§9 H17"
+  },
+  {
+    "id": "r-I1-1",
+    "paperId": "I1",
+    "sectionId": "s1",
+    "quote": "roughly 87% of total protein was sedimentable in the fully phosphorylated case",
+    "field": "micellar_fraction",
+    "value": 87,
+    "unit": "% sedimentable",
+    "si": {
+      "value": 87,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "fully phosphorylated reassembled micelles",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I1 — sedimentable fraction across all three reassembly systems; method recorded as gravimetric (sedimentation), pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§10 I1"
+  },
+  {
+    "id": "r-I1-2",
+    "paperId": "I1",
+    "sectionId": "s1",
+    "quote": "precipitating at their isoelectric point around pH 5.5",
+    "field": "gelation_ph",
+    "value": 5.5,
+    "unit": "",
+    "si": {
+      "value": 5.5,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "fully dephosphorylated caseins — precipitation, not gelation",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I1 — the pH at which fully dephosphorylated caseins precipitate instead of gelling; the curation note names no analytical method, so method is undetermined; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§10 I1"
+  },
+  {
+    "id": "r-I1-3",
+    "paperId": "I1",
+    "sectionId": "s1",
+    "quote": "fully dephosphorylated caseins hardly formed micelle structures at all and remained in serum",
+    "field": "micellar_fraction",
+    "value": 0,
+    "unit": "% sedimentable",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "fully dephosphorylated casein pool",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I1 — a reported negative, not a missing measurement: the curation note states the effect qualitatively (\"hardly formed micelle structures at all\"), so the value is entered as zero at reduced confidence and must be replaced with the published figure at verification"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§10 I1",
+    "negativeResult": true
+  },
+  {
+    "id": "r-I2-1",
+    "paperId": "I2",
+    "sectionId": "s1",
+    "quote": "roughly three times larger than normal",
+    "field": "fold_improvement",
+    "value": 3,
+    "unit": "×",
+    "si": {
+      "value": 3,
+      "unit": "×"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "artificial casein micelle size",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I2 — recorded as a fold change rather than a micelle_diameter because the curation note gives no absolute size; the direction is a degradation, not an improvement, and the baseline carries that; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§10 I2",
+    "comparativeBaseline": "normally sized artificial casein micelles (predominantly dephosphorylated casein vs normal)"
+  },
+  {
+    "id": "r-I9-1",
+    "paperId": "I9",
+    "sectionId": "s1",
+    "quote": "recombinant non-phosphorylated αs1-casein can stabilize emulsion and foam interfaces",
+    "field": "phosphorylation_degree",
+    "value": 0,
+    "unit": "% of native sites",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "recombinant αs1-casein, emulsion and foam interfaces",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I9 — the material is described as non-phosphorylated and still interfacially functional; recorded as a reported zero rather than a missing measurement, with no analytical method named; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§10 I9",
+    "negativeResult": true
+  },
+  {
+    "id": "r-I9-2",
+    "paperId": "I9",
+    "sectionId": "s1",
+    "quote": "ACM formation from recombinant caseins has so far been unsuccessful",
+    "field": "micellar_fraction",
+    "value": 0,
+    "unit": "% sedimentable",
+    "si": {
+      "value": 0,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "artificial casein micelles from recombinant caseins",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §10 I9 — a field-level negative reported by a review (\"unsuccessful, largely for PTM reasons\") rather than a measured fraction; entered at reduced confidence and flagged as a negative result; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§10 I9",
+    "negativeResult": true
+  },
+  {
+    "id": "r-J7-1",
+    "paperId": "J7",
+    "sectionId": "s1",
+    "quote": "isoelectric precipitation of recombinant β-casein at pI 4.6",
+    "field": "gelation_ph",
+    "value": 4.6,
+    "unit": "",
+    "si": {
+      "value": 4.6,
+      "unit": ""
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "isoelectric point (pI) of β-casein",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J7 — the acid-precipitation pH of β-casein, held under gelation_ph because the ontology carries isoelectric precipitation there; no analytical method is named; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§11 J7"
+  },
+  {
+    "id": "r-J9-1",
+    "paperId": "J9",
+    "sectionId": "s1",
+    "quote": "Yeast mannan is the analogue of the UVM4 cell-wall-glycoprotein aggregate problem",
+    "field": "glycan_species",
+    "value": "mannan",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "componentTag": "host glycan interfering with purification",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J9 — the host glycan named as the purification interferent; the entry is [verify] and names no analytical method; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§11 J9"
+  },
+  {
+    "id": "r-J10-1",
+    "paperId": "J10",
+    "sectionId": "s1",
+    "quote": "an average protein yield of 31 ± 6%",
+    "field": "disruption_protein_yield",
+    "value": 31,
+    "unit": "% of total protein",
+    "si": {
+      "value": 31,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "componentTag": "pulsed electric field, cell-wall-deficient mutant",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J10 — PEF on the cell-wall-deficient mutant; the curation note gives 31 ± 6% as a mean with a standard deviation, so the point value is entered and the spread is not encoded as a range; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§11 J10"
+  },
+  {
+    "id": "r-J10-2",
+    "paperId": "J10",
+    "sectionId": "s1",
+    "quote": "11 ± 3% for the walled wild type",
+    "field": "disruption_protein_yield",
+    "value": 11,
+    "unit": "% of total protein",
+    "si": {
+      "value": 11,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "pulsed electric field, walled wild type",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J10 — the walled wild-type control for r-J10-1, kept as its own record so the contrast survives aggregation; the walled strain is not one of the platform strain ids, so no organism is set; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§11 J10"
+  },
+  {
+    "id": "r-J10-3",
+    "paperId": "J10",
+    "sectionId": "s1",
+    "quote": "roughly three-fold",
+    "field": "fold_improvement",
+    "value": 3,
+    "unit": "×",
+    "si": {
+      "value": 3,
+      "unit": "×"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "cw15",
+    "componentTag": "pulsed electric field, wall-deficient vs walled",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J10 — the ratio the curation note draws between r-J10-1 and r-J10-2; not an independent measurement of either, and aggregation should treat it as the same observation viewed as a ratio; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§11 J10",
+    "comparativeBaseline": "PEF protein release from the walled wild type (11 ± 3% of total protein)"
+  },
+  {
+    "id": "r-J11-1",
+    "paperId": "J11",
+    "sectionId": "s1",
+    "quote": "giving >95% cell disintegration",
+    "field": "disruption_protein_yield",
+    "value": 95,
+    "unit": "%",
+    "si": {
+      "value": 95,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "cell disintegration by HPH and bead milling (not protein release)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J11 — a stated lower bound (>95%) entered as 95 at reduced confidence; the number counts disrupted cells rather than released protein, so the unit is a plain percentage and componentTag says so; re-field this record if the ontology gains a disintegration parameter"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§11 J11"
+  },
+  {
+    "id": "r-J11-2",
+    "paperId": "J11",
+    "sectionId": "s1",
+    "quote": "approximately 50% (w/w) release of total proteins",
+    "field": "disruption_protein_yield",
+    "value": 50,
+    "unit": "% of total protein",
+    "si": {
+      "value": 50,
+      "unit": "%"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "high-pressure homogenization and bead milling, Nannochloropsis gaditana",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J11 — the mechanical-disruption protein-release benchmark; stated as approximate, so confidence is reduced; the organism is not one of the platform strain ids; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§11 J11"
+  },
+  {
+    "id": "r-J11-3",
+    "paperId": "J11",
+    "sectionId": "s1",
+    "quote": "at low energy input (<0.5 kWh per kg biomass)",
+    "field": "disruption_energy",
+    "value": 0.5,
+    "unit": "kWh kg⁻¹",
+    "si": {
+      "value": 0.5,
+      "unit": "kWh kg⁻¹"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "high-pressure homogenization and bead milling",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J11 — a stated upper bound (<0.5 kWh per kg biomass) entered as 0.5 at reduced confidence; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§11 J11"
+  },
+  {
+    "id": "r-J11-4",
+    "paperId": "J11",
+    "sectionId": "s1",
+    "quote": "PEF released a maximum of 13% of protein from walled Chlorella vulgaris",
+    "field": "disruption_protein_yield",
+    "value": 13,
+    "unit": "% of total protein",
+    "si": {
+      "value": 13,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "pulsed electric field on walled Chlorella vulgaris",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J11 — the counter-case to J10: PEF on walled cells, at 10-100x the energy of bead milling; a stated maximum; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§11 J11"
+  },
+  {
+    "id": "r-J11-5",
+    "paperId": "J11",
+    "sectionId": "s1",
+    "quote": "which released 45–50%",
+    "field": "disruption_protein_yield",
+    "value": 47.5,
+    "unit": "% of total protein",
+    "si": {
+      "value": 47.5,
+      "unit": "%"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "bead milling on walled Chlorella vulgaris",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §11 J11 — the bead-milling comparator in the same sentence as r-J11-4; the source states a range, so the midpoint is the value and the range is carried explicitly; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "gravimetric",
+    "curationRef": "§11 J11",
+    "range": {
+      "low": 45,
+      "high": 50
+    }
+  },
+  {
+    "id": "r-K1-1",
+    "paperId": "K1",
+    "sectionId": "s1",
+    "quote": "1 g/L β-lactoglobulin",
+    "field": "titer_secreted",
+    "value": 1,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "treesei",
+    "componentTag": "bovine β-lactoglobulin secreted by T. reesei",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K1 — secreted β-lactoglobulin titer, reported at both 24-well plate and bioreactor scale; method recorded as HPLC, which the curation note does not itself name, so the qualifier must be confirmed at ingest; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "HPLC",
+    "curationRef": "§12 K1"
+  },
+  {
+    "id": "r-K1-2",
+    "paperId": "K1",
+    "sectionId": "s1",
+    "quote": "2 g/L ovalbumin",
+    "field": "titer_secreted",
+    "value": 2,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 2,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "treesei",
+    "componentTag": "hen egg ovalbumin secreted by T. reesei",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K1 — secreted ovalbumin titer, reported at both 24-well plate and bioreactor scale; method recorded as HPLC, which the curation note does not itself name, so the qualifier must be confirmed at ingest; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "HPLC",
+    "curationRef": "§12 K1"
+  },
+  {
+    "id": "r-K1-3",
+    "paperId": "K1",
+    "sectionId": "s1",
+    "quote": "N-glycosylated with mannose-containing five-sugar-unit glycans typical of fungal hosts",
+    "field": "glycan_species",
+    "value": "mannose-containing five-sugar-unit N-glycan (fungal)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "treesei",
+    "componentTag": "host N-glycosylation on recombinant β-Lg and ovalbumin",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K1 — the host glycan structure carried by the recombinant proteins; the curation note names no analytical method, so method is undetermined; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§12 K1"
+  },
+  {
+    "id": "r-K5-1",
+    "paperId": "K5",
+    "sectionId": "s1",
+    "quote": "recombinant caseins can acquire O-glycosylation absent from the animal-derived protein",
+    "field": "glycan_species",
+    "value": "O-glycosylation (yeast-added, absent from bovine casein)",
+    "unit": "",
+    "si": {
+      "value": 0,
+      "unit": ""
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "gs115",
+    "componentTag": "recombinant casein expressed in yeast",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K5 — a host-added modification that the animal-derived protein does not carry, recorded because unwanted glycosylation is a product risk rather than a requirement for casein; the review names no analytical method, so method is undetermined; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§12 K5"
+  },
+  {
+    "id": "r-K10-1",
+    "paperId": "K10",
+    "sectionId": "s1",
+    "quote": "from about 0.001 g/L in 1990",
+    "field": "titer_secreted",
+    "value": 0.001,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.001,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "milk protein from microbial fermentation, 1990 — trajectory start",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K10 — the 1990 end of the milk-protein titer trajectory; stated as \"about\" and not attributed to a named host or product, hence reduced confidence and no organism; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§12 K10"
+  },
+  {
+    "id": "r-K10-2",
+    "paperId": "K10",
+    "sectionId": "s1",
+    "quote": "to about 1 g/L",
+    "field": "titer_secreted",
+    "value": 1,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "milk protein from microbial fermentation, present day — trajectory end",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K10 — the present-day end of the milk-protein titer trajectory; stated as \"about\" and not attributed to a named host, hence reduced confidence and no organism; note that it coincides with the K1 T. reesei measurement and must not be double-counted with it in aggregates until verification establishes whether it is that same result; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§12 K10"
+  },
+  {
+    "id": "r-K10-3",
+    "paperId": "K10",
+    "sectionId": "s1",
+    "quote": "roughly 3 g/L β-lactoglobulin in bovine milk",
+    "field": "titer_secreted",
+    "value": 3,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 3,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "bovine",
+    "componentTag": "natural β-lactoglobulin concentration in bovine milk — the biological benchmark, not a fermentation titer",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K10 — the natural abundance of β-lactoglobulin in bovine milk, held in titer_secreted because it is the concentration every fermentation titer in the corpus is compared against; it is emphatically not a recombinant secretion measurement and the componentTag says so, so it must be excluded from host-performance aggregates; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§12 K10"
+  },
+  {
+    "id": "r-K10-4",
+    "paperId": "K10",
+    "sectionId": "s1",
+    "quote": "at least 6 g/L for heterologous secretion",
+    "field": "titer_secreted",
+    "value": 6,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 6,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "ecoli",
+    "componentTag": "engineered E. coli secretion systems — reported floor, not a point value",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §12 K10 — reported secretion yields via engineered E. coli secretion systems; the source states a lower bound (\"at least 6 g/L\") rather than a point or a closed range, so the value is entered as that floor and no `range` is set; pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§12 K10"
+  },
+  {
+    "id": "r-M5-1",
+    "paperId": "M5",
+    "sectionId": "s1",
+    "quote": "a maximum density of 1.23 ± 0.13 g/L within 96 h",
+    "field": "final_biomass_density",
+    "value": 1.23,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1.23,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "componentTag": "wild-type CC-137c in TAP, 96 h",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M5 — wild-type baseline density; the ±0.13 g/L spread is a standard deviation rather than a stated range, so it is left in the quote rather than entered as `range` — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M5"
+  },
+  {
+    "id": "r-M5-2",
+    "paperId": "M5",
+    "sectionId": "s1",
+    "quote": "maximum biomass productivity 24.30 ± 1.65 mg L⁻¹ h⁻¹",
+    "field": "volumetric_productivity",
+    "value": 24.3,
+    "unit": "mg L⁻¹ h⁻¹",
+    "si": {
+      "value": 0.024300000000000002,
+      "unit": "g L⁻¹ h⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "componentTag": "wild-type CC-137c in TAP — biomass, not product",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M5 — the productivity figure the ontology cites as its worked example for this field; it is a biomass productivity, not a product productivity — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M5"
+  },
+  {
+    "id": "r-M5-3",
+    "paperId": "M5",
+    "sectionId": "s1",
+    "quote": "a cGAPDH-overexpressing strain reached 1.74 ± 0.09 g/L",
+    "field": "final_biomass_density",
+    "value": 1.74,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1.74,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "componentTag": "cGAPDH-overexpressing strain, CC-137c background",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M5 — engineered arm of the same experiment; organism is recorded as the CC-137c wild-type background because the corpus has no id for the cGAPDH derivative — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M5"
+  },
+  {
+    "id": "r-M5-4",
+    "paperId": "M5",
+    "sectionId": "s1",
+    "quote": "28.54 ± 1.43 mg L⁻¹ h⁻¹",
+    "field": "volumetric_productivity",
+    "value": 28.54,
+    "unit": "mg L⁻¹ h⁻¹",
+    "si": {
+      "value": 0.02854,
+      "unit": "g L⁻¹ h⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "componentTag": "cGAPDH-overexpressing strain — biomass productivity",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M5 — paired with r-M5-2; the two together are the only same-experiment productivity comparison in the corpus — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M5"
+  },
+  {
+    "id": "r-M6-1",
+    "paperId": "M6",
+    "sectionId": "s1",
+    "quote": "Greatest biomass production 2.15 g L⁻¹ in 5 days",
+    "field": "final_biomass_density",
+    "value": 2.15,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 2.15,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "mixotrophic cultivation with acetate, 5 days",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M6 — the upper end of the 1–2 g/L Chlamydomonas band; the curation note names no strain, so no organism id is asserted — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M6"
+  },
+  {
+    "id": "r-M7-1",
+    "paperId": "M7",
+    "sectionId": "s1",
+    "quote": "fastest growth rate, r = 0.087 h⁻¹, with 0% CO₂ feed",
+    "field": "growth_rate_mu",
+    "value": 0.087,
+    "unit": "h⁻¹",
+    "si": {
+      "value": 0.087,
+      "unit": "h⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "organism": "creinhardtii-wt",
+    "componentTag": "strain cc124 in TAP, 0% CO₂ feed",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M7 — the value the ontology quotes for growth_rate_mu; the source writes it as r rather than μ, which must be confirmed to be a specific growth rate at verification"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M7"
+  },
+  {
+    "id": "r-M8-1",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "response-surface optimum at 4.12 g/L sodium acetate",
+    "field": "medium_component_conc",
+    "value": 4.12,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 4.12,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "sodium acetate",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — carbon-source optimum from the response-surface study (PMC9549070); the optimum was fitted for lipid productivity, not for recombinant protein, and must not be reused without that caveat — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-2",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "0.20 g/L NH₄Cl",
+    "field": "medium_component_conc",
+    "value": 0.2,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.2,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "NH₄Cl (response-surface optimum, nitrogen-reduced)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — the nitrogen-reduced optimum; paired with r-M8-3, which carries the standard TAP value it is reduced from — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-3",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "standard TAP contains 0.38 g/L NH₄Cl",
+    "field": "medium_component_conc",
+    "value": 0.38,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 0.38,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "NH₄Cl (standard TAP)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — the standard TAP nitrogen concentration, recorded so that the reduced optimum in r-M8-2 has a baseline to be read against — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-4",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "1.68 g/L biomass",
+    "field": "final_biomass_density",
+    "value": 1.68,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1.68,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "response-surface optimum, nitrogen-reduced TAP",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — density achieved at the fitted medium optimum (PMC9549070) — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-5",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "highest cell concentration 1.5 g/L at 3.4 g/L feed acetate",
+    "field": "final_biomass_density",
+    "value": 1.5,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 1.5,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "heterotrophic chemostat on acetate (Chen & Johns 1996)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — the chemostat half of the composite entry; it is a steady-state cell concentration rather than a batch harvest density, which the field name does not capture — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-6",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "3.4 g/L feed acetate",
+    "field": "medium_component_conc",
+    "value": 3.4,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 3.4,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "acetate (chemostat feed concentration)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — feed concentration, not a batch medium concentration; recorded because it is the carbon input the 1.5 g/L in r-M8-5 was obtained from — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-M8-7",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "Heterotrophic microalgal cultures can reach 50–100 g/L dry biomass",
+    "field": "final_biomass_density",
+    "value": 75,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 75,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "heterotrophic microalgae, general band (not Chlamydomonas)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — a general claim about heterotrophic microalgae rather than a measurement on one strain; the point value is the midpoint of the stated range and carries no meaning on its own — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8",
+    "range": {
+      "low": 50,
+      "high": 100
+    }
+  },
+  {
+    "id": "r-M8-8",
+    "paperId": "M8",
+    "sectionId": "s1",
+    "quote": "a maximum around 30 g/L autotrophically",
+    "field": "final_biomass_density",
+    "value": 30,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 30,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "autotrophic microalgae, general ceiling",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §14 M8 — stated as \"around 30 g/L\", so confidence is reduced; it is the autotrophic counterpart to r-M8-7 and the ceiling the cw15 case has to argue against — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§14 M8"
+  },
+  {
+    "id": "r-O2-1",
+    "paperId": "O2",
+    "sectionId": "s1",
+    "quote": "Biomass-fermentation protein costs converge around $4–6/kg",
+    "field": "minimum_selling_price",
+    "value": 5,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 5,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "biomass-fermentation protein, convergence of 55 published models",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O2 — the figure the ontology quotes for this field; it is a meta-analytic convergence across 55 models rather than one process estimate, and the same entry warns those models systematically overstate cost — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O2",
+    "range": {
+      "low": 4,
+      "high": 6
+    }
+  },
+  {
+    "id": "r-O2-2",
+    "paperId": "O2",
+    "sectionId": "s1",
+    "quote": "Microbial oils range $1.5–19.6/kg",
+    "field": "minimum_selling_price",
+    "value": 10.55,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 10.55,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "microbial oils (a different product to protein — not a comparator)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O2 — the point value is the arithmetic midpoint of a 13-fold span and should never be read as a central estimate; the range is the claim — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O2",
+    "range": {
+      "low": 1.5,
+      "high": 19.6
+    }
+  },
+  {
+    "id": "r-O2-3",
+    "paperId": "O2",
+    "sectionId": "s1",
+    "quote": "average titer around 24 g/L",
+    "field": "titer_secreted",
+    "value": 24,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 24,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "mean assumed titer across published TEA models",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O2 — field assignment is provisional: the note says only \"titer\" and does not distinguish secreted from intracellular, so titer_secreted is the closer of the two fields rather than a stated one. It is also a modelling assumption, not a measurement. Confidence reduced accordingly — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§16 O2"
+  },
+  {
+    "id": "r-O2-4",
+    "paperId": "O2",
+    "sectionId": "s1",
+    "quote": "average around 42 g/L",
+    "field": "titer_secreted",
+    "value": 42,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 42,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "mean titer across private-sector benchmarks",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O2 — the private-sector counterpart to r-O2-3 and the reason the entry argues published models overstate cost; same provisional field assignment and same reduced confidence — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§16 O2"
+  },
+  {
+    "id": "r-O3-1",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "crude protein ranged $2,300/kg (1 L empirical)",
+    "field": "minimum_selling_price",
+    "value": 2300,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 2300,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "crude protein, 1 L empirical scenario",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — worst-case crude MSP, from the scenario built on 1 L empirical data; the same scenario supplies r-O3-5 and r-O3-6, which are the two parameters the entry says drive it — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O3-2",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "to $75/kg (optimistic)",
+    "field": "minimum_selling_price",
+    "value": 75,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 75,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "crude protein, optimistic scenario",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — best-case crude MSP; the 30-fold spread against r-O3-1 comes from scenario assumptions alone, not from different measurements — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O3-3",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "purified protein ranged $99,000/kg",
+    "field": "minimum_selling_price",
+    "value": 99000,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 99000,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "purified protein, high end of the four-scenario range",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — the note does not say which scenario the purified endpoints belong to, so the componentTag says \"high end\" rather than assuming it pairs with the 1 L empirical case — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O3-4",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "$99,000/kg to $970/kg",
+    "field": "minimum_selling_price",
+    "value": 970,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 970,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "purified protein, low end of the four-scenario range",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — same caution as r-O3-3 about scenario attribution; the crude-to-purified step is roughly 13-fold at both ends, which is the transferable part of this model — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O3-5",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "the 1 L case ran at 4.2 g/L biomass",
+    "field": "final_biomass_density",
+    "value": 4.2,
+    "unit": "g L⁻¹",
+    "si": {
+      "value": 4.2,
+      "unit": "kg m⁻³"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "1 L empirical scenario — the density driving r-O3-1",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — one of the two upstream parameters the entry identifies as inversely related to levelized protein cost; the host is not named in the note — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O3-6",
+    "paperId": "O3",
+    "sectionId": "s1",
+    "quote": "target protein at 0.1% of cell mass",
+    "field": "expression_pct_tsp",
+    "value": 0.1,
+    "unit": "% TSP",
+    "si": {
+      "value": 0.1,
+      "unit": "% TSP"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "1 L empirical scenario — source states % of cell mass, not % TSP",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O3 — recorded under the expression-share field with unit % TSP, but the note says \"% of cell mass\", which is a different denominator to total soluble protein. Confidence reduced and the discrepancy flagged for verification rather than silently normalised"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "curationRef": "§16 O3"
+  },
+  {
+    "id": "r-O4-1",
+    "paperId": "O4",
+    "sectionId": "s1",
+    "quote": "production cost 69 €/kg, dominated by labor and depreciation",
+    "field": "minimum_selling_price",
+    "value": 69,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 69,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "real 30 m³ tubular plant at 3.8 t/y — biomass, not protein",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O4 — currency deliberately left in euros; units.ts keeps costEUR and costUSD in separate families because converting needs an exchange rate with a date. Cost of dried biomass, not of a purified protein — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O4"
+  },
+  {
+    "id": "r-O4-2",
+    "paperId": "O4",
+    "sectionId": "s1",
+    "quote": "Simplification plus scale-up to 200 t/y reduces cost to 12.6 €/kg",
+    "field": "minimum_selling_price",
+    "value": 12.6,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 12.6,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "same plant simplified and scaled to 200 t/y (projected)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O4 — a projection rather than an operated cost, unlike r-O4-1; the 5.5-fold gap between the two is the scale argument this entry contributes — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O4"
+  },
+  {
+    "id": "r-O5-1",
+    "paperId": "O5",
+    "sectionId": "s1",
+    "quote": "6.7 €/kg biomass at 24% TAG",
+    "field": "minimum_selling_price",
+    "value": 6.7,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 6.7,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "100-ha plant, base case at 24% TAG",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O5 — base-case biomass cost for a 100-ha modelled plant; currency left in euros by design — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O5"
+  },
+  {
+    "id": "r-O5-2",
+    "paperId": "O5",
+    "sectionId": "s1",
+    "quote": "All improvements together project 3.3 €/kg at 60% TAG",
+    "field": "minimum_selling_price",
+    "value": 3.3,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 3.3,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "all modelled improvements applied, 60% TAG (projected)",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O5 — a stacked best case, not an achieved cost: it assumes every sensitivity in the entry is realised at once and the TAG fraction more than doubles — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O5"
+  },
+  {
+    "id": "r-O6-1",
+    "paperId": "O6",
+    "sectionId": "s1",
+    "quote": "residual protein-rich biomass co-product was valued at only 0.44 EUR/kg DM",
+    "field": "minimum_selling_price",
+    "value": 0.44,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 0.44,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "co-product credit inside the model — a valuation, not a product minimum selling price",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O6 — field assignment is a compromise: the ontology has one price-per-kilogram field and this is a co-product valuation rather than a break-even price, so the componentTag carries the distinction the field cannot. Must not be aggregated with product MSPs — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O6"
+  },
+  {
+    "id": "r-O7-1",
+    "paperId": "O7",
+    "sectionId": "s1",
+    "quote": "53.32 €/kg DW at 27.61 t/y for 1 ha",
+    "field": "minimum_selling_price",
+    "value": 53.32,
+    "unit": "EUR kg⁻¹",
+    "si": {
+      "value": 53.32,
+      "unit": "EUR kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "Nannochloropsis oceanica, 1 ha year-round, dry weight basis",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O7 — includes harvesting and drying, unlike the cultivation-only costs in O4 and O5, which is why it sits an order of magnitude above them; currency left in euros — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "process model",
+    "curationRef": "§16 O7"
+  },
+  {
+    "id": "r-O8-1",
+    "paperId": "O8",
+    "sectionId": "s1",
+    "quote": "about USD 1 million/kg in 2000",
+    "field": "minimum_selling_price",
+    "value": 1000000,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 1000000,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "precision-fermentation protein, year 2000",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O8 — stated as \"about\", so confidence is reduced; the review names no costing method behind the trajectory, so method is undetermined rather than assumed to be a process model. Sits above the ontology plausibility ceiling on purpose — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§16 O8"
+  },
+  {
+    "id": "r-O8-2",
+    "paperId": "O8",
+    "sectionId": "s1",
+    "quote": "roughly USD 100/kg currently",
+    "field": "minimum_selling_price",
+    "value": 100,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 100,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "precision-fermentation protein, as of the 2024 review",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O8 — the peer-reviewed present-day figure, and the one that should be compared against the O8m vendor claims rather than mixed with them — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§16 O8"
+  },
+  {
+    "id": "r-O8-3",
+    "paperId": "O8",
+    "sectionId": "s1",
+    "quote": "forecast below USD 10/kg by 2030",
+    "field": "minimum_selling_price",
+    "value": 10,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 10,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.7,
+    "status": "unverified",
+    "provenance": "curated",
+    "componentTag": "forecast ceiling for 2030 — the source states \"below\", not a point",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O8 — a forecast, not a measurement, and an upper bound rather than an estimate: the value 10 is the stated ceiling and the true claim is \"less than\". Confidence reduced — pending verification against source"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§16 O8"
+  },
+  {
+    "id": "r-O8m-1",
+    "paperId": "O8m",
+    "sectionId": "s1",
+    "quote": "precision-fermentation whey protein at $25–30/kg in 2025",
+    "field": "minimum_selling_price",
+    "value": 27.5,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 27.5,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "industry-estimate",
+    "componentTag": "precision-fermentation whey protein, 2025 — vendor claim",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O8 market half — non-peer-reviewed. OF-COR-001 names no source, so there is nothing to verify against and the provenance class, not the confidence, carries the warning. Never gold; excluded from default aggregates"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§16 O8",
+    "range": {
+      "low": 25,
+      "high": 30
+    }
+  },
+  {
+    "id": "r-O8m-2",
+    "paperId": "O8m",
+    "sectionId": "s1",
+    "quote": "targeting $8–12/kg by 2028",
+    "field": "minimum_selling_price",
+    "value": 10,
+    "unit": "USD kg⁻¹",
+    "si": {
+      "value": 10,
+      "unit": "USD kg⁻¹"
+    },
+    "confidence": 0.9,
+    "status": "unverified",
+    "provenance": "industry-estimate",
+    "componentTag": "precision-fermentation whey protein, 2028 vendor target",
+    "audit": [
+      {
+        "at": "2026-08-10 09:00",
+        "who": "S. Creighton",
+        "action": "curated from OF-COR-001 §16 O8 market half — a vendor target rather than a forecast with a method behind it. It happens to coincide with the peer-reviewed 2030 ceiling in r-O8-3 two years earlier, which is precisely the kind of agreement the industry-estimate tick exists to keep from reading as corroboration"
+      }
+    ],
+    "isPrimary": true,
+    "evidenceClass": "literature",
+    "method": "undetermined",
+    "curationRef": "§16 O8",
+    "range": {
+      "low": 8,
+      "high": 12
+    }
+  }
+]
