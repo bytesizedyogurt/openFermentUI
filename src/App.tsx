@@ -43,9 +43,11 @@ import Library from '@/screens/Library';
 import PaperReader from '@/screens/PaperReader';
 import Ingest from '@/screens/Ingest';
 import Extract from '@/screens/Extract';
-import { Ledger, ParameterPage, Contradictions, UnbuiltPart } from '@/screens/Ledger';
+import { Ledger, ParameterPage, Contradictions } from '@/screens/Ledger';
 import { Parchment } from '@/screens/Parchment';
 import { OpenLab } from '@/screens/OpenLab';
+import { DesignIndex, DesignDetail } from '@/screens/DesignDetail';
+import { Notary } from '@/screens/Notary';
 import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
@@ -85,7 +87,7 @@ const RAIL: RailItem[] = [
   { group: 'Return' },
   { to: '/runbook', label: 'Runbook', icon: ClipboardList, key: 'p' },
   { to: '/openlab', label: 'openLab', icon: Users, key: 'b' },
-  { to: '/notary', label: 'Notary', icon: Stamp, key: 'y', pending: true },
+  { to: '/notary', label: 'Notary', icon: Stamp, key: 'y' },
   { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
 ];
 
@@ -163,7 +165,7 @@ function Screen() {
     case 'openlab':
       return <OpenLab />;
     case 'notary':
-      return <UnbuiltPart name="Notary" blurb="A disclosure queue gated on an enablement checklist. Publish stays disabled, with a specific reason, until a disclosure would actually teach someone to reproduce the result." />;
+      return <Notary />;
     case 'geneos':
       return b ? <StrainPage strainId={b} /> : <Organisms />;
     case 'runbook':
@@ -172,6 +174,7 @@ function Screen() {
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
     case 'fermos':
       if (b === 'compare') return <Compare />;
+      if (b === 'd') return c ? <DesignDetail designId={c} /> : <DesignIndex />;
       if (b === 's' && c) return <ScenarioWorkspace scenarioId={c} />;
       return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;
     case 'learn':

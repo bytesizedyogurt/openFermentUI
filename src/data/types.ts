@@ -435,6 +435,14 @@ export interface ScenarioDim {
   unit: string;
   values: number[];
   sourceRecordId?: string;
+  /**
+   * The ontology parameter this dimension sweeps, where it is one. Set only for
+   * dimensions that vary a Ledger parameter — a fermenter scale or a milk price
+   * is a process or market input, not a parameter the corpus measures, and must
+   * not claim otherwise. T0 checks a configured value against this field's
+   * declared range.
+   */
+  field?: FieldId;
 }
 
 /**
@@ -754,4 +762,58 @@ export interface ResultField {
   type: 'number' | 'text' | 'boolean';
   unit?: string;
   required: boolean;
+}
+
+// ── OF-FE-004 §2 — design records and the tier cascade ─────────────────
+
+export type Tier = 'T0' | 'T1' | 'T2' | 'T3';
+
+/**
+ * A tier either ran or it did not. `absent` is a first-class state, not a
+ * failure and not a pass: T1 needs a genome-scale model and T2 a reactor model,
+ * and neither exists in this build. Rendering an absent tier as passed would
+ * claim the biology was checked when only the economics were modelled.
+ */
+export type TierState = 'passed' | 'failed' | 'absent';
+
+export interface TierResult {
+  tier: Tier;
+  state: TierState;
+  /** Why the tier is absent, when it is. Shown in place of a result. */
+  absentReason?: string;
+  /** The constraint that bound the result — the most useful string on the page. */
+  bindingConstraint: string;
+  values: Record<string, { value: number; unit: string }>;
+  /** T3 only. Never a bare point estimate presented as a distribution. */
+  msp?: { median: number; p05: number; p95: number; unit: string };
+  /** T3 only, sorted by |rho| descending. Drives the experiment loop. */
+  sensitivity?: { field?: FieldId; label: string; rho: number }[];
+  engineVersion: string;
+}
+
+export type PublicationStatus =
+  | 'draft'
+  | 'counsel-review'
+  | 'hold'
+  | 'publish'
+  | 'published'
+  | { kind: 'embargo'; until: string };
+
+export interface DesignRecord {
+  id: string;
+  label: string;
+  scenarioId: string;
+  config: Record<string, number>;
+  tiers: TierResult[];
+  /** Exact records consumed — the basis for staleness. */
+  consumedRecordIds: string[];
+  /**
+   * 'clear' means Parchment has not evaluated this design, NOT that it is
+   * unencumbered. Parchment holds no parsed claim bounds, so it cannot decide;
+   * the word must never imply it did.
+   */
+  scope: 'clear' | 'adjacent' | 'claimed';
+  scopeEvaluated: boolean;
+  scopeHits: { patentId: string; claim: number }[];
+  publication: PublicationStatus;
 }

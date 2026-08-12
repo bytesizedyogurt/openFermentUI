@@ -9,6 +9,7 @@
 import { PAPERS } from '../src/data/papers';
 import { CONTRADICTIONS } from '../src/data/contradictions';
 import { PATENTS } from '../src/data/patents';
+import { DESIGNS } from '../src/data/designs';
 import { stillFails } from '../src/engine/balance';
 import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
@@ -368,6 +369,38 @@ for (const sc of SCENARIOS) {
     } else if (a.basis.kind === 'model' && !a.basis.justification.trim()) {
       fail(`${sc.id}: assumption "${a.label}" is a model parameter with no justification`);
     }
+  }
+}
+
+// ── design records resolve what they consume (OF-FE-003 §9.5) ─────────
+// A design that names a record it did not consume, or one that does not exist,
+// breaks staleness silently: the correction would never reach it.
+for (const d of DESIGNS) {
+  for (const rid of d.consumedRecordIds) {
+    if (!recordIds.has(rid)) fail(`${d.id}: consumedRecordIds names unresolved record ${rid}`);
+  }
+  if (!SCENARIOS.some((s) => s.id === d.scenarioId)) {
+    fail(`${d.id}: scenarioId ${d.scenarioId} does not resolve`);
+  }
+  // An absent tier must never carry a result, and a passed one must say what
+  // bound it. Rendering an absent tier as passed is the §2 failure mode.
+  for (const t of d.tiers) {
+    if (t.state === 'absent' && !t.absentReason) {
+      fail(`${d.id} ${t.tier}: absent with no reason given`);
+    }
+    if (t.state === 'absent' && Object.keys(t.values).length > 0) {
+      fail(`${d.id} ${t.tier}: absent but carries values — an absent tier has no result`);
+    }
+    if (t.state !== 'absent' && !t.bindingConstraint.trim()) {
+      fail(`${d.id} ${t.tier}: ran but names no binding constraint`);
+    }
+    // A point estimate must not occupy the interval field.
+    if (t.msp && t.msp.p05 === t.msp.p95) {
+      fail(`${d.id} ${t.tier}: msp interval has zero width — a point estimate is not a distribution`);
+    }
+  }
+  if (d.scope !== 'clear' && !d.scopeEvaluated) {
+    fail(`${d.id}: scope '${d.scope}' claimed without evaluation`);
   }
 }
 

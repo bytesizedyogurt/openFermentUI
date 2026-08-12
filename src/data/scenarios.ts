@@ -38,9 +38,9 @@ const lines = (o: Partial<Record<CostLine, number>>): Record<CostLine, number> =
 const S1: CostModel = {
   modelId: 'S1',
   dims: [
-    { key: 'density', label: 'Biomass density', unit: 'g L⁻¹', values: [0.5, 1.25, 2, 3, 4, 5] },
-    { key: 'pctTsp', label: 'β-casein as % of cell mass', unit: '% TSP', values: [0.1, 1, 3, 6, 12, 20] },
-    { key: 'dispYield', label: 'Disruption + recovery yield', unit: '%', values: [10, 20, 30, 40, 50] },
+    { key: 'density', field: 'final_biomass_density' as const, label: 'Biomass density', unit: 'g L⁻¹', values: [0.5, 1.25, 2, 3, 4, 5] },
+    { key: 'pctTsp', field: 'expression_pct_tsp' as const, label: 'β-casein as % of cell mass', unit: '% TSP', values: [0.1, 1, 3, 6, 12, 20] },
+    { key: 'dispYield', field: 'disruption_protein_yield' as const, label: 'Disruption + recovery yield', unit: '%', values: [10, 20, 30, 40, 50] },
   ],
   referencePoint: { density: 2, pctTsp: 3, dispYield: 31 },
   evaluate: (p) => {
@@ -84,7 +84,7 @@ const S1: CostModel = {
 const S2: CostModel = {
   modelId: 'S2',
   dims: [
-    { key: 'titer', label: 'Secreted titer', unit: 'g L⁻¹', values: [0.05, 0.25, 0.5, 1, 2, 3, 5] },
+    { key: 'titer', field: 'titer_secreted' as const, label: 'Secreted titer', unit: 'g L⁻¹', values: [0.05, 0.25, 0.5, 1, 2, 3, 5] },
     { key: 'scale', label: 'Fermenter scale', unit: 'm³', values: [20, 65, 110, 155, 200] },
     { key: 'dspYield', label: 'Downstream yield', unit: 'fraction', values: [0.55, 0.65, 0.75, 0.85] },
   ],

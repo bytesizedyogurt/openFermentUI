@@ -31,6 +31,7 @@ import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/comp
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
 import { blastRadius } from '@/engine/stale';
+import { DESIGNS } from '@/data/designs';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -543,6 +544,50 @@ export default function Home() {
               <div className="text-caption text-ink-soft mt-2.5 pt-2 border-t border-line">
                 Designs and scope are not built in this build, so the Bench has no panel for
                 them rather than an empty one.
+              </div>
+            </Card>
+          </div>
+        </section>
+
+        {/* ── Band 1c · Designs and Scope (OF-FE-004 §4) ─────────────── */}
+        <section aria-labelledby="home-designs" className="mb-7">
+          <SectionTitle>
+            <span id="home-designs">Designs and scope</span>
+          </SectionTitle>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Card className="p-3">
+              <div className="text-caption uppercase tracking-wide text-ink-soft">Designs</div>
+              <div className="mt-1.5 text-body">
+                <span className="font-num text-ink">{DESIGNS.length}</span> points from the
+                authored sweep grids, each carrying a four-tier cascade.
+              </div>
+              <div className="text-caption text-ink-soft mt-1.5">
+                Every one reads <span className="font-mono">T0 ✓ · T1 — · T2 — · T3 ✓</span>: the
+                economics were modelled and the biology was not checked. T1 needs a genome-scale
+                model and T2 a reactor model, and neither is in this build, so both render absent
+                rather than passed.{' '}
+                <a href={href('/fermos/d')} className="text-accent hover:underline">
+                  Open designs
+                </a>
+              </div>
+            </Card>
+
+            <Card className="p-3">
+              <div className="text-caption uppercase tracking-wide text-ink-soft">Scope</div>
+              <div className="mt-1.5 text-body">
+                <span className="font-num text-signal-warn">0</span> of{' '}
+                <span className="font-num">{DESIGNS.length}</span> designs have been evaluated
+                against a patent claim.
+              </div>
+              <div className="text-caption text-ink-soft mt-1.5">
+                Parchment holds six real patents and no parsed claim bounds, so nothing can be
+                tested yet. A design showing <span className="font-mono">clear</span> means
+                unevaluated, not unencumbered — the field to read is{' '}
+                <span className="font-mono">scopeEvaluated</span>.{' '}
+                <a href={href('/parchment')} className="text-accent hover:underline">
+                  Open Parchment
+                </a>
               </div>
             </Card>
           </div>

@@ -3,11 +3,13 @@
 // its provenance attached. This is the screen that makes the corpus auditable.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
-import { fieldName } from '@/data/ontology';
+import type { ExtractionRecord, FieldId } from '@/data/types';
+import { fieldName, ONTOLOGY_BY_ID } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import { unitFamily } from '@/engine/units';
+import { unitFamily, asNumber, convert } from '@/engine/units';
+import { aggregate } from '@/engine/posterior';
+import { ContradictionRail } from '@/components/ContradictionRail';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceLegend, type ProvKind } from '@/components/Provenance';
@@ -128,6 +130,30 @@ export default function Extract() {
   const paperParam = route.query.get('paper');
 
   const records = useStore((s) => s.records);
+  const contradictions = useStore((s) => s.contradictions);
+
+  // Every corpus value per field, converted once, so each row's rail plots the
+  // same axis rather than recomputing per render.
+  const peersByField = useMemo(() => {
+    const m = new Map<FieldId, { record: ExtractionRecord; value: number }[]>();
+    for (const r of records) {
+      const def = ONTOLOGY_BY_ID[r.field];
+      const n = asNumber(r.value);
+      if (!def || n === null) continue;
+      let v = n;
+      if (def.canonicalUnit && r.unit !== def.canonicalUnit) {
+        try {
+          v = convert(n, r.unit, def.canonicalUnit);
+        } catch {
+          continue;
+        }
+      }
+      const list = m.get(r.field) ?? [];
+      list.push({ record: r, value: v });
+      m.set(r.field, list);
+    }
+    return m;
+  }, [records]);
   const papers = useStore((s) => s.papers);
   const unitMode = useStore((s) => s.ui.unitMode);
   const density = useStore((s) => s.ui.density);
@@ -295,6 +321,25 @@ export default function Extract() {
         </span>
       ),
       value: ({ rec }) => fieldName(rec.field),
+    },
+    {
+      key: 'spread',
+      header: 'Spread',
+      width: '58px',
+      priority: 2,
+      // The record table answers "what was extracted"; the rail answers "where
+      // does this one sit among the others for the same field", which is the
+      // question a reader has in front of any single number.
+      render: ({ rec }) => (
+        <ContradictionRail
+          marks={peersByField.get(rec.field) ?? []}
+          aggregate={aggregate((peersByField.get(rec.field) ?? []).map((x) => x.record))}
+          contradictions={contradictions.filter((c) => c.recordIds.includes(rec.id))}
+          height={28}
+          highlightId={rec.id}
+        />
+      ),
+      value: ({ rec }) => (peersByField.get(rec.field) ?? []).length,
     },
     {
       key: 'value',
