@@ -109,7 +109,7 @@ export function ContradictionRail({
     .join('. ');
 
   return (
-    <div className={cx('inline-flex items-start gap-1', className)}>
+    <div className={cx('relative inline-flex items-start gap-1', className)}>
       {/* The rail itself carries no accessible name — a scatter of absolutely
           positioned divs is noise to a screen reader. The sentence beside it
           says what the picture says, which is the same rule the DataTable ticks

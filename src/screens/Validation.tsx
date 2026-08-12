@@ -336,13 +336,13 @@ export default function Validation() {
       text: `Correction note filed on ${label} (${RUN_LABEL[run.run]} · ${
         OUTCOME_LABEL[open.outcome]
       })${body ? ` — ${body.slice(0, 90)}` : ''}`,
-      href: '#/extract/validation',
+      href: '#/assay',
       provenance: 'user',
     });
     toast({
       text: `Correction note filed on ${label} — it appears in the activity feed for this session only`,
       kind: 'success',
-      href: '#/extract/validation',
+      href: '#/assay',
       hrefLabel: 'Stay',
     });
     setFiled((s) => new Set(s).add(open.key));

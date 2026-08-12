@@ -134,7 +134,7 @@ export default function Compare() {
               <Pin size={12} className="text-accent" />
             </div>
             <a
-              href={`#/simulate/${e.scenario.id}`}
+              href={`#/fermos/s/${e.scenario.id}`}
               className="font-serif text-section-title font-semibold hover:text-accent block leading-snug"
             >
               {e.scenario.name}

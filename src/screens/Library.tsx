@@ -227,19 +227,19 @@ export default function Library() {
         { label: 'Score confidence', ms: 700 },
         { label: 'Stage for review', ms: 500 },
       ],
-      href: n === 1 ? `#/extract?paper=${selected[0].paper.id}` : '#/extract',
+      href: n === 1 ? `#/ledger/records?paper=${selected[0].paper.id}` : '#/ledger/records',
     });
     logActivity({
       at: nowStamp(),
       icon: 'table',
       text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'}`,
-      href: '#/extract',
+      href: '#/ledger/records',
       provenance: 'demo',
     });
     toast({
       text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — the demo extractor replays the seeded records, it does not mint new ones`,
       kind: 'info',
-      href: '#/extract',
+      href: '#/ledger/records',
       hrefLabel: 'Extract',
     });
     clear();

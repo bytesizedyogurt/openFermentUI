@@ -242,7 +242,7 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
         <div className="mt-2">
           <Callout kind="info">
             No passages in this corpus match. Broaden the question, or{' '}
-            <a href="#/library" className="text-accent hover:underline">
+            <a href="#/trawl" className="text-accent hover:underline">
               check Library coverage
             </a>
             .
@@ -870,7 +870,7 @@ function InsertInto({ md }: { md: string }) {
                 toast({
                   text: `${ids.length} references staged for ${p.id}`,
                   kind: 'success',
-                  href: `#/protocols/${p.id}`,
+                  href: `#/runbook/${p.id}`,
                   hrefLabel: 'Open',
                 });
                 navigate(`/protocols/${p.id}`);
@@ -889,7 +889,7 @@ function InsertInto({ md }: { md: string }) {
                 toast({
                   text: `${ids.length} references staged for ${s.name}`,
                   kind: 'success',
-                  href: `#/simulate/${s.id}`,
+                  href: `#/fermos/s/${s.id}`,
                   hrefLabel: 'Open',
                 });
                 navigate(`/simulate/${s.id}`);

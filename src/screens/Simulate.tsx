@@ -69,7 +69,7 @@ export default function Simulate() {
                 </div>
 
                 <a
-                  href={`#/simulate/${sc.id}`}
+                  href={`#/fermos/s/${sc.id}`}
                   className="font-serif text-section-title font-semibold hover:text-accent leading-snug"
                 >
                   {sc.name}

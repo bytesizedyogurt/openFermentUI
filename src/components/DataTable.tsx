@@ -218,7 +218,9 @@ export function DataTable<T>({
   return (
     <div className="flex gap-4 items-start">
       {facets.length > 0 && (
-        <aside className="w-[196px] shrink-0 hidden lg:block">
+        // xl, not lg: the app's own 188px rail shows from md, so turning the
+        // facet rail on at 1024 leaves the table itself under ~640px.
+        <aside className="w-[196px] shrink-0 hidden xl:block">
           <div className="flex items-center justify-between mb-2">
             <div className="text-caption uppercase tracking-wide text-ink-soft">Filters</div>
             {Object.values(active).some((s) => s.size > 0) && (

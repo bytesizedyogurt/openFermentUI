@@ -219,7 +219,7 @@ export default function Extract() {
       at: nowStamp(),
       icon: 'clipboard-check',
       text: `Review session started — ${ids.length} unverified record${ids.length === 1 ? '' : 's'}`,
-      href: '#/extract/review',
+      href: '#/trawl/review',
       provenance: 'user',
     });
     navigate('/trawl/review');

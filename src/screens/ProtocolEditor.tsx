@@ -126,13 +126,13 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
       at: new Date().toISOString().slice(0, 16).replace('T', ' '),
       icon: 'file',
       text: `${protocol.title} — version ${draftVersion.version} published`,
-      href: `#/protocols/${protocolId}`,
+      href: `#/runbook/${protocolId}`,
       provenance: 'user',
     });
     toast({
       text: `Version ${draftVersion.version} published for this session`,
       kind: 'success',
-      href: `#/protocols/${protocolId}`,
+      href: `#/runbook/${protocolId}`,
       hrefLabel: 'Open',
     });
     setConfirmOpen(false);

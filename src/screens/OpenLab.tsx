@@ -17,7 +17,7 @@ import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { fieldName } from '@/data/ontology';
 import { Card, PageHeader, SectionTitle, Callout, Button, LinkButton, cx } from '@/components/ui';
-import type { ResultField, RunOutcome, RunState } from '@/data/types';
+import type { FieldId, ResultField, RunOutcome, RunState } from '@/data/types';
 
 const OUTCOME_META = {
   success: { label: 'Success', Icon: CheckCircle2, tone: 'text-accent' },
@@ -30,6 +30,7 @@ export function OpenLab() {
   const deposits = useStore((s) => s.deposits);
   const protocols = useStore((s) => s.protocols);
   const depositRun = useStore((s) => s.depositRun);
+  const mintExperimentRecords = useStore((s) => s.mintExperimentRecords);
 
   const depositedIds = useMemo(() => new Set(deposits.map((d) => d.runId)), [deposits]);
   const finished = useMemo(
@@ -157,7 +158,16 @@ export function OpenLab() {
                 run={r}
                 protocolTitle={protocols.find((p) => p.id === r.protocolId)?.title ?? r.protocolId}
                 schema={schemaFor(r)}
-                onDeposit={depositRun}
+                onDeposit={(outcome, measured) => {
+                  // The form promises "becomes a record" beside every field
+                  // bound to an ontology field. Mint them first, so the deposit
+                  // carries real ids and the promise is kept.
+                  const produced =
+                    outcome.outcome === 'success'
+                      ? mintExperimentRecords(r.id, r.protocolId, measured)
+                      : [];
+                  depositRun({ ...outcome, producedRecordIds: produced });
+                }}
               />
             ))}
           </div>
@@ -229,7 +239,10 @@ function DepositCard({
   run: RunState;
   protocolTitle: string;
   schema: ResultField[];
-  onDeposit: (o: RunOutcome) => void;
+  onDeposit: (
+    o: RunOutcome,
+    measured: { field: FieldId; value: number; unit: string }[],
+  ) => void;
 }) {
   const [outcome, setOutcome] = useState<RunOutcome['outcome']>('success');
   const [reason, setReason] = useState('');
@@ -333,22 +346,30 @@ function DepositCard({
           }
           onClick={() => {
             const typed: Record<string, number | string | boolean> = {};
+            const measured: { field: FieldId; value: number; unit: string }[] = [];
             if (outcome === 'success') {
               for (const f of schema) {
                 const raw = results[f.id];
                 if (raw === undefined || raw === '') continue;
                 typed[f.label] =
                   f.type === 'number' ? Number(raw) : f.type === 'boolean' ? raw === 'true' : raw;
+                // Only a numeric field bound to the ontology can become a record.
+                if (f.field && f.type === 'number' && Number.isFinite(Number(raw))) {
+                  measured.push({ field: f.field, value: Number(raw), unit: f.unit ?? '' });
+                }
               }
             }
-            onDeposit({
-              runId: run.id,
-              outcome,
-              failureReason: outcome === 'failure' ? reason.trim() : undefined,
-              results: typed,
-              operator: 'you',
-              producedRecordIds: [],
-            });
+            onDeposit(
+              {
+                runId: run.id,
+                outcome,
+                failureReason: outcome === 'failure' ? reason.trim() : undefined,
+                results: typed,
+                operator: 'you',
+                producedRecordIds: [],
+              },
+              measured,
+            );
           }}
         >
           Deposit

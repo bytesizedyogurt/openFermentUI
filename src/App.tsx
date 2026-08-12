@@ -123,6 +123,8 @@ function canonicalize(segments: string[]): string[] | null {
   const [a, b, ...rest] = segments;
   if (!a) return null;
   if (a === 'extract' && b === 'validation') return ['assay', ...rest];
+  if (a === 'extract' && !b) return ['ledger', 'records'];
+  if (a === 'extract' && b !== 'review') return ['ledger', 'records', b, ...rest];
   if (a === 'library' && b === 'papers') return ['trawl', 'sources', ...rest];
   if (a === 'extract' && b === 'review') return ['trawl', 'review', ...rest];
   if (a === 'simulate' && b && b !== 'compare') return ['fermos', 's', b, ...rest];
@@ -288,7 +290,9 @@ export default function App() {
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
-  const inRunMode = route.segments[0] === 'protocols' && route.segments[2] === 'run';
+  // Canonicalised routes reach Run Mode as /runbook/:id/run/:runId; gating on
+  // the pre-rename 'protocols' segment silently disabled the §8.12 takeover.
+  const inRunMode = route.segments[0] === 'runbook' && route.segments[2] === 'run';
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {

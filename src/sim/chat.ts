@@ -578,7 +578,7 @@ async function handleSlash(input: string, sessionId: string): Promise<SlashResul
         { label: 'Embed', ms: 1100 },
         { label: 'Extract', ms: 1900 },
       ],
-      href: `#/extract?paper=${paper.id}`,
+      href: `#/ledger/records?paper=${paper.id}`,
     });
     push(sessionId, {
       kind: 'system',

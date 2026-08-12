@@ -790,7 +790,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         at: stamp(),
         icon: 'clipboard-check',
         text: `Review session started — ${label} for ${strainId} (${ids.length} record${ids.length === 1 ? '' : 's'})`,
-        href: '#/extract/review',
+        href: '#/trawl/review',
         provenance: 'user',
       });
       navigate('/trawl/review');

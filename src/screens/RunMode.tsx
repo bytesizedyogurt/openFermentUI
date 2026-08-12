@@ -797,7 +797,7 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
               toast({
                 text: 'Run kept active — find it in the Jobs tray',
                 kind: 'info',
-                href: `#/protocols/${protocolId}/run/${runId}`,
+                href: `#/runbook/${protocolId}/run/${runId}`,
                 hrefLabel: 'Resume',
               });
               navigate(`/protocols/${protocolId}`);

@@ -9,6 +9,7 @@ import type {
   Collection,
   Deviation,
   Contradiction,
+  FieldId,
   ExtractionRecord,
   Job,
   LearnModule,
@@ -107,6 +108,12 @@ export interface OFState {
    */
   deposits: RunOutcome[];
   depositRun: (o: RunOutcome) => void;
+  /** Create experiment-class records from a deposit's measured results. */
+  mintExperimentRecords: (
+    runId: string,
+    protocolId: string,
+    entries: { field: FieldId; value: number; unit: string; organism?: string }[],
+  ) => string[];
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
@@ -502,7 +509,7 @@ export const useStore = create<OFState>()((set, get) => ({
         { label: 'Embed', ms: 1100 },
         { label: 'Extract', ms: 1800 },
       ],
-      href: `#/library/papers/${paperId}`,
+      href: `#/trawl/sources/${paperId}`,
     });
     if (fails) {
       // Scripted failure path (§8.5): halts at Parse with a specific reason.
@@ -517,7 +524,7 @@ export const useStore = create<OFState>()((set, get) => ({
         get().toast({
           text: `Ingest ${paperId} halted at Fetch`,
           kind: 'error',
-          href: '#/library/ingest',
+          href: '#/trawl/ingest',
           hrefLabel: 'Review',
         });
       }, wait);
@@ -526,7 +533,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'download',
       text: `Ingest started for ${paperId}`,
-      href: `#/library/ingest`,
+      href: `#/trawl/ingest`,
       provenance: 'demo',
     });
   },
@@ -703,7 +710,7 @@ export const useStore = create<OFState>()((set, get) => ({
         at: stamp(),
         icon: 'check',
         text: `Run completed — ${proto.title}`,
-        href: `#/protocols/${proto.id}`,
+        href: `#/runbook/${proto.id}`,
         provenance: 'user',
       });
     }
@@ -810,6 +817,42 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({ text: 'Filed. This source is back in the review queue.', kind: 'info' });
+  },
+
+  /**
+   * Mint Ledger records from a deposit's results (OF-FE-003 §4.5, §9.7).
+   *
+   * This is the only place in the build that creates an `evidenceClass:
+   * 'experiment'` record, and the only honest one: the value came from a run
+   * somebody executed here. Provenance is 'user' — the two axes doing exactly
+   * what they exist for, since a fresh bench number is unverified by anyone
+   * else while being a measurement rather than a transcription.
+   *
+   * paperId points at the protocol, not a paper. A bench result has no paper,
+   * and inventing one would be a citation to a document that does not exist.
+   */
+  mintExperimentRecords: (runId, protocolId, entries) => {
+    if (entries.length === 0) return [];
+    const at = stamp();
+    const minted: ExtractionRecord[] = entries.map((e, i) => ({
+      id: `r-exp-${runId}-${i + 1}`,
+      paperId: protocolId,
+      sectionId: 'run',
+      quote: `Measured in run ${runId}.`,
+      field: e.field,
+      value: e.value,
+      unit: e.unit,
+      si: toSI(e.value, e.unit),
+      confidence: 1,
+      status: 'unverified',
+      provenance: 'user',
+      isPrimary: true,
+      evidenceClass: 'experiment',
+      organism: e.organism,
+      audit: [{ at, who: 'you', action: `deposited from run ${runId}` }],
+    }));
+    set((st) => ({ records: [...st.records, ...minted] }));
+    return minted.map((m) => m.id);
   },
 
   depositRun: (o) => {

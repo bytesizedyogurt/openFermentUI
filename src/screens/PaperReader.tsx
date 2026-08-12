@@ -261,12 +261,12 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         { label: 'Score confidence', ms: 800 },
         { label: 'Stage for review', ms: 500 },
       ],
-      href: `#/extract?paper=${paper.id}`,
+      href: `#/ledger/records?paper=${paper.id}`,
     });
     toast({
       text: `${label} queued for ${paper.id} — the demo extractor replays this paper's seeded records rather than minting new ones`,
       kind: 'info',
-      href: '#/extract',
+      href: '#/ledger/records',
       hrefLabel: 'Extract',
     });
   };
@@ -420,7 +420,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Ingest started for ${paper.id}`,
                     kind: 'info',
-                    href: '#/library/ingest',
+                    href: '#/trawl/ingest',
                     hrefLabel: 'Board',
                   });
                 }}
@@ -462,7 +462,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Retrying ingest for ${paper.id}`,
                     kind: 'info',
-                    href: '#/library/ingest',
+                    href: '#/trawl/ingest',
                     hrefLabel: 'Board',
                   });
                 }}

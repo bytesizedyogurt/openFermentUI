@@ -200,7 +200,7 @@ export default function Ingest() {
     toast({
       text: `${row.paper.id} joined the corpus with abstract-only text — extractions are limited to the abstract until it re-parses`,
       kind: 'warn',
-      href: `#/library/papers/${row.paper.id}`,
+      href: `#/trawl/sources/${row.paper.id}`,
       hrefLabel: 'Open',
     });
   };

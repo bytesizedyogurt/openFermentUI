@@ -12,6 +12,11 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 
 // ── Page scaffolding ───────────────────────────────────────────────────
 
+/**
+ * Header block. The action slot is shrink-0, so the row must wrap: without it a
+ * long title plus a button widen the document past the viewport at narrow
+ * widths and the entire page scrolls sideways.
+ */
 export function PageHeader({
   title,
   subtitle,
@@ -24,7 +29,7 @@ export function PageHeader({
   eyebrow?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 mb-5">
+    <div className="flex items-start justify-between gap-x-6 gap-y-2 flex-wrap mb-5">
       <div className="min-w-0">
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
