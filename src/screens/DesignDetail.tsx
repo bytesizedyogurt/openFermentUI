@@ -156,7 +156,7 @@ export function DesignDetail({ designId }: { designId: string }) {
       />
 
       {/* ── cascade ── */}
-      <section className="mb-5">
+      <section className="mb-6">
         <SectionTitle
           right={
             <Explain label="Why are two tiers empty?">
@@ -208,7 +208,7 @@ export function DesignDetail({ designId }: { designId: string }) {
 
       {/* ── cost ── */}
       {t3 && (
-        <section className="mb-5">
+        <section className="mb-6">
           <SectionTitle>Minimum selling price</SectionTitle>
           <Tick p="demo" className="card p-3 max-w-3xl">
             <div className="font-num text-[26px] leading-none">
@@ -226,7 +226,7 @@ export function DesignDetail({ designId }: { designId: string }) {
 
       {/* ── tornado ── */}
       {t3?.sensitivity && t3.sensitivity.length > 0 && (
-        <section className="mb-5">
+        <section className="mb-6">
           <SectionTitle
             right={
               <Explain label="Why does this link out?">

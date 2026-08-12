@@ -50,7 +50,7 @@ export function Parchment() {
         </Callout>
       </div>
 
-      <section className="mt-5">
+      <section className="mt-6 mb-6">
         <SectionTitle
           right={
             <Explain label="What is anticipation?">
