@@ -1,8 +1,15 @@
-// Build frozen ResultGrids from authored cost models (OF-DES-001 §17.1).
-// In production these grids become caches in front of a BioSTEAM worker;
-// the Scenario/ResultGrid contract does not change (§17.4).
-import type { CostModel, CostLine, ResultGrid } from '@/data/types';
+// Build frozen ResultGrids by sweeping a plant over its dimensions.
+//
+// The §17.4 note this file used to carry said the grids would one day become
+// caches in front of a BioSTEAM worker and the contract would not change. The
+// contract has not changed. What changed is what fills it: each cell is now a
+// built flowsheet, a costed equipment list and a discounted cash flow solved
+// for the price at which net present value reaches zero, rather than a closure
+// with six coefficients typed into it.
+import type { CostModel, CostLine, ResultGrid, SensitivityRow, FieldId } from '@/data/types';
 import { interpolate, clampPoint, type Grid } from './interp';
+import { deriveSensitivity } from './plant';
+import { FLOWSHEET_BY_MODEL } from '@/sim/flowsheets/plants';
 
 export const COST_LINES: CostLine[] = [
   'capex',
@@ -13,13 +20,24 @@ export const COST_LINES: CostLine[] = [
   'other',
 ];
 
+/**
+ * The six lines, and what they now mean.
+ *
+ * `capex` and `downstream` are no longer an annualised capital charge and a
+ * lumped processing cost. They are the two halves of what the cash flow
+ * requires the plant to charge above its operating cost — split between the
+ * fermentation island and the recovery train by installed-cost share. That
+ * residual is not an allocation: it is the answer the discounted cash flow
+ * gives, and it is the reason no capital charge factor has to be assumed
+ * anywhere in this app any more.
+ */
 export const COST_LINE_LABEL: Record<CostLine, string> = {
-  capex: 'CAPEX (annualized)',
-  media: 'Media & feedstock',
+  capex: 'Capital recovery — upstream',
+  downstream: 'Capital recovery — recovery & purification',
+  media: 'Feedstock & media',
   utilities: 'Utilities',
-  labor: 'Labor',
-  downstream: 'Downstream processing',
-  other: 'Other fixed',
+  labor: 'Labour',
+  other: 'Maintenance, insurance & overhead',
 };
 
 export function buildGrid(model: CostModel): ResultGrid {
@@ -49,7 +67,20 @@ export function buildGrid(model: CostModel): ResultGrid {
     msp[flat] = sum;
   }
 
-  return { modelId: model.modelId, dims, msp, costLines, sensitivity: model.sensitivity };
+  // Sensitivity is derived at the model's reference point by re-solving the
+  // plant at each parameter's bounds, so a bar that looks wrong can be checked
+  // by dragging the slider to that bound and reading the headline.
+  const spec = FLOWSHEET_BY_MODEL[model.modelId];
+  const sensitivity: SensitivityRow[] = spec
+    ? deriveSensitivity(spec, model.referencePoint).map((s) => ({
+        assumption: s.assumption,
+        lowPct: s.lowPct,
+        hiPct: s.hiPct,
+        field: s.field as FieldId | undefined,
+      }))
+    : [];
+
+  return { modelId: model.modelId, dims, msp, costLines, sensitivity };
 }
 
 export interface EvaluatedPoint {

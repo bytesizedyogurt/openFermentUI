@@ -1,33 +1,54 @@
-// Techno-economic scenarios (OF-COR-001 §20). Replaces the three synthetic
-// algal cases with the comparison a faculty reviewer will actually ask for:
-// the algal route, the incumbent yeast route, and the cow.
+// Techno-economic scenarios (OF-COR-001 §20). The algal route, the incumbent
+// yeast route, and the cow.
 //
-// HONESTY: the response surfaces below are authored cost engines, not process
-// simulations. Their SHAPE is grounded — scaling exponents, the density and
-// protein-content sensitivities from the formate-dehydrogenase TEA (O3), the
-// biomass cost points from Acién (O4) and the GFI meta-analysis (O2) — but the
-// absolute numbers are modeled, not measured. Every headline carries that
-// label, and the whole surface is provenance 'demo'.
+// These were three authored cost engines. They are now three plants. Each model
+// below keeps its sweep dimensions and its reference point — the axes a reader
+// already knows how to read — and delegates every evaluation to a flowsheet in
+// `src/sim/flowsheets`, where the equipment is sized, costed against bioSTEAM's
+// correlations, and priced by a discounted cash flow solved at NPV = 0.
+//
+// What that buys, concretely: the old S1 charged a fixed 18 USD/kg of
+// "downstream" plus a penalty for imperfect recovery, so improving disruption
+// yield moved a coefficient. Now it changes how much paste the centrifuge
+// handles, which changes the centrifuge, the membrane area, the pumping load
+// and the electricity bill, and the price falls out of the cash flow. Nothing
+// on the way is authored.
+//
+// HONESTY, unchanged and still load-bearing: a correct arithmetic chain over
+// uncertain inputs is still uncertain. The photobioreactor and the PEF skid
+// have no published cost correlation and are marked `authored` wherever they
+// appear; the whole surface remains provenance 'demo'; and the plant view
+// states what each flowsheet does not model before it shows the number.
 import type { CostLine, CostModel, Scenario } from './types';
+import { evaluatePlantCached } from '@/engine/plant';
 
-// ── shared cost primitives ────────────────────────────────────────────
-const CAPITAL_CHARGE = 0.12; // annualisation factor
-const OPERATING_DAYS = 330;
-const SCALE_EXPONENT = 0.6; // O1/O3: capital scales ~capacity^0.6
-
-/** Annualised capital per kg, given a reference cost and the six-tenths rule. */
-function capexPerKg(refCostUSD: number, refScale: number, scale: number, kgPerYear: number) {
-  const cost = refCostUSD * Math.pow(scale / refScale, SCALE_EXPONENT);
-  return (cost * CAPITAL_CHARGE) / Math.max(1, kgPerYear);
+/**
+ * Evaluate a point through its plant.
+ *
+ * A failed build returns zeros rather than throwing: the grid sweep visits
+ * corners the sizing routines cannot resolve, and a zero cell is caught by the
+ * non-convergence machinery the workspace already has. The plant screen, which
+ * a reader arrives at deliberately, fails visibly instead.
+ */
+function viaPlant(modelId: 'S1' | 'S2' | 'S3') {
+  return (point: Record<string, number>): Record<CostLine, number> => {
+    try {
+      const r = evaluatePlantCached(modelId, point);
+      if (!r || !Number.isFinite(r.msp)) return ZERO_LINES();
+      return r.costLines;
+    } catch {
+      return ZERO_LINES();
+    }
+  };
 }
 
-const lines = (o: Partial<Record<CostLine, number>>): Record<CostLine, number> => ({
-  capex: o.capex ?? 0,
-  media: o.media ?? 0,
-  utilities: o.utilities ?? 0,
-  labor: o.labor ?? 0,
-  downstream: o.downstream ?? 0,
-  other: o.other ?? 0,
+const ZERO_LINES = (): Record<CostLine, number> => ({
+  capex: 0,
+  media: 0,
+  utilities: 0,
+  labor: 0,
+  downstream: 0,
+  other: 0,
 });
 
 // ══ S1 — cw15 intracellular β-casein ═══════════════════════════════════
@@ -43,38 +64,7 @@ const S1: CostModel = {
     { key: 'dispYield', field: 'disruption_protein_yield' as const, label: 'Disruption + recovery yield', unit: '%', values: [10, 20, 30, 40, 50] },
   ],
   referencePoint: { density: 2, pctTsp: 3, dispYield: 31 },
-  evaluate: (p) => {
-    const density = p.density; // g/L biomass
-    const share = p.pctTsp / 100; // product per g biomass
-    const recovery = p.dispYield / 100;
-    // grams of recovered product per litre of broth
-    const gPerL = Math.max(1e-6, density * share * recovery);
-    const volumeM3 = 120; // fixed plant size for this surface
-    const batchesPerYear = OPERATING_DAYS / 5; // ~5-day mixotrophic batch
-    const kgPerYear = Math.max(1, (gPerL * volumeM3 * 1000 * batchesPerYear) / 1000);
-
-    // Photobioreactor capital is the algal penalty: Acién's 3 m³ tubular plant
-    // at 69 €/kg biomass is the anchor for how expensive this hardware is.
-    const capex = capexPerKg(9.5e6, 120, volumeM3, kgPerYear);
-    // TAP with acetate — you pay per litre processed, sell per kg product.
-    const mediaPerL = 0.42;
-    const media = (mediaPerL * 1000 * volumeM3) / kgPerYear * batchesPerYear / 1000 * 1000;
-    // Lighting and mixing dominate algal utilities.
-    const utilities = (0.31 * 1000 * volumeM3 * batchesPerYear) / 1000 / kgPerYear * 1000;
-    const labor = (420000 * 4) / kgPerYear;
-    // Mild PEF disruption is cheap; the penalty is in the yield term above.
-    const downstream = 18 + 240 * (1 - recovery);
-    const other = 6 + capex * 0.05;
-    return lines({ capex, media, utilities, labor, downstream, other });
-  },
-  sensitivity: [
-    { assumption: 'β-casein as % of cell mass', field: 'expression_pct_tsp' as const, lowPct: 92.4, hiPct: -38.1 },
-    { assumption: 'Biomass density', field: 'final_biomass_density' as const, lowPct: 61.7, hiPct: -28.4 },
-    { assumption: 'Disruption + recovery yield', field: 'disruption_protein_yield' as const, lowPct: 22.8, hiPct: -14.9 },
-    { assumption: 'Photobioreactor capital', lowPct: -12.6, hiPct: 12.6 },
-    { assumption: 'Medium cost', lowPct: -9.1, hiPct: 9.1 },
-    { assumption: 'Labour', lowPct: -6.4, hiPct: 6.4 },
-  ],
+  evaluate: viaPlant('S1'),
 };
 
 // ══ S2 — K. phaffii secreted comparator ════════════════════════════════
@@ -89,31 +79,7 @@ const S2: CostModel = {
     { key: 'dspYield', label: 'Downstream yield', unit: 'fraction', values: [0.55, 0.65, 0.75, 0.85] },
   ],
   referencePoint: { titer: 1, scale: 110, dspYield: 0.75 },
-  evaluate: (p) => {
-    const gPerL = Math.max(1e-6, p.titer * p.dspYield);
-    const batchesPerYear = OPERATING_DAYS / 4; // ~4-day fed-batch cycle
-    const kgPerYear = Math.max(1, (gPerL * p.scale * 1000 * batchesPerYear) / 1000);
-    const capex = capexPerKg(7.2e6, 110, p.scale, kgPerYear);
-    // Defined medium plus methanol feed; cheaper per litre than TAP but the
-    // whole line still scales inversely with titer.
-    const media = (0.55 * 1000 * p.scale * batchesPerYear) / kgPerYear;
-    const utilities = (0.38 * 1000 * p.scale * batchesPerYear) / kgPerYear;
-    const labor = (420000 * 5) / kgPerYear;
-    // Secretion avoids disruption but adds chromatography-free capture cost;
-    // Keppler & Boom argue purity should yield to functionality here.
-    const downstream = 14 / p.dspYield + 6;
-    const other = 5 + capex * 0.05;
-    return lines({ capex, media, utilities, labor, downstream, other });
-  },
-  sensitivity: [
-    { assumption: 'Secreted titer', field: 'titer_secreted' as const, lowPct: 118.3, hiPct: -41.2 },
-    { assumption: 'Downstream yield', lowPct: 24.6, hiPct: -17.8 },
-    { assumption: 'Fermenter scale', lowPct: 19.4, hiPct: -11.2 },
-    { assumption: 'Medium cost', lowPct: -13.7, hiPct: 13.7 },
-    { assumption: 'Fermenter capital', lowPct: -11.1, hiPct: 11.1 },
-    { assumption: 'Labour', lowPct: -5.2, hiPct: 5.2 },
-  ],
-  nonConvergent: (p) => p.titer <= 0.05 && p.dspYield <= 0.55 && p.scale >= 200,
+  evaluate: viaPlant('S2'),
 };
 
 // ══ S3 — conventional β-casein isolation from milk ═════════════════════
@@ -127,26 +93,7 @@ const S3: CostModel = {
     { key: 'recovery', label: 'β-casein recovery', unit: 'fraction', values: [0.3, 0.45, 0.6, 0.75, 0.9] },
   ],
   referencePoint: { milkPrice: 0.45, recovery: 0.6 },
-  evaluate: (p) => {
-    const betaInMilk = 2.6; // g/L (Atamer et al. 2017)
-    const gPerL = Math.max(1e-6, betaInMilk * p.recovery);
-    const litresPerKg = 1000 / gPerL;
-    // Milk is the feedstock; the rest of the cost is fractionation.
-    const media = litresPerKg * p.milkPrice;
-    const capex = 4.1;
-    const utilities = litresPerKg * 0.004;
-    const labor = 2.6;
-    const downstream = 7.5 + 9 * (1 - p.recovery);
-    const other = 1.8;
-    return lines({ capex, media, utilities, labor, downstream, other });
-  },
-  sensitivity: [
-    { assumption: 'Raw milk price', lowPct: -28.4, hiPct: 28.4 },
-    { assumption: 'β-casein recovery', field: 'titer_secreted' as const, lowPct: 41.9, hiPct: -18.7 },
-    { assumption: 'Microfiltration capital', lowPct: -6.2, hiPct: 6.2 },
-    { assumption: 'Labour', lowPct: -3.9, hiPct: 3.9 },
-    { assumption: 'Utilities', lowPct: -2.1, hiPct: 2.1 },
-  ],
+  evaluate: viaPlant('S3'),
 };
 
 export const COST_MODELS: CostModel[] = [S1, S2, S3];

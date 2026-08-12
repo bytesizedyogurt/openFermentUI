@@ -213,6 +213,53 @@ for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/
 await narrow.close();
 ck('No page-level horizontal overflow at 420px', overflow.length === 0, overflow.join(', '));
 
+// fermOS is a plant now, not a cost curve. The checks below are the ones that
+// would have caught the old model pretending to be one: an equipment list, a
+// cash flow that reaches zero at the quoted price, and the split between
+// bioSTEAM's correlations and ours stated rather than blended.
+await go('/fermos/s/sc-s2/plant');
+const plant = await p.locator('#of-main').innerText();
+ck('The plant view lists sized equipment', /Bioreactor/i.test(plant) && /Centrifuge/i.test(plant));
+ck('...with a capital ladder that names each step',
+   /Direct permanent investment/i.test(plant) && /Total capital investment/i.test(plant));
+ck('...and a discounted cash flow', /Cumulative NPV/i.test(plant) && /Discount factor/i.test(plant));
+ck('MSP is stated as solved at NPV = 0, not summed', /NPV\s*=\s*0/i.test(plant));
+ck('ThermoSTEAM is declared as not ported', /ThermoSTEAM is not ported/i.test(plant));
+const equipRows = await p.locator('#of-main table[data-table="equipment"] tbody tr').count();
+const cashRows = await p.locator('#of-main table[data-table="cashflow"] tbody tr').count();
+ck('The equipment and cash-flow tables have rows', equipRows > 5 && cashRows > 10,
+   equipRows + ' units, ' + cashRows + ' years');
+
+// A design result behind a purchase cost, one click away.
+const firstUnit = p.locator('#of-main table[data-table="equipment"] tbody tr').first();
+await firstUnit.click(); await p.waitForTimeout(400);
+ck('A unit opens to its design results', /Design results/i.test(await p.locator('#of-main').innerText()));
+
+// The authored-versus-bioSTEAM split has to be visible on the algal route,
+// where it is the whole caveat.
+await go('/fermos/s/sc-s1/plant');
+const s1 = await p.locator('#of-main').innerText();
+ck('The algal plant declares how much capital is an authored correlation',
+   /authored/i.test(s1) && /photobioreactor/i.test(s1));
+
+// Uncertainty is work, not decoration: nothing runs until it is asked for.
+ck('Monte Carlo does not run on arrival', /No Monte Carlo has been run/i.test(s1));
+const mc = p.locator('button', { hasText: /Run the samples|Run 200 samples/ }).first();
+if (await mc.count()) {
+  await mc.click();
+  await p.waitForTimeout(9000);
+  const after = await p.locator('#of-main').innerText();
+  ck('Monte Carlo reports percentiles and a rank correlation',
+     /percentile/i.test(after) && /Spearman/i.test(after));
+} else ck('Monte Carlo reports percentiles and a rank correlation', false, 'run button missing');
+
+// The tornado in the workspace is derived now, so it must say so rather than
+// claiming a fixed ±20% swing it never performed.
+await go('/fermos/s/sc-s2');
+const ws = await p.locator('#of-main').innerText();
+ck('The workspace tornado states it re-solves the plant', /re-solving the plant/i.test(ws));
+ck('...and no longer claims a ±20% perturbation', !/±20%/.test(ws));
+
 await b.close(); server.close();
 console.log(`\n${res.filter(Boolean).length}/${res.length} extra checks passed`);
 if(errs.length){console.log('errors:'); [...new Set(errs)].slice(0,6).forEach(e=>console.log('  - '+e));}

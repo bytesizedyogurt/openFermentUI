@@ -435,6 +435,19 @@ input[type='range']::-moz-range-thumb {
   background: rgb(var(--accent-wash));
   border-color: rgb(var(--accent) / 0.45);
 }
+/* A chip that marks a claim as weaker than its neighbours — an authored cost
+   correlation beside bioSTEAM's own, for instance. Signal hue at low weight, so
+   it reads as a caveat rather than an alarm. */
+.chip-warn {
+  background: rgb(var(--signal-warn) / 0.1);
+  border-color: rgb(var(--signal-warn) / 0.45);
+  color: rgb(var(--signal-warn));
+}
+.chip-error {
+  background: rgb(var(--signal-error) / 0.1);
+  border-color: rgb(var(--signal-error) / 0.5);
+  color: rgb(var(--signal-error));
+}
 .overlay {
   box-shadow: var(--shadow-overlay);
   background: rgb(var(--surface-1));

@@ -527,18 +527,22 @@ export interface SensitivityRow {
 }
 
 /**
- * A cost model is authored once (spreadsheet-grade engine, §17.1) and swept
- * over its grid at load time. Cost lines are $/kg product and sum to MSP by
- * construction, so the waterfall always agrees with the headline.
+ * A cost model is a set of sweep axes over a plant. Every evaluation goes
+ * through a flowsheet: equipment sized, costed against bioSTEAM's correlations,
+ * and priced by a discounted cash flow solved at NPV = 0. Cost lines are
+ * USD/kg product and sum to MSP by construction, so the waterfall always agrees
+ * with the headline.
+ *
+ * There is no `sensitivity` field any more. It used to hold authored
+ * percentages that nothing could contradict; a tornado is now derived by
+ * re-solving the plant at each parameter's bounds, which means it changes when
+ * the model changes and can be checked by dragging a slider.
  */
 export interface CostModel {
   modelId: 'S1' | 'S2' | 'S3';
   dims: ScenarioDim[];
   referencePoint: Record<string, number>;
   evaluate: (point: Record<string, number>) => Record<CostLine, number>;
-  sensitivity: SensitivityRow[];
-  /** Grid coordinates where the authored engine fails to converge (§17.3). */
-  nonConvergent?: (point: Record<string, number>) => boolean;
 }
 
 /** Precomputed sweep of a CostModel (§15 ResultGrid). */

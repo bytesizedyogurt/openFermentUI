@@ -16,11 +16,12 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Table2, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, Copy, Download, Factory, GitCompare, Pin, PinOff, Table2, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '@/store';
 import { navigate } from '@/router';
 import type { CostLine } from '@/data/types';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
+import { plantFails } from '@/engine/plant';
 import { fmt } from '@/engine/units';
 import { scaled } from '@/sim/latency';
 import { exportCSV } from '@/lib/csv';
@@ -83,21 +84,15 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
 
   const grid = scenario ? grids[scenario.modelId] : undefined;
 
-  // The S2 model declares a non-convergent corner (§17.3). Grids are pure data
-  // and carry no predicate, so detect the corner from the scenario's own dims.
-  const nonConvergent = useMemo(() => {
-    if (!scenario || scenario.modelId !== 'S2') return false;
-    const dim = (k: string) => scenario.dims.find((d) => d.key === k);
-    const titer = dim('titer');
-    const dsp = dim('dspYield');
-    const sc = dim('scale');
-    if (!titer || !dsp || !sc) return false;
-    return (
-      scenario.point.titer <= titer.values[0] &&
-      scenario.point.dspYield <= dsp.values[0] &&
-      scenario.point.scale >= sc.values[sc.values.length - 1]
-    );
-  }, [scenario]);
+  // Asked of the plant, not asserted about it. This used to be a predicate on
+  // S2 naming one corner of its grid as non-convergent; that corner solves
+  // perfectly well now, it is just ruinously expensive, and a failure that does
+  // not fail when computed is the same defect the contradiction engine exists to
+  // refuse.
+  const nonConvergent = useMemo(
+    () => (scenario ? plantFails(scenario.modelId, scenario.point) : false),
+    [scenario],
+  );
 
   const result = useMemo(
     () => (grid && scenario && !nonConvergent ? evaluateGrid(grid, scenario.point) : null),
@@ -283,6 +278,13 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
             <Button onClick={() => navigate('/fermos/compare')} title="Compare (c)">
               <GitCompare size={14} /> Compare
             </Button>
+            <Button
+              variant="primary"
+              onClick={() => navigate(`/fermos/s/${scenario.id}/plant`)}
+              title="The sized flowsheet, the capital ladder and the cash flow behind this price"
+            >
+              <Factory size={14} /> Open the plant
+            </Button>
           </>
         }
       />
@@ -393,13 +395,13 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                 <AlertTriangle size={22} className="text-signal-error shrink-0 mt-0.5" />
                 <div>
                   <h2 className="font-serif text-section-title font-semibold mb-1">
-                    The model did not converge at this point
+                    The plant did not size at this point
                   </h2>
                   <p className="text-body text-ink-soft mb-3 max-w-xl">
-                    At the minimum titer and minimum downstream yield, the largest fermenter scale
-                    produces a mass balance the cost engine cannot close — the plant cannot produce
-                    enough product to justify the utilities it consumes, and the solver runs away.
-                    Rather than show you a number from a failed solve, the workspace shows nothing.
+                    Either the flowsheet could not be built here — a vessel count that runs away, a
+                    stream with no mass in it — or the cash flow found no price at which net present
+                    value reaches zero. Rather than show you a number from a failed solve, the
+                    workspace shows nothing.
                   </p>
                   <Button
                     variant="primary"
@@ -532,15 +534,18 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                   <h2 className="font-serif text-section-title font-semibold mb-1">
                     Sensitivity{' '}
                     <Explain label="How to read a tornado">
-                      Each bar varies one assumption at a time by ±20% and plots the resulting swing
-                      in MSP. Longer bars matter more. Asymmetric bars mean the risk is one-sided,
-                      which is usually more decision-relevant than the length. One-at-a-time analysis
-                      ignores interactions between assumptions.
+                      Each bar takes one parameter to the bottom and the top of its modelled range,
+                      holds the rest at the reference point, and rebuilds the entire plant — new
+                      equipment sizes, new capital, a fresh cash flow — to see what the price does.
+                      Longer bars matter more. Asymmetric bars mean the risk is one-sided, which is
+                      usually more decision-relevant than the length. One-at-a-time analysis cannot
+                      see interactions; the rank correlation on the plant screen can.
                     </Explain>
                   </h2>
                   <p className="text-caption text-ink-soft mb-3">
-                    Precomputed per model and evaluated at the model’s reference point — not at your
-                    current slider position.
+                    Derived by re-solving the plant at each parameter’s bounds, evaluated at the
+                    model’s reference point — not at your current slider position. Drag a slider to
+                    a bound and the headline will agree with the bar.
                   </p>
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -563,13 +568,13 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                         />
                         <Tooltip {...tip} formatter={(v: number) => [`${v.toFixed(1)}%`, 'MSP change']} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="lowPct" name="−20%" fill={seriesColor(0)} isAnimationActive={false} />
-                        <Bar dataKey="hiPct" name="+20%" fill={seriesColor(1)} isAnimationActive={false} />
+                        <Bar dataKey="lowPct" name="at the lower bound" fill={seriesColor(0)} isAnimationActive={false} />
+                        <Bar dataKey="hiPct" name="at the upper bound" fill={seriesColor(1)} isAnimationActive={false} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                   <ChartTable
-                    headers={['Assumption', '−20%', '+20%']}
+                    headers={['Parameter', 'At the lower bound', 'At the upper bound']}
                     rows={tornado.map((t) => [
                       t.assumption,
                       `${t.lowPct.toFixed(1)}%`,

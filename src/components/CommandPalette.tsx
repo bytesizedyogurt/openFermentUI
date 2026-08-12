@@ -138,6 +138,13 @@ export function CommandPalette() {
         run: () => navigate('/fermos/s/sc-s1'),
       },
       {
+        id: 'n-plant',
+        group: 'Navigate',
+        label: 'Plant — the flowsheet and cash flow behind a price',
+        icon: LineChart,
+        run: () => navigate('/fermos/s/sc-s2/plant'),
+      },
+      {
         id: 'a-tour',
         group: 'Actions',
         label: 'Start guided tour',

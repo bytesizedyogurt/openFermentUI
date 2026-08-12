@@ -58,6 +58,7 @@ import ProtocolEditor from '@/screens/ProtocolEditor';
 import RunMode from '@/screens/RunMode';
 import Simulate from '@/screens/Simulate';
 import ScenarioWorkspace from '@/screens/ScenarioWorkspace';
+import Plant from '@/screens/Plant';
 import Compare from '@/screens/Compare';
 import Learn from '@/screens/Learn';
 import Lesson from '@/screens/Lesson';
@@ -177,6 +178,7 @@ function Screen() {
     case 'fermos':
       if (b === 'compare') return <Compare />;
       if (b === 'd') return c ? <DesignDetail designId={c} /> : <DesignIndex />;
+      if (b === 's' && c && d === 'plant') return <Plant scenarioId={c} />;
       if (b === 's' && c) return <ScenarioWorkspace scenarioId={c} />;
       return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;
     case 'learn':

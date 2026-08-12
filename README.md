@@ -180,17 +180,34 @@ upgrading one as soon as a corpus value needs it.
 `explainRefusal(from, to)` takes two unit strings, not a record, so a refusal explains what the
 *conversion* needs rather than what a particular record lacks.
 
-### Simulated BioSTEAM
+### bioSTEAM
 
-The Sim ships *response surfaces, not a process simulator*. Each cost model is authored once
-(CAPEX scaling exponents, annualization, media/utility/labor line items, downstream yield
-effects) and evaluated over its full sweep grid at load. The client multilinearly interpolates
-between grid points, so sliders are continuous and instantaneous — and the cost waterfall
-always sums to the headline MSP, because the lines were computed together.
+This section used to say the Sim shipped response surfaces rather than a process simulator, and
+that the frozen grids would one day become caches in front of a real BioSTEAM worker. The grids
+are still frozen and still interpolated, and the `Scenario`/`ResultGrid` contract is unchanged.
+What fills them is not.
 
-In production the frozen grids become caches in front of a real BioSTEAM worker against the
-same `Scenario`/`ResultGrid` contract. Nothing in the UI changes, which is the point of
-specifying it this way.
+`src/engine/biosteam/` is a TypeScript port of BioSTEAM v2.53.11's costing and techno-economic
+core, under the University of Illinois/NCSA licence — see `src/engine/biosteam/NOTICE.md` for the
+attribution and the full list of what was left behind. Ported: the CEPCI table, ASME pressure-vessel
+weight and wall thickness, the vertical and horizontal vessel purchase-cost correlations, the tank
+algorithms, `size_batch`, van 't Riet's kLa correlation, the utility agents with their upstream
+prices, the bare-module installation convention, MACRS depreciation, and the discounted cash flow
+with its construction and start-up schedules. Every upstream doctest the port touches is asserted
+on each `pnpm verify` by `scripts/check-biosteam.ts`.
+
+Each grid cell is therefore a plant: `src/sim/flowsheets/` builds a feed-forward train of sized,
+costed equipment at that parameter point, and the minimum selling price is solved as the price
+that drives net present value to zero — not summed from assumed cost lines. The waterfall still
+sums to the headline, because the operating lines come off the TEA and the capital line is the
+residual the cash flow requires. No capital charge factor is assumed anywhere in the app any more.
+
+**ThermoSTEAM is not ported.** There is no property package, no vapour–liquid equilibrium, no
+rigorous energy balance and no recycle convergence; streams are lumped component mass flows at a
+stated temperature. Three units — the photobioreactor, the pulsed-electric-field disruptor and the
+membrane skids — have no published correlation to borrow and are costed by correlations written
+here. They are marked `authored` in the equipment table, and the plant view reports what share of
+installed capital they represent before it shows the price.
 
 ### Simulated agent
 
