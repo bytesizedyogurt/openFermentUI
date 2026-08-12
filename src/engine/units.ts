@@ -303,19 +303,45 @@ export function parseQuantity(text: string): { value: number; unit: string } | n
  * glycan_species) carry a string, and the right rendering for those is the
  * string itself — so this passes them through rather than producing NaN.
  */
+const SUPERSCRIPT: Record<string, string> = {
+  '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+  '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+};
+
+/** Real superscript digits, matching the unit strings the corpus already uses. */
+function superscript(n: number): string {
+  return String(n)
+    .split('')
+    .map((c) => SUPERSCRIPT[c] ?? c)
+    .join('');
+}
+
 export function fmt(value: number | string, maxDecimals = 3): string {
   if (typeof value === 'string') return value;
   if (!isFinite(value)) return '—';
   if (value === 0) return '0';
   const abs = Math.abs(value);
-  if (abs >= 10000 || abs < 0.001) {
-    return value.toExponential(2).replace('e', '×10^').replace('×10^+', '×10^');
+
+  // Scientific notation only where a plain number stops being readable. An MSP
+  // of 20437 USD/kg read as "2.04×10⁴" is worse than "20,437" — the reader has
+  // to decode it before they can judge it. Above a million, the reverse.
+  if (abs >= 1e6 || abs < 0.001) {
+    const [mantissa, exp] = value.toExponential(2).split('e');
+    return `${mantissa}×10${superscript(Number(exp))}`;
   }
+
   let decimals = maxDecimals;
   if (abs >= 100) decimals = Math.min(1, maxDecimals);
   else if (abs >= 10) decimals = Math.min(2, maxDecimals);
-  const s = value.toFixed(decimals);
-  return s.replace(/\.?0+$/, '');
+  const s = value.toFixed(decimals).replace(/\.?0+$/, '');
+
+  // Group the integer part once numbers get long enough to miscount at a glance.
+  if (abs >= 10000) {
+    const [int, frac] = s.split('.');
+    const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return frac ? `${grouped}.${frac}` : grouped;
+  }
+  return s;
 }
 
 /** Round to a precision increment (e.g. 0.1 g) for pipettable recipes. */

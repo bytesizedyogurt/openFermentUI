@@ -130,7 +130,8 @@ export function Ledger() {
             <tr className="text-caption uppercase tracking-wide text-ink-soft border-b border-line">
               <th className="text-left font-medium py-2 pr-3">Parameter</th>
               <th className="text-left font-medium py-2 pr-3">Family</th>
-              <th className="text-right font-medium py-2 pr-3">Median</th>
+              <th className="text-right font-medium py-2 pr-1.5">Median</th>
+              <th className="text-left font-medium py-2 pr-6 pl-0">Unit</th>
               <th className="text-right font-medium py-2 pr-3">n</th>
               <th className="text-right font-medium py-2 pr-3">primary</th>
               <th className="text-left font-medium py-2 pr-3">Spread</th>
@@ -144,10 +145,10 @@ export function Ledger() {
               return (
                 <tr
                   key={v.field}
-                  className="border-b border-line/60 hover:bg-accent-wash/40 cursor-pointer"
+                  className="border-b border-line/60 hover:bg-accent-wash/40 cursor-pointer align-middle"
                   onClick={() => navigate(`/ledger/p/${v.field}`)}
                 >
-                  <td className="py-2 pr-3">
+                  <td className="py-1.5 pr-3">
                     <a
                       href={href(`/ledger/p/${v.field}`)}
                       className="text-ink hover:text-accent"
@@ -156,34 +157,38 @@ export function Ledger() {
                       {v.def.name}
                     </a>
                   </td>
-                  <td className="py-2 pr-3 text-ink-soft text-caption">
+                  <td className="py-1.5 pr-3 text-ink-soft text-caption">
                     {FAMILY_LABEL[v.def.family]}
                   </td>
-                  <td className="py-2 pr-3 text-right font-num">
+                  <td className="py-1.5 pr-1 text-right font-num tabular-nums whitespace-nowrap">
                     {v.aggregate ? (
-                      <>
-                        {fmt(v.aggregate.median)}{' '}
-                        <span className="text-ink-soft text-caption">{unit}</span>
-                      </>
+                      fmt(v.aggregate.median)
                     ) : (
                       <span className="text-ink-soft" title="Fewer than two comparable records">
                         —
                       </span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 text-right font-num">{v.recordIds.length}</td>
-                  <td className="py-2 pr-3 text-right font-num text-ink-soft">
-                    {v.aggregate?.nPrimary ?? 0}
+                  <td className="py-1.5 pr-6 text-caption text-ink-soft whitespace-nowrap">
+                    {v.aggregate ? unit : ''}
                   </td>
-                  <td className="py-2 pr-3">
+                  <td className="py-1.5 pr-3 text-right font-num tabular-nums">{v.recordIds.length}</td>
+                  <td className="py-1.5 pr-3 text-right font-num tabular-nums text-ink-soft">
+                    {v.aggregate ? (
+                      v.aggregate.nPrimary
+                    ) : (
+                      <span title="No aggregate — categorical, or too few comparable records">—</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-3">
                     <ContradictionRail
                       marks={marks}
                       aggregate={v.aggregate}
                       contradictions={v.contradictions}
-                      height={48}
+                      height={34}
                     />
                   </td>
-                  <td className="py-2">
+                  <td className="py-1.5">
                     <RefereeChip v={v} />
                   </td>
                 </tr>
@@ -304,8 +309,10 @@ export function ParameterPage({ field }: { field: FieldId }) {
         <ArrowLeft size={12} aria-hidden /> Ledger
       </button>
 
-      <div className="flex items-start justify-between gap-6 flex-wrap">
-        <div className="min-w-[320px]">
+      {/* The rail sits beside the number it summarises. justify-between flung it
+          to the far edge of a 1200px column, where it read as unrelated chrome. */}
+      <div className="flex items-start gap-6 flex-wrap">
+        <div className="min-w-[300px]">
           <h1 className="font-serif text-page-title font-semibold">{def.name}</h1>
           <div className="text-caption text-ink-soft mt-0.5">
             <span className="font-mono">{def.canonicalUnit || 'categorical'}</span> ·{' '}
@@ -341,13 +348,17 @@ export function ParameterPage({ field }: { field: FieldId }) {
           </div>
         </div>
 
-        <ContradictionRail
-          marks={marks}
-          aggregate={view.aggregate}
-          contradictions={view.contradictions}
-          height={160}
-          onPick={(id) => navigate(`/ledger/records?record=${id}`)}
-        />
+        {marks.length > 1 && (
+          <ContradictionRail
+            marks={marks}
+            aggregate={view.aggregate}
+            contradictions={view.contradictions}
+            height={160}
+            showScale
+            className="shrink-0"
+            onPick={(id) => navigate(`/ledger/records?record=${id}`)}
+          />
+        )}
       </div>
 
       {/* ── referee ── */}
@@ -429,38 +440,46 @@ export function ParameterPage({ field }: { field: FieldId }) {
       {/* ── evidence ── */}
       <section className="mt-6">
         <SectionTitle>Evidence</SectionTitle>
+        {/* A fixed grid, not justify-between. The first cut put the value hard
+            left and a run-on of "primary uvm4 <title>" hard right, so nothing
+            aligned down the column and the title truncated into the gutter. */}
         <div className="space-y-1">
           {mine.map((r) => {
             const held = !isAggregatable(r);
-            const why = aggregateExclusion(r);
             const paper = papers.find((p) => p.id === r.paperId);
             return (
               <Tick
                 key={r.id}
                 p={provenanceOf(r)}
                 e={r.evidenceClass}
-                className={cx('card p-2.5', held && 'opacity-70')}
+                className={cx('card px-3 py-2', held && 'opacity-75')}
               >
-                <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <div className="font-num">
-                    {String(r.value)} <span className="text-ink-soft text-caption">{r.unit}</span>
-                  </div>
-                  <div className="text-caption text-ink-soft flex items-center gap-2 flex-wrap">
+                <div className="grid gap-x-3 gap-y-1 items-baseline grid-cols-[7.5rem_5.5rem_1fr] sm:grid-cols-[8rem_6rem_7rem_1fr]">
+                  <span className="font-num tabular-nums">
+                    {String(r.value)}{' '}
+                    <span className="text-ink-soft text-caption">{r.unit}</span>
+                  </span>
+
+                  <span className="text-caption">
                     {r.isPrimary ? (
-                      <span>primary</span>
+                      <span className="text-ink-soft">primary</span>
                     ) : (
-                      <span className="text-signal-warn">reports another study</span>
+                      <span className="text-signal-warn">recites</span>
                     )}
-                    {r.method && <span className="font-mono">{r.method}</span>}
-                    {r.organism && <span>{r.organism}</span>}
-                    <a
-                      href={href(`/trawl/sources/${r.paperId}`)}
-                      className="text-accent hover:underline"
-                    >
-                      {paper?.title?.slice(0, 48) ?? r.paperId}
-                      {(paper?.title?.length ?? 0) > 48 ? '…' : ''}
-                    </a>
-                  </div>
+                  </span>
+
+                  <span className="text-caption text-ink-soft hidden sm:block truncate">
+                    {r.organism ?? '—'}
+                    {r.method ? ` · ${r.method}` : ''}
+                  </span>
+
+                  <a
+                    href={href(`/trawl/sources/${r.paperId}`)}
+                    className="text-caption text-accent hover:underline truncate min-w-0"
+                    title={paper?.title ?? r.paperId}
+                  >
+                    {paper?.title ?? r.paperId}
+                  </a>
                 </div>
                 {excludedById.has(r.id) && (
                   <div className="text-caption text-signal-warn mt-1">

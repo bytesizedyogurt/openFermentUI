@@ -31,6 +31,15 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 export function DesignIndex() {
+  const scenarios = useStore((st) => st.scenarios);
+
+  // Grouped by scenario and carrying the MSP. A flat list of 19 rows showing
+  // only a label and four badges omits the number designs exist to be compared
+  // on, and makes the reader open each one to find it.
+  const groups = scenarios
+    .map((sc) => ({ sc, designs: DESIGNS.filter((d) => d.scenarioId === sc.id) }))
+    .filter((g) => g.designs.length > 0);
+
   return (
     <div className="p-6 max-w-[1100px]">
       <PageHeader
@@ -39,23 +48,53 @@ export function DesignIndex() {
         subtitle="Points in the authored sweep grids, re-presented as designs. Modelled economics, not validated."
         actions={<LinkButton to="/fermos">Scenarios</LinkButton>}
       />
-      <div className="space-y-2">
-        {DESIGNS.map((d) => (
-          <Card
-            key={d.id}
-            className="p-3 cursor-pointer hover:border-accent/45"
-            onClick={() => navigate(`/fermos/d/${d.id}`)}
-          >
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <div className="text-body">{d.label}</div>
-                <div className="text-caption text-ink-soft font-mono">{d.id}</div>
-              </div>
-              <Cascade design={d} />
-            </div>
-          </Card>
-        ))}
-      </div>
+
+      {groups.map(({ sc, designs }) => (
+        <section key={sc.id} className="mb-6">
+          <SectionTitle>{sc.name}</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full text-body">
+              <thead>
+                <tr className="text-caption uppercase tracking-wide text-ink-soft border-b border-line">
+                  <th className="text-left font-medium py-1.5 pr-3">Design</th>
+                  {/* The unit is constant across a scenario's designs, so it
+                      belongs in the header rather than repeated 19 times. */}
+                  <th className="text-right font-medium py-1.5 pr-6 whitespace-nowrap">
+                    MSP{' '}
+                    <span className="normal-case tracking-normal">
+                      {designs[0]?.tiers.find((t) => t.tier === 'T3')?.values.msp?.unit ?? ''}
+                    </span>
+                  </th>
+                  <th className="text-left font-medium py-1.5">Cascade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {designs.map((d) => {
+                  const msp = d.tiers.find((t) => t.tier === 'T3')?.values.msp;
+                  return (
+                    <tr key={d.id} className="border-b border-line/60 hover:bg-accent-wash/40">
+                      <td className="py-1.5 pr-3">
+                        {/* A real link, not a div with cursor-pointer: it has to
+                            be reachable by keyboard and openable in a new tab. */}
+                        <a href={href(`/fermos/d/${d.id}`)} className="text-ink hover:text-accent">
+                          {d.label.replace(`${sc.name} — `, '')}
+                        </a>
+                        <span className="text-caption text-ink-soft font-mono ml-2">{d.id}</span>
+                      </td>
+                      <td className="py-1.5 pr-6 text-right font-num tabular-nums whitespace-nowrap">
+                        {msp ? fmt(msp.value) : '—'}
+                      </td>
+                      <td className="py-1.5">
+                        <Cascade design={d} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
@@ -124,11 +163,11 @@ export function DesignDetail({ designId }: { designId: string }) {
           Tier cascade
         </SectionTitle>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5 max-w-3xl">
           {cascade(design).map((t) => (
             <Card
               key={t.tier}
-              className={cx('p-3', t.state === 'absent' && 'border-dashed opacity-90')}
+              className={cx('px-3 py-2', t.state === 'absent' && 'border-dashed')}
             >
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <span className="text-body font-medium">{TIER_LABEL[t.tier]}</span>
@@ -143,15 +182,17 @@ export function DesignDetail({ designId }: { designId: string }) {
               </div>
 
               {t.state === 'absent' ? (
-                <p className="text-caption text-ink-soft mt-1.5">{t.absentReason}</p>
+                <p className="text-caption text-ink-soft mt-1">{t.absentReason}</p>
               ) : (
                 <>
                   {/* The binding constraint is the most useful string on the
                       page, so it gets the most prominent type in the row. */}
-                  <p className="text-body mt-1.5">{t.bindingConstraint}</p>
-                  <div className="text-caption text-ink-soft mt-1">
-                    engine <span className="font-mono">{t.engineVersion}</span>
-                  </div>
+                  <p className="text-body mt-1">
+                    {t.bindingConstraint}{' '}
+                    <span className="text-caption text-ink-soft">
+                      · engine <span className="font-mono">{t.engineVersion}</span>
+                    </span>
+                  </p>
                 </>
               )}
             </Card>
@@ -163,7 +204,7 @@ export function DesignDetail({ designId }: { designId: string }) {
       {t3 && (
         <section className="mb-5">
           <SectionTitle>Minimum selling price</SectionTitle>
-          <Tick p="demo" className="card p-3">
+          <Tick p="demo" className="card p-3 max-w-3xl">
             <div className="font-num text-[26px] leading-none">
               {msp ? fmt(msp.value) : '—'}{' '}
               <span className="text-body text-ink-soft">{msp?.unit}</span>

@@ -142,42 +142,48 @@ export function Notary() {
       </div>
 
       {/* ── queue by status ── */}
+      {/* A five-column board with four columns permanently empty spends 80% of
+          the width saying "nothing here". A status strip plus one working list
+          says the same thing in a line and gives the designs room to be read. */}
       <section className="mb-6">
         <SectionTitle>Queue</SectionTitle>
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-caption mb-3">
           {COLUMNS.map((col) => {
-            const items = DESIGNS.filter((d) => statusKey(d.publication) === col.status);
+            const n = DESIGNS.filter((d) => statusKey(d.publication) === col.status).length;
             return (
-              <div key={col.status} className="min-w-0">
-                <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
-                  {col.label}{' '}
-                  <span className="font-num">{items.length}</span>
+              <span key={col.status} className={n === 0 ? 'text-ink-soft/60' : 'text-ink'}>
+                <span className="font-num">{n}</span>{' '}
+                <span className="text-ink-soft">{col.label.toLowerCase()}</span>
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+          {DESIGNS.map((d) => {
+            const unmetHere = enablement(d).filter((r) => !r.met).length;
+            const active = design?.id === d.id;
+            return (
+              <button
+                key={d.id}
+                onClick={() => setSelected(d.id)}
+                aria-pressed={active}
+                className={cx(
+                  'text-left border rounded-card px-2.5 py-2 transition-colors min-w-0',
+                  active
+                    ? 'border-accent bg-accent-wash'
+                    : 'border-line hover:border-accent/45',
+                )}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-mono text-caption truncate">{d.id}</span>
+                  <span className="text-caption text-signal-warn shrink-0">
+                    {unmetHere} blocking
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  {items.slice(0, 6).map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => setSelected(d.id)}
-                      className={cx(
-                        'w-full text-left text-caption border rounded-card px-2 py-1.5 transition-colors',
-                        design?.id === d.id
-                          ? 'border-accent bg-accent-wash'
-                          : 'border-line hover:border-accent/45',
-                      )}
-                    >
-                      <span className="font-mono">{d.id}</span>
-                    </button>
-                  ))}
-                  {items.length > 6 && (
-                    <div className="text-caption text-ink-soft">
-                      …and {items.length - 6} more
-                    </div>
-                  )}
-                  {items.length === 0 && (
-                    <div className="text-caption text-ink-soft">—</div>
-                  )}
-                </div>
-              </div>
+                <div className="text-caption text-ink-soft truncate mt-0.5">{d.label}</div>
+              </button>
             );
           })}
         </div>
@@ -199,9 +205,9 @@ export function Notary() {
             Enablement — <span className="font-mono">{design.id}</span>
           </SectionTitle>
 
-          <div className="space-y-1.5 mb-4">
+          <div className="border border-line rounded-card divide-y divide-line mb-4 max-w-3xl">
             {reqs.map((r) => (
-              <Card key={r.id} className={cx('p-2.5', !r.met && 'border-signal-warn/40')}>
+              <div key={r.id} className={cx('px-3 py-2', !r.met && 'bg-signal-warn/[0.04]')}>
                 <div className="flex items-start gap-2">
                   {r.met ? (
                     <Check size={14} className="text-accent mt-0.5 shrink-0" aria-hidden />
@@ -215,7 +221,7 @@ export function Notary() {
                     )}
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
 

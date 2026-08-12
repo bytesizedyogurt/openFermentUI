@@ -248,7 +248,6 @@ export default function Home() {
 
   // ── band 1 numbers ───────────────────────────────────────────────────
   const ingested = useMemo(() => papers.filter((p) => p.ingest === 'complete'), [papers]);
-  const shelved = papers.length - ingested.length;
 
   const status = useMemo(() => {
     let verified = 0;
@@ -355,17 +354,17 @@ export default function Home() {
                     'No corpus loaded'
                   ) : (
                     <>
-                      <span className="font-num">{shelved}</span> awaiting full-text ingest
+                      <span className="font-num">{ingested.length}</span> of{' '}
+                      <span className="font-num">{papers.length}</span> have full text
                     </>
                   )
                 }
               >
-                <div className="font-num text-display leading-tight">
-                  {ingested.length}
-                  <span className="text-section-title text-ink-soft ml-1.5">
-                    / {papers.length}
-                  </span>
-                </div>
+                {/* The headline is what the label says it is. Showing 0/132 under
+                    "Papers catalogued" read as "none catalogued", when in fact
+                    all 132 are catalogued and none has full text — the opposite
+                    of the intended claim. */}
+                <div className="font-num text-display leading-tight">{papers.length}</div>
               </VitalTile>
             </TileBoundary>
 

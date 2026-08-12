@@ -15,6 +15,7 @@ import { useMemo, useState } from 'react';
 import { Users, CheckCircle2, XCircle, CircleSlash } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
+import { fieldName } from '@/data/ontology';
 import { Card, PageHeader, SectionTitle, Callout, Button, LinkButton, cx } from '@/components/ui';
 import type { ResultField, RunOutcome, RunState } from '@/data/types';
 
@@ -46,6 +47,22 @@ export function OpenLab() {
     const v = proto?.versions.find((x) => x.version === r.version) ?? proto?.versions[0];
     return v?.resultSchema ?? [];
   };
+
+  // Protocols that declare a decisive measurement — what to run first when the
+  // feed is empty.
+  const decisive = useMemo(
+    () =>
+      protocols.flatMap((p) =>
+        p.versions
+          .filter((v) => v.version === p.currentVersion && v.decisive)
+          .map((v) => ({
+            protocol: p,
+            field: v.decisive!.field,
+            uncertainty: v.decisive!.currentUncertainty,
+          })),
+      ),
+    [protocols],
+  );
 
   const failures = deposits.filter((d) => d.outcome === 'failure').length;
   const rate = deposits.length ? Math.round((failures / deposits.length) * 100) : null;
@@ -96,6 +113,37 @@ export function OpenLab() {
               at equal visual weight.
             </p>
           </Callout>
+
+          {decisive.length > 0 && (
+            <section className="mt-4">
+              <SectionTitle>Where a run would count most</SectionTitle>
+              <p className="text-caption text-ink-soft mb-2">
+                Protocols that declare which uncertainty they exist to resolve. An empty feed is
+                a starting point, not a dead end.
+              </p>
+              <div className="space-y-1.5">
+                {decisive.map(({ protocol, field, uncertainty }) => (
+                  <Card key={protocol.id} className="px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                      <a
+                        href={href(`/runbook/${protocol.id}`)}
+                        className="text-body text-accent hover:underline"
+                      >
+                        {protocol.title}
+                      </a>
+                      <a
+                        href={href(`/ledger/p/${field}`)}
+                        className="text-caption text-ink-soft hover:text-accent whitespace-nowrap"
+                      >
+                        settles {fieldName(field)} →
+                      </a>
+                    </div>
+                    <p className="text-caption text-ink-soft mt-1 line-clamp-2">{uncertainty}</p>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
 

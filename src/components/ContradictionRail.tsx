@@ -54,6 +54,7 @@ export function ContradictionRail({
   height = 48,
   onPick,
   highlightId,
+  showScale = false,
   className,
 }: {
   marks: RailMark[];
@@ -64,6 +65,13 @@ export function ContradictionRail({
   onPick?: (recordId: string) => void;
   /** Ring one mark — "this record, among its peers". */
   highlightId?: string;
+  /**
+   * Endpoint and median labels, positioned by the same projection that places
+   * the marks. Laying them out with justify-between instead floats the median
+   * label at the vertical centre while the line sits wherever the data puts it,
+   * which points the reader at the wrong number.
+   */
+  showScale?: boolean;
   className?: string;
 }) {
   // A single value is a value, not a spread. An empty frame around one mark
@@ -108,18 +116,23 @@ export function ContradictionRail({
           positioned divs is noise to a screen reader. The sentence beside it
           says what the picture says, which is the same rule the DataTable ticks
           follow. */}
+      {/* A narrow bordered box with hairlines in it reads as a scrollbar track,
+          which is what the first cut of this looked like. A soft band with no
+          hard edge, wide enough for a mark to be a mark, reads as a plot. */}
       <div
         aria-hidden
         className={cx(
-          'relative shrink-0 rounded-[2px] border',
-          contradicted ? 'border-signal-error bg-signal-error/[0.06]' : 'border-line bg-surface-1',
+          'relative shrink-0 rounded-[3px]',
+          contradicted
+            ? 'bg-signal-error/[0.09] ring-1 ring-signal-error/70'
+            : 'bg-ink-soft/[0.09]',
         )}
-        style={{ width: 18, height }}
+        style={{ width: height >= 120 ? 34 : 26, height }}
       >
         {aggregate && (
           <div
-            className="absolute left-0 right-0 bg-ink"
-            style={{ top: project(aggregate.median) - 1, height: 2 }}
+            className="absolute bg-ink rounded-[1px]"
+            style={{ top: project(aggregate.median) - 1, height: 2, left: -3, right: -3 }}
             title={`median ${fmt(aggregate.median)} ${unit}`}
           />
         )}
@@ -140,17 +153,17 @@ export function ContradictionRail({
                 ? { type: 'button' as const, tabIndex: -1, onClick: () => onPick(record.id) }
                 : {})}
               className={cx(
-                'absolute left-1/2 -translate-x-1/2 rounded-[0.5px] block',
+                'absolute left-1/2 -translate-x-1/2 rounded-[1px] block',
                 PROV_BG[provenanceOf(record)] ?? 'bg-ink-soft',
                 markClass(record),
-                held && !on && 'opacity-40',
+                held && !on && 'opacity-45',
                 on && 'ring-1 ring-ink ring-offset-0 z-10',
                 onPick && 'cursor-pointer',
               )}
               style={{
-                top: project(value) - (on ? 1 : 0.5),
-                width: on ? 11 : 7,
-                height: on ? 2 : 1,
+                top: project(value) - (on ? 1.5 : 1),
+                width: on ? '100%' : '72%',
+                height: on ? 3 : 2,
               }}
               title={`${fmt(value)} ${unit}${why ? ` · ${EXCLUSION_NOTE[why]}` : ''}`}
             />
@@ -168,6 +181,40 @@ export function ContradictionRail({
           </span>
         )}
       </div>
+      {showScale && (
+        <div className="relative shrink-0" style={{ height, width: 92 }} aria-hidden>
+          <span
+            className="absolute left-0 text-caption text-ink-soft leading-none"
+            style={{ top: project(hi) - 4 }}
+          >
+            {fmt(hi)}
+          </span>
+          {aggregate && (
+            <span
+              className="absolute left-0 text-caption text-ink leading-none whitespace-nowrap"
+              style={{ top: project(aggregate.median) - 4 }}
+            >
+              median {fmt(aggregate.median)}
+            </span>
+          )}
+          <span
+            className="absolute left-0 text-caption text-ink-soft leading-none"
+            style={{ top: project(lo) - 4 }}
+          >
+            {fmt(lo)}
+          </span>
+          {logScale && (
+            // Above the high label, not below the low one — the low label sits
+            // at the floor of the band and the two collided.
+            <span
+              className="absolute left-0 text-caption text-ink-soft/70 whitespace-nowrap"
+              style={{ top: -14 }}
+            >
+              log scale
+            </span>
+          )}
+        </div>
+      )}
       <span className="sr-only">{summary}</span>
     </div>
   );
