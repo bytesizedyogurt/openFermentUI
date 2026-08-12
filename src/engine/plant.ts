@@ -14,9 +14,10 @@
 // what the plant has to charge above its operating cost to service its capital
 // and its tax. That number is not an allocation. It is the answer.
 import type { CostLine } from '@/data/types';
-import type { AreaSummary, BioSystem } from '@/engine/biosteam/system';
+import type { AreaSummary, BioSystem, FlowsheetGraph, StreamRow } from '@/engine/biosteam/system';
 import type { UnitResult } from '@/engine/biosteam/types';
-import { TEA, type CashflowRow } from '@/engine/biosteam/tea';
+import { TEA, type CashflowRow, type TEAOptions } from '@/engine/biosteam/tea';
+import { CE } from '@/engine/biosteam/cepci';
 import { FLOWSHEET_BY_MODEL } from '@/sim/flowsheets/plants';
 import type { FlowsheetSpec } from '@/sim/flowsheets/spec';
 
@@ -54,6 +55,23 @@ export interface PlantResult {
     powerConsumption: number;
   };
   costSourceSplit: { biosteam: number; authored: number };
+  streams: StreamRow[];
+  graph: FlowsheetGraph;
+  /**
+   * What the plant actually sells.
+   *
+   * `purity` is the fraction of the powder that is the target protein. It is
+   * not decoration: bioSTEAM prices a *stream*, so the minimum selling price
+   * above is the price of this powder and not of pure β-casein. A model that
+   * quoted a price without quoting the purity behind it would be inviting the
+   * reader to compare it against an isolate.
+   */
+  product: {
+    ID: string;
+    massFlowPerHr: number;
+    purity: number;
+    composition: Record<string, number>;
+  };
   warnings: { ID: string; message: string }[];
   /** Solver residual on NPV at the solved price, USD. Near zero or it is wrong. */
   npvResidual: number;
@@ -102,10 +120,74 @@ function decompose(
   };
 }
 
+/**
+ * Edits made on the plant screen, on top of what the flowsheet declares.
+ *
+ * Kept outside the flowsheet rather than mutated into it, for two reasons. A
+ * flowsheet that carried the reader's edits would make the scenario's own
+ * numbers unreproducible, and the screen has to be able to say which values are
+ * the model's and which are yours — a control that cannot tell you it has been
+ * touched is a control you stop trusting.
+ */
+export interface PlantOverrides {
+  /** Per unit, per bioSTEAM attribute. */
+  units?: Record<string, Record<string, number | string>>;
+  /** Financial and plant-wide settings, merged over the flowsheet's TEA. */
+  tea?: Partial<TEAOptions>;
+  /** Chemical Engineering Plant Cost Index. Re-costs every correlation at once. */
+  CE?: number;
+}
+
+function hasOverrides(o?: PlantOverrides): boolean {
+  if (!o) return false;
+  if (o.CE !== undefined) return true;
+  if (o.tea && Object.keys(o.tea).length > 0) return true;
+  return Object.values(o.units ?? {}).some((u) => Object.keys(u).length > 0);
+}
+
 /** Build, size, cost and price a plant at one parameter point. */
-export function evaluatePlant(spec: FlowsheetSpec, point: Record<string, number>): PlantResult {
-  const sys = spec.build(point);
-  const tea = new TEA(sys, spec.tea);
+export function evaluatePlant(
+  spec: FlowsheetSpec,
+  point: Record<string, number>,
+  overrides?: PlantOverrides,
+): PlantResult {
+  // The cost index is a module global, exactly as `bst.CE` is upstream. It is
+  // set for the duration of this build and put back afterwards, so one screen
+  // asking "what would this cost in 2008 dollars" cannot leak into the next
+  // scenario's grid.
+  const savedCE = CE.value;
+  if (overrides?.CE !== undefined) CE.value = overrides.CE;
+  let sys;
+  try {
+    sys = spec.build(point);
+    const unitOverrides = overrides?.units;
+    if (unitOverrides && Object.keys(unitOverrides).length > 0) {
+      let touched = false;
+      for (const u of sys.units) {
+        const edits = unitOverrides[u.ID];
+        if (!edits) continue;
+        for (const key in edits) {
+          if (u.setSpec(key, edits[key])) touched = true;
+        }
+      }
+      // Re-run the whole train, not just the edited unit: changing a split
+      // changes every stream downstream of it, and re-costing one vessel while
+      // leaving the rest on the old mass balance would be the worst of both.
+      if (touched) {
+        sys.simulate();
+        const last = sys.products[0];
+        if (last) {
+          const rebuilt = sys.units
+            .flatMap((u) => u.outs)
+            .find((o) => o.ID === spec.productStreamID);
+          if (rebuilt) sys.products = [rebuilt];
+        }
+      }
+    }
+  } finally {
+    CE.value = savedCE;
+  }
+  const tea = new TEA(sys, overrides?.tea ? { ...spec.tea, ...overrides.tea } : spec.tea);
   const annualProduction = sys.annualProduction(spec.productStreamID);
   const msp = tea.solvePrice(spec.productStreamID);
 
@@ -151,6 +233,18 @@ export function evaluatePlant(spec: FlowsheetSpec, point: Record<string, number>
       powerConsumption: sys.powerConsumption,
     },
     costSourceSplit: sys.costSourceSplit(),
+    streams: sys.streamTable(),
+    graph: sys.diagram(),
+    product: (() => {
+      const p = sys.products[0];
+      const total = p ? Object.values(p.flow).reduce((t, v) => t + v, 0) : 0;
+      return {
+        ID: p?.ID ?? '—',
+        massFlowPerHr: total,
+        purity: total > 0 ? (p.flow.product ?? 0) / total : 0,
+        composition: p ? { ...p.flow } : {},
+      };
+    })(),
     warnings: sys.warnings,
     npvResidual,
   };
@@ -174,9 +268,15 @@ function cacheKey(modelId: string, point: Record<string, number>): string {
 export function evaluatePlantCached(
   modelId: string,
   point: Record<string, number>,
+  overrides?: PlantOverrides,
 ): PlantResult | null {
   const spec = FLOWSHEET_BY_MODEL[modelId];
   if (!spec) return null;
+  // An edited plant is not cached. The cache exists so a slider drag over a
+  // fixed grid is cheap; an edit session is a handful of solves and caching it
+  // would mean keying on the whole override object, which is more bookkeeping
+  // than the saving is worth.
+  if (hasOverrides(overrides)) return evaluatePlant(spec, point, overrides);
   const key = cacheKey(modelId, point);
   const hit = CACHE.get(key);
   if (hit) return hit;

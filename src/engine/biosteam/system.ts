@@ -12,8 +12,53 @@
 // installed cost, utility demand, material cost — and the grouping by process
 // area that makes a capital breakdown readable.
 import type { BioUnit } from './unit';
-import { AREA_NAMES, massFlow, type Stream, type UnitResult } from './types';
+import { AREA_NAMES, massFlow, type CostSource, type Stream, type UnitResult } from './types';
 import { costPower } from './utilities';
+
+/** One row of bioSTEAM's `report.stream_table`. */
+export interface StreamRow {
+  ID: string;
+  /** Unit that produced it, or null for a feed. */
+  source: string | null;
+  /** Unit that consumes it, or null for a product or waste stream. */
+  sink: string | null;
+  phase: 'l' | 'g' | 's';
+  /** K. */
+  T: number;
+  /** Pa. */
+  P: number;
+  /** kg/hr. */
+  massFlow: number;
+  /** USD/kg. */
+  price: number;
+  /** Percent of total mass, per component. */
+  composition: Record<string, number>;
+  /** kg/hr, per component. */
+  flow: Record<string, number>;
+}
+
+export interface FlowsheetNode {
+  id: string;
+  label: string;
+  line?: string;
+  kind: 'unit' | 'feed' | 'product' | 'waste';
+  area: number;
+  costSource?: CostSource;
+  installedCost?: number;
+  warnings?: number;
+}
+
+export interface FlowsheetEdge {
+  from: string;
+  to: string;
+  label: string;
+  kind: 'feed' | 'process' | 'product' | 'waste';
+}
+
+export interface FlowsheetGraph {
+  nodes: FlowsheetNode[];
+  edges: FlowsheetEdge[];
+}
 
 export interface AreaSummary {
   area: number;
@@ -50,8 +95,133 @@ export class BioSystem {
     this.operatingHours = opts.operatingHours;
   }
 
+  /**
+   * Resolve every unit's inlets from the declared graph, then run the train.
+   *
+   * Units are simulated in declaration order, which is process order in all
+   * three flowsheets. There is no tearing and no recycle iteration: a loop
+   * would need a convergence scheme, and a convergence scheme without a
+   * property package would be arithmetic pretending to be thermodynamics. A
+   * unit whose source has not run yet gets an empty stream and will size to
+   * nothing, which is loud rather than subtle.
+   */
   simulate(): void {
-    for (const u of this.units) u.simulate();
+    const byId = new Map(this.units.map((u) => [u.ID, u]));
+    for (const u of this.units) {
+      u.ins = u.sources.map((src) => {
+        if (src.kind === 'feed') return src.stream;
+        const from = byId.get(src.from);
+        if (!from) throw new Error(`${u.ID}: no unit '${src.from}' upstream of it`);
+        const out = from.outs[src.port];
+        if (!out) {
+          throw new Error(
+            `${u.ID}: unit '${src.from}' has no outlet ${src.port} — it produced ${from.outs.length}`,
+          );
+        }
+        return out;
+      });
+      u.simulate();
+    }
+  }
+
+  /**
+   * Every stream in the flowsheet, with what made it and what consumes it.
+   *
+   * The columns are bioSTEAM's `report.stream_table`: source, sink, phase,
+   * temperature, pressure, total flow, then the composition. Feeds have no
+   * source and products no sink, which is how upstream marks them too.
+   */
+  streamTable(): StreamRow[] {
+    const rows: StreamRow[] = [];
+    const sinkOf = new Map<string, string>();
+    for (const u of this.units) {
+      for (const src of u.sources) {
+        const id = src.kind === 'feed' ? src.stream.ID : `${src.from}#${src.port}`;
+        sinkOf.set(id, u.ID);
+      }
+    }
+    const push = (s: Stream, key: string, source: string | null): void => {
+      const total = massFlow(s);
+      rows.push({
+        ID: s.ID,
+        source,
+        sink: sinkOf.get(key) ?? null,
+        phase: s.phase ?? 'l',
+        T: s.T,
+        P: s.P,
+        massFlow: total,
+        price: s.price,
+        composition: Object.fromEntries(
+          Object.entries(s.flow)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => [k, total > 0 ? (v / total) * 100 : 0]),
+        ),
+        flow: { ...s.flow },
+      });
+    };
+    for (const f of this.feeds) push(f, f.ID, null);
+    for (const u of this.units) {
+      u.outs.forEach((o, i) => push(o, `${u.ID}#${i}`, u.ID));
+    }
+    return rows;
+  }
+
+  /** Nodes and edges for the flowsheet diagram, read off the same graph. */
+  diagram(): FlowsheetGraph {
+    const productIDs = new Set(this.products.map((p) => p.ID));
+    const nodes: FlowsheetNode[] = [];
+    const edges: FlowsheetEdge[] = [];
+    const feedIDs = new Set(this.feeds.map((f) => f.ID));
+
+    for (const f of this.feeds) {
+      nodes.push({ id: `feed:${f.ID}`, label: f.ID, kind: 'feed', area: 0 });
+    }
+    for (const u of this.units) {
+      nodes.push({
+        id: u.ID,
+        label: u.ID,
+        line: u.line,
+        kind: 'unit',
+        area: u.area,
+        costSource: u.costSource,
+        installedCost: u.installedCost,
+        warnings: u.warnings.length,
+      });
+    }
+    for (const u of this.units) {
+      u.sources.forEach((src, port) => {
+        const stream = u.ins[port];
+        const label = stream ? stream.ID : '';
+        if (src.kind === 'feed') {
+          edges.push({ from: `feed:${src.stream.ID}`, to: u.ID, label, kind: 'feed' });
+        } else {
+          edges.push({ from: src.from, to: u.ID, label, kind: 'process' });
+        }
+      });
+    }
+    // Terminal products, and any outlet nobody consumes — a purge or a waste
+    // stream is still a stream, and hiding it would make the diagram lie about
+    // where the mass went.
+    const consumed = new Set(
+      this.units.flatMap((u) =>
+        u.sources.filter((s) => s.kind === 'unit').map((s) => `${(s as { from: string }).from}#${(s as { port: number }).port}`),
+      ),
+    );
+    for (const u of this.units) {
+      u.outs.forEach((o, i) => {
+        if (consumed.has(`${u.ID}#${i}`)) return;
+        const isProduct = productIDs.has(o.ID) || (!feedIDs.has(o.ID) && massFlow(o) > 0 && i === 0);
+        const id = `out:${u.ID}#${i}`;
+        nodes.push({
+          id,
+          label: o.ID,
+          kind: isProduct ? 'product' : 'waste',
+          area: 0,
+        });
+        edges.push({ from: u.ID, to: id, label: o.ID, kind: isProduct ? 'product' : 'waste' });
+      });
+    }
+    return { nodes, edges };
   }
 
   get purchaseCost(): number {

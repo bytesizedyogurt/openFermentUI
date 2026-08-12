@@ -1,11 +1,15 @@
 // The three plants.
 //
-// Each one is a feed-forward train of sized, costed equipment, built fresh at
-// every parameter point. Nothing is cached inside a plant and nothing is
-// authored as a result: change the titer and the fermenter gets smaller, the
-// centrifuge gets cheaper, the electricity bill falls, and the DCF re-solves.
-// That chain is the reason for the whole exercise — the old cost engines moved
-// a headline number without anything physical moving underneath it.
+// Each one is a connected train: a unit declares where its inlets come from, the
+// System resolves the graph and runs it in order, and the mass balance
+// propagates from the feed to the powder. Nothing is hand-built in the middle.
+// That matters for more than tidiness — the flowsheet diagram and the stream
+// table are read off this same graph, so a picture that disagrees with the model
+// is not expressible.
+//
+// Change the titer and the reaction stoichiometry changes, which changes how
+// much broth the centrifuge sees, which changes the membrane area, the pumping
+// load and the electricity bill, and the price falls out of the cash flow.
 //
 // Where a number is a modelling choice rather than a measurement it is bound
 // with `{kind:'model'}` and the justification says so out loud. Where a number
@@ -13,6 +17,8 @@
 // defect, which is exactly what it is.
 import { BioSystem } from '@/engine/biosteam/system';
 import type { Stream } from '@/engine/biosteam/types';
+import type { Reaction } from '@/engine/biosteam/reaction';
+import type { BioUnit } from '@/engine/biosteam/unit';
 import {
   AeratedBioreactor,
   HXutility,
@@ -25,6 +31,8 @@ import {
   SprayDryer,
   StorageTank,
   CP_BROTH,
+  fromFeed,
+  fromUnit,
 } from './units';
 import { baseTEA, OPERATING_HOURS, type FlowsheetSpec } from './spec';
 
@@ -35,6 +43,38 @@ function stream(ID: string, flow: Record<string, number>, opts: Partial<Stream> 
   return { ID, flow, T: 303, P: 101325, price: 0, rho: RHO_BROTH, phase: 'l', ...opts };
 }
 
+/**
+ * Assemble a system and resolve its product stream after the train has run.
+ *
+ * The product is an outlet of the last unit, which does not exist until the
+ * graph has been simulated — so it is picked up afterwards rather than
+ * constructed alongside. Identity matters here: the TEA mutates the price on
+ * this object while solving, so it has to be the same object the unit produced
+ * and not a copy of it.
+ */
+function assemble(opts: {
+  ID: string;
+  units: BioUnit[];
+  feeds: Stream[];
+  productUnit: string;
+  productPort?: number;
+}): BioSystem {
+  const sys = new BioSystem({
+    ID: opts.ID,
+    units: opts.units,
+    feeds: opts.feeds,
+    products: [],
+    operatingHours: OPERATING_HOURS,
+  });
+  sys.simulate();
+  const last = opts.units.find((u) => u.ID === opts.productUnit);
+  if (!last) throw new Error(`${opts.ID}: no unit '${opts.productUnit}' to take the product from`);
+  const product = last.outs[opts.productPort ?? 0];
+  if (!product) throw new Error(`${opts.ID}: '${opts.productUnit}' produced no outlet to sell`);
+  sys.products = [product];
+  return sys;
+}
+
 // ══ S2 — K. phaffii secreted β-casein ══════════════════════════════════
 //
 // The comparator, and the easiest of the three to defend, because every unit in
@@ -42,109 +82,112 @@ function stream(ID: string, flow: Record<string, number>, opts: Partial<Stream> 
 // fermenter volume and the cycle time between them set how much broth the plant
 // makes in a year, and everything downstream follows from that.
 
+/** Biomass yield on glycerol, kg/kg. Typical for a Crabtree-negative yeast. */
+const Y_XS_YEAST = 0.5;
+/** Cell density at harvest, g/L. High-cell-density fed-batch. */
+const X_YEAST = 100;
+
 function buildS2(p: Record<string, number>): BioSystem {
   const titer = Math.max(1e-4, p.titer); // g/L secreted
   const scale = p.scale; // m³ installed fermenter working volume
   const dspYield = Math.min(0.995, Math.max(0.05, p.dspYield));
-  const tau = 96; // hr of fed-batch
+  const tau = 96;
   const tauClean = 12;
+  const conversion = 0.98;
 
-  // Hourly-equivalent broth throughput: one turn of the installed volume per
-  // reaction-plus-turnaround cycle.
+  // One turn of the installed volume per reaction-plus-turnaround cycle.
   const F_broth = scale / (tau + tauClean); // m³/hr
-  const brothL = F_broth * 1000;
 
-  // High-cell-density fed-batch. The oxygen demand follows from the biomass,
-  // which is what makes electricity scale with the culture rather than the tank.
-  const X = 100; // g DCW/L at harvest
+  // Substrate is set by the biomass the culture has to build; the product yield
+  // is whatever the scenario's titer asks of that same substrate. That is the
+  // honest way round — the titer is the question being asked, and the
+  // stoichiometry is what asking it implies.
+  const substrate_kg_m3 = X_YEAST / Y_XS_YEAST / conversion;
+  const reaction: Reaction = {
+    equation: 'glycerol -> biomass + β-casein + CO₂',
+    reactant: 'substrate',
+    X: conversion,
+    yields: {
+      biomass: X_YEAST / substrate_kg_m3 / conversion,
+      product: titer / substrate_kg_m3 / conversion,
+    },
+  };
+
+  // Oxygen demand follows the biomass, which is what makes electricity scale
+  // with the culture rather than with the tank.
   const qO2 = 0.0015; // mol O₂ per g DCW per hour
-  const OUR = qO2 * X; // mol O₂ per litre per hour
-
-  const product_kg_hr = titer * F_broth; // g/L × m³/hr = kg/hr
-  const biomass_kg_hr = (X * brothL) / 1000;
+  const OUR = qO2 * X_YEAST; // mol O₂ per litre per hour
 
   const media = stream(
     'media',
-    { water: brothL * 0.96, nutrients: brothL * 0.04 },
+    { water: F_broth * 950, substrate: F_broth * substrate_kg_m3 },
     { price: 0.55, T: 293 },
   );
 
-  const mediaPrep = new MixTank('T101 media prep', [media], 8);
-  const feedPump = new Pump('P101 feed pump', [media], 3e5, 100);
-  // Sterilisation: heat the medium to 121 °C and hold.
-  const steriliser = new HXutility('H101 steriliser', [media], {
-    duty: brothL * CP_BROTH * (394 - 293),
+  const mediaPrep = new MixTank('T101 media prep', [fromFeed(media)], 8);
+  const feedPump = new Pump('P101 feed pump', [fromUnit('T101 media prep')], 3e5, 100);
+  // Sterilise at 121 °C and hold. Only the net duty is charged: a real steriliser
+  // regenerates against the incoming feed, and pretending otherwise would put a
+  // heating and a cooling bill on the same stream.
+  const steriliser = new HXutility('H101 steriliser', [fromUnit('P101 feed pump')], {
+    duty: F_broth * 1000 * CP_BROTH * 25,
     agent: 'low_pressure_steam',
+    T_out: 303,
     dT_lm: 40,
     area: 100,
   });
-
-  const brothIn = stream('broth-feed', {
-    water: brothL * 0.96,
-    nutrients: brothL * 0.04,
-  });
-  const fermenter = new AeratedBioreactor('R301 fermenter', [brothIn], {
+  const fermenter = new AeratedBioreactor('R301 fermenter', [fromUnit('H101 steriliser')], {
     tau,
     tau_cleaning: tauClean,
     V_max: 500,
     OUR,
     T: 303,
+    reaction,
   });
-
-  const broth = stream('broth', {
-    water: brothL * 0.93,
-    biomass: biomass_kg_hr,
-    product: product_kg_hr,
-  });
-
-  // Secreted product stays in the centrate; the loss is what leaves wet with
-  // the cell cake, which is a physical loss and not an adjustable one.
-  const centrifuge = new SolidsCentrifuge('C401 disc stack', [broth], {
-    solidsSplit: 0.97,
+  // Secreted product stays in the centrate; the loss is what leaves wet with the
+  // cell cake, which is physical and not adjustable.
+  const centrifuge = new SolidsCentrifuge('C401 disc stack', [fromUnit('R301 fermenter', 0)], {
+    split: 0.97,
     productToCake: 0.04,
+    cakeMoisture: 2,
   });
-  const centrate = centrifuge.outs.length ? centrifuge.outs[0] : broth;
-
-  // The membrane step carries whatever recovery the scenario asks for, after
-  // the centrifuge has taken its physical cut.
-  const uf = new MembraneSkid('M501 UF/DF', [
-    stream('centrate', {
-      water: brothL * 0.9,
-      product: product_kg_hr * 0.96,
-    }),
-  ], {
+  // Clarify before concentrating. The first cut of this flowsheet went straight
+  // from the centrifuge to the ultrafiltration, and the mass balance said the
+  // powder was a fifth product and four fifths yeast: a disc stack leaves about
+  // 3 g/L of cells behind, an ultrafiltration rejects cells and protein alike,
+  // and concentrating both together gives you a cell paste with some casein in
+  // it. A 0.2 µm microfiltration passes the protein and holds the cells, which
+  // is what every real recovery train does and what the model was asking for.
+  const clarify = new MembraneSkid('M402 clarification', [fromUnit('C401 disc stack', 0)], {
+    flux: 60,
+    productYield: 0.97,
+    label: 'Microfiltration',
+    diavolumes: 1,
+    area: 400,
+    waterRemoval: 0.2,
+    productInRetentate: false,
+    usdPerM2: 600,
+  });
+  clarify.rejection = 0.999;
+  // The ultrafiltration carries whatever recovery the scenario asks for, after
+  // the centrifuge and the clarifier have taken their physical cuts.
+  const uf = new MembraneSkid('M501 UF/DF', [fromUnit('M402 clarification', 1)], {
     flux: 35,
-    productYield: Math.min(0.995, dspYield / 0.96),
+    productYield: Math.min(0.995, dspYield / (0.96 * 0.97)),
     label: 'Ultrafiltration',
     diavolumes: 4,
+    waterRemoval: 0.97,
   });
+  const dryer = new SprayDryer('D601 spray dryer', [fromUnit('M501 UF/DF', 0)]);
+  const silo = new StorageTank('T801 product silo', [fromUnit('D601 spray dryer', 0)], 7);
+  silo.outIDs = ['product'];
 
-  const concentrate = stream('concentrate', {
-    water: (product_kg_hr * dspYield) / 0.12,
-    product: product_kg_hr * dspYield,
-  });
-  const dryer = new SprayDryer('D601 spray dryer', [concentrate]);
-
-  const powder = stream(
-    'product',
-    { product: product_kg_hr * dspYield, water: product_kg_hr * dspYield * 0.05 },
-    { phase: 's' },
-  );
-  const silo = new StorageTank('T801 product silo', [powder], 7);
-
-  const units = [mediaPrep, feedPump, steriliser, fermenter, centrifuge, uf, dryer, silo];
-  const sys = new BioSystem({
+  return assemble({
     ID: 'S2 — K. phaffii secreted',
-    units,
+    units: [mediaPrep, feedPump, steriliser, fermenter, centrifuge, clarify, uf, dryer, silo],
     feeds: [media],
-    products: [powder],
-    operatingHours: OPERATING_HOURS,
+    productUnit: 'T801 product silo',
   });
-  sys.simulate();
-  // The centrate reference above is informational only; the mass balance the
-  // TEA consumes is the explicit stream list, so a stale `outs` cannot leak in.
-  void centrate;
-  return sys;
 }
 
 export const S2_FLOWSHEET: FlowsheetSpec = {
@@ -165,7 +208,7 @@ export const S2_FLOWSHEET: FlowsheetSpec = {
       field: 'titer_secreted',
       paperId: 'K1',
       basis: { kind: 'record', recordId: 'r-K1-1' },
-      note: 'Sets the broth volume behind every kilogram, so it moves the fermenter, the centrifuge and the membrane together.',
+      note: 'Sets the product yield on substrate, so it moves the fermenter, the centrifuge and the membrane together.',
     },
     {
       key: 'scale',
@@ -200,100 +243,101 @@ export const S2_FLOWSHEET: FlowsheetSpec = {
     'No vapour–liquid equilibrium: the steriliser and the dryer are sized on latent and sensible heat, not on a property package.',
     'Aeration is modelled at a single oxygen uptake rate rather than over the fed-batch profile, so the peak demand that actually sizes the compressor is not resolved.',
     'The sparged gas is treated as air all the way up the column. Real off-gas is oxygen-depleted, so the driving force here is optimistic and the agitator power correspondingly low.',
-    'The ultrafiltration skid has no published cost correlation; its capital is a vendor-class figure written here, not borrowed from bioSTEAM.',
+    'Neither membrane skid has a published cost correlation; their capital is a vendor-class figure written here, not borrowed from bioSTEAM.',
+    'Components are lumped. The clarification step separates “cells” from “protein” and cannot distinguish the target protein from any other one the host secretes, so the purity below is an upper bound.',
   ],
 };
 
 // ══ S1 — cw15 intracellular β-casein in a photobioreactor ══════════════
 //
 // The expensive one, and the honest one: two of its four significant units have
-// no published correlation, and the plant view says so before the reader gets
-// to the number.
+// no published correlation, and the plant view says so before the reader gets to
+// the number.
+
+/** Biomass yield on acetate, kg/kg, for mixotrophic Chlamydomonas. */
+const Y_XS_ALGAE = 0.35;
 
 function buildS1(p: Record<string, number>): BioSystem {
   const density = Math.max(0.05, p.density); // g/L biomass
   const share = Math.max(1e-4, p.pctTsp) / 100; // product per g biomass
   const recovery = Math.min(0.98, Math.max(0.02, p.dispYield / 100));
-  const tau = 120; // hr, ~5-day mixotrophic batch
+  const tau = 120; // ~5-day mixotrophic batch
   const volumeM3 = 120; // fixed plant size for this surface
+  const conversion = 0.9;
 
   const F_broth = volumeM3 / (tau + 24); // m³/hr
-  const brothL = F_broth * 1000;
-
-  const biomass_kg_hr = (density * brothL) / 1000;
-  const productInCells_kg_hr = biomass_kg_hr * share;
+  const acetate_kg_m3 = density / Y_XS_ALGAE / conversion;
+  const reaction: Reaction = {
+    equation: 'acetate -> biomass + β-casein + O₂',
+    reactant: 'acetate',
+    X: conversion,
+    yields: {
+      biomass: density / acetate_kg_m3 / conversion,
+      product: (density * share) / acetate_kg_m3 / conversion,
+    },
+  };
 
   const media = stream(
     'TAP medium',
-    { water: brothL * 0.99, acetate: brothL * 0.01 },
+    { water: F_broth * 990, acetate: F_broth * acetate_kg_m3 },
     { price: 0.42, T: 293 },
   );
-  const mediaPrep = new MixTank('T101 TAP prep', [media], 12);
 
-  const pbr = new Photobioreactor(
-    'R301 tubular loops',
-    [stream('broth-feed', { water: brothL * 0.99, acetate: brothL * 0.01 })],
-    { tau, lightingWPerM3: 60, T: 298 },
-  );
-
-  const broth = stream('broth', {
-    water: brothL * 0.99,
-    biomass: biomass_kg_hr,
-    product: productInCells_kg_hr,
+  const mediaPrep = new MixTank('T101 TAP prep', [fromFeed(media)], 12);
+  const pbr = new Photobioreactor('R301 tubular loops', [fromUnit('T101 TAP prep')], {
+    tau,
+    lightingWPerM3: 60,
+    T: 298,
+    reaction,
   });
-
-  // Harvest first — the cells are the product here, so the centrifuge keeps
-  // the cake and the centrate is the waste stream.
-  const harvest = new SolidsCentrifuge('C401 harvest', [broth], {
-    solidsSplit: 0.95,
+  // The cells are the product here, so the harvest keeps the cake.
+  const harvest = new SolidsCentrifuge('C401 harvest', [fromUnit('R301 tubular loops', 0)], {
+    split: 0.95,
     productToCake: 0.95,
+    cakeMoisture: 4,
   });
-
-  const paste = stream('paste', {
-    water: biomass_kg_hr * 4,
-    biomass: biomass_kg_hr * 0.95,
-    product: productInCells_kg_hr * 0.95,
-  });
-  const pef = new PEFDisruption('E402 PEF', [paste], recovery);
-
-  const lysate = stream('lysate', {
-    water: biomass_kg_hr * 4,
-    biomass: biomass_kg_hr * 0.95,
-    product: productInCells_kg_hr * 0.95 * recovery,
-  });
-  const clarifier = new SolidsCentrifuge('C403 debris removal', [lysate], {
-    solidsSplit: 0.98,
+  const pef = new PEFDisruption('E402 PEF', [fromUnit('C401 harvest', 1)], recovery);
+  // The product is in solution now and the debris is waste, so this one keeps
+  // the centrate.
+  const clarifier = new SolidsCentrifuge('C403 debris removal', [fromUnit('E402 PEF', 0)], {
+    split: 0.98,
     productToCake: 0.08,
+    cakeMoisture: 3,
   });
+  // The same clarification the yeast route needs, and for a sharper reason. At
+  // 2 g/L of cells and 3% of cell mass as casein, the debris outweighs the
+  // product thirty-fold: two per cent carried past the centrifuge is still
+  // twice the protein, and an ultrafiltration would concentrate both. Passing
+  // the protein through a 0.2 µm membrane and holding the debris is the only
+  // way this train produces a powder rather than a cell paste.
+  const clarify = new MembraneSkid('M502 clarification', [fromUnit('C403 debris removal', 0)], {
+    flux: 40,
+    productYield: 0.96,
+    label: 'Microfiltration',
+    diavolumes: 2,
+    area: 500,
+    waterRemoval: 0.2,
+    productInRetentate: false,
+    usdPerM2: 600,
+  });
+  clarify.rejection = 0.999;
+  const uf = new MembraneSkid('M501 UF/DF', [fromUnit('M502 clarification', 1)], {
+    flux: 25,
+    productYield: 0.9,
+    label: 'Ultrafiltration',
+    diavolumes: 5,
+    waterRemoval: 0.95,
+  });
+  const dryer = new SprayDryer('D601 spray dryer', [fromUnit('M501 UF/DF', 0)]);
+  const silo = new StorageTank('T801 product silo', [fromUnit('D601 spray dryer', 0)], 7);
+  silo.outIDs = ['product'];
 
-  const product_kg_hr = productInCells_kg_hr * 0.95 * recovery * 0.92;
-  const uf = new MembraneSkid(
-    'M501 UF/DF',
-    [stream('clarified', { water: biomass_kg_hr * 4, product: product_kg_hr })],
-    { flux: 25, productYield: 0.9, label: 'Ultrafiltration', diavolumes: 5 },
-  );
-
-  const finalProduct = product_kg_hr * 0.9;
-  const dryer = new SprayDryer(
-    'D601 spray dryer',
-    [stream('concentrate', { water: finalProduct / 0.12, product: finalProduct })],
-  );
-  const powder = stream(
-    'product',
-    { product: finalProduct, water: finalProduct * 0.05 },
-    { phase: 's' },
-  );
-  const silo = new StorageTank('T801 product silo', [powder], 7);
-
-  const sys = new BioSystem({
+  return assemble({
     ID: 'S1 — cw15 photobioreactor',
-    units: [mediaPrep, pbr, harvest, pef, clarifier, uf, dryer, silo],
+    units: [mediaPrep, pbr, harvest, pef, clarifier, clarify, uf, dryer, silo],
     feeds: [media],
-    products: [powder],
-    operatingHours: OPERATING_HOURS,
+    productUnit: 'T801 product silo',
   });
-  sys.simulate();
-  return sys;
 }
 
 export const S1_FLOWSHEET: FlowsheetSpec = {
@@ -314,7 +358,7 @@ export const S1_FLOWSHEET: FlowsheetSpec = {
       field: 'final_biomass_density',
       paperId: 'M5',
       basis: { kind: 'record', recordId: 'r-M5-1' },
-      note: 'Everything downstream is sized on the paste this produces, and the photobioreactor is sized on the volume it takes to make it.',
+      note: 'Sets the acetate the culture consumes and the paste the harvest produces. Everything downstream is sized on it.',
     },
     {
       key: 'pctTsp',
@@ -342,10 +386,11 @@ export const S1_FLOWSHEET: FlowsheetSpec = {
     },
   ],
   limitations: [
-    'The photobioreactor has no published cost correlation. Its capital is six-tenths scaling from a single real 3 m³ plant, and dominates the answer.',
+    'The photobioreactor has no published cost correlation. Its capital is six-tenths scaling from a single real 3 m³ plant, and it dominates the answer.',
     'The PEF disruptor is priced off pilot skid quotes. It is the least defensible capital number in this plant.',
     'Light delivery is modelled as a flat W/m³ rather than as a function of culture depth and optical density, so the density axis does not pay the light-attenuation penalty it would pay in reality.',
     'No vapour–liquid equilibrium, and no CO₂ mass transfer.',
+    'Components are lumped, so the clarification separates “debris” from “protein” and cannot tell β-casein from the rest of the algal proteome. The purity below is an upper bound.',
   ],
 };
 
@@ -357,7 +402,7 @@ export const S1_FLOWSHEET: FlowsheetSpec = {
 // feedstock, and that only shows up if you actually process the milk.
 
 function buildS3(p: Record<string, number>): BioSystem {
-  const milkPrice = p.milkPrice; // USD/L
+  const milkPrice = p.milkPrice; // USD/L, and USD/kg at water density
   const recovery = Math.min(0.98, Math.max(0.05, p.recovery));
   const betaInMilk = 2.6; // g/L, Atamer et al.
 
@@ -367,67 +412,63 @@ function buildS3(p: Record<string, number>): BioSystem {
 
   const milk = stream(
     'raw milk',
-    { water: milkL * 0.87, protein: milkL * 0.034, fat: milkL * 0.04, lactose: milkL * 0.048 },
-    { price: milkPrice, T: 277 },
+    {
+      water: milkL * 0.87,
+      product: (betaInMilk * milkL) / 1000,
+      protein: milkL * 0.0314,
+      fat: milkL * 0.04,
+      lactose: milkL * 0.048,
+    },
+    { price: milkPrice, T: 281 },
   );
 
-  const receiving = new StorageTank('T101 milk silo', [milk], 1, 100);
+  const receiving = new StorageTank('T101 milk silo', [fromFeed(milk)], 1, 100);
   // Chill to the 4 °C where β-casein leaves the micelle. Without this step the
   // separation does not exist, so it is not an optional utility line.
   //
-  // Brine, not chilled water: chilled water is supplied at 280.4 K and returns
-  // no warmer than 300.4 K, so it cannot take a stream down to 277 K. Passing
-  // the process temperature into the utility turns that from a number nobody
-  // checks into an exception.
-  const chiller = new HXutility('H101 chiller', [milk], {
+  // Brine, not chilled water: chilled water is supplied at 280.4 K and cannot
+  // take a stream down to 277 K. Passing the process temperature into the
+  // utility turns that from a number nobody checks into an exception.
+  const chiller = new HXutility('H101 chiller', [fromUnit('T101 milk silo')], {
     duty: -milkL * CP_BROTH * 6,
     agent: 'chilled_brine',
+    T_out: 277,
     dT_lm: 8,
     area: 100,
   });
-  const feedPump = new Pump('P101 feed pump', [milk], 4e5, 100);
-
-  const beta_kg_hr = (betaInMilk * milkL) / 1000;
-  const mf = new MembraneSkid('M401 cold microfiltration', [milk], {
+  const feedPump = new Pump('P101 feed pump', [fromUnit('H101 chiller')], 4e5, 100);
+  // Cold microfiltration: β-casein dissociates into the serum and passes the
+  // membrane while the remaining micelle is retained. The product leaves in the
+  // permeate, which is the entire trick of this route.
+  const mf = new MembraneSkid('M401 cold microfiltration', [fromUnit('P101 feed pump')], {
     flux: 55,
     productYield: recovery,
     label: 'Microfiltration',
     diavolumes: 2,
     area: 400,
+    waterRemoval: 0.6,
+    productInRetentate: false,
   });
-
-  const permeate = stream('serum', {
-    water: milkL * 0.6,
-    product: beta_kg_hr * recovery,
-  });
-  const uf = new MembraneSkid('M501 UF/DF', [permeate], {
+  // A 0.1 µm ceramic membrane holds fat globules and casein micelles better than
+  // the generic default, and what leaks past it is what dilutes the powder.
+  mf.rejection = 0.997;
+  const uf = new MembraneSkid('M501 UF/DF', [fromUnit('M401 cold microfiltration', 1)], {
     flux: 30,
     productYield: 0.95,
     label: 'Ultrafiltration',
     diavolumes: 4,
+    waterRemoval: 0.95,
   });
+  const dryer = new SprayDryer('D601 spray dryer', [fromUnit('M501 UF/DF', 0)]);
+  const silo = new StorageTank('T801 product silo', [fromUnit('D601 spray dryer', 0)], 7);
+  silo.outIDs = ['product'];
 
-  const product_kg_hr = beta_kg_hr * recovery * 0.95;
-  const dryer = new SprayDryer(
-    'D601 spray dryer',
-    [stream('concentrate', { water: product_kg_hr / 0.15, product: product_kg_hr })],
-  );
-  const powder = stream(
-    'product',
-    { product: product_kg_hr, water: product_kg_hr * 0.05 },
-    { phase: 's' },
-  );
-  const silo = new StorageTank('T801 product silo', [powder], 7);
-
-  const sys = new BioSystem({
+  return assemble({
     ID: 'S3 — dairy microfiltration',
     units: [receiving, chiller, feedPump, mf, uf, dryer, silo],
     feeds: [milk],
-    products: [powder],
-    operatingHours: OPERATING_HOURS,
+    productUnit: 'T801 product silo',
   });
-  sys.simulate();
-  return sys;
 }
 
 export const S3_FLOWSHEET: FlowsheetSpec = {
@@ -472,6 +513,7 @@ export const S3_FLOWSHEET: FlowsheetSpec = {
     'The membrane skids are priced on installed area at a module price, not on a published correlation.',
     'Co-product credit for the retentate — micellar casein concentrate, which is a saleable product — is not taken. That makes this route look worse than it is, and the direction of the bias is stated rather than corrected.',
     'No vapour–liquid equilibrium; the dryer is sized on latent heat.',
+    'Whey proteins and caseins are one lumped “protein” component, so the model cannot resolve the separation that actually sets purity here. Two membrane passes give a β-casein-enriched powder rather than an isolate, and the purity reported below reflects that.',
   ],
 };
 

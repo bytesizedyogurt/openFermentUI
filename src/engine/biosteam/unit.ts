@@ -52,11 +52,62 @@ export interface CostItem {
   ub?: number;
 }
 
+/**
+ * An editable unit specification — one of the attributes you would set on a
+ * bioSTEAM unit before simulating it.
+ *
+ * `biosteamName` is the attribute as upstream spells it, so a reader who knows
+ * the library can see that the control labelled "Residence time" is `tau` and
+ * behaves the way `tau` behaves. Every spec here is live: changing one re-sizes
+ * and re-costs the plant and re-solves the cash flow. None of them is a display
+ * that shrugs.
+ */
+export interface UnitSpec {
+  key: string;
+  label: string;
+  /** The attribute name upstream, e.g. 'tau', 'V_wf', 'vessel_material'. */
+  biosteamName: string;
+  kind: 'number' | 'select';
+  value: number | string;
+  options?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  units: string;
+  /** What the attribute does upstream, in one sentence. */
+  note: string;
+}
+
+/** Where a unit's inlet comes from. */
+export type Inlet =
+  | { kind: 'feed'; stream: Stream }
+  | { kind: 'unit'; from: string; port: number };
+
 export abstract class BioUnit {
   ID: string;
   area = 300;
+  /**
+   * Declared connectivity, resolved by the System at simulate time.
+   *
+   * Upstream a Unit holds its inlet Stream objects directly and the System
+   * infers the graph from shared references. Declaring the graph instead means
+   * the flowsheet diagram and the stream table are read off the same structure
+   * that ran the mass balance, rather than drawn beside it — a diagram that can
+   * disagree with the model is worse than no diagram.
+   */
+  sources: Inlet[] = [];
   ins: Stream[] = [];
   outs: Stream[] = [];
+  /**
+   * Override the default outlet names.
+   *
+   * Streams are named after the unit that made them, which is right for the
+   * ninety per cent of a flowsheet nobody looks at twice and wrong for the one
+   * stream the whole plant exists to produce. A stream table reading
+   * "T801 product silo-out" where it should read "product" is a small thing that
+   * makes the table feel machine-generated rather than read.
+   */
+  outIDs?: string[];
 
   designResults: DesignResults = {};
   baselinePurchaseCosts: Record<string, number> = {};
@@ -74,9 +125,28 @@ export abstract class BioUnit {
   /** What an authored correlation is anchored on. Empty for bioSTEAM's own. */
   readonly costBasis: string = '';
 
-  constructor(ID: string, ins: Stream[] = []) {
+  constructor(ID: string, sources: Inlet[] = []) {
     this.ID = ID;
-    this.ins = ins;
+    this.sources = sources;
+  }
+
+  /**
+   * The attributes this unit exposes for editing. Override to publish them.
+   *
+   * Empty by default rather than throwing: a unit with nothing worth setting is
+   * a legitimate unit, and forcing every subclass to declare an empty list
+   * would just add noise.
+   */
+  specs(): UnitSpec[] {
+    return [];
+  }
+
+  /** Apply an edited spec. Returns false when the key is not one of ours. */
+  setSpec(key: string, value: number | string): boolean {
+    const spec = this.specs().find((s) => s.key === key);
+    if (!spec) return false;
+    (this as unknown as Record<string, number | string>)[key] = value;
+    return true;
   }
 
   /** Mass balance. Fills `outs`. */
@@ -95,6 +165,9 @@ export abstract class BioUnit {
     this.powerUtility = 0;
     this.warnings = [];
     this._run();
+    if (this.outIDs) {
+      this.outs = this.outs.map((o, i) => (this.outIDs?.[i] ? { ...o, ID: this.outIDs[i] } : o));
+    }
     this._design();
     this._cost();
   }
@@ -190,6 +263,7 @@ export abstract class BioUnit {
       heatUtilities: this.heatUtilities,
       utilityCostPerHr: this.utilityCostPerHr,
       warnings: this.warnings,
+      specs: this.specs(),
     };
   }
 }

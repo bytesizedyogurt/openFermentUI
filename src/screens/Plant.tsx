@@ -36,12 +36,17 @@ import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { evaluatePlantCached } from '@/engine/plant';
-import type { PlantResult } from '@/engine/plant';
+import { CE } from '@/engine/biosteam/cepci';
+import type { PlantOverrides, PlantResult } from '@/engine/plant';
 import { FLOWSHEET_BY_MODEL } from '@/sim/flowsheets/plants';
 import { runPlantUncertainty, type PlantUncertainty } from '@/engine/uncertainty';
 import { exportCSV } from '@/lib/csv';
 import { scaled } from '@/sim/latency';
 import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
+import { Flowsheet, FlowsheetLegend } from '@/components/Flowsheet';
+import { StreamTable } from '@/components/StreamTable';
+import { UnitSpecEditor, DesignResultsTable } from '@/components/UnitSpecEditor';
+import { SettingsPanel, UtilityAgentTable, type PlantSettings } from '@/components/BiosteamSettings';
 import {
   PageHeader,
   Card,
@@ -427,10 +432,35 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
 
   const [uncertainty, setUncertainty] = useState<PlantUncertainty | null>(null);
   const [running, setRunning] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  /**
+   * Edits live here, not in the flowsheet.
+   *
+   * Keeping them beside the plant rather than inside it is what lets the screen
+   * say which numbers are the model's and which are yours, and lets a reset put
+   * the scenario back exactly as the corpus left it. It also means the grid the
+   * workspace sweeps is never contaminated by an experiment on this screen.
+   */
+  const [overrides, setOverrides] = useState<PlantOverrides>({});
 
   const spec = scenario ? FLOWSHEET_BY_MODEL[scenario.modelId] : undefined;
 
+  const editCount =
+    Object.values(overrides.units ?? {}).reduce((n, u) => n + Object.keys(u).length, 0) +
+    Object.keys(overrides.tea ?? {}).length +
+    (overrides.CE === undefined ? 0 : 1);
+
   const result = useMemo(() => {
+    if (!scenario) return null;
+    try {
+      return evaluatePlantCached(scenario.modelId, scenario.point, overrides);
+    } catch {
+      return null;
+    }
+  }, [scenario, overrides]);
+
+  /** The plant as the scenario declares it, for the before-and-after. */
+  const baseline = useMemo(() => {
     if (!scenario) return null;
     try {
       return evaluatePlantCached(scenario.modelId, scenario.point);
@@ -438,6 +468,68 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
       return null;
     }
   }, [scenario]);
+
+  const settingsDefaults: PlantSettings | null = spec
+    ? {
+        cepciYear: null,
+        CE: CE.value,
+        operatingDays: spec.tea.operatingDays,
+        IRR: spec.tea.IRR,
+        incomeTax: spec.tea.incomeTax,
+        depreciation: spec.tea.depreciation,
+        WC_over_FCI: spec.tea.WC_over_FCI,
+        financeInterest: spec.tea.financeInterest,
+        financeYears: spec.tea.financeYears,
+        financeFraction: spec.tea.financeFraction,
+        startupMonths: spec.tea.startupMonths,
+        laborCost: spec.tea.laborCost,
+        maintenance: spec.tea.maintenance,
+        langFactor: spec.tea.langFactor,
+      }
+    : null;
+
+  const settings: PlantSettings | null = settingsDefaults
+    ? {
+        ...settingsDefaults,
+        ...(overrides.tea as Partial<PlantSettings> | undefined),
+        ...(overrides.CE !== undefined ? { CE: overrides.CE } : {}),
+      }
+    : null;
+
+  /**
+   * Settings split two ways on the way out: the cost index is a plant-wide
+   * global that has to be in force while the equipment is costed, and
+   * everything else is a TEA constructor argument. Keeping them in one panel is
+   * right for the reader and wrong for the engine, so the split happens here.
+   */
+  const applySettings = (patch: Partial<PlantSettings>): void => {
+    setOverrides((o) => {
+      const next = { ...o };
+      const { CE: ce, cepciYear, ...teaPatch } = patch;
+      if (ce !== undefined) next.CE = ce;
+      void cepciYear;
+      const teaKeys = Object.keys(teaPatch);
+      if (teaKeys.length > 0) {
+        next.tea = { ...o.tea, ...(teaPatch as PlantOverrides['tea']) };
+      }
+      return next;
+    });
+  };
+
+  const setUnitSpec = (unitID: string, key: string, value: number | string): void => {
+    setOverrides((o) => ({
+      ...o,
+      units: { ...o.units, [unitID]: { ...(o.units?.[unitID] ?? {}), [key]: value } },
+    }));
+  };
+
+  const resetUnit = (unitID: string): void => {
+    setOverrides((o) => {
+      const units = { ...o.units };
+      delete units[unitID];
+      return { ...o, units };
+    });
+  };
 
   if (!scenario || !spec) {
     return (
@@ -478,6 +570,10 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
       </>
     );
   }
+
+  const selectedUnitResult = selectedUnit
+    ? (result.units.find((u) => u.ID === selectedUnit) ?? null)
+    : null;
 
   const split = result.costSourceSplit;
   const authoredShare = split.biosteam + split.authored > 0
@@ -536,7 +632,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-4">
         <Card className="p-4">
           <Stat
             label="Minimum selling price"
@@ -547,6 +643,18 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
                 solved at NPV = 0, residual{' '}
                 <span className="font-num">{result.npvResidual.toExponential(1)}</span> USD
               </>
+            }
+          />
+        </Card>
+        <Card className="p-4">
+          <Stat
+            label="Product purity"
+            value={`${(result.product.purity * 100).toFixed(0)}%`}
+            unit=""
+            sub={
+              result.product.purity < 0.8
+                ? 'the price above is for this powder, not for an isolate'
+                : `${spec.productLabel}`
             }
           />
         </Card>
@@ -577,6 +685,32 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
       </div>
 
       <div className="mb-4 space-y-3">
+        {editCount > 0 && (
+          <Callout
+            kind="warn"
+            title={`${editCount} attribute${editCount === 1 ? '' : 's'} edited — this plant no longer matches the scenario`}
+          >
+            The scenario grid, the workspace waterfall and the comparison screen are all still running the
+            flowsheet as the corpus declares it. Only this screen reflects your edits.{' '}
+            {baseline && Number.isFinite(baseline.msp) && (
+              <>
+                The declared plant prices at{' '}
+                <span className="font-num">{money(baseline.msp)}</span> per kg against{' '}
+                <span className="font-num">{money(result.msp)}</span> here.{' '}
+              </>
+            )}
+            <button
+              className="text-accent hover:underline"
+              onClick={() => {
+                setOverrides({});
+                toast({ text: 'Plant restored to the scenario’s declared flowsheet', kind: 'info' });
+              }}
+            >
+              Restore the declared plant
+            </button>
+            .
+          </Callout>
+        )}
         <Callout kind="info" title="What is doing the arithmetic here">
           Equipment sizing, purchase-cost correlations, bare-module installation factors, CEPCI
           indexing, utility prices, MACRS depreciation and the discounted cash flow are ported from{' '}
@@ -612,6 +746,55 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
           </Callout>
         )}
       </div>
+
+      <section className="mb-6">
+        <SectionTitle
+          right={
+            <Explain label="What a flowsheet diagram is">
+              The same picture bioSTEAM draws from <span className="font-num">system.diagram()</span>. It is
+              read off the graph that ran the mass balance rather than drawn beside it, so it cannot
+              disagree with the model: every arrow is a stream in the table below, and every box is a row in
+              the equipment table. Click a unit to open its attributes.
+            </Explain>
+          }
+        >
+          Flowsheet
+        </SectionTitle>
+        <Card className="p-4">
+          <Flowsheet
+            graph={result.graph}
+            streams={result.streams}
+            onSelectUnit={(id) => setSelectedUnit(id)}
+            selectedUnit={selectedUnit}
+          />
+          <div className="mt-3">
+            <FlowsheetLegend graph={result.graph} />
+          </div>
+        </Card>
+        {selectedUnitResult && (
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <Card className="p-4">
+              <UnitSpecEditor
+                unit={selectedUnitResult}
+                specs={selectedUnitResult.specs}
+                overrides={overrides.units?.[selectedUnitResult.ID] ?? {}}
+                onChange={(key, value) => setUnitSpec(selectedUnitResult.ID, key, value)}
+                onReset={() => resetUnit(selectedUnitResult.ID)}
+              />
+            </Card>
+            <Card className="p-4">
+              <DesignResultsTable unit={selectedUnitResult} />
+            </Card>
+          </div>
+        )}
+        {!selectedUnitResult && (
+          <p className="text-caption text-ink-soft mt-2">
+            Select a unit to see how it was sized and to change the attributes bioSTEAM would let you set on
+            it — residence time, working volume, vessel material, exchanger type, split. Every one of them
+            re-sizes the equipment, re-costs it and re-solves the cash flow.
+          </p>
+        )}
+      </section>
 
       <section className="mb-6">
         <SectionTitle
@@ -682,6 +865,24 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
       </section>
 
       <section className="mb-6">
+        <SectionTitle
+          right={
+            <Explain label="Reading a stream table">
+              Streams in columns and properties in rows, which is the orientation bioSTEAM's
+              <span className="font-num"> report.stream_table</span> uses and the reason it looks the way it
+              does. A feed has no source and a product no sink. Composition is by mass, and a component
+              absent from a stream shows a dash rather than a zero — absent and zero are different things.
+            </Explain>
+          }
+        >
+          Streams
+        </SectionTitle>
+        <Card className="p-4">
+          <StreamTable streams={result.streams} onSelectUnit={(id) => setSelectedUnit(id)} />
+        </Card>
+      </section>
+
+      <section className="mb-6">
         <SectionTitle>Operating cost and process demand</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="p-4">
@@ -738,6 +939,45 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
                 </li>
               ))}
             </ul>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mb-6">
+        <SectionTitle
+          right={
+            <Explain label="Why these are shared">
+              All three plants are priced on the same discount rate, the same tax rate and the same cost
+              index, because three plants compared on three financial bases is not a comparison. Change
+              them here and only this screen moves; the scenario grid keeps the declared basis.
+            </Explain>
+          }
+        >
+          Settings
+        </SectionTitle>
+        {/* Stacked, not side by side. The settings panel is already a two-column
+            form and the agent table is short, so pairing them left a column of
+            empty card beside a tall one. */}
+        <div className="space-y-3">
+          <Card className="p-4">
+            {settings && settingsDefaults && (
+              <SettingsPanel
+                value={settings}
+                defaults={settingsDefaults}
+                onChange={applySettings}
+                onReset={() =>
+                  setOverrides((o) => {
+                    const next = { ...o };
+                    delete next.tea;
+                    delete next.CE;
+                    return next;
+                  })
+                }
+              />
+            )}
+          </Card>
+          <Card className="p-4">
+            <UtilityAgentTable />
           </Card>
         </div>
       </section>

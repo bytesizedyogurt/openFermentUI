@@ -253,6 +253,42 @@ if (await mc.count()) {
      /percentile/i.test(after) && /Spearman/i.test(after));
 } else ck('Monte Carlo reports percentiles and a rank correlation', false, 'run button missing');
 
+// The workbench: a flowsheet diagram, a stream table, and equipment attributes
+// that actually re-simulate. These are the checks that would catch a control
+// which changes a label and nothing else.
+await go('/fermos/s/sc-s2/plant');
+const wb = await p.locator('#of-main').innerText();
+ck('The plant renders a flowsheet diagram', (await p.locator('#of-main svg[role="img"]').count()) > 0);
+ck('...with a stream table beside it', /Source/.test(wb) && /Composition/i.test(wb));
+ck('The powder’s purity is stated, not just its price', /purity/i.test(wb));
+
+const unitNode = p.locator('#of-main svg [role="button"], #of-main svg button').first();
+if (await unitNode.count()) {
+  await unitNode.click();
+  await p.waitForTimeout(600);
+  const opened = await p.locator('#of-main').innerText();
+  ck('Clicking a unit in the diagram opens its bioSTEAM attributes',
+     /tau|V_wf|vessel_material|heat_exchanger_type|split/.test(opened));
+} else ck('Clicking a unit in the diagram opens its bioSTEAM attributes', false, 'no clickable unit node');
+
+// The decisive one: an edited attribute has to move the number.
+const before = await p.locator('#of-main').innerText();
+const mspBefore = (before.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
+const sel = p.locator('#of-main select').first();
+if (await sel.count()) {
+  const opts = await sel.locator('option').allTextContents();
+  if (opts.length > 1) {
+    await sel.selectOption({ index: opts.length - 1 });
+    await p.waitForTimeout(1200);
+    const after = await p.locator('#of-main').innerText();
+    const mspAfter = (after.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
+    ck('Editing a bioSTEAM attribute re-solves the plant', !!mspBefore && mspBefore !== mspAfter,
+       `${mspBefore} -> ${mspAfter}`);
+    ck('...and the screen says the plant no longer matches the scenario',
+       /modified|edited|no longer matches/i.test(after));
+  } else ck('Editing a bioSTEAM attribute re-solves the plant', false, 'select had one option');
+} else ck('Editing a bioSTEAM attribute re-solves the plant', false, 'no select control found');
+
 // The tornado in the workspace is derived now, so it must say so rather than
 // claiming a fixed ±20% swing it never performed.
 await go('/fermos/s/sc-s2');

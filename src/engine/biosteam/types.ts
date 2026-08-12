@@ -7,6 +7,7 @@
 // Naming follows upstream: a reader who knows `Unit.design_results`,
 // `baseline_purchase_costs`, `F_BM` and `installed_cost` should recognise every
 // field here, and can check this code against the Python line by line.
+import type { UnitSpec } from './unit';
 
 /** One entry in a unit's design results table, with its unit of measure. */
 export interface DesignEntry {
@@ -113,6 +114,15 @@ export interface UnitResult {
    * worse than the extrapolation itself.
    */
   warnings: string[];
+  /**
+   * The attributes this unit exposes for editing, with their current values.
+   *
+   * Carried on the result rather than fetched from the live object because the
+   * screen never holds a unit: it holds a `PlantResult`, and a control bound to
+   * an object the render does not own is how a panel ends up showing one plant's
+   * settings beside another plant's numbers.
+   */
+  specs: UnitSpec[];
 }
 
 /** NREL-style process areas, used for the capital breakdown. */

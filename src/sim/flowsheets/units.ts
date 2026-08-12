@@ -6,18 +6,27 @@
 // between a number carrying Seider's authority and a number carrying ours is
 // the whole argument of this application.
 //
+// Every class also publishes `specs()` — the attributes you would set on the
+// unit before simulating it upstream, spelled the way upstream spells them.
+// Those are live: editing `tau` re-sizes the vessel, re-costs it, re-runs the
+// cash flow and moves the selling price. A control that changed a label and
+// nothing else would be worse than no control.
+//
 // The costing convention throughout: purchase costs are baseline, indexed to
 // the current CE, and installation is a bare-module factor rather than a Lang
 // factor — the same choice bioSTEAM makes by default.
-import { BioUnit } from '@/engine/biosteam/unit';
+import { BioUnit, type Inlet, type UnitSpec } from '@/engine/biosteam/unit';
 import type { CostSource, Stream } from '@/engine/biosteam/types';
 import { massFlow, volFlow } from '@/engine/biosteam/types';
 import { CE } from '@/engine/biosteam/cepci';
+import { applyReaction, type Reaction } from '@/engine/biosteam/reaction';
 import {
   MATERIAL_DENSITIES_LB_PER_FT3,
   PRESSURE_VESSEL_MATERIAL_FACTORS,
   checkVesselBounds,
   computeVesselWeightAndWallThickness,
+  computeHorizontalVesselPurchaseCost,
+  computeHorizontalVesselPlatformAndLaddersPurchaseCost,
   computeVerticalVesselPurchaseCost,
   computeVerticalVesselPlatformAndLaddersPurchaseCost,
 } from '@/engine/biosteam/vessel';
@@ -27,9 +36,26 @@ import {
   computeNumberOfTanksAndPurchaseCost,
 } from '@/engine/biosteam/tanks';
 import { sizeBatch } from '@/engine/biosteam/batch';
-import { C_O2_L, PAtKLaRiet, logMeanDrivingForce } from '@/engine/biosteam/aeration';
+import {
+  C_O2_L,
+  KLA_COEFFICIENTS_RIET,
+  PAtKLaRiet,
+  logMeanDrivingForce,
+} from '@/engine/biosteam/aeration';
+import { COOLING_AGENTS, HEATING_AGENTS } from '@/engine/biosteam/utilities';
 
 const FT_PER_M = 3.28084;
+
+/**
+ * Components a crossflow membrane holds back.
+ *
+ * Everything else is treated as a small solute that passes freely, which is the
+ * right default for glycerol, acetate and lactose and the wrong one for
+ * anything colloidal. The list is short because the component vocabulary is:
+ * with no property package there is no molecular weight to decide this from, so
+ * it is decided here and written down.
+ */
+const MEMBRANE_REJECTED = new Set(['biomass', 'protein', 'fat']);
 const PSI_PER_PA = 1.450377e-4;
 
 /** Water-like heat capacity, kJ/kg/K. Broth is mostly water and says so. */
@@ -45,27 +71,64 @@ export const CP_BROTH = 4.18;
  */
 export const HEAT_PER_MOL_O2 = 460;
 
+/** Declare an inlet fed from outside the flowsheet. */
+export function fromFeed(stream: Stream): Inlet {
+  return { kind: 'feed', stream };
+}
+
+/** Declare an inlet taken from another unit's outlet. */
+export function fromUnit(from: string, port = 0): Inlet {
+  return { kind: 'unit', from, port };
+}
+
+/**
+ * Copy a stream with a new identity, keeping the state costing depends on.
+ *
+ * Price is explicitly dropped. Spreading the inlet carried it forward, so every
+ * internal stream in the plant inherited the media price and the stream table
+ * cheerfully reported that the fermenter's carbon-dioxide vent was worth 55
+ * cents a kilogram. Only what the plant buys and what it sells has a price;
+ * everything in between is worth whatever the next unit does with it.
+ */
+function derive(
+  s: Stream,
+  ID: string,
+  flow: Record<string, number>,
+  over: Partial<Stream> = {},
+): Stream {
+  return { ...s, ID, flow, price: 0, ...over };
+}
+
 // ══ bioSTEAM-derived units ═════════════════════════════════════════════
 
 /** Media preparation and hold. bioSTEAM `units/tank.py` MixTank. */
 export class MixTank extends BioUnit {
   readonly line = 'Mix tank';
   readonly costSource: CostSource = 'biosteam';
-  /** Residence time, hr. */
+  /** Residence time, hr. Upstream's `tau`. */
   tau: number;
-  /** Working volume fraction. */
+  /** Working volume fraction. Upstream's `V_wf`. */
   V_wf = 0.8;
   /** bioSTEAM's MixTank default agitator power, kW/m³. */
   kW_per_m3 = 0.0985;
 
-  constructor(ID: string, ins: Stream[], tau: number) {
-    super(ID, ins);
+  constructor(ID: string, sources: Inlet[], tau: number) {
+    super(ID, sources);
     this.tau = tau;
     this.area = 100;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'tau', label: 'Residence time', biosteamName: 'tau', kind: 'number', value: this.tau, min: 0.5, max: 48, step: 0.5, units: 'hr', note: 'Hold-up time. Sets the tank volume directly.' },
+      { key: 'V_wf', label: 'Working volume fraction', biosteamName: 'V_wf', kind: 'number', value: this.V_wf, min: 0.5, max: 1, step: 0.05, units: '', note: 'How full the tank runs. The vessel is grossed up by its inverse.' },
+      { key: 'kW_per_m3', label: 'Agitator power', biosteamName: 'kW_per_m3', kind: 'number', value: this.kW_per_m3, min: 0, max: 2, step: 0.01, units: 'kW m⁻³', note: "bioSTEAM's MixTank default is 0.0985 kW/m³." },
+    ];
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-out` }));
+    const feed = this.ins[0];
+    this.outs = [derive(feed, `${this.ID}-out`, { ...feed.flow })];
   }
 
   protected _design(): void {
@@ -76,13 +139,10 @@ export class MixTank extends BioUnit {
 
   protected _cost(): void {
     const V = this.designResults['Total volume'].value;
-    const { N, Cp, warning } = computeNumberOfTanksAndPurchaseCost(
-      V,
-      MIX_TANK_ALGORITHMS.Conventional,
-    );
-    this.baselinePurchaseCosts['Tanks'] = Cp;
-    this.parallel['Tanks'] = N;
-    this.F_BM['Tanks'] = 1.8;
+    const { N, Cp, warning } = computeNumberOfTanksAndPurchaseCost(V, MIX_TANK_ALGORITHMS.Conventional);
+    this.baselinePurchaseCosts.Tanks = Cp;
+    this.parallel.Tanks = N;
+    this.F_BM.Tanks = 1.8;
     if (warning) this.warnings.push(warning);
     this.powerUtility += this.kW_per_m3 * V;
   }
@@ -94,15 +154,34 @@ export class StorageTank extends BioUnit {
   readonly costSource: CostSource = 'biosteam';
   /** Days of hold-up. */
   tauDays: number;
+  /** Upstream's `vessel_type`, keyed into the storage cost algorithms. */
+  vessel_type = 'Field erected';
 
-  constructor(ID: string, ins: Stream[], tauDays: number, area = 800) {
-    super(ID, ins);
+  constructor(ID: string, sources: Inlet[], tauDays: number, area = 800) {
+    super(ID, sources);
     this.tauDays = tauDays;
     this.area = area;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'tauDays', label: 'Days of storage', biosteamName: 'tau', kind: 'number', value: this.tauDays, min: 0.5, max: 30, step: 0.5, units: 'd', note: 'Hold-up in days. Upstream states tau in hours; days read better at this scale.' },
+      {
+        key: 'vessel_type',
+        label: 'Vessel type',
+        biosteamName: 'vessel_type',
+        kind: 'select',
+        value: this.vessel_type,
+        options: Object.keys(STORAGE_TANK_ALGORITHMS).map((k) => ({ value: k, label: k })),
+        units: '',
+        note: 'Selects the purchase-cost algorithm. Each carries its own validity range, published index and construction material.',
+      },
+    ];
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-out` }));
+    const feed = this.ins[0];
+    this.outs = [derive(feed, `${this.ID}-out`, { ...feed.flow })];
   }
 
   protected _design(): void {
@@ -112,24 +191,33 @@ export class StorageTank extends BioUnit {
 
   protected _cost(): void {
     const V = this.designResults['Total volume'].value;
-    const { N, Cp, warning } = computeNumberOfTanksAndPurchaseCost(
-      V,
-      STORAGE_TANK_ALGORITHMS['Field erected'],
-    );
-    this.baselinePurchaseCosts['Tanks'] = Cp;
-    this.parallel['Tanks'] = N;
-    this.F_BM['Tanks'] = 1.7;
+    const algo = STORAGE_TANK_ALGORITHMS[this.vessel_type] ?? STORAGE_TANK_ALGORITHMS['Field erected'];
+    const { N, Cp, warning } = computeNumberOfTanksAndPurchaseCost(V, algo);
+    this.baselinePurchaseCosts[this.vessel_type] = Cp;
+    this.parallel[this.vessel_type] = N;
+    this.F_BM[this.vessel_type] = 1.7;
     if (warning) this.warnings.push(warning);
   }
 }
 
 /**
+ * The five exchanger correlations bioSTEAM ships, in `units/heat_exchange.py`.
+ * Area in ft², all indexed CE/567, all Seider via bioSTEAM.
+ */
+const HX_CORRELATIONS: Record<string, { f: (A: number) => number; BM: number }> = {
+  'Floating head': { f: (A) => Math.exp(12.031 - 0.8709 * Math.log(A) + 0.09005 * Math.log(A) ** 2), BM: 3.17 },
+  'Fixed head': { f: (A) => Math.exp(11.4185 - 0.9228 * Math.log(A) + 0.09861 * Math.log(A) ** 2), BM: 3.17 },
+  'U tube': { f: (A) => Math.exp(11.551 - 0.9186 * Math.log(A) + 0.0979 * Math.log(A) ** 2), BM: 3.17 },
+  'Kettle vaporizer': { f: (A) => Math.exp(12.331 - 0.8709 * Math.log(A) + 0.09005 * Math.log(A) ** 2), BM: 3.17 },
+  'Double pipe': { f: (A) => Math.exp(7.2718 + 0.16 * Math.log(A)), BM: 1.8 },
+};
+
+/**
  * Shell-and-tube exchanger against a utility.
  *
- * Area from Q = U·A·ΔT_lm, cost from bioSTEAM's floating-head correlation in
- * `units/heat_exchange.py`. The overall coefficient is a heuristic rather than a
+ * Area from Q = U·A·ΔT_lm. The overall coefficient is a heuristic rather than a
  * computed one, since computing it needs the property package this port does
- * not have; it is stated as a design result so it can be argued with.
+ * not have; it is a design result so it can be argued with.
  */
 export class HXutility extends BioUnit {
   readonly line = 'Heat exchanger';
@@ -140,47 +228,79 @@ export class HXutility extends BioUnit {
   U: number;
   /** K. */
   dT_lm: number;
+  /** Utility agent ID. Upstream picks it from the pinch; here it is stated. */
   agent: string;
+  /** Upstream's `heat_exchanger_type`. */
+  heat_exchanger_type = 'Floating head';
+  /** Outlet temperature, K. */
+  T_out: number;
 
   constructor(
     ID: string,
-    ins: Stream[],
-    opts: { duty: number; agent: string; U?: number; dT_lm?: number; area?: number },
+    sources: Inlet[],
+    opts: { duty: number; agent: string; T_out: number; U?: number; dT_lm?: number; area?: number },
   ) {
-    super(ID, ins);
+    super(ID, sources);
     this.duty = opts.duty;
     this.agent = opts.agent;
+    this.T_out = opts.T_out;
     this.U = opts.U ?? 0.5;
     this.dT_lm = opts.dT_lm ?? 20;
     this.area = opts.area ?? 400;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      {
+        key: 'heat_exchanger_type',
+        label: 'Exchanger type',
+        biosteamName: 'heat_exchanger_type',
+        kind: 'select',
+        value: this.heat_exchanger_type,
+        options: Object.keys(HX_CORRELATIONS).map((k) => ({ value: k, label: k })),
+        units: '',
+        note: 'Five correlations, and a double pipe carries a different bare-module factor as well as a different curve.',
+      },
+      { key: 'U', label: 'Overall coefficient', biosteamName: 'U', kind: 'number', value: this.U, min: 0.05, max: 3, step: 0.05, units: 'kW m⁻² K⁻¹', note: 'Heuristic. Computing it needs the property package this port does not have, so it is stated rather than derived.' },
+      { key: 'dT_lm', label: 'Log-mean driving force', biosteamName: 'LMTD', kind: 'number', value: this.dT_lm, min: 2, max: 120, step: 1, units: 'K', note: 'Sets the area for a given duty. Halving it doubles the exchanger.' },
+      {
+        key: 'agent',
+        label: 'Utility agent',
+        biosteamName: 'agent',
+        kind: 'select',
+        value: this.agent,
+        options: [...HEATING_AGENTS, ...COOLING_AGENTS].map((a) => ({ value: a.ID, label: a.ID.replace(/_/g, ' ') })),
+        units: '',
+        note: 'A cooling agent that cannot reach the process temperature refuses rather than quietly costing the impossible.',
+      },
+    ];
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-out` }));
+    const feed = this.ins[0];
+    this.outs = [derive(feed, `${this.ID}-out`, { ...feed.flow }, { T: this.T_out })];
   }
 
   protected _design(): void {
-    // Q [kW] = U [kW/m²/K] · A [m²] · ΔT [K]
     const Q_kW = Math.abs(this.duty) / 3600;
     const A_m2 = Q_kW / (this.U * this.dT_lm);
     this.setDesign('Area', A_m2, 'm^2');
+    this.setDesign('Duty', this.duty, 'kJ/hr');
     this.setDesign('Overall coefficient', this.U, 'kW/m^2/K');
     this.setDesign('Log-mean driving force', this.dT_lm, 'K');
   }
 
   protected _cost(): void {
-    const A_ft2 = this.designResults['Area'].value * FT_PER_M ** 2;
-    // Upstream costs a single shell up to 5000 ft²; above that it splits.
+    const A_ft2 = this.designResults.Area.value * FT_PER_M ** 2;
+    const corr = HX_CORRELATIONS[this.heat_exchanger_type] ?? HX_CORRELATIONS['Floating head'];
     const N = Math.max(1, Math.ceil(A_ft2 / 5000));
     const A = Math.max(150, A_ft2 / N);
-    const lnA = Math.log(A);
-    const Cb = Math.exp(12.031 - 0.8709 * lnA + 0.09005 * lnA * lnA) * (CE.value / 567);
-    this.baselinePurchaseCosts['Floating head'] = Cb;
-    this.parallel['Floating head'] = N;
-    this.F_BM['Floating head'] = 3.17;
+    this.baselinePurchaseCosts[this.heat_exchanger_type] = corr.f(A) * (CE.value / 567);
+    this.parallel[this.heat_exchanger_type] = N;
+    this.F_BM[this.heat_exchanger_type] = corr.BM;
     if (A_ft2 < 150) {
       this.warnings.push(
-        `Heat-transfer area ${A_ft2.toPrecision(3)} ft² is below the 150 ft² floor of the floating-head correlation — costed at the floor.`,
+        `Heat-transfer area ${A_ft2.toPrecision(3)} ft² is below the 150 ft² floor of the ${this.heat_exchanger_type.toLowerCase()} correlation — costed at the floor.`,
       );
     }
     this.addHeatUtility(this.agent, this.duty, this.ins[0]?.T);
@@ -191,86 +311,134 @@ export class HXutility extends BioUnit {
 export class Pump extends BioUnit {
   readonly line = 'Pump';
   readonly costSource: CostSource = 'biosteam';
-  /** Pressure rise, Pa. */
+  /** Pressure rise, Pa. Upstream derives this from the sink's P. */
   dP: number;
+  /** Shaft efficiency on the hydraulic power. */
+  efficiency = 0.7;
 
-  constructor(ID: string, ins: Stream[], dP = 2e5, area = 100) {
-    super(ID, ins);
+  constructor(ID: string, sources: Inlet[], dP = 2e5, area = 100) {
+    super(ID, sources);
     this.dP = dP;
     this.area = area;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'dP', label: 'Pressure rise', biosteamName: 'dP', kind: 'number', value: this.dP, min: 5e4, max: 2e6, step: 5e4, units: 'Pa', note: 'Sets the head, which sets the size factor q·√h the cost correlation runs on.' },
+      { key: 'efficiency', label: 'Pump efficiency', biosteamName: 'efficiency', kind: 'number', value: this.efficiency, min: 0.3, max: 0.9, step: 0.05, units: '', note: 'Hydraulic power over this is the shaft power the motor draws.' },
+    ];
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-out`, P: s.P + this.dP }));
+    const feed = this.ins[0];
+    this.outs = [derive(feed, `${this.ID}-out`, { ...feed.flow }, { P: feed.P + this.dP })];
   }
 
   protected _design(): void {
-    const F_vol = this.ins.reduce((t, s) => t + volFlow(s), 0); // m³/hr
+    const F_vol = this.ins.reduce((t, s) => t + volFlow(s), 0);
     const gpm = F_vol * 4.40287;
     const rho = this.ins[0]?.rho ?? 1000;
     const head_ft = (this.dP / (rho * 9.80665)) * FT_PER_M;
     this.setDesign('Flow rate', gpm, 'gal/min');
     this.setDesign('Head', head_ft, 'ft');
-    // Hydraulic power over an assumed 70% efficiency.
-    this.powerUtility += ((F_vol / 3600) * this.dP) / 0.7 / 1000;
+    this.powerUtility += ((F_vol / 3600) * this.dP) / this.efficiency / 1000;
     this.setDesign('Power', this.powerUtility, 'kW');
   }
 
   protected _cost(): void {
     const q = Math.max(50, this.designResults['Flow rate'].value);
-    const h = Math.max(50, this.designResults['Head'].value);
+    const h = Math.max(50, this.designResults.Head.value);
     const S = q * Math.sqrt(h);
     const S_new = S > 400 ? S : 400;
     const lnS = Math.log(S_new);
-    let Cb = Math.exp(12.1656 - 1.1448 * lnS + 0.0862 * lnS * lnS);
-    Cb *= S / S_new;
-    this.baselinePurchaseCosts['Pump'] = Cb * (CE.value / 567);
-    this.F_BM['Pump'] = 3.3;
+    const Cb = Math.exp(12.1656 - 1.1448 * lnS + 0.0862 * lnS * lnS) * (S / S_new);
+    this.baselinePurchaseCosts.Pump = Cb * (CE.value / 567);
+    this.F_BM.Pump = 3.3;
   }
 }
 
 /**
- * Disc-stack centrifuge. bioSTEAM `units/solids_separation.py` SolidsCentrifuge,
- * scroll-solid ('reciprocating pusher') branch.
+ * Solid-bowl centrifuge. bioSTEAM `units/solids_separation.py` SolidsCentrifuge.
+ *
+ * Two outlets, as upstream: centrate at port 0, cake at port 1. Which one is the
+ * product depends on the process — the yeast route keeps the centrate, the algal
+ * route keeps the cake — and the flowsheet says which by what it connects.
  */
 export class SolidsCentrifuge extends BioUnit {
   readonly line = 'Centrifuge';
   readonly costSource: CostSource = 'biosteam';
-  /** Fraction of the solids that report to the cake. */
-  solidsSplit: number;
-  /** Fraction of the dissolved product that leaves with the cake — a loss. */
+  /** Fraction of the solids reporting to the cake. Upstream's `split`. */
+  split: number;
+  /** Fraction of the dissolved product carried with the cake. */
   productToCake: number;
+  /** Upstream's `kWhr_per_m3`. */
   kWhr_per_m3 = 1.4;
+  /** Upstream's `centrifuge_type`. */
+  centrifuge_type = 'reciprocating pusher';
+  /** Water retained in the cake, kg per kg of solids. */
+  cakeMoisture = 4;
 
   constructor(
     ID: string,
-    ins: Stream[],
-    opts: { solidsSplit: number; productToCake: number; area?: number },
+    sources: Inlet[],
+    opts: { split: number; productToCake: number; area?: number; cakeMoisture?: number },
   ) {
-    super(ID, ins);
-    this.solidsSplit = opts.solidsSplit;
+    super(ID, sources);
+    this.split = opts.split;
     this.productToCake = opts.productToCake;
+    if (opts.cakeMoisture !== undefined) this.cakeMoisture = opts.cakeMoisture;
     this.area = opts.area ?? 400;
+  }
+
+  specs(): UnitSpec[] {
+    return [
+      { key: 'split', label: 'Solids to cake', biosteamName: 'split', kind: 'number', value: this.split, min: 0.5, max: 0.999, step: 0.005, units: '', note: 'Separation efficiency on the solid phase.' },
+      { key: 'productToCake', label: 'Product lost to cake', biosteamName: 'split[product]', kind: 'number', value: this.productToCake, min: 0, max: 1, step: 0.01, units: '', note: 'Dissolved product carried out wet with the solids. A physical loss, not an adjustable one.' },
+      {
+        key: 'centrifuge_type',
+        label: 'Centrifuge type',
+        biosteamName: 'centrifuge_type',
+        kind: 'select',
+        value: this.centrifuge_type,
+        options: [
+          { value: 'reciprocating pusher', label: 'Reciprocating pusher' },
+          { value: 'scroll solid bowl', label: 'Scroll solid bowl' },
+        ],
+        units: '',
+        note: 'Two correlations on solids loading: 68 040·ts^0.5 against 170 100·ts^0.3. The scroll bowl is dearer at small scale and cheaper at large.',
+      },
+      { key: 'kWhr_per_m3', label: 'Specific energy', biosteamName: 'kWhr_per_m3', kind: 'number', value: this.kWhr_per_m3, min: 0.2, max: 5, step: 0.1, units: 'kWh m⁻³', note: "bioSTEAM's default is 1.4 kWh per m³ of feed." },
+      { key: 'cakeMoisture', label: 'Cake moisture', biosteamName: 'moisture_content', kind: 'number', value: this.cakeMoisture, min: 0.5, max: 12, step: 0.5, units: 'kg kg⁻¹', note: 'Water carried out with the solids, per kilogram of solids. Wetter cake means more product lost with it.' },
+    ];
   }
 
   protected _run(): void {
     const feed = this.ins[0];
-    const cake: Stream = { ...feed, ID: `${this.ID}-cake`, flow: {}, phase: 's' };
-    const centrate: Stream = { ...feed, ID: `${this.ID}-centrate`, flow: {} };
+    const cakeFlow: Record<string, number> = {};
+    const centrateFlow: Record<string, number> = {};
+    let solidsToCake = 0;
     for (const k in feed.flow) {
+      if (k === 'water') continue;
       const f = feed.flow[k];
-      const toCake =
-        k === 'biomass' ? this.solidsSplit : k === 'product' ? this.productToCake : 0.05;
-      cake.flow[k] = f * toCake;
-      centrate.flow[k] = f * (1 - toCake);
+      const toCake = k === 'biomass' ? this.split : k === 'product' ? this.productToCake : 0.05;
+      cakeFlow[k] = f * toCake;
+      centrateFlow[k] = f * (1 - toCake);
+      if (k === 'biomass') solidsToCake += f * toCake;
     }
-    this.outs = [centrate, cake];
+    // Water follows the cake only as far as the cake is wet.
+    const water = feed.flow.water ?? 0;
+    const waterToCake = Math.min(water, solidsToCake * this.cakeMoisture);
+    cakeFlow.water = waterToCake;
+    centrateFlow.water = water - waterToCake;
+    this.outs = [
+      derive(feed, `${this.ID}-centrate`, centrateFlow),
+      derive(feed, `${this.ID}-cake`, cakeFlow, { phase: 's' }),
+    ];
   }
 
   protected _design(): void {
     const solids_kg_hr = this.ins.reduce((t, s) => t + (s.flow.biomass ?? 0), 0);
-    // Upstream works in short tons per hour.
-    const ts = solids_kg_hr * 0.0011023;
+    const ts = solids_kg_hr * 0.0011023; // short tons/hr
     this.setDesign('Solids loading', ts, 'ton/hr');
     this.setDesign('Number of centrifuges', Math.max(1, Math.ceil(ts / 40)), '');
     const F_vol = this.ins.reduce((t, s) => t + volFlow(s), 0);
@@ -279,12 +447,14 @@ export class SolidsCentrifuge extends BioUnit {
   }
 
   protected _cost(): void {
-    const ts = this.designResults['Solids loading'].value;
-    // Reciprocating-pusher branch: 68040 · ts^0.5.
-    const cost = 68040 * Math.sqrt(Math.max(ts, 1e-6)) * (CE.value / 567);
-    this.baselinePurchaseCosts['Centrifuges'] = cost;
-    this.parallel['Centrifuges'] = this.designResults['Number of centrifuges'].value;
-    this.F_BM['Centrifuges'] = 2.03;
+    const ts = Math.max(this.designResults['Solids loading'].value, 1e-6);
+    const cost =
+      this.centrifuge_type === 'scroll solid bowl'
+        ? 170100 * Math.pow(ts, 0.3)
+        : 68040 * Math.pow(ts, 0.5);
+    this.baselinePurchaseCosts.Centrifuges = cost * (CE.value / 567);
+    this.parallel.Centrifuges = this.designResults['Number of centrifuges'].value;
+    this.F_BM.Centrifuges = 2.03;
     if (ts < 2) {
       this.warnings.push(
         `Solids loading ${ts.toPrecision(3)} ton/hr is below the range bioSTEAM's centrifuge correlation was fitted over — the cost is an extrapolation downwards.`,
@@ -293,47 +463,54 @@ export class SolidsCentrifuge extends BioUnit {
   }
 }
 
-/** Spray dryer. bioSTEAM `units/drying.py` SprayDryer. */
+/** Spray dryer. bioSTEAM `units/drying.py` SprayDryer. Powder at 0, vapour at 1. */
 export class SprayDryer extends BioUnit {
   readonly line = 'Spray dryer';
   readonly costSource: CostSource = 'biosteam';
   /** Solids fraction of the dried product. */
   finalSolids = 0.95;
 
-  constructor(ID: string, ins: Stream[]) {
-    super(ID, ins);
+  constructor(ID: string, sources: Inlet[]) {
+    super(ID, sources);
     this.area = 600;
+  }
+
+  specs(): UnitSpec[] {
+    return [
+      { key: 'finalSolids', label: 'Final solids', biosteamName: 'moisture_content', kind: 'number', value: this.finalSolids, min: 0.8, max: 0.99, step: 0.01, units: '', note: 'Drier powder costs more steam and weighs less. Both move the price.' },
+    ];
   }
 
   protected _run(): void {
     const feed = this.ins[0];
-    const solids = (feed.flow.product ?? 0) + (feed.flow.biomass ?? 0);
-    const dry: Stream = {
-      ...feed,
-      ID: `${this.ID}-powder`,
-      phase: 's',
-      flow: {
-        ...feed.flow,
-        water: (solids / this.finalSolids) * (1 - this.finalSolids),
-      },
-    };
-    this.outs = [dry];
+    const solids = Object.entries(feed.flow)
+      .filter(([k]) => k !== 'water')
+      .reduce((t, [, v]) => t + v, 0);
+    const retainedWater = (solids / this.finalSolids) * (1 - this.finalSolids);
+    const feedWater = feed.flow.water ?? 0;
+    const evaporated = Math.max(0, feedWater - retainedWater);
+    const powderFlow = { ...feed.flow, water: Math.min(feedWater, retainedWater) };
+    this.outs = [
+      derive(feed, `${this.ID}-powder`, powderFlow, { phase: 's' }),
+      derive(feed, `${this.ID}-vapour`, { water: evaporated }, { phase: 'g', T: 373 }),
+    ];
   }
 
   protected _design(): void {
-    const feed = this.ins[0];
-    const evaporated = Math.max(0, massFlow(feed) - massFlow(this.outs[0]));
-    // Upstream's basis is lb/hr of evaporation.
+    const evaporated = massFlow(this.outs[1]);
     this.setDesign('Evaporation rate', evaporated * 2.20462, 'lb/hr');
-    // Latent heat of water plus sensible heating of the feed to the dryer inlet.
-    this.addHeatUtility('low_pressure_steam', evaporated * 2260 + massFlow(feed) * CP_BROTH * 60);
+    this.addHeatUtility(
+      'low_pressure_steam',
+      evaporated * 2260 + massFlow(this.ins[0]) * CP_BROTH * 60,
+      this.ins[0]?.T,
+    );
   }
 
   protected _cost(): void {
     const W = Math.max(30, this.designResults['Evaporation rate'].value);
     const logW = Math.log(W);
-    const Cb = Math.exp(8.5133 + 0.9847 * logW - 0.0561 * logW * logW) * (CE.value / 567);
-    this.baselinePurchaseCosts['Spray dryer'] = Cb;
+    this.baselinePurchaseCosts['Spray dryer'] =
+      Math.exp(8.5133 + 0.9847 * logW - 0.0561 * logW * logW) * (CE.value / 567);
     this.F_BM['Spray dryer'] = 2.06;
   }
 }
@@ -341,21 +518,22 @@ export class SprayDryer extends BioUnit {
 /**
  * Aerated stirred-tank bioreactor.
  *
- * This is the unit the whole plant turns on, and the one place where a
- * fermentation TEA earns the right to be called one rather than a spreadsheet.
- * Three couplings are real here:
+ * The unit the whole plant turns on, and the one place where a fermentation TEA
+ * earns the right to be called one rather than a spreadsheet. Four couplings are
+ * real here:
  *
+ *  - a `Reaction` consumes substrate and makes biomass, product and carbon
+ *    dioxide, so the mass balance closes and the vent carries what it should;
  *  - the vessel is sized by `size_batch`, so cleaning and loading time buy
  *    volume rather than being absorbed into a fudge factor;
  *  - the agitator power comes from the oxygen the culture demands, inverted
- *    through van 't Riet's kLa correlation — so a denser culture is charged for
- *    the electricity it actually needs, not a fixed W/m³;
+ *    through van 't Riet's kLa correlation against a driving force read from
+ *    Henry's law at the sparger and at the surface;
  *  - the cooling duty comes from the same oxygen uptake through the
  *    oxycalorific equivalent, which is why you cannot buy your way out of the
  *    aeration bill by chilling harder.
  *
- * The vessel itself is designed and costed as an ASME pressure vessel from
- * bioSTEAM's `flash_vessel_design`, jacketed.
+ * Broth leaves at port 0 and the vent at port 1.
  */
 export class AeratedBioreactor extends BioUnit {
   readonly line = 'Bioreactor';
@@ -369,148 +547,200 @@ export class AeratedBioreactor extends BioUnit {
   /** Largest single vessel, m³. */
   V_max: number;
   /** Superficial gas velocity, m/s. */
-  U = 0.03;
+  U = 0.06;
   /** Oxygen uptake, mol O₂ per litre of broth per hour. */
   OUR: number;
   /** Broth temperature, K. */
   T: number;
-  vesselMaterial = 'Stainless steel 304';
+  vessel_material = 'Stainless steel 304';
+  vessel_type = 'Vertical';
+  /** Design pressure, Pa absolute. */
+  P_design = 4 * 101325;
+  /** Which fitted kLa row to use. */
+  kLa_correlation = 'Figueiredo & Calderbank';
+  reaction: Reaction;
 
   constructor(
     ID: string,
-    ins: Stream[],
+    sources: Inlet[],
     opts: {
       tau: number;
+      reaction: Reaction;
+      OUR: number;
       tau_cleaning?: number;
       V_max?: number;
-      OUR: number;
       T?: number;
       area?: number;
     },
   ) {
-    super(ID, ins);
+    super(ID, sources);
     this.tau = opts.tau;
+    this.reaction = opts.reaction;
+    this.OUR = opts.OUR;
     this.tau_cleaning = opts.tau_cleaning ?? 12;
     this.V_max = opts.V_max ?? 500;
-    this.OUR = opts.OUR;
     this.T = opts.T ?? 303;
     this.area = opts.area ?? 300;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'tau', label: 'Reaction time', biosteamName: 'tau', kind: 'number', value: this.tau, min: 12, max: 240, step: 6, units: 'hr', note: 'Longer batches make more per turn and fewer turns per year. The vessel count follows.' },
+      { key: 'tau_cleaning', label: 'Turnaround', biosteamName: 'tau_0', kind: 'number', value: this.tau_cleaning, min: 0, max: 48, step: 1, units: 'hr', note: 'Clean-in-place and unloading. Dead time you still pay vessel capital for.' },
+      { key: 'V_wf', label: 'Working volume fraction', biosteamName: 'V_wf', kind: 'number', value: this.V_wf, min: 0.5, max: 0.95, step: 0.05, units: '', note: 'Headspace for foam. The vessel is grossed up by its inverse.' },
+      { key: 'V_max', label: 'Largest vessel', biosteamName: 'V_max', kind: 'number', value: this.V_max, min: 20, max: 1000, step: 10, units: 'm³', note: 'Above this, size_batch adds vessels in parallel instead of growing one.' },
+      { key: 'U', label: 'Superficial gas velocity', biosteamName: 'U', kind: 'number', value: this.U, min: 0.01, max: 0.15, step: 0.005, units: 'm s⁻¹', note: 'More sparge buys kLa cheaply until it floods the impeller. This model does not check for flooding.' },
+      { key: 'T', label: 'Broth temperature', biosteamName: 'T', kind: 'number', value: this.T, min: 285, max: 320, step: 1, units: 'K', note: 'Sets oxygen solubility through Henry’s law and decides which cooling agent can serve the vessel.' },
+      { key: 'X', label: 'Substrate conversion', biosteamName: 'reaction.X', kind: 'number', value: this.reaction.X, min: 0.1, max: 1, step: 0.01, units: '', note: 'Upstream’s Reaction.X. Unconverted substrate leaves in the broth and is paid for anyway.' },
+      {
+        key: 'vessel_material',
+        label: 'Vessel material',
+        biosteamName: 'vessel_material',
+        kind: 'select',
+        value: this.vessel_material,
+        options: Object.entries(PRESSURE_VESSEL_MATERIAL_FACTORS)
+          .filter(([m]) => MATERIAL_DENSITIES_LB_PER_FT3[m] !== undefined)
+          .map(([m, f]) => ({ value: m, label: `${m} · F_M ${f}` })),
+        units: '',
+        note: 'The material factor multiplies the vessel cost and the density changes its weight. Only materials bioSTEAM gives a density for are offered.',
+      },
+      {
+        key: 'vessel_type',
+        label: 'Vessel orientation',
+        biosteamName: 'vessel_type',
+        kind: 'select',
+        value: this.vessel_type,
+        options: [
+          { value: 'Vertical', label: 'Vertical' },
+          { value: 'Horizontal', label: 'Horizontal' },
+        ],
+        units: '',
+        note: 'Different weight correlation, different platform cost, different bare-module factor. A horizontal fermenter is unusual; the option is here because upstream has it.',
+      },
+      {
+        key: 'kLa_correlation',
+        label: 'kLa correlation',
+        biosteamName: 'coefficients',
+        kind: 'select',
+        value: this.kLa_correlation,
+        options: Object.keys(KLA_COEFFICIENTS_RIET).map((k) => ({ value: k, label: k })),
+        units: '',
+        note: 'Two fitted rows for the same equation. Inverting for power magnifies the gap between them, so this is a real assumption and not a detail.',
+      },
+    ];
+  }
+
+  /** `setSpec` has to reach inside the Reaction for X. */
+  setSpec(key: string, value: number | string): boolean {
+    if (key === 'X') {
+      this.reaction = { ...this.reaction, X: Number(value) };
+      return true;
+    }
+    return super.setSpec(key, value);
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-broth`, T: this.T }));
+    const feed = this.ins[0];
+    const reacted = applyReaction(feed, this.reaction);
+    const co2 = reacted.flow.co2 ?? 0;
+    const brothFlow = { ...reacted.flow };
+    delete brothFlow.co2;
+    this.outs = [
+      derive(feed, `${this.ID}-broth`, brothFlow, { T: this.T }),
+      derive(feed, `${this.ID}-vent`, { co2 }, { phase: 'g', T: this.T }),
+    ];
   }
 
   protected _design(): void {
-    const F_vol = this.ins.reduce((t, s) => t + volFlow(s), 0); // m³/hr
-    const batch = sizeBatch(F_vol, this.tau, this.tau_cleaning, this.V_wf, {
-      V_max: this.V_max,
-    });
+    const F_vol = this.ins.reduce((t, s) => t + volFlow(s), 0);
+    const batch = sizeBatch(F_vol, this.tau, this.tau_cleaning, this.V_wf, { V_max: this.V_max });
     this.setDesign('Reactor volume', batch.reactorVolume, 'm^3');
     this.setDesign('Batch time', batch.batchTime, 'hr');
     this.setDesign('Loading time', batch.loadingTime, 'hr');
     this.setDesign('Number of reactors', batch.nReactors, '');
 
-    // Geometry: a 2:1 vertical vessel, which is the usual aspect ratio for a
-    // stirred fermenter and the one the kLa correlations were fitted on.
+    // A 2:1 vertical vessel, the usual aspect ratio for a stirred fermenter and
+    // the one the kLa correlations were fitted on.
     const V = batch.reactorVolume;
-    const D_m = Math.cbrt((2 * V) / Math.PI); // V = π/4 · D² · L with L = 2D
+    const D_m = Math.cbrt((2 * V) / Math.PI);
     const L_m = 2 * D_m;
     this.setDesign('Diameter', D_m, 'm');
     this.setDesign('Length', L_m, 'm');
 
-    // Oxygen demand -> required kLa -> gassed power.
-    //
-    // The driving force is the number this whole calculation pivots on, and it
-    // is worth taking seriously rather than assuming. Saturation comes from the
-    // ported Henry's law rather than a remembered "0.21 mol/m³ in air": at the
-    // pressure a real fermenter runs at, that figure is 17% low, and because
-    // power goes as kLa^(1/b) with b = 0.6, a 17% error in the driving force is
-    // a 30% error in the electricity bill.
-    //
-    // Two things raise it above the textbook air-water value. The headspace is
-    // held at a slight overpressure for sterility, and the liquid is twelve
-    // metres deep, so the sparger sees roughly twice the partial pressure the
-    // surface does. Averaging the two logarithmically is the same correction a
-    // counter-current exchanger gets, and it is what the ported
-    // `log_mean_driving_force` is for.
     const workingV_m3 = V * this.V_wf;
-    const workingV_L = workingV_m3 * 1000;
-    const OTR_mol_hr = this.OUR * workingV_L; // mol O₂/hr per vessel
+    const OTR_mol_hr = this.OUR * workingV_m3 * 1000;
+    this.setDesign('Oxygen uptake', OTR_mol_hr, 'mol/hr');
 
-    const P_head = 1.3e5; // Pa absolute, sterile overpressure
+    // Saturation from Henry's law at the sparger and at the surface, log-mean
+    // between them. The remembered "0.21 mol/m³ in air" is 17% low at the
+    // pressure a real fermenter runs at, and power goes as kLa^(1/b).
+    const P_head = 1.3e5;
     const liquidHeight_m = L_m * this.V_wf;
     const P_sparger = P_head + 1000 * 9.80665 * liquidHeight_m;
-    const Y_O2 = 0.21; // air, and gas-phase depletion up the column is not modelled
-    // C_O2_L returns kmol/m³; the rest of this works in mol/m³.
+    const Y_O2 = 0.21;
     const C_sat_top = C_O2_L(this.T, Y_O2 * P_head) * 1000;
     const C_sat_bottom = C_O2_L(this.T, Y_O2 * P_sparger) * 1000;
-    // Held at 20% of air saturation, the usual dissolved-oxygen setpoint.
     const C_dissolved = 0.2 * C_sat_top;
     const driving = logMeanDrivingForce(C_sat_top, C_sat_bottom, C_dissolved);
     this.setDesign('Oxygen driving force', driving, 'mol/m^3');
-    const kLa = OTR_mol_hr / 3600 / (driving * workingV_m3); // 1/s
+
+    const kLa = OTR_mol_hr / 3600 / (driving * workingV_m3);
     this.setDesign('kLa', kLa, '1/s');
-    const P_W = PAtKLaRiet(kLa, workingV_m3, this.U);
+    const P_W = PAtKLaRiet(kLa, workingV_m3, this.U, this.kLa_correlation);
     const nReactors = batch.nReactors;
     this.powerUtility += (P_W / 1000) * nReactors;
     this.setDesign('Agitation power', P_W / 1000, 'kW');
 
-    // Cooling: metabolic heat from the same oxygen uptake, plus the agitator's
-    // shaft work, which all ends up in the broth.
     const metabolic_kJ_hr = OTR_mol_hr * HEAT_PER_MOL_O2;
     const shaft_kJ_hr = (P_W / 1000) * 3600;
     this.addHeatUtility('chilled_water', -(metabolic_kJ_hr + shaft_kJ_hr) * nReactors, this.T);
 
-    // Air compression to sparge, at the superficial velocity assumed above.
     const area_m2 = (Math.PI / 4) * D_m * D_m;
     const Q_air_m3_s = this.U * area_m2;
-    // Isothermal compression to 1.5 bar over 70% efficiency.
     const P_comp_kW = ((Q_air_m3_s * 101325 * Math.log(1.5)) / 0.7 / 1000) * nReactors;
     this.powerUtility += P_comp_kW;
     this.setDesign('Air compression power', P_comp_kW, 'kW');
   }
 
   protected _cost(): void {
-    const D_ft = this.designResults['Diameter'].value * FT_PER_M;
-    const L_ft = this.designResults['Length'].value * FT_PER_M;
+    const D_ft = this.designResults.Diameter.value * FT_PER_M;
+    const L_ft = this.designResults.Length.value * FT_PER_M;
     const N = this.designResults['Number of reactors'].value;
-    const rho = MATERIAL_DENSITIES_LB_PER_FT3[this.vesselMaterial] ?? 499.4;
-    // Sterile operation is run at a slight overpressure; 3 barg is the usual
-    // design pressure for a vessel that also has to survive steam-in-place.
-    const P_psia = (4 * 101325) * PSI_PER_PA;
-    const { weight, thickness } = computeVesselWeightAndWallThickness(
-      P_psia,
-      D_ft,
-      L_ft,
-      rho,
-      0.5, // jacket annulus, ft
-    );
+    const rho = MATERIAL_DENSITIES_LB_PER_FT3[this.vessel_material] ?? 499.4;
+    const P_psia = this.P_design * PSI_PER_PA;
+    const horizontal = this.vessel_type === 'Horizontal';
+    const { weight, thickness } = computeVesselWeightAndWallThickness(P_psia, D_ft, L_ft, rho, 0.5);
     this.setDesign('Weight', weight, 'lb');
     this.setDesign('Wall thickness', thickness, 'in');
-    const F_M = PRESSURE_VESSEL_MATERIAL_FACTORS[this.vesselMaterial] ?? 1.7;
-    this.baselinePurchaseCosts['Vertical pressure vessel (jacketed)'] =
-      computeVerticalVesselPurchaseCost(weight) * F_M;
-    this.parallel['Vertical pressure vessel (jacketed)'] = N;
-    this.F_BM['Vertical pressure vessel (jacketed)'] = 4.16;
-    this.baselinePurchaseCosts['Platform and ladders'] =
-      computeVerticalVesselPlatformAndLaddersPurchaseCost(D_ft, L_ft);
+    const F_M = PRESSURE_VESSEL_MATERIAL_FACTORS[this.vessel_material] ?? 1.7;
+    const vesselKey = horizontal
+      ? 'Horizontal pressure vessel (jacketed)'
+      : 'Vertical pressure vessel (jacketed)';
+    this.baselinePurchaseCosts[vesselKey] =
+      (horizontal ? computeHorizontalVesselPurchaseCost(weight) : computeVerticalVesselPurchaseCost(weight)) *
+      F_M;
+    this.parallel[vesselKey] = N;
+    this.F_BM[vesselKey] = horizontal ? 3.05 : 4.16;
+    this.baselinePurchaseCosts['Platform and ladders'] = horizontal
+      ? computeHorizontalVesselPlatformAndLaddersPurchaseCost(D_ft)
+      : computeVerticalVesselPlatformAndLaddersPurchaseCost(D_ft, L_ft);
     this.parallel['Platform and ladders'] = N;
     this.F_BM['Platform and ladders'] = 1;
-    // Agitator, on bioSTEAM's stirred-tank basis of USD/kW installed.
-    const agitator_kW = this.designResults['Agitation power'].value;
-    this.baselinePurchaseCosts['Agitator'] = 3200 * Math.pow(Math.max(agitator_kW, 1), 0.72) * (CE.value / 567);
-    this.parallel['Agitator'] = N;
-    this.F_BM['Agitator'] = 1.5;
 
-    // Upstream raises these from inside `PressureVessel._vertical_vessel_design`.
-    // This port left them to the calling unit, which means a unit that forgets
-    // to ask gets no warning at all — a silent extrapolation, which is the one
-    // outcome worse than a loud one. Both bounds are asked here, in bioSTEAM's
-    // own words.
+    const agitator_kW = this.designResults['Agitation power'].value;
+    this.baselinePurchaseCosts.Agitator =
+      3200 * Math.pow(Math.max(agitator_kW, 1), 0.72) * (CE.value / 567);
+    this.parallel.Agitator = N;
+    this.F_BM.Agitator = 1.5;
+
+    // Upstream raises these from inside `PressureVessel._vessel_design`. This
+    // port left them to the calling unit, which means a unit that forgets to ask
+    // gets a silent extrapolation — the worse of the two failures.
     for (const w of [
-      checkVesselBounds('Vertical vessel weight', weight),
-      checkVesselBounds('Vertical vessel length', L_ft),
+      checkVesselBounds(horizontal ? 'Horizontal vessel weight' : 'Vertical vessel weight', weight),
+      horizontal
+        ? checkVesselBounds('Horizontal vessel diameter', D_ft)
+        : checkVesselBounds('Vertical vessel length', L_ft),
     ]) {
       if (w) this.warnings.push(w);
     }
@@ -530,12 +760,7 @@ export class AeratedBioreactor extends BioUnit {
  * bioSTEAM has no photobioreactor and no published correlation to borrow, so
  * this one is written here and anchored on the only real operating plant in the
  * corpus: Acién's 3 m³ tubular installation, which reported 69 €/kg of biomass
- * across two years. That anchors the order of magnitude and nothing finer. The
- * exponent is the six-tenths rule.
- *
- * The lighting term is the part that makes an algal route expensive and it is
- * modelled explicitly rather than folded into utilities, because a reader will
- * want to argue with it.
+ * across two years. That anchors the order of magnitude and nothing finer.
  */
 export class Photobioreactor extends BioUnit {
   readonly line = 'Photobioreactor';
@@ -548,22 +773,58 @@ export class Photobioreactor extends BioUnit {
   V_max = 200;
   /** Photosynthetically active irradiance delivered, W per m³ of culture. */
   lightingWPerM3: number;
+  /** Circulation power, kW per m³. */
+  circulationKWPerM3 = 0.15;
   T: number;
+  /** Reference capital, USD at the reference volume. */
+  refCost = 9.5e6;
+  refVolume = 120;
+  scalingExponent = 0.6;
+  reaction: Reaction;
 
   constructor(
     ID: string,
-    ins: Stream[],
-    opts: { tau: number; lightingWPerM3?: number; T?: number },
+    sources: Inlet[],
+    opts: { tau: number; reaction: Reaction; lightingWPerM3?: number; T?: number },
   ) {
-    super(ID, ins);
+    super(ID, sources);
     this.tau = opts.tau;
+    this.reaction = opts.reaction;
     this.lightingWPerM3 = opts.lightingWPerM3 ?? 60;
     this.T = opts.T ?? 298;
     this.area = 300;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'tau', label: 'Cultivation time', biosteamName: 'tau', kind: 'number', value: this.tau, min: 24, max: 480, step: 12, units: 'hr', note: 'Mixotrophic cultures reach maximum biomass in about five days.' },
+      { key: 'V_max', label: 'Largest loop', biosteamName: 'V_max', kind: 'number', value: this.V_max, min: 20, max: 500, step: 10, units: 'm³', note: 'Tubular loops do not scale as single vessels; above this the plant adds loops.' },
+      { key: 'lightingWPerM3', label: 'Light delivered', biosteamName: '—', kind: 'number', value: this.lightingWPerM3, min: 10, max: 200, step: 5, units: 'W m⁻³', note: 'Flat with depth, which flatters a dense culture: attenuation is not modelled.' },
+      { key: 'circulationKWPerM3', label: 'Circulation power', biosteamName: '—', kind: 'number', value: this.circulationKWPerM3, min: 0.02, max: 1, step: 0.01, units: 'kW m⁻³', note: 'Keeps cells moving through the light. Ends up in the broth as heat.' },
+      { key: 'refCost', label: 'Reference capital', biosteamName: '—', kind: 'number', value: this.refCost, min: 1e6, max: 3e7, step: 5e5, units: 'USD', note: 'Cost of the reference installation. The least defensible number on this screen, and the one that dominates the answer.' },
+      { key: 'scalingExponent', label: 'Scaling exponent', biosteamName: 'n', kind: 'number', value: this.scalingExponent, min: 0.4, max: 1, step: 0.05, units: '', note: 'Six-tenths rule. At 1.0 there is no economy of scale at all.' },
+      { key: 'X', label: 'Substrate conversion', biosteamName: 'reaction.X', kind: 'number', value: this.reaction.X, min: 0.1, max: 1, step: 0.01, units: '', note: 'Acetate consumed by the mixotrophic culture.' },
+    ];
+  }
+
+  setSpec(key: string, value: number | string): boolean {
+    if (key === 'X') {
+      this.reaction = { ...this.reaction, X: Number(value) };
+      return true;
+    }
+    return super.setSpec(key, value);
+  }
+
   protected _run(): void {
-    this.outs = this.ins.map((s) => ({ ...s, ID: `${this.ID}-broth`, T: this.T }));
+    const feed = this.ins[0];
+    const reacted = applyReaction(feed, this.reaction, 'o2');
+    const o2 = reacted.flow.o2 ?? 0;
+    const brothFlow = { ...reacted.flow };
+    delete brothFlow.o2;
+    this.outs = [
+      derive(feed, `${this.ID}-broth`, brothFlow, { T: this.T }),
+      derive(feed, `${this.ID}-vent`, { o2 }, { phase: 'g', T: this.T }),
+    ];
   }
 
   protected _design(): void {
@@ -575,29 +836,23 @@ export class Photobioreactor extends BioUnit {
     const totalV = batch.reactorVolume * batch.nReactors * this.V_wf;
     this.setDesign('Total culture volume', totalV, 'm^3');
 
-    // Lighting, and the circulation that keeps cells moving through the light.
     const lighting_kW = (this.lightingWPerM3 * totalV) / 1000;
     this.powerUtility += lighting_kW;
     this.setDesign('Lighting load', lighting_kW, 'kW');
-    const circulation_kW = 0.15 * totalV;
+    const circulation_kW = this.circulationKWPerM3 * totalV;
     this.powerUtility += circulation_kW;
     this.setDesign('Circulation power', circulation_kW, 'kW');
 
-    // Nearly all the lighting energy lands in the culture as heat and has to
-    // come back out; a closed tubular loop in daylight has no other exit.
-    //
     // Chilled water, not cooling water. A cooling tower supplies at 305.4 K and
-    // a Chlamydomonas culture is held at 298 K, so the tower loop cannot take
-    // heat out of it at all — passing the process temperature into the utility
-    // makes that pairing throw instead of quietly costing the impossible.
+    // this culture is held at 298 K, so the tower loop cannot take heat out of
+    // it at all — passing the process temperature makes that pairing throw.
     this.addHeatUtility('chilled_water', -(lighting_kW + circulation_kW) * 3600, this.T);
   }
 
   protected _cost(): void {
     const totalV = this.designResults['Total culture volume'].value;
-    // 9.5 MUSD at 120 m³, six-tenths.
-    const Cp = 9.5e6 * Math.pow(totalV / 120, 0.6) * (CE.value / 567);
-    this.baselinePurchaseCosts['Tubular loops'] = Cp;
+    this.baselinePurchaseCosts['Tubular loops'] =
+      this.refCost * Math.pow(totalV / this.refVolume, this.scalingExponent) * (CE.value / 567);
     this.F_BM['Tubular loops'] = 1.8;
   }
 }
@@ -620,36 +875,51 @@ export class PEFDisruption extends BioUnit {
   releaseYield: number;
   /** Specific energy, kJ per kg of broth. */
   specificEnergy = 100;
+  refCost = 480000;
+  refThroughput = 5000;
+  scalingExponent = 0.65;
 
-  constructor(ID: string, ins: Stream[], releaseYield: number) {
-    super(ID, ins);
+  constructor(ID: string, sources: Inlet[], releaseYield: number) {
+    super(ID, sources);
     this.releaseYield = releaseYield;
     this.area = 400;
   }
 
+  specs(): UnitSpec[] {
+    return [
+      { key: 'releaseYield', label: 'Protein released', biosteamName: '—', kind: 'number', value: this.releaseYield, min: 0.02, max: 0.95, step: 0.01, units: '', note: 'The cell-wall-deficient chassis exists for this number: 31% against 11% for the walled wild type.' },
+      { key: 'specificEnergy', label: 'Specific energy', biosteamName: '—', kind: 'number', value: this.specificEnergy, min: 10, max: 400, step: 10, units: 'kJ kg⁻¹', note: 'Pulse energy per kilogram of broth. Mild PEF is cheap; the penalty is in the release yield.' },
+      { key: 'refCost', label: 'Reference skid cost', biosteamName: '—', kind: 'number', value: this.refCost, min: 1e5, max: 3e6, step: 2e4, units: 'USD', note: 'Vendor-class pricing at the reference throughput. Nothing published stands behind it.' },
+    ];
+  }
+
   protected _run(): void {
     const feed = this.ins[0];
+    // Disruption releases protein from the cells; nothing leaves the stream, so
+    // the mass balance is a pass-through and the yield shows up downstream as
+    // how much product the clarifier can actually take away.
     this.outs = [
-      {
-        ...feed,
-        ID: `${this.ID}-lysate`,
-        flow: { ...feed.flow, product: (feed.flow.product ?? 0) * this.releaseYield },
-      },
+      derive(feed, `${this.ID}-lysate`, {
+        ...feed.flow,
+        product: (feed.flow.product ?? 0) * this.releaseYield,
+        biomass: (feed.flow.biomass ?? 0) + (feed.flow.product ?? 0) * (1 - this.releaseYield),
+      }),
     ];
   }
 
   protected _design(): void {
     const m = this.ins.reduce((t, s) => t + massFlow(s), 0);
     this.setDesign('Throughput', m, 'kg/hr');
+    this.setDesign('Release yield', this.releaseYield, '');
     const kW = (m * this.specificEnergy) / 3600;
     this.powerUtility += kW;
     this.setDesign('Pulse energy', kW, 'kW');
   }
 
   protected _cost(): void {
-    const m = this.designResults['Throughput'].value;
-    const Cp = 480000 * Math.pow(Math.max(m, 1) / 5000, 0.65) * (CE.value / 567);
-    this.baselinePurchaseCosts['PEF skid'] = Cp;
+    const m = this.designResults.Throughput.value;
+    this.baselinePurchaseCosts['PEF skid'] =
+      this.refCost * Math.pow(Math.max(m, 1) / this.refThroughput, this.scalingExponent) * (CE.value / 567);
     this.F_BM['PEF skid'] = 2.2;
   }
 }
@@ -661,6 +931,8 @@ export class PEFDisruption extends BioUnit {
  * protein recovery train, so it could not simply be left out. Area comes from a
  * design flux; capital comes from installed area at a module price. Both are
  * quoted openly rather than hidden inside a lumped "downstream" line.
+ *
+ * Retentate at port 0, permeate at port 1.
  */
 export class MembraneSkid extends BioUnit {
   readonly line = 'Membrane skid';
@@ -670,17 +942,29 @@ export class MembraneSkid extends BioUnit {
 
   /** L per m² per hour. */
   flux: number;
-  /** Fraction of the product retained. */
+  /** Fraction of the product this step keeps. */
   productYield: number;
   /** USD per m² of installed membrane, module plus skid. */
   usdPerM2 = 850;
   label: string;
   /** Diavolumes, for a diafiltration step; drives water use and pumping. */
   diavolumes: number;
+  /** Fraction of the water removed to permeate. */
+  waterRemoval = 0.9;
+  /**
+   * Whether the product is retained or passes. An ultrafiltration keeps it in
+   * the retentate; a cold microfiltration on milk pushes β-casein into the
+   * permeate, which is the entire trick of that route.
+   */
+  productInRetentate = true;
+  /** Crossflow recirculation power, kW per m². */
+  kWPerM2 = 0.05;
+  /** Fraction of a rejected macromolecule that stays in the retentate. */
+  rejection = 0.99;
 
   constructor(
     ID: string,
-    ins: Stream[],
+    sources: Inlet[],
     opts: {
       flux: number;
       productYield: number;
@@ -688,40 +972,85 @@ export class MembraneSkid extends BioUnit {
       diavolumes?: number;
       area?: number;
       usdPerM2?: number;
+      waterRemoval?: number;
+      productInRetentate?: boolean;
     },
   ) {
-    super(ID, ins);
+    super(ID, sources);
     this.flux = opts.flux;
     this.productYield = opts.productYield;
     this.label = opts.label;
     this.diavolumes = opts.diavolumes ?? 0;
     this.area = opts.area ?? 500;
     if (opts.usdPerM2) this.usdPerM2 = opts.usdPerM2;
+    if (opts.waterRemoval !== undefined) this.waterRemoval = opts.waterRemoval;
+    if (opts.productInRetentate !== undefined) this.productInRetentate = opts.productInRetentate;
+  }
+
+  specs(): UnitSpec[] {
+    return [
+      { key: 'flux', label: 'Design flux', biosteamName: '—', kind: 'number', value: this.flux, min: 5, max: 120, step: 5, units: 'L m⁻² hr⁻¹', note: 'Halving the flux doubles the membrane area and the capital with it.' },
+      { key: 'productYield', label: 'Product recovery', biosteamName: '—', kind: 'number', value: this.productYield, min: 0.3, max: 0.999, step: 0.005, units: '', note: 'Fraction of the product this step keeps.' },
+      { key: 'diavolumes', label: 'Diavolumes', biosteamName: '—', kind: 'number', value: this.diavolumes, min: 0, max: 12, step: 1, units: '', note: 'Wash volumes for diafiltration. Each one is another pass through the membrane.' },
+      { key: 'usdPerM2', label: 'Module price', biosteamName: '—', kind: 'number', value: this.usdPerM2, min: 200, max: 3000, step: 50, units: 'USD m⁻²', note: 'Installed module plus skid. Vendor-class, not published.' },
+      { key: 'waterRemoval', label: 'Water to permeate', biosteamName: 'split', kind: 'number', value: this.waterRemoval, min: 0.1, max: 0.99, step: 0.01, units: '', note: 'How much of the water this step takes out, which sets how concentrated the retentate is.' },
+      { key: 'rejection', label: 'Macromolecule rejection', biosteamName: 'split', kind: 'number', value: this.rejection, min: 0.8, max: 0.999, step: 0.005, units: '', note: 'How completely the membrane holds back biomass, fat and other proteins. What leaks through ends up in the powder and dilutes it.' },
+    ];
   }
 
   protected _run(): void {
     const feed = this.ins[0];
-    const retentate: Stream = {
-      ...feed,
-      ID: `${this.ID}-retentate`,
-      flow: {},
-    };
+    const retentate: Record<string, number> = {};
+    const permeate: Record<string, number> = {};
     for (const k in feed.flow) {
-      retentate.flow[k] =
-        k === 'product' ? feed.flow[k] * this.productYield : k === 'water' ? feed.flow[k] * 0.1 : feed.flow[k] * 0.2;
+      const f = feed.flow[k];
+      retentate[k] = f * this.retention(k);
+      permeate[k] = f - retentate[k];
     }
-    this.outs = [retentate];
+    this.outs = [
+      derive(feed, `${this.ID}-retentate`, retentate),
+      derive(feed, `${this.ID}-permeate`, permeate),
+    ];
+  }
+
+  /**
+   * What fraction of a component stays behind.
+   *
+   * Three behaviours, and getting them wrong is not a rounding error. A
+   * macromolecule is rejected almost completely. A small solute — glycerol,
+   * lactose, residual acetate — is not rejected at all, so it leaves in
+   * proportion to the water that carries it, and diafiltration is precisely the
+   * operation that washes it out: each diavolume is another pass, so retention
+   * falls as 1/(1 + N). The product is whichever side the process puts it on.
+   *
+   * The first cut of this model gave every non-water component a flat 20%
+   * retention. That made the yeast plant's powder about half unconverted
+   * glycerol, and since the plant is priced on what it sells, it halved the
+   * selling price. A mass balance that closes can still be wrong about where
+   * the mass went.
+   */
+  private retention(component: string): number {
+    if (component === 'product') {
+      return this.productInRetentate ? this.productYield : 1 - this.productYield;
+    }
+    if (MEMBRANE_REJECTED.has(component)) return this.rejection;
+    // Water is set by how far the step concentrates. A solute that the membrane
+    // does not reject leaves with that water and is then washed further by each
+    // diavolume — which is the entire reason diafiltration exists, and the
+    // reason the diavolume control has to do something rather than only cost
+    // pumping.
+    if (component === 'water') return 1 - this.waterRemoval;
+    return (1 - this.waterRemoval) / (1 + this.diavolumes);
   }
 
   protected _design(): void {
-    const F_vol_L = this.ins.reduce((t, s) => t + volFlow(s), 0) * 1000; // L/hr
+    const F_vol_L = this.ins.reduce((t, s) => t + volFlow(s), 0) * 1000;
     const throughput = F_vol_L * (1 + this.diavolumes);
     const A = throughput / this.flux;
     this.setDesign('Membrane area', A, 'm^2');
     this.setDesign('Design flux', this.flux, 'L/m^2/hr');
-    // Crossflow recirculation is the pumping cost, roughly 0.5 kW per m² of
-    // installed area at typical crossflow velocities.
-    this.powerUtility += A * 0.05;
+    this.setDesign('Diavolumes', this.diavolumes, '');
+    this.powerUtility += A * this.kWPerM2;
   }
 
   protected _cost(): void {

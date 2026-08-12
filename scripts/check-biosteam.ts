@@ -215,9 +215,19 @@ for (const spec of FLOWSHEETS) {
 
   const split = r.costSourceSplit;
   const total = split.biosteam + split.authored;
+  // Purity is checked, not just reported. bioSTEAM prices a stream, so a plant
+  // whose powder is mostly unconverted substrate or spent cells would quote a
+  // cheerful price for something nobody would buy — which is exactly what the
+  // first connected mass balance revealed.
+  ok(
+    `${spec.modelId} sells a powder that is mostly product`,
+    r.product.purity > 0.5,
+    `purity ${(r.product.purity * 100).toFixed(0)}%`,
+  );
   console.log(
     `  ${spec.modelId}  MSP $${r.msp.toFixed(2)}/kg · TCI $${(r.capital.TCI / 1e6).toFixed(1)}M · ` +
-      `${r.units.length} units · ${((split.authored / total) * 100).toFixed(0)}% authored capital · ` +
+      `${r.units.length} units · purity ${(r.product.purity * 100).toFixed(0)}% · ` +
+      `${((split.authored / total) * 100).toFixed(0)}% authored capital · ` +
       `${r.warnings.length} design warnings`,
   );
 }

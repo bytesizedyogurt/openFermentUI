@@ -202,6 +202,14 @@ that drives net present value to zero — not summed from assumed cost lines. Th
 sums to the headline, because the operating lines come off the TEA and the capital line is the
 residual the cash flow requires. No capital charge factor is assumed anywhere in the app any more.
 
+The plant view is a workbench rather than a report. The flowsheet diagram and the stream table are read
+off the same graph that ran the mass balance — a unit declares where its inlets come from, the system
+resolves the order and propagates the streams — so a picture that disagrees with the model is not
+expressible. Every unit publishes the attributes you would set on it upstream, spelled the way upstream
+spells them (`tau`, `V_wf`, `vessel_material`, `heat_exchanger_type`, `split`, `Reaction.X`), and editing one
+re-sizes the equipment, re-costs it and re-solves the cash flow. So do the plant-wide settings: the CEPCI
+year, the depreciation schedule, the discount rate, bare-module factors against a Lang factor.
+
 **ThermoSTEAM is not ported.** There is no property package, no vapour–liquid equilibrium, no
 rigorous energy balance and no recycle convergence; streams are lumped component mass flows at a
 stated temperature. Three units — the photobioreactor, the pulsed-electric-field disruptor and the
