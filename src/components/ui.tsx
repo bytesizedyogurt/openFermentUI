@@ -13,9 +13,12 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // ── Page scaffolding ───────────────────────────────────────────────────
 
 /**
- * Header block. The action slot is shrink-0, so the row must wrap: without it a
- * long title plus a button widen the document past the viewport at narrow
- * widths and the entire page scrolls sideways.
+ * Header block. The action slot both wraps and shrinks. Wrapping alone does
+ * nothing while the slot is shrink-0: flex lays items onto lines using their
+ * hypothetical — unwrapped — main size, so a shrink-0 row of buttons beside a
+ * long title still widens the main region past the viewport and the page
+ * scrolls sideways. Measured on #of-main, the inner scroll container, not on
+ * documentElement, which never reports the overflow.
  */
 export function PageHeader({
   title,
@@ -37,7 +40,7 @@ export function PageHeader({
         <h1 className="font-serif text-page-title font-semibold leading-tight">{title}</h1>
         {subtitle && <div className="text-body text-ink-soft mt-1 max-w-3xl">{subtitle}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>}
     </div>
   );
 }

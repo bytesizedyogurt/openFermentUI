@@ -166,6 +166,52 @@ const cmpTxt = await p.locator('body').innerText();
 ck('Compare renders pinned scenarios', /Minimum selling price/i.test(cmpTxt));
 ck('Compare generates an auto-summary sentence', /(undercuts|within a cent)/i.test(cmpTxt));
 
+// ?record= is a scope, not decoration. Two screens link here with it, and for a
+// while nothing read it: the link opened 134 unfiltered rows and left the
+// reader to find one id by eye.
+await go('/ledger/records?record=r-M8-3');
+const scoped = await p.locator('#of-main').innerText();
+const scopedRows = await p.locator('#of-main tbody tr').count();
+ck('?record= narrows the table to that record', scopedRows === 1, scopedRows + ' rows');
+ck('...and names the scope with a way out', /Scoped to/.test(scoped) && /Show every record/.test(scoped));
+await go('/ledger/records?record=r-not-a-record');
+ck('An id from a dead session is explained, not shown as an empty grid',
+   /No record r-not-a-record/.test(await p.locator('#of-main').innerText()));
+
+// Dense mode has to save vertical space, not just repaint the tokens. One
+// wrapping cell pins a row open and the whole setting becomes decorative — the
+// record table sat at 69px rows while --row-h said 30.
+await go('/ledger/records');
+const rowH = async () => p.evaluate(() => {
+  const tr = document.querySelector('#of-main tbody tr');
+  const t = document.querySelector('#of-main table');
+  return { row: tr ? Math.round(tr.getBoundingClientRect().height) : 0,
+           table: t ? Math.round(t.getBoundingClientRect().height) : 0 };
+});
+const comfy = await rowH();
+await p.keyboard.press('Shift+D'); await p.waitForTimeout(500);
+const dense = await rowH();
+ck('Dense mode actually shortens the record table',
+   dense.row < comfy.row && dense.table < comfy.table,
+   `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
+await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
+
+// The page never scrolls sideways. A table may scroll inside its own card; the
+// main region may not, and a shrink-0 action slot beside a long title is the
+// usual way that breaks.
+const narrow = await b.newPage({ viewport: { width: 420, height: 900 } });
+let overflow = [];
+for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/trawl/ingest', '/']) {
+  await narrow.goto('http://localhost:4324/#' + r, { waitUntil: 'networkidle' });
+  await narrow.waitForTimeout(400);
+  const over = await narrow.evaluate(() => {
+    const el = document.getElementById('of-main');
+    return el ? el.scrollWidth - el.clientWidth : 0;
+  });
+  if (over > 2) overflow.push(`${r} +${over}px`);
+}
+await narrow.close();
+ck('No page-level horizontal overflow at 420px', overflow.length === 0, overflow.join(', '));
 
 await b.close(); server.close();
 console.log(`\n${res.filter(Boolean).length}/${res.length} extra checks passed`);

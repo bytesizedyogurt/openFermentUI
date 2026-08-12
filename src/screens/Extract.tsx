@@ -165,6 +165,7 @@ export default function Extract() {
   }, []);
 
   const scopedPaper = paperParam ? papers.find((p) => p.id === paperParam) : undefined;
+  const scopedRecord = recordParam ? records.find((r) => r.id === recordParam) : undefined;
 
   const allRows = useMemo<ExRow[]>(
     () =>
@@ -339,8 +340,15 @@ export default function Extract() {
       numeric: true,
       priority: 1,
       // Always converts from the stored pair, never from a displayed string.
+      //
+      // Capped, because a categorical value is a sentence: under auto table
+      // layout a single-line cell claims its full text as min-content, and one
+      // kinase name stretched this column to 831px and pushed everything after
+      // it off the plate.
       render: ({ rec }) => (
-        <Quantity value={rec.value} unit="" si={{ value: rec.si.value, unit: '' }} mode={unitMode} />
+        <span className="inline-block max-w-[9rem] truncate align-middle">
+          <Quantity value={rec.value} unit="" si={{ value: rec.si.value, unit: '' }} mode={unitMode} />
+        </span>
       ),
       value: ({ rec }) => (si ? rec.si.value : rec.value),
     },
@@ -371,7 +379,10 @@ export default function Extract() {
       header: 'Quoted span',
       priority: 2,
       render: ({ rec }) => (
-        <span className="font-serif italic text-ink-soft block truncate" title={rec.quote}>
+        <span
+          className="font-serif italic text-ink-soft block max-w-[24rem] truncate"
+          title={rec.quote}
+        >
           “{truncate(rec.quote, 96)}”
         </span>
       ),
@@ -438,7 +449,12 @@ export default function Extract() {
       header: 'Updated',
       width: '124px',
       priority: 3,
-      render: ({ updated }) => <span className="font-num text-ink-soft">{updated}</span>,
+      // nowrap, or the stamp breaks across three lines in a squeezed column and
+      // pins every row of the table open at 69px — dense mode then changes the
+      // row token and nothing else.
+      render: ({ updated }) => (
+        <span className="font-num text-ink-soft whitespace-nowrap">{updated}</span>
+      ),
       value: ({ updated }) => updated,
     },
   ];
@@ -512,13 +528,15 @@ export default function Extract() {
         </div>
       </div>
 
-      {paperParam && (
+      {/* One chip, never two. ?record= wins over ?paper= in the filter above,
+          so showing both would name a scope that is not in force. */}
+      {(recordParam || paperParam) && (
         <span className="chip chip-active">
-          Scoped to <span className="font-num">{paperParam}</span>
+          Scoped to <span className="font-num">{recordParam ?? paperParam}</span>
           <button
             className="text-ink-soft hover:text-ink ml-1"
             onClick={() => navigate('/ledger/records')}
-            aria-label={`Clear the ${paperParam} scope`}
+            aria-label={`Clear the ${recordParam ?? paperParam} scope`}
             title="Show every record again"
           >
             ×
@@ -583,19 +601,27 @@ export default function Extract() {
         <Card>
           <EmptyState
             icon={<Table2 size={22} />}
-            title={paperParam ? `No records for ${paperParam}` : 'No extraction records yet'}
+            title={
+              recordParam
+                ? `No record ${recordParam}`
+                : paperParam
+                  ? `No records for ${paperParam}`
+                  : 'No extraction records yet'
+            }
             body={
-              paperParam
-                ? scopedPaper
-                  ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
-                  : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
-                : 'Nothing has been extracted in this session. Ingest a paper from the demo shelf, then run the extractor to stage candidate records here.'
+              recordParam
+                ? `${recordParam} is not a record in this session. Session state resets on refresh, so a link minted in an earlier session points at an id that no longer exists.`
+                : paperParam
+                  ? scopedPaper
+                    ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
+                    : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
+                  : 'Nothing has been extracted in this session. Ingest a paper from the demo shelf, then run the extractor to stage candidate records here.'
             }
             action={
-              paperParam ? (
+              recordParam || paperParam ? (
                 <div className="flex gap-2">
                   <Button onClick={() => navigate('/ledger/records')}>Show every record</Button>
-                  {scopedPaper && (
+                  {scopedPaper && !recordParam && (
                     <LinkButton to={`/library/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
@@ -623,7 +649,8 @@ export default function Extract() {
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
         <span>
-          <span className="font-num text-ink">{rows.length}</span> records
+          <span className="font-num text-ink">{rows.length}</span>{' '}
+          {rows.length === 1 ? 'record' : 'records'}
         </span>
         <span>
           <span className="font-num text-ink">{unverifiedCount}</span> awaiting review
@@ -634,7 +661,20 @@ export default function Extract() {
         <ProvenanceLegend />
       </div>
 
-      {scopedPaper && (
+      {scopedRecord && (
+        <div className="mb-3">
+          <Callout kind="info" title={`Scoped to record ${scopedRecord.id}`}>
+            Showing a single record, linked from elsewhere in the app. Facet counts and the
+            summary above describe this row alone.{' '}
+            <button className="text-accent hover:underline" onClick={() => navigate('/ledger/records')}>
+              Show every record
+            </button>
+            .
+          </Callout>
+        </div>
+      )}
+
+      {scopedPaper && !recordParam && (
         <div className="mb-3">
           <Callout kind="info" title={`Scoped to ${scopedPaper.id}`}>
             Showing only records extracted from{' '}

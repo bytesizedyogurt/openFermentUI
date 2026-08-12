@@ -44,7 +44,10 @@ export function navigate(to: string, opts?: { replace?: boolean }) {
     window.location.hash = target.slice(1);
   }
   // Scroll the main region to top on navigation, but keep anchored deep links.
-  if (!target.includes('?span=') && !target.includes('?record=')) {
+  // ?record= is not one: it filters the table down to that row rather than
+  // scrolling to it, so suppressing the reset left the reader mid-page on a
+  // one-row table.
+  if (!target.includes('?span=')) {
     requestAnimationFrame(() => {
       document.getElementById('of-main')?.scrollTo({ top: 0 });
     });

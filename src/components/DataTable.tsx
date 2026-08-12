@@ -438,7 +438,13 @@ export function DataTable<T>({
                       <td
                         key={c.key}
                         className={cx(
-                          'px-2 py-1 align-middle',
+                          // A dense grid is single-line by construction. One
+                          // wrapping cell pins the whole row open — the record
+                          // table sat at 69px rows while --row-h said 30, so
+                          // dense mode moved the token and nothing else. A
+                          // column that genuinely needs two lines resets
+                          // white-space on its own content.
+                          'px-2 py-1 align-middle whitespace-nowrap',
                           c.numeric && 'text-right font-num',
                           !!c.priority && c.priority > 2 && 'hidden xl:table-cell',
                           ci === 0 && !bulkActions && tickOf && 'tick-cell pl-3',

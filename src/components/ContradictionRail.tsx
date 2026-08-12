@@ -12,6 +12,7 @@ import type { Contradiction, ExtractionRecord } from '@/data/types';
 import type { Aggregate } from '@/data/types';
 import { provenanceOf, isAggregatable, aggregateExclusion, EXCLUSION_NOTE } from '@/engine/aggregation';
 import { fmt, asNumber, convert } from '@/engine/units';
+import { useStore } from '@/store';
 import { cx } from './ui';
 
 /**
@@ -91,13 +92,16 @@ const PROV_BG: Record<string, string> = {
   unsourced: 'bg-signal-error',
 };
 
-/** Current --rail-h, so an inline rail tracks the density setting. */
-function railHeightFromToken(): number {
-  if (typeof window === 'undefined') return 34;
-  const raw = getComputedStyle(document.documentElement).getPropertyValue('--rail-h');
-  const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : 34;
-}
+/**
+ * Inline rail height per density, mirroring --rail-h in the stylesheet.
+ *
+ * Read from the store rather than from getComputedStyle: a computed style is
+ * sampled during render and nothing re-renders when the custom property
+ * changes, so Shift+D switched every other measurement on the page and left
+ * the rails — and therefore the row height they pin open — exactly as they
+ * were. Subscribing means the same keystroke moves both.
+ */
+const RAIL_H = { comfortable: 34, dense: 24 } as const;
 
 export function ContradictionRail({
   marks,
@@ -128,11 +132,14 @@ export function ContradictionRail({
   showScale?: boolean;
   className?: string;
 }) {
+  // Above the early return: a hook that runs conditionally is not a hook.
+  const density = useStore((s) => s.ui.density);
+
   // A single value is a value, not a spread. An empty frame around one mark
   // reads as "we looked and found agreement", which would be a lie.
   if (marks.length < 2) return null;
 
-  const h = height ?? railHeightFromToken();
+  const h = height ?? RAIL_H[density];
 
   const values = marks.map((m) => m.value);
   const lo = Math.min(...values);
