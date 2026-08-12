@@ -374,9 +374,14 @@ function buildS3(p: Record<string, number>): BioSystem {
   const receiving = new StorageTank('T101 milk silo', [milk], 1, 100);
   // Chill to the 4 °C where β-casein leaves the micelle. Without this step the
   // separation does not exist, so it is not an optional utility line.
+  //
+  // Brine, not chilled water: chilled water is supplied at 280.4 K and returns
+  // no warmer than 300.4 K, so it cannot take a stream down to 277 K. Passing
+  // the process temperature into the utility turns that from a number nobody
+  // checks into an exception.
   const chiller = new HXutility('H101 chiller', [milk], {
     duty: -milkL * CP_BROTH * 6,
-    agent: 'chilled_water',
+    agent: 'chilled_brine',
     dT_lm: 8,
     area: 100,
   });

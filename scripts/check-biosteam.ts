@@ -16,7 +16,7 @@ import { computeVesselWeightAndWallThickness } from '../src/engine/biosteam/vess
 import { fieldErectedTankPurchaseCost } from '../src/engine/biosteam/tanks';
 import { sizeBatch } from '../src/engine/biosteam/batch';
 import { wegstein, solveBrentq } from '../src/engine/biosteam/solvers';
-import { ELECTRICITY_PRICE, getAgent } from '../src/engine/biosteam/utilities';
+import { ELECTRICITY_PRICE, costHeatUtility, getAgent } from '../src/engine/biosteam/utilities';
 import { DEPRECIATION_SCHEDULES } from '../src/engine/biosteam/tea';
 import { spearmanRho } from '../src/engine/biosteam/stats';
 import { C_O2_L, PAtKLaRiet, kLaStirredRiet, henrysLawConstant } from '../src/engine/biosteam/aeration';
@@ -104,6 +104,27 @@ eq('low_pressure_steam regeneration price', getAgent('low_pressure_steam').regen
 eq('cooling_water T', getAgent('cooling_water').T, 305.372);
 eq('cooling_water regeneration price', getAgent('cooling_water').regenerationPrice, 4.8785e-4);
 eq('chilled_water heat transfer price', getAgent('chilled_water').heatTransferPrice, 5e-6);
+
+// A cooling agent only achieves its full temperature rise against a hot enough
+// process. The ratio below was measured against a live bioSTEAM 2.53.11 run:
+// the same 1000 kJ/hr costs 0.000333 USD/hr cooling from 340 K and 0.000673
+// cooling from 320 K, because the return temperature is min(T_limit, T_in - 5)
+// and cooling water is billed per mole.
+{
+  const hot = costHeatUtility('cooling_water', -1000, 340);
+  const tepid = costHeatUtility('cooling_water', -1000, 320);
+  eq('cooling water at a hot process reaches its full rise', hot, 3.3316882671025717e-4, 1e-9);
+  eq('cooling water costs 2.02x as much against a 320 K process', tepid / hot, 2.019, 1e-3);
+  let threw = false;
+  try {
+    costHeatUtility('cooling_water', -1000, 298);
+  } catch {
+    threw = true;
+  }
+  ok('a cooling tower refuses to chill a 25 °C culture', threw);
+  ok('a NaN duty prices as NaN rather than free', Number.isNaN(costHeatUtility('cooling_water', NaN, 340)));
+  eq('a zero duty is free', costHeatUtility('cooling_water', 0, 340), 0);
+}
 
 // ── aeration (aeration.py) ─────────────────────────────────────────────
 //

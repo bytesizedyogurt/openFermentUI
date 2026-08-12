@@ -134,10 +134,20 @@ export abstract class BioUnit {
     }
   }
 
-  /** Add a heating (duty > 0) or cooling (duty < 0) demand in kJ/hr. */
-  protected addHeatUtility(agent: string, duty: number): void {
+  /**
+   * Add a heating (duty > 0) or cooling (duty < 0) demand in kJ/hr.
+   *
+   * `T_process_in` is the temperature of the stream being served. It is
+   * optional in the signature and should not be: a cooling agent only achieves
+   * its full temperature rise against a hot enough process, and omitting the
+   * temperature quietly prices every duty at the most favourable case. Passing
+   * it also makes an impossible pairing throw — cooling water supplied at 90 °F
+   * cannot chill a culture held at 25 °C, and finding that out from an
+   * exception is much better than finding it out from a plausible bill.
+   */
+  protected addHeatUtility(agent: string, duty: number, T_process_in?: number): void {
     if (!duty) return;
-    this.heatUtilities.push({ agent, duty, cost: costHeatUtility(agent, duty) });
+    this.heatUtilities.push({ agent, duty, cost: costHeatUtility(agent, duty, T_process_in) });
   }
 
   get purchaseCost(): number {

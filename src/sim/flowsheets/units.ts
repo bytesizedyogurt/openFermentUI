@@ -183,7 +183,7 @@ export class HXutility extends BioUnit {
         `Heat-transfer area ${A_ft2.toPrecision(3)} ft² is below the 150 ft² floor of the floating-head correlation — costed at the floor.`,
       );
     }
-    this.addHeatUtility(this.agent, this.duty);
+    this.addHeatUtility(this.agent, this.duty, this.ins[0]?.T);
   }
 }
 
@@ -460,7 +460,7 @@ export class AeratedBioreactor extends BioUnit {
     // shaft work, which all ends up in the broth.
     const metabolic_kJ_hr = OTR_mol_hr * HEAT_PER_MOL_O2;
     const shaft_kJ_hr = (P_W / 1000) * 3600;
-    this.addHeatUtility('chilled_water', -(metabolic_kJ_hr + shaft_kJ_hr) * nReactors);
+    this.addHeatUtility('chilled_water', -(metabolic_kJ_hr + shaft_kJ_hr) * nReactors, this.T);
 
     // Air compression to sparge, at the superficial velocity assumed above.
     const area_m2 = (Math.PI / 4) * D_m * D_m;
@@ -585,7 +585,12 @@ export class Photobioreactor extends BioUnit {
 
     // Nearly all the lighting energy lands in the culture as heat and has to
     // come back out; a closed tubular loop in daylight has no other exit.
-    this.addHeatUtility('cooling_water', -(lighting_kW + circulation_kW) * 3600);
+    //
+    // Chilled water, not cooling water. A cooling tower supplies at 305.4 K and
+    // a Chlamydomonas culture is held at 298 K, so the tower loop cannot take
+    // heat out of it at all — passing the process temperature into the utility
+    // makes that pairing throw instead of quietly costing the impossible.
+    this.addHeatUtility('chilled_water', -(lighting_kW + circulation_kW) * 3600, this.T);
   }
 
   protected _cost(): void {

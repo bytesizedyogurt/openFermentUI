@@ -315,7 +315,10 @@ export class TEA {
   constructor(system: BioSystem, options: TEAOptions) {
     this.system = system;
     this.IRR = options.IRR;
-    this.duration = [options.duration[0], options.duration[1]];
+    // Upstream stores `duration` as `[int(start), int(end)]`; the venture length
+    // is an array length downstream, so a fractional year has to be truncated
+    // here rather than turned into an unallocatable array further down.
+    this.duration = [Math.trunc(options.duration[0]), Math.trunc(options.duration[1])];
     this.depreciation = options.depreciation;
     this.incomeTax = options.incomeTax;
     this.langFactor = options.langFactor;

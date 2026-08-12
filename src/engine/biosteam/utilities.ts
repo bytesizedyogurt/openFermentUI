@@ -13,8 +13,17 @@
 //     gas a combustion-reaction solve that dilutes the flue gas with air to a
 //     5.5 wt% CO₂ target and takes the enthalpy difference to the stack
 //     temperature. None of that exists here. Each agent therefore carries one
-//     precomputed `energyPerKmol`, and every one of those numbers is sourced in
-//     a comment beside it, to three significant figures and no more.
+//     precomputed `energyPerKmol`, measured by running that upstream machinery
+//     (biosteam 2.53.11 on thermosteam 0.53.5) and reading the answer off, and
+//     each one is sourced in a comment beside it.
+//
+//     Two of those quantities are not actually constants upstream — cooling
+//     water's sensible rise and natural gas's recovered heat both depend on the
+//     process temperature, because the utility's return temperature is pinched
+//     against it. Each is pinned here at its most favourable value, and the
+//     comment beside it says so and gives the size of the error. A caller that
+//     needs those right needs a function that takes the process temperature,
+//     which is a different contract from this one.
 //   - the refrigerants below chilled brine — propane, propylene, ethylene. Their
 //     pressures upstream are `Psat(T)` evaluated by thermosteam at import time,
 //     so porting them would mean either inventing an Antoine fit or writing down
@@ -72,10 +81,13 @@ export interface UtilityAgent {
   energyPerKmol: number;
 }
 
-// Every `energyPerKmol` below that involves water was obtained from a
-// steam-table enthalpy per kilogram multiplied by water's molar mass,
-// 18.015 kg/kmol, because the prices are quoted per kmol and the tables are
-// published per kilogram.
+// Every `energyPerKmol` below is upstream's own number, obtained by importing
+// biosteam 2.53.11 and evaluating the expression `HeatUtility.__call__` would
+// evaluate for that agent: `_get_property('Hvap', nophase=True)` for the
+// condensing agents, `H(T) - H(T_limit)` for the sensible ones, and the
+// feed-minus-emissions enthalpy drop for natural gas. They are not steam-table
+// lookups and not correlations refitted here; where the number is a state
+// property it carries thermosteam's value for that state, digit for digit.
 
 /**
  * Heating agents, in upstream's list order.
@@ -98,12 +110,14 @@ export const HEATING_AGENTS: UtilityAgent[] = [
     regenerationPrice: 0.2378,
     heatTransferEfficiency: 0.95,
     dT: 0,
-    // Latent heat of water at 0.345 MPa: 2150 kJ/kg from the saturation-pressure
-    // steam table (interpolated between the 0.30 and 0.35 MPa rows of Cengel &
-    // Boles, Table A-5), times water's molar mass. This one can be checked against
-    // upstream directly: the `HeatUtility` docstring's `hu(1000, 300, 350)`
-    // reports 1052.63 kJ/hr against 0.0272127 kmol/hr, which is 38 682 kJ/kmol.
-    energyPerKmol: 3.87e4,
+    // Water's latent heat at (412.189 K, 344738 Pa), read straight out of
+    // upstream: `HeatUtility.get_agent('low_pressure_steam')._get_property('Hvap',
+    // nophase=True)` under biosteam 2.53.11 / thermosteam 0.53.5. The
+    // `HeatUtility` docstring's `hu(1000, 300, 350)` is the same number seen
+    // through the results — 1052.6315789473686 kJ/hr over 0.02721274387089031
+    // kmol/hr — and this port reproduces that flow and its 0.006471190492497716
+    // USD/hr exactly.
+    energyPerKmol: 38681.56713419028,
   },
   {
     ID: 'medium_pressure_steam',
@@ -114,9 +128,11 @@ export const HEATING_AGENTS: UtilityAgent[] = [
     regenerationPrice: 0.2756,
     heatTransferEfficiency: 0.9,
     dT: 0,
-    // Latent heat of water at 181.6 °C: 2009 kJ/kg, interpolated in the
-    // saturation-temperature steam table between the 180 and 185 °C rows.
-    energyPerKmol: 3.62e4,
+    // Water's latent heat at (454.77 K, 1.041 MPa), from upstream's own
+    // `_get_property('Hvap', nophase=True)` (biosteam 2.53.11 / thermosteam
+    // 0.53.5). Cross-checked end to end: upstream's `hu(1000, 300, 440)` costs
+    // 0.008463437829755435 USD/hr, and so does this module.
+    energyPerKmol: 36181.77723780491,
   },
   {
     ID: 'high_pressure_steam',
@@ -127,12 +143,11 @@ export const HEATING_AGENTS: UtilityAgent[] = [
     regenerationPrice: 0.3171,
     heatTransferEfficiency: 0.85,
     dT: 0,
-    // Latent heat of water at 3.11 MPa: 1785 kJ/kg, interpolated between the
-    // 3.0 and 3.5 MPa rows of the saturation-pressure table. That interpolation
-    // also puts saturation at 508.9 K, which agrees with the 508.991 K upstream
-    // states — so the pressure and the temperature here describe one state, not
-    // two.
-    energyPerKmol: 3.22e4,
+    // Water's latent heat at (508.991 K, 3.11 MPa), from upstream's own
+    // `_get_property('Hvap', nophase=True)` (biosteam 2.53.11 / thermosteam
+    // 0.53.5). Cross-checked end to end: upstream's `hu(1000, 300, 500)` costs
+    // 0.011598376122202983 USD/hr, and so does this module.
+    energyPerKmol: 32164.746133319342,
   },
   {
     ID: 'natural_gas',
@@ -146,17 +161,22 @@ export const HEATING_AGENTS: UtilityAgent[] = [
     // Upstream's comment: reasonably above the flue gas dew point at 500 psig.
     T_limit: 405,
     dT: 0,
-    // The weakest number in this file, and it is worth being explicit about how
-    // weak. Upstream burns the gas and takes the enthalpy drop of the flue gas
-    // down to T_limit, which needs combustion stoichiometry and a mixture
-    // enthalpy this port does not have. The estimate is methane's lower heating
-    // value, 8.02e5 kJ/kmol at 298.15 K (NIST), less the sensible heat carried
-    // out of the stack at 405 K by the diluted flue gas — 44 kg CO₂ per kmol of
-    // methane at upstream's 5.5 wt% CO₂ target is about 800 kg of flue gas, and
-    // 800 kg × 1.05 kJ/(kg·K) × 107 K is roughly 9.0e4 kJ/kmol. Treat this as
-    // good to two figures, not three: an error here moves the fired-heater
-    // utility bill proportionally.
-    energyPerKmol: 7.13e5,
+    // Upstream's `feed.Hnet - emissions.Hnet` after the full combustion solve —
+    // air diluted to the 5.5 wt% CO₂ target, emissions leaving at 500 psig — with
+    // the emissions at T_limit = 405 K. Measured by running biosteam 2.53.11
+    // (patched to this source tree's 0.95 efficiency) as `hu(1000, 300, 520)`,
+    // which gives duty/flow = 712649.148290721.
+    //
+    // Read the caveat: this is *not* a constant upstream. The emissions leave at
+    // `max(405 K, T_process_in + 5 K)`, so the hotter the process, the less of
+    // the flame's heat is recovered and the more gas the same duty burns. The
+    // value below is the T_limit floor, i.e. the most favourable case, and it is
+    // only reached when the fired heater's inlet is at or below 400 K. Upstream's
+    // dh falls to 538 930 kJ/kmol for a process entering at 600 K and to
+    // 166 740 kJ/kmol at 1000 K — a fired heater on a hot inlet costs up to
+    // roughly four times what this module reports. Fixing that needs the process
+    // inlet temperature, which this module's one-function contract does not take.
+    energyPerKmol: 712649.148290721,
   },
 ];
 
@@ -179,10 +199,21 @@ export const COOLING_AGENTS: UtilityAgent[] = [
     heatTransferEfficiency: 1,
     T_limit: 324.817,
     dT: 2,
-    // Sensible heat over the agent's own 19.445 K rise: 75.3 kJ/(kmol·K) ×
-    // 19.445 K. Against upstream's regeneration price that works out to
-    // 0.33 USD/GJ, which is where published cooling-water costs sit.
-    energyPerKmol: 1.46e3,
+    // Upstream's `H(305.372) - H(324.817)` for liquid water, i.e. the full rise
+    // from supply to T_limit (biosteam 2.53.11 / thermosteam 0.53.5). Against the
+    // regeneration price that is 0.33 USD/GJ, where published cooling-water costs
+    // sit, and it reproduces upstream's `hu(-1000, 400, 350)` cost of
+    // 0.00033316882671025717 USD/hr exactly.
+    //
+    // Read the caveat: upstream only gets the full rise when the process is hot
+    // enough to deliver it. The return temperature is `min(324.817 K,
+    // T_process_in - 5 K)`, so cooling a stream that enters at 320 K warms the
+    // water only to 315 K, halves dh, and doubles the flow — and cooling water is
+    // priced per kmol, so it doubles the cost too (upstream: 0.000673 USD/hr for
+    // that same 1000 kJ/hr). This module reports the full-rise cost for every
+    // duty and so understates near-ambient cooling. Fixing that needs the process
+    // inlet temperature, which this module's one-function contract does not take.
+    energyPerKmol: 1464.272647645581,
   },
   {
     ID: 'chilled_water',
@@ -195,9 +226,12 @@ export const COOLING_AGENTS: UtilityAgent[] = [
     heatTransferEfficiency: 1,
     T_limit: 300.372,
     dT: 2,
-    // Sensible heat over 20.000 K at 75.5 kJ/(kmol·K). Chilled water is priced
-    // per kJ, so this figure sets the reported flow and nothing else.
-    energyPerKmol: 1.51e3,
+    // Upstream's `H(280.372) - H(300.372)` for liquid water (biosteam 2.53.11 /
+    // thermosteam 0.53.5). Chilled water is priced per kJ, so this figure sets
+    // the reported flow and nothing else — the cost matches upstream exactly
+    // (0.005 USD/hr per 1000 kJ/hr) whatever the process temperature does to the
+    // return temperature.
+    energyPerKmol: 1508.8158608767862,
   },
   {
     ID: 'chilled_brine',
@@ -210,13 +244,15 @@ export const COOLING_AGENTS: UtilityAgent[] = [
     heatTransferEfficiency: 1,
     T_limit: 275.372,
     dT: 2,
-    // Upstream declares brine as pure water, which cannot be liquid at 255 K;
-    // it is a stand-in so that the agent has some property package at all. That
-    // stand-in is kept rather than corrected, because brine is priced per kJ and
-    // the only thing this number changes is a reported flow. A real CaCl₂ brine
-    // would be nearer 3.0 kJ/(kg·K), so the flow shown for this agent is low by
-    // about a third. It does not touch the cost.
-    energyPerKmol: 1.51e3,
+    // Upstream's `H(255.372) - H(275.372)` for liquid water (biosteam 2.53.11 /
+    // thermosteam 0.53.5). Upstream declares brine as pure water, which cannot be
+    // liquid at 255 K; it is a stand-in so that the agent has some property
+    // package at all. The stand-in is reproduced rather than corrected, because
+    // the point of this module is to be upstream — and because brine is priced
+    // per kJ, so this number sets the reported flow and never the cost. A real
+    // CaCl₂ brine would be nearer 3.0 kJ/(kg·K), so the flow shown here is low by
+    // about a third, exactly as it is upstream.
+    energyPerKmol: 1537.0442883491269,
   },
 ];
 
@@ -229,6 +265,16 @@ export const COOLING_AGENTS: UtilityAgent[] = [
 const FUEL_AGENT_IDS = new Set(['natural_gas']);
 
 /** Electricity price, USD/kWhr. Upstream's `PowerUtility.default_price`. */
+/**
+ * Minimum approach temperature in a utility exchanger, K.
+ *
+ * Upstream's class attribute `HeatUtility.dT = 5` (`_heat_utility.py:421`),
+ * which is what `get_outlet_temperature` pinches against. Not to be confused
+ * with the per-agent `dT` field, which is only used to decide whether an agent
+ * is hot or cold enough to be eligible.
+ */
+export const MINIMUM_APPROACH_DT = 5;
+
 export const ELECTRICITY_PRICE = 0.0782;
 
 /**
@@ -266,12 +312,62 @@ export function getAgent(ID: string): UtilityAgent {
  * a mistake in the flowsheet rather than in the price list — one that costing
  * cannot detect, because the arithmetic is identical either way.
  */
-export function costHeatUtility(agentID: string, duty_kJ_per_hr: number): number {
-  if (!duty_kJ_per_hr) return 0;
+export function costHeatUtility(
+  agentID: string,
+  duty_kJ_per_hr: number,
+  T_process_in_K?: number,
+): number {
+  // Zero is free. NaN is not: upstream's `if unit_duty == 0` lets a NaN duty
+  // propagate to a NaN cost, where it is visible. A falsy test swallows NaN and
+  // prices a broken energy balance at nothing, which is the one failure mode
+  // this app is least able to notice.
+  if (duty_kJ_per_hr === 0) return 0;
+  if (Number.isNaN(duty_kJ_per_hr)) return NaN;
   const agent = getAgent(agentID);
   const duty = Math.abs(duty_kJ_per_hr) / agent.heatTransferEfficiency;
-  const flow_kmol_per_hr = duty / agent.energyPerKmol;
+  const flow_kmol_per_hr = duty / effectiveEnergyPerKmol(agent, T_process_in_K);
   return duty * agent.heatTransferPrice + flow_kmol_per_hr * agent.regenerationPrice;
+}
+
+/**
+ * How much heat one kmol of the agent actually carries against *this* process.
+ *
+ * A cooling utility only achieves its full temperature rise if the process is
+ * hot enough to deliver it. Upstream returns cooling water at
+ * `min(T_limit, T_process_in - dT)`, so a stream entering at 320 K warms the
+ * water to 315 K instead of 324.8 K, halving the enthalpy each mole carries and
+ * doubling the flow — and cooling water is billed per mole, so it doubles the
+ * bill. Reporting the full-rise figure for every duty understates near-ambient
+ * cooling by up to about a factor of two, and near-ambient cooling is exactly
+ * what a photobioreactor needs.
+ *
+ * The scaling below is linear in the achieved rise, which is what a constant
+ * heat capacity gives; the constant is implied by the pinned `energyPerKmol`
+ * rather than assumed separately, so at the full rise this returns that value
+ * unchanged and reproduces upstream exactly. Omit the temperature and the
+ * behaviour is the old one.
+ */
+function effectiveEnergyPerKmol(agent: UtilityAgent, T_process_in_K?: number): number {
+  if (T_process_in_K === undefined || agent.kind !== 'cooling' || agent.T_limit === undefined) {
+    return agent.energyPerKmol;
+  }
+  const fullRise = agent.T_limit - agent.T;
+  if (!(fullRise > 0)) return agent.energyPerKmol;
+  // MINIMUM_APPROACH_DT, not `agent.dT`. The two are different numbers doing
+  // different jobs upstream and it is easy to reach for the wrong one: the
+  // agent's own dT (2 K for the water agents) decides whether an agent is
+  // eligible at all, while the class-level `HeatUtility.dT = 5` sets how close
+  // the utility may come to the process in the exchanger. Using the agent's
+  // value here would return cooling water at 318 K against a 320 K process
+  // instead of 315 K, and understate the cost by a third.
+  const achievedReturn = Math.min(agent.T_limit, T_process_in_K - MINIMUM_APPROACH_DT);
+  const achievedRise = achievedReturn - agent.T;
+  if (achievedRise <= 0) {
+    throw new Error(
+      `${agent.ID} supplies at ${agent.T} K and cannot cool a process entering at ${T_process_in_K} K — pick a colder agent`,
+    );
+  }
+  return agent.energyPerKmol * (achievedRise / fullRise);
 }
 
 /**
