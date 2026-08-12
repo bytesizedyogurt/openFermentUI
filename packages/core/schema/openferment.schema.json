@@ -1,0 +1,3703 @@
+{
+  "$defs": {
+    "ActivityEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "icon",
+        "text",
+        "provenance"
+      ],
+      "title": "ActivityEvent",
+      "type": "object"
+    },
+    "Aggregate": {
+      "additionalProperties": false,
+      "description": "Deliberately not a Bayesian posterior. With 134 curated records and none\nverified, a hierarchical fit would be false precision. Median-of-primary with\na visible interquartile range is honest at this corpus size, and this shape\nlets a posterior replace the internals later without any screen changing.",
+      "properties": {
+        "max": {
+          "type": "number"
+        },
+        "median": {
+          "type": "number"
+        },
+        "method": {
+          "description": "Named, so a screen can say how the number was produced.",
+          "type": "string"
+        },
+        "min": {
+          "type": "number"
+        },
+        "n": {
+          "type": "integer"
+        },
+        "nPrimary": {
+          "type": "integer"
+        },
+        "p25": {
+          "type": "number"
+        },
+        "p75": {
+          "type": "number"
+        },
+        "strata": {
+          "description": "Grouping actually used — by organism, by method, by year.",
+          "items": {
+            "$ref": "#/$defs/AggregateStratum"
+          },
+          "type": "array"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "median",
+        "p25",
+        "p75",
+        "min",
+        "max",
+        "n",
+        "nPrimary",
+        "unit",
+        "strata",
+        "method"
+      ],
+      "title": "Aggregate",
+      "type": "object"
+    },
+    "AggregateStratum": {
+      "additionalProperties": false,
+      "description": "One grouping in `Aggregate.strata` — by organism, by method, by year.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "median": {
+          "type": "number"
+        },
+        "n": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "n",
+        "median"
+      ],
+      "title": "AggregateStratum",
+      "type": "object"
+    },
+    "AnalysisMethod": {
+      "description": "Analytical method behind a PTM or functional measurement (OF-COR-001 §17\nRule 1). 'undetermined' is a first-class value: Mora Vásquez et al. record\nit for most bacterial studies because the analysis was never done, and the\nplatform must distinguish *absence of measurement* from *measurement of\nabsence*.",
+      "enum": [
+        "LC-ESI-MS",
+        "MALDI-MS",
+        "Phos-tag",
+        "urea-PAGE",
+        "urea-PAGE + phosphatase",
+        "SDS-PAGE mobility",
+        "Ethyl Stains-All",
+        "CD spectroscopy",
+        "SAXS",
+        "SANS",
+        "DLS",
+        "cryo-TEM",
+        "HPLC",
+        "gravimetric",
+        "spectrophotometric",
+        "process model",
+        "undetermined"
+      ],
+      "title": "AnalysisMethod",
+      "type": "string"
+    },
+    "AnswerMessage": {
+      "additionalProperties": false,
+      "description": "The answer arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "flowId": {
+          "type": "string"
+        },
+        "followups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "answer",
+          "enum": [
+            "answer"
+          ],
+          "type": "string"
+        },
+        "md": {
+          "type": "string"
+        },
+        "streaming": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "md",
+        "streaming",
+        "followups"
+      ],
+      "title": "AnswerMessage",
+      "type": "object"
+    },
+    "AssumptionBasis": {
+      "discriminator": {
+        "mapping": {
+          "model": "#/$defs/BasisModel",
+          "record": "#/$defs/BasisRecord",
+          "unsourced": "#/$defs/BasisUnsourced"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BasisRecord"
+        },
+        {
+          "$ref": "#/$defs/BasisModel"
+        },
+        {
+          "$ref": "#/$defs/BasisUnsourced"
+        }
+      ],
+      "title": "AssumptionBasis"
+    },
+    "AuditEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "from": {},
+        "to": {},
+        "who": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "who",
+        "action"
+      ],
+      "title": "AuditEvent",
+      "type": "object"
+    },
+    "BaseBatch": {
+      "additionalProperties": false,
+      "description": "The batch size every material amount in this version is stated at.\n\nInline in the TypeScript (`baseBatch: { value: number; unit: string; label:\nstring }`); named here because Pydantic has no anonymous model.",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "label"
+      ],
+      "title": "BaseBatch",
+      "type": "object"
+    },
+    "BasisModel": {
+      "additionalProperties": false,
+      "description": "A deliberate modeling choice, or a literature value the ontology has no\nfield to hold. Legitimate, but must declare itself in writing.",
+      "properties": {
+        "justification": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "model",
+          "default": "model",
+          "enum": [
+            "model"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "justification",
+        "kind"
+      ],
+      "title": "BasisModel",
+      "type": "object"
+    },
+    "BasisRecord": {
+      "additionalProperties": false,
+      "description": "Bound to a Ledger record. The value must equal that record's SI value.",
+      "properties": {
+        "kind": {
+          "const": "record",
+          "default": "record",
+          "enum": [
+            "record"
+          ],
+          "type": "string"
+        },
+        "recordId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "recordId",
+        "kind"
+      ],
+      "title": "BasisRecord",
+      "type": "object"
+    },
+    "BasisUnsourced": {
+      "additionalProperties": false,
+      "description": "DEFECT. A number with no record and no declared justification.",
+      "properties": {
+        "kind": {
+          "const": "unsourced",
+          "default": "unsourced",
+          "enum": [
+            "unsourced"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "BasisUnsourced",
+      "type": "object"
+    },
+    "ChatFlow": {
+      "additionalProperties": false,
+      "properties": {
+        "answerMd": {
+          "description": "chips as [[ex-0112]] / [[SP-004]]",
+          "type": "string"
+        },
+        "clarify": {
+          "$ref": "#/$defs/ClarifyPrompt"
+        },
+        "followups": {
+          "description": "may be \"flow:F2|label\"",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "plan": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "toolCalls": {
+          "items": {
+            "$ref": "#/$defs/ChatToolCall"
+          },
+          "type": "array"
+        },
+        "triggers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "triggers",
+        "plan",
+        "toolCalls",
+        "answerMd",
+        "followups"
+      ],
+      "title": "ChatFlow",
+      "type": "object"
+    },
+    "ChatMessage": {
+      "discriminator": {
+        "mapping": {
+          "answer": "#/$defs/AnswerMessage",
+          "clarify": "#/$defs/ClarifyMessage",
+          "plan": "#/$defs/PlanMessage",
+          "system": "#/$defs/SystemMessage",
+          "tool": "#/$defs/ToolMessage",
+          "user": "#/$defs/UserMessage"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/UserMessage"
+        },
+        {
+          "$ref": "#/$defs/PlanMessage"
+        },
+        {
+          "$ref": "#/$defs/ToolMessage"
+        },
+        {
+          "$ref": "#/$defs/AnswerMessage"
+        },
+        {
+          "$ref": "#/$defs/ClarifyMessage"
+        },
+        {
+          "$ref": "#/$defs/SystemMessage"
+        }
+      ],
+      "title": "ChatMessage"
+    },
+    "ChatRetrievalHit": {
+      "additionalProperties": false,
+      "properties": {
+        "paperId": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "sectionId": {
+          "type": "string"
+        },
+        "snippet": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "paperId",
+        "sectionId",
+        "score",
+        "snippet"
+      ],
+      "title": "ChatRetrievalHit",
+      "type": "object"
+    },
+    "ChatSession": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "messages": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "answer": "#/$defs/AnswerMessage",
+                "clarify": "#/$defs/ClarifyMessage",
+                "plan": "#/$defs/PlanMessage",
+                "system": "#/$defs/SystemMessage",
+                "tool": "#/$defs/ToolMessage",
+                "user": "#/$defs/UserMessage"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/UserMessage"
+              },
+              {
+                "$ref": "#/$defs/PlanMessage"
+              },
+              {
+                "$ref": "#/$defs/ToolMessage"
+              },
+              {
+                "$ref": "#/$defs/AnswerMessage"
+              },
+              {
+                "$ref": "#/$defs/ClarifyMessage"
+              },
+              {
+                "$ref": "#/$defs/SystemMessage"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "pinned": {
+          "items": {
+            "$ref": "#/$defs/ChatRetrievalHit"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "$ref": "#/$defs/SessionScope"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "startedAt",
+        "messages",
+        "pinned"
+      ],
+      "title": "ChatSession",
+      "type": "object"
+    },
+    "ChatToolCall": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "durationMs": {
+          "description": "Milliseconds.",
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "retrieval": {
+          "items": {
+            "$ref": "#/$defs/ChatRetrievalHit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "args",
+        "durationMs"
+      ],
+      "title": "ChatToolCall",
+      "type": "object"
+    },
+    "CheckpointQuestion": {
+      "additionalProperties": false,
+      "description": "One end-of-lesson check.\n\nMultiple-choice questions carry `options` and `answerIndex`; numeric ones\ncarry `answer`. Both shapes live in one interface in the TypeScript, so both\nsets of fields are optional here and the `kind` says which apply.",
+      "properties": {
+        "answer": {
+          "$ref": "#/$defs/NumericAnswer",
+          "description": "Expected value, unit and tolerance. Present when `kind` is 'numeric'."
+        },
+        "answerIndex": {
+          "description": "Index of the correct entry in `options`. Present when `kind` is 'mc'.",
+          "type": "integer"
+        },
+        "evidenceChip": {
+          "description": "Evidence chip backing the answer, e.g. 'ex-0112' or 'SP-004' — the lesson cites the corpus for its own claims on the same terms it asks the reader to.",
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "mc",
+            "numeric"
+          ],
+          "type": "string"
+        },
+        "options": {
+          "description": "Multiple-choice options. Present when `kind` is 'mc'.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prompt",
+        "kind",
+        "explanation"
+      ],
+      "title": "CheckpointQuestion",
+      "type": "object"
+    },
+    "ClaimBound": {
+      "additionalProperties": false,
+      "description": "One bound in `ClaimScope.bounds`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "op": {
+          "enum": [
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "in",
+            "eq"
+          ],
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "items": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
+      "title": "ClaimBound",
+      "type": "object"
+    },
+    "ClaimScope": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "description": "Claim scope expressed in the SAME ontology as the literature. This comparability is the entire value of Parchment: it is what lets a Ledger record be tested against a claim instead of read beside it.",
+          "items": {
+            "$ref": "#/$defs/ClaimBound"
+          },
+          "type": "array"
+        },
+        "independent": {
+          "type": "boolean"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "parseUncertain": {
+          "description": "True when the parse is uncertain. Never render a shaky parse as confident.",
+          "type": "boolean"
+        },
+        "rawText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "independent",
+        "bounds",
+        "rawText"
+      ],
+      "title": "ClaimScope",
+      "type": "object"
+    },
+    "ClarifyMessage": {
+      "additionalProperties": false,
+      "description": "The clarify arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "clarify",
+          "enum": [
+            "clarify"
+          ],
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          },
+          "type": "array"
+        },
+        "question": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "question",
+        "options"
+      ],
+      "title": "ClarifyMessage",
+      "type": "object"
+    },
+    "ClarifyOption": {
+      "additionalProperties": false,
+      "description": "One branch a clarifying question can send the conversation down.\n\nInline in the TypeScript — shared by `ChatFlow.clarify` and the `clarify`\narm of `ChatMessage` — and named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "flowId": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "flowId"
+      ],
+      "title": "ClarifyOption",
+      "type": "object"
+    },
+    "ClarifyPrompt": {
+      "additionalProperties": false,
+      "description": "The clarifying question a flow asks before it will answer.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "options": {
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          },
+          "type": "array"
+        },
+        "question": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "options"
+      ],
+      "title": "ClarifyPrompt",
+      "type": "object"
+    },
+    "Collection": {
+      "additionalProperties": false,
+      "description": "A reader-assembled set of corpus papers.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "paperIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "paperIds"
+      ],
+      "title": "Collection",
+      "type": "object"
+    },
+    "ConsistentStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "state": {
+          "const": "consistent",
+          "default": "consistent",
+          "enum": [
+            "consistent"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "checks",
+        "state"
+      ],
+      "title": "ConsistentStatus",
+      "type": "object"
+    },
+    "ConstraintCheck": {
+      "additionalProperties": false,
+      "description": "The machine form of a contradiction, for the referee panel.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "expression": {
+          "type": "string"
+        },
+        "residual": {
+          "type": "number"
+        },
+        "tolerance": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expression",
+        "residual",
+        "tolerance",
+        "unit"
+      ],
+      "title": "ConstraintCheck",
+      "type": "object"
+    },
+    "ContradictedStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "contradictionIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "state": {
+          "const": "contradicted",
+          "default": "contradicted",
+          "enum": [
+            "contradicted"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "contradictionIds",
+        "state"
+      ],
+      "title": "ContradictedStatus",
+      "type": "object"
+    },
+    "Contradiction": {
+      "additionalProperties": false,
+      "description": "A set of entries that cannot all be true. The referee flags the *set*;\nit does not need to identify which member is wrong to be useful.",
+      "properties": {
+        "constraint": {
+          "$ref": "#/$defs/ConstraintCheck",
+          "description": "Machine form for the referee panel."
+        },
+        "detectedBy": {
+          "$ref": "#/$defs/DetectedBy"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ContradictionKind"
+        },
+        "note": {
+          "description": "Required when status leaves 'open'. Displayed permanently.",
+          "type": "string"
+        },
+        "recordIds": {
+          "description": "Every participating record. Minimum two.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "statement": {
+          "description": "One plain sentence a non-specialist can read. Rendered as the headline.",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ContradictionStatus"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "recordIds",
+        "statement",
+        "constraint",
+        "detectedBy",
+        "status"
+      ],
+      "title": "Contradiction",
+      "type": "object"
+    },
+    "ContradictionKind": {
+      "enum": [
+        "balance",
+        "specification",
+        "scale",
+        "direct"
+      ],
+      "title": "ContradictionKind",
+      "type": "string"
+    },
+    "ContradictionStatus": {
+      "enum": [
+        "open",
+        "explained",
+        "resolved"
+      ],
+      "title": "ContradictionStatus",
+      "type": "string"
+    },
+    "CorpusThread": {
+      "description": "Which corpus thread an entry belongs to (OF-COR-001 §1).",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O"
+      ],
+      "title": "CorpusThread",
+      "type": "string"
+    },
+    "CorrectedValue": {
+      "additionalProperties": false,
+      "description": "`ExtractionRecord.corrected` — the reviewer's replacement value.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. See `GoldValue` on why this one's `value` is numeric only.",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "CorrectedValue",
+      "type": "object"
+    },
+    "CostLine": {
+      "enum": [
+        "capex",
+        "media",
+        "utilities",
+        "labor",
+        "downstream",
+        "other"
+      ],
+      "title": "CostLine",
+      "type": "string"
+    },
+    "CoverageDispute": {
+      "additionalProperties": false,
+      "description": "A reader filed \"something's missing\" against a source (OF-FE-003 §8.4).\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "note",
+        "at"
+      ],
+      "title": "CoverageDispute",
+      "type": "object"
+    },
+    "CuratorNote": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "who": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "who",
+        "text"
+      ],
+      "title": "CuratorNote",
+      "type": "object"
+    },
+    "DecisiveMeasurement": {
+      "additionalProperties": false,
+      "description": "The single uncertainty this protocol exists to resolve (OF-FE-003 §4.5).\n\nThis is the return leg of the experiment loop: a sensitivity tornado names\nthe parameter whose uncertainty moves the answer most, and a protocol that\ndeclares itself the measurement for that parameter is what turns the naming\ninto work someone can do. Without it the loop points at a parameter page and\nstops.\n\nInline in the TypeScript (`decisive?: { ... }`); named here because Pydantic\nhas no anonymous model.",
+      "properties": {
+        "currentUncertainty": {
+          "description": "Plain sentence: what is not known, and why it matters here.",
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "whatWouldChange": {
+          "description": "What a result would settle — \"if below X, design D2 wins\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "currentUncertainty",
+        "whatWouldChange"
+      ],
+      "title": "DecisiveMeasurement",
+      "type": "object"
+    },
+    "DesignRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "consumedRecordIds": {
+          "description": "Exact records consumed — the basis for staleness.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "publication": {
+          "anyOf": [
+            {
+              "enum": [
+                "draft",
+                "counsel-review",
+                "hold",
+                "publish",
+                "published"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/EmbargoStatus"
+            }
+          ]
+        },
+        "scenarioId": {
+          "type": "string"
+        },
+        "scope": {
+          "description": "'clear' means Parchment has not evaluated this design, NOT that it is unencumbered. Parchment holds no parsed claim bounds, so it cannot decide; the word must never imply it did.",
+          "enum": [
+            "clear",
+            "adjacent",
+            "claimed"
+          ],
+          "type": "string"
+        },
+        "scopeEvaluated": {
+          "type": "boolean"
+        },
+        "scopeHits": {
+          "items": {
+            "$ref": "#/$defs/ScopeHit"
+          },
+          "type": "array"
+        },
+        "tiers": {
+          "items": {
+            "$ref": "#/$defs/TierResult"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "scenarioId",
+        "config",
+        "tiers",
+        "consumedRecordIds",
+        "scope",
+        "scopeEvaluated",
+        "scopeHits",
+        "publication"
+      ],
+      "title": "DesignRecord",
+      "type": "object"
+    },
+    "DetectedBy": {
+      "enum": [
+        "balance",
+        "flux",
+        "reactor",
+        "ontology",
+        "manual"
+      ],
+      "title": "DetectedBy",
+      "type": "string"
+    },
+    "Deviation": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "stepId",
+        "text"
+      ],
+      "title": "Deviation",
+      "type": "object"
+    },
+    "EmbargoStatus": {
+      "additionalProperties": false,
+      "description": "The one object member of `PublicationStatus`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. An embargo is the only publication state that carries data — the date\nit lifts — which is why it alone is an object.",
+      "properties": {
+        "kind": {
+          "const": "embargo",
+          "default": "embargo",
+          "enum": [
+            "embargo"
+          ],
+          "type": "string"
+        },
+        "until": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "until",
+        "kind"
+      ],
+      "title": "EmbargoStatus",
+      "type": "object"
+    },
+    "EmbedBlock": {
+      "additionalProperties": false,
+      "description": "The embed arm of `LessonBlock`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "arg": {
+          "description": "Component-specific argument, e.g. the record or protocol id the embed should show. Absent where the embed needs no target.",
+          "type": "string"
+        },
+        "embed": {
+          "$ref": "#/$defs/EmbedKind"
+        },
+        "kind": {
+          "const": "embed",
+          "enum": [
+            "embed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "embed"
+      ],
+      "title": "EmbedBlock",
+      "type": "object"
+    },
+    "EmbedKind": {
+      "description": "Which live component a lesson block mounts.\n\nA closed set: a lesson embeds the real interface element it is teaching, so\nevery member here corresponds to a component the Learn renderer knows how to\nmount. Adding a value without adding the component leaves a lesson with a\nhole in it.",
+      "enum": [
+        "chip-demo",
+        "record-card",
+        "unit-playground",
+        "mini-queue",
+        "metrics-tiles",
+        "strip-plot",
+        "protocol-card",
+        "ask-prompt",
+        "scenario-widget"
+      ],
+      "title": "EmbedKind",
+      "type": "string"
+    },
+    "EstimatedMinutes": {
+      "additionalProperties": false,
+      "description": "Hands-on and wall-clock time for a version.\n\nInline in the TypeScript (`estMinutes: { active: number; total: number }`);\nnamed here because Pydantic has no anonymous model. These are minutes and\nmay be fractional, so float rather than int.",
+      "properties": {
+        "active": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "active",
+        "total"
+      ],
+      "title": "EstimatedMinutes",
+      "type": "object"
+    },
+    "EvidenceClass": {
+      "description": "Where a value came from, orthogonal to how far it has been verified.\n`Provenance` answers \"how much has this been checked?\";\n`EvidenceClass` answers \"what kind of thing produced it?\".\n\nBoth are needed once the system holds predictions and bench results\nalongside literature: a `curated` prediction and a `curated` measurement\nare the same verification state and completely different claims.\n\nEncoded as tick *geometry*, never as a second hue — the ambient-texture\nproperty of the provenance palette depends on hue meaning one thing only.",
+      "enum": [
+        "literature",
+        "patent",
+        "computed",
+        "experiment",
+        "correction"
+      ],
+      "title": "EvidenceClass",
+      "type": "string"
+    },
+    "ExcludedRecord": {
+      "additionalProperties": false,
+      "description": "One record held out of the aggregate, with the reason.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "recordId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "recordId",
+        "reason"
+      ],
+      "title": "ExcludedRecord",
+      "type": "object"
+    },
+    "ExtractedValue": {
+      "additionalProperties": false,
+      "description": "What an extractor actually produced for a record.\n\nInline in the TypeScript, in both `RunResult.extracted` and\n`FalsePositive.extracted`; named once here because Pydantic has no\nanonymous model and the two shapes are identical.",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "ExtractedValue",
+      "type": "object"
+    },
+    "ExtractionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "audit": {
+          "items": {
+            "$ref": "#/$defs/AuditEvent"
+          },
+          "type": "array"
+        },
+        "citesRecordId": {
+          "description": "When not primary, the record this one is quoting.",
+          "type": "string"
+        },
+        "comparativeBaseline": {
+          "description": "For comparative claims (\"12-fold higher than X\"), the baseline.",
+          "type": "string"
+        },
+        "componentTag": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number"
+        },
+        "corrected": {
+          "$ref": "#/$defs/CorrectedValue"
+        },
+        "curationRef": {
+          "description": "Where in OF-COR-001 a 'curated' value was transcribed from, e.g. '§9 H4'.",
+          "type": "string"
+        },
+        "evidenceClass": {
+          "$ref": "#/$defs/EvidenceClass",
+          "description": "What kind of thing produced this value. Every seeded record is 'literature'; the field is required so that a prediction written by geneOS or a measurement deposited by openLab cannot enter the store wearing the same face as a paper. `check:seed` enforces its presence."
+        },
+        "extractorRun": {
+          "$ref": "#/$defs/ExtractorRun",
+          "description": "Absent for curated records — they did not come from an extractor run."
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "gold": {
+          "$ref": "#/$defs/GoldValue"
+        },
+        "goldOnly": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "isPrimary": {
+          "description": "False. This paper is quoting someone else's measurement (OF-COR-001 §19, fifth trap). Citation-of-a-citation is the most common false-independence error in literature aggregation: 15 mg/L appears in both C2 (the measurement) and C6 (a citation of it), and a strip plot that counts both overstates consensus. Aggregate statistics must filter on this.",
+          "type": "boolean"
+        },
+        "method": {
+          "$ref": "#/$defs/AnalysisMethod",
+          "description": "How the value was measured. Mandatory for PTM and functional fields (OF-COR-001 §17 Rule 1) — 'undetermined' is a legitimate answer and means the analysis was never done, not that the result was negative."
+        },
+        "negativeResult": {
+          "description": "Value is a reported negative/absent result, not a missing measurement.",
+          "type": "boolean"
+        },
+        "numbering": {
+          "$ref": "#/$defs/NumberingConvention",
+          "description": "Required on phospho_site_position — mature and precursor differ by 15."
+        },
+        "organism": {
+          "type": "string"
+        },
+        "paperId": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance",
+          "description": "Explicit provenance. Extractor output is 'unverified' until reviewed; values transcribed from OF-COR-001 are 'curated'; market figures are 'industry-estimate' and never enter the gold set."
+        },
+        "quote": {
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/ValueRange",
+          "description": "A value the source states as a range rather than a point."
+        },
+        "rejectReason": {
+          "type": "string"
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "sectionId": {
+          "type": "string"
+        },
+        "si": {
+          "$ref": "#/$defs/SIValue"
+        },
+        "status": {
+          "$ref": "#/$defs/RecordStatus"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Categorical fields (kinase_identity, glycan_species) carry a string."
+        }
+      },
+      "required": [
+        "id",
+        "paperId",
+        "sectionId",
+        "quote",
+        "field",
+        "value",
+        "unit",
+        "si",
+        "confidence",
+        "status",
+        "provenance",
+        "audit",
+        "isPrimary",
+        "evidenceClass"
+      ],
+      "title": "ExtractionRecord",
+      "type": "object"
+    },
+    "ExtractorRun": {
+      "enum": [
+        "v0.3",
+        "v0.4",
+        "v0.4r"
+      ],
+      "title": "ExtractorRun",
+      "type": "string"
+    },
+    "FalsePositive": {
+      "additionalProperties": false,
+      "description": "A value an extractor produced that no gold record claims.\n\nInline in the TypeScript as an element of `RunOutput.falsePositives`;\nnamed here because Pydantic has no anonymous model.",
+      "properties": {
+        "extracted": {
+          "$ref": "#/$defs/ExtractedValue"
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "id": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "paperId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "paperId",
+        "field",
+        "extracted",
+        "note"
+      ],
+      "title": "FalsePositive",
+      "type": "object"
+    },
+    "FieldId": {
+      "description": "Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families.",
+      "enum": [
+        "expression_pct_tsp",
+        "titer_intracellular",
+        "titer_secreted",
+        "secreted_fraction",
+        "fold_improvement",
+        "transformation_efficiency",
+        "time_to_colony",
+        "phosphate_count",
+        "phosphorylation_degree",
+        "phospho_site_position",
+        "glycan_species",
+        "kinase_identity",
+        "micelle_diameter",
+        "micellar_fraction",
+        "gelation_ph",
+        "calcium_binding",
+        "melt_stretch_length",
+        "growth_rate_mu",
+        "final_biomass_density",
+        "volumetric_productivity",
+        "medium_component_conc",
+        "disruption_protein_yield",
+        "disruption_energy",
+        "minimum_selling_price"
+      ],
+      "title": "FieldId",
+      "type": "string"
+    },
+    "GoldValue": {
+      "additionalProperties": false,
+      "description": "`ExtractionRecord.gold` — the gold-set answer this record is scored\nagainst.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. Its `value` is `number | string` where `CorrectedValue.value` is\n`number` alone: a gold answer may be categorical (kinase_identity,\nglycan_species) while a reviewer correction, as the TypeScript has it, may\nnot. That asymmetry is in the TypeScript and is reproduced, not fixed —\nchanging it here would put the two implementations out of agreement, which\nis the exact failure this migration exists to prevent.",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "GoldValue",
+      "type": "object"
+    },
+    "GridPointResult": {
+      "additionalProperties": false,
+      "properties": {
+        "costLines": {
+          "additionalProperties": false,
+          "properties": {
+            "capex": {
+              "type": "number"
+            },
+            "downstream": {
+              "type": "number"
+            },
+            "labor": {
+              "type": "number"
+            },
+            "media": {
+              "type": "number"
+            },
+            "other": {
+              "type": "number"
+            },
+            "utilities": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "capex",
+            "media",
+            "utilities",
+            "labor",
+            "downstream",
+            "other"
+          ],
+          "type": "object"
+        },
+        "msp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "msp",
+        "costLines"
+      ],
+      "title": "GridPointResult",
+      "type": "object"
+    },
+    "IngestStage": {
+      "enum": [
+        "fetch",
+        "parse",
+        "chunk",
+        "embed",
+        "extract"
+      ],
+      "title": "IngestStage",
+      "type": "string"
+    },
+    "IngestStatus": {
+      "description": "Where a corpus entry is in the ingest pipeline.\n\nThe TypeScript writes the five in-progress members as a template literal,\n`` `stage:${IngestStage}` ``, which is a genuinely nicer way to say it and a\nthing JSON Schema cannot express — a schema can enumerate strings but cannot\ndescribe a string built from another enum. They are therefore written out\nhere. If `IngestStage` ever grows a member, this enum has to grow the\nmatching `stage:` member by hand, and there is a test that fails if it does\nnot.",
+      "enum": [
+        "complete",
+        "catalogued",
+        "stage:fetch",
+        "stage:parse",
+        "stage:chunk",
+        "stage:embed",
+        "stage:extract",
+        "failed:fetch",
+        "failed:parse",
+        "shelf"
+      ],
+      "title": "IngestStatus",
+      "type": "string"
+    },
+    "Job": {
+      "additionalProperties": false,
+      "properties": {
+        "failReason": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/JobKind"
+        },
+        "stageIndex": {
+          "type": "integer"
+        },
+        "stageProgress": {
+          "description": "0-1 within current stage",
+          "type": "number"
+        },
+        "stages": {
+          "items": {
+            "$ref": "#/$defs/JobStage"
+          },
+          "type": "array"
+        },
+        "startedAt": {
+          "description": "Epoch milliseconds.",
+          "type": "number"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "stages",
+        "stageIndex",
+        "stageProgress",
+        "status",
+        "startedAt"
+      ],
+      "title": "Job",
+      "type": "object"
+    },
+    "JobKind": {
+      "enum": [
+        "ingest",
+        "extraction",
+        "simulation",
+        "run"
+      ],
+      "title": "JobKind",
+      "type": "string"
+    },
+    "JobStage": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "ms": {
+          "description": "Milliseconds.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "ms"
+      ],
+      "title": "JobStage",
+      "type": "object"
+    },
+    "JobStatus": {
+      "enum": [
+        "running",
+        "done",
+        "failed"
+      ],
+      "title": "JobStatus",
+      "type": "string"
+    },
+    "LearnModule": {
+      "additionalProperties": false,
+      "properties": {
+        "blurb": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "index": {
+          "description": "Ordering index of the module within the Learn track.",
+          "type": "integer"
+        },
+        "lessons": {
+          "items": {
+            "$ref": "#/$defs/Lesson"
+          },
+          "type": "array"
+        },
+        "outline": {
+          "description": "Planned lesson headings for a module whose lessons are not written yet. An empty `lessons` list with an outline is a stated gap, not a defect.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "index",
+        "title",
+        "blurb",
+        "lessons"
+      ],
+      "title": "LearnModule",
+      "type": "object"
+    },
+    "Lesson": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "embed": "#/$defs/EmbedBlock",
+                "prose": "#/$defs/ProseBlock"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ProseBlock"
+              },
+              {
+                "$ref": "#/$defs/EmbedBlock"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "checkpoint": {
+          "items": {
+            "$ref": "#/$defs/CheckpointQuestion"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "minutes": {
+          "description": "Estimated reading time in whole minutes.",
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "minutes",
+        "blocks",
+        "checkpoint"
+      ],
+      "title": "Lesson",
+      "type": "object"
+    },
+    "LessonBlock": {
+      "discriminator": {
+        "mapping": {
+          "embed": "#/$defs/EmbedBlock",
+          "prose": "#/$defs/ProseBlock"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ProseBlock"
+        },
+        {
+          "$ref": "#/$defs/EmbedBlock"
+        }
+      ],
+      "title": "LessonBlock"
+    },
+    "MSPDistribution": {
+      "additionalProperties": false,
+      "description": "The minimum selling price as a distribution, in `TierResult.msp`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "median": {
+          "type": "number"
+        },
+        "p05": {
+          "type": "number"
+        },
+        "p95": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "median",
+        "p05",
+        "p95",
+        "unit"
+      ],
+      "title": "MSPDistribution",
+      "type": "object"
+    },
+    "Material": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "precision": {
+          "description": "The rounding INCREMENT the scaled amount is snapped to, not a count of decimal places: 0.05 means 'to the nearest 0.05 g', and the corpus uses 0.001 through 0.5. `roundToPrecision` in src/engine/units.ts is what consumes it, so that a scaled recipe stays pipettable at the bench rather than asking for 3.847 g.",
+          "type": "number"
+        },
+        "scaling": {
+          "$ref": "#/$defs/ScalingClass"
+        },
+        "sourceRecordId": {
+          "type": "string"
+        },
+        "stock": {
+          "$ref": "#/$defs/StockSolution"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "unit",
+        "scaling",
+        "precision"
+      ],
+      "title": "Material",
+      "type": "object"
+    },
+    "NumberingConvention": {
+      "description": "Residue-numbering convention (OF-COR-001 §19, first trap).",
+      "enum": [
+        "precursor",
+        "mature"
+      ],
+      "title": "NumberingConvention",
+      "type": "string"
+    },
+    "NumericAnswer": {
+      "additionalProperties": false,
+      "description": "The expected answer to a `kind: 'numeric'` checkpoint question.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. The tolerance is carried with the answer rather than applied globally\nbecause a unit-conversion question and an order-of-magnitude question are not\nmarked to the same precision.",
+      "properties": {
+        "tolerancePct": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "tolerancePct"
+      ],
+      "title": "NumericAnswer",
+      "type": "object"
+    },
+    "Paper": {
+      "additionalProperties": false,
+      "properties": {
+        "abstract": {
+          "description": "For 'catalogued' papers this is the curator's summary from OF-COR-001, NOT the publisher's abstract. `textSource` says which.",
+          "type": "string"
+        },
+        "authors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "corpusRole": {
+          "description": "Why this entry earns its place, from the corpus document.",
+          "type": "string"
+        },
+        "coverageDisputed": {
+          "$ref": "#/$defs/CoverageDispute",
+          "description": "A reader filed \"something's missing\" against this source (OF-FE-003 §8.4). Recall failure is the failure that hides: a wrong value gets clicked and corrected, a missed one is invisible forever. This flag is the only thing in the system that surfaces it, so it returns the source to the review queue rather than sitting as a passive annotation."
+        },
+        "doi": {
+          "description": "The authoritative record key — never the author string (OF-COR-001 header).",
+          "type": "string"
+        },
+        "id": {
+          "description": "Corpus entry id, e.g. 'H1' — thread letter plus index (OF-COR-001 §1).",
+          "type": "string"
+        },
+        "ingest": {
+          "$ref": "#/$defs/IngestStatus"
+        },
+        "openAccess": {
+          "description": "Openly retrievable vs. needs institutional access (OF-COR-001 §19).",
+          "type": "boolean"
+        },
+        "organisms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pmcid": {
+          "type": "string"
+        },
+        "pmid": {
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/PaperSection"
+          },
+          "type": "array"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourceType"
+        },
+        "textSource": {
+          "description": "Whether `sections` hold the paper's own text or the curator's notes.",
+          "enum": [
+            "full-text",
+            "curation-note"
+          ],
+          "type": "string"
+        },
+        "thread": {
+          "$ref": "#/$defs/CorpusThread"
+        },
+        "title": {
+          "type": "string"
+        },
+        "topics": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tranche": {
+          "description": "Ingestion tranche: 1 = open-access core, 2 = remainder, 3 = v1.1.",
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "type": "integer"
+        },
+        "venue": {
+          "type": "string"
+        },
+        "verifyNeeded": {
+          "description": "Author string not fully resolved — must be checked at ingest ([verify]).",
+          "type": "boolean"
+        },
+        "year": {
+          "description": "0 where the year is genuinely unknown. A sentinel rather than a guess: see invariant 4 in CLAUDE.md.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "authors",
+        "year",
+        "venue",
+        "organisms",
+        "topics",
+        "abstract",
+        "sections",
+        "ingest",
+        "thread",
+        "sourceType",
+        "textSource",
+        "openAccess",
+        "tranche"
+      ],
+      "title": "Paper",
+      "type": "object"
+    },
+    "PaperSection": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "heading",
+        "text"
+      ],
+      "title": "PaperSection",
+      "type": "object"
+    },
+    "ParameterDef": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalUnit": {
+          "description": "'' for categorical fields (kinase_identity, glycan_species).",
+          "type": "string"
+        },
+        "categorical": {
+          "description": "Categorical fields hold a string value, not a number.",
+          "type": "boolean"
+        },
+        "definition": {
+          "type": "string"
+        },
+        "family": {
+          "$ref": "#/$defs/ParameterFamily"
+        },
+        "id": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "range": {
+          "items": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "refuseConversionTo": {
+          "description": "Unit families this field must NOT be auto-converted into, with the reason. OF-COR-001 §17 Rule 2: %TSP and g/L are not interconvertible without cell density and total-protein fraction. The engine refuses and says why.",
+          "items": {
+            "$ref": "#/$defs/RefuseConversion"
+          },
+          "type": "array"
+        },
+        "requiresMethod": {
+          "description": "OF-COR-001 §17 Rule 1: a value without its method is not interpretable.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "name",
+        "definition",
+        "canonicalUnit",
+        "range",
+        "notes"
+      ],
+      "title": "ParameterDef",
+      "type": "object"
+    },
+    "ParameterFamily": {
+      "enum": [
+        "expression",
+        "ptm",
+        "functional",
+        "cultivation",
+        "downstream"
+      ],
+      "title": "ParameterFamily",
+      "type": "string"
+    },
+    "ParameterView": {
+      "additionalProperties": false,
+      "description": "Derived at load from RECORDS. Never seeded — see engine/posterior.ts.",
+      "properties": {
+        "aggregate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Aggregate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only records passing isAggregatable() contribute."
+        },
+        "contradictions": {
+          "items": {
+            "$ref": "#/$defs/Contradiction"
+          },
+          "type": "array"
+        },
+        "def": {
+          "$ref": "#/$defs/ParameterDef"
+        },
+        "excluded": {
+          "description": "Records held out of the aggregate, each with the reason.",
+          "items": {
+            "$ref": "#/$defs/ExcludedRecord"
+          },
+          "type": "array"
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "recordIds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "referee": {
+          "discriminator": {
+            "mapping": {
+              "consistent": "#/$defs/ConsistentStatus",
+              "contradicted": "#/$defs/ContradictedStatus",
+              "unchecked": "#/$defs/UncheckedStatus"
+            },
+            "propertyName": "state"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/UncheckedStatus"
+            },
+            {
+              "$ref": "#/$defs/ConsistentStatus"
+            },
+            {
+              "$ref": "#/$defs/ContradictedStatus"
+            }
+          ]
+        }
+      },
+      "required": [
+        "field",
+        "def",
+        "recordIds",
+        "aggregate",
+        "contradictions",
+        "referee",
+        "excluded"
+      ],
+      "title": "ParameterView",
+      "type": "object"
+    },
+    "Patent": {
+      "additionalProperties": false,
+      "properties": {
+        "assignee": {
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ClaimScope"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "jurisdiction": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        },
+        "paperId": {
+          "description": "The corpus entry this was catalogued from.",
+          "type": "string"
+        },
+        "priorityDate": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/PatentStatus"
+        },
+        "title": {
+          "type": "string"
+        },
+        "verifyNeeded": {
+          "description": "Same discipline as papers: no invented identifiers, ever.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "jurisdiction",
+        "number",
+        "title",
+        "assignee",
+        "priorityDate",
+        "status",
+        "claims"
+      ],
+      "title": "Patent",
+      "type": "object"
+    },
+    "PatentStatus": {
+      "enum": [
+        "pending",
+        "granted",
+        "lapsed",
+        "revoked"
+      ],
+      "title": "PatentStatus",
+      "type": "string"
+    },
+    "PlanMessage": {
+      "additionalProperties": false,
+      "description": "The plan arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "collapsed": {
+          "type": "boolean"
+        },
+        "done": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "plan",
+          "enum": [
+            "plan"
+          ],
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "steps",
+        "done",
+        "collapsed"
+      ],
+      "title": "PlanMessage",
+      "type": "object"
+    },
+    "ProseBlock": {
+      "additionalProperties": false,
+      "description": "The prose arm of `LessonBlock`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "kind": {
+          "const": "prose",
+          "enum": [
+            "prose"
+          ],
+          "type": "string"
+        },
+        "md": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "md"
+      ],
+      "title": "ProseBlock",
+      "type": "object"
+    },
+    "Protocol": {
+      "additionalProperties": false,
+      "properties": {
+        "bsl": {
+          "enum": [
+            1,
+            2
+          ],
+          "type": "integer"
+        },
+        "category": {
+          "$ref": "#/$defs/ProtocolCategory"
+        },
+        "currentVersion": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "organisms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provenanceNote": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "versions": {
+          "items": {
+            "$ref": "#/$defs/ProtocolVersion"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "category",
+        "organisms",
+        "bsl",
+        "purpose",
+        "versions",
+        "currentVersion",
+        "provenanceNote"
+      ],
+      "title": "Protocol",
+      "type": "object"
+    },
+    "ProtocolCategory": {
+      "enum": [
+        "media",
+        "culture",
+        "analytics",
+        "harvest",
+        "fermentation",
+        "sop"
+      ],
+      "title": "ProtocolCategory",
+      "type": "string"
+    },
+    "ProtocolReference": {
+      "additionalProperties": false,
+      "description": "One entry in `ProtocolVersion.references`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. Every member is optional in the TypeScript and stays optional here —\na reference may point at a corpus entry, at an extraction record, or be a\nbare note.",
+      "properties": {
+        "note": {
+          "type": "string"
+        },
+        "paperId": {
+          "type": "string"
+        },
+        "recordId": {
+          "type": "string"
+        }
+      },
+      "title": "ProtocolReference",
+      "type": "object"
+    },
+    "ProtocolVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "baseBatch": {
+          "$ref": "#/$defs/BaseBatch"
+        },
+        "changelog": {
+          "type": "string"
+        },
+        "decisive": {
+          "$ref": "#/$defs/DecisiveMeasurement"
+        },
+        "equipment": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "estMinutes": {
+          "$ref": "#/$defs/EstimatedMinutes"
+        },
+        "materials": {
+          "items": {
+            "$ref": "#/$defs/Material"
+          },
+          "type": "array"
+        },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/ProtocolReference"
+          },
+          "type": "array"
+        },
+        "resultSchema": {
+          "description": "Shape of the result form an openLab deposit generates from a run.",
+          "items": {
+            "$ref": "#/$defs/ResultField"
+          },
+          "type": "array"
+        },
+        "safety": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "baseBatch",
+        "materials",
+        "equipment",
+        "safety",
+        "steps",
+        "estMinutes",
+        "references"
+      ],
+      "title": "ProtocolVersion",
+      "type": "object"
+    },
+    "Provenance": {
+      "description": "Provenance classes (OF-DES-001 §7.4, revised by OF-COR-001 §20).\n\nWith a real corpus, 'demo' no longer means \"this whole platform is fake\" —\nit is reserved for the three surfaces that remain modeled rather than\nmeasured: simulation response grids, scripted agent answer text, and\nanything derived from them.\n\n'curated' is new and load-bearing. It marks a value transcribed from the\ncuration document (OF-COR-001) rather than read off the source PDF. The\nclaim is real and attributable, but it has not yet been checked against the\npaper itself, so it is weaker than 'verified' and must never silently pass\nas a source-span extraction.\n\n'industry-estimate' marks market and vendor figures (OF-COR-001 §16 O8).\nThey are useful for framing and useless as evidence: excluded from the gold\nset and from aggregate statistics by default.\n\n'unsourced' is a defect class, not a value class. It marks a quantity that\nreached the interface with no provenance record behind it — the interface\nexpression of Rule 1 of the agent contract, that no quantity may come from\nmodel weights. It is unreachable in the seeded build, `check:seed` enforces\nthat no record carries it, and `Tick` shouts in the console when one renders.\nIt is kept reachable on one Settings route so a reviewer can see what the\nsystem does when the rule is broken rather than be asked to believe it cannot\nbe.",
+      "enum": [
+        "gold",
+        "verified",
+        "curated",
+        "unverified",
+        "user",
+        "industry-estimate",
+        "demo",
+        "unsourced"
+      ],
+      "title": "Provenance",
+      "type": "string"
+    },
+    "PublicationStatus": {
+      "anyOf": [
+        {
+          "enum": [
+            "draft",
+            "counsel-review",
+            "hold",
+            "publish",
+            "published"
+          ],
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/EmbargoStatus"
+        }
+      ],
+      "title": "PublicationStatus"
+    },
+    "RecordStatus": {
+      "enum": [
+        "unverified",
+        "verified",
+        "rejected"
+      ],
+      "title": "RecordStatus",
+      "type": "string"
+    },
+    "RefereeStatus": {
+      "discriminator": {
+        "mapping": {
+          "consistent": "#/$defs/ConsistentStatus",
+          "contradicted": "#/$defs/ContradictedStatus",
+          "unchecked": "#/$defs/UncheckedStatus"
+        },
+        "propertyName": "state"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/UncheckedStatus"
+        },
+        {
+          "$ref": "#/$defs/ConsistentStatus"
+        },
+        {
+          "$ref": "#/$defs/ContradictedStatus"
+        }
+      ],
+      "title": "RefereeStatus"
+    },
+    "RefuseConversion": {
+      "additionalProperties": false,
+      "description": "One entry in `ParameterDef.refuseConversionTo`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel. The `because` string is user-facing product copy and is reproduced\nverbatim wherever it appears — a refusal that cannot say why is just an\nerror message.",
+      "properties": {
+        "because": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        }
+      },
+      "required": [
+        "field",
+        "because"
+      ],
+      "title": "RefuseConversion",
+      "type": "object"
+    },
+    "ResultField": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "type": {
+          "enum": [
+            "number",
+            "text",
+            "boolean"
+          ],
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "type",
+        "required"
+      ],
+      "title": "ResultField",
+      "type": "object"
+    },
+    "RunOutcome": {
+      "additionalProperties": false,
+      "description": "A failed run is a first-class outcome, not an error.",
+      "properties": {
+        "depositedAt": {
+          "type": "string"
+        },
+        "failureReason": {
+          "description": "Real bench prose: contamination, a pump, an ambiguous reading.",
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "failure",
+            "abandoned"
+          ],
+          "type": "string"
+        },
+        "producedRecordIds": {
+          "description": "Records created by this deposit — evidenceClass: 'experiment'.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "results": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        "runId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId",
+        "outcome",
+        "results",
+        "operator",
+        "producedRecordIds"
+      ],
+      "title": "RunOutcome",
+      "type": "object"
+    },
+    "RunOutcomeKind": {
+      "description": "How one gold record fared in an extractor run.\n\nNamed `RunOutcomeKind` rather than `RunOutcome` because that name belongs\nto a different type in `protocol.py`.",
+      "enum": [
+        "match",
+        "value_mismatch",
+        "unit_error",
+        "span_error",
+        "miss"
+      ],
+      "title": "RunOutcomeKind",
+      "type": "string"
+    },
+    "RunOutput": {
+      "additionalProperties": false,
+      "description": "The scored output of one extractor run.\n\nNo instance of this is seeded. `RUN_OUTPUTS` stays empty until a real\nextractor runs (invariant 2 in CLAUDE.md) — the shape exists so that real\noutput has somewhere to land, not so that plausible numbers can be written\ninto it.",
+      "properties": {
+        "falsePositives": {
+          "items": {
+            "$ref": "#/$defs/FalsePositive"
+          },
+          "type": "array"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/RunResult"
+          },
+          "type": "array"
+        },
+        "run": {
+          "$ref": "#/$defs/ExtractorRun"
+        }
+      },
+      "required": [
+        "run",
+        "results",
+        "falsePositives"
+      ],
+      "title": "RunOutput",
+      "type": "object"
+    },
+    "RunResult": {
+      "additionalProperties": false,
+      "description": "One gold record's outcome in an extractor run.\n\nInline in the TypeScript as an element of `RunOutput.results`; named here\nbecause Pydantic has no anonymous model.",
+      "properties": {
+        "extracted": {
+          "$ref": "#/$defs/ExtractedValue"
+        },
+        "goldRecordId": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/RunOutcomeKind"
+        }
+      },
+      "required": [
+        "goldRecordId",
+        "outcome"
+      ],
+      "title": "RunResult",
+      "type": "object"
+    },
+    "RunState": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "additionalProperties": {
+            "items": {
+              "type": "boolean"
+            },
+            "type": "array"
+          },
+          "description": "stepId -> multiCheck states",
+          "type": "object"
+        },
+        "completed": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "stepId -> epoch ms completed",
+          "type": "object"
+        },
+        "currentStep": {
+          "type": "integer"
+        },
+        "deviations": {
+          "items": {
+            "$ref": "#/$defs/Deviation"
+          },
+          "type": "array"
+        },
+        "finishedAt": {
+          "description": "epoch ms",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "protocolId": {
+          "type": "string"
+        },
+        "scale": {
+          "description": "multiplier vs baseBatch",
+          "type": "number"
+        },
+        "skipped": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "stepId -> reason",
+          "type": "object"
+        },
+        "startedAt": {
+          "description": "epoch ms",
+          "type": "number"
+        },
+        "timers": {
+          "items": {
+            "$ref": "#/$defs/TimerState"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "protocolId",
+        "version",
+        "scale",
+        "startedAt",
+        "currentStep",
+        "completed",
+        "skipped",
+        "checks",
+        "deviations",
+        "timers"
+      ],
+      "title": "RunState",
+      "type": "object"
+    },
+    "SIValue": {
+      "additionalProperties": false,
+      "description": "`ExtractionRecord.si` — the value in its canonical SI unit.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "SIValue",
+      "type": "object"
+    },
+    "ScalingClass": {
+      "enum": [
+        "per_batch_volume",
+        "fixed",
+        "per_unit_biomass"
+      ],
+      "title": "ScalingClass",
+      "type": "string"
+    },
+    "Scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "$ref": "#/$defs/ScenarioAssumption"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dims": {
+          "items": {
+            "$ref": "#/$defs/ScenarioDim"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "modelId": {
+          "enum": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "point": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "product": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "modelId",
+        "name",
+        "description",
+        "product",
+        "dims",
+        "point",
+        "assumptions",
+        "pinned"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    },
+    "ScenarioAssumption": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "description": "Required. `check:seed` verifies a record binding against the record.",
+          "discriminator": {
+            "mapping": {
+              "model": "#/$defs/BasisModel",
+              "record": "#/$defs/BasisRecord",
+              "unsourced": "#/$defs/BasisUnsourced"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BasisRecord"
+            },
+            {
+              "$ref": "#/$defs/BasisModel"
+            },
+            {
+              "$ref": "#/$defs/BasisUnsourced"
+            }
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "paperId": {
+          "description": "Cite a paper when the assumption rests on a source but no single record.",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "recordId": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "value",
+        "unit",
+        "provenance",
+        "basis",
+        "note"
+      ],
+      "title": "ScenarioAssumption",
+      "type": "object"
+    },
+    "ScenarioDim": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/FieldId",
+          "description": "The ontology parameter this dimension sweeps, where it is one. Set only for dimensions that vary a Ledger parameter — a fermenter scale or a milk price is a process or market input, not a parameter the corpus measures, and must not claim otherwise. T0 checks a configured value against this field's declared range."
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "paperId": {
+          "description": "Cite a paper where a sweep default came from the literature.",
+          "type": "string"
+        },
+        "sourceRecordId": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "unit",
+        "values"
+      ],
+      "title": "ScenarioDim",
+      "type": "object"
+    },
+    "ScopeHit": {
+      "additionalProperties": false,
+      "description": "One patent claim this design falls within, in `DesignRecord.scopeHits`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "claim": {
+          "type": "integer"
+        },
+        "patentId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "patentId",
+        "claim"
+      ],
+      "title": "ScopeHit",
+      "type": "object"
+    },
+    "SensitivityEntry": {
+      "additionalProperties": false,
+      "description": "One row of `TierResult.sensitivity`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/FieldId"
+        },
+        "label": {
+          "type": "string"
+        },
+        "rho": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "rho"
+      ],
+      "title": "SensitivityEntry",
+      "type": "object"
+    },
+    "SensitivityRow": {
+      "additionalProperties": false,
+      "properties": {
+        "assumption": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/$defs/FieldId",
+          "description": "The parameter this row varies, when the assumption behind it is record-bound. Makes each tornado bar a link to its parameter page, which is the entry to the whole experiment loop and the single most valuable navigation in the app."
+        },
+        "hiPct": {
+          "type": "number"
+        },
+        "lowPct": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "assumption",
+        "lowPct",
+        "hiPct"
+      ],
+      "title": "SensitivityRow",
+      "type": "object"
+    },
+    "SessionScope": {
+      "additionalProperties": false,
+      "description": "What a chat session is scoped to — one paper, or a collection of them.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "paper",
+            "collection"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "label"
+      ],
+      "title": "SessionScope",
+      "type": "object"
+    },
+    "SourceType": {
+      "enum": [
+        "journal-article",
+        "review",
+        "thesis",
+        "patent",
+        "book",
+        "industry-report",
+        "preprint"
+      ],
+      "title": "SourceType",
+      "type": "string"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "multiCheck": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "note": {
+          "type": "string"
+        },
+        "refs": {
+          "description": "record or paper ids",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "description": "may contain {{qty:materialName}} placeholders",
+          "type": "string"
+        },
+        "timerLabel": {
+          "type": "string"
+        },
+        "timerSec": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "StockSolution": {
+      "additionalProperties": false,
+      "description": "The stock a material is made up from, where it is not weighed out neat.\n\nInline in the TypeScript (`stock?: { conc: number; unit: string }`); named\nhere because Pydantic has no anonymous model.",
+      "properties": {
+        "conc": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conc",
+        "unit"
+      ],
+      "title": "StockSolution",
+      "type": "object"
+    },
+    "Strain": {
+      "additionalProperties": false,
+      "properties": {
+        "badges": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "binomial": {
+          "type": "string"
+        },
+        "bsl": {
+          "enum": [
+            1,
+            2
+          ],
+          "type": "integer"
+        },
+        "description": {
+          "type": "string"
+        },
+        "designation": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/CuratorNote"
+          },
+          "type": "array"
+        },
+        "taxonomy": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "binomial",
+        "designation",
+        "taxonomy",
+        "description",
+        "badges",
+        "bsl",
+        "notes"
+      ],
+      "title": "Strain",
+      "type": "object"
+    },
+    "SystemMessage": {
+      "additionalProperties": false,
+      "description": "The system arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "system",
+          "enum": [
+            "system"
+          ],
+          "type": "string"
+        },
+        "retry": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "text"
+      ],
+      "title": "SystemMessage",
+      "type": "object"
+    },
+    "Tier": {
+      "enum": [
+        "T0",
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "TierResult": {
+      "additionalProperties": false,
+      "properties": {
+        "absentReason": {
+          "description": "Why the tier is absent, when it is. Shown in place of a result.",
+          "type": "string"
+        },
+        "bindingConstraint": {
+          "description": "The constraint that bound the result — the most useful string on the page.",
+          "type": "string"
+        },
+        "engineVersion": {
+          "type": "string"
+        },
+        "msp": {
+          "$ref": "#/$defs/MSPDistribution",
+          "description": "T3 only. Never a bare point estimate presented as a distribution."
+        },
+        "sensitivity": {
+          "description": "T3 only, sorted by |rho| descending. Drives the experiment loop.",
+          "items": {
+            "$ref": "#/$defs/SensitivityEntry"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/TierState"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
+        "values": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TierValue"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "tier",
+        "state",
+        "bindingConstraint",
+        "values",
+        "engineVersion"
+      ],
+      "title": "TierResult",
+      "type": "object"
+    },
+    "TierState": {
+      "description": "A tier either ran or it did not. `absent` is a first-class state, not a\nfailure and not a pass: T1 needs a genome-scale model and T2 a reactor model,\nand neither exists in this build. Rendering an absent tier as passed would\nclaim the biology was checked when only the economics were modelled.",
+      "enum": [
+        "passed",
+        "failed",
+        "absent"
+      ],
+      "title": "TierState",
+      "type": "string"
+    },
+    "TierValue": {
+      "additionalProperties": false,
+      "description": "One entry in `TierResult.values` — a number with the unit it was computed in.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "TierValue",
+      "type": "object"
+    },
+    "TimerState": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "remainingSec": {
+          "type": "number"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "startedAt": {
+          "description": "epoch ms",
+          "type": "number"
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "totalSec": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "stepId",
+        "label",
+        "totalSec",
+        "remainingSec",
+        "running"
+      ],
+      "title": "TimerState",
+      "type": "object"
+    },
+    "ToolMessage": {
+      "additionalProperties": false,
+      "description": "The tool arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "call": {
+          "$ref": "#/$defs/ChatToolCall"
+        },
+        "expanded": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "tool",
+          "enum": [
+            "tool"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "call",
+        "expanded"
+      ],
+      "title": "ToolMessage",
+      "type": "object"
+    },
+    "UncheckedStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "const": "unchecked",
+          "default": "unchecked",
+          "enum": [
+            "unchecked"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "UncheckedStatus",
+      "type": "object"
+    },
+    "UserMessage": {
+      "additionalProperties": false,
+      "description": "The user arm of `ChatMessage`.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "user",
+          "enum": [
+            "user"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "text"
+      ],
+      "title": "UserMessage",
+      "type": "object"
+    },
+    "ValueRange": {
+      "additionalProperties": false,
+      "description": "`ExtractionRecord.range` — a value the source states as an interval.\n\nInline in the TypeScript; named here because Pydantic has no anonymous\nmodel.",
+      "properties": {
+        "high": {
+          "type": "number"
+        },
+        "low": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "title": "ValueRange",
+      "type": "object"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "GENERATED from the Pydantic models in packages/core/openferment_core/schema. Do not edit. Edit the models and re-run `pnpm gen:types`.",
+  "properties": {
+    "ActivityEvent": {
+      "$ref": "#/$defs/ActivityEvent"
+    },
+    "Aggregate": {
+      "$ref": "#/$defs/Aggregate"
+    },
+    "AggregateStratum": {
+      "$ref": "#/$defs/AggregateStratum"
+    },
+    "AnalysisMethod": {
+      "$ref": "#/$defs/AnalysisMethod"
+    },
+    "AnswerMessage": {
+      "$ref": "#/$defs/AnswerMessage"
+    },
+    "AssumptionBasis": {
+      "$ref": "#/$defs/AssumptionBasis"
+    },
+    "AuditEvent": {
+      "$ref": "#/$defs/AuditEvent"
+    },
+    "BaseBatch": {
+      "$ref": "#/$defs/BaseBatch"
+    },
+    "BasisModel": {
+      "$ref": "#/$defs/BasisModel"
+    },
+    "BasisRecord": {
+      "$ref": "#/$defs/BasisRecord"
+    },
+    "BasisUnsourced": {
+      "$ref": "#/$defs/BasisUnsourced"
+    },
+    "ChatFlow": {
+      "$ref": "#/$defs/ChatFlow"
+    },
+    "ChatMessage": {
+      "$ref": "#/$defs/ChatMessage"
+    },
+    "ChatRetrievalHit": {
+      "$ref": "#/$defs/ChatRetrievalHit"
+    },
+    "ChatSession": {
+      "$ref": "#/$defs/ChatSession"
+    },
+    "ChatToolCall": {
+      "$ref": "#/$defs/ChatToolCall"
+    },
+    "CheckpointQuestion": {
+      "$ref": "#/$defs/CheckpointQuestion"
+    },
+    "ClaimBound": {
+      "$ref": "#/$defs/ClaimBound"
+    },
+    "ClaimScope": {
+      "$ref": "#/$defs/ClaimScope"
+    },
+    "ClarifyMessage": {
+      "$ref": "#/$defs/ClarifyMessage"
+    },
+    "ClarifyOption": {
+      "$ref": "#/$defs/ClarifyOption"
+    },
+    "ClarifyPrompt": {
+      "$ref": "#/$defs/ClarifyPrompt"
+    },
+    "Collection": {
+      "$ref": "#/$defs/Collection"
+    },
+    "ConsistentStatus": {
+      "$ref": "#/$defs/ConsistentStatus"
+    },
+    "ConstraintCheck": {
+      "$ref": "#/$defs/ConstraintCheck"
+    },
+    "ContradictedStatus": {
+      "$ref": "#/$defs/ContradictedStatus"
+    },
+    "Contradiction": {
+      "$ref": "#/$defs/Contradiction"
+    },
+    "ContradictionKind": {
+      "$ref": "#/$defs/ContradictionKind"
+    },
+    "ContradictionStatus": {
+      "$ref": "#/$defs/ContradictionStatus"
+    },
+    "CorpusThread": {
+      "$ref": "#/$defs/CorpusThread"
+    },
+    "CorrectedValue": {
+      "$ref": "#/$defs/CorrectedValue"
+    },
+    "CostLine": {
+      "$ref": "#/$defs/CostLine"
+    },
+    "CoverageDispute": {
+      "$ref": "#/$defs/CoverageDispute"
+    },
+    "CuratorNote": {
+      "$ref": "#/$defs/CuratorNote"
+    },
+    "DecisiveMeasurement": {
+      "$ref": "#/$defs/DecisiveMeasurement"
+    },
+    "DesignRecord": {
+      "$ref": "#/$defs/DesignRecord"
+    },
+    "DetectedBy": {
+      "$ref": "#/$defs/DetectedBy"
+    },
+    "Deviation": {
+      "$ref": "#/$defs/Deviation"
+    },
+    "EmbargoStatus": {
+      "$ref": "#/$defs/EmbargoStatus"
+    },
+    "EmbedBlock": {
+      "$ref": "#/$defs/EmbedBlock"
+    },
+    "EmbedKind": {
+      "$ref": "#/$defs/EmbedKind"
+    },
+    "EstimatedMinutes": {
+      "$ref": "#/$defs/EstimatedMinutes"
+    },
+    "EvidenceClass": {
+      "$ref": "#/$defs/EvidenceClass"
+    },
+    "ExcludedRecord": {
+      "$ref": "#/$defs/ExcludedRecord"
+    },
+    "ExtractedValue": {
+      "$ref": "#/$defs/ExtractedValue"
+    },
+    "ExtractionRecord": {
+      "$ref": "#/$defs/ExtractionRecord"
+    },
+    "ExtractorRun": {
+      "$ref": "#/$defs/ExtractorRun"
+    },
+    "FalsePositive": {
+      "$ref": "#/$defs/FalsePositive"
+    },
+    "FieldId": {
+      "$ref": "#/$defs/FieldId"
+    },
+    "GoldValue": {
+      "$ref": "#/$defs/GoldValue"
+    },
+    "GridPointResult": {
+      "$ref": "#/$defs/GridPointResult"
+    },
+    "IngestStage": {
+      "$ref": "#/$defs/IngestStage"
+    },
+    "IngestStatus": {
+      "$ref": "#/$defs/IngestStatus"
+    },
+    "Job": {
+      "$ref": "#/$defs/Job"
+    },
+    "JobKind": {
+      "$ref": "#/$defs/JobKind"
+    },
+    "JobStage": {
+      "$ref": "#/$defs/JobStage"
+    },
+    "JobStatus": {
+      "$ref": "#/$defs/JobStatus"
+    },
+    "LearnModule": {
+      "$ref": "#/$defs/LearnModule"
+    },
+    "Lesson": {
+      "$ref": "#/$defs/Lesson"
+    },
+    "LessonBlock": {
+      "$ref": "#/$defs/LessonBlock"
+    },
+    "MSPDistribution": {
+      "$ref": "#/$defs/MSPDistribution"
+    },
+    "Material": {
+      "$ref": "#/$defs/Material"
+    },
+    "NumberingConvention": {
+      "$ref": "#/$defs/NumberingConvention"
+    },
+    "NumericAnswer": {
+      "$ref": "#/$defs/NumericAnswer"
+    },
+    "Paper": {
+      "$ref": "#/$defs/Paper"
+    },
+    "PaperSection": {
+      "$ref": "#/$defs/PaperSection"
+    },
+    "ParameterDef": {
+      "$ref": "#/$defs/ParameterDef"
+    },
+    "ParameterFamily": {
+      "$ref": "#/$defs/ParameterFamily"
+    },
+    "ParameterView": {
+      "$ref": "#/$defs/ParameterView"
+    },
+    "Patent": {
+      "$ref": "#/$defs/Patent"
+    },
+    "PatentStatus": {
+      "$ref": "#/$defs/PatentStatus"
+    },
+    "PlanMessage": {
+      "$ref": "#/$defs/PlanMessage"
+    },
+    "ProseBlock": {
+      "$ref": "#/$defs/ProseBlock"
+    },
+    "Protocol": {
+      "$ref": "#/$defs/Protocol"
+    },
+    "ProtocolCategory": {
+      "$ref": "#/$defs/ProtocolCategory"
+    },
+    "ProtocolReference": {
+      "$ref": "#/$defs/ProtocolReference"
+    },
+    "ProtocolVersion": {
+      "$ref": "#/$defs/ProtocolVersion"
+    },
+    "Provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "PublicationStatus": {
+      "$ref": "#/$defs/PublicationStatus"
+    },
+    "RecordStatus": {
+      "$ref": "#/$defs/RecordStatus"
+    },
+    "RefereeStatus": {
+      "$ref": "#/$defs/RefereeStatus"
+    },
+    "RefuseConversion": {
+      "$ref": "#/$defs/RefuseConversion"
+    },
+    "ResultField": {
+      "$ref": "#/$defs/ResultField"
+    },
+    "RunOutcome": {
+      "$ref": "#/$defs/RunOutcome"
+    },
+    "RunOutcomeKind": {
+      "$ref": "#/$defs/RunOutcomeKind"
+    },
+    "RunOutput": {
+      "$ref": "#/$defs/RunOutput"
+    },
+    "RunResult": {
+      "$ref": "#/$defs/RunResult"
+    },
+    "RunState": {
+      "$ref": "#/$defs/RunState"
+    },
+    "SIValue": {
+      "$ref": "#/$defs/SIValue"
+    },
+    "ScalingClass": {
+      "$ref": "#/$defs/ScalingClass"
+    },
+    "Scenario": {
+      "$ref": "#/$defs/Scenario"
+    },
+    "ScenarioAssumption": {
+      "$ref": "#/$defs/ScenarioAssumption"
+    },
+    "ScenarioDim": {
+      "$ref": "#/$defs/ScenarioDim"
+    },
+    "ScopeHit": {
+      "$ref": "#/$defs/ScopeHit"
+    },
+    "SensitivityEntry": {
+      "$ref": "#/$defs/SensitivityEntry"
+    },
+    "SensitivityRow": {
+      "$ref": "#/$defs/SensitivityRow"
+    },
+    "SessionScope": {
+      "$ref": "#/$defs/SessionScope"
+    },
+    "SourceType": {
+      "$ref": "#/$defs/SourceType"
+    },
+    "Step": {
+      "$ref": "#/$defs/Step"
+    },
+    "StockSolution": {
+      "$ref": "#/$defs/StockSolution"
+    },
+    "Strain": {
+      "$ref": "#/$defs/Strain"
+    },
+    "SystemMessage": {
+      "$ref": "#/$defs/SystemMessage"
+    },
+    "Tier": {
+      "$ref": "#/$defs/Tier"
+    },
+    "TierResult": {
+      "$ref": "#/$defs/TierResult"
+    },
+    "TierState": {
+      "$ref": "#/$defs/TierState"
+    },
+    "TierValue": {
+      "$ref": "#/$defs/TierValue"
+    },
+    "TimerState": {
+      "$ref": "#/$defs/TimerState"
+    },
+    "ToolMessage": {
+      "$ref": "#/$defs/ToolMessage"
+    },
+    "UncheckedStatus": {
+      "$ref": "#/$defs/UncheckedStatus"
+    },
+    "UserMessage": {
+      "$ref": "#/$defs/UserMessage"
+    },
+    "ValueRange": {
+      "$ref": "#/$defs/ValueRange"
+    }
+  },
+  "title": "GeneratedSchemaIndex",
+  "type": "object"
+}

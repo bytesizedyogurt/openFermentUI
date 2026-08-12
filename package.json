@@ -15,7 +15,9 @@
     "test:deep": "node scripts/deep-paths.mjs",
     "bundle:single": "pnpm build && node scripts/bundle-single.mjs",
     "check:biosteam": "tsx scripts/check-biosteam.ts",
-    "capture:fixtures": "tsx scripts/capture-fixtures.ts"
+    "capture:fixtures": "tsx scripts/capture-fixtures.ts",
+    "gen:types": "node scripts/gen-types.mjs",
+    "check:schema": "python3 packages/core/scripts/validate_fixtures.py"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",
@@ -34,6 +36,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "json-schema-to-typescript": "^15.0.4",
     "playwright": "^1.62.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
