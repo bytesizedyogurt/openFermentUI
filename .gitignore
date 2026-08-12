@@ -3,3 +3,6 @@ dist/
 .DS_Store
 *.local
 .vite/
+
+# Scratch scripts (screenshot harnesses, audit probes). Never committed.
+scripts/_*
