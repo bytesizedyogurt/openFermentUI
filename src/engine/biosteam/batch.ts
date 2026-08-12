@@ -121,6 +121,18 @@ export function sizeBatch(
     N_reactors = N_given;
   }
 
+  // Upstream divides by `1 - 1/N_reactors` when no loading time is given, and
+  // by `N_reactors` in either case, so these two vessel counts raise
+  // ZeroDivisionError there. JavaScript would instead return Infinity or NaN
+  // and let it travel silently into a cost correlation, so the same inputs are
+  // rejected here. Only a caller-supplied count can reach them: the sizing
+  // above floors the iterative branch at two vessels.
+  if (N_reactors === 0 || (loading_time === undefined && N_reactors === 1)) {
+    throw new Error(
+      `N_reactors = ${N_reactors} leaves a zero divisor; upstream raises ZeroDivisionError on this input`,
+    );
+  }
+
   let V_i: number;
   let tau_loading: number;
   if (loading_time === undefined) {

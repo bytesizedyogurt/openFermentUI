@@ -56,6 +56,25 @@ import {
 
 const USD = (v: number): string => (Number.isFinite(v) ? fmt(v) : '—');
 
+/**
+ * Money, in the magnitude a reader can hold.
+ *
+ * `fmt` switches to scientific notation above a million, which is right for a
+ * titer and wrong for a capital cost: a ladder reading $1.83×10⁶ then $5.16×10⁶
+ * then $484,682.7 makes the reader do the comparison the chart was supposed to
+ * do for them. Millions get an M, thousands get separators, and nothing gets a
+ * decimal it has not earned.
+ */
+function money(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `${sign}$${Math.round(abs).toLocaleString('en-US')}`;
+  return `${sign}$${abs.toFixed(2)}`;
+}
+
 /** A "view as table" disclosure — the accessibility floor for every chart. */
 function ChartTable({ headers, rows }: { headers: string[]; rows: (string | number)[][] }) {
   return (
@@ -135,7 +154,7 @@ function CapitalLadder({ r }: { r: PlantResult }) {
             <div className="text-body">{row.label}</div>
             <div className="text-caption text-ink-soft">{row.note}</div>
           </div>
-          <div className="font-num text-body whitespace-nowrap">${USD(row.value)}</div>
+          <div className="font-num text-body whitespace-nowrap">{money(row.value)}</div>
           <div className="col-span-2 h-1 rounded-full bg-ink-soft/15 overflow-hidden">
             <div
               className="h-full rounded-full bg-accent/70"
@@ -181,8 +200,8 @@ function EquipmentTable({ r }: { r: PlantResult }) {
                 <td className="py-1.5 pr-3 font-num whitespace-nowrap">{u.ID}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap">{u.line}</td>
                 <td className="py-1.5 pr-3 whitespace-nowrap text-ink-soft">{u.areaName}</td>
-                <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">${USD(u.purchaseCost)}</td>
-                <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">${USD(u.installedCost)}</td>
+                <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">{money(u.purchaseCost)}</td>
+                <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">{money(u.installedCost)}</td>
                 <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">
                   {u.powerKW ? `${fmt(u.powerKW)} kW` : '—'}
                 </td>
@@ -237,7 +256,7 @@ function EquipmentTable({ r }: { r: PlantResult }) {
                                 <span className="text-ink-soft/70"> · F<sub>BM</sub> {u.F_BM[k]}</span>
                               </dt>
                               <dd className="text-caption font-num text-right py-0.5 whitespace-nowrap">
-                                ${USD(v * (u.parallel[k] ?? 1))}
+                                {money(v * (u.parallel[k] ?? 1))}
                               </dd>
                             </div>
                           ))}
@@ -269,10 +288,10 @@ function EquipmentTable({ r }: { r: PlantResult }) {
               {r.units.length} units
             </td>
             <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">
-              ${USD(r.capital.purchaseCost)}
+              {money(r.capital.purchaseCost)}
             </td>
             <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">
-              ${USD(r.capital.installedEquipmentCost)}
+              {money(r.capital.installedEquipmentCost)}
             </td>
             <td className="py-1.5 pr-3 text-right font-num whitespace-nowrap">
               {fmt(r.process.powerConsumption)} kW
@@ -534,8 +553,8 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
         <Card className="p-4">
           <Stat
             label="Total capital investment"
-            value={USD(result.capital.TCI / 1e6)}
-            unit="M USD"
+            value={money(result.capital.TCI).replace(/^\$/, '')}
+            unit="USD"
             sub={`${result.units.length} unit operations`}
           />
         </Card>
@@ -550,9 +569,9 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
         <Card className="p-4">
           <Stat
             label="Annual operating cost"
-            value={USD(result.operating.AOC / 1e6)}
-            unit="M USD yr⁻¹"
-            sub={`${USD(result.operating.materialCost / 1e6)}M feedstock`}
+            value={money(result.operating.AOC).replace(/^\$/, '')}
+            unit="USD yr⁻¹"
+            sub={`${money(result.operating.materialCost)} feedstock`}
           />
         </Card>
       </div>
@@ -577,8 +596,8 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
             skid, because nobody has published a costing correlation into it for them. Those units
             are costed by correlations written for this app and marked{' '}
             <span className="chip chip-warn">authored</span> in the equipment table. The split is{' '}
-            <span className="font-num">${USD(split.biosteam / 1e6)}M</span> bioSTEAM against{' '}
-            <span className="font-num">${USD(split.authored / 1e6)}M</span> authored.
+            <span className="font-num">{money(split.biosteam)}</span> bioSTEAM against{' '}
+            <span className="font-num">{money(split.authored)}</span> authored.
           </Callout>
         )}
         {result.warnings.length > 0 && (
@@ -617,7 +636,11 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
             </div>
             <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={areaData} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <BarChart
+                  data={areaData}
+                  layout="vertical"
+                  margin={{ left: 8, right: 16, bottom: 18 }}
+                >
                   <CartesianGrid stroke={theme.grid} horizontal={false} />
                   <XAxis
                     type="number"
@@ -674,7 +697,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
                 <div key={label as string} className={cx('contents', i === 4 && 'font-medium')}>
                   <dt className="py-0.5 text-ink-soft">{label}</dt>
                   <dd className="py-0.5 text-right font-num whitespace-nowrap">
-                    ${USD((v as number) / 1e6)}M
+                    {money(v as number)}
                   </dd>
                 </div>
               ))}
@@ -699,7 +722,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
               </dd>
               <dt className="py-0.5 text-ink-soft">Power cost</dt>
               <dd className="py-0.5 text-right font-num whitespace-nowrap">
-                ${USD(result.operating.powerCost / 1e6)}M yr⁻¹
+                {money(result.operating.powerCost)} yr⁻¹
               </dd>
             </dl>
           </Card>
@@ -787,7 +810,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
                   ).map(([label, v]) => (
                     <div key={label} className="flex justify-between gap-4">
                       <span className="text-ink-soft">{label}</span>
-                      <span className="font-num">${USD(v)}</span>
+                      <span className="font-num">{money(v)}</span>
                     </div>
                   ))}
                 </div>

@@ -16,6 +16,7 @@ import { CE } from '@/engine/biosteam/cepci';
 import {
   MATERIAL_DENSITIES_LB_PER_FT3,
   PRESSURE_VESSEL_MATERIAL_FACTORS,
+  checkVesselBounds,
   computeVesselWeightAndWallThickness,
   computeVerticalVesselPurchaseCost,
   computeVerticalVesselPlatformAndLaddersPurchaseCost,
@@ -26,7 +27,7 @@ import {
   computeNumberOfTanksAndPurchaseCost,
 } from '@/engine/biosteam/tanks';
 import { sizeBatch } from '@/engine/biosteam/batch';
-import { PAtKLaRiet } from '@/engine/biosteam/aeration';
+import { C_O2_L, PAtKLaRiet, logMeanDrivingForce } from '@/engine/biosteam/aeration';
 
 const FT_PER_M = 3.28084;
 const PSI_PER_PA = 1.450377e-4;
@@ -418,15 +419,36 @@ export class AeratedBioreactor extends BioUnit {
     this.setDesign('Diameter', D_m, 'm');
     this.setDesign('Length', L_m, 'm');
 
-    // Oxygen demand -> required kLa -> gassed power. Driving force is taken
-    // between saturation and the 20%-of-saturation the culture is held at,
-    // which is the usual dissolved-oxygen setpoint.
+    // Oxygen demand -> required kLa -> gassed power.
+    //
+    // The driving force is the number this whole calculation pivots on, and it
+    // is worth taking seriously rather than assuming. Saturation comes from the
+    // ported Henry's law rather than a remembered "0.21 mol/m³ in air": at the
+    // pressure a real fermenter runs at, that figure is 17% low, and because
+    // power goes as kLa^(1/b) with b = 0.6, a 17% error in the driving force is
+    // a 30% error in the electricity bill.
+    //
+    // Two things raise it above the textbook air-water value. The headspace is
+    // held at a slight overpressure for sterility, and the liquid is twelve
+    // metres deep, so the sparger sees roughly twice the partial pressure the
+    // surface does. Averaging the two logarithmically is the same correction a
+    // counter-current exchanger gets, and it is what the ported
+    // `log_mean_driving_force` is for.
     const workingV_m3 = V * this.V_wf;
     const workingV_L = workingV_m3 * 1000;
     const OTR_mol_hr = this.OUR * workingV_L; // mol O₂/hr per vessel
-    // Saturation at 1 atm air, 30 °C ≈ 0.21 mol/m³; driving force is 80% of it.
-    const C_sat = 0.21; // mol/m³
-    const driving = C_sat * 0.8;
+
+    const P_head = 1.3e5; // Pa absolute, sterile overpressure
+    const liquidHeight_m = L_m * this.V_wf;
+    const P_sparger = P_head + 1000 * 9.80665 * liquidHeight_m;
+    const Y_O2 = 0.21; // air, and gas-phase depletion up the column is not modelled
+    // C_O2_L returns kmol/m³; the rest of this works in mol/m³.
+    const C_sat_top = C_O2_L(this.T, Y_O2 * P_head) * 1000;
+    const C_sat_bottom = C_O2_L(this.T, Y_O2 * P_sparger) * 1000;
+    // Held at 20% of air saturation, the usual dissolved-oxygen setpoint.
+    const C_dissolved = 0.2 * C_sat_top;
+    const driving = logMeanDrivingForce(C_sat_top, C_sat_bottom, C_dissolved);
+    this.setDesign('Oxygen driving force', driving, 'mol/m^3');
     const kLa = OTR_mol_hr / 3600 / (driving * workingV_m3); // 1/s
     this.setDesign('kLa', kLa, '1/s');
     const P_W = PAtKLaRiet(kLa, workingV_m3, this.U);
@@ -481,9 +503,20 @@ export class AeratedBioreactor extends BioUnit {
     this.parallel['Agitator'] = N;
     this.F_BM['Agitator'] = 1.5;
 
-    if (L_ft < 12 || L_ft > 40) {
+    // Upstream raises these from inside `PressureVessel._vertical_vessel_design`.
+    // This port left them to the calling unit, which means a unit that forgets
+    // to ask gets no warning at all — a silent extrapolation, which is the one
+    // outcome worse than a loud one. Both bounds are asked here, in bioSTEAM's
+    // own words.
+    for (const w of [
+      checkVesselBounds('Vertical vessel weight', weight),
+      checkVesselBounds('Vertical vessel length', L_ft),
+    ]) {
+      if (w) this.warnings.push(w);
+    }
+    if (P_psia < 14.68) {
       this.warnings.push(
-        `Vessel length ${L_ft.toPrecision(3)} ft is outside the 12–40 ft range bioSTEAM's vertical-vessel weight correlation was validated over.`,
+        'Vessel designed below atmospheric pressure. The ASME vacuum codes are not implemented — wall thickness may be under-estimated and stiffening rings may be required.',
       );
     }
   }

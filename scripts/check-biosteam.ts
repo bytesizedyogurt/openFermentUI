@@ -19,6 +19,7 @@ import { wegstein, solveBrentq } from '../src/engine/biosteam/solvers';
 import { ELECTRICITY_PRICE, getAgent } from '../src/engine/biosteam/utilities';
 import { DEPRECIATION_SCHEDULES } from '../src/engine/biosteam/tea';
 import { spearmanRho } from '../src/engine/biosteam/stats';
+import { C_O2_L, PAtKLaRiet, kLaStirredRiet, henrysLawConstant } from '../src/engine/biosteam/aeration';
 import { FLOWSHEETS } from '../src/sim/flowsheets/plants';
 import { evaluatePlant } from '../src/engine/plant';
 
@@ -103,6 +104,19 @@ eq('low_pressure_steam regeneration price', getAgent('low_pressure_steam').regen
 eq('cooling_water T', getAgent('cooling_water').T, 305.372);
 eq('cooling_water regeneration price', getAgent('cooling_water').regenerationPrice, 4.8785e-4);
 eq('chilled_water heat transfer price', getAgent('chilled_water').heatTransferPrice, 5e-6);
+
+// ── aeration (aeration.py) ─────────────────────────────────────────────
+//
+// Upstream ships no doctest for these, so the cases are identities rather than
+// remembered values: inverting the kLa correlation must return the power that
+// produced it, and the Henry constant at the reference temperature must be the
+// reference constant. Both would catch a transposed exponent, which is the
+// failure mode that matters here — power goes as kLa^(1/b), so an error in b
+// is magnified rather than damped.
+eq('P_at_kLa_Riet inverts kLa_stirred_Riet', PAtKLaRiet(kLaStirredRiet(5000, 10, 0.03), 10, 0.03), 5000, 1e-9);
+eq('Henry constant at the reference temperature', henrysLawConstant(298.15, 0.0013, 1500), 0.0013, 1e-12);
+// Air-water at 25 °C and one atmosphere: 8.85 mg/L, the textbook value.
+eq('dissolved oxygen at saturation, 25 °C, 1 atm air', C_O2_L(298.15, 0.21 * 101325) * 32e3, 8.85, 5e-3);
 
 // ── depreciation (_tea.py) ─────────────────────────────────────────────
 {

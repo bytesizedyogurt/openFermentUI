@@ -199,6 +199,7 @@ export const S2_FLOWSHEET: FlowsheetSpec = {
   limitations: [
     'No vapour–liquid equilibrium: the steriliser and the dryer are sized on latent and sensible heat, not on a property package.',
     'Aeration is modelled at a single oxygen uptake rate rather than over the fed-batch profile, so the peak demand that actually sizes the compressor is not resolved.',
+    'The sparged gas is treated as air all the way up the column. Real off-gas is oxygen-depleted, so the driving force here is optimistic and the agitator power correspondingly low.',
     'The ultrafiltration skid has no published cost correlation; its capital is a vendor-class figure written here, not borrowed from bioSTEAM.',
   ],
 };

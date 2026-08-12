@@ -36,6 +36,7 @@ import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
+import { clearPlantCache } from '@/engine/plant';
 import { toSI } from '@/engine/units';
 
 export type Theme = 'bench' | 'night';
@@ -900,6 +901,11 @@ export const useStore = create<OFState>()((set, get) => ({
     })),
 
   resetDemo: () => {
+    // The plant cache is keyed by model and point, and a reset restores the
+    // seeded points — so a stale entry would be returned rather than recomputed,
+    // and the reset would silently not reset the one thing on the screen that
+    // costs anything to compute.
+    clearPlantCache();
     set({ ...seedState(), grids: seedGrids(), toasts: [] });
     get().toast({
       text: 'Workspace restored to the seeded corpus — review decisions, runs and scenario edits discarded',
