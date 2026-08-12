@@ -123,14 +123,33 @@ The simulation holds itself to eight conditions (design §11):
 ```
 src/data/       seed content as typed TS modules — becomes API fixtures in production
 src/data/corpus/  the 15 literature threads, A–O, one file per thread group
-src/engine/     pure logic, unit-testable without UI, ships to production unchanged
+src/engine/     pure logic, unit-testable without UI — see the routing table below
 src/sim/        latency model and chat flow player — two files, retired last
 src/components/ shared primitives (citation chip, data table, quantity field, …)
 src/screens/    one file per screen
 ```
 
-The split is deliberate. `engine/` (units, scaling, diff, metrics, interpolation, retrieval)
-is production code already. `data/` seed modules keep the shapes the API will return, so they
+This section used to say `engine/` "ships to production unchanged." That was the root
+error, and correcting it is what the migration in `CLAUDE.md` exists to do. Most of what
+lives there has to be callable by BioSTEAM, PaperQA2, Inspect AI and the extraction
+pipeline, and all four of those are Python-only. A TypeScript implementation that a Python
+one has to agree with is not a head start; it is two things to keep in step.
+
+Where each concern belongs:
+
+| Concern | Language | Home |
+|---|---|---|
+| Entity schema (`Provenance`, `FieldId`, `Paper`, `ExtractionRecord`, …) | Python | `openferment-core` → generated to TS |
+| Unit conversion, dimensional analysis, refusals | Python | `openferment-core` → golden-fixture cross-check in TS |
+| Extraction metrics / gold-set scoring | Python | Inspect AI scorer |
+| Corpus retrieval | Python | PaperQA2 — do not reimplement |
+| Protocol scaling math | Python | drives physical lab work |
+| Protocol version diff | Python | Ledger concern, must run server-side |
+| Cost model authoring | Python | BioSTEAM |
+| Grid interpolation for sliders | TypeScript | legitimate UI convenience, stays |
+| Screens, components, routing, store | TypeScript | stays |
+
+`data/` seed modules keep the shapes the API will return, so they
 become fixtures and contract tests. `sim/` is designed to be thrown away, and the scripted chat flows survive
 it as regression fixtures for the real agent's answer formatter. It is not quite a clean seam:
 the simulated job pacing lives in `store.ts` (`startJob`/`tickJobs`) rather than in `sim/`, so

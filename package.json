@@ -1,5 +1,5 @@
 {
-  "name": "openferment",
+  "name": "@openferment/ui",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -14,7 +14,8 @@
     "verify": "pnpm typecheck && pnpm check:seed && pnpm check:biosteam && pnpm build && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
     "test:deep": "node scripts/deep-paths.mjs",
     "bundle:single": "pnpm build && node scripts/bundle-single.mjs",
-    "check:biosteam": "tsx scripts/check-biosteam.ts"
+    "check:biosteam": "tsx scripts/check-biosteam.ts",
+    "capture:fixtures": "tsx scripts/capture-fixtures.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

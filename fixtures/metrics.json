@@ -1,0 +1,425 @@
+{
+  "meta": {
+    "generatedFrom": "src/engine/metrics.ts",
+    "note": "Inputs are synthetic and exist only to exercise every branch. RUN_OUTPUTS in the app is empty and stays empty until a real extractor has been run.",
+    "goldRecordsInSeed": 0,
+    "syntheticGoldUsed": true
+  },
+  "inputs": {
+    "syntheticGold": [
+      {
+        "id": "synthetic-gold-1",
+        "paperId": "A1",
+        "sectionId": "s1",
+        "quote": "Both reach ~0.2% of total soluble protein for intracellular GFP/YFP",
+        "field": "expression_pct_tsp",
+        "value": 0.2,
+        "unit": "% TSP",
+        "si": {
+          "value": 0.2,
+          "unit": "% TSP"
+        },
+        "confidence": 0.9,
+        "status": "unverified",
+        "provenance": "curated",
+        "organism": "uvm4",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "curationRef": "§2 A1",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §2 A1 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 0.2,
+          "unit": "% TSP"
+        }
+      },
+      {
+        "id": "synthetic-gold-2",
+        "paperId": "A1",
+        "sectionId": "s1",
+        "quote": "Selection used paromomycin at 10 µg/mL and zeocin",
+        "field": "medium_component_conc",
+        "value": 10,
+        "unit": "µg mL⁻¹",
+        "si": {
+          "value": 0.01,
+          "unit": "kg m⁻³"
+        },
+        "confidence": 0.9,
+        "status": "unverified",
+        "provenance": "curated",
+        "componentTag": "paromomycin",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "curationRef": "§2 A1",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §2 A1 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 10,
+          "unit": "µg mL⁻¹"
+        }
+      },
+      {
+        "id": "synthetic-gold-3",
+        "paperId": "A2",
+        "sectionId": "s1",
+        "quote": "Untransformed CC-4350 and Elow47 show no detectable YFP",
+        "field": "expression_pct_tsp",
+        "value": 0,
+        "unit": "% TSP",
+        "si": {
+          "value": 0,
+          "unit": "% TSP"
+        },
+        "confidence": 0.7,
+        "status": "unverified",
+        "provenance": "curated",
+        "organism": "cw15",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "negativeResult": true,
+        "curationRef": "§2 A2",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §2 A2 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 0,
+          "unit": "% TSP"
+        }
+      },
+      {
+        "id": "synthetic-gold-4",
+        "paperId": "A7",
+        "sectionId": "s1",
+        "quote": "an 8.6-fold increase in transgenic protein accumulation over random insertion",
+        "field": "fold_improvement",
+        "value": 8.6,
+        "unit": "×",
+        "si": {
+          "value": 8.6,
+          "unit": "×"
+        },
+        "confidence": 0.9,
+        "status": "unverified",
+        "provenance": "curated",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "comparativeBaseline": "random insertion of the same transgene (vs targeted integration at the LHCBM1 safe harbor)",
+        "curationRef": "§2 A7",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §2 A7 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 8.6,
+          "unit": "×"
+        }
+      },
+      {
+        "id": "synthetic-gold-5",
+        "paperId": "A7",
+        "sectionId": "s1",
+        "quote": "a 60-fold increase in valencene production when a sesquiterpene synthase was co-expressed there",
+        "field": "fold_improvement",
+        "value": 60,
+        "unit": "×",
+        "si": {
+          "value": 60,
+          "unit": "×"
+        },
+        "confidence": 0.7,
+        "status": "unverified",
+        "provenance": "curated",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "comparativeBaseline": "baseline not stated in OF-COR-001; the entry contrasts targeted integration at the LHCBM1 safe harbor with random insertion",
+        "curationRef": "§2 A7",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §2 A7 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 60,
+          "unit": "×"
+        }
+      },
+      {
+        "id": "synthetic-gold-6",
+        "paperId": "B5",
+        "sectionId": "s1",
+        "quote": "colonies appear on selection in 7–10 days for cw15 and UVM4",
+        "field": "time_to_colony",
+        "value": 8.5,
+        "unit": "d",
+        "si": {
+          "value": 204,
+          "unit": "h"
+        },
+        "confidence": 0.9,
+        "status": "unverified",
+        "provenance": "curated",
+        "organism": "cw15",
+        "isPrimary": true,
+        "evidenceClass": "literature",
+        "range": {
+          "low": 7,
+          "high": 10
+        },
+        "curationRef": "§3 B5",
+        "audit": [
+          {
+            "at": "2026-08-10 09:00",
+            "who": "S. Creighton",
+            "action": "curated from OF-COR-001 §3 B5 — pending verification against source"
+          }
+        ],
+        "gold": {
+          "value": 8.5,
+          "unit": "d"
+        }
+      }
+    ],
+    "runs": [
+      {
+        "run": "v0.4",
+        "results": [
+          {
+            "goldRecordId": "synthetic-gold-1",
+            "outcome": "match",
+            "extracted": {
+              "value": 1,
+              "unit": "% TSP"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-2",
+            "outcome": "value_mismatch",
+            "extracted": {
+              "value": 2,
+              "unit": "µg mL⁻¹"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-3",
+            "outcome": "unit_error",
+            "extracted": {
+              "value": 3,
+              "unit": "% TSP"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-4",
+            "outcome": "span_error",
+            "extracted": {
+              "value": 4,
+              "unit": "×"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-5",
+            "outcome": "miss",
+            "extracted": {
+              "value": 5,
+              "unit": "×"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-6",
+            "outcome": "match",
+            "extracted": {
+              "value": 6,
+              "unit": "d"
+            }
+          }
+        ],
+        "falsePositives": [
+          {
+            "id": "synthetic-fp-1",
+            "paperId": "A1",
+            "field": "expression_pct_tsp",
+            "extracted": {
+              "value": 99,
+              "unit": "g L⁻¹"
+            },
+            "note": "Spurious extraction, synthetic."
+          }
+        ]
+      },
+      {
+        "run": "v0.4r",
+        "results": [
+          {
+            "goldRecordId": "record-that-was-deleted",
+            "outcome": "match"
+          },
+          {
+            "goldRecordId": "synthetic-gold-1",
+            "outcome": "match",
+            "extracted": {
+              "value": 1,
+              "unit": "% TSP"
+            }
+          },
+          {
+            "goldRecordId": "synthetic-gold-2",
+            "outcome": "value_mismatch",
+            "extracted": {
+              "value": 2,
+              "unit": "µg mL⁻¹"
+            }
+          }
+        ],
+        "falsePositives": []
+      },
+      {
+        "run": "v0.3",
+        "results": [],
+        "falsePositives": []
+      }
+    ]
+  },
+  "computeRunMetrics": [
+    {
+      "label": "every outcome, plus a false positive",
+      "extractorRun": "v0.4",
+      "out": {
+        "run": "v0.4",
+        "micro": {
+          "precision": 0.3333333333333333,
+          "recall": 0.3333333333333333,
+          "f1": 0.3333333333333333,
+          "tp": 2,
+          "fp": 4,
+          "fn": 4
+        },
+        "perField": [
+          {
+            "field": "expression_pct_tsp",
+            "nGold": 2,
+            "tp": 1,
+            "fp": 2,
+            "fn": 1,
+            "precision": 0.3333333333333333,
+            "recall": 0.5,
+            "f1": 0.4,
+            "topFailure": "unit normalization"
+          },
+          {
+            "field": "fold_improvement",
+            "nGold": 2,
+            "tp": 0,
+            "fp": 1,
+            "fn": 2,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "topFailure": "wrong span"
+          },
+          {
+            "field": "medium_component_conc",
+            "nGold": 1,
+            "tp": 0,
+            "fp": 1,
+            "fn": 1,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "topFailure": "value mismatch"
+          },
+          {
+            "field": "time_to_colony",
+            "nGold": 1,
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1,
+            "topFailure": "—"
+          }
+        ],
+        "goldSize": 6,
+        "papersCovered": 4
+      }
+    },
+    {
+      "label": "a result naming a gold record that no longer exists",
+      "extractorRun": "v0.4r",
+      "out": {
+        "run": "v0.4r",
+        "micro": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "perField": [
+          {
+            "field": "expression_pct_tsp",
+            "nGold": 2,
+            "tp": 1,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1,
+            "topFailure": "—"
+          },
+          {
+            "field": "medium_component_conc",
+            "nGold": 1,
+            "tp": 0,
+            "fp": 1,
+            "fn": 1,
+            "precision": 0,
+            "recall": 0,
+            "f1": 0,
+            "topFailure": "value mismatch"
+          }
+        ],
+        "goldSize": 6,
+        "papersCovered": 4
+      }
+    },
+    {
+      "label": "no results and no false positives",
+      "extractorRun": "v0.3",
+      "out": {
+        "run": "v0.3",
+        "micro": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "perField": [],
+        "goldSize": 6,
+        "papersCovered": 4
+      }
+    }
+  ]
+}

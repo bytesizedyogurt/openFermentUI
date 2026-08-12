@@ -235,6 +235,22 @@ const ALIASES: Record<string, string> = {
   'm3': 'm³',
 };
 
+/**
+ * The unit and alias tables, exported read-only so a fixture capture can be
+ * exhaustive rather than transcribed.
+ *
+ * Phase 0 of the Python migration pins this engine's behaviour as
+ * language-neutral JSON, and a hand-written list of "the units I remembered"
+ * would pin the wrong thing — the one alias nobody typed into the fixture is
+ * exactly the one that would silently diverge. Exporting the tables costs
+ * nothing at runtime and makes the capture provably complete.
+ */
+export const UNIT_TABLE: Readonly<Record<string, UnitDef>> = U;
+export const UNIT_ALIASES: Readonly<Record<string, string>> = ALIASES;
+export const SI_UNIT_BY_FAMILY: Readonly<Record<string, string>> = SI_UNIT;
+/** Cross-family pairs the engine refuses with an explanation rather than a bare error. */
+export const REFUSAL_PAIRS: readonly { a: string; b: string; because: string }[] = REFUSALS;
+
 export function normalizeUnit(raw: string): string | null {
   const t = raw.trim();
   if (t in U) return t;

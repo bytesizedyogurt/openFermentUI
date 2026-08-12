@@ -1,0 +1,908 @@
+{
+  "meta": {
+    "generatedFrom": "src/engine/diff.ts",
+    "realPairs": 1,
+    "note": "Only PR-TAP-01 carries a second version, so the real pairs never produce an added or removed STEP. The synthetic pair covers those branches and describes nothing that happened."
+  },
+  "diffVersions": [
+    {
+      "protocol": "PR-TAP-01",
+      "from": "1.0",
+      "to": "1.1",
+      "out": {
+        "steps": [
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            },
+            "b": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            },
+            "b": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            },
+            "b": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "refs": [
+                "M2"
+              ],
+              "note": "The Tris–acetate pairing is the defining feature of the formulation M2 introduced. OF-COR-001 does not transcribe M2’s numbers, so treat the charges on this sheet as local values traceable to the Sourcebook, not as figures read from the 1965 paper."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p4",
+              "text": "Add {{stock:Ammonium chloride}} of salt stock S. That single addition delivers the whole salt charge: {{qty:Ammonium chloride}} ammonium chloride, {{qty:Magnesium sulfate heptahydrate}} magnesium sulfate heptahydrate and {{qty:Calcium chloride dihydrate}} calcium chloride dihydrate.",
+              "note": "Invert the stock bottle three times before drawing. Magnesium settles out of stock S within a week at bench temperature.",
+              "refs": [
+                "r-M8-3"
+              ]
+            },
+            "b": {
+              "id": "p4",
+              "text": "Add {{stock:Ammonium chloride}} of salt stock S. That single addition delivers the whole salt charge: {{qty:Ammonium chloride}} ammonium chloride, {{qty:Magnesium sulfate heptahydrate}} magnesium sulfate heptahydrate and {{qty:Calcium chloride dihydrate}} calcium chloride dihydrate.",
+              "note": "Invert the stock bottle three times before drawing. Magnesium settles out of stock S within a week at bench temperature.",
+              "refs": [
+                "r-M8-3"
+              ]
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p5",
+              "text": "Add {{stock:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate stock P, delivering {{qty:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate salts. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears."
+            },
+            "b": {
+              "id": "p5",
+              "text": "Add {{stock:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate stock P, delivering {{qty:Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)}} of phosphate salts. Add it slowly and directly into the vortex, with the calcium already dispersed. A local excess of phosphate against undiluted calcium precipitates calcium phosphate as a haze that never clears."
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p6",
+              "text": "Add {{qty:Hutner trace element solution}} of Hutner trace element solution. The stock should be clear amber; discard any bottle showing a rust-coloured precipitate, which means the chelate has broken down and the iron is no longer bioavailable."
+            },
+            "b": {
+              "id": "p6",
+              "text": "Add {{qty:Revised trace element solution (Kropat 2011)}} of the revised trace element solution, made up to the Kropat table with each metal complexed separately before combining. Do not substitute the Hutner stock at this step: the two supplements are not interchangeable and the batch record must say which was used.",
+              "refs": [
+                "M3"
+              ],
+              "note": "OF-COR-001 §14 records M3 as the modern trace-element recipe and its title claims increased biomass and growth rate; the corpus does not transcribe the table itself, and this platform holds no measured comparison between the two supplements. If you want that comparison, it is an experiment, not a lookup."
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p7",
+              "text": "In the fume hood, add {{qty:Glacial acetic acid}} of glacial acetic acid to the stirring medium and mix for 2 min."
+            },
+            "b": {
+              "id": "p7",
+              "text": "In the fume hood, add {{qty:Glacial acetic acid}} of glacial acetic acid straight into the vortex. This addition is both the acetate carbon charge and the titrant for the Tris.",
+              "note": "Weigh the acid rather than pipetting it at any scale above 2 L. Glacial acetic acid wets a polypropylene tip badly and volumetric delivery carries a 3–4 % error that propagates straight into the starting pH."
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p8",
+              "text": "Read the pH and adjust to the setpoint on your medium sheet by dropwise addition of 1 M hydrochloric acid or 1 M sodium hydroxide. Record the setpoint you used and the volume of titrant.",
+              "note": "OF-COR-001 records no pH setpoint for TAP. Whatever value your sheet carries, write it on the batch record — a medium released against an unrecorded setpoint cannot be compared with the next batch."
+            },
+            "b": {
+              "id": "p8",
+              "text": "Stir for 2 min, then read the pH and record it. Do not titrate to a setpoint. A reading outside the window on your medium sheet means the Tris or the acetate was weighed wrong, and the batch is remade rather than corrected.",
+              "note": "A batch reading high has usually had Tris weighed against the formula weight of the hydrochloride salt. A batch reading low has had acid added twice. Neither is fixed by titration — both are fixed by reweighing."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p9",
+              "text": "Transfer the medium to a 1 L Class A graduated cylinder and make up to the 1,000 mL mark with deionised water. Rinse the beaker with two small aliquots of the make-up water and add the rinses, so the trace element charge transfers quantitatively."
+            },
+            "b": {
+              "id": "p9",
+              "text": "Transfer the medium to a 1 L Class A graduated cylinder and make up to the 1,000 mL mark with deionised water. Rinse the beaker with two small aliquots of the make-up water and add the rinses, so the trace element charge transfers quantitatively."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p10",
+              "text": "Split the medium between two 500 mL media bottles, leaving at least 20 % headspace in each. Cap one quarter turn back from finger tight and mark each cap with {{qty:Autoclave indicator tape}} of autoclave indicator tape."
+            },
+            "b": {
+              "id": "p10",
+              "text": "Split the medium between two 500 mL media bottles, leaving at least 20 % headspace in each. Cap one quarter turn back from finger tight and mark each cap with {{qty:Autoclave indicator tape}} of autoclave indicator tape."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p11",
+              "text": "Autoclave at 121 °C for 20 min on a liquids cycle with slow exhaust. Start the timer when the chamber reaches setpoint, not when the cycle is initiated.",
+              "timerSec": 1200,
+              "timerLabel": "Autoclave 121 °C, 20 min"
+            },
+            "b": {
+              "id": "p11",
+              "text": "Autoclave at 121 °C for 20 min on a liquids cycle with slow exhaust. Start the timer when the chamber reaches setpoint, not when the cycle is initiated.",
+              "timerSec": 1200,
+              "timerLabel": "Autoclave 121 °C, 20 min"
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p12",
+              "text": "Leave the bottles in the closed chamber until it reads below 80 °C, then move them to the bench and let them reach room temperature before tightening the caps.",
+              "timerSec": 2700,
+              "timerLabel": "Cool to room temperature"
+            },
+            "b": {
+              "id": "p12",
+              "text": "Leave the bottles in the closed chamber until it reads below 80 °C, then move them to the bench and let them reach room temperature before tightening the caps.",
+              "timerSec": 2700,
+              "timerLabel": "Cool to room temperature"
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p13",
+              "text": "Withdraw 5 mL from one bottle into a clean tube and confirm the pH of the cooled medium is within 0.2 units of the setpoint recorded at step p8."
+            },
+            "b": {
+              "id": "p13",
+              "text": "Withdraw 5 mL from one bottle into a clean tube and read the pH of the cooled medium. Release the batch only if it is within 0.1 units of the pre-autoclave reading and the medium is water-clear. A faint white haze is calcium phosphate; discard the batch and repeat step p5 more slowly."
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p14",
+              "text": "Label each bottle with the medium name, this protocol version, the preparation date and your initials. Store at room temperature in the dark and use within 8 weeks.",
+              "note": "Discard at the first sign of turbidity. TAP is unbuffered against microbial growth and a contaminated bottle will not always look cloudy until it is heavily overgrown."
+            },
+            "b": {
+              "id": "p14",
+              "text": "Label each bottle with the medium name, this protocol version, the trace-element supplement used, the preparation date and your initials. Store at room temperature in the dark and use within 8 weeks.",
+              "note": "The supplement identity belongs on the label, not only on the batch sheet. A growth difference between two campaigns is uninterpretable if nobody can tell which bottles carried which trace elements."
+            }
+          }
+        ],
+        "materials": [
+          {
+            "kind": "unchanged",
+            "name": "Tris base",
+            "a": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            },
+            "b": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Glacial acetic acid",
+            "a": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            },
+            "b": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Ammonium chloride",
+            "a": {
+              "name": "Ammonium chloride",
+              "amount": 0.38,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.005,
+              "stock": {
+                "conc": 0.0152,
+                "unit": "mL"
+              },
+              "sourceRecordId": "r-M8-3"
+            },
+            "b": {
+              "name": "Ammonium chloride",
+              "amount": 0.38,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.005,
+              "stock": {
+                "conc": 0.0152,
+                "unit": "mL"
+              },
+              "sourceRecordId": "r-M8-3"
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Magnesium sulfate heptahydrate",
+            "a": {
+              "name": "Magnesium sulfate heptahydrate",
+              "amount": 0.1,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.001,
+              "stock": {
+                "conc": 0.004,
+                "unit": "mL"
+              }
+            },
+            "b": {
+              "name": "Magnesium sulfate heptahydrate",
+              "amount": 0.1,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.001,
+              "stock": {
+                "conc": 0.004,
+                "unit": "mL"
+              }
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Calcium chloride dihydrate",
+            "a": {
+              "name": "Calcium chloride dihydrate",
+              "amount": 0.05,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.001,
+              "stock": {
+                "conc": 0.002,
+                "unit": "mL"
+              }
+            },
+            "b": {
+              "name": "Calcium chloride dihydrate",
+              "amount": 0.05,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.001,
+              "stock": {
+                "conc": 0.002,
+                "unit": "mL"
+              }
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)",
+            "a": {
+              "name": "Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)",
+              "amount": 1.61,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01,
+              "stock": {
+                "conc": 0.161,
+                "unit": "mL"
+              }
+            },
+            "b": {
+              "name": "Potassium phosphate salts (K₂HPO₄ + KH₂PO₄)",
+              "amount": 1.61,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01,
+              "stock": {
+                "conc": 0.161,
+                "unit": "mL"
+              }
+            }
+          },
+          {
+            "kind": "added",
+            "name": "Revised trace element solution (Kropat 2011)",
+            "b": {
+              "name": "Revised trace element solution (Kropat 2011)",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.1
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Deionised water (make-up)",
+            "a": {
+              "name": "Deionised water (make-up)",
+              "amount": 900,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 10
+            },
+            "b": {
+              "name": "Deionised water (make-up)",
+              "amount": 900,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 10
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "pH 7.00 calibration buffer sachet",
+            "a": {
+              "name": "pH 7.00 calibration buffer sachet",
+              "amount": 1,
+              "unit": "sachet",
+              "scaling": "fixed",
+              "precision": 1
+            },
+            "b": {
+              "name": "pH 7.00 calibration buffer sachet",
+              "amount": 1,
+              "unit": "sachet",
+              "scaling": "fixed",
+              "precision": 1
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "pH 4.01 calibration buffer sachet",
+            "a": {
+              "name": "pH 4.01 calibration buffer sachet",
+              "amount": 1,
+              "unit": "sachet",
+              "scaling": "fixed",
+              "precision": 1
+            },
+            "b": {
+              "name": "pH 4.01 calibration buffer sachet",
+              "amount": 1,
+              "unit": "sachet",
+              "scaling": "fixed",
+              "precision": 1
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Autoclave indicator tape",
+            "a": {
+              "name": "Autoclave indicator tape",
+              "amount": 1,
+              "unit": "strip",
+              "scaling": "fixed",
+              "precision": 1
+            },
+            "b": {
+              "name": "Autoclave indicator tape",
+              "amount": 1,
+              "unit": "strip",
+              "scaling": "fixed",
+              "precision": 1
+            }
+          },
+          {
+            "kind": "removed",
+            "name": "Hutner trace element solution",
+            "a": {
+              "name": "Hutner trace element solution",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.1
+            }
+          }
+        ],
+        "changelog": "Trace-element supplement changed from the Hutner solution to the revised mineral nutrient supplement of Kropat et al. 2011 (M3), which OF-COR-001 §14 records as the modern trace-element recipe and whose title states that it increases biomass and growth rate in C. reinhardtii. The corpus transcribes neither recipe, so this is a change of cited source and stock identity, not a change of transcribed numbers: the volume added per litre is unchanged and the operator makes the stock to the published Kropat table. Second change: the titrate-to-setpoint pH step is replaced by a pass/fail check. Acetic acid in this medium is stoichiometrically paired with the Tris rather than trimmed against a target, and back-titrating with hydrochloric acid loads the medium with chloride while leaving the acetate carbon charge short."
+      }
+    }
+  ],
+  "syntheticInputs": {
+    "from": {
+      "version": "synthetic-a",
+      "changelog": "Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8).",
+      "baseBatch": {
+        "value": 1,
+        "unit": "L",
+        "label": "batch"
+      },
+      "materials": [
+        {
+          "name": "Tris base",
+          "amount": 2.42,
+          "unit": "g",
+          "scaling": "per_batch_volume",
+          "precision": 0.01
+        },
+        {
+          "name": "Glacial acetic acid",
+          "amount": 1,
+          "unit": "mL",
+          "scaling": "per_batch_volume",
+          "precision": 0.05
+        }
+      ],
+      "equipment": [
+        "1 L borosilicate beaker and a 50 mm PTFE-coated stir bar",
+        "Magnetic stirrer (stirring only, no heat)",
+        "Analytical balance readable to 0.001 g and a top-pan balance readable to 0.01 g",
+        "pH meter with a refillable glass electrode and an ATC probe",
+        "1 L Class A graduated cylinder",
+        "2 × 500 mL borosilicate media bottles with vented closures",
+        "Autoclave capable of a 121 °C liquids cycle with slow exhaust",
+        "P1000 and P5000 air-displacement pipettes"
+      ],
+      "safety": [
+        "Glacial acetic acid is corrosive and its vapour is a respiratory irritant. Dispense it in a fume hood in nitrile gloves and splash goggles, and add the acid to the bulk medium — never medium to acid.",
+        "Autoclave at 121 °C on a liquids cycle with slow exhaust. Do not open the chamber until the display reads below 80 °C and the pressure gauge has fully returned to zero; bottles of hot medium boil over violently when depressurised.",
+        "Cap media bottles one quarter turn back from finger tight before autoclaving. A fully sealed bottle can rupture in the chamber.",
+        "The trace element stock carries soluble copper, zinc, manganese and molybdenum salts. Collect rinse water in the heavy-metal waste carboy rather than the sink."
+      ],
+      "steps": [
+        {
+          "id": "p1",
+          "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+          "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+        },
+        {
+          "id": "p2",
+          "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+        },
+        {
+          "id": "p3",
+          "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+          "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+          "refs": [
+            "M1"
+          ]
+        }
+      ],
+      "estMinutes": {
+        "active": 40,
+        "total": 105
+      },
+      "references": [
+        {
+          "paperId": "M1",
+          "note": "The Chlamydomonas Sourcebook — the TAP reference this recipe descends from. Catalogued only; OF-COR-001 transcribes its cultivation conditions (22 °C, 50–100 µE m⁻² s⁻¹, mixotrophic) but not its medium composition."
+        },
+        {
+          "paperId": "M2",
+          "note": "Gorman & Levine 1965 — the original Tris-acetate-phosphate formulation. Author string flagged [verify] in the corpus; no composition transcribed."
+        },
+        {
+          "recordId": "r-M8-3",
+          "note": "Standard TAP contains 0.38 g L⁻¹ NH₄Cl — the only TAP composition figure in the corpus. Curated, unverified against the source PDF."
+        }
+      ]
+    },
+    "to": {
+      "version": "synthetic-b",
+      "changelog": "Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8).",
+      "baseBatch": {
+        "value": 1,
+        "unit": "L",
+        "label": "batch"
+      },
+      "materials": [
+        {
+          "name": "Tris base",
+          "amount": 2.42,
+          "unit": "g",
+          "scaling": "per_batch_volume",
+          "precision": 0.01
+        },
+        {
+          "name": "Glacial acetic acid",
+          "amount": 2,
+          "unit": "mL",
+          "scaling": "per_batch_volume",
+          "precision": 0.05
+        },
+        {
+          "name": "Synthetic added material",
+          "amount": 2.42,
+          "unit": "g",
+          "scaling": "per_batch_volume",
+          "precision": 0.01
+        }
+      ],
+      "equipment": [
+        "1 L borosilicate beaker and a 50 mm PTFE-coated stir bar",
+        "Magnetic stirrer (stirring only, no heat)",
+        "Analytical balance readable to 0.001 g and a top-pan balance readable to 0.01 g",
+        "pH meter with a refillable glass electrode and an ATC probe",
+        "1 L Class A graduated cylinder",
+        "2 × 500 mL borosilicate media bottles with vented closures",
+        "Autoclave capable of a 121 °C liquids cycle with slow exhaust",
+        "P1000 and P5000 air-displacement pipettes"
+      ],
+      "safety": [
+        "Glacial acetic acid is corrosive and its vapour is a respiratory irritant. Dispense it in a fume hood in nitrile gloves and splash goggles, and add the acid to the bulk medium — never medium to acid.",
+        "Autoclave at 121 °C on a liquids cycle with slow exhaust. Do not open the chamber until the display reads below 80 °C and the pressure gauge has fully returned to zero; bottles of hot medium boil over violently when depressurised.",
+        "Cap media bottles one quarter turn back from finger tight before autoclaving. A fully sealed bottle can rupture in the chamber.",
+        "The trace element stock carries soluble copper, zinc, manganese and molybdenum salts. Collect rinse water in the heavy-metal waste carboy rather than the sink."
+      ],
+      "steps": [
+        {
+          "id": "p2",
+          "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air. (edited)"
+        },
+        {
+          "id": "synthetic-inserted-step",
+          "text": "Inserted step.",
+          "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+        },
+        {
+          "id": "p3",
+          "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+          "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+          "refs": [
+            "M1"
+          ]
+        }
+      ],
+      "estMinutes": {
+        "active": 40,
+        "total": 105
+      },
+      "references": [
+        {
+          "paperId": "M1",
+          "note": "The Chlamydomonas Sourcebook — the TAP reference this recipe descends from. Catalogued only; OF-COR-001 transcribes its cultivation conditions (22 °C, 50–100 µE m⁻² s⁻¹, mixotrophic) but not its medium composition."
+        },
+        {
+          "paperId": "M2",
+          "note": "Gorman & Levine 1965 — the original Tris-acetate-phosphate formulation. Author string flagged [verify] in the corpus; no composition transcribed."
+        },
+        {
+          "recordId": "r-M8-3",
+          "note": "Standard TAP contains 0.38 g L⁻¹ NH₄Cl — the only TAP composition figure in the corpus. Curated, unverified against the source PDF."
+        }
+      ]
+    }
+  },
+  "diffVersionsSynthetic": [
+    {
+      "label": "added, removed, modified and reordered steps",
+      "out": {
+        "steps": [
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            },
+            "b": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air. (edited)"
+            }
+          },
+          {
+            "kind": "added",
+            "b": {
+              "id": "synthetic-inserted-step",
+              "text": "Inserted step.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            },
+            "b": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            }
+          },
+          {
+            "kind": "removed",
+            "a": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          }
+        ],
+        "materials": [
+          {
+            "kind": "unchanged",
+            "name": "Tris base",
+            "a": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            },
+            "b": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          },
+          {
+            "kind": "modified",
+            "name": "Glacial acetic acid",
+            "a": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            },
+            "b": {
+              "name": "Glacial acetic acid",
+              "amount": 2,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            }
+          },
+          {
+            "kind": "added",
+            "name": "Synthetic added material",
+            "b": {
+              "name": "Synthetic added material",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          }
+        ],
+        "changelog": "Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8)."
+      }
+    },
+    {
+      "label": "reverse direction",
+      "out": {
+        "steps": [
+          {
+            "kind": "added",
+            "b": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          },
+          {
+            "kind": "modified",
+            "a": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air. (edited)"
+            },
+            "b": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            },
+            "b": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            }
+          },
+          {
+            "kind": "removed",
+            "a": {
+              "id": "synthetic-inserted-step",
+              "text": "Inserted step.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          }
+        ],
+        "materials": [
+          {
+            "kind": "unchanged",
+            "name": "Tris base",
+            "a": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            },
+            "b": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          },
+          {
+            "kind": "modified",
+            "name": "Glacial acetic acid",
+            "a": {
+              "name": "Glacial acetic acid",
+              "amount": 2,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            },
+            "b": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            }
+          },
+          {
+            "kind": "removed",
+            "name": "Synthetic added material",
+            "a": {
+              "name": "Synthetic added material",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          }
+        ],
+        "changelog": "Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8)."
+      }
+    },
+    {
+      "label": "a version against itself",
+      "out": {
+        "steps": [
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            },
+            "b": {
+              "id": "p1",
+              "text": "Calibrate the pH meter immediately before use. Run a two-point calibration with {{qty:pH 7.00 calibration buffer sachet}} of pH 7.00 buffer followed by {{qty:pH 4.01 calibration buffer sachet}} of pH 4.01 buffer, at the temperature at which the medium will be measured.",
+              "note": "A slope below 95 % almost always means a dried or protein-fouled junction. Refill and recondition the electrode rather than accepting the reading."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            },
+            "b": {
+              "id": "p2",
+              "text": "Place a clean 1 L beaker on the stirrer, add {{qty:Deionised water (make-up)}} of deionised water and drop in the stir bar. Stir at roughly 300 rpm: fast enough to raise a shallow vortex, slow enough not to entrain air."
+            }
+          },
+          {
+            "kind": "unchanged",
+            "a": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            },
+            "b": {
+              "id": "p3",
+              "text": "Weigh {{qty:Tris base}} of Tris base and add it to the stirring water. Stir for 3–5 min until the solution is completely clear. Tris that has not dissolved by this point will not dissolve once the acetate is in.",
+              "note": "OF-COR-001 does not transcribe the Sourcebook composition, so this Tris charge is the local working value and not a figure read out of M1 or M2. Check it against your own medium sheet before the first batch of a campaign.",
+              "refs": [
+                "M1"
+              ]
+            }
+          }
+        ],
+        "materials": [
+          {
+            "kind": "unchanged",
+            "name": "Tris base",
+            "a": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            },
+            "b": {
+              "name": "Tris base",
+              "amount": 2.42,
+              "unit": "g",
+              "scaling": "per_batch_volume",
+              "precision": 0.01
+            }
+          },
+          {
+            "kind": "unchanged",
+            "name": "Glacial acetic acid",
+            "a": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            },
+            "b": {
+              "name": "Glacial acetic acid",
+              "amount": 1,
+              "unit": "mL",
+              "scaling": "per_batch_volume",
+              "precision": 0.05
+            }
+          }
+        ],
+        "changelog": "Initial release. Written against the Sourcebook baseline catalogued as M1 — liquid or agar-solidified TAP, mixotrophic — with the classic Hutner trace-element supplement and a conventional titrate-to-setpoint pH step. The ammonium charge is the single composition figure the corpus states (r-M8-3, OF-COR-001 §14 M8)."
+      }
+    }
+  ]
+}
