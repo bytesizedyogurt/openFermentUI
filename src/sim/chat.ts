@@ -6,8 +6,8 @@
 import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '@/data/types';
 import { FLOWS } from '@/data/flows';
 import { useStore, nextId, isAggregatable } from '@/store';
-import { tokenize, expandQuery, searchCorpus } from '@/engine/retrieval';
-import { PAPERS, STRAINS } from '@/data/source';
+import { tokenize, expandQuery } from './intent';
+import { PAPERS, STRAINS, search } from '@/data/source';
 import { ONTOLOGY } from '@/data/source';
 import { fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
@@ -412,19 +412,25 @@ async function playEntityLookup(input: string, entities: Entities, sessionId: st
     patch(sessionId, planId, { done: i + 1 } as Partial<ChatMessage>);
   }
 
-  const hits: ChatRetrievalHit[] = searchCorpus(state.papers, input, 5).map((h) => ({
-    paperId: h.paperId,
-    sectionId: h.sectionId,
-    score: h.score,
-    snippet: h.snippet,
-  }));
+  // Retrieval goes through the data-source adapter. Under "bundled" that is a
+  // substring filter, not a retriever, and `found.method` is how the trace says
+  // so — it is passed straight into the tool call's args, where the Ask screen
+  // renders it under the call and the Inspector prints it with the rest.
+  const found = await search(input, { k: 5, papers: state.papers });
+  const hits: ChatRetrievalHit[] = found.hits;
 
   push(sessionId, {
     kind: 'tool',
     id: nextId('m'),
     call: {
       name: 'corpus.search',
-      args: { query: input, k: 5, ...(entities.organism ? { organism: entities.organism } : {}) },
+      args: {
+        query: input,
+        k: 5,
+        ...(entities.organism ? { organism: entities.organism } : {}),
+        backend: found.backend,
+        method: found.method,
+      },
       durationMs: 780,
       retrieval: hits,
     },
@@ -505,17 +511,20 @@ async function playDecline(input: string, sessionId: string) {
     patch(sessionId, planId, { done: i + 1 } as Partial<ChatMessage>);
   }
 
-  const hits = searchCorpus(useStore.getState().papers, input, 3);
+  const found = await search(input, { k: 3, papers: useStore.getState().papers });
   push(sessionId, {
     kind: 'tool',
     id: nextId('m'),
     call: {
+      // k is 3 because 3 is what was asked for. It read 6 here while the call
+      // requested 3, which is exactly the kind of small lie a trace must not
+      // tell about itself.
       name: 'corpus.search',
-      args: { query: input, k: 6 },
+      args: { query: input, k: 3, backend: found.backend, method: found.method },
       durationMs: 820,
-      // Real (weak) hits — the trace shows what was actually retrieved, even
+      // Real (weak) hits — the trace shows what was actually returned, even
       // when nothing cleared the support threshold.
-      retrieval: hits.filter((h) => h.score > 0.55),
+      retrieval: found.hits.filter((h) => h.score > 0.55),
     },
     expanded: false,
   });

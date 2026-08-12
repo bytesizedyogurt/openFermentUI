@@ -68,6 +68,14 @@
  * one per language — Python for the pipeline, the parity-checked TS mirror in
  * `@/engine/units` here — rather than a converted number copied between them.
  *
+ * ── SEARCH ────────────────────────────────────────────────────────────────
+ * `search()` at the foot of this file is the same seam for one query rather
+ * than one collection: under "api" it asks the server, which is where PaperQA2
+ * will answer it, and under "bundled" it runs a substring filter in the
+ * browser. Unlike the collections, the two backends are NOT equivalent here —
+ * one is retrieval and one is a stand-in — so a search result carries the
+ * method that produced it and the UI states it. See the section comment there.
+ *
  * ── WHAT DID NOT MOVE ─────────────────────────────────────────────────────
  * `COST_MODELS` stays in `src/data/scenarios.ts`. Its `evaluate` is a function;
  * `CostModel` and `ResultGrid` were established in Phase 1 as the two types
@@ -257,4 +265,180 @@ export function initCorpus(): Promise<void> {
   if (BACKEND === 'bundled') return Promise.resolve();
   if (!pending) pending = fetchAll();
   return pending;
+}
+
+// ── Search ────────────────────────────────────────────────────────────────
+//
+// Retrieval is Python's. PaperQA2 owns it, and the "api" backend is the seam
+// it will arrive through. What went away to make room for this was a
+// BM25-flavoured `searchCorpus` in `src/engine/retrieval.ts`: a second ranking
+// function, in the wrong language, that would have had to agree with PaperQA2
+// forever. It is not ported and not replaced.
+//
+// The "bundled" backend still has to answer, and it has no server to ask. So it
+// runs a substring filter in the browser. That is a demo affordance, not
+// retrieval, and the difference is invisible in the output — a filter and a
+// retriever both hand back a ranked-looking list of snippets with a number
+// beside each one. So the METHOD travels with the hits, and the agent trace
+// renders it. See `ToolMessage` in `src/screens/Ask.tsx`.
+
+/**
+ * One passage a search returned.
+ *
+ * Structurally what the chat trace renders as a `ChatRetrievalHit`, and its own
+ * type on purpose: this is what a DATA SOURCE hands back, and it should not
+ * inherit chat-message members the day the trace grows one.
+ */
+export interface CorpusSearchHit {
+  paperId: string;
+  sectionId: string;
+  score: number;
+  snippet: string;
+}
+
+/** Hits plus the statement of what produced them. Never one without the other. */
+export interface CorpusSearchResult {
+  hits: CorpusSearchHit[];
+  backend: CorpusBackend;
+  /**
+   * One sentence naming what actually ran, written for a reader of the agent
+   * trace rather than for a developer. It is UI copy and it is load-bearing:
+   * it is the only thing standing between a substring filter and a reader who
+   * assumes a retrieval system produced these passages.
+   */
+  method: string;
+}
+
+export const BUNDLED_SEARCH_METHOD =
+  'Substring filter over the bundled corpus, run in the browser — not a retrieval system. ' +
+  "Score is the fraction of the query's search terms found in the passage, not a relevance ranking.";
+
+/**
+ * The server names its own method when it can; this is the fallback. It does
+ * not name PaperQA2, because this module cannot know what answered — claiming
+ * a retriever ran would be the same error in the other direction.
+ */
+const API_SEARCH_METHOD = 'Retrieval served by the corpus API; the scores are the server’s.';
+
+export interface CorpusSearchOptions {
+  /** Passages to return. */
+  k?: number;
+  /**
+   * Papers to filter, for the "bundled" backend only. The chat agent passes the
+   * STORE's copy rather than `PAPERS`, because a paper's `ingest` status changes
+   * during a session and an unparsed paper has no body to match against.
+   * Ignored under "api", where the corpus is the server's and not the client's
+   * to hand over.
+   */
+  papers?: readonly Paper[];
+}
+
+/** Words carrying no subject. Dropped so a query is scored on what it asks about. */
+const SEARCH_STOP = new Set(
+  'the a an and or of in on for with to from by at is are was were be been what which how why does do did this that these those it its as'.split(
+    ' ',
+  ),
+);
+
+/**
+ * The query's search terms: words of two characters or more that are not
+ * connective tissue, deduplicated. Deliberately NOT the scripted agent's
+ * tokenizer — that one expands domain synonyms to decide which flow answers a
+ * question, and borrowing it here would quietly make this filter look cleverer
+ * than it is.
+ */
+function searchTerms(query: string): string[] {
+  const seen = new Set<string>();
+  for (const raw of query.toLowerCase().match(/[a-z0-9µ⁻%°.-]+/g) ?? []) {
+    if (raw.length > 1 && !SEARCH_STOP.has(raw)) seen.add(raw);
+  }
+  return [...seen];
+}
+
+/** The first sentence containing a term, so the snippet shows why the row matched. */
+function firstMatchingSentence(text: string, terms: string[]): string {
+  const sentences = text.split(/(?<=\.)\s+/);
+  const hit = sentences.find((s) => {
+    const lower = s.toLowerCase();
+    return terms.some((t) => lower.includes(t));
+  });
+  const best = hit ?? sentences[0] ?? '';
+  return best.length > 220 ? best.slice(0, 217) + '…' : best;
+}
+
+/**
+ * Filter sections by substring containment.
+ *
+ * `score` is the fraction of the query's search terms the section contains —
+ * a count, stated as such in `BUNDLED_SEARCH_METHOD`. It is not a relevance
+ * model and must not be presented as one. Sections that have not been ingested
+ * are skipped: `shelf` and `failed:parse` papers are catalogued, not parsed,
+ * so there is no body text to match and a hit against one would be fiction.
+ */
+function filterBundled(papers: readonly Paper[], query: string, k: number): CorpusSearchHit[] {
+  const terms = searchTerms(query);
+  if (terms.length === 0) return [];
+  const hits: CorpusSearchHit[] = [];
+  for (const p of papers) {
+    if (p.ingest === 'shelf' || p.ingest === 'failed:parse') continue;
+    for (const s of p.sections) {
+      const hay = `${s.text} ${s.heading} ${p.title}`.toLowerCase();
+      const found = terms.filter((t) => hay.includes(t)).length;
+      if (found === 0) continue;
+      hits.push({
+        paperId: p.id,
+        sectionId: s.id,
+        score: Math.round((found / terms.length) * 100) / 100,
+        snippet: firstMatchingSentence(s.text, terms),
+      });
+    }
+  }
+  hits.sort((a, b) => b.score - a.score);
+  return hits.slice(0, k);
+}
+
+async function searchViaApi(query: string, k: number): Promise<CorpusSearchResult> {
+  const url = `${API_BASE}/search?q=${encodeURIComponent(query)}&k=${k}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`openFerment corpus: GET ${url} failed — ${res.status} ${res.statusText}`);
+  }
+  const body: unknown = await res.json();
+  const raw = (Array.isArray(body) ? body : (body as { hits?: unknown })?.hits) as unknown;
+  if (!Array.isArray(raw)) {
+    throw new Error(`openFerment corpus: ${url} did not return search hits`);
+  }
+  const method = (body as { method?: unknown })?.method;
+  return {
+    hits: raw as CorpusSearchHit[],
+    backend: 'api',
+    method: typeof method === 'string' && method.trim() ? method : API_SEARCH_METHOD,
+  };
+}
+
+/**
+ * Search the corpus.
+ *
+ * Under "api" this delegates to the server, which is where retrieval belongs
+ * and where PaperQA2 will answer it; a failed request REJECTS rather than
+ * returning nothing, for the same reason `initCorpus` does — an empty result
+ * set is indistinguishable from "the corpus has nothing on this", and that is a
+ * worse lie than a visible failure. `src/screens/Ask.tsx` catches it and offers
+ * the turn again.
+ *
+ * Under "bundled" it is a substring filter. Read `CorpusSearchResult.method`
+ * before rendering the hits: whatever shows the passages has to show what
+ * produced them.
+ */
+export async function search(
+  query: string,
+  options: CorpusSearchOptions = {},
+): Promise<CorpusSearchResult> {
+  const k = options.k ?? 6;
+  if (BACKEND === 'api') return searchViaApi(query, k);
+  return {
+    hits: filterBundled(options.papers ?? PAPERS, query, k),
+    backend: 'bundled',
+    method: BUNDLED_SEARCH_METHOD,
+  };
 }

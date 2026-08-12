@@ -1,3 +1,18 @@
+// MIRROR of the gate on ExtractionRecord in
+// packages/core/openferment_core/schema/records.py. Python is canonical.
+// Changes go there first, then here, and parity is enforced by pnpm verify.
+//
+// This copy stays because the Ledger recomputes as a reviewer corrects a
+// record, in the browser, with no server in the loop. Because it stays, the two
+// are checked against each other rather than trusted: `pnpm check:aggregation`
+// runs BOTH over the real corpus and compares every answer, including which
+// exclusion each reports — the reason string is displayed, so a multiply-
+// excluded record naming a different reason on each side is a visible
+// disagreement, not an implementation detail.
+//
+// `provenanceOf` below is NOT mirrored and has no Python counterpart: it
+// decides which tick a record renders with, which is display logic.
+//
 // Aggregation policy (OF-COR-001 §16 O8, §19; OF-FE-003 §1).
 //
 // These live in engine/ rather than store/ because they are pure functions of a

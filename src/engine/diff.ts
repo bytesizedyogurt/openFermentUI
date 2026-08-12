@@ -1,3 +1,17 @@
+// MIRROR of openferment_core/protocol/diff.py. Python is canonical. Changes go
+// there first, then here, and parity is enforced by pnpm verify.
+//
+// This file is not dead weight and is not scheduled for deletion: the UI runs
+// offline in the browser, where there is no Python, and the version-compare
+// view has to render without a round trip. The diff OF RECORD is a Ledger
+// concern and is computed server-side from the canonical models; this copy is
+// what a reviewer reads offline, and it has to say the same thing. So the
+// mirror stays — and because it stays, the agreement between the two has to be
+// mechanically checked rather than remembered. `pnpm check:protocol` replays
+// fixtures/diff.json, the language-neutral pin, against this file. If you change
+// what counts as a modification, or the order the diff comes out in, here
+// without changing it in Python, that check fails.
+//
 // Structural diff of two protocol versions (OF-DES-001 §8.11).
 import type { ProtocolVersion, Step, Material } from '@/data/types';
 

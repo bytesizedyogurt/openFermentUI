@@ -1,3 +1,16 @@
+// MIRROR of openferment_core/protocol/scale.py. Python is canonical. Changes go
+// there first, then here, and parity is enforced by pnpm verify.
+//
+// This file is not dead weight and is not scheduled for deletion: the UI runs
+// offline in the browser, where there is no Python, and a bench sheet that had
+// to make a network call before it could show an amount would be useless at the
+// bench it was printed for. So the mirror stays — and because it stays, the
+// agreement between the two has to be mechanically checked rather than
+// remembered. `pnpm check:protocol` replays fixtures/scale.json, the
+// language-neutral pin, against this file. If you change a scaling class, a
+// precision increment or the stock-volume calculation here without changing it
+// in Python, that check fails — and these numbers are weighed out by hand.
+//
 // Protocol scaling math (OF-DES-001 §8.11): quantities scale by declared
 // class, rounded to each material's precision spec so recipes stay pipettable.
 import type { Material, ProtocolVersion, Step } from '@/data/types';

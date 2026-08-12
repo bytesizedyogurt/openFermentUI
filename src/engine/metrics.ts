@@ -1,3 +1,13 @@
+// MIRROR of packages/assay/openferment_assay/metrics.py. Python is canonical.
+// Changes go there first, then here, and parity is enforced by pnpm verify.
+//
+// Scoring an extractor run belongs to Inspect AI, which is Python only, so the
+// scorer lives in packages/assay. This copy stays because the validation screen
+// recomputes live in the browser as a reviewer corrects records — a round trip
+// to a server per keystroke is not a thing that screen can do. Both sides
+// replay fixtures/metrics.json, so the agreement is checked rather than
+// remembered: `pnpm check:metrics` here, `packages/assay/tests` there.
+//
 // Validation metrics (OF-DES-001 §8.8): P/R/F1 against the gold set,
 // recomputed live from seeded per-run confusion data.
 import type { ExtractionRecord, FieldId, RunOutput } from '@/data/types';

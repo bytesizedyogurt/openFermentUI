@@ -211,6 +211,12 @@ function RetrievalCards({
 function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' }>; onInspect: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const call = m.call;
+  // What actually ran, stated by whatever ran it — `search()` in
+  // `src/data/source.ts` puts it here. A `corpus.search` row and a list of
+  // scored snippets look the same whether a retriever or a substring filter
+  // produced them, so the row says which, unfolded rather than behind the
+  // expander. Absent on scripted flows, whose tool calls ran nothing.
+  const method = typeof call.args.method === 'string' ? call.args.method : null;
   return (
     <div>
       <div className="card p-2.5">
@@ -229,6 +235,7 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
           <span className="font-num text-caption text-ink-soft shrink-0">{call.durationMs} ms</span>
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
+        {method && <p className="mt-1.5 text-caption text-ink-soft leading-snug">{method}</p>}
         {expanded && (
           <pre className="mt-2 text-[11px] font-num bg-surface-0 rounded-input p-2 overflow-x-auto">
             {JSON.stringify({ tool: call.name, args: call.args, durationMs: call.durationMs, hits: call.retrieval?.length ?? 0 }, null, 2)}

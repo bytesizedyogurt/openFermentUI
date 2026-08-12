@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openferment-assay"
+version = "0.1.0"
+description = "Gold-set scoring for openFerment extractor runs: per-field precision, recall and F1, as an Inspect AI scorer."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# `openferment-core` is not published; in this repo it resolves out of the tree
+# (see `[tool.pytest.ini_options].pythonpath` and `[tool.mypy].mypy_path` below)
+# or as an editable install of `packages/core`. It is declared rather than
+# assumed because the record schema — FieldId, RunOutput, RunOutcomeKind — is a
+# hard dependency of the counting rules, not an optional convenience.
+dependencies = ["openferment-core", "pydantic>=2.9"]
+
+[project.optional-dependencies]
+# inspect-ai is OPTIONAL on purpose. `openferment_assay.metrics` is a pure
+# function with no Inspect import anywhere in its chain, so the counting rules
+# stay testable — and the fixture parity gate stays runnable — in an
+# environment that has never seen Inspect. Only `openferment_assay.scorer`, the
+# wrapper, needs it.
+inspect = ["inspect-ai>=0.3"]
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6", "inspect-ai>=0.3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["openferment_assay"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# Same ignores as `packages/core`, for the same reason: RUF001/002/003 flag
+# "ambiguous" unicode, and this package handles the corpus's unit strings (µ,
+# ⁻¹, ×) and prints the em dash that `metrics.ts` uses for "no failures".
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+# `openferment-core` is not installed in the repo's CI path, so mypy resolves it
+# the same way pytest does — straight out of the sibling package.
+mypy_path = "../core"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Neither package is installed in the repo's CI path — `pnpm check:schema` runs
+# `packages/core` straight out of the tree — so tests resolve both the same way.
+pythonpath = [".", "../core"]
