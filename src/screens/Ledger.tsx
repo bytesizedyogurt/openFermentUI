@@ -125,7 +125,9 @@ export function Ledger() {
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-body">
+        {/* Density is a CSS variable the shell stamps on the root; a table
+            that hardcodes its own type size ignores Shift+D entirely. */}
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead>
             <tr className="text-caption uppercase tracking-wide text-ink-soft border-b border-line">
               <th className="text-left font-medium py-2 pr-3">Parameter</th>
@@ -356,7 +358,6 @@ export function ParameterPage({ field }: { field: FieldId }) {
             height={160}
             showScale
             className="shrink-0"
-            onPick={(id) => navigate(`/ledger/records?record=${id}`)}
           />
         )}
       </div>

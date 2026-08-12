@@ -14,12 +14,15 @@ import { Scale, AlertTriangle } from 'lucide-react';
 import { PATENTS } from '@/data/patents';
 import { unparsedClaims } from '@/engine/scope';
 import { useStore } from '@/store';
-import { href, navigate } from '@/router';
+import { href } from '@/router';
 import { Card, PageHeader, SectionTitle, Callout, Explain, LinkButton } from '@/components/ui';
 
 export function Parchment() {
   const papers = useStore((s) => s.papers);
   const unparsed = unparsedClaims(PATENTS);
+  // Both halves of the ratio were unparsed.length, so it could only ever read
+  // "N of N" — it would still say "all of them" once some were parsed.
+  const totalClaims = PATENTS.reduce((n, pt) => n + pt.claims.length, 0);
 
   return (
     <div className="p-6 max-w-[1100px]">
@@ -36,7 +39,7 @@ export function Parchment() {
             patent landscape catalogued in OF-COR-001 §9. What the corpus holds for each is a
             curator&rsquo;s one-line description of its subject matter —{' '}
             <span className="font-num">{unparsed.length}</span> of{' '}
-            <span className="font-num">{unparsed.length}</span> claims carry no parsed bounds.
+            <span className="font-num">{totalClaims}</span> claims carry no parsed bounds.
           </p>
           <p>
             A scope map needs claimed regions, and a region inferred from subject matter would be a
@@ -105,17 +108,17 @@ export function Parchment() {
                       Claim {c.number}
                       {c.independent ? ' (independent)' : ''}
                       {c.parseUncertain && (
-                        <span className="text-signal-warn">
+                        <span
+                          className="text-signal-warn"
+                          title="Subject-matter note, not claim language — it cannot be tested against a record."
+                        >
                           {' '}
-                          · <AlertTriangle size={10} className="inline" aria-hidden /> not parsed
+                          · <AlertTriangle size={10} className="inline" aria-hidden /> no bounds
+                          parsed
                         </span>
                       )}
                     </div>
                     <div className="text-caption text-ink-soft mt-1 italic">{c.rawText}</div>
-                    <div className="text-caption text-signal-warn mt-1">
-                      No bounds parsed — this is the subject-matter note, not claim language. It
-                      cannot be tested against a record.
-                    </div>
                   </div>
                 ))}
               </Card>

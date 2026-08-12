@@ -215,7 +215,12 @@ export function Notary() {
                     <X size={14} className="text-signal-warn mt-0.5 shrink-0" aria-hidden />
                   )}
                   <div className="min-w-0">
-                    <div className="text-body">{r.label}</div>
+                    <div className="text-body">
+                      {/* The glyph is aria-hidden and colour is the only other
+                          carrier, so a met row said nothing at all out loud. */}
+                      <span className="sr-only">{r.met ? 'Satisfied: ' : 'Outstanding: '}</span>
+                      {r.label}
+                    </div>
                     {r.missing && (
                       <div className="text-caption text-ink-soft mt-0.5">{r.missing}</div>
                     )}

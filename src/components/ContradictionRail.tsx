@@ -52,7 +52,6 @@ export function ContradictionRail({
   aggregate,
   contradictions = [],
   height = 48,
-  onPick,
   highlightId,
   showScale = false,
   className,
@@ -62,7 +61,6 @@ export function ContradictionRail({
   contradictions?: Contradiction[];
   /** 48 inline, 160 on the parameter page, 28 inside a list row. */
   height?: number;
-  onPick?: (recordId: string) => void;
   /** Ring one mark — "this record, among its peers". */
   highlightId?: string;
   /**
@@ -137,28 +135,25 @@ export function ContradictionRail({
           />
         )}
 
+        {/* The marks are not controls. §7 asks for click-a-mark-to-open, but a
+            mark is 2px tall and 24px wide and they overlap wherever values
+            cluster — a target that cannot reliably be hit is a dead control
+            wearing a cursor. The rail is a picture; the Evidence list beneath it
+            is the interactive surface, and it reaches every record including
+            the ones plotted on top of each other. */}
         {marks.map(({ record, value }) => {
           const held = !isAggregatable(record);
           const why = aggregateExclusion(record);
           const on = record.id === highlightId;
-          // A plain span unless something can be done with a click. The rail
-          // renders inside list rows that are themselves buttons, and nesting
-          // one button in another is invalid HTML that browsers resolve by
-          // dropping the inner element.
-          const Mark = onPick ? 'button' : 'span';
           return (
-            <Mark
+            <span
               key={record.id}
-              {...(onPick
-                ? { type: 'button' as const, tabIndex: -1, onClick: () => onPick(record.id) }
-                : {})}
               className={cx(
                 'absolute left-1/2 -translate-x-1/2 rounded-[1px] block',
                 PROV_BG[provenanceOf(record)] ?? 'bg-ink-soft',
                 markClass(record),
                 held && !on && 'opacity-45',
                 on && 'ring-1 ring-ink ring-offset-0 z-10',
-                onPick && 'cursor-pointer',
               )}
               style={{
                 top: project(value) - (on ? 1.5 : 1),

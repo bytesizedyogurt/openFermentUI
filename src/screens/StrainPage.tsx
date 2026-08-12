@@ -478,7 +478,6 @@ function FieldRow({
                   c.recordIds.some((id: string) => g.all.some((p) => p.rec.id === id)),
                 )}
                 height={48}
-                onPick={(id) => navigate(`/ledger/records?record=${id}`)}
               />
               <div>
               <div>

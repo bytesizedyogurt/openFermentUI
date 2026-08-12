@@ -53,7 +53,9 @@ export function DesignIndex() {
         <section key={sc.id} className="mb-6">
           <SectionTitle>{sc.name}</SectionTitle>
           <div className="overflow-x-auto">
-            <table className="w-full text-body">
+            {/* Density is a CSS variable the shell stamps on the root; a table
+                that hardcodes its own type size ignores Shift+D entirely. */}
+            <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
               <thead>
                 <tr className="text-caption uppercase tracking-wide text-ink-soft border-b border-line">
                   <th className="text-left font-medium py-1.5 pr-3">Design</th>
@@ -112,6 +114,10 @@ function Cascade({ design }: { design: DesignRecord }) {
           title={t.state === 'absent' ? t.absentReason : t.bindingConstraint}
         >
           {t.tier} {t.state === 'absent' ? '—' : t.state === 'passed' ? '✓' : '✗'}
+          <span className="sr-only">
+            {' '}
+            {t.state}: {t.state === 'absent' ? t.absentReason : t.bindingConstraint}
+          </span>
         </span>
       ))}
     </div>

@@ -254,14 +254,21 @@ function DepositCard({
 
       {/* Failure is offered at the same visual weight as success. A radio row
           where one option is quieter than the other is a thumb on the scale. */}
-      <div className="flex flex-wrap gap-1.5 mt-2.5">
+      {/* One choice, not three switches — exposed as a radiogroup so it is
+          announced and arrow-navigable as the single decision it is. */}
+      <div
+        className="flex flex-wrap gap-1.5 mt-2.5"
+        role="radiogroup"
+        aria-label="Run outcome"
+      >
         {(['success', 'failure', 'abandoned'] as const).map((o) => {
           const meta = OUTCOME_META[o];
           return (
             <button
               key={o}
               onClick={() => setOutcome(o)}
-              aria-pressed={outcome === o}
+              role="radio"
+              aria-checked={outcome === o}
               className={cx(
                 'text-caption border rounded-btn px-2.5 py-1 transition-colors',
                 outcome === o
