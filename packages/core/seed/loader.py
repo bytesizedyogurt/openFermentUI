@@ -22,6 +22,13 @@ camelCase keys, absent optionals absent. What it does NOT do is sort, or
 recompute `si`: the adapter applies both on read, deliberately and for both
 backends, so doing it here as well would be a second implementation of a
 derivation that already has one home.
+
+One caveat, since this file defers to the adapter for it: the adapter's sort
+covers PAPERS only. A paper id encodes its order and nothing else does, so the
+other six collections come back from a bare SELECT in whatever order the server
+chose — and for ontology, protocols, scenarios and learn that order IS the
+datum. Giving each row an explicit ordinal is the fix. It has not been done, and
+it is not safe to assume it has.
 """
 
 from __future__ import annotations

@@ -137,6 +137,16 @@ def diff_summary(a: Any, b: Any, path: str = "") -> str:
             if sub:
                 return sub
         return ""
+    # Checked BEFORE equality, because `bool` is a SUBCLASS of `int` and so
+    # `1 == True` is already True in Python — the comparison below never sees a
+    # difference to report. Pydantic coerces freely across that boundary in lax
+    # mode, so a `1` typed where `false` belongs parses, re-emits as `true`, and
+    # every check here answers "unchanged". The exporter then writes the flipped
+    # fact to the corpus under a banner saying it round-tripped intact. A tool
+    # whose job is to stop the corpus being edited by accident must not be the
+    # thing that edits it.
+    if isinstance(a, bool) != isinstance(b, bool):
+        return f"{path}: {a!r} -> {b!r}"
     if a != b:
         # Float formatting differs harmlessly between the two sides; only report
         # a real change in value.

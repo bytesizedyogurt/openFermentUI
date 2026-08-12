@@ -6,7 +6,18 @@
  * be inlined. woff2 covers every browser that can run this app, so the woff
  * fallbacks are dropped rather than doubling the payload.
  *
- *   pnpm build && node scripts/bundle-single.mjs
+ *   pnpm bundle:single
+ *
+ * NOT `pnpm build && node scripts/bundle-single.mjs`, which is what this line
+ * used to say. `src/main.tsx` imports App and the store dynamically so the
+ * corpus lands before anything derives from it, and Rollup answers a dynamic
+ * import with a separate chunk. This script inlines ONE chunk, so after a plain
+ * `pnpm build` it would inline whichever chunk readdir happened to return first
+ * and leave the other two as sibling <script> imports that a file:// page
+ * cannot fetch — a 1.9 MB artifact that loads to an empty shell and reports
+ * success. `pnpm bundle:single` runs `vite build --mode offline`, which folds
+ * them back into one. The guard below makes that a requirement rather than a
+ * convention.
  */
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -15,9 +26,19 @@ const DIST = join(process.cwd(), 'dist');
 const ASSETS = join(DIST, 'assets');
 
 const files = await readdir(ASSETS);
-const jsName = files.find((f) => f.endsWith('.js'));
+const jsFiles = files.filter((f) => f.endsWith('.js'));
 const cssName = files.find((f) => f.endsWith('.css'));
-if (!jsName || !cssName) throw new Error('run `pnpm build` first');
+if (jsFiles.length === 0 || !cssName) throw new Error('run `pnpm bundle:single` (not `pnpm build`)');
+if (jsFiles.length > 1) {
+  throw new Error(
+    `dist/assets holds ${jsFiles.length} JS chunks (${jsFiles.join(', ')}), and a single-file\n` +
+      'bundle can inline exactly one. This is a code-split build; run `pnpm bundle:single`,\n' +
+      'which builds with --mode offline and folds the dynamic imports flat.\n' +
+      'Inlining one chunk and leaving the others as sibling <script> imports would\n' +
+      'produce a file that loads to an empty shell over file:// and reports success.',
+  );
+}
+const jsName = jsFiles[0];
 
 let css = await readFile(join(ASSETS, cssName), 'utf8');
 const js = await readFile(join(ASSETS, jsName), 'utf8');

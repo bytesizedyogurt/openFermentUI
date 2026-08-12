@@ -271,6 +271,14 @@ try:
     # definition against the same corpus; a second copy here would be a second
     # answer to the same question, which is the failure mode CLAUDE.md names.
     from validate_fixtures import diff_summary, identify, prune_none
+
+    # The CANONICAL unit engine (Phase 2). si is a derivation of (value, unit),
+    # and the value written into the corpus must come from the engine that owns
+    # that derivation — not from the TypeScript mirror, whose answers reach this
+    # script only because the adapter happens to compute them on read. The
+    # corpus file feeds a Postgres loader that deliberately does not recompute,
+    # so whatever is written here is what a Python consumer believes.
+    from openferment_core.units import to_si
 except Exception as exc:
     bail(f"{type(exc).__name__}: {exc}")
 
@@ -345,6 +353,40 @@ def main() -> None:
         dumped: list[Any] = []
         for i, raw in enumerate(items):
             ident = identify(raw, i)
+
+            # Recompute si here, in the canonical engine, and DISAGREE LOUDLY
+            # rather than overwrite quietly. The incoming value was computed by
+            # src/engine/units.ts; if the two ever differ on a real corpus
+            # record, that is the mirror drifting from the canon on live data —
+            # which is exactly what this migration exists to prevent, and it is
+            # worth more as a failed export than as a silently corrected number.
+            if key == "records":
+                raw = dict(raw)
+                value = raw.get("value")
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    # Categorical: no number to convert. Matches the adapter.
+                    ours = {"value": 0, "unit": raw["unit"]}
+                else:
+                    converted = to_si(float(value), raw["unit"])
+                    # An integral result is written WITHOUT a trailing .0, which
+                    # is not cosmetic: JavaScript has one number type, so the
+                    # rest of this file spells 204.0 as 204, and a Python float
+                    # leaking its spelling in here would rewrite 55 lines of the
+                    # corpus to say the same numbers differently. Same rule as
+                    # keep_int, applied before the value reaches it.
+                    si_value = converted.value
+                    if isinstance(si_value, float) and si_value.is_integer():
+                        si_value = int(si_value)
+                    ours = {"value": si_value, "unit": converted.unit}
+                theirs = raw.get("si")
+                if theirs is not None and prune_none(theirs) != prune_none(ours):
+                    failures.append(
+                        f"{key}/{ident}: si disagrees between the engines — "
+                        f"TypeScript {short(theirs)}, Python {short(ours)}"
+                    )
+                    continue
+                raw["si"] = ours
+
             try:
                 parsed = model.model_validate(raw)
             except ValidationError as e:
@@ -470,11 +512,29 @@ if (report.fatal) {
 }
 
 if (!report.ok) {
+  // Two kinds of failure land here and they point at different files, so the
+  // advice has to split. A model that rejects a real corpus entity is the
+  // model's fault; two unit engines disagreeing about the same record is
+  // neither engine's data and neither the model's — it is the mirror drifting
+  // from the canon, and sending that reader to edit a Pydantic model would
+  // waste their afternoon.
+  const engineDrift = report.failures.filter((f) => f.includes('si disagrees between the engines'));
   console.error(
-    `✗ ${report.failures.length} validation failure(s). Per CLAUDE.md the MODEL is wrong here,\n` +
-      '  not the data — the corpus is real literature and its gaps are deliberate.\n' +
-      '  Report these before changing anything:\n',
+    `✗ ${report.failures.length} validation failure(s). Report these before changing anything:\n`,
   );
+  if (engineDrift.length < report.failures.length) {
+    console.error(
+      '  Where a real corpus entity fails to parse, the MODEL is wrong and not the\n' +
+        '  data — the corpus is real literature and its gaps are deliberate.\n',
+    );
+  }
+  if (engineDrift.length) {
+    console.error(
+      `  ${engineDrift.length} of these are the two unit engines disagreeing. Python is\n` +
+        '  canonical (CLAUDE.md); src/engine/units.ts is the mirror. Fix the mirror,\n' +
+        '  and expect `pnpm check:units` to be failing too.\n',
+    );
+  }
   for (const f of report.failures) console.error(`  - ${f}`);
   console.error('\nNothing was written.');
   process.exit(1);
@@ -487,9 +547,50 @@ if (report.collections.length !== COLLECTIONS.length) {
   process.exit(1);
 }
 
-// ── 4. write ───────────────────────────────────────────────────────────
+// ── 4. write, or check ─────────────────────────────────────────────────
 // Only now, and only all seven. Everything above this line is a check, so a
 // failed run leaves the previous export exactly as it was.
+//
+// `--check` writes nothing and instead asserts that what WOULD be written is
+// already on disk. That is the fixed-point property stated as a test, which is
+// what lets it live in `pnpm verify`: the corpus is the source now, and without
+// this the corpus could stop being a fixed point of its own models — or an edit
+// could be silently rewritten — and the harness would stay green. CLAUDE.md
+// invariant 1 makes `pnpm verify` the regression harness for this migration,
+// and a harness that cannot see the corpus is not one.
+const CHECK_ONLY = process.argv.includes('--check');
+
+if (CHECK_ONLY) {
+  const drifted: string[] = [];
+  for (const c of report.collections) {
+    const path = join(OUT, `${c.key}.json`);
+    let onDisk: string;
+    try {
+      onDisk = readFileSync(path, 'utf8');
+    } catch {
+      drifted.push(`${relative(ROOT, path)} is missing`);
+      continue;
+    }
+    if (onDisk !== c.text) {
+      drifted.push(
+        `${relative(ROOT, path)} differs from what the models would emit ` +
+          `(${onDisk.length} bytes on disk, ${c.text.length} expected)`,
+      );
+    }
+  }
+  if (drifted.length) {
+    console.error('✗ data/corpus is not a fixed point of the schema:');
+    for (const d of drifted) console.error(`  - ${d}`);
+    console.error('\n  Run `pnpm export:corpus` to normalise, then read the diff before');
+    console.error('  committing it — the exporter rewrites to the canonical form, and a');
+    console.error('  change you did not intend is a corpus edit you did not intend.');
+    process.exit(1);
+  }
+  const n = report.collections.reduce((a, c) => a + c.count, 0);
+  console.log(`✓ data/corpus — ${n} entities validate and are a fixed point of the models.`);
+  process.exit(0);
+}
+
 mkdirSync(OUT, { recursive: true });
 
 console.log('openFerment corpus export');

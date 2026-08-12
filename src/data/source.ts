@@ -42,9 +42,20 @@
  * without `ORDER BY` returns whatever Postgres feels like, and an API response
  * assembled from a query carries whatever order the query gave it. Baked into
  * the exporter, the ordering invariant would hold under "bundled" and quietly
- * break the day the same collection arrives over HTTP. Applied here it holds
- * for every backend, by construction, for the cost of one comparator over a few
- * hundred entries.
+ * break the day the same collection arrives over HTTP.
+ *
+ * KNOWN GAP, stated because the sentence above used to overclaim it. This is
+ * true of PAPERS ONLY, because a paper's id encodes its order and the sort can
+ * therefore be reconstructed from the row itself. The other six collections
+ * carry no ordering key at all — for `ontology`, `protocols`, `scenarios` and
+ * `learn`, array order IS the datum — so no comparator here can restore an
+ * order the transport dropped. Under "bundled" the JSON array order is the
+ * order, and it holds. Under "api", and for the Postgres loader, PRESERVING
+ * ARRAY ORDER IS A REQUIREMENT ON THE TRANSPORT, and nothing currently
+ * enforces it: reverse `scenarios.json` and the fermOS landing screen leads
+ * with a different plant and a different headline price. Closing this properly
+ * means an explicit ordinal on each row, which is a schema change and belongs
+ * with the work that makes the api backend real.
  *
  * The SI twin, because `si` is a derivation of (value, unit), not an
  * independent datum — that is exactly why `records.ts` recomputed it rather
