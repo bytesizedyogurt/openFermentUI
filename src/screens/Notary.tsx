@@ -152,7 +152,7 @@ export function Notary() {
           {COLUMNS.map((col) => {
             const n = DESIGNS.filter((d) => statusKey(d.publication) === col.status).length;
             return (
-              <span key={col.status} className={n === 0 ? 'text-ink-soft/60' : 'text-ink'}>
+              <span key={col.status} className={n === 0 ? 'text-ink-soft' : 'text-ink'}>
                 <span className="font-num">{n}</span>{' '}
                 <span className="text-ink-soft">{col.label.toLowerCase()}</span>
               </span>

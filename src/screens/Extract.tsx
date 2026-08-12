@@ -9,7 +9,7 @@ import { useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { unitFamily, asNumber, convert } from '@/engine/units';
 import { aggregate } from '@/engine/posterior';
-import { ContradictionRail } from '@/components/ContradictionRail';
+import { ContradictionRail, railMarksByField } from '@/components/ContradictionRail';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceLegend, type ProvKind } from '@/components/Provenance';
@@ -128,32 +128,19 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
 export default function Extract() {
   const route = useRoute();
   const paperParam = route.query.get('paper');
+  // Two screens link here with ?record=; nothing read it, so those links opened
+  // an unfiltered table of 134 rows and left the reader to find one id.
+  const recordParam = route.query.get('record');
 
   const records = useStore((s) => s.records);
   const contradictions = useStore((s) => s.contradictions);
 
   // Every corpus value per field, converted once, so each row's rail plots the
   // same axis rather than recomputing per render.
-  const peersByField = useMemo(() => {
-    const m = new Map<FieldId, { record: ExtractionRecord; value: number }[]>();
-    for (const r of records) {
-      const def = ONTOLOGY_BY_ID[r.field];
-      const n = asNumber(r.value);
-      if (!def || n === null) continue;
-      let v = n;
-      if (def.canonicalUnit && r.unit !== def.canonicalUnit) {
-        try {
-          v = convert(n, r.unit, def.canonicalUnit);
-        } catch {
-          continue;
-        }
-      }
-      const list = m.get(r.field) ?? [];
-      list.push({ record: r, value: v });
-      m.set(r.field, list);
-    }
-    return m;
-  }, [records]);
+  const peersByField = useMemo(
+    () => railMarksByField(records, (f) => ONTOLOGY_BY_ID[f]?.canonicalUnit ?? ''),
+    [records],
+  );
   const papers = useStore((s) => s.papers);
   const unitMode = useStore((s) => s.ui.unitMode);
   const density = useStore((s) => s.ui.density);
@@ -193,8 +180,13 @@ export default function Extract() {
 
   // ?paper=SP-004 narrows the whole table before the facets ever see it.
   const rows = useMemo(
-    () => (paperParam ? allRows.filter((r) => r.rec.paperId === paperParam) : allRows),
-    [allRows, paperParam],
+    () =>
+      recordParam
+        ? allRows.filter((r) => r.rec.id === recordParam)
+        : paperParam
+          ? allRows.filter((r) => r.rec.paperId === paperParam)
+          : allRows,
+    [allRows, paperParam, recordParam],
   );
 
   // Identity-stable so DataTable's effect never drives a render loop.
@@ -335,7 +327,6 @@ export default function Extract() {
           marks={peersByField.get(rec.field) ?? []}
           aggregate={aggregate((peersByField.get(rec.field) ?? []).map((x) => x.record))}
           contradictions={contradictions.filter((c) => c.recordIds.includes(rec.id))}
-          height={28}
           highlightId={rec.id}
         />
       ),

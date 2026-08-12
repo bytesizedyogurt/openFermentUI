@@ -477,7 +477,6 @@ function FieldRow({
                 contradictions={contradictions.filter((c) =>
                   c.recordIds.some((id: string) => g.all.some((p) => p.rec.id === id)),
                 )}
-                height={48}
               />
               <div>
               <div>

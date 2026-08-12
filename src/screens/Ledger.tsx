@@ -13,7 +13,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed } from 'lucide-rea
 import { useStore } from '@/store';
 import { provenanceOf, isAggregatable, aggregateExclusion, EXCLUSION_NOTE } from '@/engine/aggregation';
 import { buildParameterView } from '@/engine/posterior';
-import { ContradictionRail, type RailMark } from '@/components/ContradictionRail';
+import { ContradictionRail, toRailMarks } from '@/components/ContradictionRail';
 import { ONTOLOGY, ONTOLOGY_BY_ID, ONTOLOGY_GAPS, FAMILY_LABEL, fieldName } from '@/data/ontology';
 import type { ExtractionRecord, FieldId, ParameterView } from '@/data/types';
 import { convert, asNumber, fmt, explainRefusal } from '@/engine/units';
@@ -22,25 +22,6 @@ import { Card, PageHeader, SectionTitle, Callout, Explain, LinkButton, cx } from
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
 // ── shared helpers ─────────────────────────────────────────────────────
-
-/** Records converted into the field's canonical unit, for plotting. */
-function railMarks(records: ExtractionRecord[], unit: string): RailMark[] {
-  const out: RailMark[] = [];
-  for (const r of records) {
-    const n = asNumber(r.value);
-    if (n === null) continue;
-    let v = n;
-    if (unit && r.unit !== unit) {
-      try {
-        v = convert(n, r.unit, unit);
-      } catch {
-        continue;
-      }
-    }
-    out.push({ record: r, value: v });
-  }
-  return out;
-}
 
 function useViews(): ParameterView[] {
   const records = useStore((s) => s.records);
@@ -143,7 +124,7 @@ export function Ledger() {
           <tbody>
             {withRecords.map((v) => {
               const unit = v.aggregate?.unit ?? v.def.canonicalUnit;
-              const marks = railMarks(byField.get(v.field) ?? [], unit);
+              const marks = toRailMarks(byField.get(v.field) ?? [], unit);
               return (
                 <tr
                   key={v.field}
@@ -187,7 +168,6 @@ export function Ledger() {
                       marks={marks}
                       aggregate={v.aggregate}
                       contradictions={v.contradictions}
-                      height={34}
                     />
                   </td>
                   <td className="py-1.5">
@@ -274,7 +254,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
   }
 
   const unit = view.aggregate?.unit ?? def.canonicalUnit;
-  const marks = railMarks(mine, unit);
+  const marks = toRailMarks(mine, unit);
   const excludedById = new Map(view.excluded.map((e) => [e.recordId, e.reason]));
 
   // Downstream consumers, resolved from the live store rather than a seeded list.
@@ -304,12 +284,12 @@ export function ParameterPage({ field }: { field: FieldId }) {
 
   return (
     <div className="p-6 max-w-[1200px]">
-      <button
+      <a
+        href={href('/ledger')}
         className="text-caption text-ink-soft hover:text-ink inline-flex items-center gap-1 mb-2"
-        onClick={() => navigate('/ledger')}
       >
         <ArrowLeft size={12} aria-hidden /> Ledger
-      </button>
+      </a>
 
       {/* The rail sits beside the number it summarises. justify-between flung it
           to the far edge of a 1200px column, where it read as unrelated chrome. */}

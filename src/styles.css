@@ -19,6 +19,9 @@
   --grid-alpha: 0.03;
   --row-h: 40px;
   --table-fs: 14px;
+  /* Inline rail height, so a table row carrying one shrinks with density
+     instead of being pinned open by a hardcoded prop. */
+  --rail-h: 34px;
   --shadow-overlay: 0 8px 24px -6px rgb(28 34 30 / 0.18), 0 2px 6px -2px rgb(28 34 30 / 0.12);
 }
 
@@ -42,6 +45,7 @@
 [data-density='dense'] {
   --row-h: 30px;
   --table-fs: 13px;
+  --rail-h: 24px;
 }
 
 * {

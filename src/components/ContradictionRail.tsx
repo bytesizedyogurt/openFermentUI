@@ -11,8 +11,52 @@
 import type { Contradiction, ExtractionRecord } from '@/data/types';
 import type { Aggregate } from '@/data/types';
 import { provenanceOf, isAggregatable, aggregateExclusion, EXCLUSION_NOTE } from '@/engine/aggregation';
-import { fmt } from '@/engine/units';
+import { fmt, asNumber, convert } from '@/engine/units';
 import { cx } from './ui';
+
+/**
+ * Convert records into plottable marks, in the field's canonical unit.
+ *
+ * Lives beside the rail because three screens had grown their own copy and they
+ * had already diverged — one silently dropped anything it could not convert,
+ * another kept it at its published value and plotted it on the wrong axis.
+ * A record that will not convert is not plotted, and an explained refusal is
+ * exactly such a case.
+ */
+export function toRailMarks(records: ExtractionRecord[], unit: string): RailMark[] {
+  const out: RailMark[] = [];
+  for (const r of records) {
+    const n = asNumber(r.value);
+    if (n === null) continue;
+    let v = n;
+    if (unit && r.unit !== unit) {
+      try {
+        v = convert(n, r.unit, unit);
+      } catch {
+        continue;
+      }
+    }
+    out.push({ record: r, value: v });
+  }
+  return out;
+}
+
+/** Marks for every field present in `records`, keyed by field. */
+export function railMarksByField(
+  records: ExtractionRecord[],
+  unitOf: (field: ExtractionRecord['field']) => string,
+): Map<ExtractionRecord['field'], RailMark[]> {
+  const m = new Map<ExtractionRecord['field'], RailMark[]>();
+  for (const r of records) {
+    const list = m.get(r.field);
+    if (list) continue;
+    m.set(
+      r.field,
+      toRailMarks(records.filter((x) => x.field === r.field), unitOf(r.field)),
+    );
+  }
+  return m;
+}
 
 export interface RailMark {
   record: ExtractionRecord;
@@ -39,7 +83,7 @@ function markClass(r: ExtractionRecord): string {
 const PROV_BG: Record<string, string> = {
   gold: 'bg-gold',
   verified: 'bg-accent',
-  curated: 'bg-accent/60',
+  curated: 'bg-accent/85',
   unverified: 'bg-ink-soft',
   user: 'bg-signal-info',
   'industry-estimate': 'bg-ink-soft',
@@ -47,11 +91,19 @@ const PROV_BG: Record<string, string> = {
   unsourced: 'bg-signal-error',
 };
 
+/** Current --rail-h, so an inline rail tracks the density setting. */
+function railHeightFromToken(): number {
+  if (typeof window === 'undefined') return 34;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--rail-h');
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 34;
+}
+
 export function ContradictionRail({
   marks,
   aggregate,
   contradictions = [],
-  height = 48,
+  height,
   highlightId,
   showScale = false,
   className,
@@ -59,7 +111,11 @@ export function ContradictionRail({
   marks: RailMark[];
   aggregate: Aggregate | null;
   contradictions?: Contradiction[];
-  /** 48 inline, 160 on the parameter page, 28 inside a list row. */
+  /**
+   * Explicit height in px, or omitted to follow --rail-h, which density
+   * shrinks. A hardcoded inline height made dense mode make tables *taller*,
+   * because the type shrank while the row stayed pinned open by the rail.
+   */
   height?: number;
   /** Ring one mark — "this record, among its peers". */
   highlightId?: string;
@@ -76,6 +132,8 @@ export function ContradictionRail({
   // reads as "we looked and found agreement", which would be a lie.
   if (marks.length < 2) return null;
 
+  const h = height ?? railHeightFromToken();
+
   const values = marks.map((m) => m.value);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
@@ -90,7 +148,7 @@ export function ContradictionRail({
       : (v - lo) / (hi - lo || 1);
     // 0 at the bottom of the frame, 1 at the top; inset 3px so a mark at an
     // extreme is not clipped by the frame.
-    return 3 + (1 - t) * (height - 6);
+    return 3 + (1 - t) * (h - 6);
   };
 
   const contradicted = contradictions.length > 0;
@@ -125,7 +183,7 @@ export function ContradictionRail({
             ? 'bg-signal-error/[0.09] ring-1 ring-signal-error/70'
             : 'bg-ink-soft/[0.09]',
         )}
-        style={{ width: height >= 120 ? 34 : 26, height }}
+        style={{ width: h >= 120 ? 34 : 26, height: h }}
       >
         {aggregate && (
           <div
@@ -152,7 +210,7 @@ export function ContradictionRail({
                 'absolute left-1/2 -translate-x-1/2 rounded-[1px] block',
                 PROV_BG[provenanceOf(record)] ?? 'bg-ink-soft',
                 markClass(record),
-                held && !on && 'opacity-45',
+                held && !on && 'opacity-70',
                 on && 'ring-1 ring-ink ring-offset-0 z-10',
               )}
               style={{
@@ -177,7 +235,7 @@ export function ContradictionRail({
         )}
       </div>
       {showScale && (
-        <div className="relative shrink-0" style={{ height, width: 92 }} aria-hidden>
+        <div className="relative shrink-0" style={{ height: h, width: 92 }} aria-hidden>
           <span
             className="absolute left-0 text-caption text-ink-soft leading-none"
             style={{ top: project(hi) - 4 }}

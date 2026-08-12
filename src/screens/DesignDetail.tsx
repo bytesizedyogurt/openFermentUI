@@ -142,12 +142,12 @@ export function DesignDetail({ designId }: { designId: string }) {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <button
+      <a
+        href={href('/fermos/d')}
         className="text-caption text-ink-soft hover:text-ink inline-flex items-center gap-1 mb-2"
-        onClick={() => navigate('/fermos/d')}
       >
         <ArrowLeft size={12} aria-hidden /> Designs
-      </button>
+      </a>
 
       <PageHeader
         eyebrow={<span className="font-mono">{design.id}</span>}
@@ -261,7 +261,7 @@ export function DesignDetail({ designId }: { designId: string }) {
                       </span>
                     )}
                   </div>
-                  <div className="flex-1 h-3 bg-surface-1 rounded-[2px] overflow-hidden">
+                  <div className="flex-1 h-3 bg-ink-soft/15 rounded-[2px] overflow-hidden">
                     <div
                       className="h-full bg-signal-warn/60"
                       style={{ width: `${Math.min(100, Math.abs(s.rho) * 100)}%` }}
