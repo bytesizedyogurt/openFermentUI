@@ -71,7 +71,7 @@ const ROUTES = [
   ['/fermos/s/sc-s3', 'Scenario S3 (the incumbent)'],
   ['/fermos/compare', 'Compare'],
   ['/parchment', 'Parchment'],
-  ['/openlab', 'openLab (not built)'],
+  ['/openlab', 'openLab'],
   ['/notary', 'Notary (not built)'],
   ['/learn', 'Learn map'],
   ['/learn/m0/l0-1', 'Lesson 0.1'],

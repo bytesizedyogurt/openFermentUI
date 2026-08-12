@@ -702,3 +702,27 @@ export interface Patent {
   /** The corpus entry this was catalogued from. */
   paperId?: string;
 }
+
+// ── OF-FE-003 §4.5 — openLab ───────────────────────────────────────────
+
+/** A failed run is a first-class outcome, not an error. */
+export interface RunOutcome {
+  runId: string;
+  outcome: 'success' | 'failure' | 'abandoned';
+  /** Real bench prose: contamination, a pump, an ambiguous reading. */
+  failureReason?: string;
+  results: Record<string, number | string | boolean>;
+  operator: string;
+  depositedAt?: string;
+  /** Records created by this deposit — evidenceClass: 'experiment'. */
+  producedRecordIds: string[];
+}
+
+export interface ResultField {
+  id: string;
+  field?: FieldId;
+  label: string;
+  type: 'number' | 'text' | 'boolean';
+  unit?: string;
+  required: boolean;
+}

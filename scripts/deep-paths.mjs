@@ -60,6 +60,31 @@ const afterEdit = await p.locator('body').innerText();
 ck('Editing a source record ages the protocol that consumed it', /Stale/i.test(afterEdit), afterEdit.match(/Stale[^\n]*/)?.[0] ?? 'no stale banner');
 ck('Staleness carries the numeric before and after', /4\.2/.test(afterEdit) && /changed from/i.test(afterEdit));
 
+// openLab deposit (OF-FE-003 §8.7). The argument of the part is that a failure
+// counts the same, so the check is that it deposits at all and renders in the
+// feed rather than being filtered, greyed or sorted away.
+await go('/openlab');
+await p.waitForTimeout(700);
+const emptyLab = await p.locator('body').innerText();
+ck('openLab starts empty and says why nothing was seeded', /No deposits yet/i.test(emptyLab));
+
+await p.evaluate(() => {
+  const s = window.__ofStore?.getState?.();
+  if (!s) return;
+  s.depositRun({
+    runId: 'run-probe',
+    outcome: 'failure',
+    failureReason: 'Contamination in the 5 L flask at 18 h; culture discarded before induction.',
+    results: {},
+    operator: 'harness',
+    producedRecordIds: [],
+  });
+});
+await p.waitForTimeout(400);
+const withDeposit = await p.locator('body').innerText();
+ck('A failure deposits and appears in the feed', /Failure/.test(withDeposit) && /Contamination/.test(withDeposit));
+ck('Failure rate is reported rather than hidden', /failure rate/i.test(withDeposit));
+
 // Protocol version diff
 await go('/runbook/PR-TAP-01');
 const cmp = p.locator('button',{hasText:/compare version/i}).first();

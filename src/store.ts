@@ -17,6 +17,7 @@ import type {
   Provenance,
   RecordStatus,
   ResultGrid,
+  RunOutcome,
   RunOutput,
   RunState,
   Scenario,
@@ -96,6 +97,16 @@ export interface OFState {
    * to persist it.
    */
   stale: StalePatch[];
+  /**
+   * Deposits from runs actually executed in this session (OF-FE-003 §8.7).
+   *
+   * Seeded empty, deliberately. Fabricating bench deposits and stamping them
+   * evidenceClass 'experiment' would launder invented data as measurement,
+   * which is the one thing this whole build exists to prevent. A deposit here
+   * is one a user produced by running a protocol in Run Mode.
+   */
+  deposits: RunOutcome[];
+  depositRun: (o: RunOutcome) => void;
   reviewIndex: number;
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
@@ -212,6 +223,7 @@ const seedState = () => ({
   jobs: [] as Job[],
   reviewQueue: [] as string[],
   stale: [] as StalePatch[],
+  deposits: [] as RunOutcome[],
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
@@ -798,6 +810,21 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({ text: 'Filed. This source is back in the review queue.', kind: 'info' });
+  },
+
+  depositRun: (o) => {
+    set((s) => ({ deposits: [{ ...o, depositedAt: stamp() }, ...s.deposits] }));
+    get().logActivity({
+      at: stamp(),
+      icon: o.outcome === 'failure' ? 'alert' : 'check',
+      text: `Run ${o.runId} deposited — ${o.outcome}`,
+      href: '/openlab',
+      provenance: 'user',
+    });
+    get().toast({
+      text: o.outcome === 'failure' ? 'Failure deposited. It counts the same.' : 'Run deposited.',
+      kind: 'info',
+    });
   },
 
   logActivity: (e) => set((s) => ({ activity: [e, ...s.activity].slice(0, 40) })),

@@ -45,6 +45,7 @@ import Ingest from '@/screens/Ingest';
 import Extract from '@/screens/Extract';
 import { Ledger, ParameterPage, Contradictions, UnbuiltPart } from '@/screens/Ledger';
 import { Parchment } from '@/screens/Parchment';
+import { OpenLab } from '@/screens/OpenLab';
 import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
@@ -83,7 +84,7 @@ const RAIL: RailItem[] = [
   { to: '/postdoc', label: 'Postdoc', icon: MessagesSquare, key: 'a' },
   { group: 'Return' },
   { to: '/runbook', label: 'Runbook', icon: ClipboardList, key: 'p' },
-  { to: '/openlab', label: 'openLab', icon: Users, key: 'b', pending: true },
+  { to: '/openlab', label: 'openLab', icon: Users, key: 'b' },
   { to: '/notary', label: 'Notary', icon: Stamp, key: 'y', pending: true },
   { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
 ];
@@ -160,7 +161,7 @@ function Screen() {
     case 'parchment':
       return <Parchment />;
     case 'openlab':
-      return <UnbuiltPart name="openLab" blurb="A deposit feed where a failed run carries the same weight as a successful one — same card, same size, not greyed, not sorted down. A network reporting zero failures is hiding them." />;
+      return <OpenLab />;
     case 'notary':
       return <UnbuiltPart name="Notary" blurb="A disclosure queue gated on an enablement checklist. Publish stays disabled, with a specific reason, until a disclosure would actually teach someone to reproduce the result." />;
     case 'geneos':
