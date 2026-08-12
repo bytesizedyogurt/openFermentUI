@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { ExtractionRecord, Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
 import { useStore } from '@/store';
+import { fieldName } from '@/data/ontology';
 import { href, navigate } from '@/router';
 import {
   batchLabel,
@@ -986,6 +987,33 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           </Callout>
         </div>
       )}
+      {version.decisive && (
+        // Above the fold, deliberately. This is the return leg of the
+        // experiment loop: a tornado bar names the parameter, and this says
+        // what running the protocol would settle. Burying it under the
+        // materials list would make the loop a diagram rather than a path.
+        <Card className="p-3 mb-3 border-accent/45 bg-accent-wash/30">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <span className="text-caption uppercase tracking-wide text-accent">
+              Decisive measurement
+            </span>
+            <a
+              href={href(`/ledger/p/${version.decisive.field}`)}
+              className="text-caption text-accent hover:underline"
+            >
+              {fieldName(version.decisive.field)} →
+            </a>
+          </div>
+          <p className="text-reading font-serif mt-1.5">
+            {version.decisive.currentUncertainty}
+          </p>
+          <p className="text-body mt-2">
+            <span className="text-ink-soft">What a result would change: </span>
+            {version.decisive.whatWouldChange}
+          </p>
+        </Card>
+      )}
+
       <PageHeader
         eyebrow={
           <span className="inline-flex items-center gap-1.5">

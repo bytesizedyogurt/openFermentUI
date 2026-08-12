@@ -16,7 +16,7 @@ import { Users, CheckCircle2, XCircle, CircleSlash } from 'lucide-react';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Card, PageHeader, SectionTitle, Callout, Button, LinkButton, cx } from '@/components/ui';
-import type { RunOutcome, RunState } from '@/data/types';
+import type { ResultField, RunOutcome, RunState } from '@/data/types';
 
 const OUTCOME_META = {
   success: { label: 'Success', Icon: CheckCircle2, tone: 'text-accent' },
@@ -38,6 +38,14 @@ export function OpenLab() {
         .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0)),
     [runs, depositedIds],
   );
+
+  // The result form comes from the protocol version the run was started at, so
+  // a deposit collects exactly what that protocol exists to measure.
+  const schemaFor = (r: RunState): ResultField[] => {
+    const proto = protocols.find((p) => p.id === r.protocolId);
+    const v = proto?.versions.find((x) => x.version === r.version) ?? proto?.versions[0];
+    return v?.resultSchema ?? [];
+  };
 
   const failures = deposits.filter((d) => d.outcome === 'failure').length;
   const rate = deposits.length ? Math.round((failures / deposits.length) * 100) : null;
@@ -100,6 +108,7 @@ export function OpenLab() {
                 key={r.id}
                 run={r}
                 protocolTitle={protocols.find((p) => p.id === r.protocolId)?.title ?? r.protocolId}
+                schema={schemaFor(r)}
                 onDeposit={depositRun}
               />
             ))}
@@ -166,14 +175,22 @@ export function OpenLab() {
 function DepositCard({
   run,
   protocolTitle,
+  schema,
   onDeposit,
 }: {
   run: RunState;
   protocolTitle: string;
+  schema: ResultField[];
   onDeposit: (o: RunOutcome) => void;
 }) {
   const [outcome, setOutcome] = useState<RunOutcome['outcome']>('success');
   const [reason, setReason] = useState('');
+  const [results, setResults] = useState<Record<string, string>>({});
+
+  // A failed run has no results to report — that is what failure means here, and
+  // demanding them would push an operator toward calling a failure a success.
+  const needed = outcome === 'success' ? schema.filter((f) => f.required) : [];
+  const missing = needed.filter((f) => !String(results[f.id] ?? '').trim());
 
   return (
     <Card className="p-3">
@@ -220,22 +237,72 @@ function DepositCard({
         />
       )}
 
-      <div className="mt-2">
+      {outcome === 'success' && schema.length > 0 && (
+        <div className="mt-2.5 space-y-1.5">
+          <div className="text-caption uppercase tracking-wide text-ink-soft">
+            Results — generated from this protocol's schema
+          </div>
+          {schema.map((f) => (
+            <label key={f.id} className="flex items-center gap-2 text-caption">
+              <span className="w-[240px] shrink-0">
+                {f.label}
+                {f.unit && <span className="text-ink-soft"> ({f.unit})</span>}
+                {f.required && <span className="text-signal-warn"> *</span>}
+                {f.field && (
+                  <span className="text-ink-soft"> · becomes a record</span>
+                )}
+              </span>
+              {f.type === 'boolean' ? (
+                <input
+                  type="checkbox"
+                  checked={results[f.id] === 'true'}
+                  onChange={(e) => setResults((r) => ({ ...r, [f.id]: String(e.target.checked) }))}
+                />
+              ) : (
+                <input
+                  className="input flex-1"
+                  inputMode={f.type === 'number' ? 'decimal' : undefined}
+                  value={results[f.id] ?? ''}
+                  onChange={(e) => setResults((r) => ({ ...r, [f.id]: e.target.value }))}
+                />
+              )}
+            </label>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-2.5 flex items-center gap-3 flex-wrap">
         <Button
-          disabled={outcome === 'failure' && reason.trim().length === 0}
-          onClick={() =>
+          disabled={
+            (outcome === 'failure' && reason.trim().length === 0) || missing.length > 0
+          }
+          onClick={() => {
+            const typed: Record<string, number | string | boolean> = {};
+            if (outcome === 'success') {
+              for (const f of schema) {
+                const raw = results[f.id];
+                if (raw === undefined || raw === '') continue;
+                typed[f.label] =
+                  f.type === 'number' ? Number(raw) : f.type === 'boolean' ? raw === 'true' : raw;
+              }
+            }
             onDeposit({
               runId: run.id,
               outcome,
               failureReason: outcome === 'failure' ? reason.trim() : undefined,
-              results: {},
+              results: typed,
               operator: 'you',
               producedRecordIds: [],
-            })
-          }
+            });
+          }}
         >
           Deposit
         </Button>
+        {missing.length > 0 && (
+          <span className="text-caption text-ink-soft">
+            {missing.map((f) => f.label.toLowerCase()).join(', ')} required
+          </span>
+        )}
       </div>
     </Card>
   );

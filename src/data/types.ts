@@ -367,6 +367,24 @@ export interface Step {
 export interface ProtocolVersion {
   version: string;
   changelog?: string;
+  /**
+   * The single uncertainty this protocol exists to resolve (OF-FE-003 §4.5).
+   *
+   * This is the return leg of the experiment loop: a sensitivity tornado names
+   * the parameter whose uncertainty moves the answer most, and a protocol that
+   * declares itself the measurement for that parameter is what turns the naming
+   * into work someone can do. Without it the loop points at a parameter page and
+   * stops.
+   */
+  decisive?: {
+    field: FieldId;
+    /** Plain sentence: what is not known, and why it matters here. */
+    currentUncertainty: string;
+    /** What a result would settle — "if below X, design D2 wins". */
+    whatWouldChange: string;
+  };
+  /** Shape of the result form an openLab deposit generates from a run. */
+  resultSchema?: ResultField[];
   baseBatch: { value: number; unit: string; label: string };
   materials: Material[];
   equipment: string[];

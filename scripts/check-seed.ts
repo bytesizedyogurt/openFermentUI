@@ -377,6 +377,44 @@ for (const sc of SCENARIOS) {
   }
 }
 
+// Shared by the decisive, patent-bound and design checks below.
+const FIELD_IDS = new Set(ONTOLOGY.map((d) => d.id));
+
+// ── decisive measurements and result schemas (OF-FE-003 §4.5, §9) ─────
+// A protocol that claims to settle a parameter must name a real one, and a
+// result field that claims to produce a record must name a field that can hold
+// it. Either one wrong makes the experiment loop point somewhere that does not
+// exist.
+let decisiveCount = 0;
+for (const p of PROTOCOLS) {
+  for (const v of p.versions) {
+    if (v.decisive) {
+      decisiveCount++;
+      if (!FIELD_IDS.has(v.decisive.field)) {
+        fail(`${p.id}@${v.version}: decisive names unknown field '${v.decisive.field}'`);
+      }
+      if (!v.decisive.currentUncertainty.trim() || !v.decisive.whatWouldChange.trim()) {
+        fail(`${p.id}@${v.version}: decisive must say what is unknown and what a result changes`);
+      }
+    }
+    for (const f of v.resultSchema ?? []) {
+      if (f.field && !FIELD_IDS.has(f.field)) {
+        fail(`${p.id}@${v.version}: result field '${f.id}' names unknown ontology field '${f.field}'`);
+      }
+    }
+    // A protocol that declares a decisive measurement should be able to collect
+    // it, otherwise running it produces nothing the Ledger can absorb.
+    if (v.decisive && !(v.resultSchema ?? []).some((f) => f.field === v.decisive!.field)) {
+      fail(
+        `${p.id}@${v.version}: declares ${v.decisive.field} decisive but no result field produces it`,
+      );
+    }
+  }
+}
+if (decisiveCount < 4) {
+  warn(`only ${decisiveCount} protocol versions declare a decisive measurement (OF-FE-003 §9 asks for at least 4)`);
+}
+
 // ── design records resolve what they consume (OF-FE-003 §9.5) ─────────
 // A design that names a record it did not consume, or one that does not exist,
 // breaks staleness silently: the correction would never reach it.
@@ -429,7 +467,6 @@ for (const d of DEPOSITS) {
 // ── patent claim bounds name real fields (OF-FE-003 §9.4) ─────────────
 // A claim whose bound names a field the ontology does not have cannot be tested
 // against anything, and would sit on the screen looking like scope.
-const FIELD_IDS = new Set(ONTOLOGY.map((d) => d.id));
 for (const pt of PATENTS) {
   if (pt.paperId && !paperIds.has(pt.paperId)) {
     fail(`${pt.id}: paperId ${pt.paperId} does not resolve`);

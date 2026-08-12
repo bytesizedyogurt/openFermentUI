@@ -378,6 +378,30 @@ async function main() {
     /unevaluated, not clear/i.test(designText),
   );
 
+  // ── 10b-ii. The experiment loop closes ──────────────────────────────
+  // The tornado names the parameter that moves the answer most; the parameter
+  // page names the protocol that would settle it; the protocol says what a
+  // result would change. Until a protocol declared itself decisive, that chain
+  // stopped at the parameter page.
+  await go('/ledger/p/expression_pct_tsp');
+  await page.waitForTimeout(700);
+  const loopParam = await page.locator('body').innerText();
+  check('Parameter page names what would settle it', /what would settle this/i.test(loopParam));
+  const toProtocol = page.locator('a[href*="/runbook/"]').first();
+  check('It links to a protocol', (await toProtocol.count()) > 0);
+  if (await toProtocol.count()) {
+    await toProtocol.click();
+    await page.waitForTimeout(800);
+    const proto = await page.locator('body').innerText();
+    check('The protocol declares the decisive measurement above the fold', /decisive measurement/i.test(proto));
+    check(
+      'And says what a result would change',
+      /what a result would change/i.test(proto) && /no casein has been expressed in a microalga/i.test(proto),
+    );
+    const backToParam = page.locator('a[href*="/ledger/p/"]').first();
+    check('The protocol links back to the parameter', (await backToParam.count()) > 0);
+  }
+
   // ── 10c. Notary: publication blocked, with the reasons itemised ─────
   await go('/notary');
   await page.waitForTimeout(700);

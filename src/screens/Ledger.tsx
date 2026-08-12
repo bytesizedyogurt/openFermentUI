@@ -271,6 +271,15 @@ export function ParameterPage({ field }: { field: FieldId }) {
   const excludedById = new Map(view.excluded.map((e) => [e.recordId, e.reason]));
 
   // Downstream consumers, resolved from the live store rather than a seeded list.
+  // The protocol that exists to measure this parameter, if one declares it.
+  // This is the forward leg of the experiment loop — the tornado sends a reader
+  // here, and this sends them on to the bench.
+  const measuredBy = protocols.flatMap((p) =>
+    p.versions
+      .filter((v) => v.decisive?.field === field && v.version === p.currentVersion)
+      .map((v) => ({ protocol: p, decisive: v.decisive! })),
+  );
+
   const usingProtocols = protocols.filter((p) =>
     p.versions.some((v) =>
       v.materials.some((m) => m.sourceRecordId && mine.some((r) => r.id === m.sourceRecordId)),
@@ -488,6 +497,28 @@ export function ParameterPage({ field }: { field: FieldId }) {
               </Card>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── what would measure this ── */}
+      {measuredBy.length > 0 && (
+        <section className="mt-6">
+          <SectionTitle>What would settle this</SectionTitle>
+          {measuredBy.map(({ protocol, decisive }) => (
+            <Card key={protocol.id} className="p-3 border-accent/45 bg-accent-wash/30">
+              <a
+                href={href(`/runbook/${protocol.id}`)}
+                className="text-body text-accent hover:underline"
+              >
+                {protocol.title} →
+              </a>
+              <p className="text-caption text-ink-soft mt-1.5">{decisive.currentUncertainty}</p>
+              <p className="text-caption mt-1.5">
+                <span className="text-ink-soft">If it runs: </span>
+                {decisive.whatWouldChange}
+              </p>
+            </Card>
+          ))}
         </section>
       )}
 

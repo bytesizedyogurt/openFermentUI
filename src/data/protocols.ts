@@ -866,6 +866,22 @@ export const PROTOCOLS: Protocol[] = [
     versions: [
       {
         version: '1.0',
+      // Second bar on the S1 tornado at 61.7%. r-M5-1 records 1.23 g/L for the
+      // walled wild type in TAP; the S1 reference point assumes 2 g/L, which
+      // the assumption note itself calls "already optimistic against this".
+      decisive: {
+        field: 'final_biomass_density' as const,
+        currentUncertainty:
+          'The biomass density the S1 model assumes has not been measured on cw15. r-M5-1 reports 1.23 g/L, and that was the walled wild type — cell-wall-deficient strains are more fragile and typically reach less.',
+        whatWouldChange:
+          'The reference design assumes 2 g/L. Measuring below about 1.2 g/L on cw15 itself moves the MSP by more than half the range the sweep covers, and makes the photobioreactor capital line dominant.',
+      },
+      resultSchema: [
+        { id: 'dcw', field: 'final_biomass_density' as const, label: 'Dry cell weight', type: 'number' as const, unit: 'g L⁻¹', required: true },
+        { id: 'od750', label: 'OD750 at harvest', type: 'number' as const, unit: '', required: true },
+        { id: 'factor', label: 'Derived OD750 → g/L conversion factor', type: 'number' as const, unit: 'g L⁻¹', required: false },
+        { id: 'notes', label: 'Notes', type: 'text' as const, required: false },
+      ],
         changelog:
           'Initial release. Blanking against spent medium, filter-blank subtraction and a through-origin regression, with the corpus biomass records used as plausibility bounds on the gravimetric result rather than as targets.',
         baseBatch: { value: 12, unit: 'samples', label: 'per run' },
@@ -1022,6 +1038,23 @@ export const PROTOCOLS: Protocol[] = [
     versions: [
       {
         version: '1.0',
+      // r-J10-1 records 31% protein release for wall-deficient cells against 11%
+      // for the walled wild type — the strongest economic argument for cw15 as
+      // the chassis, and the third bar on the S1 tornado. It was measured in a
+      // cuvette, not a harvest train.
+      decisive: {
+        field: 'disruption_protein_yield' as const,
+        currentUncertainty:
+          'The 31% release for cell-wall-deficient cells under mild PEF comes from one laboratory measurement. Whether it survives a real harvest — concentration, hold time, a flow cell rather than a cuvette — is unrecorded.',
+        whatWouldChange:
+          'Release below about 20% erases most of the cw15 downstream advantage over a walled strain, and the case for the chassis has to rest on the secretory pathway alone.',
+      },
+      resultSchema: [
+        { id: 'release', field: 'disruption_protein_yield' as const, label: 'Protein released', type: 'number' as const, unit: '% of total protein', required: true },
+        { id: 'field_strength', label: 'Field strength applied', type: 'number' as const, unit: 'kV cm⁻¹', required: true },
+        { id: 'viability', label: 'Cells visibly lysed under microscopy', type: 'boolean' as const, required: false },
+        { id: 'notes', label: 'Deviations from the mild-condition window', type: 'text' as const, required: false },
+      ],
         changelog:
           'Initial release. Replaces the previous bead-mill-only harvest protocol, which treated mechanical disruption as the process route. Bead milling is retained here as the comparator arm rather than the product route, because the corpus case for this host is specifically that mild PEF on wall-deficient cells reaches mechanical-scale release without mechanical-scale energy.',
         baseBatch: { value: 10, unit: 'L', label: 'culture' },
@@ -1243,6 +1276,22 @@ export const PROTOCOLS: Protocol[] = [
     versions: [
       {
         version: '1.0',
+      // The top bar on the S1 tornado at 92.4%: nothing else moves the MSP as
+      // much. And it is the axis the corpus cannot speak to at all — A1's ~0.2%
+      // TSP is an intracellular reporter, not a casein.
+      decisive: {
+        field: 'expression_pct_tsp' as const,
+        currentUncertainty:
+          'No casein has been expressed in a microalga, so every point on the % TSP axis above zero is extrapolation from reporter proteins. A1 records ~0.2% TSP for intracellular GFP/YFP in UVM4 — a reporter ceiling, never measured on a casein.',
+        whatWouldChange:
+          'This is the most influential parameter in the S1 cost model. Below roughly 0.2% TSP the reference design does not reach a defensible MSP at any biomass density, and the route depends entirely on the 8.6-fold safe-harbour uplift in r-A7-1 being real for this construct.',
+      },
+      resultSchema: [
+        { id: 'pct_tsp', field: 'expression_pct_tsp' as const, label: 'β-casein as % of total soluble protein', type: 'number' as const, unit: '% TSP', required: true },
+        { id: 'recovery', label: 'Recovery through the pH 4.6 precipitation', type: 'number' as const, unit: '%', required: true },
+        { id: 'redissolved', label: 'Pellet redissolved cleanly at pH 7', type: 'boolean' as const, required: true },
+        { id: 'notes', label: 'Observations', type: 'text' as const, required: false },
+      ],
         changelog:
           'Initial release. Written as a capture step, not a polishing step. The two corpus values for the isoelectric point (4.65 and 4.6) are carried through to the bench rather than reconciled on paper, and the operator records the pH actually held.',
         baseBatch: { value: 2, unit: 'L', label: 'clarified lysate' },
@@ -1454,6 +1503,23 @@ export const PROTOCOLS: Protocol[] = [
     versions: [
       {
         version: '1.0',
+      // The central open question of the whole programme. D5 asks whether
+      // C. reinhardtii encodes a Fam20-family kinase at all, and no casein has
+      // been published in any microalga — so nothing in the corpus can answer
+      // this by argument. Only this assay can.
+      decisive: {
+        field: 'phosphorylation_degree' as const,
+        currentUncertainty:
+          'No record in this corpus reports the phosphorylation degree of a β-casein made in any alga, because none has been made. Whether C. reinhardtii phosphorylates the Ser-x-Glu motifs at all is open — D5 asks whether it even encodes a Fam20-family kinase, and that search has not been run.',
+        whatWouldChange:
+          'A degree at or near the 5 mol/mol of the bovine protein makes the cw15 route viable without co-expressing a kinase. A degree near zero means every design needs FAM20C alongside the casein, which changes the construct, the strain and the cost model together.',
+      },
+      resultSchema: [
+        { id: 'degree', field: 'phosphorylation_degree' as const, label: 'Phosphorylation degree', type: 'number' as const, unit: 'mol mol⁻¹', required: true },
+        { id: 'shifted', label: 'Phos-tag band shift observed', type: 'boolean' as const, required: true },
+        { id: 'bands', label: 'Distinct shifted species counted', type: 'number' as const, unit: '', required: false },
+        { id: 'notes', label: 'Gel notes', type: 'text' as const, required: false },
+      ],
         changelog:
           'Initial release. Written so that the result it produces is interpretable in this platform’s ontology: every phosphorylation value entered from this protocol carries its analysis method, and "undetermined" remains available and legitimate for anything the run did not actually measure.',
         baseBatch: { value: 10, unit: 'lanes', label: 'per gel pair' },
