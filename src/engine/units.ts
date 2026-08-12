@@ -1,3 +1,15 @@
+// MIRROR of openferment_core/units.py. Python is canonical. Changes go there
+// first, then here, and parity is enforced by pnpm verify.
+//
+// This file is not dead weight and is not scheduled for deletion: the UI runs
+// offline in the browser, where there is no Python, and a unit conversion that
+// needed a round trip to a server would make every quantity on every screen a
+// network call. So the mirror stays — and because it stays, the agreement
+// between the two has to be mechanically checked rather than remembered.
+// `pnpm check:units` replays fixtures/units.json, the language-neutral pin,
+// against this file. If you change a factor, an alias or a refusal here without
+// changing it in Python, that check fails.
+//
 // Purpose-built unit engine for the openFerment ontology (OF-DES-001 §7.5).
 // Linear families use factor-to-base; temperature is affine.
 
@@ -251,12 +263,34 @@ export const SI_UNIT_BY_FAMILY: Readonly<Record<string, string>> = SI_UNIT;
 /** Cross-family pairs the engine refuses with an explanation rather than a bare error. */
 export const REFUSAL_PAIRS: readonly { a: string; b: string; because: string }[] = REFUSALS;
 
+/**
+ * Own-property lookup.
+ *
+ * `t in U` and `ALIASES[t]` walk the prototype chain, so before this guard every
+ * `Object.prototype` member name was accepted as a unit. `normalizeUnit('toString')`
+ * returned `'toString'`; `unitFamily` then returned `undefined`, violating its own
+ * `string | null` signature; `sameFamily('toString', 'constructor')` returned TRUE;
+ * `convert` across that pair returned NaN with no throw; and `toSI` crashed reading
+ * a property of undefined.
+ *
+ * A unit engine whose job is to refuse what it cannot justify must not report that
+ * two non-units share a dimension. That is fabricated agreement, and fabricated
+ * agreement is what invariant 2 forbids. A Python dict has no prototype, so the
+ * canonical engine never had this behaviour and the mirror now matches it.
+ */
+function own<T>(obj: Record<string, T>, key: string): T | undefined {
+  // Object.hasOwn is ES2022; this file targets ES2020.
+  return Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined;
+}
+
 export function normalizeUnit(raw: string): string | null {
   const t = raw.trim();
-  if (t in U) return t;
+  if (own(U, t) !== undefined) return t;
   const lower = t.toLowerCase();
-  if (ALIASES[t]) return ALIASES[t];
-  if (ALIASES[lower]) return ALIASES[lower];
+  const exact = own(ALIASES, t);
+  if (exact) return exact;
+  const lowered = own(ALIASES, lower);
+  if (lowered) return lowered;
   // Try unicode-superscript-insensitive match
   const strip = (s: string) =>
     s.replace(/⁻¹/g, '-1').replace(/⁻²/g, '-2').replace(/⁻³/g, '-3').replace(/³/g, '3').replace(/²/g, '2').replace(/\s+/g, ' ').toLowerCase();
