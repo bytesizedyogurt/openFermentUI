@@ -201,8 +201,21 @@ class _Postgres(Dialect):
 
     def privilege_statements(self, table: str) -> list[str]:
         # Defence in depth, not the defence. The trigger is what enforces the
-        # rule; this is what stops a role from being granted the ability to try.
-        # Neither can stop the table's owner from dropping the trigger, and no
+        # rule.
+        #
+        # Do not read this as stopping a role from being GRANTED the ability to
+        # try — REVOKE removes privileges currently held and places no
+        # constraint on a future GRANT. On the empty database this script
+        # builds it removes nothing at all, because PostgreSQL grants PUBLIC no
+        # privileges on tables by default. It earns its place only on a
+        # database where something has already granted them.
+        #
+        # Nor does it cover `records_current`: that view is auto-updatable, and
+        # permission checks on the base table run as the view's owner, so a role
+        # granted DELETE on the view is not subject to this revoke. The trigger
+        # is what stops that too — which is the point of the first line.
+        #
+        # And nothing here stops the table's owner from dropping the trigger. No
         # database can: a schema cannot defend itself against its own owner.
         return [f"REVOKE UPDATE, DELETE, TRUNCATE ON TABLE {self.quote(table)} FROM PUBLIC"]
 

@@ -83,7 +83,15 @@ def corpus_dir(
 
 def _connect() -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
+    # SQLite fires BEFORE DELETE triggers for rows removed by REPLACE conflict
+    # resolution ONLY when recursive_triggers is on, and it defaults off. Without
+    # this line `INSERT OR REPLACE` rewrites a row of an append-only table in
+    # place, silently — including a row of audit_event, so the rewrite leaves no
+    # trace. Postgres has no REPLACE, so this is not a hole in the shipped
+    # schema; it is a hole in the EVIDENCE, and the evidence is the whole reason
+    # the SQLite rendering exists.
     connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA recursive_triggers = ON")
     connection.executescript(seed.schema_sql(seed.SQLITE))
     return connection
 
@@ -657,3 +665,49 @@ def test_a_corpus_entity_that_does_not_parse_names_itself(tmp_path: Path) -> Non
     with pytest.raises(seed.CorpusError) as caught:
         seed.read_corpus(tmp_path)
     assert any("records/r-broken" in failure for failure in caught.value.failures)
+
+
+def _quoted(columns: list[str]) -> str:
+    """`audit_event` really has columns named `from` and `to` (AuditEvent's own
+    field names). The DDL quotes them; anything hand-writing SQL against these
+    tables has to as well."""
+    return ", ".join(f'"{c}"' for c in columns)
+
+
+def test_insert_or_replace_cannot_rewrite_an_append_only_row(loaded: sqlite3.Connection) -> None:
+    """The hole this closes was in the evidence, not in the shipped schema.
+
+    SQLite fires BEFORE DELETE triggers for rows removed by REPLACE conflict
+    resolution only when `recursive_triggers` is on, and it defaults OFF. With
+    the default, `INSERT OR REPLACE` rewrote a row of `records` in place and the
+    append-only trigger never fired — so the suite was claiming a proof that
+    rows cannot be rewritten while executing a rendering in which they could.
+
+    Postgres has no REPLACE and was never exposed. But the SQLite rendering
+    exists precisely to execute what the DDL says, and it has to execute all of
+    it or it is decoration.
+    """
+    columns = [d[0] for d in loaded.execute("SELECT * FROM records LIMIT 1").description]
+    row = list(loaded.execute("SELECT * FROM records WHERE row_id = 1").fetchone())
+    row[columns.index("id")] = "FORGED"
+    placeholders = ", ".join("?" * len(columns))
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        loaded.execute(
+            f"INSERT OR REPLACE INTO records ({_quoted(columns)}) VALUES ({placeholders})", row
+        )
+    assert loaded.execute("SELECT id FROM records WHERE row_id = 1").fetchone()[0] != "FORGED"
+
+
+def test_insert_or_replace_cannot_rewrite_the_audit_trail(loaded: sqlite3.Connection) -> None:
+    """The worse half: an audit row rewritten leaves no trace that it was."""
+    columns = [d[0] for d in loaded.execute("SELECT * FROM audit_event LIMIT 1").description]
+    first = loaded.execute("SELECT * FROM audit_event LIMIT 1").fetchone()
+    if first is None:
+        pytest.skip("no audit events in the seeded corpus")
+    row = list(first)
+    row[columns.index("who")] = "FORGER"
+    placeholders = ", ".join("?" * len(columns))
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        loaded.execute(
+            f"INSERT OR REPLACE INTO audit_event ({_quoted(columns)}) VALUES ({placeholders})", row
+        )

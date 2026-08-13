@@ -76,7 +76,15 @@ def _load(args: argparse.Namespace) -> int:
         import sqlite3
 
         connection = sqlite3.connect(args.sqlite)
+        # SQLite fires BEFORE DELETE triggers for rows removed by REPLACE conflict
+        # resolution ONLY when recursive_triggers is on, and it defaults off. Without
+        # this line `INSERT OR REPLACE` rewrites a row of an append-only table in
+        # place, silently — including a row of audit_event, so the rewrite leaves no
+        # trace. Postgres has no REPLACE, so this is not a hole in the shipped
+        # schema; it is a hole in the EVIDENCE, and the evidence is the whole reason
+        # the SQLite rendering exists.
         connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA recursive_triggers = ON")
         if args.create:
             connection.executescript(emit(SQLITE))
         cursor = connection.cursor()

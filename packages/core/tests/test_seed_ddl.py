@@ -92,3 +92,30 @@ def test_not_null_and_checks_survive_into_the_sql() -> None:
 def test_the_current_view_exists_only_for_the_superseding_table() -> None:
     views = [t.this.this.name for t in _parsed() if isinstance(t, exp.Create) and t.kind == "VIEW"]
     assert views == ["records_current"]
+
+
+def test_two_columns_of_one_name_are_refused_at_derivation() -> None:
+    """Un-creatable DDL, caught where it is derived rather than at deploy.
+
+    Nothing downstream would notice: the emitter prints it, `schema.sql` looks
+    plausible, and Postgres rejects the whole file with `duplicate column name`
+    when someone finally runs it. No model does this today — the guard exists so
+    that the day one does, it fails naming the model and the field.
+    """
+    from pydantic import BaseModel
+
+    from openferment_core.schema.ontology import AnalysisMethod
+    from seed.columns import columns_for_model
+
+    class SharesASuffix(BaseModel):
+        # Two TEXT arms, so both want to be `x_txt`.
+        x: AnalysisMethod | str | None = None
+
+    with pytest.raises(ValueError, match="two columns named 'x_txt'"):
+        columns_for_model(SharesASuffix)
+
+    class DistinctSuffixes(BaseModel):
+        # The shape ExtractionRecord.value actually uses: `_num` and `_txt`.
+        v: float | str | None = None
+
+    assert [c.name for c in columns_for_model(DistinctSuffixes)] == ["v_num", "v_txt"]

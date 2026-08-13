@@ -315,6 +315,29 @@ def columns_for_model(
         if name in skip:
             continue
         out.extend(_columns_for_field(name, info))
+
+    # Two columns of one name is un-creatable DDL, and it is derived rather than
+    # written, so nothing downstream would catch it: the emitter would print it,
+    # `schema.sql` would look fine, and Postgres would reject the whole file with
+    # `duplicate column name` at deploy time.
+    #
+    # Three annotation shapes reach it. A union whose arms share a suffix —
+    # `AnalysisMethod | str` (two TEXT arms, both `_txt`) or `int | Literal[1, 2]`
+    # (BIGINT and SMALLINT, both `_int`). And a model field named `row_id`, which
+    # collides with the synthetic identity column. No model does any of this
+    # today; the point is that if one starts to, it fails HERE, naming the model
+    # and the field, rather than at deploy.
+    seen: dict[str, str] = {}
+    for col in out:
+        if col.name in seen:
+            raise ValueError(
+                f"{model.__name__} derives two columns named {col.name!r} "
+                f"(from fields {seen[col.name]!r} and {col.field or col.name!r}). "
+                "A union whose arms share a column suffix, or a field colliding with a "
+                "synthetic column, produces DDL Postgres will not create. Rename the field "
+                "or give the arms distinct suffixes."
+            )
+        seen[col.name] = col.field or col.name
     return tuple(out)
 
 

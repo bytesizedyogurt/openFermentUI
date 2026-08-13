@@ -15,18 +15,28 @@ reason, so an undocumented hand-written column cannot survive review.
 ── NO CROSS-ENTITY FOREIGN KEYS, DELIBERATELY ─────────────────────────────
 `records.paper_id` is not a `REFERENCES papers (id)`, and neither are
 `cites_record_id`, `source_record_id` or the ids inside a scenario assumption.
-Two reasons, and the second is the real one.
+One reason, and it is enough.
 
 The models do not state those relationships — `paper_id` is a `str` — so a
 foreign key would have to be inferred from the name, and "any column ending in
 `_id` points at the table its prefix names" is a guess that is wrong the first
-time a `component_tag` or a `curation_ref` looks like one.
+time a `component_tag` or a `curation_ref` looks like one. The relationship the
+schema does not declare is not the schema's to enforce.
 
-More importantly the corpus is deliberately uneven and its gaps are documented
-(CLAUDE.md, "Do not improve the corpus data"). A foreign key would make the
-loader REJECT a record whose paper is catalogued but not yet ingested, which is
-a real state this corpus is in on purpose. The referee's job is to report a
-dangling reference, not the loader's job to refuse the corpus over one. The one
+This used to give a second reason and call it the real one: that a foreign key
+would reject a record whose paper is catalogued but not yet ingested. That is
+not true of this corpus and was never measured. `catalogued` describes how much
+of a paper has been INGESTED; the paper is a row in `papers` either way, so the
+constraint would be satisfied. Measured on the seeded corpus: 0 of 134 records
+name a paper absent from `papers.json`, no `citesRecordId` dangles, and all 15
+scenario-assumption record references resolve. The state that argument describes
+is one the corpus may reach, and it was written as a state the corpus is in.
+
+Which is not an argument FOR adding the key later: when the corpus does hold a
+reference it cannot satisfy, reporting it is the referee's job, and a loader
+that refuses the whole corpus over one dangling id has made the gap harder to
+see rather than easier. But that is a claim about what SHOULD happen, and it is
+not evidence about what does. The one
 foreign key that IS emitted — `audit_event.record_row_id` — is structural: it is
 a parent link the loader creates itself, not a claim about the literature.
 """
