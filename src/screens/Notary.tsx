@@ -11,10 +11,24 @@
 // anything the engine can compute is computed.
 import { useMemo, useState } from 'react';
 import { Stamp, Check, X } from 'lucide-react';
-import { DESIGNS } from '@/data/designs';
 import { useStore } from '@/store';
 import { href, navigate } from '@/router';
-import { Card, PageHeader, SectionTitle, Callout, Button, Explain, cx } from '@/components/ui';
+import {
+  Card,
+  PageHeader,
+  SectionTitle,
+  Callout,
+  Button,
+  Explain,
+  Skeleton,
+  cx,
+} from '@/components/ui';
+// Designs come from fermOS. See the reasoning on `DesignDetail`, which is
+// where this phase wrote it down: a design is the OUTPUT of the tier cascade,
+// and the cascade is the process server's work whether or not the client can
+// currently shortcut it.
+import { adapters } from '@/adapters';
+import { useAdapterData } from '@/adapters/react';
 import type { DesignRecord, PublicationStatus } from '@/data/types';
 
 interface Requirement {
@@ -104,9 +118,23 @@ function statusKey(p: PublicationStatus): string {
   return typeof p === 'string' ? p : 'embargo';
 }
 
+/**
+ * One shared empty array for the pre-arrival render.
+ *
+ * Module scope so its identity is stable: it feeds a `useMemo` dependency
+ * list, and a fresh `[]` each render would re-run the memo every time for a
+ * value that never changed.
+ */
+const EMPTY: DesignRecord[] = [];
+
 export function Notary() {
   const [selected, setSelected] = useState<string | null>(null);
-  const design = useMemo(() => DESIGNS.find((d) => d.id === selected) ?? DESIGNS[0], [selected]);
+  const queue = useAdapterData(() => adapters.process.listDesigns(), []);
+  const DESIGNS = queue.status === 'ready' ? queue.data : EMPTY;
+  const design = useMemo(
+    () => DESIGNS.find((d) => d.id === selected) ?? DESIGNS[0],
+    [DESIGNS, selected],
+  );
   const reqs = design ? enablement(design) : [];
   const unmet = reqs.filter((r) => !r.met);
 
@@ -115,13 +143,41 @@ export function Notary() {
 
   const everPasses = DESIGNS.filter((d) => enablement(d).every((r) => r.met)).length;
 
+  const header = (
+    <PageHeader
+      eyebrow="Return · Notary"
+      title="Disclosure queue"
+      subtitle="A disclosure that does not enable is worthless as prior art. Publish stays disabled until it would teach someone to reproduce the result."
+    />
+  );
+
+  // The queue is not rendered until it has arrived, and this is the one place
+  // on this screen where an empty first frame would have been a LIE rather
+  // than a blank: the callout below states "N of M designs are publishable",
+  // and 0 of 0 reads as a finding about the corpus when it is a fact about a
+  // promise. The same goes for the five status counts, which would each read
+  // zero. Nothing here is slow today — the fixture resolves in a microtask —
+  // but the sentence has to be false-proof against the backend that is not.
+  if (queue.status !== 'ready') {
+    return (
+      <div className="p-6 max-w-[1100px]">
+        {header}
+        {queue.status === 'failed' ? (
+          <Callout kind="warn" title="The design queue could not be read">
+            {queue.error.message}
+          </Callout>
+        ) : (
+          <Card>
+            <Skeleton rows={6} />
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader
-        eyebrow="Return · Notary"
-        title="Disclosure queue"
-        subtitle="A disclosure that does not enable is worthless as prior art. Publish stays disabled until it would teach someone to reproduce the result."
-      />
+      {header}
 
       <div className="max-w-3xl mb-5">
         <Callout

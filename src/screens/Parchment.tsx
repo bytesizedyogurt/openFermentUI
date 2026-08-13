@@ -11,18 +11,60 @@
 // So this screen ships the six real entries, states precisely what is missing,
 // and shows the arithmetic that is already built and waiting for input.
 import { Scale, AlertTriangle } from 'lucide-react';
-import { PATENTS } from '@/data/patents';
 import { unparsedClaims } from '@/engine/scope';
 import { useStore } from '@/store';
 import { href } from '@/router';
-import { Card, PageHeader, SectionTitle, Callout, Explain, LinkButton } from '@/components/ui';
+import {
+  Card,
+  PageHeader,
+  SectionTitle,
+  Callout,
+  Explain,
+  LinkButton,
+  Skeleton,
+} from '@/components/ui';
+// Patents come from BioRepo, not from a "Parchment" server. Parchment is this
+// screen; a patent is catalogued literature that carries claims, keyed by
+// `paperId` to a corpus entry, and `CorpusAdapter.getScope` already reads the
+// same six to test a configuration. Naming an adapter after the page that
+// draws it would make a UI layout into an architecture — see the reasoning on
+// `CorpusAdapter.listPatents`.
+import { adapters } from '@/adapters';
+import { useAdapterData } from '@/adapters/react';
 
 export function Parchment() {
   const papers = useStore((s) => s.papers);
-  const unparsed = unparsedClaims(PATENTS);
+  const patents = useAdapterData(() => adapters.corpus.listPatents(), []);
+
+  if (patents.status !== 'ready') {
+    return (
+      <div className="p-6 max-w-[1100px]">
+        <PageHeader
+          eyebrow="Reason · Parchment"
+          title="Patent scope"
+          subtitle="Claims expressed in the same ontology as the literature, so a Ledger record can be tested against one rather than read beside it."
+        />
+        {patents.status === 'failed' ? (
+          // The failure is shown, not smoothed over. An empty patent list on
+          // this screen would read as "no patents were found", which is the
+          // one sentence the whole page exists to avoid saying by accident.
+          <Callout kind="warn" title="The patent catalogue could not be read">
+            {patents.error.message}
+          </Callout>
+        ) : (
+          <Card>
+            <Skeleton rows={6} />
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  const catalogued = patents.data;
+  const unparsed = unparsedClaims(catalogued);
   // Both halves of the ratio were unparsed.length, so it could only ever read
   // "N of N" — it would still say "all of them" once some were parsed.
-  const totalClaims = PATENTS.reduce((n, pt) => n + pt.claims.length, 0);
+  const totalClaims = catalogued.reduce((n, pt) => n + pt.claims.length, 0);
 
   return (
     <div className="p-6 max-w-[1100px]">
@@ -35,7 +77,7 @@ export function Parchment() {
       <div className="max-w-3xl">
         <Callout kind="warn" title="The scope map is not drawn, and should not be">
           <p className="mb-2">
-            All <span className="font-num">{PATENTS.length}</span> entries below are real, from the
+            All <span className="font-num">{catalogued.length}</span> entries below are real, from the
             patent landscape catalogued in OF-COR-001 §9. What the corpus holds for each is a
             curator&rsquo;s one-line description of its subject matter —{' '}
             <span className="font-num">{unparsed.length}</span> of{' '}
@@ -67,7 +109,7 @@ export function Parchment() {
         </SectionTitle>
 
         <div className="space-y-2">
-          {PATENTS.map((pt) => {
+          {catalogued.map((pt) => {
             const source = papers.find((p) => p.id === pt.paperId);
             return (
               <Card key={pt.id} className="p-3">

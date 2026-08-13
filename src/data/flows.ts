@@ -1058,15 +1058,8 @@ For this programme the stake is bounded: β-casein is not natively N-glycosylate
   },
 ];
 
-/**
- * Prompt chips on the empty Ask screen. Each string is one flow's trigger
- * verbatim, so clicking a chip is an exact match rather than a fuzzy one.
- */
-export const SUGGESTED_PROMPTS: string[] = [
-  'What titers have been achieved for recombinant β-casein?',
-  'Has anyone expressed a casein in an alga?',
-  'Compare Chlamydomonas and Pichia as casein hosts',
-  'What is the maximum secreted protein yield from Chlamydomonas?',
-  'Does phosphorylation actually matter for making cheese?',
-  'What is the regulatory status of C. reinhardtii as food?',
-];
+// SUGGESTED_PROMPTS moved to `src/sim/prompts.ts`. It was never corpus data:
+// each chip is one trigger from the array above, verbatim, so that a click is
+// an exact match — a property of the scripted matcher in `src/sim/chat.ts`,
+// not of the literature. FLOWS stay here, because they survive the scripted
+// agent as regression fixtures for the real one's answer formatter.

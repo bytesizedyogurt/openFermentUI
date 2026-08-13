@@ -26,8 +26,17 @@ import {
 import { useStore, provenanceOf } from '@/store';
 import { navigate, useRoute } from '@/router';
 import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
-import { SUGGESTED_PROMPTS } from '@/data/flows';
+// The chips belong to the scripted agent, not the corpus, and moved to sit
+// beside it: each is one flow trigger verbatim, so a click is an exact match —
+// a guarantee only the scripted matcher makes, and one that retires with it.
+// This screen already reads `send`/`sendFlow` from the same place, so the
+// import is not a new dependency, and there is no adapter behind it and no
+// loading state, because nothing here leaves the client.
+import { SUGGESTED_PROMPTS } from '@/sim/prompts';
 import { send, sendFlow } from '@/sim/chat';
+// `fieldName` and `ONTOLOGY_BY_ID` below are DISPLAY HELPERS, not seed data —
+// they turn an id into a label. They stay on `@/data/ontology` deliberately;
+// the same is true everywhere else they appear in this directory.
 import { fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';

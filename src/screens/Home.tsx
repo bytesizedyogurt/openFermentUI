@@ -29,9 +29,14 @@ import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
-import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
 import { blastRadius } from '@/engine/stale';
-import { DESIGNS } from '@/data/designs';
+// Two adapters, not one, because the two tiles below are answered by two
+// subsystems. The gold-set plan is BioRepo's — every row of it is a paper id,
+// an ontology field list and a record count, and Audit owns the SCORE rather
+// than the SET (`CorpusAdapter.getGoldSetPlan`). Designs are fermOS's, because
+// a design is the output of the tier cascade (`DesignDetail`).
+import { adapters } from '@/adapters';
+import { useAdapterData } from '@/adapters/react';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -222,6 +227,22 @@ export default function Home() {
   const records = useStore((s) => s.records);
   const contradictions = useStore((s) => s.contradictions);
   const disputed = papers.filter((p) => p.coverageDisputed).length;
+
+  // Both reads feed COUNTS inside two tiles, not the page's structure, so
+  // Home does not gate on them — the corpus vitals, the work rail and the
+  // contradictions are all live while these are in flight. A count that has
+  // not arrived renders as an em dash, which is this design system's mark for
+  // a value that is not known. It is NOT rendered as `0`: zero designs and
+  // zero planned gold records are both statements this build would be making
+  // falsely, and they are exactly the statements these tiles exist to get
+  // right. The tiles already sit inside `TileBoundary`, so a rejected read
+  // degrades this section and never the page.
+  const designs = useAdapterData(() => adapters.process.listDesigns(), []);
+  const goldSet = useAdapterData(() => adapters.corpus.getGoldSetPlan(), []);
+  const designCount = designs.status === 'ready' ? designs.data.length : null;
+  const goldPlan = goldSet.status === 'ready' ? goldSet.data : null;
+  /** An unknown count, spelled the way the rest of the build spells one. */
+  const UNKNOWN = '—';
 
   // Executable-layer coverage (OF-FE-004 §1.2). A true statement about the
   // corpus that belongs on the screen: hiding it would be the same error as
@@ -478,11 +499,16 @@ export default function Home() {
                 been run against this corpus, so there is no precision, recall or F1 to report.
               </div>
               <div className="text-caption text-ink-soft mt-1.5">
-                <span className="font-num">{GOLD_SET_PLAN.reduce((n, g) => n + g.records, 0)}</span>{' '}
+                <span className="font-num">
+                  {goldPlan ? goldPlan.entries.reduce((n, g) => n + g.records, 0) : UNKNOWN}
+                </span>{' '}
                 records are planned for the gold set across{' '}
-                <span className="font-num">{GOLD_SET_PLAN.length}</span> sources, and{' '}
-                <span className="font-num">{GOLD_SET_DIFFICULTY_CASES.length}</span> cases were
-                chosen to be hard.{' '}
+                <span className="font-num">{goldPlan ? goldPlan.entries.length : UNKNOWN}</span>{' '}
+                sources, and{' '}
+                <span className="font-num">
+                  {goldPlan ? goldPlan.difficultyCases.length : UNKNOWN}
+                </span>{' '}
+                cases were chosen to be hard.{' '}
                 <a href={href('/assay')} className="text-accent hover:underline">
                   Open Assay
                 </a>
@@ -558,8 +584,8 @@ export default function Home() {
             <Card className="p-3">
               <div className="text-caption uppercase tracking-wide text-ink-soft">Designs</div>
               <div className="mt-1.5 text-body">
-                <span className="font-num text-ink">{DESIGNS.length}</span> points from the
-                authored sweep grids, each carrying a four-tier cascade.
+                <span className="font-num text-ink">{designCount ?? UNKNOWN}</span> points from
+                the authored sweep grids, each carrying a four-tier cascade.
               </div>
               <div className="text-caption text-ink-soft mt-1.5">
                 Every one reads <span className="font-mono">T0 ✓ · T1 — · T2 — · T3 ✓</span>: the
@@ -576,8 +602,8 @@ export default function Home() {
               <div className="text-caption uppercase tracking-wide text-ink-soft">Scope</div>
               <div className="mt-1.5 text-body">
                 <span className="font-num text-signal-warn">0</span> of{' '}
-                <span className="font-num">{DESIGNS.length}</span> designs have been evaluated
-                against a patent claim.
+                <span className="font-num">{designCount ?? UNKNOWN}</span> designs have been
+                evaluated against a patent claim.
               </div>
               <div className="text-caption text-ink-soft mt-1.5">
                 Parchment holds six real patents and no parsed claim bounds, so nothing can be

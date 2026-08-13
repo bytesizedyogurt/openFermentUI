@@ -123,6 +123,66 @@ collections already go through it. Four collections do not.
 
 ---
 
+## Phase 3 — the last seven seed imports
+
+**Status:** complete. `pnpm verify` green, all fifteen stages, 53 routes / 48
+golden / 44 deep.
+
+The seven SEED import lines Phase 0 measured are gone. Nothing was routed by
+convenience: the four modules landed behind four different answers, because the
+adapter a collection sits behind is a claim about which server will serve it.
+
+| Module | Landed on | Why |
+|---|---|---|
+| `PATENTS` | `CorpusAdapter.listPatents` — BioRepo | Catalogued literature that carries claims, keyed by `paperId` to H17a–f. `getScope` already read the same six. Parchment is the SCREEN; naming an adapter after the page that draws it turns a UI layout into an architecture. Not the Guild — a patent is not an attestation a chapter issued. |
+| `DESIGNS` | `ProcessAdapter.listDesigns` / `getDesign` — fermOS | A design is the OUTPUT of the tier cascade, and three of its four tiers are Python (COBRApy, BioSTEAM twice). The client can sweep it today only because T1 and T2 are absent and T3 is a grid interpolation. Derived-at-module-scope is what a fixture looks like, not what the thing is. No new methods were needed, which is the seam being right already. |
+| `GOLD_SET_PLAN`, `GOLD_SET_DIFFICULTY_CASES` | `CorpusAdapter.getGoldSetPlan` — BioRepo | Audit owns the SCORE, not the SET. Every plan field is a corpus coordinate and one row's `blocked` is a fact about `ONTOLOGY_GAPS` a scorer holding no ontology could not evaluate; when annotation happens the rows become `provenance: 'gold'` records in the same store. `RUN_OUTPUTS` goes the other way — a scorer's output, Audit's whenever that seam is built. They share a file because one screen renders both. |
+| `SUGGESTED_PROMPTS` | `src/sim/prompts.ts` — the agent seam | Not corpus and not a server's. Each chip is one flow TRIGGER verbatim so a click is an exact match — a property of the scripted matcher, which retires with it. Moved next to the thing that needs it, headed for `AgentAdapter.suggestedPrompts()` in the phase that quarantines `src/sim/`. Building that adapter now, with `send`/`sendFlow` still going around it, would be a seam that lied about what passed through it. |
+
+`src/data/source.ts` was deliberately NOT extended. None of the four is a
+JSON-backed corpus collection: there is no `data/corpus/patents.json`, the
+exporter maps seven keys to seven Pydantic models, and that module's whole
+contract is that its collections come from the exporter and are fetchable at
+`${API_BASE}/<name>.json`. An eighth array with no file behind it and no `api`
+path would be a lie in the most-copied place in the data layer. `Patent` does
+have a Pydantic model (`schema/design.py`); when it is exported, `listPatents`
+reads it through `@/data/source` like the rest and nothing above changes.
+
+### Loading states — the real work
+
+The adapter surface is async by contract, so six screens gained three states
+where they had one. Two of those screens were rendering a FALSE SENTENCE on the
+first frame, not a blank:
+
+- `DesignDetail` answered "Design not found" for any unresolved id, and every
+  design's first frame is an unresolved id. `loading` and `null` are now
+  different branches; the not-found branch is still reachable and still tested.
+- `Notary`'s callout reads "N of M designs are publishable"; `0 of 0` is a
+  finding about the corpus when it is a fact about a promise. It gates.
+
+`Home` does not gate — its two reads feed counts inside two tiles, and an
+unarrived count renders as `—` rather than `0`. `Validation` folded the read
+into the `delayClass('quick')` skeleton it already had. `Ask` gained nothing:
+its prompts never leave the client.
+
+This was checked rather than assumed. A frame audit recorded every DOM mutation
+from before the bundle evaluated until 2 s after load and asserted the false
+sentences appear in NO frame — not merely in the settled one the 500 ms waits in
+`test:golden` observe. Separately, the rendered text of all nine affected routes
+is byte-identical before and after, with zero console errors.
+
+### Exit condition
+
+`grep -r "from '@/data/" src/screens/` returns 37 lines: 21 type-only, 13
+display helpers from `@/data/ontology` (`fieldName`, `ONTOLOGY_BY_ID`,
+`ONTOLOGY_GAPS`, `FAMILY_LABEL` — id-to-label lookups, not seed data), and 3
+`ONTOLOGY` reads that already go through `@/data/source`. All three categories
+are the ones the brief's own exit condition and Phase 0's import map allow.
+**SEED: 0.** Each surviving helper import is annotated in place so the next
+reader does not read it as one that was missed.
+
+---
+
 ## Phase log
 
 | Phase | Description | Status | verify |
@@ -130,8 +190,8 @@ collections already go through it. Four collections do not.
 | 0 | Freeze, baseline, import map | [x] complete | green, 15 stages |
 | 1 | Extract the schema | [ ] **blocked — see below** | |
 | 2 | Extract the engine | [ ] not started | |
-| 3 | The adapter seam | [ ] partial — seam exists, 4 collections outstanding | |
-| 4 | Quarantine the simulation | [ ] partial — `src/sim/` already headed and fixture-exported | |
+| 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
+| 4 | Quarantine the simulation | [ ] partial — `src/sim/` headed and fixture-exported; `SUGGESTED_PROMPTS` moved there in Phase 3 | |
 | 5 | Server skeletons | [ ] not started | |
 | 6 | Workspace hygiene | [ ] not started | |
 
@@ -196,3 +256,66 @@ The brief asks for `git tag v0.1-sim` and a `restructure/monorepo` branch. This
 session is constrained to `claude/openferment-design-sim-99drgg` and may not push
 elsewhere without explicit permission. `v0.1-sim` also names a state six phases
 back — `8722f9d` is the closest commit. Both need a go-ahead.
+
+---
+
+## Phase 3 — the adapter seam
+
+**Status:** complete. `pnpm verify` green, fifteen stages.
+
+### Exit condition
+
+The brief's own wording: `grep -r "from '@/data/" src/screens/` returns nothing
+except type imports. It now returns type imports, plus `@/data/ontology` display
+helpers (`fieldName`, `ONTOLOGY_BY_ID`, `ONTOLOGY_GAPS`, `FAMILY_LABEL`) and
+`@/data/source`, the adapter itself. **Zero direct seed imports remain.**
+
+The helpers are left deliberately and said so where they sit: they are display
+logic over the ontology, not seed data, and pushing them into a data adapter
+would put UI formatting behind a server boundary.
+
+### The five interfaces
+
+`src/adapters/` — `types.ts`, a `fixture/` backend, `mcp/` stubs that throw
+`NotImplemented`, and an `index.ts` selecting on `VITE_ADAPTER_BACKEND`
+(defaulting to fixture, and forced to fixture under Node).
+
+Every method is async, including the ones the fixture answers from an array it
+already holds — a synchronous interface cannot grow latency later without
+touching every caller. Every response is
+`{ data, serverVersion, corpusSnapshotId, modelVersion?, notice? }`.
+`corpusSnapshotId` is an FNV-1a digest **of the corpus itself**, not a constant,
+so it changes when the corpus does and a trace recorded today stays replayable.
+
+Expensive tiers are asynchronous as required: `submitEvaluation` returns a
+handle and `getEvaluation` collects it. The fixture completes before it returns
+and issues the handle anyway — the shape is what is being fixed now, not a
+simulation of slowness. `jobRunner()` is the one synchronous method, reusing the
+`JobRunner` from `src/sim/jobs.ts`, because it is called from a
+`requestAnimationFrame` loop.
+
+### Where the four remaining collections landed, and why
+
+Routing is a claim about which server will serve a thing, so each was decided on
+its own terms rather than swept into the corpus adapter:
+
+| Module | Landed | Reasoning |
+|---|---|---|
+| `patents` | **CorpusAdapter** | prior-art literature; `SourceType` already has a `patent` member |
+| `runOutputs` | **CorpusAdapter** | the gold-set plan describes corpus records. `RUN_OUTPUTS` stays empty |
+| `designs` | **ProcessAdapter** | `designs.ts` says it outright — *"Derived at load from the authored cost models, never seeded"*. A computed sweep is something fermOS produces, not something a corpus server stores |
+| `flows` (`SUGGESTED_PROMPTS`) | **`src/sim/prompts.ts`** | never corpus data. Each string is a flow's trigger verbatim, and the exact-match guarantee it exists to provide dies with the scripted agent, so it retires with it rather than being carried across a server boundary |
+
+### Two absences that are disclosed rather than silent
+
+`getScope` and `getWhitespace` are new and return `[]` under fixture. Both carry
+a `notice` in the same object as the payload, following the rule
+`CorpusSearchResult.method` already set:
+
+- `getScope` genuinely runs `inScope` over all six patents and finds nothing,
+  because every claim carries `bounds: []`. *"An empty result here means the
+  question could not be asked — not that the configuration is unencumbered."*
+- `getWhitespace` runs nothing at all. The computed answer from zero parsed
+  claims would be "the entire parameter space is unclaimed", which is the most
+  commercially dangerous sentence the system could emit and it would arrive with
+  the authority of a computation. *"The empty array is a stub, not a finding."*

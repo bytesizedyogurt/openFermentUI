@@ -4,15 +4,50 @@
 // A design that cleared T0 and T3 without T1 or T2 says the economics were
 // modelled while the biology went unchecked — the actual state of the field, and
 // a more useful thing to show than a full green row would be.
-import { useMemo } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useStore } from '@/store';
-import { DESIGNS } from '@/data/designs';
 import { cascade } from '@/engine/designs';
 import { fmt } from '@/engine/units';
+// A display helper, not seed data: it turns a `FieldId` into a label. Left on
+// `@/data/ontology` on purpose — the exit condition for this phase is about
+// SEED imports, and a label lookup is not one.
 import { fieldName } from '@/data/ontology';
 import { href, navigate } from '@/router';
-import { Card, PageHeader, SectionTitle, Callout, Explain, LinkButton, cx } from '@/components/ui';
+import {
+  Card,
+  PageHeader,
+  SectionTitle,
+  Callout,
+  Explain,
+  LinkButton,
+  Skeleton,
+  cx,
+} from '@/components/ui';
+/**
+ * WHY DESIGNS COME FROM fermOS AND NOT FROM THE CLIENT.
+ *
+ * `src/data/designs.ts` derives `DESIGNS` at module scope — a sweep of the
+ * grid built from each scenario's cost model — so the tempting reading is that
+ * a design is something the client computes from what a server served, and
+ * that only `SCENARIOS` needs an adapter. That reading is wrong, and it is
+ * wrong in the direction that gets copied.
+ *
+ * A design is the OUTPUT OF THE TIER CASCADE. T0 is a bounds check, T1 is flux
+ * balance, T2 is a reactor model and T3 is a discounted cash flow, and three
+ * of those four are Python by CLAUDE.md's table — COBRApy, and BioSTEAM twice
+ * over. The client can sweep them today for exactly one reason: T1 and T2 are
+ * ABSENT in this build and T3 is an interpolation over a precomputed grid. The
+ * day a genome-scale model answers T1, the sweep stops being computable in the
+ * browser at all — which is why `ProcessAdapter.submitEvaluation` is already
+ * shaped as submit-and-collect rather than request/response.
+ *
+ * So fermOS serves designs, and the fixture derives them, which is what a
+ * fixture is for. `listDesigns` stamps `modelVersion` on the response for the
+ * same reason: these are computed, not read, and a computed answer has to name
+ * what computed it.
+ */
+import { adapters } from '@/adapters';
+import { useAdapterData } from '@/adapters/react';
 import { Tick } from '@/components/Provenance';
 import type { DesignRecord, TierResult } from '@/data/types';
 
@@ -32,22 +67,48 @@ const TIER_LABEL: Record<string, string> = {
 
 export function DesignIndex() {
   const scenarios = useStore((st) => st.scenarios);
+  const all = useAdapterData(() => adapters.process.listDesigns(), []);
+
+  const header = (
+    <PageHeader
+      eyebrow="Reason · fermOS"
+      title="Designs"
+      subtitle="Points in the authored sweep grids, re-presented as designs. Modelled economics, not validated."
+      actions={<LinkButton to="/fermos">Scenarios</LinkButton>}
+    />
+  );
+
+  // Before the sweep arrives every group is empty and `groups` filters them
+  // all away, so the page would render a heading over nothing — which is what
+  // this screen looks like when fermOS genuinely has no designs. The two
+  // states are told apart here rather than left to the reader.
+  if (all.status !== 'ready') {
+    return (
+      <div className="p-6 max-w-[1100px]">
+        {header}
+        {all.status === 'failed' ? (
+          <Callout kind="warn" title="Designs could not be read">
+            {all.error.message}
+          </Callout>
+        ) : (
+          <Card>
+            <Skeleton rows={8} />
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   // Grouped by scenario and carrying the MSP. A flat list of 19 rows showing
   // only a label and four badges omits the number designs exist to be compared
   // on, and makes the reader open each one to find it.
   const groups = scenarios
-    .map((sc) => ({ sc, designs: DESIGNS.filter((d) => d.scenarioId === sc.id) }))
+    .map((sc) => ({ sc, designs: all.data.filter((d) => d.scenarioId === sc.id) }))
     .filter((g) => g.designs.length > 0);
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader
-        eyebrow="Reason · fermOS"
-        title="Designs"
-        subtitle="Points in the authored sweep grids, re-presented as designs. Modelled economics, not validated."
-        actions={<LinkButton to="/fermos">Scenarios</LinkButton>}
-      />
+      {header}
 
       {groups.map(({ sc, designs }) => (
         <section key={sc.id} className="mb-6">
@@ -126,7 +187,45 @@ function Cascade({ design }: { design: DesignRecord }) {
 
 export function DesignDetail({ designId }: { designId: string }) {
   const records = useStore((s) => s.records);
-  const design = useMemo(() => DESIGNS.find((d) => d.id === designId), [designId]);
+  // Fetched BY ID rather than filtered out of the full list: a design id is
+  // what a deep link carries, and `getDesign` is the method a server answers
+  // it with. Re-runs when `designId` changes, and `useAdapterData` drops a
+  // superseded response so a slow answer for the previous id cannot land under
+  // this one's heading.
+  const found = useAdapterData(() => adapters.process.getDesign(designId), [designId]);
+
+  // "Not found" and "not yet arrived" are DIFFERENT SENTENCES and were the same
+  // branch before this read became async. Every design's first frame is an
+  // unresolved id, so the old code would have opened by telling the reader
+  // their design does not exist and then silently replaced the claim. `null`
+  // from the adapter means the backend looked and has no such design; a
+  // `loading` state means nobody has looked yet.
+  if (found.status === 'loading') {
+    return (
+      <div className="p-6 max-w-[1100px]">
+        <PageHeader eyebrow="fermOS" title="Design" subtitle={designId} />
+        <Card>
+          <Skeleton rows={6} />
+        </Card>
+      </div>
+    );
+  }
+
+  if (found.status === 'failed') {
+    return (
+      <div className="p-6 max-w-[1100px]">
+        <PageHeader eyebrow="fermOS" title="Design" subtitle={designId} />
+        <Callout kind="warn" title="This design could not be read">
+          {found.error.message}
+        </Callout>
+        <div className="mt-4">
+          <LinkButton to="/fermos/d">Back to designs</LinkButton>
+        </div>
+      </div>
+    );
+  }
+
+  const design = found.data;
 
   if (!design) {
     return (

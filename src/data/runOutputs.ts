@@ -24,18 +24,34 @@ import type { RunOutput } from './types';
 export const RUN_OUTPUTS: RunOutput[] = [];
 
 /**
- * The gold set planned in OF-COR-001 §18, kept here so the validation screen
- * can report progress against it rather than against nothing. These counts are
- * a plan, not an achievement — the screen must say so.
+ * One row of the planned gold set.
+ *
+ * Named rather than left inline because the adapter seam serves it and had to
+ * refer to it: `CorpusAdapter.getGoldSetPlan` imports this type rather than
+ * restating its members, the same way `adapters/types.ts` imports `PlantResult`
+ * and `JobPosition` from their one declaration. There is no Pydantic model for
+ * it yet — the plan is prose in OF-COR-001 §18 — so this file is the single
+ * declaration until there is, and the seam must not grow a second one.
+ *
+ * Every member is a BioRepo coordinate, which is the argument for who serves
+ * it: a paper id, an ontology field list, a record count, and a `blocked` flag
+ * whose truth is a fact about the ontology. See `getGoldSetPlan`.
  */
-export const GOLD_SET_PLAN: {
+export interface GoldSetPlanEntry {
   paperId: string;
   fields: string;
   records: number;
   rationale: string;
   /** Cannot be annotated until the ontology is extended (see ONTOLOGY_GAPS). */
   blocked?: boolean;
-}[] = [
+}
+
+/**
+ * The gold set planned in OF-COR-001 §18, kept here so the validation screen
+ * can report progress against it rather than against nothing. These counts are
+ * a plan, not an achievement — the screen must say so.
+ */
+export const GOLD_SET_PLAN: GoldSetPlanEntry[] = [
   { paperId: 'H1', fields: 'expression_pct_tsp, titer_*, phosphorylation status + method, kinase_identity', records: 18, rationale: 'Tables 1–3 are already structured; the highest-density extraction target and the best test of table parsing.' },
   { paperId: 'H4', fields: 'expression_pct_tsp, titer, secreted_fraction, phosphate_count, glycan_species', records: 6, rationale: 'Multi-field, single paper, all numeric — an ideal precision test.' },
   { paperId: 'I1', fields: 'micellar_fraction, gelation_ph, calcium_binding, phosphorylation_degree', records: 6, rationale: 'The functional-threshold anchor.' },

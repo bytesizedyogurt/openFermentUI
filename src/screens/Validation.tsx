@@ -18,7 +18,17 @@ import type { ExtractionRecord, ExtractorRun, FieldId, RunOutput } from '@/data/
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
-import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
+// The gold-set PLAN comes from BioRepo, not from Audit. Audit — the Inspect AI
+// scorer in `packages/assay` — owns the score; it consumes a gold set and does
+// not author one, and every field of a plan row is a corpus coordinate. The
+// other half of `src/data/runOutputs.ts` goes the other way: RUN_OUTPUTS is a
+// scorer's output, it is empty, and it reaches this screen through the store.
+// See `CorpusAdapter.getGoldSetPlan` for the argument in full.
+import { adapters } from '@/adapters';
+import { useAdapterData } from '@/adapters/react';
+// `ONTOLOGY_GAPS` and `fieldName` are DISPLAY HELPERS from the ontology
+// module, not seed data — a gap list the screen names and an id-to-label
+// lookup. They stay.
 import { ONTOLOGY_GAPS } from '@/data/ontology';
 import { convert, fmt, sameFamily, toSI } from '@/engine/units';
 import { href } from '@/router';
@@ -216,6 +226,7 @@ export default function Validation() {
   const palette = useCategorical();
 
   const [ready, setReady] = useState(false);
+  const goldSet = useAdapterData(() => adapters.corpus.getGoldSetPlan(), []);
   const [pickedRun, setPickedRun] = useState<ExtractorRun | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'nGold', dir: -1 });
   const [tag, setTag] = useState<string>('all');
@@ -418,7 +429,14 @@ export default function Validation() {
     />
   );
 
-  if (!ready) {
+  // One gate for two waits. The screen already held a skeleton behind a
+  // `delayClass('quick')` — the modelled latency of the scoring pass — and the
+  // gold-set read joins it rather than adding a second flicker beneath it.
+  // Gating on `!== 'ready'` and not on `!goldSet.data` on purpose: a rejected
+  // read would leave `data` empty forever and hold the skeleton up as though
+  // it were still working, which is the failure mode a loading state is
+  // supposed to remove rather than create.
+  if (!ready || goldSet.status === 'loading') {
     return (
       <>
         {header()}
@@ -429,12 +447,26 @@ export default function Validation() {
     );
   }
 
+  if (goldSet.status === 'failed') {
+    return (
+      <>
+        {header()}
+        <Callout kind="warn" title="The gold-set plan could not be read">
+          {goldSet.error.message}
+        </Callout>
+      </>
+    );
+  }
+
+  const goldPlan = goldSet.data.entries;
+  const difficultyCases = goldSet.data.difficultyCases;
+
   // No extractor has been run against this corpus, and the screen says so
   // rather than showing a number (OF-COR-001 §22, actions 6–7). Every entry is
   // catalogued: the curator's notes stand in for source text, so there are no
   // source spans to annotate a gold set against and nothing to score.
   if (!run || !metrics) {
-    const plannedRecords = GOLD_SET_PLAN.reduce((n, p) => n + p.records, 0);
+    const plannedRecords = goldPlan.reduce((n, p) => n + p.records, 0);
 
     // Known-bad, derived rather than maintained. Three signals the corpus can
     // answer on its own: a field the referee has contradicted, a field where
@@ -574,9 +606,9 @@ export default function Validation() {
               </span>
             </div>
             <p className="text-body text-ink-soft mb-3">
-              {GOLD_SET_PLAN.length} papers, weighted toward fields with enough independent
+              {goldPlan.length} papers, weighted toward fields with enough independent
               measurements to make precision and recall mean something.{' '}
-              {GOLD_SET_PLAN.some((p) => p.blocked) && (
+              {goldPlan.some((p) => p.blocked) && (
                 <span className="text-signal-warn">
                   One row is blocked: the ontology has no field for what it asks for.
                 </span>
@@ -593,7 +625,7 @@ export default function Validation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {GOLD_SET_PLAN.map((p) => (
+                  {goldPlan.map((p) => (
                     <tr key={p.paperId} className="border-b border-line/60 align-top">
                       <td className="py-1.5">
                         <CitationChip paperId={p.paperId} />
@@ -619,7 +651,7 @@ export default function Validation() {
               corpus document calls for.
             </p>
             <ul className="space-y-1.5">
-              {GOLD_SET_DIFFICULTY_CASES.map((c, i) => (
+              {difficultyCases.map((c, i) => (
                 <li key={i} className="tick tick-gold text-body">
                   {c}
                 </li>

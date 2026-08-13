@@ -170,8 +170,14 @@ function byEntryId(a: Paper, b: Paper): number {
  * construction rather than by authoring discipline. Categorical records carry a
  * string value and are passed through with `si.value = 0`, keeping their unit.
  * Lifted verbatim from `src/data/records.ts`, which this module supersedes.
+ *
+ * Exported because the WRITE path needs the same normalisation as the read
+ * path and must not have its own copy of it: `CorpusAdapter.writeRecord`
+ * applies this to what it is handed, so a record cannot enter through the
+ * adapter with an `si` that disagrees with its `value` any more than it can
+ * arrive through a transport with one.
  */
-function withSI(r: ExtractionRecord): ExtractionRecord {
+export function withSI(r: ExtractionRecord): ExtractionRecord {
   if (typeof r.value !== 'number') return { ...r, si: { value: 0, unit: r.unit } };
   return { ...r, si: toSI(r.value, r.unit) };
 }

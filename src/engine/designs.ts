@@ -107,21 +107,64 @@ function tierThree(grid: ResultGrid, config: Record<string, number>): TierResult
   };
 }
 
+/** Which ontology field each sweep axis is keyed to. */
+function dimFieldMap(scenario: Scenario): Record<string, string> {
+  const dimField: Record<string, string> = {};
+  for (const d of scenario.dims) {
+    if (d.field) dimField[d.key] = d.field;
+  }
+  return dimField;
+}
+
+/** The records a scenario's assumptions rest on — the basis for staleness. */
+function consumedRecordIds(scenario: Scenario): string[] {
+  return scenario.assumptions
+    .filter((a) => a.basis.kind === 'record')
+    .map((a) => (a.basis as { recordId: string }).recordId);
+}
+
+/**
+ * One configuration, run through the cascade.
+ *
+ * Split out of `designsFor` so that evaluating an ARBITRARY point — which is
+ * what `ProcessAdapter.submitEvaluation` does at the adapter seam — goes
+ * through the same code as evaluating a sweep corner, rather than through a
+ * second assembly that would have to keep agreeing with this one. In
+ * particular the two absent-tier reasons below are rendered verbatim on the
+ * design detail screen, and there is exactly one copy of each.
+ */
+export function evaluateDesign(
+  scenario: Scenario,
+  grid: ResultGrid,
+  config: Record<string, number>,
+  identity: { id: string; label: string },
+): DesignRecord {
+  return {
+    id: identity.id,
+    label: identity.label,
+    scenarioId: scenario.id,
+    config,
+    tiers: [
+      tierZero(config, dimFieldMap(scenario)),
+      absentTier('T1', 'No genome-scale metabolic model in this build. Flux balance is server-side work outside this repo.'),
+      absentTier('T2', 'No reactor model in this build. Mass transfer and mixing are unmodelled.'),
+      tierThree(grid, config),
+    ],
+    consumedRecordIds: consumedRecordIds(scenario),
+    // Parchment holds no parsed claim bounds, so nothing has evaluated scope.
+    scope: 'clear',
+    scopeEvaluated: false,
+    scopeHits: [],
+    publication: 'draft',
+  };
+}
+
 /**
  * Designs for a scenario: the reference point plus the corners of its sweep, so
  * the set spans the space the model was authored over rather than sampling it
  * arbitrarily.
  */
 export function designsFor(scenario: Scenario, grid: ResultGrid): DesignRecord[] {
-  const dimField: Record<string, string> = {};
-  for (const d of scenario.dims) {
-    if (d.field) dimField[d.key] = d.field;
-  }
-
-  const consumed = scenario.assumptions
-    .filter((a) => a.basis.kind === 'record')
-    .map((a) => (a.basis as { recordId: string }).recordId);
-
   const points: { label: string; config: Record<string, number> }[] = [];
   const ref = Object.fromEntries(grid.dims.map((d) => [d.key, d.values[Math.floor(d.values.length / 2)]]));
   points.push({ label: 'reference', config: ref });
@@ -135,24 +178,12 @@ export function designsFor(scenario: Scenario, grid: ResultGrid): DesignRecord[]
     }
   }
 
-  return points.map((p, i) => ({
-    id: `${scenario.id}-d${String(i + 1).padStart(2, '0')}`,
-    label: `${scenario.name} — ${p.label}`,
-    scenarioId: scenario.id,
-    config: p.config,
-    tiers: [
-      tierZero(p.config, dimField),
-      absentTier('T1', 'No genome-scale metabolic model in this build. Flux balance is server-side work outside this repo.'),
-      absentTier('T2', 'No reactor model in this build. Mass transfer and mixing are unmodelled.'),
-      tierThree(grid, p.config),
-    ],
-    consumedRecordIds: consumed,
-    // Parchment holds no parsed claim bounds, so nothing has evaluated scope.
-    scope: 'clear',
-    scopeEvaluated: false,
-    scopeHits: [],
-    publication: 'draft',
-  }));
+  return points.map((p, i) =>
+    evaluateDesign(scenario, grid, p.config, {
+      id: `${scenario.id}-d${String(i + 1).padStart(2, '0')}`,
+      label: `${scenario.name} — ${p.label}`,
+    }),
+  );
 }
 
 /** The four-segment cascade badge, in tier order. */

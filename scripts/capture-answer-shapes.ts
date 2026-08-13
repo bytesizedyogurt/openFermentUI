@@ -50,7 +50,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
+import { FLOWS } from '../src/data/flows';
+import { SUGGESTED_PROMPTS } from '../src/sim/prompts';
 import { PAPERS, RECORDS } from '../src/data/source';
 import type { ChatFlow, ChatToolCall } from '../src/data/types';
 
