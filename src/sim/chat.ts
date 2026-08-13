@@ -69,9 +69,27 @@ export function scoreFlow(input: string, flow: ChatFlow): number {
     // typed two characters that happen to occur inside the trigger did not:
     // "hi" sits inside "which host", and scoring that as a phrase match let
     // single words select a flow and answer with total confidence.
+    //
+    // COVERAGE is the other half, and dropping it was a regression. A trigger
+    // that sits inside a longer question accounts for only part of it, and the
+    // part it does not account for is where the question's actual subject often
+    // is: "what signal peptide should I use" is a trigger, and
+    // "what signal peptide should I use FOR TOMATOES" contains it — so without
+    // this the app answered a question about a plant with Chlamydomonas signal
+    // peptides, footed "well supported across several papers", and said nothing
+    // about the mismatch anywhere on screen.
+    //
+    // The deleted scorer priced that with a corpus vocabulary and a
+    // 0.4-per-unseen-token multiplier. This does it with string length alone —
+    // no vocabulary, no document frequencies, no salience weights, nothing that
+    // has to be recalibrated when the corpus grows. A trigger must account for
+    // most of what was asked, or the turn goes to the fallback ladder, which
+    // looks the entity up for real and otherwise declines by name.
+    const coverage = Math.min(t.length, q.length) / Math.max(t.length, q.length);
     const contains =
-      (q.includes(t) && tWords.length >= 2) ||
-      (t.includes(q) && qWords.length >= 2 && q.length >= t.length * 0.6);
+      ((q.includes(t) && tWords.length >= 2) ||
+        (t.includes(q) && qWords.length >= 2)) &&
+      coverage >= 0.82;
     if (contains) best = Math.max(best, 70 + Math.min(10, t.length / 8));
   }
   return best;
@@ -450,9 +468,24 @@ async function playDecline(input: string, sessionId: string) {
       name: 'corpus.search',
       args: { query: input, k: 3, backend: found.backend, method: found.method },
       durationMs: 820,
-      // Real (weak) hits — the trace shows what was actually returned, even
-      // when nothing cleared the support threshold.
-      retrieval: found.hits.filter((h) => h.score > 0.55),
+      // What was actually returned — ALL of it, which is what the sentence
+      // above this used to claim while the line below it discarded most.
+      //
+      // The 0.55 filter predates the retrieval change and did not survive it.
+      // The old scorer normalised so the top hit was always 1.00, making 0.55 a
+      // RELATIVE relevance cut. The bundled filter emits an unnormalised
+      // termsFound/termsAsked, so the same constant became an absolute one and
+      // silently swallowed real hits: a query returning three sections at 0.20
+      // showed none, under a callout reading "No passages in this corpus
+      // match." Two adjacent rows of the same trace then disagreed about
+      // whether anything matched, on the screen whose whole premise is not
+      // overclaiming — and the decline's own copy is a claim about MATCHING,
+      // not about clearing a threshold, so it was false as written.
+      //
+      // Showing the weak hits is also the more useful failure: a reader can see
+      // the corpus was searched, what it surfaced, and why that is not an
+      // answer. The answer text already declines in words.
+      retrieval: found.hits,
     },
     expanded: false,
   });

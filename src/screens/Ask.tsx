@@ -267,7 +267,7 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
       {call.retrieval && call.retrieval.length === 0 && (
         <div className="mt-2">
           <Callout kind="info">
-            No passages in this corpus match. Broaden the question, or{' '}
+            Nothing here supports an answer. Broaden the question, or{' '}
             <a href="#/trawl" className="text-accent hover:underline">
               check Library coverage
             </a>
