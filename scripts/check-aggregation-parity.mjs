@@ -105,6 +105,8 @@ const PROBES = [
   { ...base, id: 'probe:industry+not-primary', provenance: 'industry-estimate', isPrimary: false },
   { ...base, id: 'probe:verified', status: 'verified' },
   { ...base, id: 'probe:demo', provenance: 'demo' },
+  { ...base, id: 'probe:demo+rejected', provenance: 'demo', status: 'rejected' },
+  { ...base, id: 'probe:demo+not-primary', provenance: 'demo', isPrimary: false },
   { ...base, id: 'probe:gold', provenance: 'gold' },
   { ...base, id: 'probe:primary-true', isPrimary: true },
 ];

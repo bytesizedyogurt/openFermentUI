@@ -47,7 +47,7 @@
  *
  * Nothing here changes behaviour. It only observes it.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
@@ -1098,7 +1098,28 @@ const fixture = {
 };
 
 const path = join(OUT, 'answer-shapes.json');
-writeFileSync(path, `${JSON.stringify(fixture, null, 2)}\n`, 'utf8');
+const serialised = `${JSON.stringify(fixture, null, 2)}\n`;
+
+// `--check` compares and writes nothing. Without it this fixture is a 165 KB
+// pin that NOTHING replays: it is the contract the real agent's formatter will
+// be checked against, and it could silently stop describing the flows it was
+// captured from. It is also the fixture that would have caught the flow-
+// selection regression, had anything been replaying it.
+if (process.argv.includes('--check')) {
+  const committed = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  if (committed !== serialised) {
+    console.error('\n✗ fixtures/answer-shapes.json no longer matches the flows it pins.');
+    console.error(`  committed ${committed.length} bytes, the flows imply ${serialised.length}.`);
+    console.error('  Run `pnpm capture:answer-shapes` and READ the diff before committing it:');
+    console.error('  this file is the contract for the real agent\'s answer formatter, so a');
+    console.error('  change here is a change to what that agent will be held to.');
+    process.exit(1);
+  }
+  console.log(`  fixtures/answer-shapes.json   ${flows.length} flows, up to date`);
+  process.exit(0);
+}
+
+writeFileSync(path, serialised, 'utf8');
 
 // ══ Report ═════════════════════════════════════════════════════════════
 

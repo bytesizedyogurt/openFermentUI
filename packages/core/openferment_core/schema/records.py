@@ -133,12 +133,14 @@ class AggregateExclusion(StrEnum):
 
     REJECTED = "rejected"
     INDUSTRY_ESTIMATE = "industry-estimate"
+    DEMO = "demo"
     NOT_PRIMARY = "not-primary"
 
 
 EXCLUSION_NOTE: dict[AggregateExclusion, str] = {
     AggregateExclusion.REJECTED: "rejected — excluded from statistics",
     AggregateExclusion.INDUSTRY_ESTIMATE: "industry estimate — excluded from statistics",
+    AggregateExclusion.DEMO: "modeled, not measured — excluded from statistics",
     AggregateExclusion.NOT_PRIMARY: (
         "reports another study’s measurement — excluded from statistics"
     ),
@@ -246,6 +248,12 @@ class ExtractionRecord(OFModel):
           not evidence about the world.
         - `industry-estimate` — market and vendor figures (OF-COR-001 §16 O8).
           Useful for framing, useless as evidence.
+        - `demo` — modeled rather than measured: simulation response grids,
+          scripted agent text, anything derived from them. CLAUDE.md invariant 3
+          names it alongside industry-estimate and BOTH implementations omitted
+          it, so a demo value would have entered a median unremarked. No record
+          carries it today, which is why nothing noticed; the gate is supposed
+          to hold whether or not the corpus currently tests it.
         - `not-primary` — the paper is quoting someone else's measurement
           (OF-COR-001 §19, fifth trap). The same number counted twice is not
           two studies agreeing.
@@ -257,6 +265,8 @@ class ExtractionRecord(OFModel):
             return AggregateExclusion.REJECTED
         if self.provenance == Provenance.INDUSTRY_ESTIMATE:
             return AggregateExclusion.INDUSTRY_ESTIMATE
+        if self.provenance == Provenance.DEMO:
+            return AggregateExclusion.DEMO
         if self.is_primary is False:
             return AggregateExclusion.NOT_PRIMARY
         return None

@@ -36,14 +36,25 @@
  * fixture; the script contains no remembered numbers of its own. Three exports
  * of scale.ts — `renderStepText`, `batchLabel` and `materialsChecklist` — have
  * no fixture collection, because the Phase 0 capture did not record them. They
- * are therefore not gated here. Extending `capture-fixtures.ts` is the fix;
- * inventing expected strings in this file would not be.
+ * are compared BETWEEN THE TWO IMPLEMENTATIONS instead, over every real
+ * protocol version at four scales — see `renderedText` below, and the note
+ * there for why that is a weaker guarantee than a pin and still worth having.
+ * Extending `capture-fixtures.ts` to record them would be better; inventing
+ * expected strings in this file would not be.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { inoculumVolume, scaleMaterial, scaleMaterials } from '../src/engine/scale.ts';
+import {
+  batchLabel,
+  inoculumVolume,
+  materialsChecklist,
+  renderStepText,
+  scaleMaterial,
+  scaleMaterials,
+} from '../src/engine/scale.ts';
 import { diffVersions } from '../src/engine/diff.ts';
 import { PROTOCOLS } from '../src/data/source.ts';
 
@@ -336,6 +347,95 @@ function guardCheck(what, got, want) {
     Object.keys(diffFixture).filter((k) => k !== 'meta').sort(),
     [...DIFF_COLLECTIONS].sort(),
   );
+}
+
+// ── the three functions the fixture never recorded ─────────────────────
+//
+// `renderStepText`, `batchLabel` and `materialsChecklist` have no fixture
+// collection, so the replay above cannot see them. That was disclosed and left
+// open, and it was the wrong one to leave: `scale.ts`'s own header says "here
+// the answer is a mass on a balance in a real lab", and these three are what
+// puts the mass on the page. Mutating `renderStepText` to triple a quantity
+// changed eight lines of a bench sheet — "Weigh 2.42 g of Tris base" became
+// "7.26 g" — with `pnpm verify` green throughout.
+//
+// There is no pin to replay, so this compares the two IMPLEMENTATIONS against
+// each other over every real protocol version at four scales, which is what
+// `check:aggregation` does for the same reason. It is a weaker guarantee than a
+// fixture — both sides could drift together — but it is far stronger than
+// nothing, and it catches exactly the class of edit that put 7.26 g on a page.
+{
+  const PY_SRC = `
+import json, sys
+from pathlib import Path
+
+ROOT = Path(sys.argv[1]).resolve()
+sys.path.insert(0, str(ROOT / "packages" / "core"))
+
+from openferment_core.protocol.scale import batch_label, materials_checklist, render_step_text
+from openferment_core.schema import Protocol
+
+out = []
+for raw in json.load(open(ROOT / "data" / "corpus" / "protocols.json", encoding="utf-8")):
+    proto = Protocol.model_validate(raw)
+    for version in proto.versions:
+        # Keys must match the JavaScript side exactly, and JS prints 1 where
+        # Python prints 1.0 — so the label is the literal text, not the float.
+        for label, scale in (("0.5", 0.5), ("1", 1.0), ("2", 2.0), ("10", 10.0)):
+            out.append({
+                "key": f"{proto.id}/{version.version}/{label}",
+                "batchLabel": batch_label(version, scale),
+                "checklist": materials_checklist(version, scale, proto.title),
+                "steps": [render_step_text(step, version, scale) for step in version.steps],
+            })
+json.dump(out, sys.stdout, ensure_ascii=False)
+`;
+  let raw;
+  try {
+    raw = execFileSync('python3', ['-c', PY_SRC, ROOT], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch (e) {
+    console.error('✗ the Python side could not be run:\n' + (e.stderr || e.message));
+    process.exit(1);
+  }
+  const fromPython = new Map(JSON.parse(raw).map((r) => [r.key, r]));
+
+  let compared = 0;
+  let bad = 0;
+  for (const proto of PROTOCOLS) {
+    for (const version of proto.versions) {
+      for (const scale of [0.5, 1, 2, 10]) {
+        const key = `${proto.id}/${version.version}/${scale}`;
+        const theirs = fromPython.get(key);
+        compared += 1;
+        if (!theirs) {
+          bad += 1;
+          record('renderedText', key, 'a Python answer', 'nothing');
+          continue;
+        }
+        const ours = {
+          batchLabel: batchLabel(version, scale),
+          checklist: materialsChecklist(version, scale, proto.title),
+          steps: version.steps.map((step) => renderStepText(step, version, scale)),
+        };
+        for (const field of ['batchLabel', 'checklist']) {
+          if (ours[field] !== theirs[field]) {
+            bad += 1;
+            record('renderedText', `${key}.${field}`, theirs[field], ours[field]);
+          }
+        }
+        for (let i = 0; i < ours.steps.length; i += 1) {
+          if (ours.steps[i] !== theirs.steps[i]) {
+            bad += 1;
+            record('renderedText', `${key}.steps[${i}]`, theirs.steps[i], ours.steps[i]);
+          }
+        }
+      }
+    }
+  }
+  tally.push({ name: 'renderedText', cases: compared, bad });
 }
 
 // ── report ─────────────────────────────────────────────────────────────

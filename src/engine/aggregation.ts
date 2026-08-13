@@ -49,11 +49,15 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'not-primary';
+export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'demo' | 'not-primary';
 
 export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
+  // CLAUDE.md invariant 3 names `demo` alongside `industry-estimate`, and both
+  // implementations omitted it — a modeled value would have entered a median
+  // unremarked. No record carries it today, which is why nothing noticed.
+  if (r.provenance === 'demo') return 'demo';
   if (r.isPrimary === false) return 'not-primary';
   return null;
 }
@@ -67,5 +71,6 @@ export function isAggregatable(r: ExtractionRecord): boolean {
 export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
   rejected: 'rejected — excluded from statistics',
   'industry-estimate': 'industry estimate — excluded from statistics',
+  demo: 'modeled, not measured — excluded from statistics',
   'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
 };
