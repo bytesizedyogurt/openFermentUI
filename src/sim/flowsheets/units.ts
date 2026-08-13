@@ -1,3 +1,19 @@
+// NOT SIMULATION — NOT DELETED WITH THE REST OF `sim/`.
+//
+// Every other file in `src/sim/` is a rehearsal with a removal date: the
+// scripted agent, its intent matcher, its latency model and its job pacing all
+// go in the phase that lands the real agent. `sim/flowsheets/` does not. It is
+// the bioSTEAM plant definition — a real mass balance over real, cited
+// equipment correlations, attributed in `src/engine/biosteam/NOTICE.md` and
+// asserted against upstream doctests on every `pnpm verify`. No phase of this
+// migration deletes it.
+//
+// It sits under `sim/` because a plant simulation is a simulation in the
+// engineering sense, not in the "stands in until the backend exists" sense the
+// rest of this directory means. Where the cost model is ultimately AUTHORED is
+// the BioSTEAM question in CLAUDE.md — a question about which language owns
+// the model, not a removal date.
+//
 // The equipment this plant is made of.
 //
 // Each class is a BioUnit: run, design, cost, in that order. Where bioSTEAM

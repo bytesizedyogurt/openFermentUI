@@ -46,6 +46,25 @@ const SLASH_HINTS = [
 ];
 
 /** A strip chart of the record values an answer cites (§8.2, message type 5). */
+/**
+ * Distinct PAPERS backing an answer: every paper cited directly, plus the paper
+ * behind every cited record. Both citation forms the corpus actually uses —
+ * `[[H4]]` for a source and `[[r-H4-4]]` for one extracted value from it.
+ *
+ * Papers rather than citations, because the footer grades support by breadth
+ * ("across several papers"), and four records lifted from one paper is one
+ * paper's worth of evidence however many chips it renders.
+ */
+function countSourcePapers(md: string, records: { id: string; paperId: string }[]): number {
+  const papers = new Set<string>();
+  for (const m of md.matchAll(/\[\[([A-O]\d+[a-z]?)\]\]/g)) papers.add(m[1]);
+  for (const m of md.matchAll(/\[\[(r-[A-Za-z0-9]+-\d+)\]\]/g)) {
+    const rec = records.find((r) => r.id === m[1]);
+    if (rec) papers.add(rec.paperId);
+  }
+  return papers.size;
+}
+
 function AnswerStrip({ md }: { md: string }) {
   const records = useStore((s) => s.records);
   const color = useSeriesColor();
@@ -265,6 +284,9 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
   const createSession = useStore((s) => s.createSession);
   const appendMessage = useStore((s) => s.appendMessage);
   const pinEvidence = useStore((s) => s.pinEvidence);
+  // For the answer footer: a cited record names its paper, and the footer
+  // grades support by how many PAPERS stand behind the answer.
+  const records = useStore((s) => s.records);
   const chatMode = useStore((s) => s.ui.chatMode);
   const inspectorOpen = useStore((s) => s.ui.inspectorOpen);
   const sessionsOpen = useStore((s) => s.ui.sessionsOpen);
@@ -521,9 +543,19 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                 );
               }
               // answer
-              const sourceCount = new Set(
-                [...m.md.matchAll(/\[\[(SP-\d+)\]\]/g)].map((x) => x[1]),
-              ).size;
+              //
+              // Count the PAPERS behind the answer, so "4 sources — well
+              // supported across several papers" is literally what it says: a
+              // paper cited directly, plus the paper behind every cited record.
+              //
+              // This regex used to be /\[\[(SP-\d+)\]\]/, a citation form from
+              // the synthetic corpus that no real corpus id has. It therefore
+              // matched nothing, and EVERY answer footed itself "0 sources — No
+              // corpus support — see the decline above" while rendering dozens
+              // of working chips above it. Under-claiming is still claiming
+              // wrongly: the screen was telling a reader the corpus had nothing
+              // behind an answer it had, in fact, sourced.
+              const sourceCount = countSourcePapers(m.md, records);
               return (
                 <Card key={m.id} className="p-4">
                   <Markdown md={m.md} />

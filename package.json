@@ -22,6 +22,7 @@
     "export:corpus": "tsx scripts/export-corpus.ts",
     "check:corpus": "tsx scripts/export-corpus.ts --check",
     "capture:fixtures": "tsx scripts/capture-fixtures.ts",
+    "capture:answer-shapes": "tsx scripts/capture-answer-shapes.ts",
     "gen:types": "node scripts/gen-types.mjs",
     "check:schema": "python3 packages/core/scripts/validate_fixtures.py"
   },

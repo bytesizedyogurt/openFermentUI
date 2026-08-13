@@ -1,3 +1,13 @@
+// SIMULATION — REMOVED WITH THE SCRIPTED AGENT.
+//
+// Removed in: the final migration phase, the one that lands the real agent.
+// `sim/` is retired last, by design (README, Architecture).
+// Replaced by: PaperQA2 retrieval and a real model behind the Ask screen.
+// The FLOWS are not deleted with this file — they survive as regression
+// fixtures for the real agent's answer formatter (README, Architecture), which
+// is why every message here comes out of the flow object rather than being
+// assembled on the way past.
+//
 // Scripted agent: intent matching and staged flow playback (OF-DES-001 §16).
 //
 // A turn is flow selection followed by staged playback. All content comes from
@@ -6,7 +16,6 @@
 import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '@/data/types';
 import { FLOWS } from '@/data/flows';
 import { useStore, nextId, isAggregatable } from '@/store';
-import { tokenize, expandQuery } from './intent';
 import { PAPERS, STRAINS, search } from '@/data/source';
 import { ONTOLOGY } from '@/data/source';
 import { fieldName } from '@/data/ontology';
@@ -18,96 +27,42 @@ import { delay, scaled, streamInterval } from './latency';
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9µ⁻¹\s-]/g, ' ').replace(/\s+/g, ' ').trim();
 
 /**
- * Every token the corpus can actually speak about: paper titles and curator
- * prose, strain names and aliases, ontology field names, and the flow triggers
- * themselves. ~2.5k tokens — small enough that a word missing from it is real
- * evidence the question is about something else entirely.
- */
-const CORPUS_VOCAB: Set<string> = (() => {
-  const v = new Set<string>();
-  const add = (text: unknown) => {
-    if (typeof text !== 'string') return;
-    for (const tok of tokenize(text)) v.add(tok);
-  };
-  for (const p of PAPERS) {
-    add(p.title);
-    add(p.venue);
-    for (const sec of p.sections) {
-      add(sec.heading);
-      add(sec.text);
-    }
-  }
-  for (const st of STRAINS) {
-    add(st.binomial);
-    add(st.designation);
-    add(st.description);
-    for (const t of st.taxonomy) add(t);
-  }
-  for (const d of ONTOLOGY) {
-    add(d.name);
-    add(d.definition);
-  }
-  for (const f of FLOWS) for (const t of f.triggers) add(t);
-  return v;
-})();
-
-/**
- * How much to trust a match given words the corpus has never seen. "max
- * secreted yield from tomatoes" overlaps a titer trigger on three tokens out of
- * four and used to answer, confidently, about Chlamydomonas. Each unseen token
- * is one more reason to hand the turn to the fallback ladder, which declines
- * and names what the corpus does cover.
- */
-const CORPUS_DF: Map<string, number> = (() => {
-  const df = new Map<string, number>();
-  for (const p of PAPERS) {
-    for (const sec of p.sections) {
-      const seen = new Set(tokenize(`${sec.heading} ${sec.text} ${p.title}`));
-      for (const tok of seen) df.set(tok, (df.get(tok) ?? 0) + 1);
-    }
-  }
-  return df;
-})();
-
-/**
- * How much a query token counts when asking "did the trigger account for this?".
- * A rare, specific term carries the question's subject; a common one is
- * connective tissue. "maximum secreted protein yield from soybean" shares four
- * common tokens with a titer trigger and differs on the one word that says what
- * the question is actually about — so that word has to outweigh the other four.
- */
-function salience(tok: string): number {
-  const df = CORPUS_DF.get(tok) ?? 0;
-  if (df === 0) return 4;
-  if (df <= 3) return 10;
-  if (df <= 10) return 3;
-  return 1;
-}
-
-function domainConfidence(qTokens: string[]): number {
-  if (qTokens.length === 0) return 1;
-  const unseen = qTokens.filter((t) => !CORPUS_VOCAB.has(t)).length;
-  return Math.pow(0.4, unseen);
-}
-
-/**
- * Score input against a flow's triggers: exact match beats whole-phrase
- * containment beats weighted keyword overlap with synonym expansion.
+ * Score input against a flow's triggers: exact match, then whole-phrase
+ * containment. Nothing else.
+ *
+ * WHAT USED TO BE HERE, and why it is gone. This function carried a real
+ * intent matcher: a vocabulary of every token the corpus could speak about, a
+ * document-frequency table over the section texts, a salience weight that made
+ * a rare noun outweigh four common ones, an F1 over trigger-coverage and
+ * query-coverage, and a 0.4-per-unseen-token confidence multiplier so that
+ * "max secreted yield from tomatoes" could not be answered with a
+ * Chlamydomonas titer.
+ *
+ * It worked, and it is deleted anyway, on the migration brief's instruction:
+ * it does not survive contact with a real model. A language model does its own
+ * intent resolution, and a hand-tuned keyword scorer in front of one is a
+ * second opinion that has to be maintained, calibrated and eventually argued
+ * with. Keeping it "just until the real agent lands" is how it would have
+ * stayed.
+ *
+ * WHAT THIS COSTS, stated rather than discovered later: a PARAPHRASE no longer
+ * selects a flow. The six suggested prompts are exact triggers and still play;
+ * a rewording of one now falls to the fallback ladder, which looks the entity
+ * up for real and otherwise declines by name. That is the honest direction to
+ * fail in — declining a question we half-recognised was already the cheaper
+ * error under the old scorer, and this makes it the only one.
  */
 export function scoreFlow(input: string, flow: ChatFlow): number {
   const q = norm(input);
   if (!q) return 0;
+  const qWords = q.split(' ').filter(Boolean);
   let best = 0;
-  const qTokens = tokenize(q);
-  const qExpanded = expandQuery(qTokens);
-  const confidence = domainConfidence(qTokens);
 
   for (const trigger of flow.triggers) {
     const t = norm(trigger);
     if (t === q) return 100;
-
-    const tTokens = tokenize(t);
-    if (tTokens.length === 0) continue;
+    const tWords = t.split(' ').filter(Boolean);
+    if (tWords.length === 0) continue;
 
     // Whole-phrase containment, but only in the direction that carries
     // evidence. A user who typed a superset of the trigger meant it. A user who
@@ -115,36 +70,9 @@ export function scoreFlow(input: string, flow: ChatFlow): number {
     // "hi" sits inside "which host", and scoring that as a phrase match let
     // single words select a flow and answer with total confidence.
     const contains =
-      (q.includes(t) && tTokens.length >= 2) ||
-      (t.includes(q) && qTokens.length >= 2 && q.length >= t.length * 0.6);
-    if (contains) {
-      best = Math.max(best, (70 + Math.min(10, t.length / 8)) * confidence);
-      continue;
-    }
-
-    // Keyword overlap, scored on BOTH directions of coverage. Trigger coverage
-    // alone rewards a query for the tokens it happens to share and ignores the
-    // ones it does not: "max secreted yield from tomatoes" covers two thirds of
-    // a titer trigger and says "tomatoes" for free. Weighing how much of the
-    // *query* the trigger accounts for is what makes an out-of-domain noun
-    // cost something.
-    let overlap = 0;
-    for (const tok of tTokens) overlap += qExpanded.get(tok) ?? 0;
-    const triggerCoverage = overlap / tTokens.length;
-
-    const tExpanded = expandQuery(tTokens);
-    let qHit = 0;
-    let qTotal = 0;
-    for (const tok of qTokens) {
-      const w = salience(tok);
-      qTotal += w;
-      if ((tExpanded.get(tok) ?? 0) > 0) qHit += w;
-    }
-    const queryCoverage = qTotal > 0 ? qHit / qTotal : 0;
-
-    const denom = triggerCoverage + queryCoverage;
-    const f1 = denom > 0 ? (2 * triggerCoverage * queryCoverage) / denom : 0;
-    best = Math.max(best, f1 * 70 * confidence);
+      (q.includes(t) && tWords.length >= 2) ||
+      (t.includes(q) && qWords.length >= 2 && q.length >= t.length * 0.6);
+    if (contains) best = Math.max(best, 70 + Math.min(10, t.length / 8));
   }
   return best;
 }

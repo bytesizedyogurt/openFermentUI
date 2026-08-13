@@ -34,6 +34,7 @@ import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { clearPlantCache } from '@/engine/plant';
 import { toSI } from '@/engine/units';
+import { createSimulatedJobRunner, type JobRunner } from '@/sim/jobs';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -250,6 +251,21 @@ function initialTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'bench';
 }
 
+/**
+ * Where the jobs in the tray are, moment to moment.
+ *
+ * Only the PACING is simulated, and it is all on the other side of this
+ * reference. `tickJobs` below asks a `JobRunner` where each running job stands
+ * and applies the answer; it does not work the answer out. Swapping the
+ * scripted pacing for a server-backed runner is this one line — everything
+ * else about a job (that it exists, its stages, its status, the toast when it
+ * lands, the paper it marks complete) is real and stays in the store.
+ *
+ * The speed is passed as a getter, not a value: `ui.simSpeed` is live state
+ * and the user can change it from Settings while a job is in flight.
+ */
+const jobRunner: JobRunner = createSimulatedJobRunner(() => useStore.getState().ui.simSpeed);
+
 export const useStore = create<OFState>()((set, get) => ({
   ...seedState(),
   grids: seedGrids(),
@@ -436,33 +452,40 @@ export const useStore = create<OFState>()((set, get) => ({
     return id;
   },
 
+  /**
+   * Apply whatever the runner reports, and do the real work of a job landing.
+   *
+   * The arithmetic that used to sit here — spending a frame's milliseconds
+   * across declared stage durations — moved to `sim/jobs.ts`, because a real
+   * runner is TOLD where a job is rather than computing it. What is left is
+   * not simulation: a running job takes the position it is given, a job the
+   * runner reports `done` becomes `done`, a finished job toasts, and a
+   * finished ingest marks its paper complete. A server-backed runner needs
+   * every line of that unchanged.
+   */
   tickJobs: (dtMs) => {
-    const speed = get().ui.simSpeed;
-    const dt = speed === Infinity ? 1e9 : dtMs * speed;
+    const positions = jobRunner.report(
+      get().jobs.filter((j) => j.status === 'running'),
+      dtMs,
+    );
     const finishedJobs: Job[] = [];
     set((s) => ({
       jobs: s.jobs.map((j) => {
         if (j.status !== 'running') return j;
-        let { stageIndex, stageProgress } = j;
-        let budget = dt;
-        while (budget > 0 && stageIndex < j.stages.length) {
-          const stage = j.stages[stageIndex];
-          const remaining = stage.ms * (1 - stageProgress);
-          if (budget >= remaining) {
-            budget -= remaining;
-            stageIndex += 1;
-            stageProgress = 0;
-          } else {
-            stageProgress += budget / stage.ms;
-            budget = 0;
-          }
-        }
-        if (stageIndex >= j.stages.length) {
-          const done: Job = { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' };
+        // No report for this job means no news — leave it where it is.
+        const at = positions.get(j.id);
+        if (!at) return j;
+        if (at.done) {
+          const done: Job = {
+            ...j,
+            stageIndex: at.stageIndex,
+            stageProgress: at.stageProgress,
+            status: 'done',
+          };
           finishedJobs.push(done);
           return done;
         }
-        return { ...j, stageIndex, stageProgress };
+        return { ...j, stageIndex: at.stageIndex, stageProgress: at.stageProgress };
       }),
     }));
     for (const j of finishedJobs) {

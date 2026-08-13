@@ -124,7 +124,7 @@ The simulation holds itself to eight conditions (design §11):
 src/data/       seed content as typed TS modules — becomes API fixtures in production
 src/data/corpus/  the 15 literature threads, A–O, one file per thread group
 src/engine/     pure logic, unit-testable without UI — see the routing table below
-src/sim/        latency model and chat flow player — two files, retired last
+src/sim/        latency model, job pacing and the chat flow player — retired last
 src/components/ shared primitives (citation chip, data table, quantity field, …)
 src/screens/    one file per screen
 ```
@@ -151,9 +151,14 @@ Where each concern belongs:
 
 `data/` seed modules keep the shapes the API will return, so they
 become fixtures and contract tests. `sim/` is designed to be thrown away, and the scripted chat flows survive
-it as regression fixtures for the real agent's answer formatter. It is not quite a clean seam:
-the simulated job pacing lives in `store.ts` (`startJob`/`tickJobs`) rather than in `sim/`, so
-retiring the simulation means editing the store too.
+it as regression fixtures for the real agent's answer formatter. The seam is clean now: the simulated
+job pacing moved out of `store.ts` into `src/sim/jobs.ts`, behind a `JobRunner` interface a
+server-backed runner satisfies by *reporting* progress instead of deriving it from a millisecond
+budget. What a real runner also does stays in the store — that jobs exist, that they have stages and
+a status, that a finished job toasts and a finished ingest marks its paper complete. Every file under
+`src/sim/` carries a header naming the phase that deletes it and what replaces it, except
+`src/sim/flowsheets/`, whose header says the opposite: the plant definition is real and no phase
+deletes it.
 
 ### The evidence tick
 

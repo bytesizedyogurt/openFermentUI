@@ -1,0 +1,6095 @@
+{
+  "meta": {
+    "generatedFrom": "src/data/flows.ts",
+    "generatedBy": "scripts/capture-answer-shapes.ts",
+    "renderedBy": [
+      "src/screens/Ask.tsx",
+      "src/components/Markdown.tsx",
+      "src/components/Chip.tsx"
+    ],
+    "playedBy": "src/sim/chat.ts",
+    "purpose": "Regression fixtures for the FORMATTER of the real agent that replaces the scripted flows. A real model will write its own prose; it must still produce this shape — the same plan granularity, the same tool sequence, citation chips in the same places relative to the claims they support, and the same closing standing note.",
+    "capturedFromProse": [
+      "plan step text — a plan step is not prose, it is the plan",
+      "bold lead-in labels — the answer’s section structure",
+      "table headers — the table’s schema",
+      "the closing standing note — the honesty policy, kept verbatim because a paraphrase is not a regression target",
+      "clarify questions and option labels — the fork is the shape"
+    ],
+    "deliberatelyNotCaptured": [
+      "answerMd body prose",
+      "retrieval snippet text",
+      "corpus.search query strings",
+      "toolCall durationMs — playback timing, not answer shape"
+    ],
+    "counts": {
+      "flows": 13,
+      "planSteps": 53,
+      "toolCalls": 25,
+      "retrievalHits": 54,
+      "citationChips": 159,
+      "distinctChipIds": 109,
+      "clarifyFlows": 2,
+      "declineFlows": 2,
+      "corpusPapers": 132,
+      "corpusRecords": 134
+    },
+    "taxonomies": {
+      "planStepRole": {
+        "parse": "Restate the question in ontology terms — field ids, organism ids, target.",
+        "retrieve": "Pull passages from the corpus.",
+        "query": "Query the structured record store.",
+        "guard": "A check that must pass before the answer may be written — counter-evidence, isPrimary, conflict detection, a refused unit conversion, a negative result to flag.",
+        "shape": "Organise the retrieved evidence: split, separate, rank, map.",
+        "deliver": "Assemble, report or state the answer.",
+        "unclassified": "No rule fired. Add a rule rather than leaving this in a fixture."
+      },
+      "chipSlot": {
+        "sentence-lead": "First token of a sentence. The dominant paper-chip position: the entry is the grammatical subject of the claim it supports.",
+        "sentence-final": "Last token before the sentence terminator.",
+        "clause-final": "Last token before a comma or semicolon.",
+        "mid-sentence": "Inside a sentence with words on both sides.",
+        "cell-only": "The table cell contains nothing but the chip.",
+        "cell-lead": "First token of a table cell, with more after it.",
+        "cell-trailing": "Last token of a table cell — the cell states a value, the chip cites it.",
+        "cell-mid": "Inside a table cell with content on both sides."
+      },
+      "chipPrecededBy": {
+        "block-start": "Chip is the first token of its block — paper chip in subject position.",
+        "cell-start": "Chip is the first token of a table cell.",
+        "bold-quantity": "Immediately after a bolded number — \"**500 mg/L** [[r-H2-1]]\".",
+        "quantity": "Immediately after an unbolded number within the last three tokens.",
+        "bold-word": "Immediately after a bolded non-numeric span.",
+        "word": "Mid-prose, after ordinary words — the chip discharges a clause, not a number.",
+        "chip": "Immediately after another chip — a chip run.",
+        "punctuation": "After a comma, dash or colon."
+      },
+      "chipFollowedBy": {
+        "period": "Sentence ends immediately after the chip.",
+        "comma": "Clause ends immediately after the chip.",
+        "semicolon": "Clause ends immediately after the chip.",
+        "em-dash": "An aside opens immediately after the chip.",
+        "chip": "Another chip follows — a chip run.",
+        "word": "The sentence continues past the chip.",
+        "block-end": "Chip is the last token of its block.",
+        "cell-end": "Chip is the last token of its table cell."
+      },
+      "footerClaim": {
+        "curator-transcription": "States the numbers came from a curator note, not a source PDF.",
+        "catalogued-not-ingested": "Names the entries as catalogued — metadata plus a note, no full text.",
+        "verify-before-citing": "Tells the reader to verify before citing.",
+        "not-read-from-source": "Names something the corpus has not read and therefore cannot claim.",
+        "authored-judgement": "Marks part of the answer as the agent’s own judgement rather than corpus fact.",
+        "scope-limit": "Bounds what the cited evidence covers — measured on a reporter, on the wild type, on a different organism.",
+        "absence-is-a-finding": "States that the absence itself is the curated result."
+      }
+    },
+    "determinism": "Derived from a fixed array in declaration order; maps are keyed in codepoint order, never locale order. Two consecutive runs are byte-identical."
+  },
+  "renderingContract": {
+    "assertedNotDerived": true,
+    "note": "Read out of the files named below at capture time. Nothing here is computed from FLOWS, so it goes stale if those files change and must be re-read rather than trusted.",
+    "playback": {
+      "source": "src/sim/chat.ts — playFlow()",
+      "messageOrder": [
+        "plan",
+        "tool (one per toolCall, in order)",
+        "clarify (only if flow.clarify)",
+        "answer"
+      ],
+      "planTicksStepByStepThenCollapses": true,
+      "oneToolMessagePerToolCall": true,
+      "retrievalCardsFollowTheirToolRow": true,
+      "clarifyIsPushedBeforeTheAnswer": true,
+      "clarifyAnswerIsPushedWithEmptyFollowups": true,
+      "followupsArePatchedInAfterStreamingEnds": true,
+      "answerStreamsInAboutNinetyChunks": true
+    },
+    "answerRendering": {
+      "source": "src/screens/Ask.tsx, src/components/Markdown.tsx, src/components/Chip.tsx",
+      "chipSyntax": "[[id]]",
+      "chipRegex": "/\\[\\[([A-Za-z0-9\\-]+)\\]\\]/g",
+      "recordChipRule": "an id starting \"r-\" renders as a record chip (deep-links to the span); anything else renders as a paper chip",
+      "unresolvedChipRendering": "red error chip reading \"Source unavailable\", never silent",
+      "blockGrammar": [
+        "table",
+        "list",
+        "ordered-list",
+        "heading",
+        "blockquote",
+        "paragraph"
+      ],
+      "inlineGrammar": [
+        "**bold**",
+        "*italic*",
+        "`code`",
+        "[[chip]]"
+      ],
+      "stripChartAppearsWhen": "four or more cited records share one ontology field and convert to its canonical unit",
+      "answerActions": [
+        "Copy",
+        "Export",
+        "Pin sources",
+        "Insert into…",
+        "Helpful",
+        "Not helpful"
+      ]
+    },
+    "retrievalRendering": {
+      "source": "src/screens/Ask.tsx — RetrievalCards",
+      "layout": "two-column card grid beneath the tool row",
+      "perCard": [
+        "paper citation chip",
+        "section heading",
+        "score bar",
+        "score to two decimals",
+        "snippet clamped to two lines",
+        "Inspect",
+        "Open source"
+      ],
+      "emptyRetrievalArray": "renders the \"No passages in this corpus match\" callout",
+      "absentRetrievalKey": "renders nothing beneath the tool row"
+    },
+    "toolRowRendering": {
+      "source": "src/screens/Ask.tsx — ToolMessage",
+      "collapsed": "wrench icon, tool name, args joined as \"k=v · k=v\", durationMs",
+      "expanded": "pretty-printed { tool, args, durationMs, hits }",
+      "methodLine": "args.method, when present, is printed unfolded beneath the row — scripted flows do not set it, live retrieval does"
+    }
+  },
+  "promptEntryPoints": {
+    "note": "The six chips on the empty Ask screen. Each is one flow trigger verbatim, so a click is an exact match rather than a fuzzy one — this is the demo’s entry path and the first thing to break if triggers are edited. Matched here by a documented normalizer (lowercase; non-alphanumerics to space; collapse whitespace), which is deliberately looser than the matcher in src/sim/chat.ts. This fixture pins the entry RELATION, not the matcher.",
+    "prompts": [
+      {
+        "prompt": "What titers have been achieved for recombinant β-casein?",
+        "entersFlow": "F1",
+        "relation": "exact-trigger-after-normalization"
+      },
+      {
+        "prompt": "Has anyone expressed a casein in an alga?",
+        "entersFlow": "F6",
+        "relation": "exact-trigger-after-normalization"
+      },
+      {
+        "prompt": "Compare Chlamydomonas and Pichia as casein hosts",
+        "entersFlow": "F9",
+        "relation": "exact-trigger-after-normalization"
+      },
+      {
+        "prompt": "What is the maximum secreted protein yield from Chlamydomonas?",
+        "entersFlow": "F4",
+        "relation": "exact-trigger-after-normalization"
+      },
+      {
+        "prompt": "Does phosphorylation actually matter for making cheese?",
+        "entersFlow": "F3",
+        "relation": "exact-trigger-after-normalization"
+      },
+      {
+        "prompt": "What is the regulatory status of C. reinhardtii as food?",
+        "entersFlow": "F12",
+        "relation": "exact-trigger-after-normalization"
+      }
+    ],
+    "allPromptsEnterAFlow": true
+  },
+  "aggregate": {
+    "flows": 13,
+    "plan": {
+      "stepCounts": {
+        "4": 12,
+        "5": 1
+      },
+      "signatures": {
+        "parse → retrieve → guard → deliver": 4,
+        "parse → retrieve → guard → shape": 1,
+        "parse → retrieve → query → shape → deliver": 1,
+        "parse → retrieve → retrieve → deliver": 2,
+        "parse → retrieve → retrieve → shape": 1,
+        "parse → retrieve → shape → deliver": 2,
+        "parse → retrieve → shape → guard": 2
+      },
+      "roleCounts": {
+        "deliver": 9,
+        "guard": 7,
+        "parse": 13,
+        "query": 1,
+        "retrieve": 16,
+        "shape": 7
+      },
+      "everyPlanOpensWithParse": true,
+      "everyPlanHasRetrieve": true,
+      "flowsWithGuardStep": 7,
+      "flowsEndingInDelivery": 9,
+      "unclassifiedSteps": []
+    },
+    "toolCalls": {
+      "callCounts": {
+        "1": 2,
+        "2": 10,
+        "3": 1
+      },
+      "names": {
+        "corpus.search": 13,
+        "ontology.lookup": 1,
+        "records.query": 11
+      },
+      "everyFlowOpensWithCorpusSearch": true,
+      "everyFlowSearchesExactlyOnce": true,
+      "kValues": {
+        "5": 3,
+        "6": 7,
+        "8": 3,
+        "none": 12
+      },
+      "filterDimensions": {
+        "organism": 1,
+        "thread": 6
+      },
+      "recordQueryFlags": {
+        "componentTag": 1,
+        "detectConflicts": 1,
+        "excludeFromAggregate": 1,
+        "groupBy": 1,
+        "includeNonPrimary": 1,
+        "isPrimary": 1,
+        "organism": 5,
+        "property": 1,
+        "provenance": 1,
+        "requireMethod": 2,
+        "value": 1
+      },
+      "fieldsRequested": {
+        "disruption_protein_yield": 1,
+        "expression_pct_tsp": 4,
+        "final_biomass_density": 1,
+        "gelation_ph": 1,
+        "glycan_species": 1,
+        "kinase_identity": 3,
+        "micellar_fraction": 1,
+        "minimum_selling_price": 1,
+        "phosphate_count": 1,
+        "phosphorylation_degree": 4,
+        "secreted_fraction": 1,
+        "time_to_colony": 1,
+        "titer_intracellular": 2,
+        "titer_secreted": 3
+      },
+      "retrievalRendering": {
+        "cards": 13,
+        "none": 12
+      }
+    },
+    "retrieval": {
+      "hitCounts": {
+        "3": 2,
+        "4": 8,
+        "5": 2,
+        "6": 1
+      },
+      "everyFlowScoresDescending": true,
+      "everyHitOnSectionS1": true,
+      "totalHits": 54,
+      "flowsRetrievingAPaperTwice": [
+        "F3",
+        "F5",
+        "F8",
+        "F12"
+      ],
+      "totalRetrievedNotCited": 1,
+      "totalCitedNotRetrieved": 18
+    },
+    "citations": {
+      "total": 159,
+      "paper": 72,
+      "record": 87,
+      "distinct": 109,
+      "allResolveAgainstCorpus": true,
+      "byBlockKind": {
+        "paragraph": 112,
+        "table": 47
+      },
+      "bySlot": {
+        "cell-mid": 6,
+        "cell-only": 15,
+        "cell-trailing": 26,
+        "clause-final": 23,
+        "mid-sentence": 34,
+        "sentence-final": 18,
+        "sentence-lead": 37
+      },
+      "paperBySlot": {
+        "cell-mid": 3,
+        "cell-only": 15,
+        "cell-trailing": 2,
+        "clause-final": 4,
+        "mid-sentence": 11,
+        "sentence-lead": 37
+      },
+      "recordBySlot": {
+        "cell-mid": 3,
+        "cell-trailing": 24,
+        "clause-final": 19,
+        "mid-sentence": 23,
+        "sentence-final": 18
+      },
+      "paperPrecededBy": {
+        "block-start": 8,
+        "bold-quantity": 2,
+        "bold-word": 16,
+        "cell-start": 15,
+        "punctuation": 8,
+        "quantity": 2,
+        "word": 21
+      },
+      "recordPrecededBy": {
+        "bold-quantity": 8,
+        "bold-word": 2,
+        "chip": 1,
+        "quantity": 26,
+        "word": 50
+      },
+      "paperFollowedBy": {
+        "cell-end": 17,
+        "comma": 4,
+        "em-dash": 1,
+        "word": 50
+      },
+      "recordFollowedBy": {
+        "cell-end": 24,
+        "chip": 1,
+        "comma": 18,
+        "em-dash": 8,
+        "period": 18,
+        "semicolon": 3,
+        "word": 15
+      },
+      "chipRuns": 2,
+      "maxRunLength": 2,
+      "invariants": {
+        "noRecordChipEverLeadsASentence": true,
+        "noRecordChipEverOpensABlockOrCell": true,
+        "everyChipAloneInACellIsAPaperChip": true,
+        "everySentenceFinalChipIsARecordChip": true,
+        "recordChipsImmediatelyAfterAQuantity": 34,
+        "paperChipsImmediatelyAfterAQuantity": 4
+      }
+    },
+    "answer": {
+      "blockCounts": {
+        "4": 1,
+        "5": 4,
+        "6": 7,
+        "7": 1
+      },
+      "flowsWithTable": [
+        "F1",
+        "F7",
+        "F8",
+        "F9"
+      ],
+      "tableShapes": [
+        {
+          "id": "F1",
+          "columns": 6,
+          "rows": 12
+        },
+        {
+          "id": "F7",
+          "columns": 3,
+          "rows": 3
+        },
+        {
+          "id": "F8",
+          "columns": 3,
+          "rows": 4
+        },
+        {
+          "id": "F9",
+          "columns": 3,
+          "rows": 5
+        }
+      ],
+      "openingSentenceWords": {
+        "min": 1,
+        "max": 32,
+        "atOrUnderFifteen": 11,
+        "longest": "F11"
+      },
+      "openingWordCounts": [
+        {
+          "id": "F1",
+          "words": 3
+        },
+        {
+          "id": "F2",
+          "words": 13
+        },
+        {
+          "id": "F3",
+          "words": 14
+        },
+        {
+          "id": "F4",
+          "words": 11
+        },
+        {
+          "id": "F5",
+          "words": 12
+        },
+        {
+          "id": "F6",
+          "words": 1
+        },
+        {
+          "id": "F7",
+          "words": 12
+        },
+        {
+          "id": "F8",
+          "words": 10
+        },
+        {
+          "id": "F9",
+          "words": 8
+        },
+        {
+          "id": "F10",
+          "words": 9
+        },
+        {
+          "id": "F11",
+          "words": 32
+        },
+        {
+          "id": "F12",
+          "words": 9
+        },
+        {
+          "id": "F-SIALYL",
+          "words": 16
+        }
+      ],
+      "leadInCounts": {
+        "0": 2,
+        "1": 5,
+        "2": 1,
+        "3": 3,
+        "4": 1,
+        "5": 1
+      }
+    },
+    "footer": {
+      "flowsWithStandingNote": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F12"
+      ],
+      "flowsWithoutStandingNote": [
+        "F10",
+        "F11",
+        "F-SIALYL"
+      ],
+      "closingDischarge": {
+        "byStandingNote": [
+          "F1",
+          "F2",
+          "F3",
+          "F4",
+          "F5",
+          "F6",
+          "F7",
+          "F8",
+          "F9",
+          "F12"
+        ],
+        "byExplicitNegation": [
+          "F11",
+          "F-SIALYL"
+        ],
+        "noMarkerFired": [
+          "F10"
+        ]
+      },
+      "claims": {
+        "absence-is-a-finding": 1,
+        "authored-judgement": 2,
+        "catalogued-not-ingested": 3,
+        "curator-transcription": 5,
+        "not-read-from-source": 5,
+        "scope-limit": 3,
+        "verify-before-citing": 2
+      },
+      "noteWordCounts": [
+        {
+          "id": "F1",
+          "words": 13
+        },
+        {
+          "id": "F2",
+          "words": 9
+        },
+        {
+          "id": "F3",
+          "words": 18
+        },
+        {
+          "id": "F4",
+          "words": 24
+        },
+        {
+          "id": "F5",
+          "words": 20
+        },
+        {
+          "id": "F6",
+          "words": 16
+        },
+        {
+          "id": "F7",
+          "words": 31
+        },
+        {
+          "id": "F8",
+          "words": 21
+        },
+        {
+          "id": "F9",
+          "words": 35
+        },
+        {
+          "id": "F12",
+          "words": 19
+        }
+      ]
+    },
+    "clarify": {
+      "flows": [
+        "F3",
+        "F10"
+      ],
+      "optionCounts": {
+        "2": 2
+      },
+      "everyQuestionIsTwoSentences": true,
+      "everyOptionTargetsAnExistingFlow": true
+    },
+    "decline": {
+      "flows": [
+        "F6",
+        "F-SIALYL"
+      ],
+      "kinds": {
+        "absence": 1,
+        "adjudication": 1
+      },
+      "allMovesPresent": true,
+      "missingMoves": []
+    },
+    "followups": {
+      "counts": {
+        "2": 4,
+        "3": 9
+      },
+      "allTargetsResolve": true,
+      "flowsWhoseFollowupsNeverRender": [
+        "F3",
+        "F10"
+      ]
+    },
+    "renderedFooter": {
+      "flowsFootedAsUnsupported": []
+    }
+  },
+  "flows": [
+    {
+      "id": "F1",
+      "shape": {
+        "name": "table-enumeration",
+        "asserted": true,
+        "basis": "table 6×12 [Entry|Host|Level|Location|Phosphorylated?|Method]; 0 bold lead-ins; opens in 3 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 5,
+        "roles": [
+          "parse",
+          "retrieve",
+          "query",
+          "shape",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → query → shape → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "target β-casein, all hosts, expression family",
+            "words": 9,
+            "text": "Parse question — target β-casein, all hosts, expression family"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 5,
+            "text": "Retrieve thread H prior-art entries"
+          },
+          {
+            "index": 2,
+            "role": "query",
+            "verb": "Query",
+            "qualifier": null,
+            "words": 7,
+            "text": "Query records for titer and % TSP"
+          },
+          {
+            "index": 3,
+            "role": "shape",
+            "verb": "Split",
+            "qualifier": null,
+            "words": 10,
+            "text": "Split intracellular from secreted; attach the phospho method per row"
+          },
+          {
+            "index": 4,
+            "role": "deliver",
+            "verb": "Assemble",
+            "qualifier": null,
+            "words": 4,
+            "text": "Assemble the cross-host table"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 3,
+        "names": [
+          "corpus.search",
+          "records.query",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=8, filters:thread) → records.query(fields×4, +isPrimary, +provenance) → records.query(fields×2, +requireMethod)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 8,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "H"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 6
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "fields",
+              "isPrimary",
+              "provenance"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "titer_intracellular",
+              "titer_secreted",
+              "expression_pct_tsp",
+              "secreted_fraction"
+            ],
+            "fieldCount": 4,
+            "flags": {
+              "isPrimary": true,
+              "provenance": "curated"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          },
+          {
+            "index": 2,
+            "name": "records.query",
+            "argKeys": [
+              "fields",
+              "requireMethod"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "phosphorylation_degree",
+              "kinase_identity"
+            ],
+            "fieldCount": 2,
+            "flags": {
+              "requireMethod": true
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 6,
+        "papers": [
+          "H2",
+          "H4",
+          "H3",
+          "H14",
+          "H7",
+          "H15"
+        ],
+        "distinctPapers": 6,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.95,
+          0.92,
+          0.88,
+          0.79,
+          0.71,
+          0.63
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.63,
+          0.95
+        ],
+        "snippetChars": {
+          "min": 40,
+          "max": 188
+        },
+        "retrievedAndCited": [
+          "H14",
+          "H15",
+          "H2",
+          "H3",
+          "H4",
+          "H7"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "H1",
+          "H11",
+          "H12",
+          "H13",
+          "H16",
+          "H5",
+          "H6"
+        ]
+      },
+      "answer": {
+        "blockCount": 5,
+        "blockKinds": [
+          "paragraph",
+          "table",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → table → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Twelve prior-art entries.",
+          "words": 3,
+          "leadsWithBold": false
+        },
+        "leadInCount": 0,
+        "leadIns": [],
+        "table": {
+          "headers": [
+            "Entry",
+            "Host",
+            "Level",
+            "Location",
+            "Phosphorylated?",
+            "Method"
+          ],
+          "columns": 6,
+          "rows": 12,
+          "alignments": [
+            "left",
+            "left",
+            "left",
+            "left",
+            "left",
+            "left"
+          ],
+          "emDashCells": 25,
+          "cells": 72,
+          "chipBearingCells": 27
+        }
+      },
+      "citations": {
+        "total": 32,
+        "paper": 15,
+        "record": 17,
+        "distinct": 30,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 4,
+          "table": 28
+        },
+        "bySlot": {
+          "cell-mid": 1,
+          "cell-only": 12,
+          "cell-trailing": 15,
+          "mid-sentence": 2,
+          "sentence-lead": 2
+        },
+        "paperBySlot": {
+          "cell-only": 12,
+          "mid-sentence": 1,
+          "sentence-lead": 2
+        },
+        "recordBySlot": {
+          "cell-mid": 1,
+          "cell-trailing": 15,
+          "mid-sentence": 1
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "cell-start": 12,
+          "word": 2
+        },
+        "recordPrecededBy": {
+          "quantity": 10,
+          "word": 7
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H2",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H2-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 5,
+            "columnHeader": "Method",
+            "id": "r-H2-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 1,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H3",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 1,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H3-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 1,
+            "column": 5,
+            "columnHeader": "Method",
+            "id": "r-H3-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H4",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H4-1",
+            "kind": "record",
+            "slot": "cell-mid",
+            "precededBy": "quantity",
+            "followedBy": "semicolon",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H4-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 3,
+            "columnHeader": "Location",
+            "id": "r-H4-3",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 5,
+            "columnHeader": "Method",
+            "id": "r-H4-4",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 3,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H5",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 3,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H5-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 4,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H6",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 5,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H7",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 5,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H7-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 5,
+            "column": 3,
+            "columnHeader": "Location",
+            "id": "r-H7-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 6,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H11",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 7,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H12",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 7,
+            "column": 4,
+            "columnHeader": "Phosphorylated?",
+            "id": "r-H12-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 8,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H13",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 8,
+            "column": 4,
+            "columnHeader": "Phosphorylated?",
+            "id": "r-H13-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 9,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H14",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 9,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H14-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 10,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H15",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 10,
+            "column": 2,
+            "columnHeader": "Level",
+            "id": "r-H15-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 10,
+            "column": 4,
+            "columnHeader": "Phosphorylated?",
+            "id": "r-H15-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 11,
+            "column": 0,
+            "columnHeader": "Entry",
+            "id": "H16",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "H14",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "H16",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "H1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-H1-4",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "Every cell is transcribed from curator notes, not read off a source PDF.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 13,
+        "claims": [
+          "curator-transcription",
+          "not-read-from-source"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F2",
+          "F9",
+          "F6"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F2",
+            "label": "Is any of it actually phosphorylated?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F9",
+            "label": "Compare Chlamydomonas and Pichia",
+            "targetExists": true
+          },
+          {
+            "flowId": "F6",
+            "label": "Has anyone done this in an alga?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 13,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 13,
+        "distinctRecordChipsInAnswer": 17,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F2",
+      "shape": {
+        "name": "partitioned-verdicts",
+        "asserted": true,
+        "basis": "no table; 3 bold lead-ins; opens in 13 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "shape",
+          "guard"
+        ],
+        "signature": "parse → retrieve → shape → guard",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": false,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "field phosphorylation_degree, kinase_identity",
+            "words": 6,
+            "text": "Parse question — field phosphorylation_degree, kinase_identity"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 5,
+            "text": "Retrieve the H2/H3 co-expression pair"
+          },
+          {
+            "index": 2,
+            "role": "shape",
+            "verb": "Separate",
+            "qualifier": null,
+            "words": 5,
+            "text": "Separate human from bovine β-casein"
+          },
+          {
+            "index": 3,
+            "role": "guard",
+            "verb": "Check",
+            "qualifier": null,
+            "words": 10,
+            "text": "Check whether FAM20C has been demonstrated in a heterologous host"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6) → records.query(fields×2, +organism)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "fields",
+              "organism"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "kinase_identity",
+              "phosphorylation_degree"
+            ],
+            "fieldCount": 2,
+            "flags": {
+              "organism": [
+                "ecoli",
+                "bovine"
+              ]
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "H3",
+          "H2",
+          "H8",
+          "H4"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.94,
+          0.9,
+          0.83,
+          0.68
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.68,
+          0.94
+        ],
+        "snippetChars": {
+          "min": 87,
+          "max": 161
+        },
+        "retrievedAndCited": [
+          "H2",
+          "H3",
+          "H4",
+          "H8"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "F5"
+        ]
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Three answers, and which one applies depends on the casein and the kinase.",
+          "words": 13,
+          "leadsWithBold": false
+        },
+        "leadInCount": 3,
+        "leadIns": [
+          "Human β-casein with CK2 — yes.",
+          "Bovine β-casein with CK2 — only partially.",
+          "Bovine β-casein with FAM20C — not demonstrated at all."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 11,
+        "paper": 4,
+        "record": 7,
+        "distinct": 11,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 11
+        },
+        "bySlot": {
+          "clause-final": 3,
+          "mid-sentence": 2,
+          "sentence-final": 3,
+          "sentence-lead": 3
+        },
+        "paperBySlot": {
+          "mid-sentence": 1,
+          "sentence-lead": 3
+        },
+        "recordBySlot": {
+          "clause-final": 3,
+          "mid-sentence": 1,
+          "sentence-final": 3
+        },
+        "paperPrecededBy": {
+          "bold-word": 3,
+          "punctuation": 1
+        },
+        "recordPrecededBy": {
+          "bold-quantity": 1,
+          "quantity": 1,
+          "word": 5
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "H2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-H2-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-H2-2",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "H3",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-H3-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "bold-quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-F5-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "quantity",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-H3-2",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "H8",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-H8-6",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "semicolon",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "H4",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "r-H4-4",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "All four claims are curator transcriptions, not source-span extractions.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 9,
+        "claims": [
+          "curator-transcription"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F11",
+          "F8",
+          "F3"
+        ],
+        "labelsAreQuestions": 3,
+        "followups": [
+          {
+            "flowId": "F11",
+            "label": "What is FAM20C, exactly?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F8",
+            "label": "How is phosphorylation measured?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F3",
+            "label": "Does it matter for cheese?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 5,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 4,
+        "distinctRecordChipsInAnswer": 7,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F3",
+      "shape": {
+        "name": "product-fork",
+        "asserted": true,
+        "basis": "no table; 1 bold lead-in; opens in 14 words; clarifies with 2 options; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "guard",
+          "shape"
+        ],
+        "signature": "parse → retrieve → guard → shape",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": false,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "functional family, gelation and micellar fields",
+            "words": 9,
+            "text": "Parse question — functional family, gelation and micellar fields"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 4,
+            "text": "Retrieve the dephosphorylation series"
+          },
+          {
+            "index": 2,
+            "role": "guard",
+            "verb": "Check",
+            "qualifier": null,
+            "words": 5,
+            "text": "Check for counter-evidence before answering"
+          },
+          {
+            "index": 3,
+            "role": "shape",
+            "verb": "Split",
+            "qualifier": null,
+            "words": 6,
+            "text": "Split the answer by product application"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6) → records.query(fields×3, +requireMethod)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "fields",
+              "requireMethod"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "micellar_fraction",
+              "gelation_ph",
+              "phosphorylation_degree"
+            ],
+            "fieldCount": 3,
+            "flags": {
+              "requireMethod": true
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "I1",
+          "I1",
+          "I2",
+          "I9"
+        ],
+        "distinctPapers": 3,
+        "papersRetrievedTwice": [
+          {
+            "paperId": "I1",
+            "hits": 2
+          }
+        ],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.96,
+          0.91,
+          0.77,
+          0.72
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.72,
+          0.96
+        ],
+        "snippetChars": {
+          "min": 103,
+          "max": 163
+        },
+        "retrievedAndCited": [
+          "I1",
+          "I2",
+          "I9"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "For cheese and yogurt, yes — and the failure mode is binary, not gradual.",
+          "words": 14,
+          "leadsWithBold": false
+        },
+        "leadInCount": 1,
+        "leadIns": [
+          "But the product fork is real."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 8,
+        "paper": 3,
+        "record": 5,
+        "distinct": 8,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 8
+        },
+        "bySlot": {
+          "clause-final": 2,
+          "mid-sentence": 1,
+          "sentence-final": 2,
+          "sentence-lead": 3
+        },
+        "paperBySlot": {
+          "sentence-lead": 3
+        },
+        "recordBySlot": {
+          "clause-final": 2,
+          "mid-sentence": 1,
+          "sentence-final": 2
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "bold-word": 1,
+          "quantity": 1
+        },
+        "recordPrecededBy": {
+          "bold-quantity": 1,
+          "word": 4
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "I1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-I1-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-I1-3",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-I1-2",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "bold-quantity",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "I2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-I2-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "I9",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-I9-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "I1, I2 and I9 are catalogued entries — the numbers above come from curator notes pending source verification.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 18,
+        "claims": [
+          "curator-transcription",
+          "catalogued-not-ingested",
+          "verify-before-citing"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": {
+        "question": "Which product are you designing against? The evidence forks here.",
+        "questionSentences": 2,
+        "interrogativeFirst": true,
+        "justificationSentence": "The evidence forks here.",
+        "optionCount": 2,
+        "options": [
+          {
+            "branch": "Cheese and yogurt",
+            "consequence": "coagulation is required",
+            "label": "Cheese and yogurt — coagulation is required",
+            "flowId": "F2",
+            "targetExists": true
+          },
+          {
+            "branch": "Emulsifier and foaming",
+            "consequence": "phosphorylation may not be",
+            "label": "Emulsifier and foaming — phosphorylation may not be",
+            "flowId": "F1",
+            "targetExists": true
+          }
+        ],
+        "optionLabelForm": "branch — consequence, em-dash separated"
+      },
+      "followups": {
+        "count": 2,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F2",
+          "F10"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F2",
+            "label": "Can we phosphorylate it at all?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F10",
+            "label": "What does β-casein cost today?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": false
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 3,
+        "supportLabel": "Supported, but from few sources",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 3,
+        "distinctRecordChipsInAnswer": 5,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F4",
+      "shape": {
+        "name": "single-value-with-provenance-chain",
+        "asserted": true,
+        "basis": "no table; 1 bold lead-in; opens in 11 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "guard",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → guard → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "organism uvm4, field titer_secreted",
+            "words": 7,
+            "text": "Parse question — organism uvm4, field titer_secreted"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve secretion entries from thread C"
+          },
+          {
+            "index": 2,
+            "role": "guard",
+            "verb": "Check",
+            "qualifier": null,
+            "words": 7,
+            "text": "Check isPrimary before counting any value twice"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Report",
+            "qualifier": null,
+            "words": 7,
+            "text": "Report the ceiling with its provenance chain"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=5, filters:thread) → records.query(fields×1, +includeNonPrimary, +organism)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 5,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "C"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 3
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "field",
+              "includeNonPrimary",
+              "organism"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "titer_secreted"
+            ],
+            "fieldCount": 1,
+            "flags": {
+              "includeNonPrimary": true,
+              "organism": "uvm4"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 3,
+        "papers": [
+          "C2",
+          "C6",
+          "K1"
+        ],
+        "distinctPapers": 3,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.96,
+          0.84,
+          0.59
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.59,
+          0.96
+        ],
+        "snippetChars": {
+          "min": 62,
+          "max": 126
+        },
+        "retrievedAndCited": [
+          "C2",
+          "C6",
+          "K1"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "A1"
+        ]
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "**15 mg/L** [[r-C2-1]] — and it is one measurement, not two.",
+          "words": 11,
+          "leadsWithBold": true
+        },
+        "leadInCount": 1,
+        "leadIns": [
+          "15 mg/L"
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 11,
+        "paper": 3,
+        "record": 8,
+        "distinct": 9,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 11
+        },
+        "bySlot": {
+          "clause-final": 2,
+          "mid-sentence": 5,
+          "sentence-final": 2,
+          "sentence-lead": 2
+        },
+        "paperBySlot": {
+          "mid-sentence": 1,
+          "sentence-lead": 2
+        },
+        "recordBySlot": {
+          "clause-final": 2,
+          "mid-sentence": 4,
+          "sentence-final": 2
+        },
+        "paperPrecededBy": {
+          "block-start": 2,
+          "punctuation": 1
+        },
+        "recordPrecededBy": {
+          "bold-quantity": 4,
+          "word": 4
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 0,
+            "blockKind": "paragraph",
+            "id": "r-C2-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "bold-quantity",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "C2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-C2-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "bold-quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-C2-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "bold-quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "C6",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-C6-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "bold-quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-C2-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-C6-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-A1-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "K1",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "r-K1-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "Both entries are catalogued. The citation relationship is recorded in OF-COR-001 and should be confirmed against both PDFs before it is quoted as fact.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 24,
+        "claims": [
+          "catalogued-not-ingested",
+          "verify-before-citing",
+          "not-read-from-source"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F5",
+          "F7",
+          "F9"
+        ],
+        "labelsAreQuestions": 3,
+        "followups": [
+          {
+            "flowId": "F5",
+            "label": "Why cw15 rather than a walled strain?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F7",
+            "label": "Which signal peptide should I use?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F9",
+            "label": "How does Pichia compare?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 4,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 3,
+        "distinctRecordChipsInAnswer": 6,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F5",
+      "shape": {
+        "name": "reasons-and-counterweights",
+        "asserted": true,
+        "basis": "no table; 5 bold lead-ins; opens in 12 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "retrieve",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → retrieve → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "organism cw15 vs creinhardtii-wt",
+            "words": 7,
+            "text": "Parse question — organism cw15 vs creinhardtii-wt"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve transformation, expression and disruption evidence"
+          },
+          {
+            "index": 2,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 9,
+            "text": "Retrieve the stated trade-offs, not only the case for"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Assemble",
+            "qualifier": null,
+            "words": 7,
+            "text": "Assemble reasons and counterweights side by side"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6, filters:organism) → records.query(fields×3)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [
+              "organism"
+            ],
+            "filters": {
+              "organism": [
+                "cw15",
+                "uvm4"
+              ]
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 5
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "fields"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "time_to_colony",
+              "disruption_protein_yield",
+              "expression_pct_tsp"
+            ],
+            "fieldCount": 3,
+            "flags": {},
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 5,
+        "papers": [
+          "J10",
+          "B5",
+          "B5",
+          "A1",
+          "C6"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [
+          {
+            "paperId": "B5",
+            "hits": 2
+          }
+        ],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.93,
+          0.89,
+          0.81,
+          0.74,
+          0.66
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.66,
+          0.93
+        ],
+        "snippetChars": {
+          "min": 67,
+          "max": 126
+        },
+        "retrievedAndCited": [
+          "A1",
+          "B5",
+          "C6",
+          "J10"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 7,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Three independent reasons, and two costs the corpus states just as plainly.",
+          "words": 12,
+          "leadsWithBold": false
+        },
+        "leadInCount": 5,
+        "leadIns": [
+          "1 — Transformability.",
+          "2 — Expression lineage.",
+          "3 — Cheap disruption.",
+          "Counterweight 1 — shear.",
+          "Counterweight 2 — the secretome."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 12,
+        "paper": 5,
+        "record": 7,
+        "distinct": 10,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 12
+        },
+        "bySlot": {
+          "clause-final": 1,
+          "mid-sentence": 4,
+          "sentence-final": 2,
+          "sentence-lead": 5
+        },
+        "paperBySlot": {
+          "sentence-lead": 5
+        },
+        "recordBySlot": {
+          "clause-final": 1,
+          "mid-sentence": 4,
+          "sentence-final": 2
+        },
+        "paperPrecededBy": {
+          "bold-quantity": 2,
+          "bold-word": 3
+        },
+        "recordPrecededBy": {
+          "bold-word": 1,
+          "quantity": 1,
+          "word": 5
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "B5",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-B5-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-B5-3",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "A1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-A1-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "J10",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-J10-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-J10-2",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-J10-3",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "bold-word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "B5",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 5,
+            "blockKind": "paragraph",
+            "id": "C6",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 6,
+            "blockKind": "paragraph",
+            "id": "r-A1-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "Note what reason 2 does not say: 0.2 % TSP [[r-A1-1]] was measured on GFP/YFP reporters, never on a casein.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 20,
+        "claims": [
+          "scope-limit"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F4",
+          "F12",
+          "F9"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F4",
+            "label": "What is the secretion ceiling here?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F12",
+            "label": "Is it approved as food?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F9",
+            "label": "Compare with Pichia",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 4,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 4,
+        "distinctRecordChipsInAnswer": 6,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F6",
+      "shape": {
+        "name": "decline-absence",
+        "asserted": true,
+        "basis": "no table; 2 bold lead-ins; opens in 1 word; no clarify; declines by absence; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "retrieve",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → retrieve → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "target casein, host class microalga",
+            "words": 8,
+            "text": "Parse question — target casein, host class microalga"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 8,
+            "text": "Retrieve the systematic prior-art review and its tables"
+          },
+          {
+            "index": 2,
+            "role": "retrieve",
+            "verb": "Search",
+            "qualifier": null,
+            "words": 8,
+            "text": "Search the patent landscape for any algal claim"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Report",
+            "qualifier": null,
+            "words": 8,
+            "text": "Report the absence and what it rests on"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=8) → records.query(fields×1, +componentTag, +organism)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 8,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "componentTag",
+              "field",
+              "organism"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "expression_pct_tsp"
+            ],
+            "fieldCount": 1,
+            "flags": {
+              "componentTag": "casein",
+              "organism": [
+                "cw15",
+                "uvm4"
+              ]
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "H1",
+          "H17e",
+          "N4",
+          "K5"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.9,
+          0.77,
+          0.61,
+          0.52
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.52,
+          0.9
+        ],
+        "snippetChars": {
+          "min": 80,
+          "max": 141
+        },
+        "retrievedAndCited": [
+          "H1",
+          "H17e",
+          "K5",
+          "N4"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "**No.**",
+          "words": 1,
+          "leadsWithBold": true
+        },
+        "leadInCount": 2,
+        "leadIns": [
+          "No.",
+          "What the absence means."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 7,
+        "paper": 4,
+        "record": 3,
+        "distinct": 7,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 7
+        },
+        "bySlot": {
+          "clause-final": 1,
+          "mid-sentence": 2,
+          "sentence-final": 1,
+          "sentence-lead": 3
+        },
+        "paperBySlot": {
+          "mid-sentence": 1,
+          "sentence-lead": 3
+        },
+        "recordBySlot": {
+          "clause-final": 1,
+          "mid-sentence": 1,
+          "sentence-final": 1
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "word": 3
+        },
+        "recordPrecededBy": {
+          "quantity": 2,
+          "word": 1
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "H1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-H1-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-H1-2",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-H1-3",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "H17e",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "N4",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "K5",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "A search engine returns nothing here. Recording why nothing exists is the part that took curation.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 16,
+        "claims": [
+          "absence-is-a-finding"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F9",
+          "F5",
+          "F1"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F9",
+            "label": "Compare Chlamydomonas and Pichia",
+            "targetExists": true
+          },
+          {
+            "flowId": "F5",
+            "label": "Why cw15 at all?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F1",
+            "label": "What titers exist in other hosts?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 4,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 4,
+        "distinctRecordChipsInAnswer": 3,
+        "footerContradictsAnswer": false
+      },
+      "decline": {
+        "kind": "absence",
+        "moves": [
+          {
+            "move": "verdict-first",
+            "present": true
+          },
+          {
+            "move": "absence-is-structural-not-retrieval-failure",
+            "present": true
+          },
+          {
+            "move": "show-the-search-that-was-done",
+            "present": true
+          },
+          {
+            "move": "enumerate-what-was-found-instead",
+            "present": true
+          },
+          {
+            "move": "name-the-nearest-adjacent-thing",
+            "present": true
+          },
+          {
+            "move": "state-what-the-absence-means",
+            "present": true
+          },
+          {
+            "move": "name-what-could-overturn-it",
+            "present": true
+          },
+          {
+            "move": "absence-is-the-curated-result",
+            "present": true
+          }
+        ],
+        "allMovesPresent": true
+      }
+    },
+    {
+      "id": "F7",
+      "shape": {
+        "name": "ranked-recommendation",
+        "asserted": true,
+        "basis": "table 3×3 [Rank|Entry|What it gives you]; 1 bold lead-in; opens in 12 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "shape",
+          "guard"
+        ],
+        "signature": "parse → retrieve → shape → guard",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": false,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "localization, signal peptide selection",
+            "words": 7,
+            "text": "Parse question — localization, signal peptide selection"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve the thread C signal-peptide comparisons"
+          },
+          {
+            "index": 2,
+            "role": "shape",
+            "verb": "Rank",
+            "qualifier": null,
+            "words": 8,
+            "text": "Rank by whether a working cassette is published"
+          },
+          {
+            "index": 3,
+            "role": "guard",
+            "verb": "Flag",
+            "qualifier": null,
+            "words": 8,
+            "text": "Flag the negative result on native mammalian SPs"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 1,
+        "names": [
+          "corpus.search"
+        ],
+        "signature": "corpus.search(k=6, filters:thread)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "C"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "C3",
+          "C7",
+          "C8",
+          "C4"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.94,
+          0.87,
+          0.8,
+          0.58
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.58,
+          0.94
+        ],
+        "snippetChars": {
+          "min": 80,
+          "max": 230
+        },
+        "retrievedAndCited": [
+          "C3",
+          "C4",
+          "C7",
+          "C8"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "H4"
+        ]
+      },
+      "answer": {
+        "blockCount": 5,
+        "blockKinds": [
+          "paragraph",
+          "table",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → table → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Three entries carry the comparison, and none of them tested a casein.",
+          "words": 12,
+          "leadsWithBold": false
+        },
+        "leadInCount": 1,
+        "leadIns": [
+          "One thing the corpus settles negatively."
+        ],
+        "table": {
+          "headers": [
+            "Rank",
+            "Entry",
+            "What it gives you"
+          ],
+          "columns": 3,
+          "rows": 3,
+          "alignments": [
+            "left",
+            "left",
+            "left"
+          ],
+          "emDashCells": 0,
+          "cells": 9,
+          "chipBearingCells": 3
+        }
+      },
+      "citations": {
+        "total": 7,
+        "paper": 6,
+        "record": 1,
+        "distinct": 6,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 4,
+          "table": 3
+        },
+        "bySlot": {
+          "cell-only": 3,
+          "mid-sentence": 2,
+          "sentence-lead": 2
+        },
+        "paperBySlot": {
+          "cell-only": 3,
+          "mid-sentence": 1,
+          "sentence-lead": 2
+        },
+        "recordBySlot": {
+          "mid-sentence": 1
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "cell-start": 3,
+          "word": 2
+        },
+        "recordPrecededBy": {
+          "word": 1
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 1,
+            "columnHeader": "Entry",
+            "id": "C7",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 1,
+            "column": 1,
+            "columnHeader": "Entry",
+            "id": "C3",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 1,
+            "columnHeader": "Entry",
+            "id": "C8",
+            "kind": "paper",
+            "slot": "cell-only",
+            "precededBy": "cell-start",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "C4",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "H4",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-H4-3",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "C3",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "The ranking is mine, built on which entry carries a working construct. The two high-performing sequences in [[C3]] are unnamed in the curation note — identifying them means reading the PDF.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 31,
+        "claims": [
+          "curator-transcription",
+          "not-read-from-source",
+          "authored-judgement",
+          "scope-limit"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": null,
+      "followups": {
+        "count": 2,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F4",
+          "F5"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F4",
+            "label": "What is the secretion ceiling?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F5",
+            "label": "Why cw15 rather than a walled strain?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 5,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 5,
+        "distinctRecordChipsInAnswer": 1,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F8",
+      "shape": {
+        "name": "method-table",
+        "asserted": true,
+        "basis": "table 3×4 [Method|What it resolves|Trade-off]; 0 bold lead-ins; opens in 10 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "shape",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → shape → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "analytical method behind the PTM family",
+            "words": 9,
+            "text": "Parse question — analytical method behind the PTM family"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 7,
+            "text": "Retrieve the review section that enumerates methods"
+          },
+          {
+            "index": 2,
+            "role": "shape",
+            "verb": "Map",
+            "qualifier": null,
+            "words": 8,
+            "text": "Map each method onto records that used it"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Connect",
+            "qualifier": null,
+            "words": 6,
+            "text": "Connect to the ontology method qualifier"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "ontology.lookup"
+        ],
+        "signature": "corpus.search(k=5) → ontology.lookup(fields×2, +property)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 5,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "ontology.lookup",
+            "argKeys": [
+              "fields",
+              "property"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "phosphorylation_degree",
+              "phosphate_count"
+            ],
+            "fieldCount": 2,
+            "flags": {
+              "property": "requiresMethod"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "H1",
+          "H1",
+          "H4",
+          "H15"
+        ],
+        "distinctPapers": 3,
+        "papersRetrievedTwice": [
+          {
+            "paperId": "H1",
+            "hits": 2
+          }
+        ],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.95,
+          0.86,
+          0.7,
+          0.62
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.62,
+          0.95
+        ],
+        "snippetChars": {
+          "min": 30,
+          "max": 148
+        },
+        "retrievedAndCited": [
+          "H1",
+          "H15",
+          "H4"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "H2"
+        ]
+      },
+      "answer": {
+        "blockCount": 5,
+        "blockKinds": [
+          "paragraph",
+          "table",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → table → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "[[H1]] reviews four, and the ontology makes naming one mandatory.",
+          "words": 10,
+          "leadsWithBold": false
+        },
+        "leadInCount": 0,
+        "leadIns": [],
+        "table": {
+          "headers": [
+            "Method",
+            "What it resolves",
+            "Trade-off"
+          ],
+          "columns": 3,
+          "rows": 4,
+          "alignments": [
+            "left",
+            "left",
+            "left"
+          ],
+          "emDashCells": 0,
+          "cells": 12,
+          "chipBearingCells": 2
+        }
+      },
+      "citations": {
+        "total": 11,
+        "paper": 6,
+        "record": 5,
+        "distinct": 8,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 5,
+          "table": 6
+        },
+        "bySlot": {
+          "cell-mid": 4,
+          "cell-trailing": 2,
+          "mid-sentence": 3,
+          "sentence-final": 1,
+          "sentence-lead": 1
+        },
+        "paperBySlot": {
+          "cell-mid": 3,
+          "mid-sentence": 2,
+          "sentence-lead": 1
+        },
+        "recordBySlot": {
+          "cell-mid": 1,
+          "cell-trailing": 2,
+          "mid-sentence": 1,
+          "sentence-final": 1
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "punctuation": 5
+        },
+        "recordPrecededBy": {
+          "word": 5
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 0,
+            "blockKind": "paragraph",
+            "id": "H1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "H2",
+            "kind": "paper",
+            "slot": "cell-mid",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "r-H2-2",
+            "kind": "record",
+            "slot": "cell-mid",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "H15",
+            "kind": "paper",
+            "slot": "cell-mid",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "r-H15-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "H4",
+            "kind": "paper",
+            "slot": "cell-mid",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 2,
+            "columnHeader": "Trade-off",
+            "id": "r-H4-4",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "H1",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-H1-4",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "H15",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-H15-2",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "The method list is transcribed from the H1 curation note; the review's own comparison of their sensitivities has not been read.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 21,
+        "claims": [
+          "curator-transcription",
+          "not-read-from-source"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F2",
+          "F11",
+          "F3"
+        ],
+        "labelsAreQuestions": 3,
+        "followups": [
+          {
+            "flowId": "F2",
+            "label": "Is recombinant casein phosphorylated?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F11",
+            "label": "What is FAM20C?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F3",
+            "label": "Does phosphorylation matter for cheese?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 4,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 4,
+        "distinctRecordChipsInAnswer": 4,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F9",
+      "shape": {
+        "name": "head-to-head",
+        "asserted": true,
+        "basis": "table 3×5 [Axis|*C. reinhardtii* cw15 / UVM4|*K. phaffii* GS115]; 1 bold lead-in; opens in 8 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "guard",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → guard → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "organism comparison cw15/uvm4 vs gs115",
+            "words": 8,
+            "text": "Parse question — organism comparison cw15/uvm4 vs gs115"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 8,
+            "text": "Retrieve expression, density and precedent evidence for each"
+          },
+          {
+            "index": 2,
+            "role": "guard",
+            "verb": "Normalise",
+            "qualifier": null,
+            "words": 8,
+            "text": "Normalise units; refuse % TSP to g/L conversion"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Report",
+            "qualifier": null,
+            "words": 6,
+            "text": "Report the gaps without softening them"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=8) → records.query(fields×4, +organism)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 8,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 5
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "fields",
+              "organism"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "expression_pct_tsp",
+              "titer_intracellular",
+              "titer_secreted",
+              "final_biomass_density"
+            ],
+            "fieldCount": 4,
+            "flags": {
+              "organism": [
+                "cw15",
+                "uvm4",
+                "gs115",
+                "creinhardtii-wt"
+              ]
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 5,
+        "papers": [
+          "H4",
+          "M8",
+          "A1",
+          "M5",
+          "J10"
+        ],
+        "distinctPapers": 5,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.93,
+          0.85,
+          0.78,
+          0.7,
+          0.61
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.61,
+          0.93
+        ],
+        "snippetChars": {
+          "min": 61,
+          "max": 124
+        },
+        "retrievedAndCited": [
+          "A1",
+          "H4",
+          "J10",
+          "M5",
+          "M8"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "C2",
+          "H1",
+          "M6",
+          "N2",
+          "O3"
+        ]
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "table",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → table → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Not close on any number the corpus records.",
+          "words": 8,
+          "leadsWithBold": false
+        },
+        "leadInCount": 1,
+        "leadIns": [
+          "On published numbers, *Pichia* wins outright."
+        ],
+        "table": {
+          "headers": [
+            "Axis",
+            "*C. reinhardtii* cw15 / UVM4",
+            "*K. phaffii* GS115"
+          ],
+          "columns": 3,
+          "rows": 5,
+          "alignments": [
+            "left",
+            "left",
+            "left"
+          ],
+          "emDashCells": 0,
+          "cells": 15,
+          "chipBearingCells": 9
+        }
+      },
+      "citations": {
+        "total": 16,
+        "paper": 6,
+        "record": 10,
+        "distinct": 16,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 6,
+          "table": 10
+        },
+        "bySlot": {
+          "cell-mid": 1,
+          "cell-trailing": 9,
+          "clause-final": 3,
+          "mid-sentence": 3
+        },
+        "paperBySlot": {
+          "cell-trailing": 2,
+          "clause-final": 3,
+          "mid-sentence": 1
+        },
+        "recordBySlot": {
+          "cell-mid": 1,
+          "cell-trailing": 7,
+          "mid-sentence": 2
+        },
+        "paperPrecededBy": {
+          "word": 6
+        },
+        "recordPrecededBy": {
+          "quantity": 4,
+          "word": 6
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 1,
+            "columnHeader": "*C. reinhardtii* cw15 / UVM4",
+            "id": "r-A1-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 0,
+            "column": 2,
+            "columnHeader": "*K. phaffii* GS115",
+            "id": "r-H4-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 1,
+            "column": 2,
+            "columnHeader": "*K. phaffii* GS115",
+            "id": "r-H4-2",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 1,
+            "columnHeader": "*C. reinhardtii* cw15 / UVM4",
+            "id": "r-C2-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 2,
+            "column": 2,
+            "columnHeader": "*K. phaffii* GS115",
+            "id": "r-H4-3",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 3,
+            "column": 1,
+            "columnHeader": "*C. reinhardtii* cw15 / UVM4",
+            "id": "r-M5-1",
+            "kind": "record",
+            "slot": "cell-mid",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 3,
+            "column": 1,
+            "columnHeader": "*C. reinhardtii* cw15 / UVM4",
+            "id": "r-M6-1",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "quantity",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 3,
+            "column": 2,
+            "columnHeader": "*K. phaffii* GS115",
+            "id": "M8",
+            "kind": "paper",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 4,
+            "column": 1,
+            "columnHeader": "*C. reinhardtii* cw15 / UVM4",
+            "id": "H1",
+            "kind": "paper",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "table",
+            "row": 4,
+            "column": 2,
+            "columnHeader": "*K. phaffii* GS115",
+            "id": "r-H4-4",
+            "kind": "record",
+            "slot": "cell-trailing",
+            "precededBy": "word",
+            "followedBy": "cell-end",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "O3",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "J10",
+            "kind": "paper",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-J10-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-J10-2",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "N2",
+            "kind": "paper",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 5,
+            "blockKind": "paragraph",
+            "id": "M5",
+            "kind": "paper",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "Two honesty notes: the density figures were measured on walled wild-type cultures rather than cw15 [[M5]], and the 100+ g/L yeast figure has no extraction record behind it — OF-COR-001 states it in prose only.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 35,
+        "claims": [
+          "authored-judgement",
+          "scope-limit"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F5",
+          "F10",
+          "F6"
+        ],
+        "labelsAreQuestions": 3,
+        "followups": [
+          {
+            "flowId": "F5",
+            "label": "Why cw15 at all, then?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F10",
+            "label": "What does it cost to produce?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F6",
+            "label": "Is there any algal casein prior art?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 10,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 6,
+        "distinctRecordChipsInAnswer": 10,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F10",
+      "shape": {
+        "name": "provenance-partition",
+        "asserted": true,
+        "basis": "no table; 4 bold lead-ins; opens in 9 words; clarifies with 2 options; answers; closes without a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "shape",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → shape → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "field minimum_selling_price",
+            "words": 5,
+            "text": "Parse question — field minimum_selling_price"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve TEA entries from thread O"
+          },
+          {
+            "index": 2,
+            "role": "shape",
+            "verb": "Partition",
+            "qualifier": null,
+            "words": 6,
+            "text": "Partition by provenance class before aggregating"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Report",
+            "qualifier": null,
+            "words": 6,
+            "text": "Report peer-reviewed and industry figures separately"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6, filters:thread) → records.query(fields×1, +excludeFromAggregate, +groupBy)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "O"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "excludeFromAggregate",
+              "field",
+              "groupBy"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "minimum_selling_price"
+            ],
+            "fieldCount": 1,
+            "flags": {
+              "excludeFromAggregate": "industry-estimate",
+              "groupBy": "provenance"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "O2",
+          "O3",
+          "O8",
+          "O8m"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.94,
+          0.88,
+          0.81,
+          0.64
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.64,
+          0.94
+        ],
+        "snippetChars": {
+          "min": 107,
+          "max": 142
+        },
+        "retrievedAndCited": [
+          "O2",
+          "O3",
+          "O8",
+          "O8m"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 5,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "There is no β-casein cost model in this corpus.",
+          "words": 9,
+          "leadsWithBold": false
+        },
+        "leadInCount": 4,
+        "leadIns": [
+          "Peer-reviewed process models.",
+          "Peer-reviewed trajectory.",
+          "Industry estimates — quarantined.",
+          "Why the firewall matters."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 15,
+        "paper": 5,
+        "record": 10,
+        "distinct": 14,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 15
+        },
+        "bySlot": {
+          "clause-final": 5,
+          "mid-sentence": 4,
+          "sentence-final": 1,
+          "sentence-lead": 5
+        },
+        "paperBySlot": {
+          "sentence-lead": 5
+        },
+        "recordBySlot": {
+          "clause-final": 5,
+          "mid-sentence": 4,
+          "sentence-final": 1
+        },
+        "paperPrecededBy": {
+          "bold-word": 4,
+          "quantity": 1
+        },
+        "recordPrecededBy": {
+          "bold-quantity": 2,
+          "quantity": 8
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "O2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-O2-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "bold-quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "O3",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-O3-2",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-O3-3",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "O8",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-O8-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-O8-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-O8-3",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "quantity",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "O8m",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-O8m-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "r-O8m-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "O2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "r-O2-3",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "quantity",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "r-O2-4",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "bold-quantity",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": false,
+        "text": null,
+        "style": null,
+        "words": 0,
+        "claims": [],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": {
+        "question": "Which cost driver do you want to chase? O3 says there are only two that matter.",
+        "questionSentences": 2,
+        "interrogativeFirst": true,
+        "justificationSentence": "O3 says there are only two that matter.",
+        "optionCount": 2,
+        "options": [
+          {
+            "branch": "Biomass density and % TSP",
+            "consequence": "the host choice",
+            "label": "Biomass density and % TSP — the host choice",
+            "flowId": "F9",
+            "targetExists": true
+          },
+          {
+            "branch": "Secreted yield",
+            "consequence": "skipping disruption entirely",
+            "label": "Secreted yield — skipping disruption entirely",
+            "flowId": "F4",
+            "targetExists": true
+          }
+        ],
+        "optionLabelForm": "branch — consequence, em-dash separated"
+      },
+      "followups": {
+        "count": 2,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F9",
+          "F4"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F9",
+            "label": "Which host drives the cost?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F4",
+            "label": "What secreted yield is reachable?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": false
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 4,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 4,
+        "distinctRecordChipsInAnswer": 10,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F11",
+      "shape": {
+        "name": "mechanism-with-limit",
+        "asserted": true,
+        "basis": "no table; 1 bold lead-in; opens in 32 words; no clarify; answers; closes without a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "retrieve",
+          "shape"
+        ],
+        "signature": "parse → retrieve → retrieve → shape",
+        "opensWithParse": true,
+        "hasGuardStep": false,
+        "endsWithDelivery": false,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "kinase_identity, host capability",
+            "words": 6,
+            "text": "Parse question — kinase_identity, host capability"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve the identification and structure papers"
+          },
+          {
+            "index": 2,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 5,
+            "text": "Retrieve the reported expression failure"
+          },
+          {
+            "index": 3,
+            "role": "shape",
+            "verb": "Separate",
+            "qualifier": null,
+            "words": 8,
+            "text": "Separate the structural argument from the empirical one"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6) → records.query(fields×1, +value)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "field",
+              "value"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "kinase_identity"
+            ],
+            "fieldCount": 1,
+            "flags": {
+              "value": "FAM20C"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "G1",
+          "G4",
+          "H8",
+          "G9"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.96,
+          0.9,
+          0.84,
+          0.69
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.69,
+          0.96
+        ],
+        "snippetChars": {
+          "min": 58,
+          "max": 192
+        },
+        "retrievedAndCited": [
+          "G1",
+          "G4",
+          "G9",
+          "H8"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": [
+          "D5",
+          "G2"
+        ]
+      },
+      "answer": {
+        "blockCount": 4,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "FAM20C is the authentic Golgi casein kinase — the enzyme that actually phosphorylates casein, as distinct from CK1 and CK2, which were named for casein and do not recognise the motif [[r-G9-1]].",
+          "words": 32,
+          "leadsWithBold": false
+        },
+        "leadInCount": 1,
+        "leadIns": [
+          "Why *E. coli* cannot make it."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 15,
+        "paper": 6,
+        "record": 9,
+        "distinct": 15,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 15
+        },
+        "bySlot": {
+          "clause-final": 2,
+          "mid-sentence": 3,
+          "sentence-final": 5,
+          "sentence-lead": 5
+        },
+        "paperBySlot": {
+          "mid-sentence": 1,
+          "sentence-lead": 5
+        },
+        "recordBySlot": {
+          "clause-final": 2,
+          "mid-sentence": 2,
+          "sentence-final": 5
+        },
+        "paperPrecededBy": {
+          "block-start": 1,
+          "bold-word": 1,
+          "punctuation": 1,
+          "word": 3
+        },
+        "recordPrecededBy": {
+          "bold-word": 1,
+          "chip": 1,
+          "word": 7
+        },
+        "runs": 1,
+        "placements": [
+          {
+            "block": 0,
+            "blockKind": "paragraph",
+            "id": "r-G9-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "G1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "block-start",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G1-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G1-2",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "G2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G2-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "G9",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G9-3",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "chip",
+            "runLength": 2,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G9-4",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "chip",
+            "followedBy": "comma",
+            "runLength": 2,
+            "runPosition": 2
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-G9-2",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "G4",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-G4-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "bold-word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "H8",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-H8-6",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "D5",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "punctuation",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": false,
+        "text": null,
+        "style": null,
+        "words": 0,
+        "claims": [],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F2",
+          "F8",
+          "F-SIALYL"
+        ],
+        "labelsAreQuestions": 3,
+        "followups": [
+          {
+            "flowId": "F2",
+            "label": "Is recombinant casein phosphorylated?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F8",
+            "label": "How would I measure it?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F-SIALYL",
+            "label": "What glycans does the alga add?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 6,
+        "supportLabel": "Well supported across several papers",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 6,
+        "distinctRecordChipsInAnswer": 9,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F12",
+      "shape": {
+        "name": "jurisdiction-split",
+        "asserted": true,
+        "basis": "no table; 3 bold lead-ins; opens in 9 words; no clarify; answers; closes on a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "guard",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → guard → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "regulatory thread, jurisdiction split",
+            "words": 7,
+            "text": "Parse question — regulatory thread, jurisdiction split"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 8,
+            "text": "Retrieve the GRAS listing and the EFSA opinion"
+          },
+          {
+            "index": 2,
+            "role": "guard",
+            "verb": "Check",
+            "qualifier": null,
+            "words": 9,
+            "text": "Check whether the EFSA outcome was procedural or substantive"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "State",
+            "qualifier": null,
+            "words": 4,
+            "text": "State each jurisdiction separately"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 1,
+        "names": [
+          "corpus.search"
+        ],
+        "signature": "corpus.search(k=5, filters:thread)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 5,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "N"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 3
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 3,
+        "papers": [
+          "N2",
+          "N3",
+          "N3"
+        ],
+        "distinctPapers": 2,
+        "papersRetrievedTwice": [
+          {
+            "paperId": "N3",
+            "hits": 2
+          }
+        ],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.95,
+          0.92,
+          0.79
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.79,
+          0.95
+        ],
+        "snippetChars": {
+          "min": 56,
+          "max": 136
+        },
+        "retrievedAndCited": [
+          "N2",
+          "N3"
+        ],
+        "retrievedNotCited": [],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "Split, and the split is jurisdictional rather than scientific.",
+          "words": 9,
+          "leadsWithBold": false
+        },
+        "leadInCount": 3,
+        "leadIns": [
+          "United States — GRAS.",
+          "European Union — not established.",
+          "Read that conclusion precisely."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 4,
+        "paper": 4,
+        "record": 0,
+        "distinct": 2,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 4
+        },
+        "bySlot": {
+          "mid-sentence": 2,
+          "sentence-lead": 2
+        },
+        "paperBySlot": {
+          "mid-sentence": 2,
+          "sentence-lead": 2
+        },
+        "recordBySlot": {},
+        "paperPrecededBy": {
+          "bold-word": 2,
+          "word": 2
+        },
+        "recordPrecededBy": {},
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "N2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "N3",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 3,
+            "blockKind": "paragraph",
+            "id": "N3",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "N3",
+            "kind": "paper",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": true,
+        "text": "Both entries are catalogued; the EFSA opinion is open access and is the one to read in full first.",
+        "style": "whole-paragraph italic, last block, no chips required",
+        "words": 19,
+        "claims": [
+          "catalogued-not-ingested",
+          "not-read-from-source"
+        ],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": false
+      },
+      "clarify": null,
+      "followups": {
+        "count": 2,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F6",
+          "F5"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F6",
+            "label": "Has casein been made in an alga?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F5",
+            "label": "Why cw15 rather than a walled strain?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 2,
+        "supportLabel": "Supported, but from few sources",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 2,
+        "distinctRecordChipsInAnswer": 0,
+        "footerContradictsAnswer": false
+      },
+      "decline": null
+    },
+    {
+      "id": "F-SIALYL",
+      "shape": {
+        "name": "decline-adjudication",
+        "asserted": true,
+        "basis": "no table; 3 bold lead-ins; opens in 16 words; no clarify; declines by adjudication; closes without a standing note"
+      },
+      "triggerCount": 5,
+      "plan": {
+        "stepCount": 4,
+        "roles": [
+          "parse",
+          "retrieve",
+          "guard",
+          "deliver"
+        ],
+        "signature": "parse → retrieve → guard → deliver",
+        "opensWithParse": true,
+        "hasGuardStep": true,
+        "endsWithDelivery": true,
+        "steps": [
+          {
+            "index": 0,
+            "role": "parse",
+            "verb": "Parse",
+            "qualifier": "field glycan_species, organism cw15",
+            "words": 7,
+            "text": "Parse question — field glycan_species, organism cw15"
+          },
+          {
+            "index": 1,
+            "role": "retrieve",
+            "verb": "Retrieve",
+            "qualifier": null,
+            "words": 6,
+            "text": "Retrieve all thread D glycosylation entries"
+          },
+          {
+            "index": 2,
+            "role": "guard",
+            "verb": "Detect",
+            "qualifier": null,
+            "words": 4,
+            "text": "Detect disagreement before synthesising"
+          },
+          {
+            "index": 3,
+            "role": "deliver",
+            "verb": "Present",
+            "qualifier": null,
+            "words": 7,
+            "text": "Present both positions; do not average them"
+          }
+        ]
+      },
+      "toolCalls": {
+        "count": 2,
+        "names": [
+          "corpus.search",
+          "records.query"
+        ],
+        "signature": "corpus.search(k=6, filters:thread) → records.query(fields×1, +detectConflicts, +organism)",
+        "opensWithCorpusSearch": true,
+        "searchCallCount": 1,
+        "callsCarryingRetrieval": [
+          0
+        ],
+        "calls": [
+          {
+            "index": 0,
+            "name": "corpus.search",
+            "argKeys": [
+              "filters",
+              "k",
+              "query"
+            ],
+            "k": 6,
+            "filterKeys": [
+              "thread"
+            ],
+            "filters": {
+              "thread": "D"
+            },
+            "fields": [],
+            "fieldCount": 0,
+            "flags": {},
+            "retrievalRendering": "cards",
+            "hitCount": 4
+          },
+          {
+            "index": 1,
+            "name": "records.query",
+            "argKeys": [
+              "detectConflicts",
+              "field",
+              "organism"
+            ],
+            "k": null,
+            "filterKeys": [],
+            "filters": null,
+            "fields": [
+              "glycan_species"
+            ],
+            "fieldCount": 1,
+            "flags": {
+              "detectConflicts": true,
+              "organism": "cw15"
+            },
+            "retrievalRendering": "none",
+            "hitCount": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "hitCount": 4,
+        "papers": [
+          "D1",
+          "D2",
+          "D4",
+          "D3"
+        ],
+        "distinctPapers": 4,
+        "papersRetrievedTwice": [],
+        "sectionIds": [
+          "s1"
+        ],
+        "scores": [
+          0.94,
+          0.89,
+          0.83,
+          0.51
+        ],
+        "scoresDescending": true,
+        "scoreRange": [
+          0.51,
+          0.94
+        ],
+        "snippetChars": {
+          "min": 57,
+          "max": 185
+        },
+        "retrievedAndCited": [
+          "D1",
+          "D2",
+          "D4"
+        ],
+        "retrievedNotCited": [
+          "D3"
+        ],
+        "citedNotRetrieved": []
+      },
+      "answer": {
+        "blockCount": 6,
+        "blockKinds": [
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph",
+          "paragraph"
+        ],
+        "blockSignature": "paragraph → paragraph → paragraph → paragraph → paragraph → paragraph",
+        "opening": {
+          "blockKind": "paragraph",
+          "firstSentence": "The corpus disagrees with itself here, and I am not going to resolve it for you.",
+          "words": 16,
+          "leadsWithBold": false
+        },
+        "leadInCount": 3,
+        "leadIns": [
+          "Position A — oligomannosidic, xylose-decorated, no sialylation.",
+          "Position B — mammalian-like sialylated N-glycans.",
+          "These are incompatible."
+        ],
+        "table": null
+      },
+      "citations": {
+        "total": 10,
+        "paper": 5,
+        "record": 5,
+        "distinct": 8,
+        "allResolve": true,
+        "unresolved": [],
+        "byBlockKind": {
+          "paragraph": 10
+        },
+        "bySlot": {
+          "clause-final": 4,
+          "mid-sentence": 1,
+          "sentence-final": 1,
+          "sentence-lead": 4
+        },
+        "paperBySlot": {
+          "clause-final": 1,
+          "sentence-lead": 4
+        },
+        "recordBySlot": {
+          "clause-final": 3,
+          "mid-sentence": 1,
+          "sentence-final": 1
+        },
+        "paperPrecededBy": {
+          "bold-word": 2,
+          "word": 3
+        },
+        "recordPrecededBy": {
+          "word": 5
+        },
+        "runs": 0,
+        "placements": [
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "D1",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-D1-1",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-D1-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "semicolon",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "D2",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-D2-1",
+            "kind": "record",
+            "slot": "mid-sentence",
+            "precededBy": "word",
+            "followedBy": "em-dash",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 1,
+            "blockKind": "paragraph",
+            "id": "r-D2-2",
+            "kind": "record",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "D4",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "bold-word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 2,
+            "blockKind": "paragraph",
+            "id": "r-D4-1",
+            "kind": "record",
+            "slot": "sentence-final",
+            "precededBy": "word",
+            "followedBy": "period",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 4,
+            "blockKind": "paragraph",
+            "id": "D4",
+            "kind": "paper",
+            "slot": "sentence-lead",
+            "precededBy": "word",
+            "followedBy": "word",
+            "runLength": 1,
+            "runPosition": 1
+          },
+          {
+            "block": 5,
+            "blockKind": "paragraph",
+            "id": "D1",
+            "kind": "paper",
+            "slot": "clause-final",
+            "precededBy": "word",
+            "followedBy": "comma",
+            "runLength": 1,
+            "runPosition": 1
+          }
+        ]
+      },
+      "footer": {
+        "hasStandingNote": false,
+        "text": null,
+        "style": null,
+        "words": 0,
+        "claims": [],
+        "closingBlockKind": "paragraph",
+        "closingCarriesNegation": true
+      },
+      "clarify": null,
+      "followups": {
+        "count": 3,
+        "form": "flow:<id>|<label>",
+        "allTargetsResolve": true,
+        "targets": [
+          "F11",
+          "F9",
+          "F5"
+        ],
+        "labelsAreQuestions": 2,
+        "followups": [
+          {
+            "flowId": "F11",
+            "label": "What is FAM20C?",
+            "targetExists": true
+          },
+          {
+            "flowId": "F9",
+            "label": "Compare Chlamydomonas and Pichia",
+            "targetExists": true
+          },
+          {
+            "flowId": "F5",
+            "label": "Why cw15?",
+            "targetExists": true
+          }
+        ],
+        "renderedInUI": true
+      },
+      "renderedFooter": {
+        "countedBy": "countSourcePapers() in src/screens/Ask.tsx — papers, not citations",
+        "sourceCount": 3,
+        "supportLabel": "Supported, but from few sources",
+        "provenanceTick": "scripted answer prose",
+        "distinctPaperChipsInAnswer": 3,
+        "distinctRecordChipsInAnswer": 5,
+        "footerContradictsAnswer": false
+      },
+      "decline": {
+        "kind": "adjudication",
+        "moves": [
+          {
+            "move": "refuse-up-front",
+            "present": true
+          },
+          {
+            "move": "label-position-a",
+            "present": true
+          },
+          {
+            "move": "label-position-b",
+            "present": true
+          },
+          {
+            "move": "state-the-incompatibility",
+            "present": true
+          },
+          {
+            "move": "refuse-to-average",
+            "present": true
+          },
+          {
+            "move": "name-why-neither-wins",
+            "present": true
+          },
+          {
+            "move": "bound-the-stake",
+            "present": true
+          }
+        ],
+        "allMovesPresent": true
+      }
+    }
+  ]
+}

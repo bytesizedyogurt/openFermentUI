@@ -1,3 +1,13 @@
+// SIMULATION — REMOVED WITH THE SCRIPTED AGENT.
+//
+// Removed in: the final migration phase, the one that lands the real agent and
+// real server calls. `sim/` is retired last, by design (README, Architecture).
+// Replaced by: nothing. Latency stops being modelled and starts being suffered
+// — the op classes below become real round trips and the streaming cadence
+// becomes the model's own token rate. The `simSpeed` multiplier goes with this
+// file: there is no 4× on a real server, so the Settings control and the demo
+// driver's "Instant" both retire here too.
+//
 // Latency model (OF-DES-001 §13.5). One global simSpeed multiplier lets the
 // demo driver rehearse at 4× or instant.
 import { useStore } from '@/store';
