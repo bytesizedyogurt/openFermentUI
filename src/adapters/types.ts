@@ -665,12 +665,43 @@ export interface GuildAdapter {
 // ══════════════════════════════════════════════════════════════════════════
 
 /** The five, as one backend hands them over. */
+/** What a submitted turn did besides stream, mirroring `SlashResult` in the sim. */
+export interface TurnResult {
+  /** True when the input was consumed as a slash command rather than a question. */
+  handled: boolean;
+  /** A new session scope, when the turn set one (`/scope`). */
+  scope?: { kind: 'paper' | 'collection'; id: string; label: string };
+}
+
+/**
+ * The agent behind the Postdoc screen.
+ *
+ * The conversation itself STREAMS THROUGH THE STORE — messages, plan steps,
+ * tool rows and retrieval cards are pushed as they happen, which is how the
+ * screen renders a turn in progress. What comes back here is only what the
+ * caller must act on immediately: whether the input was a command, and any
+ * scope it set. A real agent honours the same split; the transport of the
+ * stream changes, the seam does not.
+ *
+ * `sendFlow` is SCRIPTED-MODE VOCABULARY, kept on the interface deliberately:
+ * a clarify option in the scripted player names the flow it continues into,
+ * and the real agent treats a clarify reply as ordinary text. It retires with
+ * `src/sim/` (whose headers name their own removal), not with this file.
+ */
+export interface AgentAdapter {
+  /** Submit a user turn into a session. */
+  send(sessionId: string, input: string): Promise<AdapterResponse<TurnResult>>;
+  /** Continue a scripted clarify into the flow its option names. */
+  sendFlow(sessionId: string, flowId: string, label: string): Promise<AdapterResponse<null>>;
+}
+
 export interface OpenFermentAdapters {
   corpus: CorpusAdapter;
   cell: CellAdapter;
   process: ProcessAdapter;
   economics: EconomicsAdapter;
   guild: GuildAdapter;
+  agent: AgentAdapter;
 }
 
 /** Which implementation is in front of the five. */

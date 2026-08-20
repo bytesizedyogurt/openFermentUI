@@ -191,7 +191,7 @@ reader does not read it as one that was missed.
 | 1 | Extract the schema | [ ] **blocked — see below** | |
 | 2 | Extract the engine | [x] complete, reshaped — see Phase 2 section | green, 17 stages |
 | 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
-| 4 | Quarantine the simulation | [ ] partial — `src/sim/` headed and fixture-exported; `SUGGESTED_PROMPTS` moved there in Phase 3 | |
+| 4 | Quarantine the simulation | [x] complete, reshaped — see Phase 4 section | green, 19 stages |
 | 5 | Server skeletons | [ ] not started | |
 | 6 | Workspace hygiene | [ ] not started | |
 
@@ -377,3 +377,54 @@ surviving interpolation at 200 seeded interior points per model, and a sample of
 nodes re-solved through `model.evaluate()` so the grid is tied to the plant
 rather than to itself. A 0.1% perturbation of one corner weight trips 3,215 of
 them.
+
+---
+
+## Phase 4 — quarantine the simulation (reshaped)
+
+**Status:** complete. `pnpm verify` green, nineteen stages.
+
+### The AgentAdapter
+
+The brief moves `src/sim/` under `packages/client/.../fixture/agent/`. There is
+no `packages/client`, and a physical move would also mislabel what lives there:
+`src/sim/flowsheets/` is the REAL bioSTEAM plant definition (its header says
+"NOT SIMULATION — NOT DELETED WITH THE REST OF sim/"), and `src/sim/jobs.ts` is
+the job-pacing seam, not agent content. So the quarantine is by seam rather
+than by directory: `src/sim/` stays where its headers and removal notes are,
+and the ONLY path a screen reaches the scripted agent by is now
+`adapters.agent` — the sixth interface, beside the five from Phase 3.
+
+The interface is two methods, because that is the true surface `Ask.tsx` used:
+`send(sessionId, input)` and `sendFlow(sessionId, flowId, label)`. The
+conversation itself streams through the store — that is how a turn renders in
+progress — and the response carries only what the caller must act on
+immediately (slash-command handling, a scope change). Every fixture turn is
+stamped `modelVersion: 'sim-scripted-flows'`, so a trace of the scripted player
+cannot be mistaken for a model run. `sendFlow` is scripted-clarify vocabulary
+and is kept deliberately: it retires with `src/sim/`, and the MCP stub for it
+says so.
+
+`SUGGESTED_PROMPTS` stays a direct sim import in `Ask.tsx`, commented at the
+site: each chip is a flow trigger verbatim (a click is an exact match), which is
+a guarantee only the scripted player can offer. The chips retire with it rather
+than crossing a boundary the real agent will never serve them over.
+
+### The flows as Audit's seed corpus
+
+`packages/assay/fixtures/flows.json` — all 13 ChatFlows, exported by
+`capture:eval-flows` and held current by `check:evals` inside verify. This is
+the eval-side sibling of `fixtures/answer-shapes.json`: answer-shapes is the
+formatter contract (shape, not prose); flows.json keeps the prose, because an
+eval needs the expected answer, the expected retrieval set, and the expected
+tool sequence per question.
+
+They land in `packages/assay/` rather than the brief's `packages/evals/`
+because assay IS the Audit package — the Inspect AI scorer lives there, and a
+second eval home would split the thing these fixtures feed. **Deviation,
+recorded.**
+
+On the way out every flow passes through the Pydantic `ChatFlow` model and must
+round-trip unchanged — their first contact with the schema anywhere, and all 13
+survived it. Export is byte-stable; hand-editing the fixture fails `check:evals`
+with a note that a change here is a change to what counts as a right answer.

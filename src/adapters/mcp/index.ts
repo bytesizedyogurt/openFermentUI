@@ -18,6 +18,7 @@ import { mcpCellAdapter } from './cell';
 import { mcpProcessAdapter } from './process';
 import { mcpEconomicsAdapter } from './economics';
 import { mcpGuildAdapter } from './guild';
+import { mcpAgentAdapter } from './agent';
 
 export const mcpAdapters: OpenFermentAdapters = {
   corpus: mcpCorpusAdapter,
@@ -25,6 +26,7 @@ export const mcpAdapters: OpenFermentAdapters = {
   process: mcpProcessAdapter,
   economics: mcpEconomicsAdapter,
   guild: mcpGuildAdapter,
+  agent: mcpAgentAdapter,
 };
 
 export {

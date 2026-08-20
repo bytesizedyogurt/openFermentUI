@@ -33,7 +33,11 @@ import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 // import is not a new dependency, and there is no adapter behind it and no
 // loading state, because nothing here leaves the client.
 import { SUGGESTED_PROMPTS } from '@/sim/prompts';
-import { send, sendFlow } from '@/sim/chat';
+// The conversation goes through the agent seam; the prompt chips do not.
+// They are scripted-mode furniture — each one a flow trigger verbatim, so a
+// click is an exact match — and they retire with src/sim rather than crossing
+// a boundary the real agent will never serve them over.
+import { adapters } from '@/adapters';
 // `fieldName` and `ONTOLOGY_BY_ID` below are DISPLAY HELPERS, not seed data —
 // they turn an id into a label. They stay on `@/data/ontology` deliberately;
 // the same is true everywhere else they appear in this directory.
@@ -378,7 +382,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
     const id = sid ?? ensureSession(text);
     setBusy(true);
     try {
-      const res = await send(text, id);
+      const { data: res } = await adapters.agent.send(id, text);
       if (res.scope !== undefined || res.handled) {
         // /scope returns a new scope; apply it to the session record.
         if (res.scope) {
@@ -529,7 +533,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                         <button
                           key={o.label}
                           className="chip hover:border-accent hover:bg-accent-wash"
-                          onClick={() => activeId && void sendFlow(o.flowId, o.label, activeId)}
+                          onClick={() => activeId && void adapters.agent.sendFlow(activeId, o.flowId, o.label)}
                         >
                           {o.label}
                         </button>
@@ -699,7 +703,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                                 className="chip hover:border-accent hover:bg-accent-wash"
                                 onClick={() => {
                                   if (!activeId) return;
-                                  if (isFlow) void sendFlow(flowId, label ?? flowId, activeId);
+                                  if (isFlow) void adapters.agent.sendFlow(activeId, flowId, label ?? flowId);
                                   else void run(label);
                                 }}
                               >

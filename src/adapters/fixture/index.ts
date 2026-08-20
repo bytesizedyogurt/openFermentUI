@@ -19,6 +19,7 @@ import { fixtureCellAdapter } from './cell';
 import { fixtureProcessAdapter } from './process';
 import { fixtureEconomicsAdapter } from './economics';
 import { fixtureGuildAdapter } from './guild';
+import { fixtureAgentAdapter } from './agent';
 
 export const fixtureAdapters: OpenFermentAdapters = {
   corpus: fixtureCorpusAdapter,
@@ -26,6 +27,7 @@ export const fixtureAdapters: OpenFermentAdapters = {
   process: fixtureProcessAdapter,
   economics: fixtureEconomicsAdapter,
   guild: fixtureGuildAdapter,
+  agent: fixtureAgentAdapter,
 };
 
 export {
@@ -34,5 +36,6 @@ export {
   fixtureProcessAdapter,
   fixtureEconomicsAdapter,
   fixtureGuildAdapter,
+  fixtureAgentAdapter,
 };
 export { corpusSnapshotId, FIXTURE_SERVER_VERSION } from './meta';
