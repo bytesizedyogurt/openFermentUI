@@ -189,7 +189,7 @@ reader does not read it as one that was missed.
 |---|---|---|---|
 | 0 | Freeze, baseline, import map | [x] complete | green, 15 stages |
 | 1 | Extract the schema | [ ] **blocked — see below** | |
-| 2 | Extract the engine | [ ] not started | |
+| 2 | Extract the engine | [x] complete, reshaped — see Phase 2 section | green, 17 stages |
 | 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
 | 4 | Quarantine the simulation | [ ] partial — `src/sim/` headed and fixture-exported; `SUGGESTED_PROMPTS` moved there in Phase 3 | |
 | 5 | Server skeletons | [ ] not started | |
@@ -319,3 +319,61 @@ a `notice` in the same object as the payload, following the rule
   claims would be "the entire parameter space is unclaimed", which is the most
   commercially dangerous sentence the system could emit and it would arrive with
   the authority of a computation. *"The empty array is a stub, not a finding."*
+
+---
+
+## Phase 2 — extract the engine (reshaped)
+
+**Status:** complete. `pnpm verify` green, seventeen stages.
+
+### Why the file movement did not happen
+
+The brief's rationale for moving `src/engine/` into `packages/engine/` is that
+it is "directly reusable by the production subsystems. `units.ts` in particular
+becomes Intake's normalisation layer." That goal was met by the earlier
+migration, in the other language: the production normalisation layer is
+`openferment_core.units` (Python, `packages/core`), with `protocol/scale`,
+`protocol/diff` and the `packages/assay` metrics scorer beside it. The
+TypeScript copies of those four are MIRRORS — browser-only, headed as such, held
+to parity gates inside `verify` — and CLAUDE.md's one rule forbids offering them
+for reuse by anything a production subsystem calls. Moving mirrors into a
+package named for reuse would invite exactly the second-implementation coupling
+the rule exists to prevent.
+
+`interp.ts` and `grids.ts` are the two modules that are legitimately TypeScript
+forever (CLAUDE.md routing table: "Grid interpolation for sliders — legitimate
+UI convenience, stays"). They move into a JS package the day a second JS
+consumer exists (`packages/client`, Phase 6 workspaces); today the only consumer
+is the app, and a package with one tenant is filing with alias machinery as its
+only content. `retrieval.ts`, the sixth module on the brief's list, was deleted
+in the earlier migration — the brief's own table agrees ("the corpus server
+replaces it").
+
+What Phase 2 is FOR — an engine that stays pure and numerics other systems can
+trust — is enforced instead of arranged:
+
+### `check:purity` — the brief's purity rule, mechanical
+
+No runtime import of `@/store`, React/zustand, or `@/data/*` anywhere under
+`src/engine/` (28 modules scanned; type-only imports allowed, the same
+distinction the brief's Phase 3 exit condition makes). Three pre-existing
+`@/data/ontology` imports (`designs`, `balance`, `posterior` — none of them on
+the brief's six) are carried as an explicit allowlist with reasons; a NEW
+violation fails, and a RESOLVED entry left unpruned also fails, so the ledger
+stays exact. Proved in both directions before being trusted.
+
+### `check:interp` — the pin the brief's tests asked for
+
+`units.convert` was already pinned harder than any unit test: 1,632 convert
+cases plus 600 cross-family refusals in `fixtures/units.json`, replayed against
+BOTH implementations on every verify. `interp.interpolate` had **no pin at
+all** — the Phase 0 capture never recorded it, and every number a slider shows
+between two solved points passes through it.
+
+It is now pinned by 3,863 property checks against the live cost-model grids, no
+remembered constants: node exactness, per-axis midpoint linearity, clamping
+(including absent-keys-clamp-low), the waterfall identity (Σ cost lines = MSP)
+surviving interpolation at 200 seeded interior points per model, and a sample of
+nodes re-solved through `model.evaluate()` so the grid is tied to the plant
+rather than to itself. A 0.1% perturbation of one corner weight trips 3,215 of
+them.
