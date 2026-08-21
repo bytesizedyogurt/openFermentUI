@@ -37,6 +37,10 @@ import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 // import is not a new dependency, and there is no adapter behind it and no
 // loading state, because nothing here leaves the client.
 import { SUGGESTED_PROMPTS } from '@/sim/prompts';
+// The demo suite's six, offered on this screen as well as on its own home.
+// Same rule as SUGGESTED_PROMPTS above: each is a flow trigger verbatim, so a
+// click is an exact match, and they retire with the scripted player.
+import { ARCHETYPE_PROMPTS } from '@/data/demo/flows';
 // The conversation goes through the agent seam; the prompt chips do not.
 // They are scripted-mode furniture — each one a flow trigger verbatim, so a
 // click is an exact match — and they retire with src/sim rather than crossing
@@ -503,12 +507,49 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                 body="Answers come with their retrieval visible and every number carrying a citation you can follow to its source span. Questions the corpus can't support get an explicit decline rather than a guess."
                 icon={<Sparkles size={28} />}
               />
-              <div className="flex flex-wrap gap-2 justify-center mt-2">
-                {SUGGESTED_PROMPTS.map((p) => (
-                  <button key={p} className="chip hover:border-accent hover:bg-accent-wash" onClick={() => void run(p)}>
-                    {p}
-                  </button>
-                ))}
+
+              {/* The six archetypes, on the agent screen itself.
+                  They were only on the demo home, which meant arriving at
+                  /postdoc from anywhere else — the rail, a deep link, a
+                  bookmark — put a reviewer in front of an empty box with no
+                  sign that the six scripted questions exist. The chips below
+                  are the flows' triggers VERBATIM, so a click is an exact
+                  match rather than a fuzzy one.
+                  They are grouped and labelled rather than mixed into the
+                  corpus prompts underneath, because the two ask over
+                  different object pools and a reviewer who cannot tell them
+                  apart will read one pool's answer as the other's. */}
+              <div className="max-w-[760px] mx-auto mt-4">
+                <div className="text-caption text-ink-soft mb-2">
+                  The demo suite — six questions, scripted end to end. Each produces a deliverable
+                  you can open, and each ends by naming what should be defensively published.
+                </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {ARCHETYPE_PROMPTS.map((a) => (
+                    <button
+                      key={a.id}
+                      className="text-left border border-line px-2.5 py-2 hover:border-accent hover:bg-[rgb(var(--accent-wash))]/40 transition-colors"
+                      onClick={() => void run(a.prompt)}
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-num text-caption text-ink-soft">{a.id}</span>
+                        <span className="text-caption text-ink-soft">{a.label}</span>
+                      </div>
+                      <div className="font-num text-caption mt-0.5">“{a.prompt}”</div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-caption text-ink-soft mt-4 mb-2">
+                  The β-casein corpus — the other pool, asked the same way.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_PROMPTS.map((p) => (
+                    <button key={p} className="chip hover:border-accent hover:bg-accent-wash" onClick={() => void run(p)}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
