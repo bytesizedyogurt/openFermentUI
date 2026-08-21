@@ -45,6 +45,32 @@ const server = createServer(async (req, res) => {
 
 const ROUTES = [
   ['/', 'Bench'],
+  // ── the demo suite (OF-DEMO-001) ─────────────────────────────────────
+  // Every archetype deliverable and both ends of each seam-matrix link, so a
+  // route that stops rendering is caught here rather than during a walkthrough.
+  ['/bench', 'Demo bench — six archetype cards'],
+  ['/repo', 'BioRepo — Accession index'],
+  ['/repo/a/OF-A-00101', 'Accession page'],
+  ['/repo/a/OF-A-00147', 'Accession page (held, excursion-flagged)'],
+  ['/repo/a/OF-A-00112', 'Accession page (normalised from a specific rate)'],
+  ['/repo/p/titer', 'Parameter page (contradicted)'],
+  ['/repo/p/minimum_selling_price', 'Parameter page (reconciled by unit closure)'],
+  ['/repo/p/inhibitor_tolerance', 'Parameter page (differs, and is NOT a contradiction)'],
+  ['/repo/contradictions', 'Contradiction queue'],
+  ['/fermos/gap/DLV-AR1-001', 'AR1 — factor map'],
+  ['/fermos/gap/DLV-AR1-001/f/temperature', 'AR1 — one factor'],
+  ['/fermos/runs', 'Run index'],
+  ['/fermos/runs/RUN-047', 'AR6 — the excursion run'],
+  ['/fermos/runs/RUN-042', 'Run without an excursion'],
+  ['/fermos/envelope/PLT-KGL-01', 'Envelope — the two computed ceilings'],
+  ['/geneos/routes/3-HP', 'AR2 — route comparison'],
+  ['/geneos/routes/3-HP/RTE-3HP-MCR', 'AR2 — per-step claim detail'],
+  ['/proforma', 'Proforma index'],
+  ['/proforma/screen/PLT-KGL-01', 'AR3 — capacity screen'],
+  ['/proforma/screen/PLT-KGL-01/c/CND-001', 'AR3 — the rescued candidate'],
+  ['/proforma/concept/DLV-AR4-001', 'AR4 — facility concepts'],
+  ['/postdoc/tree/DLV-AR5-001', 'AR5 — problem tree'],
+  ['/notary/disclosures', 'Notary queue'],
   ['/postdoc', 'Postdoc'],
   ['/trawl', 'Trawl'],
   ['/trawl/ingest', 'Ingest'],

@@ -677,3 +677,67 @@ caught by name.
 script asserting over both pools would be the merge §8 forbids, in the one place
 where the two would be hardest to tell apart. **Deviation, recorded.**
 
+### Steps 4–10 — the screens
+
+Complete. Ten components and thirteen screens across twenty-three new routes,
+all rendering under `scripts/smoke.mjs` (76/76 clean, up from 53).
+
+| Route | Archetype | What it must show |
+|---|---|---|
+| `/bench` | — | six cards, each the archetype's QUESTION rather than its name |
+| `/repo`, `/repo/a/:id`, `/repo/p/:field`, `/repo/contradictions` | — | the atom, and the company it keeps |
+| `/fermos/gap/:id` (+ `/f/:factor`) | 1 | the unexplored region as the subject, not the leftover |
+| `/geneos/routes/:product` (+ `/:route`) | 2 | the ranking reversing under the claim overlay |
+| `/proforma/screen/:plant` (+ `/c/:candidate`) | 3 | failed candidates IN the table, binding axis named |
+| `/proforma/concept/:id` | 4 | the accuracy band drawn, not footnoted |
+| `/postdoc/tree/:id` | 5 | patent density as a pre-verbal four-step scale |
+| `/fermos/runs/:runId`, `/fermos/envelope/:plantId` | 6 | the excursion band across every channel at once |
+| `/notary/disclosures` | all | the queue that makes the project's reason legible |
+
+Routing decisions, both to keep the pools apart:
+
+- The demo Notary queue is at `/notary/disclosures`; `/notary` stays the casein
+  enablement checklist. A screen serving both pools would be the merge §8
+  forbids, in the one place it would be hardest to notice.
+- `/geneos/routes/...` is matched BEFORE the bare-segment strain branch, or
+  `/geneos/routes/3-HP` renders a chassis page for a strain called "routes".
+
+### What building the screens found
+
+**`OF-A-00307` was a computed value citing nothing.** Its note named its two
+inputs — P/V = 1500 W m⁻³ and vs = 0.049 m s⁻¹ — in prose, and prose is not a
+citation. Rule 1 says no number renders unless it traces to an Accession or to a
+computation over Accessions; a computation over two numbers that are not
+Accessions does not satisfy it. Both are now Accessions (`OF-A-00327`,
+`OF-A-00328`), which also makes the seam-matrix row calling for a two-deep
+derivation chain true rather than nearly true. A `superficial_gas_velocity`
+field was added for the second, because it had been living inside a note.
+
+**Contradictions 2 and 3 were not wired.** All four are documented in
+OF-DEMO-003 §5 as deliberate, but only the first carried `conflictsWith`, so
+only one rail rendered. Contradiction 3 needed a NEW relation rather than the
+existing one: it is the case where normalisation CLOSES an apparent
+disagreement, and filing it under `conflictsWith` would make the interface cry
+wolf about its own success. `reconciledWith` renders in `signal-open` beside the
+warn-coloured unresolved block. All four are now gated, including the fourth,
+which must NOT render — and the gate catches each failure mode by name.
+
+**The capacity screen could not compute an import displacement**, and says so.
+`min(capacity, volume) × (CIF − landed cost)` needs a landed cost this pool does
+not hold for those candidates. The column shows the volume and the CIF price —
+the two quantities that exist — and the note names the missing one. A number
+computed from an invented landed cost would have been the most quotable thing on
+the screen and the least defensible.
+
+**A single-source exclusion states its flag AND lists its Accessions**, so the
+band's warning triangle and the ids beside it can disagree. They are now checked
+against each other, along with every exclusion falling inside its domain and
+every factor having a non-empty unexplored gap — a factor with none has no
+finding to show on the screen that exists to show it.
+
+**Two of my own checks were wrong before the data was.** The seam-9 check read
+`RunRecord.verdict`, which is optional and unset in this seed, so it would have
+passed silently on `undefined`; the verdict lives on the deliverable payload. And
+a "watching nothing" guard in the honesty section caught my own wrong field name
+on `PatentFamily` before it could report a vacuous pass.
+

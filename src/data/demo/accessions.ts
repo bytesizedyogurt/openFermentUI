@@ -33,6 +33,8 @@ interface AccInput {
   pf?: string;
   run?: string;
   conflicts?: string[];
+  reconciled?: string[];
+  conflictNote?: string;
   range?: [number, number];
   sd?: number;
   n?: number;
@@ -65,6 +67,8 @@ function a(i: AccInput): Accession {
     patentFamilyId: i.pf,
     runId: i.run,
     conflictsWith: i.conflicts,
+    reconciledWith: i.reconciled,
+    conflictNote: i.conflictNote,
     poolOnly: i.poolOnly,
     ledger: LED(i.note ?? 'Extracted and normalised from source.'),
   };
@@ -94,10 +98,10 @@ export const ACCESSIONS_LYSINE: Accession[] = [
   a({ id: 'OF-A-00106', field: 'titer', rep: [104.8, 'g L⁻¹'], norm: [104.8, 'g L⁻¹'], src: 'SRC-0003', st: 'journal', loc: '§4.1 Table 2',
       q: 'shifting to 33 °C at 20 h raised final titer by 9 % against the isothermal control',
       ctx: { ...CGL, temperatureC: 33 }, conflicts: ['OF-A-00107'],
-      note: 'Side A of the temperature-shift disagreement. Cell density at shift was 31 g/L.' }),
+      note: 'Side A of the temperature-shift disagreement. Cell density at shift was 31 g/L.' , conflictNote: 'A 9 % titer gain on temperature shift at 31 g L⁻¹ cell density, against OF-A-00107 which records no improvement at 58 g L⁻¹ and attributes the null result to oxygen limitation. Both stored as stated. The reconciliation candidate — that the shift only helps below a density where oxygen stops being the limit — is plausible, untested, and is not stored as a conclusion.'}),
   a({ id: 'OF-A-00107', field: 'titer', rep: [95.1, 'g L⁻¹'], norm: [95.1, 'g L⁻¹'], src: 'SRC-0003', st: 'patent-example', loc: 'Example 4', pf: 'PF-002',
       q: 'no improvement was observed over the unshifted control', ctx: { ...CGL, temperatureC: 33 }, conflicts: ['OF-A-00106'],
-      note: 'Side B. Cell density at shift was 58 g/L, and the specification attributes the null result to oxygen limitation rather than to the shift itself. That attribution is the reconciliation candidate, and it is untested.' }),
+      note: 'Side B. Cell density at shift was 58 g/L, and the specification attributes the null result to oxygen limitation rather than to the shift itself. That attribution is the reconciliation candidate, and it is untested.' , conflictNote: 'No improvement on temperature shift at 58 g L⁻¹, attributed by the source to oxygen limitation, against OF-A-00106 which records a 9 % gain at 31 g L⁻¹. A journal and a patent working example disagreeing is the shape most literature tools cannot represent at all.'}),
   a({ id: 'OF-A-00108', field: 'temperature', rep: [306.15, 'K'], norm: [33, '°C'], der: { fn: 'temperature', usingAccessionIds: [], note: 'K → °C by subtraction of 273.15.' },
       src: 'SRC-0004', st: 'journal', loc: '§2.3 Methods', q: 'cultivations were held at 306.15 K', ctx: CGL,
       note: 'One of two Accessions in this cluster reported in Kelvin. Kept in the original unit on the Accession page precisely so the conversion is visible.' }),
@@ -321,8 +325,25 @@ export const ACCESSIONS_CAPACITY: Accession[] = [
       note: 'The single fact that reorders the capacity screen. At 52 °C against 28 °C cooling-tower water the driving force is 24 K; at 30 °C it is 2 K. Thermophily is a heat-transfer decision before it is a microbiology decision.' }),
   a({ id: 'OF-A-00306', field: 'our', rep: [12, 'mmol L⁻¹ h⁻¹'], norm: [12, 'mmol L⁻¹ h⁻¹'], src: 'SRC-0018', st: 'journal', loc: '§3.1', ctx: { organismId: 'ORG-BCG-01' } }),
 
+  // The two inputs to the van 't Riet correlation, as Accessions.
+  //
+  // WHY THEY EXIST. OF-A-00307 is `provenance: 'computed'` and was citing
+  // nothing: its note named P/V = 1500 and vs = 0.049 in prose, and prose is
+  // not a citation. Rule 1 says no number renders unless it traces to an
+  // Accession or to a computation over Accessions, and a computation over two
+  // numbers that are not Accessions does not satisfy it. It also left the
+  // Accession page's derivation recursion one hop deep, so the seam-matrix row
+  // that calls for a two-deep chain did not hold.
+  a({ id: 'OF-A-00327', field: 'agitation_power', rep: [1500, 'W m⁻³'], norm: [1500, 'W m⁻³'], src: 'SRC-0035', st: 'vendor-datasheet', loc: 'Vessel package, sheet 2', prov: 'curated', conf: 0.88,
+      ctx: { scale: '5 m³' },
+      note: 'Installed specific power for the three-stage Rushton configuration. A vendor figure, so it is what the package is rated for rather than what a given batch draws.' }),
+  a({ id: 'OF-A-00328', field: 'superficial_gas_velocity', rep: [0.049, 'm s⁻¹'], norm: [0.049, 'm s⁻¹'], src: 'SRC-0035', st: 'computed', loc: 'derived from sheet 1 geometry', prov: 'computed', conf: 0.95,
+      der: { fn: 'identity', usingAccessionIds: [], note: '1 VVM through a 5 m³ working volume at H/D = 2 gives D = 1.47 m and a cross-section of 1.70 m²; 5 m³ min⁻¹ over that area is 0.049 m s⁻¹. Recomputed at load by superficialGasVelocity().' },
+      ctx: { scale: '5 m³' },
+      note: 'The input a reader is most likely to assume rather than check, which is why it is an Accession rather than a number in a note.' }),
+
   a({ id: 'OF-A-00307', field: 'kla', rep: [385, 'h⁻¹'], norm: [385, 'h⁻¹'], src: 'SRC-0016', st: 'journal', loc: '§4 Eq. 7', prov: 'computed',
-      der: { fn: 'linear', usingAccessionIds: [], note: 'van \u2019t Riet coalescing correlation, kLa = 0.026 (P/V)^0.4 vs^0.5, at P/V = 1500 W m⁻³ and vs = 0.049 m s⁻¹. Recomputed at load by lib/transport.ts.' },
+      der: { fn: 'linear', usingAccessionIds: ['OF-A-00327', 'OF-A-00328'], note: 'van \u2019t Riet coalescing correlation, kLa = 0.026 (P/V)^0.4 vs^0.5, over the installed specific power in OF-A-00327 and the superficial gas velocity in OF-A-00328. Recomputed at load by lib/transport.ts.' },
       ctx: { scale: '5 m³' },
       note: 'Clean water. A kLa quoted without a broth factor is the most common way a plant gets specified wrong.' }),
   a({ id: 'OF-A-00308', field: 'kla', rep: [0.46, 'fraction'], norm: [177.1, 'h⁻¹'],
@@ -390,11 +411,11 @@ export const ACCESSIONS_LIGNO: Accession[] = [
       q: 'installed capital of 38 M USD for a 12,000 t/yr lactate facility', ctx: { scale: '12,000 t a⁻¹' },
       note: 'The scaling anchor for every capex number in Archetype 4. 38,000,000 / 12,000. Everything else is the six-tenths rule applied to this point.' }),
   a({ id: 'OF-A-00417', field: 'minimum_selling_price', rep: [2900, 'USD t⁻¹'], norm: [2900, 'USD t⁻¹'], src: 'SRC-0026', st: 'journal', loc: '§5.1', ctx: { productId: 'xylitol' } }),
-  a({ id: 'OF-A-00418', field: 'minimum_selling_price', rep: [1150, 'USD t⁻¹'], norm: [1150, 'USD t⁻¹'], src: 'SRC-0026', st: 'journal', loc: '§5.1', ctx: { productId: 'L-lactic acid' } }),
+  a({ id: 'OF-A-00418', field: 'minimum_selling_price', rep: [1150, 'USD t⁻¹'], norm: [1150, 'USD t⁻¹'], src: 'SRC-0026', st: 'journal', loc: '§5.1', ctx: { productId: 'L-lactic acid' } , reconciled: ['OF-A-00419'], conflictNote: 'Stated in USD t⁻¹ against OF-A-00419 in EUR kg⁻¹. The two look like a disagreement and are not: converted at the fixed corpus rate they agree within 1.5 %. The gap was in the units, and it is closed.'}),
   a({ id: 'OF-A-00419', field: 'minimum_selling_price', rep: [1.05, 'EUR kg⁻¹'], norm: [1134, 'USD t⁻¹'],
       der: { fn: 'linear', usingAccessionIds: [], note: 'EUR kg⁻¹ → USD t⁻¹ at the fixed demo rate of 1.08. The rate is fixed corpus-wide; a floating rate would make two identical Accessions disagree by the date they were viewed.' },
       src: 'SRC-0026', st: 'journal', loc: '§5.1 Table 5', ctx: { productId: 'L-lactic acid' },
-      note: 'Same quantity as OF-A-00418 from a European cost basis. Within 1.5 % after conversion, which is the kind of agreement that only becomes visible once units are closed.' }),
+      note: 'Same quantity as OF-A-00418 from a European cost basis. Within 1.5 % after conversion, which is the kind of agreement that only becomes visible once units are closed.' , reconciled: ['OF-A-00418'], conflictNote: 'Stated in EUR kg⁻¹ against OF-A-00418 in USD t⁻¹. Converted at the fixed corpus rate the two agree within 1.5 % — an apparent disagreement that normalisation resolves.'}),
 ];
 
 // ══════════════════════════════════════════════════════════════════════
@@ -422,12 +443,11 @@ export const ACCESSIONS_ANALOGUE: Accession[] = [
       q: 'oleate accounted for 48 % of total fatty acids', ctx: { organismId: 'ORG-RTO-01' },
       note: 'Tunable by nitrogen regime and temperature, which is what makes the melting profile a design variable rather than a property.' }),
   a({ id: 'OF-A-00509', field: 'purity', rep: [3.4, ''], norm: [3.4, ''], src: 'SRC-0030', st: 'journal', loc: '§3.1', ctx: { organismId: 'ORG-FVE-01' },
-      q: 'native hyphal alignment gave an anisotropy index of 3.4 without texturisation' }),
+      q: 'native hyphal alignment gave an anisotropy index of 3.4 without texturisation' , conflicts: ['OF-A-00511'], conflictNote: 'Identical measured anisotropy reached two ways: native hyphal morphology here, claimed shear-cell texturisation in OF-A-00511. The values agree and what they imply does not — one route is enclosed and one is not, so a reader who sees only the number learns the wrong thing.'}),
   a({ id: 'OF-A-00510', field: 'purity', rep: [1000, ''], norm: [1000, ''], src: 'SRC-0030', st: 'journal', loc: '§4.2', ctx: { organismId: 'ORG-FVE-01' },
       q: 'colonial mutants dominated after approximately 1,000 h', note: 'Run length ceiling for continuous culture. A hard operational constraint that sets the turnaround economics of the whole branch.' }),
   a({ id: 'OF-A-00511', field: 'purity', rep: [3.4, ''], norm: [3.4, ''], src: 'SRC-0030', st: 'patent-example', loc: 'Example 5', pf: 'PF-011', conf: 0.85,
-      ctx: { productId: 'texturised protein' }, conflicts: [],
-      note: 'The claimed unit operation reaches the same anisotropy index as the native morphology in OF-A-00509. Identical outcome, one route claimed and one not — the cleanest possible argument for routing around a patent instead of licensing it.' }),
+      ctx: { productId: 'texturised protein' },       note: 'The claimed unit operation reaches the same anisotropy index as the native morphology in OF-A-00509. Identical outcome, one route claimed and one not — the cleanest possible argument for routing around a patent instead of licensing it.' , conflicts: ['OF-A-00509'], conflictNote: 'Identical measured anisotropy reached two ways: claimed shear-cell texturisation here, native hyphal morphology in OF-A-00509. The values agree and what they imply does not.'}),
   a({ id: 'OF-A-00512', field: 'purity', rep: [2, '% (w/w)'], norm: [2, '% (w/w)'], src: 'SRC-0030', st: 'journal', loc: '§5.1', ctx: { organismId: 'ORG-FVE-01' },
       note: 'RNA content ceiling for food use. A real unit operation with real yield loss, and it is invisible in every paper about the organism.' }),
 ];

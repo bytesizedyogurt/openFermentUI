@@ -97,6 +97,23 @@ function isActive(path: string, to: string) {
   return path === to || path.startsWith(to + '/');
 }
 
+// ── The demo suite (OF-DEMO-001) ───────────────────────────────────────
+//
+// A second, parallel pool alongside the casein corpus. Its routes are new
+// (`/repo`, `/proforma`, `/bench`) or new SUB-paths of existing parts
+// (`/fermos/gap`, `/geneos/routes`, `/postdoc/tree`, `/notary/disclosures`), so
+// no casein screen changes and no screen serves both pools. Keeping them apart
+// is what lets the interface tell the truth about both — an ExtractionRecord is
+// a catalogued claim awaiting verification and an Accession is a normalised
+// quantity with complete provenance, and they are not the same object.
+import { Bench as DemoBench } from '@/screens/demo/Bench';
+import { RepoIndex, AccessionPage, ParameterPage as DemoParameterPage, ContradictionQueue } from '@/screens/demo/Repo';
+import { GapMap, FactorDetail, RunIndex, RunPage, EnvelopePage } from '@/screens/demo/Fermos';
+import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
+import { ProformaIndex, CapacityScreen, CandidateDetail, FacilityConceptPage } from '@/screens/demo/Proforma';
+import { ProblemTreePage } from '@/screens/demo/Postdoc';
+import { NotaryQueue } from '@/screens/demo/NotaryQueue';
+
 // ── Route dispatch ─────────────────────────────────────────────────────
 
 /**
@@ -133,6 +150,16 @@ function canonicalize(segments: string[]): string[] | null {
   return null;
 }
 
+/**
+ * Segment `i`, or ''. The dispatch destructures four segments and two demo
+ * routes need a fifth (`/proforma/screen/:plant/c/:candidate`,
+ * `/fermos/gap/:id/f/:factor`). Widening the destructure would touch every
+ * existing branch for the sake of two.
+ */
+function segAt(segments: string[], i: number): string {
+  return segments[i] ?? '';
+}
+
 function Screen() {
   const route = useRoute();
   const canonical = canonicalize(route.segments);
@@ -150,6 +177,7 @@ function Screen() {
   if (!a) return <Home />;
   switch (a) {
     case 'postdoc':
+      if (b === 'tree' && c) return <ProblemTreePage deliverableId={c} />;
       return <Ask sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
     case 'trawl':
       if (b === 'ingest') return <Ingest />;
@@ -168,14 +196,39 @@ function Screen() {
     case 'openlab':
       return <OpenLab />;
     case 'notary':
+      // The demo queue lives one level down; `/notary` stays the casein
+      // enablement checklist. Two pools, two screens, no screen serving both.
+      if (b === 'disclosures') return <NotaryQueue />;
       return <Notary />;
+    case 'bench':
+      return <DemoBench />;
+    case 'repo':
+      if (b === 'a' && c) return <AccessionPage id={c} />;
+      if (b === 'p' && c) return <DemoParameterPage field={c as never} />;
+      if (b === 'contradictions') return <ContradictionQueue />;
+      return <RepoIndex />;
+    case 'proforma':
+      if (b === 'screen' && c && d === 'c') return <CandidateDetail plantId={c} candidateId={segAt(canonical ?? route.segments, 4)} />;
+      if (b === 'screen' && c) return <CapacityScreen plantId={c} />;
+      if (b === 'concept' && c) return <FacilityConceptPage deliverableId={c} />;
+      return <ProformaIndex />;
     case 'geneos':
+      // `routes` before the strain branch: a strain id is a bare segment, so
+      // `/geneos/routes/3-HP` would otherwise render a chassis page for a
+      // strain called "routes".
+      if (b === 'routes' && c && d) return <RouteDetail productId={c} routeId={d} />;
+      if (b === 'routes' && c) return <RouteComparison productId={c} />;
       return b ? <StrainPage strainId={b} /> : <Organisms />;
     case 'runbook':
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
     case 'fermos':
+      if (b === 'gap' && c && d === 'f') return <FactorDetail deliverableId={c} factorId={segAt(canonical ?? route.segments, 4)} />;
+      if (b === 'gap' && c) return <GapMap deliverableId={c} />;
+      if (b === 'runs' && c) return <RunPage runId={c} />;
+      if (b === 'runs') return <RunIndex />;
+      if (b === 'envelope' && c) return <EnvelopePage plantId={c} />;
       if (b === 'compare') return <Compare />;
       if (b === 'd') return c ? <DesignDetail designId={c} /> : <DesignIndex />;
       if (b === 's' && c && d === 'plant') return <Plant scenarioId={c} />;

@@ -408,3 +408,99 @@ export function openSurfaceIn(
   }
   return { totalSteps: stepClaims.length, enclosedSteps: enclosed, expiringSteps: expiring };
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// the contradiction rail's statistics
+// ══════════════════════════════════════════════════════════════════════
+//
+// Pure, and here rather than in the component, because `check:demo-seed` must
+// assert over them and it runs under node where a component's `href` import
+// touches `window`. A rule a gate cannot reach is a rule nobody is holding.
+
+import type { Accession as _Accession, FieldId as _FieldId } from '@/data/demo/types';
+import { ACCESSIONS as _ACCESSIONS, ACCESSION_BY_ID as _BY_ID } from '@/data/demo/accessions';
+
+/** Accessions on a field, pool order preserved. */
+export function accessionsOnField(field: _FieldId, pool: _Accession[] = _ACCESSIONS): _Accession[] {
+  return pool.filter((a) => a.field === field);
+}
+
+/** The ones that may enter a statistic: not held, and primary. */
+export function countable(accs: _Accession[]): _Accession[] {
+  return accs.filter((a) => !a.hold && a.isPrimary);
+}
+
+export function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+export function quartiles(xs: number[]): { q1: number; q3: number } | null {
+  if (xs.length < 4) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const at = (p: number) => {
+    const i = (s.length - 1) * p;
+    const lo = Math.floor(i);
+    const hi = Math.ceil(i);
+    return s[lo] + (s[hi] - s[lo]) * (i - lo);
+  };
+  return { q1: at(0.25), q3: at(0.75) };
+}
+
+/**
+ * Is there a real disagreement on this field?
+ *
+ * Two Accessions conflict when one NAMES the other in `conflictsWith`. That is
+ * a curation decision recorded in the seed, deliberately, rather than something
+ * inferred from spread: two values far apart under different organisms are not
+ * in conflict, and two values close together can be (contradiction 2 in
+ * OF-DEMO-003 §5 is an identical measured outcome whose IMPLICATIONS differ).
+ * Spread cannot tell those apart and a curator can.
+ */
+export function isContradiction(accs: _Accession[]): boolean {
+  return accs.some((a) => (a.conflictsWith ?? []).some((id) => accs.some((b) => b.id === id)));
+}
+
+/** The conflicting pairs, deduplicated, both directions collapsed to one. */
+/**
+ * Pairs that LOOK like they disagree and do not, once the units are closed.
+ *
+ * Rendered differently from a conflict on purpose: an unresolved pair is a
+ * warning and a reconciled pair is the system working. Filing the second under
+ * the first would make the interface cry wolf about its own success.
+ */
+export function reconciledPairs(accs: _Accession[]): [_Accession, _Accession][] {
+  const out: [_Accession, _Accession][] = [];
+  const seen = new Set<string>();
+  for (const a of accs) {
+    for (const id of a.reconciledWith ?? []) {
+      const b = _BY_ID[id];
+      if (!b || !accs.includes(b)) continue;
+      const key = [a.id, b.id].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push([a, b]);
+    }
+  }
+  return out;
+}
+
+export function conflictPairs(accs: _Accession[]): [Accession, Accession][] {
+  const out: [Accession, Accession][] = [];
+  const seen = new Set<string>();
+  for (const a of accs) {
+    for (const id of a.conflictsWith ?? []) {
+      const b = _BY_ID[id];
+      if (!b || !accs.includes(b)) continue;
+      const key = [a.id, b.id].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push([a, b]);
+    }
+  }
+  return out;
+}
+
+

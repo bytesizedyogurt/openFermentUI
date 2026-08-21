@@ -135,6 +135,7 @@ export const FIELDS: FieldDef[] = [
   { id: 'mu_setpoint', name: 'Specific growth rate setpoint', family: 'process', canonicalUnit: 'h⁻¹', definition: 'Target μ imposed by an exponential feed profile.', aggregatable: true },
   { id: 'feed_rate', name: 'Feed rate', family: 'process', canonicalUnit: 'g L⁻¹ h⁻¹', definition: 'Substrate delivery rate to the vessel.', aggregatable: true },
   { id: 'agitation_power', name: 'Installed power per volume', family: 'process', canonicalUnit: 'W m⁻³', definition: 'Ungassed impeller power divided by working volume.', aggregatable: true },
+  { id: 'superficial_gas_velocity', name: 'Superficial gas velocity', family: 'process', canonicalUnit: 'm s⁻¹', aggregatable: true, definition: 'Volumetric gas flow divided by vessel cross-section. One of the two inputs to the van ’t Riet correlation, and the one a reader is most likely to assume rather than check.' },
   { id: 'aeration_rate', name: 'Aeration rate', family: 'process', canonicalUnit: 'h⁻¹', definition: 'Volume of gas per volume of broth per minute, expressed as VVM and normalised.', aggregatable: true },
   { id: 'co2_overlay', name: 'CO₂ / bicarbonate supplementation', family: 'process', canonicalUnit: 'mM', definition: 'Dissolved inorganic carbon available for anaplerotic carboxylation.', aggregatable: true },
   { id: 'biotin_conc', name: 'Biotin concentration', family: 'process', canonicalUnit: 'mg L⁻¹', definition: 'Medium biotin. Load-bearing for Corynebacterium membrane permeability.', aggregatable: true },
@@ -218,6 +219,7 @@ export const SOURCES: Source[] = [
   { id: 'SRC-0032', type: 'bench-deposit', title: 'RUN-042 through RUN-047, Chapter CH-KGL-01 lysine campaign', authors: ['Uwase, N.'], year: 2026, venue: 'Guild of Applied Life deposit', openAccess: true, ingestState: 'verified' },
   // --- defensive publications ---
   { id: 'SRC-0033', type: 'defensive-publication', title: 'Process region disclosure: reduced dissolved oxygen setpoint with elevated bicarbonate in lysine fed-batch', authors: ['openFerment'], year: 2026, venue: 'Research Disclosure, synthetic', openAccess: true, ingestState: 'verified' },
+  { id: 'SRC-0035', type: 'vendor-datasheet', title: 'Stirred vessel package: installed power, impeller configuration and aeration envelope, synthetic vendor sheet', authors: ['—'], year: 2025, venue: 'Vendor documentation', openAccess: false, ingestState: 'catalogued' },
   { id: 'SRC-0034', type: 'vendor-datasheet', title: 'Disc-stack separator performance envelope, synthetic vendor sheet', authors: ['—'], year: 2024, venue: 'Vendor documentation', openAccess: false, ingestState: 'catalogued' },
 ];
 

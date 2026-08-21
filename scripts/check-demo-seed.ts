@@ -13,7 +13,12 @@ import {
 } from '@/data/demo/archetypes';
 import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions } from '@/data/demo/runs';
 import { ARCHETYPE_FLOWS } from '@/data/demo/flows';
-import { plantCeilings, matchEnvelope, normalise, monthsToExpiry, metabolicHeatKW } from '@/lib/demo';
+import {
+  plantCeilings, matchEnvelope, normalise, monthsToExpiry, metabolicHeatKW,
+  // Aliased: this file already has a local `conflictPairs`, a flat list of
+  // Accessions carrying links. These two are the pairwise resolutions.
+  conflictPairs as railConflicts, reconciledPairs as railReconciled, isContradiction,
+} from '@/lib/demo';
 
 const fails: string[] = [];
 const ok = (cond: boolean, msg: string) => { if (!cond) fails.push(msg); };
@@ -265,6 +270,244 @@ ok(
   CANDIDATES.some((x) => x.id === 'CND-002' && x.patentPosition.some((p) => p.jurisdiction !== jurisdiction && p.status === 'enclosed')),
   'CND-002 must carry the export-market FTO caveat',
 );
+
+// A factor exclusion states `singleSource` and also lists its Accessions. The
+// band renders a warning triangle off the flag and the reader counts the ids
+// beside it, so the two must agree or the screen contradicts itself in place.
+for (const f of LYSINE_FACTOR_MAP) {
+  for (const e of f.excluded) {
+    ok(
+      e.singleSource === (e.accessionIds.length === 1),
+      `${f.field} exclusion ${e.low}-${e.high}: singleSource is ${e.singleSource} but it cites ${e.accessionIds.length} Accession(s)`,
+    );
+    ok(e.accessionIds.length > 0, `${f.field} exclusion ${e.low}-${e.high} cites no Accession — an exclusion nobody can check`);
+    ok(e.low < e.high, `${f.field} exclusion ${e.low}-${e.high} is empty or inverted`);
+    ok(
+      e.low >= f.domain.low && e.high <= f.domain.high,
+      `${f.field} exclusion ${e.low}-${e.high} falls outside the domain ${f.domain.low}-${f.domain.high}`,
+    );
+  }
+  ok(
+    f.recommended.low >= f.domain.low && f.recommended.high <= f.domain.high,
+    `${f.field}: the recommended range falls outside the domain`,
+  );
+  // The unexplored gap is what the band is FOR. A factor with none has nothing
+  // to say on the screen that exists to show where nobody has been.
+  const covered = [...f.explored, ...f.excluded].map((r) => [r.low, r.high] as const).sort((a, b) => a[0] - b[0]);
+  let cursor = f.domain.low;
+  let gap = 0;
+  for (const [a, b] of covered) { if (a > cursor) gap += a - cursor; cursor = Math.max(cursor, b); }
+  if (cursor < f.domain.high) gap += f.domain.high - cursor;
+  ok(gap > 0, `${f.field}: nothing is unexplored, so the factor band has no finding to show`);
+}
+
+// ── The four deliberate contradictions (OF-DEMO-003 §5) ────────────────
+//
+// Three must render and the fourth must NOT. That last one is the check that
+// matters: a system which flags everything is as useless as one that flags
+// nothing, and furfural tolerance at 1.9 and 0.9 g L⁻¹ is not a disagreement —
+// the two are different organisms and the context field says which.
+
+{
+  const on = (f: string) => ACCESSIONS.filter((x) => x.field === f);
+
+  // 1 — temperature shift. A journal and a patent working example disagreeing.
+  {
+    const pair = railConflicts(on('titer'));
+    ok(
+      pair.some(([x, y]) => [x.id, y.id].sort().join() === 'OF-A-00106,OF-A-00107'),
+      'contradiction 1 (temperature shift, OF-A-00106 vs OF-A-00107) must render an unresolved rail',
+    );
+  }
+
+  // 2 — anisotropy 3.4 both ways. Identical value, opposing implications, so
+  // spread cannot find it and only the curated link can.
+  {
+    const pair = railConflicts(on('purity'));
+    ok(
+      pair.some(([x, y]) => [x.id, y.id].sort().join() === 'OF-A-00509,OF-A-00511'),
+      'contradiction 2 (anisotropy, OF-A-00509 vs OF-A-00511) must render an unresolved rail — the values agree and what they imply does not',
+    );
+    const a509 = ACCESSION_BY_ID['OF-A-00509'];
+    ok(!!a509?.conflictNote, 'contradiction 2 must carry a conflictNote — two identical numbers cannot show the disagreement by themselves');
+  }
+
+  // 3 — lactate MSP, two cost bases. The REVERSE case: it must render as
+  // reconciled, never as a conflict.
+  {
+    const rec = railReconciled(on('minimum_selling_price'));
+    ok(
+      rec.some(([x, y]) => [x.id, y.id].sort().join() === 'OF-A-00418,OF-A-00419'),
+      'contradiction 3 (lactate MSP) must render as closed-by-normalisation',
+    );
+    ok(
+      !railConflicts(on('minimum_selling_price')).some(([x, y]) => [x.id, y.id].sort().join() === 'OF-A-00418,OF-A-00419'),
+      'contradiction 3 must NOT render as unresolved — the two agree once the units are closed',
+    );
+    const a = ACCESSION_BY_ID['OF-A-00418'];
+    const b = ACCESSION_BY_ID['OF-A-00419'];
+    if (a && b) {
+      const spread = Math.abs(a.normalized.value - b.normalized.value) / a.normalized.value * 100;
+      ok(spread <= 1.5, `contradiction 3 should agree within 1.5 % after normalisation; it differs by ${spread.toFixed(2)} %`);
+    }
+  }
+
+  // 4 — furfural tolerance. Must NOT render a rail.
+  {
+    const accs = on('inhibitor_tolerance');
+    ok(accs.length >= 2, 'contradiction 4 needs at least two Accessions on inhibitor_tolerance to be a meaningful non-case');
+    ok(
+      !isContradiction(accs),
+      'contradiction 4 (furfural tolerance) must NOT render a rail — the values differ because the organisms differ, and the context field says so',
+    );
+    const orgs = new Set(accs.map((x) => x.context.organismId).filter(Boolean));
+    ok(orgs.size > 1, 'contradiction 4 is only a non-case because the organisms differ — every Accession must carry one');
+  }
+
+  // And the suite-level rule: exactly the curated pairs, no others invented.
+  const allConflicts = new Set<string>();
+  for (const x of ACCESSIONS) for (const id of x.conflictsWith ?? []) allConflicts.add([x.id, id].sort().join());
+  ok(allConflicts.size === 2, `expected exactly 2 curated conflicting pairs, found ${allConflicts.size}: ${[...allConflicts].join(' ')}`);
+  for (const x of ACCESSIONS) {
+    for (const id of [...(x.conflictsWith ?? []), ...(x.reconciledWith ?? [])]) {
+      const other = ACCESSION_BY_ID[id];
+      ok(!!other, `${x.id} names ${id}, which is not in the pool`);
+      if (other) {
+        ok(other.field === x.field, `${x.id} and ${id} are linked but sit on different fields (${x.field} vs ${other.field}) — a rail can only compare like with like`);
+        const back = [...(other.conflictsWith ?? []), ...(other.reconciledWith ?? [])];
+        ok(back.includes(x.id), `${x.id} names ${id} but ${id} does not name it back — a one-way link renders on one screen and not the other`);
+      }
+    }
+  }
+}
+
+// ── The seam matrix (OF-DEMO-003 §4) ───────────────────────────────────
+//
+// Ten cross-references, each of which must render on BOTH named screens. This
+// is the table that makes the suite read as a platform rather than as six
+// demos, and it is the one most likely to rot: a screen can be rewritten
+// without anyone noticing that the object it used to link to is no longer
+// reachable from it.
+//
+// What is checked here is the DATA side of each row — that the object exists,
+// that both ends reference it, and that the property the row depends on still
+// holds. The rendering side is `scripts/smoke.mjs`, which visits both screens.
+
+{
+  const dlvById = new Map(DELIVERABLES.map((d) => [d.id, d]));
+  const seam = (n: number, cond: boolean, msg: string) => ok(cond, `seam ${n}: ${msg}`);
+
+  // 1 — OF-A-00147, produced by AR6, consumed by AR1 as an exclusion.
+  {
+    const a = ACCESSION_BY_ID['OF-A-00147'];
+    seam(1, !!a, 'OF-A-00147 must exist');
+    seam(1, a?.hold === 'excursion-flagged', `OF-A-00147 must be held as excursion-flagged, is ${a?.hold}`);
+    seam(1, !!a?.runId, 'OF-A-00147 must name the run behind it, or the gap map cannot link back');
+    const ar1 = DELIVERABLES.find((d) => d.payload.kind === 'factor-map');
+    seam(
+      1,
+      !!ar1 && ar1.payload.kind === 'factor-map' && ar1.payload.excludedAccessionIds.includes('OF-A-00147'),
+      'the factor map must list OF-A-00147 among its exclusions',
+    );
+  }
+
+  // 2 — OF-A-00124 (mu), produced by AR1, rescues CND-001 in AR3.
+  {
+    seam(2, !!ACCESSION_BY_ID['OF-A-00124'], 'OF-A-00124 must exist');
+    const c = CANDIDATES.find((x) => x.id === 'CND-001');
+    seam(2, !!c?.rescue, 'CND-001 must carry a rescue');
+    seam(2, !!c?.rescue && dlvById.has(c.rescue.byDeliverableId), `CND-001's rescue must name a real deliverable`);
+    seam(2, !!c?.rescue?.change.includes('OF-A-00124'), 'the rescue note must name the Accession it rests on');
+  }
+
+  // 3 — the de-rated point, marked inside AR1's band.
+  {
+    for (const id of ['OF-A-00152', 'OF-A-00153']) seam(3, !!ACCESSION_BY_ID[id], `${id} must exist`);
+    const mu = ACCESSION_BY_ID['OF-A-00124'];
+    const f = LYSINE_FACTOR_MAP.find((x) => x.field === 'mu_setpoint');
+    seam(3, !!f, 'the factor map must carry a mu_setpoint band for the de-rated point to be marked in');
+    if (f && mu) {
+      seam(
+        3,
+        mu.normalized.value >= f.domain.low && mu.normalized.value <= f.domain.high,
+        `the de-rated mu ${mu.normalized.value} falls outside the band domain ${f.domain.low}-${f.domain.high}, so the mark would render off-canvas`,
+      );
+      seam(
+        3,
+        mu.normalized.value >= f.recommended.low && mu.normalized.value <= f.recommended.high,
+        `the de-rated mu ${mu.normalized.value} must sit INSIDE the recommended band — that is what makes it a rescue rather than a gamble`,
+      );
+    }
+  }
+
+  // 4 — ambient temperature, from AR3's cooling ceiling into AR5's tree.
+  seam(4, !!ACCESSION_BY_ID['OF-A-00325'], 'OF-A-00325 (ambient) must exist');
+
+  // 6, 7 — patent families shared between AR3 and AR4.
+  for (const [n, fid] of [[6, 'PF-012'], [7, 'PF-013']] as [number, string][]) {
+    const fam = PATENT_BY_ID[fid];
+    seam(n, !!fam, `${fid} must exist`);
+    seam(n, !!fam && fam.jurisdictions.length > 0, `${fid} must record jurisdictions`);
+  }
+
+  // 8 — AR5's leaves hand off to AR2.
+  {
+    const tree = DELIVERABLES.find((d) => d.payload.kind === 'problem-tree');
+    seam(8, !!tree, 'the problem tree must exist');
+    if (tree && tree.payload.kind === 'problem-tree') {
+      const spawning = tree.payload.nodes.filter((n) => n.spawnsFlowId);
+      seam(8, spawning.length > 0, 'at least one leaf must spawn a route comparison — that handoff IS the composability demonstration');
+      for (const n of spawning) {
+        seam(8, ARCHETYPE_FLOWS.some((f) => f.id === n.spawnsFlowId), `${n.id} spawns ${n.spawnsFlowId}, which is not a flow`);
+      }
+    }
+  }
+
+  // 9 — OF-A-00119, the critical-DO Accession, in AR1 and AR6.
+  {
+    const a = ACCESSION_BY_ID['OF-A-00119'];
+    seam(9, !!a, 'OF-A-00119 must exist');
+    const inFactor = LYSINE_FACTOR_MAP.some((f) =>
+      [...f.excluded.flatMap((e) => e.accessionIds), ...f.explored.flatMap((e) => e.accessionIds)].includes('OF-A-00119'),
+    );
+    seam(9, inFactor, 'OF-A-00119 must appear in the factor map');
+    // The verdict lives on the DELIVERABLE payload, not on the RunRecord —
+    // `RunRecord.verdict` is optional and unset in this seed, and a check that
+    // read it would have silently passed on `undefined`.
+    const ar6 = DELIVERABLES.find((d) => d.payload.kind === 'excursion-verdict');
+    seam(9, !!ar6, 'the excursion-verdict deliverable must exist');
+    const reasoning = ar6 && ar6.payload.kind === 'excursion-verdict' ? ar6.payload.verdict.reasoning : [];
+    seam(9, reasoning.length > 0, 'the verdict must give its reasoning');
+    seam(
+      9,
+      reasoning.join(' ').includes('OF-A-00119'),
+      'the verdict must cite OF-A-00119 by id — the same value, both places, or the seam is a coincidence',
+    );
+  }
+
+  // 10 — a two-deep derivation chain must actually be two deep, or the
+  // Accession page's recursion has nothing to show.
+  {
+    const a = ACCESSION_BY_ID['OF-A-00308'];
+    seam(10, !!a, 'OF-A-00308 (effective kLa) must exist');
+    if (a) {
+      const depth = (acc: typeof a, seen = new Set<string>()): number => {
+        if (!acc || seen.has(acc.id)) return 0;
+        seen.add(acc.id);
+        const kids = acc.derivation.usingAccessionIds.map((id) => ACCESSION_BY_ID[id]).filter(Boolean);
+        return kids.length ? 1 + Math.max(...kids.map((k) => depth(k, seen))) : 0;
+      };
+      seam(10, depth(a) >= 2, `OF-A-00308's derivation chain is ${depth(a)} deep; the seam calls for two`);
+    }
+  }
+
+  // And the suite-level rule behind all ten: every deliverable names at least
+  // one disclosure candidate, and every candidate resolves.
+  for (const d of DELIVERABLES) {
+    ok(d.disclosureCandidateIds.length > 0, `${d.id} names no disclosure candidate — that is a signal the archetype is wrong, not that the field is optional`);
+    ok(d.accessionIds.length >= 6, `${d.id} references ${d.accessionIds.length} Accessions; every deliverable must rest on at least six`);
+  }
+}
 
 // ── Honesty ────────────────────────────────────────────────────────────
 //

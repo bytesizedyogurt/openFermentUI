@@ -144,7 +144,8 @@ export type FieldFamily =
 export type FieldId =
   // process
   | 'temperature' | 'ph' | 'dissolved_oxygen' | 'feed_rate' | 'mu_setpoint'
-  | 'agitation_power' | 'aeration_rate' | 'co2_overlay' | 'biotin_conc'
+  | 'agitation_power' | 'aeration_rate' | 'superficial_gas_velocity'
+  | 'co2_overlay' | 'biotin_conc'
   // performance
   | 'titer' | 'yield_product_substrate' | 'volumetric_productivity'
   | 'specific_productivity' | 'byproduct_conc' | 'carbon_balance_closure'
@@ -220,8 +221,30 @@ export interface Accession {
   /** Run, when sourceType is bench-deposit. */
   runId?: string;
 
-  /** Set when this Accession disagrees with another on the same field. */
+  /**
+   * Set when this Accession disagrees with another on the same field, and the
+   * disagreement is LIVE. The rail shows both and states that the system is not
+   * resolving them (OF-DEMO-001 §2.5). Never populated from spread alone: two
+   * values far apart under different organisms are not in conflict, and two
+   * identical values can be — OF-DEMO-003 §5's second case is an identical
+   * measured outcome whose implications differ. Only a curator can tell those
+   * apart, so this is a curation decision recorded in the seed.
+   */
   conflictsWith?: string[];
+  /**
+   * Set when two Accessions LOOK like they disagree and normalisation closes
+   * the gap — OF-DEMO-003 §5's third case, 1,150 USD t⁻¹ against 1.05 EUR kg⁻¹,
+   * which agree within 1.5 % once the units are closed.
+   *
+   * A separate field rather than a flag on `conflictsWith`, because the rail
+   * must say two different things: an unresolved pair is a warning and a
+   * reconciled pair is the system working. Filing the second under the first
+   * would make the interface cry wolf about its own success, and showing a
+   * disagreement resolve is as useful as showing one that does not.
+   */
+  reconciledWith?: string[];
+  /** Why the pair disagrees, when the value alone does not show it. */
+  conflictNote?: string;
 
   poolOnly?: boolean;            // in the pool, not yet used by an archetype
   ledger: LedgerEntry[];
