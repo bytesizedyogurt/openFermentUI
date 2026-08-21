@@ -688,27 +688,3 @@ export function Contradictions() {
 
 // ── not yet built ──────────────────────────────────────────────────────
 
-/**
- * A part named in the architecture whose surface does not exist yet. Says so
- * plainly, and says what it will be, rather than rendering "route not found" —
- * which reads as a bug — or a fake screen, which would be worse.
- */
-export function UnbuiltPart({ name, blurb }: { name: string; blurb: string }) {
-  return (
-    <div className="p-6 max-w-2xl">
-      <PageHeader
-        eyebrow={EYEBROW}
-        title={name}
-        subtitle="Specified in OF-FE-003, not implemented in this build."
-      />
-      <Callout kind="info" title="Nothing here yet">
-        <p className="mb-2">{blurb}</p>
-        <p>
-          It is in the rail because the rail is the architecture, and hiding an unbuilt part
-          would misrepresent the shape of the system. It is marked so the gap is not mistaken
-          for a broken link.
-        </p>
-      </Callout>
-    </div>
-  );
-}

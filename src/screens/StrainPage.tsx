@@ -49,6 +49,7 @@ import { delayClass } from '@/sim/latency';
 
 import { partEyebrow } from '@/data/parts';
 
+import { median } from '@/lib/stats';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('geneos', 'corpus');
 // ── model ──────────────────────────────────────────────────────────────
@@ -119,11 +120,10 @@ function toCanonical(rec: ExtractionRecord, canonicalUnit: string): number | nul
 }
 
 function summarize(values: number[]) {
-  if (values.length === 0) return null;
+  const m = median(values);
+  if (m === null) return null;
   const s = [...values].sort((a, b) => a - b);
-  const mid = s.length >> 1;
-  const median = s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-  return { n: s.length, median, min: s[0], max: s[s.length - 1] };
+  return { n: s.length, median: m, min: s[0], max: s[s.length - 1] };
 }
 
 /** Aggregate provenance of a set of records — the strongest tier present. */

@@ -20,7 +20,7 @@ import { RUN_BY_ID } from '@/data/demo/runs';
 import { DELIVERABLE_BY_ID, AUX_ORGANISMS } from '@/data/demo/archetypes';
 import { normalise, deliverableRoute } from '@/lib/demo';
 import { href } from '@/router';
-import { cx } from '@/components/ui';
+import { cx, BrokenRef } from '@/components/ui';
 import { demoTickClass, demoTickTitle } from './DemoTick';
 
 /** Does this id belong to the demo pool at all? */
@@ -37,7 +37,7 @@ export function DemoChip({ id }: { id: string }) {
         href={href(`/repo/a/${acc.id}`)}
         className={cx(
           demoTickClass(acc.provenance, acc.sourceType),
-          acc.hold && 'opacity-60',
+          acc.hold && 'held',
           'pl-1.5 font-num text-[0.92em] hover:text-accent whitespace-nowrap',
         )}
         title={`${demoTickTitle(acc.provenance, acc.sourceType, acc.hold)} — ${+normalise(acc, ACCESSION_BY_ID).toFixed(4)} ${acc.normalized.unit}`}
@@ -96,9 +96,5 @@ export function DemoChip({ id }: { id: string }) {
   }
 
   // Matched a demo prefix and resolved to nothing.
-  return (
-    <span className="font-num text-[0.92em] text-signal-error whitespace-nowrap" title={`${id} is not in the demo pool`}>
-      ⚠ {id}
-    </span>
-  );
+  return <BrokenRef id={id} what="the demo pool" />;
 }

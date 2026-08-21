@@ -97,7 +97,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
           </div>
           <div className="space-y-2">
             {excluded.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-baseline gap-2 opacity-70">
+              <div key={a.id} className="flex flex-wrap items-baseline gap-2 held">
                 <a
                   href={href(`/repo/a/${a.id}`)}
                   className={cx(demoTickClass(a.provenance, a.sourceType), 'pl-2 font-num hover:text-accent')}

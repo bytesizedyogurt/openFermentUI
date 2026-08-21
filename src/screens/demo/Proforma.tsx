@@ -14,17 +14,10 @@ import { useMemo, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 
 import type { Candidate } from '@/data/demo/types';
-import { PLANTS, PLANT_BY_ID, ORGANISM_BY_ID, HS_CODES } from '@/data/demo/core';
+import { PLANTS, PLANT_BY_ID, HS_CODES } from '@/data/demo/core';
 import { ACCESSION_BY_ID } from '@/data/demo/accessions';
-import {
-  CANDIDATES,
-  DELIVERABLES,
-  DELIVERABLE_BY_ID,
-  DISCLOSURES,
-  BAGASSE_CONCEPTS,
-  AUX_ORGANISMS,
-} from '@/data/demo/archetypes';
-import { matchEnvelope, plantCeilings } from '@/lib/demo';
+import { CANDIDATES, DELIVERABLES, DELIVERABLE_BY_ID, DISCLOSURES, BAGASSE_CONCEPTS } from '@/data/demo/archetypes';
+import { matchEnvelope, plantCeilings, organismName } from '@/lib/demo';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout, cx } from '@/components/ui';
 import { AccessionValue } from '@/components/demo/AccessionValue';
@@ -38,11 +31,6 @@ import { partEyebrow } from '@/data/parts';
 
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('proforma', 'demo');
-function organismName(id: string): string {
-  const o = ORGANISM_BY_ID[id] ?? AUX_ORGANISMS.find((x) => x.id === id);
-  return o ? o.binomial : id;
-}
-
 const VERDICT_ORDER: Record<string, number> = {
   promoted: 0,
   viable: 1,
@@ -163,7 +151,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
                   key={c.id}
                   className={cx(
                     'border-b border-line/50 hover:bg-[rgb(var(--accent-wash))]/30 cursor-pointer align-top',
-                    dead && 'opacity-55',
+                    dead && 'held',
                   )}
                   onClick={() => navigate(`/proforma/screen/${plant.id}/c/${c.id}`)}
                 >

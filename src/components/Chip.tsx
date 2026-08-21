@@ -6,7 +6,7 @@ import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { fieldName } from '@/data/ontology';
-import { Popover, cx } from './ui';
+import { Popover, cx, BrokenRef } from './ui';
 import { ProvenanceBadge, provMeta, type ProvKind } from './Provenance';
 
 function shortTitle(t: string, max = 64) {
@@ -34,13 +34,11 @@ export function CitationChip({
   // Broken links render as an error chip rather than failing silently (§7.3).
   if (!paper) {
     return (
-      <span
-        className={cx('chip text-signal-error border-signal-error/40', className)}
-        title="Source unavailable — this reference does not resolve in the current corpus"
-      >
-        <AlertTriangle size={11} />
-        {label ?? recordId ?? paperId ?? 'unknown'}
-      </span>
+      <BrokenRef
+        id={label ?? recordId ?? paperId ?? 'unknown'}
+        what="the current corpus"
+        className={className}
+      />
     );
   }
 

@@ -19,7 +19,7 @@ import {
 import { BURGER_TREE, DELIVERABLE_BY_ID } from '@/data/demo/archetypes';
 import { FIELD_BY_ID } from '@/data/demo/core';
 import { href } from '@/router';
-import { PageHeader, Card, SectionTitle, Callout, EmptyState, cx } from '@/components/ui';
+import { PageHeader, Card, SectionTitle, Callout, EmptyState, cx, Stat } from '@/components/ui';
 import { AccessionValue } from '@/components/demo/AccessionValue';
 import { PatentDensity } from '@/components/demo/ProblemTree';
 import { DemoFooter } from '@/components/demo/DemoFooter';
@@ -66,10 +66,26 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
       </Callout>
 
       <div className="grid sm:grid-cols-4 gap-3 mt-4">
-        <Stat k="Decisions" v={String(totals.decisions)} />
-        <Stat k="Bench weeks" v={`${totals.weeks} / ${totals.criticalPathWeeks}`} note="one bench / unlimited benches" />
-        <Stat k="Consumables + analysis" v={gbp(totals.costGBP)} note="estimate, not a quote" />
-        <Stat k="Dependent" v={`${totals.blocked} of ${totals.decisions}`} note="cannot be run first" />
+        <Card>
+          <Stat label="Decisions" value={totals.decisions} />
+        </Card>
+        <Card>
+          <Stat
+            label="Bench weeks"
+            value={`${totals.weeks} / ${totals.criticalPathWeeks}`}
+            sub="one bench / unlimited benches"
+          />
+        </Card>
+        <Card>
+          <Stat label="Consumables + analysis" value={gbp(totals.costGBP)} sub="estimate, not a quote" />
+        </Card>
+        <Card>
+          <Stat
+            label="Dependent"
+            value={`${totals.blocked} of ${totals.decisions}`}
+            sub="cannot be run first"
+          />
+        </Card>
       </div>
 
       <div className="text-caption text-ink-soft mt-2 max-w-prose">
@@ -211,12 +227,3 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
   );
 }
 
-function Stat({ k, v, note }: { k: string; v: string; note?: string }) {
-  return (
-    <Card>
-      <div className="text-caption text-ink-soft">{k}</div>
-      <div className="font-num text-page-title mt-0.5">{v}</div>
-      {note && <div className="text-caption text-ink-soft">{note}</div>}
-    </Card>
-  );
-}

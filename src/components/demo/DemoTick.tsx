@@ -123,7 +123,7 @@ export function DemoTick({
 }) {
   return (
     <span
-      className={cx(demoTickClass(p, st), hold && 'opacity-50', className)}
+      className={cx(demoTickClass(p, st), hold && 'held', className)}
       title={demoTickTitle(p, st, hold)}
     >
       {p === 'unsourced' && (

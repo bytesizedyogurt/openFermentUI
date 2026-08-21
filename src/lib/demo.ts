@@ -430,24 +430,9 @@ export function countable(accs: _Accession[]): _Accession[] {
   return accs.filter((a) => !a.hold && a.isPrimary);
 }
 
-export function median(xs: number[]): number | null {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-export function quartiles(xs: number[]): { q1: number; q3: number } | null {
-  if (xs.length < 4) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const at = (p: number) => {
-    const i = (s.length - 1) * p;
-    const lo = Math.floor(i);
-    const hi = Math.ceil(i);
-    return s[lo] + (s[hi] - s[lo]) * (i - lo);
-  };
-  return { q1: at(0.25), q3: at(0.75) };
-}
+// Order statistics live in `lib/stats.ts`, shared with the corpus pool and the
+// aggregate engine. Re-exported here so demo call sites keep one import.
+export { median, quartiles } from './stats';
 
 /**
  * Is there a real disagreement on this field?
@@ -528,6 +513,22 @@ export function contradictionRows(): {
   }
   return out;
 }
+
+/**
+ * An organism's binomial, from either table.
+ *
+ * `ORGANISM_BY_ID` holds the hosts the suite models; `AUX_ORGANISMS` holds the
+ * ones that appear only as candidates inside a decomposition. A screen showing
+ * a route or a problem tree can be handed either, and neither table alone
+ * answers the question. Three screens had written this out identically.
+ */
+export function organismName(id: string): string {
+  const o = _ORGANISM_BY_ID[id] ?? _AUX_ORGANISMS.find((x) => x.id === id);
+  return o ? o.binomial : id;
+}
+
+import { ORGANISM_BY_ID as _ORGANISM_BY_ID } from '@/data/demo/core';
+import { AUX_ORGANISMS as _AUX_ORGANISMS } from '@/data/demo/archetypes';
 
 // ══════════════════════════════════════════════════════════════════════
 // routes

@@ -514,6 +514,39 @@ export function Stat({
   );
 }
 
+/**
+ * A reference that does not resolve.
+ *
+ * Both pools have this state and both had their own spelling of it: the corpus
+ * citation chip rendered `.chip` in error red with a triangle, and the demo id
+ * resolver rendered a bare span in error red with a `⚠` character. Same fact,
+ * two shapes, and the one thing this interface must never do is let a dangling
+ * reference look like an ordinary one.
+ *
+ * It is deliberately loud and deliberately still shows the id, so a reader can
+ * tell which reference broke rather than only that something did.
+ */
+export function BrokenRef({
+  id,
+  what,
+  className,
+}: {
+  id: string;
+  /** What was looked up, for the tooltip: "the demo pool", "this corpus". */
+  what: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cx('chip text-signal-error border-signal-error/40', className)}
+      title={`${id} does not resolve in ${what}`}
+    >
+      <AlertTriangle size={11} aria-hidden />
+      {id}
+    </span>
+  );
+}
+
 export function Bar({ value, max = 1, className }: { value: number; max?: number; className?: string }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (

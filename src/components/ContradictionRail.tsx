@@ -217,7 +217,7 @@ export function ContradictionRail({
                 'absolute left-1/2 -translate-x-1/2 rounded-[1px] block',
                 PROV_BG[provenanceOf(record)] ?? 'bg-ink-soft',
                 markClass(record),
-                held && !on && 'opacity-70',
+                held && !on && 'held',
                 on && 'ring-1 ring-ink ring-offset-0 z-10',
               )}
               style={{

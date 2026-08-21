@@ -188,7 +188,7 @@ export function FactorBand({
                     <a
                       key={acc.id}
                       href={href(`/repo/a/${acc.id}`)}
-                      className={cx(demoTickClass(acc.provenance, acc.sourceType), acc.hold && 'opacity-50', 'pl-1.5 mr-1 font-num hover:text-accent')}
+                      className={cx(demoTickClass(acc.provenance, acc.sourceType), acc.hold && 'held', 'pl-1.5 mr-1 font-num hover:text-accent')}
                       title={demoTickTitle(acc.provenance, acc.sourceType, acc.hold)}
                     >
                       {acc.id}

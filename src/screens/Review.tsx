@@ -40,6 +40,7 @@ import { DISCLOSURE, exportText } from '@/lib/csv';
 
 import { partEyebrow } from '@/data/parts';
 
+import { median } from '@/lib/stats';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('trawl', 'corpus');
 // ── reject reasons (numbered so they are one keystroke away) ────────────
@@ -114,13 +115,6 @@ function mmss(ms: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 function provOf(r: ExtractionRecord): ProvKind {

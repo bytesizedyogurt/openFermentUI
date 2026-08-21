@@ -253,6 +253,17 @@ body {
 }
 
 
+/* HELD — in the record and out of the statistic.
+   Both pools have this state: a corpus record excluded from an aggregate, a
+   demo Accession whose provenance bars it. It was written seven times as five
+   different opacities (40/50/55/60/70), so the same fact looked like five
+   different degrees of demotion depending on which component drew it. One
+   value, named after what it means. Never `display: none` — a held value that
+   vanishes cannot be argued with. */
+.held {
+  opacity: 0.5;
+}
+
 /* ── Focus ring (§6.6) ───────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid rgb(var(--accent));

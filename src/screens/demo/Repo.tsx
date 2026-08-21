@@ -124,7 +124,7 @@ export function RepoIndex() {
               return (
                 <tr
                   key={a.id}
-                  className={cx('border-b border-line/50 hover:bg-[rgb(var(--accent-wash))]/30 cursor-pointer', a.hold && 'opacity-60')}
+                  className={cx('border-b border-line/50 hover:bg-[rgb(var(--accent-wash))]/30 cursor-pointer', a.hold && 'held')}
                   onClick={() => navigate(`/repo/a/${a.id}`)}
                 >
                   <td className="p-2 align-top whitespace-nowrap">
@@ -494,7 +494,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
             {accs.map((a) => (
               <tr
                 key={a.id}
-                className={cx('border-b border-line/50 hover:bg-[rgb(var(--accent-wash))]/30 cursor-pointer', a.hold && 'opacity-60')}
+                className={cx('border-b border-line/50 hover:bg-[rgb(var(--accent-wash))]/30 cursor-pointer', a.hold && 'held')}
                 onClick={() => navigate(`/repo/a/${a.id}`)}
               >
                 <td className="p-2 whitespace-nowrap">

@@ -16,11 +16,11 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown, ArrowUpRight } from 'lucide-react';
 
 import type { ProblemNode } from '@/data/demo/types';
-import { ORGANISM_BY_ID } from '@/data/demo/core';
-import { AUX_ORGANISMS } from '@/data/demo/archetypes';
+
 import { href } from '@/router';
 import { cx } from '@/components/ui';
 
+import { organismName } from '@/lib/demo';
 const DENSITY_STEPS: Record<ProblemNode['patentDensity'], number> = {
   low: 1,
   moderate: 2,
@@ -58,11 +58,6 @@ export function PatentDensity({ level }: { level: ProblemNode['patentDensity'] }
       ))}
     </span>
   );
-}
-
-function organismName(id: string): string {
-  const o = ORGANISM_BY_ID[id] ?? AUX_ORGANISMS.find((x) => x.id === id);
-  return o ? o.binomial : id;
 }
 
 function Node({

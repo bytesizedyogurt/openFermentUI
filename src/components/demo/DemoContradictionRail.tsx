@@ -203,7 +203,7 @@ export function DemoContradictionRail({
 export function AccessionMark({ acc }: { acc: Accession }) {
   return (
     <span
-      className={cx(demoTickClass(acc.provenance, acc.sourceType), acc.hold && 'opacity-40', 'inline-block w-2 h-4 align-middle')}
+      className={cx(demoTickClass(acc.provenance, acc.sourceType), acc.hold && 'held', 'inline-block w-2 h-4 align-middle')}
       title={demoTickTitle(acc.provenance, acc.sourceType, acc.hold)}
       aria-hidden
     />

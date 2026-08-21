@@ -19,19 +19,13 @@ import { useStore, provenanceOf, tickClass } from '@/store';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
-import {
-  Button,
-  Callout,
-  Card,
-  EmptyState,
-  LinkButton,
-  Popover,
-  SectionTitle,
-  Skeleton,
-  cx,
-} from '@/components/ui';
+import { Button, Callout, Card, EmptyState, LinkButton, Popover, SectionTitle, Skeleton, cx, PageHeader } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('trawl', 'corpus');
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
 
@@ -288,7 +282,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
             markClass(r),
             isActive && 'span-active',
             pulseId === r.id && 'pulse-once',
-            r.status === 'rejected' && 'opacity-60',
+            r.status === 'rejected' && 'held',
             'cursor-pointer',
           )}
           onClick={() => selectFromText(r.id)}
@@ -346,15 +340,19 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         <span className="font-num">{paper.id}</span>
       </div>
 
-      <h1 className="font-serif text-page-title font-semibold leading-snug">{paper.title}</h1>
-
-      <div className="mt-2 text-body text-ink-soft">
-        {paper.authors.join(', ')}
-        {' · '}
-        <span className="font-num">{paper.year}</span>
-        {' · '}
-        <span className="italic">{paper.venue}</span>
-      </div>
+      <PageHeader
+        eyebrow={EYEBROW}
+        title={paper.title}
+        subtitle={
+          <>
+            {paper.authors.join(', ')}
+            {' · '}
+            <span className="font-num">{paper.year}</span>
+            {' · '}
+            <span className="italic">{paper.venue}</span>
+          </>
+        }
+      />
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {paper.organisms.map((o) => (

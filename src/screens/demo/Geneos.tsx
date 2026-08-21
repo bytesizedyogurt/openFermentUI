@@ -11,8 +11,8 @@
 import { useMemo } from 'react';
 
 import type { ClaimStatus, EnzymeStep, Route } from '@/data/demo/types';
-import { ROUTES_3HP, DELIVERABLES, DISCLOSURES, AUX_ORGANISMS } from '@/data/demo/archetypes';
-import { ORGANISM_BY_ID } from '@/data/demo/core';
+import { ROUTES_3HP, DELIVERABLES, DISCLOSURES } from '@/data/demo/archetypes';
+
 import { ACCESSION_BY_ID } from '@/data/demo/accessions';
 import { PATENT_BY_ID } from '@/data/demo/patents';
 import { href, navigate } from '@/router';
@@ -22,9 +22,9 @@ import { ClaimOverlay, OpenSurfaceSummary } from '@/components/demo/ClaimOverlay
 import { DisclosureSection } from './Fermos';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
-
 import { partEyebrow } from '@/data/parts';
 
+import { organismName } from '@/lib/demo';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('geneos', 'demo');
 /**
@@ -53,11 +53,6 @@ function stepPositions(step: EnzymeStep) {
 }
 
 const RANKED: ClaimStatus[] = ['enclosed', 'expiring', 'pending', 'never-nationalised', 'expired', 'no-claim-found'];
-
-function organismName(id: string): string {
-  const o = ORGANISM_BY_ID[id] ?? AUX_ORGANISMS.find((x) => x.id === id);
-  return o ? o.binomial : id;
-}
 
 export function RouteComparison({ productId }: { productId: string }) {
   const routes = useMemo(() => ROUTES_3HP.filter((r) => r.productId === productId), [productId]);

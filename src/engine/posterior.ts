@@ -22,18 +22,12 @@ import type {
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { convert, asNumber } from '@/engine/units';
 import { aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/engine/aggregation';
+// One median for the whole repository. `median-of-primary-v1` is a named,
+// versioned statistic, so a second implementation drifting from it would be
+// a reported number disagreeing with itself across two screens.
+import { quantile } from '@/lib/stats';
 
 export const AGGREGATE_METHOD = 'median-of-primary-v1';
-
-function quantile(sorted: number[], q: number): number {
-  if (sorted.length === 0) return NaN;
-  if (sorted.length === 1) return sorted[0];
-  const pos = (sorted.length - 1) * q;
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
-}
 
 /**
  * Convert a record into the field's canonical unit, or null when it cannot be

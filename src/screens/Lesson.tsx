@@ -6,11 +6,15 @@ import { useStore } from '@/store';
 import { navigate } from '@/router';
 import type { CheckpointQuestion } from '@/data/types';
 import { parseQuantity, quantityEquals, fmt } from '@/engine/units';
-import { Button, Card, EmptyState, cx, Callout } from '@/components/ui';
+import { Button, Card, EmptyState, cx, Callout, PageHeader } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { CitationChip } from '@/components/Chip';
 import { LessonEmbed } from '@/components/LessonEmbeds';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('learn', 'corpus');
 function Checkpoint({
   q,
   onResult,
@@ -204,10 +208,10 @@ export default function Lesson({ moduleId, lessonId }: { moduleId: string; lesso
         </div>
       </div>
 
-      <div className="mb-1 text-caption uppercase tracking-wide text-ink-soft font-num">
-        Lesson {lessonIndex + 1} of {mod.lessons.length} · {lesson.minutes} min
-      </div>
-      <h1 className="font-serif text-page-title font-semibold mb-5">{lesson.title}</h1>
+      <PageHeader
+        eyebrow={`${EYEBROW} · lesson ${lessonIndex + 1} of ${mod.lessons.length} · ${lesson.minutes} min`}
+        title={lesson.title}
+      />
 
       <div className="prose-reading">
         {lesson.blocks.map((block, i) =>
