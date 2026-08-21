@@ -107,7 +107,7 @@ export function RepoIndex() {
       <DemoTickLegend />
 
       <Card className="mt-3 p-0 overflow-x-auto">
-        <table className="w-full text-body">
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead className="text-caption text-ink-soft text-left">
             <tr className="border-b border-line">
               <th className="font-normal p-2">Accession</th>
@@ -480,7 +480,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
       </Card>
 
       <Card className="mt-4 p-0 overflow-x-auto">
-        <table className="w-full text-body">
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead className="text-caption text-ink-soft text-left">
             <tr className="border-b border-line">
               <th className="font-normal p-2">Accession</th>

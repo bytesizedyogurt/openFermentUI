@@ -34,6 +34,7 @@ import { DISCLOSURES } from '@/data/demo/archetypes';
 
 import { partEyebrow } from '@/data/parts';
 
+import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('fermos', 'demo');
 // The run channels carry authored excursion windows; the integrals over them
@@ -52,7 +53,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
   }, [dlv]);
 
   if (!dlv || dlv.payload.kind !== 'factor-map') {
-    return <EmptyState title="No factor map" body={`No deliverable ${deliverableId} of that kind.`} />;
+    return <DemoEmpty title="No factor map" body={`No deliverable ${deliverableId} of that kind.`} />;
   }
 
   const factors = dlv.payload.factors.length ? dlv.payload.factors : LYSINE_FACTOR_MAP;
@@ -132,7 +133,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
           explored region would be a design that confirms what is already on record.
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-body">
+          <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
             <thead className="text-caption text-ink-soft text-left">
               <tr className="border-b border-line">
                 <th className="font-normal p-2">#</th>
@@ -192,7 +193,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
       (f) => f.field === factorId,
     ) ?? LYSINE_FACTOR_MAP.find((f) => f.field === factorId);
 
-  if (!factor) return <EmptyState title="No such factor" body={`${factorId} is not in this map.`} />;
+  if (!factor) return <DemoEmpty title="No such factor" body={`${factorId} is not in this map.`} />;
 
   const supporting = factor.explored.flatMap((e) => e.accessionIds);
 
@@ -241,7 +242,7 @@ export function RunIndex() {
     <>
       <PageHeader eyebrow={EYEBROW} title="Runs" subtitle={`${RUNS.length} runs across the Ledger.`} />
       <Card className="p-0 overflow-x-auto">
-        <table className="w-full text-body">
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead className="text-caption text-ink-soft text-left">
             <tr className="border-b border-line">
               <th className="font-normal p-2">Run</th>
@@ -311,7 +312,7 @@ export function RunPage({ runId }: { runId: string }) {
     [run],
   );
 
-  if (!run) return <EmptyState title={`No run ${runId}`} body="This Ledger holds no run under that id." />;
+  if (!run) return <DemoEmpty title={`No run ${runId}`} body="This Ledger holds no run under that id." />;
 
   const dlv = DELIVERABLES.find(
     (d) => d.payload.kind === 'excursion-verdict' && d.payload.runId === run.id,

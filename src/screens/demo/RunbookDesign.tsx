@@ -26,6 +26,7 @@ import { DemoFooter } from '@/components/demo/DemoFooter';
 
 import { partEyebrow } from '@/data/parts';
 
+import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('runbook', 'demo');
 const STATUS: Record<Decision['status'], { label: string; className: string }> = {
@@ -43,7 +44,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
   const parent = DELIVERABLE_BY_ID[p.fromDeliverableId];
   const nodeById = useMemo(() => new Map(BURGER_TREE.map((n) => [n.id, n])), []);
 
-  if (!p) return <EmptyState title="No programme" body={`Nothing under ${programmeId}.`} />;
+  if (!p) return <DemoEmpty title="No programme" body={`Nothing under ${programmeId}.`} />;
 
   return (
     <>

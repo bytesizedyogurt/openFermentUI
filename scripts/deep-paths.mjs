@@ -196,6 +196,31 @@ ck('Dense mode actually shortens the record table',
    `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
 await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 
+// The seed disclaimer must survive the error paths. `check:demo-seed` proves
+// the string says what it must; this proves a reader actually reaches it. Nine
+// demo screens used to early-return a bare EmptyState with no footer, so the
+// one sentence saying the patent numbers are synthetic vanished on exactly the
+// path a reader hits by following a stale link — when they are most likely to
+// be looking at an id and wondering whether it is real.
+const deadDemoIds = [
+  '/fermos/runs/RUN-NOPE',
+  '/geneos/routes/not-a-product',
+  '/proforma/screen/PLT-KGL-01/c/NOPE',
+  '/postdoc/tree/DLV-NOPE',
+  '/runbook/design/RB-NOPE',
+];
+let missingDisclaimer = [];
+for (const r of deadDemoIds) {
+  await go(r);
+  await p.waitForTimeout(300);
+  const txt = await p.locator('#of-main').innerText();
+  if (!/all citation identifiers, author names, patent numbers and assignees are synthetic/i.test(txt)) {
+    missingDisclaimer.push(r);
+  }
+}
+ck('A dead demo id still carries the seed disclaimer',
+   missingDisclaimer.length === 0, missingDisclaimer.join(', '));
+
 // The page never scrolls sideways. A table may scroll inside its own card; the
 // main region may not, and a shrink-0 action slot beside a long title is the
 // usual way that breaks.

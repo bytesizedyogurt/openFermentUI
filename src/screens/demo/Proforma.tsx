@@ -29,6 +29,7 @@ import { DemoFooter } from '@/components/demo/DemoFooter';
 
 import { partEyebrow } from '@/data/parts';
 
+import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('proforma', 'demo');
 const VERDICT_ORDER: Record<string, number> = {
@@ -120,7 +121,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
       </Callout>
 
       <Card className="mt-4 p-0 overflow-x-auto">
-        <table className="w-full text-body" data-density="dense">
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead className="text-caption text-ink-soft text-left">
             <tr className="border-b border-line">
               <th className="font-normal p-2">Candidate</th>
@@ -245,7 +246,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
 export function CandidateDetail({ plantId, candidateId }: { plantId: string; candidateId: string }) {
   const plant = PLANT_BY_ID[plantId] ?? PLANTS[0];
   const c = CANDIDATES.find((x) => x.id === candidateId);
-  if (!c) return <EmptyState title={`No candidate ${candidateId}`} body="Not on this screen." />;
+  if (!c) return <DemoEmpty title={`No candidate ${candidateId}`} body="Not on this screen." />;
   const m = c.match ?? matchEnvelope(plant, c);
   const hs = HS_CODES.find((h) => h.code === c.hsCode);
 
@@ -329,7 +330,7 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
   const [openId, setOpenId] = useState(concepts[0]?.id ?? '');
   const open = concepts.find((c) => c.id === openId) ?? concepts[0];
 
-  if (!concepts.length) return <EmptyState title="No concepts" body="Nothing to render." />;
+  if (!concepts.length) return <DemoEmpty title="No concepts" body="Nothing to render." />;
 
   return (
     <>
@@ -379,7 +380,7 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
 
           <div>
             <div className="text-caption text-ink-soft mb-1">Major equipment</div>
-            <table className="w-full text-caption">
+            <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
               <tbody>
                 {open.majorEquipment.map((e, i) => (
                   <tr key={i} className="border-b border-line/50">

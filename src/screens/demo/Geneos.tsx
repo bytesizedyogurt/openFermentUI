@@ -25,6 +25,7 @@ import { DemoFooter } from '@/components/demo/DemoFooter';
 import { partEyebrow } from '@/data/parts';
 
 import { organismName } from '@/lib/demo';
+import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('geneos', 'demo');
 /**
@@ -62,7 +63,7 @@ export function RouteComparison({ productId }: { productId: string }) {
   const disclosures = dlv ? DISCLOSURES.filter((d) => dlv.disclosureCandidateIds.includes(d.id)) : [];
 
   if (!routes.length) {
-    return <EmptyState title={`No routes for ${productId}`} body="This pool holds no route comparison for that product." />;
+    return <DemoEmpty title={`No routes for ${productId}`} body="This pool holds no route comparison for that product." />;
   }
 
   // Ranked by the biochemistry, deliberately. Sorting by openness would hide
@@ -91,7 +92,7 @@ export function RouteComparison({ productId }: { productId: string }) {
       </Callout>
 
       <Card className="mt-4 p-0 overflow-x-auto">
-        <table className="w-full text-body">
+        <table className="w-full" style={{ fontSize: 'var(--table-fs)' }}>
           <thead className="text-caption text-ink-soft text-left">
             <tr className="border-b border-line">
               <th className="font-normal p-2">Route</th>
@@ -170,7 +171,7 @@ export function RouteComparison({ productId }: { productId: string }) {
 
 export function RouteDetail({ productId, routeId }: { productId: string; routeId: string }) {
   const route = ROUTES_3HP.find((r) => r.id === routeId && r.productId === productId);
-  if (!route) return <EmptyState title={`No route ${routeId}`} body="Not in this comparison." />;
+  if (!route) return <DemoEmpty title={`No route ${routeId}`} body="Not in this comparison." />;
 
   return (
     <>

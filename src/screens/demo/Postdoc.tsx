@@ -20,6 +20,7 @@ import { DemoFooter } from '@/components/demo/DemoFooter';
 
 import { partEyebrow } from '@/data/parts';
 
+import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('postdoc', 'demo');
 export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
@@ -32,7 +33,7 @@ export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
   );
 
   if (!dlv || dlv.payload.kind !== 'problem-tree') {
-    return <EmptyState title="No tree" body={`No deliverable ${deliverableId} of that kind.`} />;
+    return <DemoEmpty title="No tree" body={`No deliverable ${deliverableId} of that kind.`} />;
   }
 
   const { rootId, nodes, handoffFlowIds } = dlv.payload;
