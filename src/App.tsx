@@ -122,6 +122,8 @@ function isActive(path: string, to: string) {
 // is what lets the interface tell the truth about both — an ExtractionRecord is
 // a catalogued claim awaiting verification and an Accession is a normalised
 // quantity with complete provenance, and they are not the same object.
+import { UpstreamNote } from '@/components/demo/UpstreamNote';
+import { partForPath } from '@/data/demo/upstream';
 import { Bench as DemoBench } from '@/screens/demo/Bench';
 import { RepoIndex, AccessionPage, ParameterPage as DemoParameterPage, ContradictionQueue } from '@/screens/demo/Repo';
 import { GapMap, FactorDetail, RunIndex, RunPage, EnvelopePage } from '@/screens/demo/Fermos';
@@ -659,6 +661,13 @@ export default function App() {
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
               <Screen />
+              {/* "What this part will be derived from", on every page.
+                  Rendered HERE rather than inside each screen: twenty-six
+                  screens each carrying their own sentence is twenty-six
+                  sentences that drift, and one of them would be the one nobody
+                  updated. Driven off the route, so a new screen under an
+                  existing part inherits the note without being asked to. */}
+              <UpstreamNote part={partForPath(route.path)} className="mt-8 mb-2" />
             </div>
           </main>
         </div>

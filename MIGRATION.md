@@ -787,3 +787,35 @@ the way back out. The dense row is applied where the brief's reason applies —
 the capacity table, which is the screen with eleven columns — and the global
 toggle is left alone. **Deviation, recorded.**
 
+### The demo home, and the upstream notes
+
+**`/bench` leads with the agent.** It was a grid of six deliverable cards, which
+is a menu of ANSWERS and gets the demo backwards — the thing being shown is not
+six artifacts, it is a system you can ask a question. The composer is now first,
+the six archetypes are PROMPTS that run rather than links that navigate, and each
+still offers "skip to the deliverable" for a reviewer who has already watched the
+flow play once.
+
+**`src/data/demo/upstream.ts` names what each part will be derived from**, and
+`UpstreamNote` renders it from the app shell rather than from each screen —
+twenty-six screens each carrying their own sentence is twenty-six sentences that
+drift, and one of them would be the one nobody updated. Driven off the route, so
+a new screen under an existing part inherits the note.
+
+The `status` field is the substance, not decoration. It is very easy to write a
+slide saying "powered by AlphaFold" about software that has never called
+AlphaFold, and three values keep that from happening by accident:
+
+| status | means | who has it |
+|---|---|---|
+| `ported` | code from that project is in this repository now | BioSTEAM, Pydantic, Inspect AI, Postgres, MCP |
+| `named` | the decision is recorded in CLAUDE.md, a manifest or a docstring; nothing calls it yet | PaperQA2, COBRApy, Escher, ThermoSTEAM, ORCID, in-toto |
+| `candidate` | an obvious fit nobody has committed to | AlphaFold (geneOS) |
+
+Parts with no decided upstream — Parchment, Primer — say so rather than
+borrowing a famous name, and every entry states WHERE the decision is recorded
+so a reader can check it. Several notes carry an `openQuestion` that is more
+useful than the dependency list: Proforma's says the economics server refuses
+`solve_plant`, and Postdoc's says the model is deliberately unnamed because Rule
+1 means no number in an answer may come from weights either way.
+
