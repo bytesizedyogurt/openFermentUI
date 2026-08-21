@@ -17,10 +17,11 @@ import { useMemo, useState } from 'react';
 
 import type { DisclosureCandidate } from '@/data/demo/types';
 import { DISCLOSURES, DELIVERABLES } from '@/data/demo/archetypes';
+import { deliverableRoute } from '@/lib/demo';
 import { href } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout, cx } from '@/components/ui';
 import { DisclosureCard, URGENCY_RANK } from '@/components/demo/DisclosureCard';
-import { deliverableRoute } from './Repo';
+
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
 export function NotaryQueue() {

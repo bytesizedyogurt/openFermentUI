@@ -28,7 +28,7 @@ import { href, navigate, useRoute } from '@/router';
 // One route table for demo deliverables, shared with the Accession page's
 // "Uses" list — so a chat chip and a provenance link cannot disagree about
 // where an artifact lives.
-import { chipRoute } from '@/screens/demo/Repo';
+import { chipRoute } from '@/lib/demo';
 import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 // The chips belong to the scripted agent, not the corpus, and moved to sit
 // beside it: each is one flow trigger verbatim, so a click is an exact match —

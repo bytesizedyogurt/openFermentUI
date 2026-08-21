@@ -274,6 +274,21 @@ export function RunIndex() {
           </tbody>
         </table>
       </Card>
+
+      {/* The envelope page was dispatched and linked from nowhere. It belongs
+          here: a run's achievable OUR is bounded by the vessel it ran in, so
+          the ceiling is the thing to read before deciding a run underperformed
+          rather than the plant. */}
+      <div className="text-caption text-ink-soft mt-3">
+        Every run above happened in{' '}
+        <a href={href(`/fermos/envelope/${PLANTS[0].id}`)} className="text-accent hover:underline">
+          {PLANTS[0].name}
+        </a>
+        , whose oxygen-transfer and cooling ceilings are computed from the vessel and the
+        utilities. A run that misses its target inside those ceilings is a process problem; one
+        that misses them at the ceiling is an asset problem, and they are not the same finding.
+      </div>
+
       <DemoFooter />
     </div>
   );

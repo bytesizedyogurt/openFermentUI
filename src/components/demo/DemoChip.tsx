@@ -18,7 +18,7 @@ import { PATENT_BY_ID } from '@/data/demo/patents';
 import { ORGANISM_BY_ID } from '@/data/demo/core';
 import { RUN_BY_ID } from '@/data/demo/runs';
 import { DELIVERABLE_BY_ID, AUX_ORGANISMS } from '@/data/demo/archetypes';
-import { normalise } from '@/lib/demo';
+import { normalise, deliverableRoute } from '@/lib/demo';
 import { href } from '@/router';
 import { cx } from '@/components/ui';
 import { demoTickClass, demoTickTitle } from './DemoTick';
@@ -85,7 +85,11 @@ export function DemoChip({ id }: { id: string }) {
   const dlv = DELIVERABLE_BY_ID[id];
   if (dlv) {
     return (
-      <a href={href(`/bench`)} className="font-num text-[0.92em] hover:text-accent whitespace-nowrap" title={dlv.title}>
+      // Was hard-coded to `/bench` — a menu of all six deliverables — because
+      // the route table lived in a screen module and importing it from a
+      // component was a cycle. It lives in `lib/demo` now, so a deliverable
+      // chip goes to the deliverable.
+      <a href={href(deliverableRoute(dlv.id))} className="font-num text-[0.92em] hover:text-accent whitespace-nowrap" title={dlv.title}>
         {dlv.id}
       </a>
     );

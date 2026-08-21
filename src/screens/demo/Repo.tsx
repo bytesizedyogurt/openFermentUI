@@ -12,7 +12,7 @@ import { ACCESSIONS, ACCESSION_BY_ID } from '@/data/demo/accessions';
 import { FIELDS, FIELD_BY_ID, SOURCE_BY_ID, SEED_DISCLAIMER, ORGANISM_BY_ID } from '@/data/demo/core';
 import { PATENT_BY_ID } from '@/data/demo/patents';
 import { DELIVERABLES } from '@/data/demo/archetypes';
-import { normalise, accessionsOnField, isContradiction, conflictPairs, reconciledPairs } from '@/lib/demo';
+import { normalise, accessionsOnField, isContradiction, conflictPairs, reconciledPairs, deliverableRoute, contradictionRows } from '@/lib/demo';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, cx } from '@/components/ui';
 import { AccessionValue, reportedText, auxiliaryText } from '@/components/demo/AccessionValue';
@@ -50,12 +50,33 @@ export function RepoIndex() {
     });
   }, [q, family, heldOnly]);
 
+  const { unresolvedCount, reconciledCount } = useMemo(() => {
+    const rows = contradictionRows();
+    return {
+      unresolvedCount: rows.filter((r) => r.kind === 'unresolved').length,
+      reconciledCount: rows.filter((r) => r.kind === 'reconciled').length,
+    };
+  }, []);
+
   return (
     <div className="p-6 max-w-[1400px]">
       <PageHeader
         title="BioRepo"
         subtitle={`${ACCESSIONS.length} Accessions. One quantity each, with complete provenance under a permanent identifier.`}
       />
+
+      {/* The contradiction queue was dispatched and linked from nowhere. Its
+          corpus analogue is linked three times, and a queue nothing points at
+          is a queue nobody reads — which for this pool is the wrong one to
+          lose, since declining to resolve is the behaviour it argues for. */}
+      <div className="text-caption text-ink-soft mb-3">
+        <a href={href('/repo/contradictions')} className="text-accent hover:underline">
+          {unresolvedCount} unresolved contradiction{unresolvedCount === 1 ? '' : 's'}
+        </a>{' '}
+        and <span className="font-num">{reconciledCount}</span> pair
+        {reconciledCount === 1 ? '' : 's'} that only looked like one. Nothing here is averaged
+        across a disagreement.
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <input
@@ -431,46 +452,6 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
   );
 }
 
-/**
- * Where a `chip:<id>` follow-up goes.
- *
- * The archetype flows end with `chip:DLV-AR5-001|Open the decomposition tree`
- * and nothing in the UI knew what `chip:` meant — the button rendered with the
- * raw string as its label and clicking it fed that string back to the matcher
- * as a question. One resolver, covering every id kind a follow-up can name, so
- * a new chip kind is one line here rather than a new prefix nobody handles.
- */
-export function chipRoute(id: string): string {
-  if (id.startsWith('DLV-')) return deliverableRoute(id);
-  if (id.startsWith('RB-')) return `/runbook/design/${id}`;
-  if (id.startsWith('RUN-')) return `/fermos/runs/${id}`;
-  if (id.startsWith('OF-A-')) return `/repo/a/${id}`;
-  if (id.startsWith('PF-')) return `/parchment/families#${id}`;
-  return '/bench';
-}
-
-/** Where a deliverable renders. One table, so no screen invents a route. */
-export function deliverableRoute(deliverableId: string): string {
-  const d = DELIVERABLES.find((x) => x.id === deliverableId);
-  if (!d) return '/repo';
-  switch (d.payload.kind) {
-    case 'factor-map':
-      return `/fermos/gap/${d.id}`;
-    case 'route-comparison':
-      return `/geneos/routes/${d.payload.productId}`;
-    case 'capacity-screen':
-      return `/proforma/screen/${d.payload.plantId}`;
-    case 'facility-concept':
-      return `/proforma/concept/${d.id}`;
-    case 'problem-tree':
-      return `/postdoc/tree/${d.id}`;
-    case 'excursion-verdict':
-      return `/fermos/runs/${d.payload.runId}`;
-    default:
-      return '/repo';
-  }
-}
-
 // ── /repo/p/:field — the parameter page ────────────────────────────────
 
 export function ParameterPage({ field }: { field: FieldId }) {
@@ -545,16 +526,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
 // ── /repo/contradictions — the queue ───────────────────────────────────
 
 export function ContradictionQueue() {
-  const rows = useMemo(() => {
-    const out: { field: FieldId; kind: 'unresolved' | 'reconciled'; pair: [Accession, Accession] }[] = [];
-    const fields = [...new Set(ACCESSIONS.map((a) => a.field))] as FieldId[];
-    for (const f of fields) {
-      const accs = accessionsOnField(f);
-      for (const pair of conflictPairs(accs)) out.push({ field: f, kind: 'unresolved', pair });
-      for (const pair of reconciledPairs(accs)) out.push({ field: f, kind: 'reconciled', pair });
-    }
-    return out;
-  }, []);
+  const rows = useMemo(() => contradictionRows(), []);
 
   const unresolved = rows.filter((r) => r.kind === 'unresolved');
   const reconciled = rows.filter((r) => r.kind === 'reconciled');

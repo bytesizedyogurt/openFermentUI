@@ -22,11 +22,11 @@ import { ARCHETYPE_PROMPTS } from '@/data/demo/flows';
 import { ACCESSIONS } from '@/data/demo/accessions';
 import { FIELD_BY_ID } from '@/data/demo/core';
 import { UPSTREAM_BY_PART, ARCHETYPE_PART } from '@/data/demo/upstream';
-import { accessionsOnField, conflictPairs } from '@/lib/demo';
+import { accessionsOnField, conflictPairs, deliverableRoute } from '@/lib/demo';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, cx } from '@/components/ui';
 import { DemoContradictionRail } from '@/components/demo/DemoContradictionRail';
-import { deliverableRoute } from './Repo';
+
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
 /** The question each archetype answers, in the reader's words rather than ours. */

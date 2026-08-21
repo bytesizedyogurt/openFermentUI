@@ -504,3 +504,81 @@ export function conflictPairs(accs: _Accession[]): [Accession, Accession][] {
 }
 
 
+
+/**
+ * Every curator-linked pair in the pool, unresolved and reconciled alike.
+ *
+ * One implementation, because the BioRepo index states the count and the
+ * contradiction queue lists the rows, and a count that disagrees with the list
+ * it links to is worse than no count. A pair is here because a curator LINKED
+ * it, never because two numbers are far apart — spread cannot tell a
+ * disagreement from two different experiments.
+ */
+export function contradictionRows(): {
+  field: _FieldId;
+  kind: 'unresolved' | 'reconciled';
+  pair: [Accession, Accession];
+}[] {
+  const out: { field: _FieldId; kind: 'unresolved' | 'reconciled'; pair: [Accession, Accession] }[] = [];
+  const fields = [...new Set(_ACCESSIONS.map((a) => a.field))] as _FieldId[];
+  for (const f of fields) {
+    const accs = accessionsOnField(f);
+    for (const pair of conflictPairs(accs)) out.push({ field: f, kind: 'unresolved', pair });
+    for (const pair of reconciledPairs(accs)) out.push({ field: f, kind: 'reconciled', pair });
+  }
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// routes
+// ══════════════════════════════════════════════════════════════════════
+//
+// The one place that answers "where does this id render". It lives here rather
+// than in `screens/demo/Repo.tsx`, where it used to, because everything that
+// needs it is upstream of that screen: the corpus's agent workspace resolves
+// `chip:` follow-ups, the Notary queue links back to the deliverable that
+// produced each candidate, and `DemoChip` renders an id it has just resolved.
+// Importing a screen module to get a route is a cycle, and `DemoChip` paid for
+// it by hard-coding `/bench` for every `DLV-*` chip rather than importing.
+
+import { DELIVERABLES as _DELIVERABLES } from '@/data/demo/archetypes';
+
+/**
+ * Where a `chip:<id>` follow-up goes.
+ *
+ * The archetype flows end with `chip:DLV-AR5-001|Open the decomposition tree`
+ * and nothing in the UI knew what `chip:` meant — the button rendered with the
+ * raw string as its label and clicking it fed that string back to the matcher
+ * as a question. One resolver, covering every id kind a follow-up can name, so
+ * a new chip kind is one line here rather than a new prefix nobody handles.
+ */
+export function chipRoute(id: string): string {
+  if (id.startsWith('DLV-')) return deliverableRoute(id);
+  if (id.startsWith('RB-')) return `/runbook/design/${id}`;
+  if (id.startsWith('RUN-')) return `/fermos/runs/${id}`;
+  if (id.startsWith('OF-A-')) return `/repo/a/${id}`;
+  if (id.startsWith('PF-')) return `/parchment/families#${id}`;
+  return '/bench';
+}
+
+/** Where a deliverable renders. One table, so no screen invents a route. */
+export function deliverableRoute(deliverableId: string): string {
+  const d = _DELIVERABLES.find((x) => x.id === deliverableId);
+  if (!d) return '/repo';
+  switch (d.payload.kind) {
+    case 'factor-map':
+      return `/fermos/gap/${d.id}`;
+    case 'route-comparison':
+      return `/geneos/routes/${d.payload.productId}`;
+    case 'capacity-screen':
+      return `/proforma/screen/${d.payload.plantId}`;
+    case 'facility-concept':
+      return `/proforma/concept/${d.id}`;
+    case 'problem-tree':
+      return `/postdoc/tree/${d.id}`;
+    case 'excursion-verdict':
+      return `/fermos/runs/${d.payload.runId}`;
+    default:
+      return '/repo';
+  }
+}
