@@ -178,6 +178,22 @@ export function Parchment() {
         </Callout>
       </section>
 
+      {/* The Parchment part holds both pools. This is the only place the
+          corpus screen mentions the demo one, and it says which is which
+          rather than implying one catalogue. */}
+      <section className="mt-6 max-w-3xl">
+        <SectionTitle>The demo suite&rsquo;s patent families</SectionTitle>
+        <div className="text-body text-ink-soft">
+          The six above are real filings catalogued in OF-COR-001 §9. The demo suite carries a
+          separate, entirely synthetic set of{' '}
+          <a href={href('/parchment/families')} className="text-accent hover:underline">
+            fourteen families with parsed claim scope
+          </a>{' '}
+          — which is what the corpus entries lack, and what a scope map would need. They are kept
+          apart on purpose: nothing on that page is a filing that exists.
+        </div>
+      </section>
+
       <div className="mt-5">
         <LinkButton to="/ledger">Back to the Ledger</LinkButton>
       </div>

@@ -208,7 +208,7 @@ export function FactorBand({
             {factor.ftoFlag.recitedRange.low}–{factor.ftoFlag.recitedRange.high}
           </span>{' '}
           is recited by{' '}
-          <a href={href(`/parchment#${factor.ftoFlag.patentFamilyId}`)} className="font-num hover:underline">
+          <a href={href(`/parchment/families#${factor.ftoFlag.patentFamilyId}`)} className="font-num hover:underline">
             {factor.ftoFlag.patentFamilyId}
           </a>{' '}
           in {factor.ftoFlag.jurisdiction}. The space works; someone has claimed it.

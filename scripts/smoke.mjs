@@ -106,6 +106,8 @@ const ROUTES = [
   ['/fermos/d/sc-s1-d01', 'Design detail (cascade)'],
   ['/fermos/compare', 'Compare'],
   ['/parchment', 'Parchment'],
+  ['/parchment/families', 'Parchment — demo patent families'],
+  ['/parchment/families#PF-003', 'A PF- chip resolves to its family'],
   ['/openlab', 'openLab'],
   ['/notary', 'Notary'],
   ['/learn', 'Learn map'],

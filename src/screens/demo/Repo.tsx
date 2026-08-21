@@ -445,7 +445,7 @@ export function chipRoute(id: string): string {
   if (id.startsWith('RB-')) return `/runbook/design/${id}`;
   if (id.startsWith('RUN-')) return `/fermos/runs/${id}`;
   if (id.startsWith('OF-A-')) return `/repo/a/${id}`;
-  if (id.startsWith('PF-')) return `/parchment#${id}`;
+  if (id.startsWith('PF-')) return `/parchment/families#${id}`;
   return '/bench';
 }
 

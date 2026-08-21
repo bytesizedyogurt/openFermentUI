@@ -31,7 +31,7 @@ import {
   Database,
   Calculator} from 'lucide-react';
 import { useStore } from '@/store';
-import { useRoute, navigate } from '@/router';
+import { useRoute, navigate, useFragmentScroll } from '@/router';
 import { cx, Popover, Toasts, Sheet } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
@@ -131,6 +131,7 @@ import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
 import { ProformaIndex, CapacityScreen, CandidateDetail, FacilityConceptPage } from '@/screens/demo/Proforma';
 import { ProblemTreePage } from '@/screens/demo/Postdoc';
 import { NotaryQueue } from '@/screens/demo/NotaryQueue';
+import { DemoPatents } from '@/screens/demo/Patents';
 import { RunbookDesign } from '@/screens/demo/RunbookDesign';
 
 // ── Route dispatch ─────────────────────────────────────────────────────
@@ -187,8 +188,9 @@ function Screen() {
   // shared link updates itself without ever showing the wrong screen.
   useEffect(() => {
     if (!canonical) return;
-    const q = route.hash.includes('?') ? `?${route.hash.split('?')[1]}` : '';
-    navigate(`/${canonical.join('/')}${q}`, { replace: true });
+    const q = route.query.toString() ? `?${route.query}` : '';
+    const f = route.fragment ? `#${route.fragment}` : '';
+    navigate(`/${canonical.join('/')}${q}${f}`, { replace: true });
   }, [canonical?.join('/'), route.hash]);
 
   const [a, b, c, d] = canonical ?? route.segments;
@@ -211,6 +213,10 @@ function Screen() {
     case 'assay':
       return <Validation />;
     case 'parchment':
+      // The Parchment part holds both pools. They stay in separate screens
+      // because `Parchment` reads the corpus through the adapter seam and the
+      // demo pool reads its modules directly.
+      if (b === 'families') return <DemoPatents />;
       return <Parchment />;
     case 'openlab':
       return <OpenLab />;
@@ -364,6 +370,7 @@ export default function App() {
   const tickJobs = useStore((s) => s.tickJobs);
   const tickTimers = useStore((s) => s.tickTimers);
   const route = useRoute();
+  useFragmentScroll(route.fragment);
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 

@@ -51,7 +51,7 @@ export function DemoChip({ id }: { id: string }) {
   if (fam) {
     return (
       <a
-        href={href(`/parchment#${fam.id}`)}
+        href={href(`/parchment/families#${fam.id}`)}
         className="font-num text-[0.92em] hover:underline whitespace-nowrap text-signal-closed"
         title={`${fam.representativeNumber} · ${fam.assignee} · ${fam.title}`}
       >

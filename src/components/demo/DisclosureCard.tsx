@@ -53,7 +53,10 @@ export function DisclosureCard({
 }) {
   const u = URGENCY[dc.urgency];
   return (
-    <div className={cx('border border-line p-3', className)}>
+    // `id` is the anchor for `/notary/disclosures#DC-003`, which every
+    // archetype's deliverable links back to. `scroll-mt` keeps the card clear
+    // of the sticky header when `useFragmentScroll` brings it into view.
+    <div id={dc.id} className={cx('border border-line p-3 scroll-mt-4', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
         <span className="font-num text-caption text-ink-soft">{dc.id}</span>
         <span className={cx('text-caption', u.className)}>
