@@ -1,0 +1,44 @@
+{
+  "name": "geneos_mcp",
+  "version": "0.1.0",
+  "subsystem": "geneOS (hosts) — OF-DES-001",
+  "transport": "stdio",
+  "schema": "openferment_core (packages/core) — canonical Pydantic models; nothing is hand-written here",
+  "corpus": ["data/corpus/papers.json", "data/corpus/records.json", "data/corpus/strains.json"],
+  "tools": [
+    {
+      "name": "health",
+      "status": "implemented",
+      "returns": "{ ok, serverVersion, corpusSnapshotId, corpusFiles }",
+      "note": "corpusSnapshotId is a sha256 digest of the corpus bytes read at startup, never a constant."
+    },
+    {
+      "name": "list_strains",
+      "status": "implemented",
+      "mirrors": "CellAdapter.listStrains",
+      "returns": "envelope { data: Strain[] } — bsl included, because Protocol.bsl bounds which protocols a host can be run under"
+    },
+    {
+      "name": "get_strain",
+      "status": "implemented",
+      "mirrors": "CellAdapter.getStrain",
+      "returns": "envelope { data: Strain | null, ..., notice? } — null carries a notice naming the miss"
+    },
+    {
+      "name": "get_strain_records",
+      "status": "implemented",
+      "mirrors": "CellAdapter.getStrainRecords",
+      "returns": "envelope { data: ExtractionRecord[], ..., notice? }",
+      "note": "The attribution rule — tagged with the strain, or, absent a tag, belonging to a paper whose organism list names it — is openferment_core.corpus.records_attributed_to, not this server's. scripts/check-servers.mjs replays every strain through it and the TypeScript fixture and fails if they disagree."
+    },
+    {
+      "name": "predict_flux",
+      "status": "declared-refuses",
+      "mirrors": "CellAdapter.predictFlux",
+      "behaviour": "refuses: no genome-scale metabolic model in this build. Flux balance is COBRApy's, in Python, server-side. A prediction is absent rather than estimated — the same fact every design in this build reports as an absent T1."
+    }
+  ],
+  "deliberateAbsences": [
+    "No tool designs, edits or registers a strain. A host record is what protocols, records and biosafety bounds are keyed to; adding one unattended would create a chassis nobody built and let a BSL be asserted rather than assessed."
+  ]
+}

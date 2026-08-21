@@ -279,18 +279,18 @@ try:
     # corpus file feeds a Postgres loader that deliberately does not recompute,
     # so whatever is written here is what a Python consumer believes.
     from openferment_core.units import to_si
+
+    # Which model parses which collection — one map, shared with every
+    # server that reads these files back. See openferment_core/corpus.py.
+    from openferment_core.corpus import COLLECTION_MODELS
 except Exception as exc:
     bail(f"{type(exc).__name__}: {exc}")
 
-MODELS = {
-    "papers": S.Paper,
-    "records": S.ExtractionRecord,
-    "ontology": S.ParameterDef,
-    "strains": S.Strain,
-    "protocols": S.Protocol,
-    "scenarios": S.Scenario,
-    "learn": S.LearnModule,
-}
+# The collection -> model map is NOT declared here. It lives in
+# openferment_core.corpus, because the servers that read these files back have
+# to validate through the same model this script wrote them with, and a second
+# copy of the map is a second opinion about what strains.json is.
+MODELS = COLLECTION_MODELS
 
 DUMP = dict(by_alias=True, exclude_none=True, mode="json")
 

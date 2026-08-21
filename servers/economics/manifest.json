@@ -1,0 +1,50 @@
+{
+  "name": "proforma_mcp",
+  "version": "0.1.0",
+  "subsystem": "Proforma (techno-economics) — OF-DES-001",
+  "transport": "stdio",
+  "schema": "openferment_core (packages/core) — canonical Pydantic models; nothing is hand-written here",
+  "corpus": ["data/corpus/scenarios.json"],
+  "tools": [
+    {
+      "name": "health",
+      "status": "implemented",
+      "returns": "{ ok, serverVersion, corpusSnapshotId, corpusFiles }",
+      "note": "corpusSnapshotId is a sha256 digest of the corpus bytes read at startup, never a constant."
+    },
+    {
+      "name": "list_cost_models",
+      "status": "implemented",
+      "mirrors": "EconomicsAdapter.listCostModels",
+      "returns": "envelope { data: CostModelSummary[], ..., notice }",
+      "note": "DERIVED from data/corpus/scenarios.json — modelId verbatim, dims as the sweep axes, referencePoint as the scenario's point — never a copy. scripts/check-servers.mjs replays the derivation against the TypeScript COST_MODELS and fails if the two stop agreeing. Neither CostModel.evaluate nor ResultGrid ever crosses the wire: one is a function, the other holds Float64Arrays, and src/data/types.ts records both as unable to round-trip through JSON Schema."
+    },
+    {
+      "name": "get_cost_model",
+      "status": "implemented",
+      "mirrors": "EconomicsAdapter.getCostModel",
+      "returns": "envelope { data: CostModelSummary | null, ..., notice? }"
+    },
+    {
+      "name": "evaluate_point",
+      "status": "declared-refuses",
+      "mirrors": "EconomicsAdapter.evaluatePoint",
+      "behaviour": "refuses: no cost grid exists here. A grid is built by solving the plant at every node; interpolation is the cheap half and the solve is the half that does not exist."
+    },
+    {
+      "name": "solve_plant",
+      "status": "declared-refuses",
+      "mirrors": "EconomicsAdapter.solvePlant",
+      "behaviour": "refuses: BioSTEAM is not wired up. No minimum selling price is available from this server."
+    },
+    {
+      "name": "get_sensitivity",
+      "status": "declared-refuses",
+      "mirrors": "EconomicsAdapter.getSensitivity",
+      "behaviour": "refuses: a sensitivity bar is two plant solves per parameter, and solve_plant refuses."
+    }
+  ],
+  "deliberateAbsences": [
+    "No tool authors, edits or adds a cost model. A cost model's dims and reference point are the frame every MSP in the system is quoted in; an agent that could widen an axis could move a headline number without touching a single datum, and the change would look like arithmetic rather than like an edit."
+  ]
+}

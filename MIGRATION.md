@@ -192,8 +192,8 @@ reader does not read it as one that was missed.
 | 2 | Extract the engine | [x] complete, reshaped — see Phase 2 section | green, 17 stages |
 | 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
 | 4 | Quarantine the simulation | [x] complete, reshaped — see Phase 4 section | green, 19 stages |
-| 5 | Server skeletons | [ ] not started | |
-| 6 | Workspace hygiene | [ ] not started | |
+| 5 | Server skeletons | [x] complete — see Phase 5 section | green, 20 stages |
+| 6 | Workspace hygiene | [x] complete, one item declined — see Phase 6 section | green, 20 stages |
 
 ---
 
@@ -428,3 +428,166 @@ On the way out every flow passes through the Pydantic `ChatFlow` model and must
 round-trip unchanged — their first contact with the schema anywhere, and all 13
 survived it. Export is byte-stable; hand-editing the fixture fails `check:evals`
 with a note that a change here is a change to what counts as a right answer.
+
+---
+
+## Phase 5 — server skeletons
+
+**Status:** complete. `pnpm verify` green at 20 stages.
+
+Five MCP servers under `servers/`, one per subsystem, each the server-side half
+of one interface in `src/adapters/types.ts`. Full detail is in
+`servers/README.md`; this section records what the phase changed elsewhere and
+what it found.
+
+### What was found before anything was written
+
+Two servers (`process`, `guild`) already existed on disk from an earlier,
+interrupted attempt. Both were good, and both were checked rather than
+inherited:
+
+- **`process`'s smoke client had never run to completion.** Line 48 read
+  `init.serverInfo`, which is the wire alias; the Python attribute is
+  `server_info`. The server itself was fine — the handshake completed before
+  the client crashed on the response — but the transcript that was supposed to
+  prove it could not have been produced. Fixed the client.
+- **The two servers disagreed about what a `corpusSnapshotId` is.** `process`
+  framed `name \0 bytes` under a `corpus-` prefix; `guild` framed `name : bytes`
+  under `sha256:`. Two servers reading the same file would have reported
+  different ids — while `guild`'s own docstring promised that reading the same
+  files yields the same id. A snapshot id whose meaning depends on which server
+  minted it is barely better than the constant it must never be.
+
+### What moved into `openferment_core`
+
+Three modules, each because more than one server needs them to agree:
+
+- **`snapshot.py`** — one framing for `corpusSnapshotId`: names sorted, each
+  entry `name \0 length \0 bytes`, `sha256:` and 16 hex characters. The length
+  prefix closes an ambiguity a `name \0 bytes` framing has, where a file named
+  `a` holding `b \0 c` and one named `a \0 b` holding `c` digest identically.
+  `servers/guild/src/meta.ts` is now a declared MIRROR of it, gated.
+- **`corpus.py`** — the collection→model map (lifted out of the exporter, which
+  now imports it, so the exporter and every server read the same page), a
+  `CorpusReader` that mints the id for exactly the bytes it opened, and
+  `records_attributed_to`.
+- **`serving.py`** — the `AdapterResponse` envelope, so four Python servers
+  cannot answer in four slightly different shapes.
+
+`records_attributed_to` is the one that changes an existing decision.
+"Which records count for a strain" already existed twice — in
+`src/adapters/fixture/cell.ts` and in `src/screens/Organisms.tsx` — and the
+fixture's own comment says the rule is server-side work and names its own
+retirement. Writing a third copy in the `cell` server would have been a
+cross-language twin, so Python became canonical and the copies are now held to
+it by a gate.
+
+### The new gate: `check:servers`
+
+Five checks, each watched failing before being trusted:
+
+| Check | Broken by | Reported |
+|---|---|---|
+| manifest ↔ server | renaming `list_strains` in `cell`'s manifest | both directions — the undeclared tool AND the phantom one |
+| snapshot parity | dropping the length prefix from the TypeScript half | 3 of 6 cases diverge, and the adversarial pair collides |
+| cost model derivation | appending a value to one axis in `scenarios.json` | derivation no longer equals `COST_MODELS` |
+| attribution parity | disabling the untagged-record clause | per strain, with the first divergent record id |
+| status vocabulary | setting one tool's status to `stub` | names the offending tool and the three legal values |
+
+The status vocabulary is checked because it had already drifted: `process`
+said `stub` where the other four said `declared-refuses` for identical
+behaviour, and an operator reading five manifests should not have to work out
+whether those are the same thing.
+
+Two of the five also check that agreement is not vacuous: the snapshot ids must
+be DISTINCT across inputs (two halves both returning a constant would agree
+perfectly), and the attribution must be non-empty (a rule attributing nothing
+to anything agrees trivially).
+
+It deliberately does not start the servers. That needs five virtualenvs and a
+node install, which is a CI job rather than a `pnpm verify` stage — so each
+README carries the transcript its smoke client actually produced and a
+**PROVEN vs written** section separating what was watched from what was not.
+
+### Language split, and the one exception
+
+Four Python, one TypeScript. Every server that serves an ENTITY is Python,
+because every entity has a canonical Pydantic model and a server must validate
+what it serves through the same model the exporter wrote it with. The brief's
+original split put `corpus` in TypeScript; it was moved, because BioRepo serves
+`Paper` and `ExtractionRecord` and a TypeScript server would need either a
+hand-maintained validator or none. **Deviation, recorded.**
+
+The Guild stays TypeScript because it has nothing to validate: `GuildChapter`
+and `Seal` have no Pydantic model, deliberately. It pays for that — it cannot
+detect a corpus file the schema would reject, so its health tool reports
+`ok: false` rather than refusing to start, and it serves only a thin projection
+of the one file it reads. Both facts are in its README.
+
+### Deliberate absences, extended
+
+The brief names one: no Notary tool that publishes. Four more were added, each
+by the same test — would an unattended call produce something carrying
+authority nobody granted?
+
+- no `write_record` (BioRepo) — it would write a claim about a real publication
+  into the store the Ledger and every aggregate read from;
+- no cost-model authoring (Proforma) — widening an axis moves a headline number
+  without touching a datum, and looks like arithmetic;
+- no strain registration (geneOS) — it would let a BSL be asserted rather than
+  assessed;
+- no seal minting (Guild) — already refused by the fixture; here the tool is
+  simply not offered, which is the stronger statement.
+
+### Proven
+
+All five servers were started and driven over real stdio: 26 tools registered
+across the five, every real tool answering from `data/corpus/*.json`, every
+declared refusal refusing with a message naming what is missing, and every miss
+carrying a notice that says which kind of empty it is. `process` and
+`economics` both read only `scenarios.json` and both report
+`sha256:a942d5c30fed7fba` — the agreement the shared framing exists for, and
+the thing that was not true before this phase.
+
+---
+
+## Phase 6 — workspace hygiene
+
+**Status:** complete, one item declined. `pnpm verify` green at 20 stages.
+
+- **`.github/workflows/verify.yml`** — CI running the full gate on push and PR.
+  It installs `packages/core[dev]` then `packages/assay[dev]`, and installs
+  `inspect-ai` explicitly, because `packages/assay/tests/test_scorer.py` opens
+  with `pytest.importorskip("inspect_ai")` — without it the scorer suite would
+  skip silently and CI would report green over less than it appears to cover.
+- **`CONTRIBUTING.md`** — the one gate, the generated-from relationships as a
+  table, the absolute prohibitions, and where new work goes.
+- **`LICENSE`** — a deliberate placeholder naming the requirement (copyleft
+  with no enclosure) rather than guessing at a licence. It states plainly that
+  until one is committed, default copyright applies.
+- **`.gitignore`** — `servers/*/.venv/`.
+
+### `pnpm-workspace.yaml` — declined, with a reason
+
+The brief asks for one. Adding it here would be a file that does nothing at
+best and breaks a deployable at worst.
+
+`packages/core` and `packages/assay` are Python and a pnpm workspace cannot
+hold them. That leaves `servers/guild`, the one npm package outside the root —
+and it is deliberately standalone: its `Dockerfile` runs `npm ci` against its
+own lockfile so the image builds without the UI's dependency graph. Enrolling
+it in a pnpm workspace would delete that lockfile and break its build for the
+sake of deduplicating `typescript` in a dev tree. A workspace file listing only
+the root package would declare nothing.
+
+The hygiene the brief wanted from it — one place that says what each package is
+and how it is installed — is `servers/README.md` and `CONTRIBUTING.md`.
+**Deviation, recorded.**
+
+### Turborepo — not added
+
+Optional in the brief. `pnpm verify` is a linear chain of gates whose whole
+value is that it runs in a fixed order and stops at the first failure; a task
+graph that parallelised it would trade that for wall-clock on a chain that
+takes well under two minutes.
+

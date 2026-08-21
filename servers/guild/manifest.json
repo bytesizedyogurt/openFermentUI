@@ -1,0 +1,35 @@
+{
+  "name": "openferment-guild",
+  "version": "0.1.0",
+  "description": "MCP server skeleton for the Guild subsystem of openFerment: chapters, deposits, seals. Will wrap ORCID (contributor identity) and in-toto (attestation).",
+  "transport": "stdio",
+  "tools": [
+    {
+      "name": "guild_health",
+      "status": "implemented",
+      "returns": "{ ok, serverVersion, corpusSnapshotId }",
+      "note": "corpusSnapshotId is a sha256 digest derived from the corpus files this server reads, never a constant. The framing mirrors openferment_core.snapshot; scripts/check-servers.mjs feeds both the same inputs and fails if they disagree. `ok` is false rather than fatal when a file cannot be read — unlike the Python servers, this one has no schema to validate against, so saying the read failed is the strongest honest thing it can do."
+    },
+    {
+      "name": "list_sealable_protocols",
+      "status": "implemented",
+      "returns": "envelope { data: { id, title, bsl, currentVersion }[], ..., notice }",
+      "note": "Protocols a chapter could be ASKED to seal, not protocols any chapter has sealed. A thin projection on purpose: the Guild's interest in a protocol is what it takes to run one, and this server has no Pydantic with which to vouch for the rest of the entity. currentVersion rather than a bare id because a SealSubject of kind 'protocol-version' carries a version, and a seal that does not commit to a specific one attests to nothing."
+    },
+    {
+      "name": "list_chapters",
+      "status": "implemented-empty",
+      "mirrors": "GuildAdapter.listChapters",
+      "returns": "the honest empty shape { data: [], serverVersion, corpusSnapshotId, notice } — no chapter registry exists yet, and this server does not invent one"
+    }
+  ],
+  "deliberateAbsences": [
+    "No tool publishes anything. Disclosure drafting (a future prepare_disclosure) is reversible; publication is initiated by a human outside the agent loop. An MCP tool that triggers irreversible public disclosure is exactly the tool not to hand an agent.",
+    "No tool mints a seal. A seal is an attestation that a chapter checked something; there is no chapter and no check, so the fixture's requestSeal refuses and this server declares no equivalent."
+  ],
+  "subsystem": "Guild (chapters, deposits, seals) — OF-DES-001",
+  "schema": "NONE, deliberately. GuildChapter and Seal have no Pydantic model because no chapter registry exists and nothing issues a seal; the canonical shapes live in the adapter seam (src/adapters/types.ts) until a server produces one. This is the only server here that validates nothing, and it therefore serves only a thin projection of the one corpus file it reads.",
+  "corpus": [
+    "data/corpus/protocols.json"
+  ]
+}

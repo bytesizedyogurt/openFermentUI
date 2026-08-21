@@ -14,3 +14,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Python — the server virtualenvs. Each server under servers/ installs its own,
+# because each is a standalone deployable that must be installable without the
+# others (see servers/README.md). They are build output, not source.
+servers/*/.venv/

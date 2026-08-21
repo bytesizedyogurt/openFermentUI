@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "proforma-mcp"
+version = "0.1.0"
+description = "Proforma cost-model server over MCP: model summaries derived from the real corpus, every solve declared and refusing to BioSTEAM."
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2",
+    # The canonical schema. Everything this server serves is validated through
+    # openferment_core on read; it hand-writes no entity of its own.
+    "openferment-core",
+]
+
+[project.scripts]
+proforma-mcp = "proforma_mcp.server:main"
+
+[tool.uv.sources]
+# Editable — see servers/process/pyproject.toml for why. A container image
+# installs non-editably and sets OF_CORPUS_DIR.
+openferment-core = { path = "../../packages/core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["proforma_mcp"]

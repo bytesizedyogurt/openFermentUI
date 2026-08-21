@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "biorepo-mcp"
+version = "0.1.0"
+description = "BioRepo over MCP: papers and extraction records from the real corpus, scope and whitespace declared and refusing."
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2",
+    # The canonical schema. Everything this server serves is validated through
+    # openferment_core on read; it hand-writes no entity of its own.
+    "openferment-core",
+]
+
+[project.scripts]
+biorepo-mcp = "biorepo_mcp.server:main"
+
+[tool.uv.sources]
+# Editable — see servers/process/pyproject.toml for why. A container image
+# installs non-editably and sets OF_CORPUS_DIR.
+openferment-core = { path = "../../packages/core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["biorepo_mcp"]

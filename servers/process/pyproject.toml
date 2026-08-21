@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fermos-mcp"
+version = "0.1.0"
+description = "fermOS process server over MCP: scenarios from the real corpus, evaluation pair declared and refusing."
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2",
+    # The canonical schema. A path dependency, per the repo rails: this server
+    # validates everything it serves through openferment_core and hand-writes
+    # no entity of its own.
+    "openferment-core",
+]
+
+[project.scripts]
+fermos-mcp = "fermos_mcp.server:main"
+
+[tool.uv.sources]
+# EDITABLE, deliberately. A non-editable copy pins this server to a snapshot of
+# the canonical schema taken whenever the venv was last built — so a model fix
+# in packages/core would not reach the server that serves entities validated
+# through it, and the two would disagree silently. It also breaks
+# default_corpus_dir(), which walks up from the package file to the repo root.
+# A container image installs non-editably and points OF_CORPUS_DIR at the
+# corpus it copied in; that is the case default_corpus_dir's override exists for.
+openferment-core = { path = "../../packages/core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["fermos_mcp"]

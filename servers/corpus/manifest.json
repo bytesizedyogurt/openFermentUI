@@ -1,0 +1,56 @@
+{
+  "name": "biorepo_mcp",
+  "version": "0.1.0",
+  "subsystem": "BioRepo (corpus) — OF-DES-001",
+  "transport": "stdio",
+  "schema": "openferment_core (packages/core) — canonical Pydantic models; nothing is hand-written here",
+  "corpus": ["data/corpus/papers.json", "data/corpus/records.json"],
+  "tools": [
+    {
+      "name": "health",
+      "status": "implemented",
+      "returns": "{ ok, serverVersion, corpusSnapshotId, corpusFiles }",
+      "note": "corpusSnapshotId is a sha256 digest of the corpus bytes read at startup, never a constant. corpusFiles names what it covers so a reader can recompute it."
+    },
+    {
+      "name": "get_paper",
+      "status": "implemented",
+      "mirrors": "CorpusAdapter.getPaper",
+      "returns": "envelope { data: Paper | null, ..., notice? } — null carries a notice naming the miss"
+    },
+    {
+      "name": "list_papers",
+      "status": "implemented",
+      "returns": "envelope { data: { id, title, year, venue }[] } — the index, not the library"
+    },
+    {
+      "name": "list_records",
+      "status": "implemented",
+      "mirrors": "CorpusAdapter.getRecords",
+      "input": "RecordQuery { paperId?, field?, organism?, ids? } — absent means any",
+      "returns": "envelope { data: ExtractionRecord[] } — provenance and evidenceClass unfiltered; isAggregatable() is the single gate and this server is not a second one"
+    },
+    {
+      "name": "search_papers",
+      "status": "declared-refuses",
+      "mirrors": "CorpusAdapter.searchPapers",
+      "behaviour": "refuses: corpus retrieval belongs to PaperQA2 and is deliberately not reimplemented. A substring filter here would be a second implementation that must agree with the browser's forever, wearing a server's authority."
+    },
+    {
+      "name": "get_scope",
+      "status": "declared-refuses",
+      "mirrors": "CorpusAdapter.getScope",
+      "behaviour": "refuses: every Patent in this corpus carries parseUncertain: true and bounds: []. An empty hit list reads as 'unencumbered', which is a different sentence from 'no claim was checked'."
+    },
+    {
+      "name": "get_whitespace",
+      "status": "declared-refuses",
+      "mirrors": "CorpusAdapter.getWhitespace",
+      "behaviour": "refuses: whitespace is the complement of parsed claims, and the complement of nothing is everything, which is not a finding."
+    }
+  ],
+  "deliberateAbsences": [
+    "No tool writes a record. CorpusAdapter.writeRecord exists and the browser fixture implements it, because there a human is looking at the screen that submitted it. An MCP tool is called unattended, and what it would write is a claim about a REAL PUBLICATION into the store the Ledger, the gold set and every aggregate read from. The way to keep an agent from fabricating data is to not hand it the pen.",
+    "No list_patents tool. Patents have a Pydantic model but no data/corpus/patents.json — the exporter maps seven collection keys to seven models and Patent is not among them. Declaring a tool that reads a file the exporter does not write would be declaring a capability that cannot be met."
+  ]
+}

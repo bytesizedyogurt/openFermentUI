@@ -75,7 +75,7 @@ class StockSolution(OFModel):
             "delivers any solute. Unconstrained, the two implementations disagreed about "
             "what to do with it — `scale_material` raises ZeroDivisionError while "
             "`scaleMaterial` yields Infinity, which the bench sheet then renders as an "
-            "em dash, so a browser would print \"use — mL of stock\" while the pipeline "
+            'em dash, so a browser would print "use — mL of stock" while the pipeline '
             "crashed on the same protocol. The divergence was documented in scale.py and "
             "reachable by any curator; a constraint here makes it unauthorable instead, "
             "which is the only way a disagreement about an impossible input stops "

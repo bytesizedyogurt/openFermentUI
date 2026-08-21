@@ -1,0 +1,44 @@
+{
+  "name": "fermos_mcp",
+  "version": "0.1.0",
+  "subsystem": "fermOS (process design) — OF-DES-001",
+  "transport": "stdio",
+  "schema": "openferment_core (packages/core) — canonical Pydantic models; nothing is hand-written here",
+  "corpus": [
+    "data/corpus/scenarios.json"
+  ],
+  "tools": [
+    {
+      "name": "health",
+      "status": "implemented",
+      "returns": "{ ok, serverVersion, corpusSnapshotId, corpusFiles }",
+      "note": "corpusSnapshotId is a sha256 digest of the corpus bytes read at startup, never a constant. The framing is openferment_core.snapshot's, shared with every other server so that two servers reading the same file report the same id."
+    },
+    {
+      "name": "list_scenarios",
+      "status": "implemented",
+      "mirrors": "ProcessAdapter.listScenarios",
+      "returns": "envelope { data: Scenario[], serverVersion, corpusSnapshotId }"
+    },
+    {
+      "name": "get_scenario",
+      "status": "implemented",
+      "mirrors": "ProcessAdapter.getScenario",
+      "returns": "envelope { data: Scenario | null, ..., notice? } — null carries a notice naming the miss"
+    },
+    {
+      "name": "submit_evaluation",
+      "status": "declared-refuses",
+      "mirrors": "ProcessAdapter.submitEvaluation",
+      "input": "EvaluationRequest { scenarioId, config, label? }",
+      "behaviour": "validates the request shape, then refuses — no evaluator is wired up; no handle is issued"
+    },
+    {
+      "name": "get_evaluation",
+      "status": "declared-refuses",
+      "mirrors": "ProcessAdapter.getEvaluation",
+      "input": "{ jobId }",
+      "behaviour": "refuses — no evaluator is wired up; this backend has never issued a handle"
+    }
+  ]
+}

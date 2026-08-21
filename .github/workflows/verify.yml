@@ -1,0 +1,71 @@
+# The regression harness, on every push and PR.
+#
+# CLAUDE.md invariant 1 names `pnpm verify` as THE gate for this migration, and
+# until this file existed it ran only when someone remembered to run it. The
+# session that added it had already watched every stage fail at least once —
+# several of them exist because a gate was found watching only one side of a
+# two-sided thing — so the chain is trusted the only way a chain can be.
+#
+# verify is twenty stages: typecheck, eleven cross-implementation checks
+# (corpus fixed point, four TS/Python parity gates, the canonical Python
+# suites, generated-types drift, answer-shape and eval-flow currency, engine
+# purity, interpolation properties, the servers/ manifest-and-parity gate), the
+# bioSTEAM numerics check, build, and three browser suites. The Python steps
+# are real dependencies: check:corpus, check:aggregation and check:servers all
+# shell out to python3+pydantic, and check:python runs pytest in both
+# packages.
+name: verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: install Python packages (editable, with dev tooling)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e 'packages/core[dev]'
+          pip install -e 'packages/assay[dev]' || pip install -e packages/assay
+          # The scorer half of assay needs Inspect; its tests importorskip
+          # without it, which would silently shrink coverage in CI — so it is
+          # installed explicitly rather than left to chance.
+          pip install inspect-ai
+
+      - name: install a browser for the smoke, golden and deep suites
+        run: npx playwright install --with-deps chromium
+
+      - name: the gate
+        run: pnpm verify
+
+      - name: python lint and strict types
+        # Not stages of verify (verify runs the SUITES via check:python); kept
+        # green separately so a red here is a style/typing failure, never
+        # mistaken for a behaviour failure.
+        run: |
+          pip install 'ruff>=0.6' 'mypy>=1.11'
+          ruff check packages/core packages/assay
+          ruff format --check packages/core packages/assay
+          (cd packages/core && mypy openferment_core seed)
+          (cd packages/assay && mypy openferment_assay)
