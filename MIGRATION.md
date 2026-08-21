@@ -591,3 +591,89 @@ value is that it runs in a fixed order and stops at the first failure; a task
 graph that parallelised it would trade that for wall-clock on a chain that
 takes well under two minutes.
 
+---
+
+## OF-DEMO-001 — the demo suite
+
+A second brief, commissioning a parallel demo pool: six query archetypes over one
+shared object pool, alongside the casein corpus rather than inside it. Steps 1–3
+of its §3 build order are complete and gated; the screens are not built yet.
+
+### The brief describes an earlier repository, again
+
+Same as OF-FE-003 before it. Measured, not assumed:
+
+| Brief says | Repository is |
+|---|---|
+| §7: migrate `library→intake`, `extract→repo`, `organisms→geneos`, … | Already migrated, at `src/App.tsx:107` — but to `trawl` and `ledger`, not `intake` and `repo` |
+| Routes are `library, extract, organisms, simulate, ask, protocols` | Those are permanent aliases; the canonical set is `trawl, ledger, geneos, fermos, postdoc, runbook, assay, notary, parchment, openlab, learn, settings` |
+| §6: "a directory under `parts/`" | No `src/parts/`. The tree is `screens/ components/ engine/ lib/ data/ adapters/ sim/` |
+| §3 Step 1: "`types-demo.ts` … imports `Provenance`, which it widens" | The file imports nothing and declares its own 11-member union. The prose and the file disagree; the file is right |
+
+`/notary`, `/geneos`, `/fermos`, `/ledger` and `/assay` already exist and render
+the casein build. The demo routes in OF-DEMO-002 §2 will have to land beside
+them rather than found them.
+
+### Where the demo pool lives, and why not where the brief said
+
+`src/data/demo/`, not `src/data/`. Both modules export a type called
+`Provenance` and they are NOT the same type — the corpus one is GENERATED from
+the Pydantic models and has eight members, the demo one has eleven. Side by side
+in one directory, a wrong import compiles to a silently different union. The
+directory boundary makes them impossible to confuse, and it serves the brief's
+own §8: "do not merge the two object pools." **Deviation, recorded.**
+
+Nothing in `src/data/demo/` is generated and nothing in it may be, because no
+entity there has a Pydantic model yet. If a server ever produces one, that model
+becomes canonical and the TypeScript is generated from it, exactly as
+`types.generated.ts` is. The repo rails apply to this pool too.
+
+### The fabricated-identifier conflict, and how it is resolved
+
+CLAUDE.md invariant 2 forbids fabricated data and names DOIs, years, authors and
+venues. OF-DEMO-001 §2.1 requires exactly those to be synthetic. That is a real
+conflict and it is resolved by making the synthesis **provable rather than
+promised**:
+
+- Every DOI in the pool is under `10.9999`, a prefix no registration agency has
+  issued, so no string here can resolve to a real article.
+- Every patent number is in a series that cannot have been granted — `US 2029/…`,
+  `EP 4 9xx xxx`, `WO 2028/…`.
+- Every id carries a demo-pool prefix (`OF-A-`, `PF-`, `SRC-`), so a demo object
+  can never be mistaken for a corpus object.
+- `SEED_DISCLAIMER` must be long and must actually say "synthetic" and "patent".
+
+All four are checked by `check:demo-seed` and all four were watched failing: a
+`10.1016` DOI, a `US 2019/…` number, and a vague-but-long disclaimer are each
+rejected by name. The invariant's concern is fabricated claims wearing the face
+of real literature; identifiers that are impossible by construction and
+mechanically held that way are the opposite of that.
+
+### What Steps 1–3 found
+
+**Six of 134 Accessions were passing a check that asked them nothing.**
+`verifyNormalisation` handled `molar-to-mass` and the pH case by writing
+`computed = acc.normalized.value`, which makes the comparison true by
+construction. A perturbation sweep — nudge each authored normalisation by 1 %
+in turn and count what the checker catches — reported 128 of 134. The brief is
+explicit on this point ("Do not trust the authored normalisation; verify it in
+code"), so the arithmetic those two branches state in prose is now typed
+(`DerivationParams`), the species are named rather than inlined so a molar mass
+lives in one place, and the sweep reports 134 of 134.
+
+**Six rows of OF-DEMO-003 §3 were not being recomputed** although its §7 requires
+every row to be. C\*, the de-rated peak OUR, the cooling duty and headroom, the
+RUN-047 O₂ deficit and closure gap, and the capex anchor are now all replayed
+and all land within 1 % of the stated value.
+
+**The provided `assertCoreIntegrity` and seed check are not vacuous** — nudging
+the van 't Riet constant by 1 % and breaking one accession reference were both
+caught by name.
+
+### Deviation: a separate check script
+
+§6 says to add the acceptance criteria to `scripts/check-seed.ts`. They are in
+`scripts/check-demo-seed.ts` instead, wired into `pnpm verify` beside it. One
+script asserting over both pools would be the merge §8 forbids, in the one place
+where the two would be hardest to tell apart. **Deviation, recorded.**
+
