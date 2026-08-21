@@ -213,7 +213,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           <EmptyState
             title="No such paper"
             body={`${paperId} is not in this session's corpus. It may have been a link from an older session — session state resets on refresh.`}
-            action={<LinkButton to="/library">Back to Library</LinkButton>}
+            action={<LinkButton to="/trawl">Back to Library</LinkButton>}
             icon={<AlertTriangle size={22} />}
           />
         </Card>
@@ -409,7 +409,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
               >
                 Ingest this paper
               </Button>
-              <LinkButton to="/library/ingest" size="sm">
+              <LinkButton to="/trawl/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -451,7 +451,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
               >
                 <RefreshCw size={12} /> Retry ingest
               </Button>
-              <LinkButton to="/library/ingest" size="sm">
+              <LinkButton to="/trawl/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -554,7 +554,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
             }
             action={
               parseFailed ? (
-                <LinkButton to="/library/ingest" size="sm">
+                <LinkButton to="/trawl/ingest" size="sm">
                   Open ingest board
                 </LinkButton>
               ) : (

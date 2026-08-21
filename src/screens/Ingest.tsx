@@ -15,6 +15,10 @@ import {
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('trawl', 'corpus');
 import {
   Button,
   Callout,
@@ -207,7 +211,7 @@ export default function Ingest() {
 
   return (
     <>
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title="Ingest papers"
         subtitle={
           <>
@@ -218,7 +222,7 @@ export default function Ingest() {
             access.
           </>
         }
-        actions={<LinkButton to="/library">Back to Library</LinkButton>}
+        actions={<LinkButton to="/trawl">Back to Library</LinkButton>}
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-5 items-start">
@@ -408,7 +412,7 @@ export default function Ingest() {
                           )}
                         </div>
                         <a
-                          href={href(`/library/papers/${row.paper.id}`)}
+                          href={href(`/trawl/sources/${row.paper.id}`)}
                           className="font-serif leading-snug hover:text-accent hover:underline block mt-0.5"
                         >
                           {row.paper.title}
@@ -419,7 +423,7 @@ export default function Ingest() {
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0 justify-end">
                         {(row.state === 'complete' || row.state === 'degraded') && (
-                          <LinkButton to={`/library/papers/${row.paper.id}`} size="sm">
+                          <LinkButton to={`/trawl/sources/${row.paper.id}`} size="sm">
                             View paper
                           </LinkButton>
                         )}

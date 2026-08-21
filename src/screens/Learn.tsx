@@ -3,6 +3,10 @@ import { BookOpen, Check, Clock, Lock } from 'lucide-react';
 import { useStore } from '@/store';
 import { PageHeader, Card, LinkButton, cx } from '@/components/ui';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('learn', 'corpus');
 /** Completion ring — session-scoped progress, no persistence (§9.5). */
 function Ring({ done, total }: { done: number; total: number }) {
   const r = 15;
@@ -42,8 +46,8 @@ export default function Learn() {
 
   return (
     <div>
-      <PageHeader
-        title="Learn"
+      <PageHeader eyebrow={EYEBROW}
+        title="Modules"
         subtitle="Bioprocess taught through the live platform rather than beside it. Every embedded widget in these lessons is the real component, operating on the real session state."
         actions={
           <span className="text-body text-ink-soft font-num">

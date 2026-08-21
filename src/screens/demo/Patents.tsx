@@ -33,6 +33,10 @@ import { ClaimChip } from '@/components/demo/ClaimOverlay';
 import { AccessionValue } from '@/components/demo/AccessionValue';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('parchment', 'demo');
 /** Loud states first, so a scan hits enclosure before it hits an open door. */
 const RANK: Record<string, number> = {
   enclosed: 0,
@@ -51,7 +55,7 @@ export function DemoPatents() {
   return (
     <div className="p-6 max-w-[1100px]">
       <PageHeader
-        eyebrow="Reason · Parchment · demo suite"
+        eyebrow={EYEBROW}
         title="Patent families"
         subtitle={`${PATENT_FAMILIES.length} families across ${positions.length} national positions. Claim scope is expressed in the same field vocabulary as an Accession, so a recited range and a measured value can be compared rather than read beside each other.`}
       />

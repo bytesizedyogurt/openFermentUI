@@ -47,6 +47,10 @@ import {
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('geneos', 'corpus');
 // ── model ──────────────────────────────────────────────────────────────
 
 interface SPoint {
@@ -325,7 +329,7 @@ function StripPlot({
                   onFocus={() => setFocus(i)}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
-                  onClick={() => navigate(`/library/papers/${p.rec.paperId}?span=${p.rec.id}`)}
+                  onClick={() => navigate(`/trawl/sources/${p.rec.paperId}?span=${p.rec.id}`)}
                   className={cx(
                     'absolute -translate-x-1/2 rounded-full leading-none p-0 border-0 bg-transparent',
                     'hover:scale-125 focus-visible:scale-125 transition-transform',
@@ -854,7 +858,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/trawl/sources/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           onClick={(e) => e.stopPropagation()}
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
@@ -984,7 +988,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     return (
       <>
         <PageHeader
-          eyebrow="Organisms"
+          eyebrow={EYEBROW}
           title="Strain not found"
           subtitle="Session state resets on refresh, so a deep link from an earlier session can point at nothing."
         />
@@ -1004,7 +1008,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     return (
       <>
         <PageHeader
-          eyebrow="Organisms"
+          eyebrow={EYEBROW}
           title={
             <span>
               <span className="italic">{strain.binomial}</span>{' '}
@@ -1079,7 +1083,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Organisms · BSL-${strain.bsl}`}
+        eyebrow={`${EYEBROW} · BSL-${strain.bsl}`}
         title={
           <span>
             <span className="italic">{strain.binomial}</span>{' '}
@@ -1177,7 +1181,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               action={
                 <div className="flex gap-2">
                   <LinkButton to="/extract">Open the extraction table</LinkButton>
-                  <LinkButton to="/library">Browse the library</LinkButton>
+                  <LinkButton to="/trawl">Browse the sources</LinkButton>
                 </div>
               }
             />
@@ -1201,7 +1205,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             dense={density === 'dense'}
             exportName={`openferment-${strainId}-records`}
             exportNote="Canonical values are converted from the stored published pair on every render, so the table and the plots can never disagree."
-            onOpen={({ rec }) => navigate(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+            onOpen={({ rec }) => navigate(`/trawl/sources/${rec.paperId}?span=${rec.id}`)}
             searchOf={({ rec }) =>
               `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.unit} ${rec.componentTag ?? ''} ${rec.quote}`
             }
@@ -1340,7 +1344,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 {mediaProtocols.map(({ protocol, version, cited, materials }, i) => (
                   <li key={protocol.id}>
                     <a
-                      href={href(`/protocols/${protocol.id}`)}
+                      href={href(`/runbook/${protocol.id}`)}
                       className="block rounded-card border border-line p-2.5 hover:border-accent hover:bg-accent-wash transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1412,7 +1416,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   return (
                     <li key={p.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
                       <a
-                        href={href(`/protocols/${p.id}`)}
+                        href={href(`/runbook/${p.id}`)}
                         className="font-serif font-semibold hover:text-accent hover:underline"
                       >
                         {p.title}
@@ -1430,7 +1434,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                           {live && (
                             <a
                               className="btn btn-sm"
-                              href={href(`/protocols/${p.id}/run/${run.id}`)}
+                              href={href(`/runbook/${p.id}/run/${run.id}`)}
                               title="Return to the active run"
                             >
                               <Play size={12} /> Resume

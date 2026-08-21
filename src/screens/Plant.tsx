@@ -47,6 +47,10 @@ import { Flowsheet, FlowsheetLegend } from '@/components/Flowsheet';
 import { StreamTable } from '@/components/StreamTable';
 import { UnitSpecEditor, DesignResultsTable } from '@/components/UnitSpecEditor';
 import { SettingsPanel, UtilityAgentTable, type PlantSettings } from '@/components/BiosteamSettings';
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'corpus');
 import {
   PageHeader,
   Card,
@@ -534,7 +538,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
   if (!scenario || !spec) {
     return (
       <>
-        <PageHeader eyebrow="fermOS" title="Plant" />
+        <PageHeader eyebrow={EYEBROW} title="Plant" />
         <Card>
           <EmptyState
             icon={<Factory size={22} />}
@@ -551,7 +555,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
     return (
       <>
         <PageHeader
-          eyebrow="fermOS · bioSTEAM"
+          eyebrow={EYEBROW}
           title={`${scenario.name} — plant`}
           subtitle="The flowsheet, the capital, and the cash flow behind the headline price."
         />
@@ -601,7 +605,7 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
   return (
     <>
       <PageHeader
-        eyebrow="fermOS · bioSTEAM"
+        eyebrow={EYEBROW}
         title={`${scenario.name} — plant`}
         subtitle="Sized equipment, a capital ladder and a discounted cash flow. The price below is the one that drives net present value to zero, not a sum of assumed cost lines."
         actions={

@@ -14,6 +14,10 @@ import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, EmptyState, Callout, cx } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'corpus');
 interface Evaluated {
   scenario: Scenario;
   msp: number;
@@ -74,7 +78,7 @@ export default function Compare() {
   if (pinned.length === 0) {
     return (
       <div>
-        <PageHeader title="Compare scenarios" subtitle="Pin scenarios to line them up side by side." />
+        <PageHeader eyebrow={EYEBROW} title="Compare scenarios" subtitle="Pin scenarios to line them up side by side." />
         <EmptyState
           title="Nothing pinned yet"
           body="Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once."
@@ -97,7 +101,7 @@ export default function Compare() {
 
   return (
     <div>
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title="Compare scenarios"
         subtitle={`${evaluated.length} pinned scenario${evaluated.length === 1 ? '' : 's'} at their current settings. Every delta is computed from the same interpolated cost lines the workspaces show.`}
         actions={<Button onClick={exportDeltas}>Export deltas CSV</Button>}

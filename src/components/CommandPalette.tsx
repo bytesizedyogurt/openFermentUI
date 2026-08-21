@@ -11,6 +11,7 @@ import {
   ClipboardList,
   LineChart,
   GraduationCap,
+  Scale,
   Settings as SettingsIcon,
   Search,
   Sparkles,
@@ -65,20 +66,34 @@ export function CommandPalette() {
 
   const items = useMemo<Item[]>(() => {
     const nav: Item[] = [
-      { id: 'n-home', group: 'Navigate', label: 'Home', icon: Home, run: () => navigate('/') },
+      // Navigate entries carry the RAIL's label for the part, plus the old
+      // route word in parentheses, so a reader who learned "trawl" or "assay"
+      // can still find the screen by typing it. Both pools are here — one rail
+      // means the palette is one list too — and each demo entry says so.
+      { id: 'n-home', group: 'Navigate', label: 'Bench — home, both pools', icon: Home, run: () => navigate('/') },
       { id: 'n-ask', group: 'Navigate', label: 'Postdoc — ask the agent', icon: MessagesSquare, run: () => navigate('/postdoc') },
-      { id: 'n-lib', group: 'Navigate', label: 'Trawl — sources', icon: Library, run: () => navigate('/trawl') },
-      { id: 'n-ing', group: 'Navigate', label: 'Trawl — ingest', icon: Library, run: () => navigate('/trawl/ingest') },
+      { id: 'n-lib', group: 'Navigate', label: 'Intake — sources (trawl)', icon: Library, run: () => navigate('/trawl') },
+      { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest', icon: Library, run: () => navigate('/trawl/ingest') },
+      { id: 'n-rev', group: 'Navigate', label: 'Intake — review queue', icon: Table2, run: () => navigate('/trawl/review') },
       { id: 'n-led', group: 'Navigate', label: 'Ledger — parameters', icon: Table2, run: () => navigate('/ledger') },
       { id: 'n-ext', group: 'Navigate', label: 'Ledger — records', icon: Table2, run: () => navigate('/ledger/records') },
       { id: 'n-cx', group: 'Navigate', label: 'Ledger — contradictions', icon: Table2, run: () => navigate('/ledger/contradictions') },
-      { id: 'n-rev', group: 'Navigate', label: 'Trawl — review queue', icon: Table2, run: () => navigate('/trawl/review') },
-      { id: 'n-val', group: 'Navigate', label: 'Assay — validation dashboard', icon: Table2, run: () => navigate('/assay') },
-      { id: 'n-org', group: 'Navigate', label: 'geneOS — hosts', icon: FlaskConical, run: () => navigate('/geneos') },
+      { id: 'n-val', group: 'Navigate', label: 'Audit — validation dashboard (assay)', icon: Table2, run: () => navigate('/assay') },
+      { id: 'n-org', group: 'Navigate', label: 'geneOS — hosts (organisms)', icon: FlaskConical, run: () => navigate('/geneos') },
       { id: 'n-pro', group: 'Navigate', label: 'Runbook — protocols', icon: ClipboardList, run: () => navigate('/runbook') },
-      { id: 'n-sim', group: 'Navigate', label: 'fermOS — scenarios', icon: LineChart, run: () => navigate('/fermos') },
+      { id: 'n-sim', group: 'Navigate', label: 'fermOS — scenarios (simulate)', icon: LineChart, run: () => navigate('/fermos') },
       { id: 'n-cmp', group: 'Navigate', label: 'Compare scenarios', icon: LineChart, run: () => navigate('/fermos/compare') },
-      { id: 'n-lrn', group: 'Navigate', label: 'Learn', icon: GraduationCap, run: () => navigate('/learn') },
+      { id: 'n-par', group: 'Navigate', label: 'Parchment — catalogued patents', icon: Scale, run: () => navigate('/parchment') },
+      { id: 'n-not', group: 'Navigate', label: 'Notary — enablement check', icon: ClipboardList, run: () => navigate('/notary') },
+      { id: 'n-lab', group: 'Navigate', label: 'Guild — deposits (openLab)', icon: FlaskConical, run: () => navigate('/openlab') },
+      { id: 'n-lrn', group: 'Navigate', label: 'Primer — the curriculum (learn)', icon: GraduationCap, run: () => navigate('/learn') },
+      // ── The demo suite. Same rail, second pool, labelled as such. ──────
+      { id: 'n-repo', group: 'Navigate', label: 'BioRepo — Accessions (demo suite)', icon: Table2, run: () => navigate('/repo') },
+      { id: 'n-repcx', group: 'Navigate', label: 'BioRepo — contradictions (demo suite)', icon: Table2, run: () => navigate('/repo/contradictions') },
+      { id: 'n-prf', group: 'Navigate', label: 'Proforma — capacity and concepts (demo suite)', icon: LineChart, run: () => navigate('/proforma') },
+      { id: 'n-runs', group: 'Navigate', label: 'fermOS — runs (demo suite)', icon: LineChart, run: () => navigate('/fermos/runs') },
+      { id: 'n-fams', group: 'Navigate', label: 'Parchment — patent families (demo suite)', icon: Scale, run: () => navigate('/parchment/families') },
+      { id: 'n-disc', group: 'Navigate', label: 'Notary — disclosure queue (demo suite)', icon: ClipboardList, run: () => navigate('/notary/disclosures') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
     ];
@@ -89,7 +104,7 @@ export function CommandPalette() {
         label: `${p.id} — ${p.title}`,
         hint: `${p.year} · paper`,
         icon: Library,
-        run: () => navigate(`/library/papers/${p.id}`),
+        run: () => navigate(`/trawl/sources/${p.id}`),
       });
     }
     for (const s of strains) {
@@ -99,7 +114,7 @@ export function CommandPalette() {
         label: `${s.binomial} ${s.designation}`,
         hint: 'strain',
         icon: FlaskConical,
-        run: () => navigate(`/organisms/${s.id}`),
+        run: () => navigate(`/geneos/${s.id}`),
       });
     }
     for (const p of protocols) {
@@ -109,7 +124,7 @@ export function CommandPalette() {
         label: p.title,
         hint: `${p.id} · protocol`,
         icon: ClipboardList,
-        run: () => navigate(`/protocols/${p.id}`),
+        run: () => navigate(`/runbook/${p.id}`),
       });
     }
     for (const s of scenarios) {

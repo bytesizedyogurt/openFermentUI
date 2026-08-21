@@ -294,7 +294,11 @@ export const UPSTREAM_BY_PART: Record<string, PartUpstream> = Object.fromEntries
 /** Which part a route belongs to. First segment, with the demo aliases folded in. */
 export function partForPath(path: string): string {
   const seg = path.replace(/^#?\//, '').split('/')[0] ?? '';
-  if (seg === 'bench' || seg === '') return 'postdoc';
+  // The Bench is the home, not a part: it shows the state of both pools rather
+  // than owning a concern, so it has no upstream note. It used to claim
+  // Postdoc's, which put "Postdoc will be derived from Model Context Protocol"
+  // at the foot of a page that is not Postdoc.
+  if (seg === '' || seg === 'bench') return '';
   return seg;
 }
 

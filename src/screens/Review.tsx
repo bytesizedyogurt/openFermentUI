@@ -38,6 +38,10 @@ import {
 } from '@/components/ui';
 import { DISCLOSURE, exportText } from '@/lib/csv';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('trawl', 'corpus');
 // ── reject reasons (numbered so they are one keystroke away) ────────────
 
 const REASONS: { key: string; label: string; hint: string }[] = [
@@ -416,7 +420,7 @@ export default function Review() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow={EYEBROW}
           title="Review queue"
           subtitle="Accept, correct, or reject each extraction against the span it came from."
         />
@@ -520,7 +524,7 @@ export default function Review() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow={EYEBROW}
           title="Queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
@@ -655,7 +659,7 @@ export default function Review() {
   if (!record) {
     return (
       <>
-        <PageHeader eyebrow="Module 0 · Evidence" title="Review queue" />
+        <PageHeader eyebrow={EYEBROW} title="Review queue" />
         {topStrip}
         <Card className="p-4 max-w-2xl">
           <Callout kind="warn" title="This queue entry no longer resolves">
@@ -685,7 +689,7 @@ export default function Review() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow={EYEBROW}
         title="Review queue"
         subtitle="Judge each extraction against the sentence it was pulled from. Accept, correct, or reject — the audit trail keeps both the original and your correction."
         actions={
@@ -838,7 +842,7 @@ export default function Review() {
                 </span>
               </div>
               <a
-                href={href(`/library/papers/${record.paperId}?span=${record.id}`)}
+                href={href(`/trawl/sources/${record.paperId}?span=${record.id}`)}
                 className="text-caption text-accent hover:underline"
               >
                 Open in the reader

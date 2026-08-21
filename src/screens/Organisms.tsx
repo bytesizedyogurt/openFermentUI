@@ -19,6 +19,10 @@ import {
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('geneos', 'corpus');
 // ── coverage model ─────────────────────────────────────────────────────
 
 interface Coverage {
@@ -217,7 +221,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
       </Tick>
 
       <div className="flex items-center gap-2 pt-1 border-t border-line">
-        <LinkButton to={`/organisms/${s.id}`} variant="primary">
+        <LinkButton to={`/geneos/${s.id}`} variant="primary">
           Open <ArrowRight size={14} />
         </LinkButton>
         <span className="font-num text-caption text-ink-soft">{s.id}</span>
@@ -329,7 +333,7 @@ export default function Organisms() {
   if (!ready) {
     return (
       <>
-        <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />
+        <PageHeader eyebrow={EYEBROW} title="Strains" subtitle={subtitle} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <Card key={i}>
@@ -344,7 +348,7 @@ export default function Organisms() {
   if (strains.length === 0) {
     return (
       <>
-        <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />
+        <PageHeader eyebrow={EYEBROW} title="Strains" subtitle={subtitle} />
         <Card>
           <EmptyState
             icon={<FlaskConical size={22} />}
@@ -360,8 +364,8 @@ export default function Organisms() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 1 · Organisms"
-        title="Organisms"
+        eyebrow={EYEBROW}
+        title="Strains"
         subtitle={subtitle}
         actions={
           <div

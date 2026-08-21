@@ -22,6 +22,10 @@ import { navigate, href } from '@/router';
 import { Card, PageHeader, SectionTitle, Callout, Explain, LinkButton, cx } from '@/components/ui';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('ledger', 'corpus');
 // ── shared helpers ─────────────────────────────────────────────────────
 
 function useViews(): ParameterView[] {
@@ -84,7 +88,7 @@ export function Ledger() {
   return (
     <div className="p-6 max-w-[1400px]">
       <PageHeader
-        eyebrow="Read · Ledger"
+        eyebrow={EYEBROW}
         title="Parameters"
         subtitle="The 24 ontology fields, each as an aggregate over the records that measure it. A record is evidence; the parameter is the thing you reason with."
         actions={<LinkButton to="/ledger/records">Record table</LinkButton>}
@@ -248,7 +252,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
   if (!def) {
     return (
       <div className="p-6">
-        <PageHeader eyebrow="Ledger" title="Unknown parameter" subtitle={field} />
+        <PageHeader eyebrow={EYEBROW} title="Unknown parameter" subtitle={field} />
         <LinkButton to="/ledger">Back to the Ledger</LinkButton>
       </div>
     );
@@ -592,7 +596,7 @@ export function Contradictions() {
   return (
     <div className="p-6 max-w-[1000px]">
       <PageHeader
-        eyebrow="Read · Ledger"
+        eyebrow={EYEBROW}
         title="Contradictions"
         subtitle="Sets of records that cannot all be true. Found by arithmetic over what the ontology already knows, not by judgement."
         actions={<LinkButton to="/ledger">Back to parameters</LinkButton>}
@@ -693,7 +697,7 @@ export function UnbuiltPart({ name, blurb }: { name: string; blurb: string }) {
   return (
     <div className="p-6 max-w-2xl">
       <PageHeader
-        eyebrow="Not built yet"
+        eyebrow={EYEBROW}
         title={name}
         subtitle="Specified in OF-FE-003, not implemented in this build."
       />

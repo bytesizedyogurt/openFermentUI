@@ -20,6 +20,10 @@ import { DemoTick, DemoTickLegend, SOURCE_LABEL, HOLD_LABEL, demoTickClass, demo
 import { DemoContradictionRail } from '@/components/demo/DemoContradictionRail';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('repo', 'demo');
 // ── /repo — the index ──────────────────────────────────────────────────
 
 export function RepoIndex() {
@@ -60,7 +64,7 @@ export function RepoIndex() {
 
   return (
     <div className="p-6 max-w-[1400px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title="BioRepo"
         subtitle={`${ACCESSIONS.length} Accessions. One quantity each, with complete provenance under a permanent identifier.`}
       />
@@ -193,7 +197,7 @@ export function AccessionPage({ id }: { id: string }) {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={acc.id}
         subtitle={
           <>
@@ -468,7 +472,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader title={def.name} subtitle={`${def.family} · canonical unit ${def.canonicalUnit}`} />
+      <PageHeader eyebrow={EYEBROW} title={def.name} subtitle={`${def.family} · canonical unit ${def.canonicalUnit}`} />
       <div className="text-caption text-ink-soft mb-4">{def.definition}</div>
 
       <Card>
@@ -533,7 +537,7 @@ export function ContradictionQueue() {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title="Contradictions"
         subtitle="Where the record disagrees with itself, and where it only looked like it did."
       />

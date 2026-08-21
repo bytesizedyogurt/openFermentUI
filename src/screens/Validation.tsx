@@ -52,6 +52,10 @@ import { useCategorical } from '@/lib/viz';
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('assay', 'corpus');
 // ── run identity ───────────────────────────────────────────────────────
 
 const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r'];
@@ -422,7 +426,7 @@ export default function Validation() {
 
   const header = (actions?: ReactNode) => (
     <PageHeader
-      eyebrow="Module 0 · Evidence"
+      eyebrow={EYEBROW}
       title="Extraction validation"
       subtitle="What the extractor would be scored on, and what it has been scored on so far."
       actions={actions}
@@ -507,7 +511,7 @@ export default function Validation() {
 
     return (
       <>
-        {header(<LinkButton to="/library">Open the Library</LinkButton>)}
+        {header(<LinkButton to="/trawl">Open the Library</LinkButton>)}
 
         <div className="max-w-3xl space-y-4">
           <Callout kind="info" title="No extractor has been run against this corpus yet">
@@ -689,7 +693,7 @@ export default function Validation() {
               <li>Run an extractor and score it here.</li>
             </ol>
             <div className="mt-3">
-              <LinkButton to="/library/ingest" variant="primary">
+              <LinkButton to="/trawl/ingest" variant="primary">
                 Open the ingest pipeline
               </LinkButton>
             </div>
@@ -1273,7 +1277,7 @@ function ComparisonBody({
         <CitationChip paperId={row.paperId} recordId={row.recordId} />
         {record && (
           <a
-            href={href(`/library/papers/${record.paperId}?span=${record.id}`)}
+            href={href(`/trawl/sources/${record.paperId}?span=${record.id}`)}
             className="text-caption text-accent hover:underline"
           >
             Open in the reader

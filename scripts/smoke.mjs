@@ -48,7 +48,6 @@ const ROUTES = [
   // ── the demo suite (OF-DEMO-001) ─────────────────────────────────────
   // Every archetype deliverable and both ends of each seam-matrix link, so a
   // route that stops rendering is caught here rather than during a walkthrough.
-  ['/bench', 'Demo bench — six archetype cards'],
   ['/repo', 'BioRepo — Accession index'],
   ['/repo/a/OF-A-00101', 'Accession page'],
   ['/repo/a/OF-A-00147', 'Accession page (held, excursion-flagged)'],
@@ -127,6 +126,7 @@ const ROUTES = [
   ['/organisms/cw15', 'ALIAS organisms -> geneos'],
   ['/simulate', 'ALIAS simulate -> fermos'],
   ['/ask', 'ALIAS ask -> postdoc'],
+  ['/bench', 'ALIAS bench -> the Bench'],
   ['/protocols/PR-TAP-01', 'ALIAS protocols -> runbook'],
 ];
 

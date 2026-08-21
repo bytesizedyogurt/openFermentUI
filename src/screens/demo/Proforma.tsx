@@ -34,6 +34,10 @@ import { CapexCurve } from '@/components/demo/CapexCurve';
 import { DisclosureSection } from './Fermos';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('proforma', 'demo');
 function organismName(id: string): string {
   const o = ORGANISM_BY_ID[id] ?? AUX_ORGANISMS.find((x) => x.id === id);
   return o ? o.binomial : id;
@@ -53,7 +57,7 @@ export function ProformaIndex() {
   const concepts = DELIVERABLES.filter((d) => d.payload.kind === 'facility-concept');
   return (
     <div className="p-6 max-w-[900px]">
-      <PageHeader title="Proforma" subtitle="Techno-economics against an explicit regional and temporal basis." />
+      <PageHeader eyebrow={EYEBROW} title="Proforma" subtitle="Techno-economics against an explicit regional and temporal basis." />
       <div className="space-y-3">
         {[...screens, ...concepts].map((d) => (
           <Card key={d.id}>
@@ -110,7 +114,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
 
   return (
     <div className="p-6 max-w-[1500px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={dlv?.title ?? `${plant.name} — capacity screen`}
         subtitle={dlv?.query ?? `What can this plant actually make?`}
       />
@@ -259,7 +263,7 @@ export function CandidateDetail({ plantId, candidateId }: { plantId: string; can
 
   return (
     <div className="p-6 max-w-[1000px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={`${c.id} — ${c.product}`}
         subtitle={
           <a href={href(`/proforma/screen/${plant.id}`)} className="hover:text-accent">
@@ -341,7 +345,7 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
 
   return (
     <div className="p-6 max-w-[1200px]">
-      <PageHeader title={dlv?.title ?? 'Greenfield concept'} subtitle={dlv?.query} />
+      <PageHeader eyebrow={EYEBROW} title={dlv?.title ?? 'Greenfield concept'} subtitle={dlv?.query} />
 
       <Card>
         <SectionTitle>Capex against scale</SectionTitle>

@@ -558,7 +558,9 @@ export function chipRoute(id: string): string {
   if (id.startsWith('RUN-')) return `/fermos/runs/${id}`;
   if (id.startsWith('OF-A-')) return `/repo/a/${id}`;
   if (id.startsWith('PF-')) return `/parchment/families#${id}`;
-  return '/bench';
+  // The Bench, which shows the state of both pools. `/bench` used to be a
+  // second home of its own; it canonicalises here now.
+  return '/';
 }
 
 /** Where a deliverable renders. One table, so no screen invents a route. */

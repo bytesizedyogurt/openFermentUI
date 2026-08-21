@@ -364,7 +364,7 @@ function StripPlot({ field }: { field: FieldId }) {
                 key={p.r.id}
                 className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
                 style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
-                onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
+                onClick={() => navigate(`/trawl/sources/${p.r.paperId}?span=${p.r.id}`)}
                 title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}${
                   excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
                 }`}
@@ -419,7 +419,7 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
           </div>
           <p className="text-body text-ink-soft mt-1">{protocol.purpose}</p>
         </div>
-        <Button variant="primary" onClick={() => navigate(`/protocols/${protocol.id}`)}>
+        <Button variant="primary" onClick={() => navigate(`/runbook/${protocol.id}`)}>
           Open <ArrowRight size={13} />
         </Button>
       </div>

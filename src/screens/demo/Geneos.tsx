@@ -23,6 +23,10 @@ import { DisclosureSection } from './Fermos';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('geneos', 'demo');
 /**
  * A step's claims, flattened to one chip per jurisdiction.
  *
@@ -80,7 +84,7 @@ export function RouteComparison({ productId }: { productId: string }) {
 
   return (
     <div className="p-6 max-w-[1200px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={dlv?.title ?? `${productId} — route comparison`}
         subtitle={dlv?.query ?? 'Which route, and is it available?'}
       />
@@ -175,7 +179,7 @@ export function RouteDetail({ productId, routeId }: { productId: string; routeId
 
   return (
     <div className="p-6 max-w-[1000px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={route.name}
         subtitle={
           <a href={href(`/geneos/routes/${productId}`)} className="hover:text-accent">

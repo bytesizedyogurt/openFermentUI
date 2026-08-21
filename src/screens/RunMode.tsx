@@ -239,12 +239,12 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
                 variant="primary"
                 onClick={() => {
                   const id = startRun(protocolId, protocol.currentVersion, 1);
-                  navigate(`/protocols/${protocolId}/run/${id}`);
+                  navigate(`/runbook/${protocolId}/run/${id}`);
                 }}
               >
                 Start a fresh run
               </Button>
-              <Button onClick={() => navigate(`/protocols/${protocolId}`)}>Open the protocol</Button>
+              <Button onClick={() => navigate(`/runbook/${protocolId}`)}>Open the protocol</Button>
             </div>
           }
         />
@@ -401,7 +401,7 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
               onClick={() => {
                 finishRun(runId);
                 toast({ text: 'Run summary saved to this protocol’s history', kind: 'success' });
-                navigate(`/protocols/${protocolId}`);
+                navigate(`/runbook/${protocolId}`);
               }}
             >
               <Check size={15} /> Save to run history
@@ -800,7 +800,7 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
                 href: `#/runbook/${protocolId}/run/${runId}`,
                 hrefLabel: 'Resume',
               });
-              navigate(`/protocols/${protocolId}`);
+              navigate(`/runbook/${protocolId}`);
             }}
           >
             Keep active

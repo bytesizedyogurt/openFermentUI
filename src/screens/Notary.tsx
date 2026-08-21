@@ -31,6 +31,10 @@ import { adapters } from '@/adapters';
 import { useAdapterData } from '@/adapters/react';
 import type { DesignRecord, PublicationStatus } from '@/data/types';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('notary', 'corpus');
 interface Requirement {
   id: string;
   label: string;
@@ -145,8 +149,8 @@ export function Notary() {
 
   const header = (
     <PageHeader
-      eyebrow="Return · Notary"
-      title="Disclosure queue"
+      eyebrow={EYEBROW}
+      title="Enablement check"
       subtitle="A disclosure that does not enable is worthless as prior art. Publish stays disabled until it would teach someone to reproduce the result."
     />
   );

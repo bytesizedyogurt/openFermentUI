@@ -29,6 +29,7 @@ import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { DemoSuiteBand } from '@/components/demo/DemoSuiteBand';
 import { blastRadius } from '@/engine/stale';
 // Two adapters, not one, because the two tiles below are answered by two
 // subsystems. The gold-set plan is BioRepo's — every row of it is a paper id,
@@ -366,7 +367,7 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <TileBoundary label="Papers catalogued">
               <VitalTile
-                to="/library"
+                to="/trawl"
                 label="Papers catalogued"
                 prov="curated"
                 tickTitle="Real literature, curated by hand — metadata and a curator note, no full text retrieved"
@@ -673,7 +674,7 @@ export default function Home() {
 
               {activeRun && activeProtocol && (
                 <ResumeCard
-                  to={`/protocols/${activeRun.protocolId}/run/${activeRun.id}`}
+                  to={`/runbook/${activeRun.protocolId}/run/${activeRun.id}`}
                   kicker="Run in progress"
                   title={activeProtocol.title}
                   prov="user"
@@ -762,6 +763,11 @@ export default function Home() {
             What is this platform?
           </button>
         </section>
+
+        {/* The second pool. A component rather than a section written here,
+            because `Home` reads the corpus through the adapter seam and the
+            demo pool reads its modules directly. */}
+        <DemoSuiteBand />
       </div>
 
       {/* ── Right rail · recent activity ─────────────────────────────── */}

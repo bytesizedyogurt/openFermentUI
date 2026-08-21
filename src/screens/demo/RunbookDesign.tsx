@@ -24,6 +24,10 @@ import { AccessionValue } from '@/components/demo/AccessionValue';
 import { PatentDensity } from '@/components/demo/ProblemTree';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('runbook', 'demo');
 const STATUS: Record<Decision['status'], { label: string; className: string }> = {
   open: { label: 'open', className: 'text-signal-warn' },
   leaning: { label: 'leaning', className: 'text-signal-info' },
@@ -43,7 +47,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={p.title}
         subtitle={
           <>

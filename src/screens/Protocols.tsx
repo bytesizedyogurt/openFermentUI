@@ -43,6 +43,10 @@ import {
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('runbook', 'corpus');
 // ── Category vocabulary (shared with ProtocolDetail) ───────────────────
 
 export const CATEGORY_META: Record<
@@ -335,7 +339,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           </span>
           <div className="min-w-0 flex-1">
             <a
-              href={href(`/protocols/${protocol.id}`)}
+              href={href(`/runbook/${protocol.id}`)}
               className="font-serif text-section-title font-semibold leading-snug hover:text-accent hover:underline block"
             >
               {protocol.title}
@@ -363,7 +367,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
             return (
               <a
                 key={o}
-                href={href(`/organisms/${o}`)}
+                href={href(`/geneos/${o}`)}
                 className="chip text-caption text-ink-soft hover:border-accent/40 hover:bg-accent-wash"
                 title={s.title}
               >
@@ -386,14 +390,14 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           <div className="flex items-center gap-2 shrink-0">
             {row.runCount > 0 && (
               <a
-                href={href(`/protocols/${protocol.id}`)}
+                href={href(`/runbook/${protocol.id}`)}
                 className="text-caption text-ink-soft hover:text-accent font-num"
                 title="Runs recorded in this session"
               >
                 {row.runCount} run{row.runCount === 1 ? '' : 's'}
               </a>
             )}
-            <LinkButton to={`/protocols/${protocol.id}`} variant="primary" size="sm">
+            <LinkButton to={`/runbook/${protocol.id}`} variant="primary" size="sm">
               Open
             </LinkButton>
           </div>
@@ -552,7 +556,7 @@ export default function Protocols() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/protocols/${r.protocol.id}`)}
+          href={href(`/runbook/${r.protocol.id}`)}
           className="font-num text-accent hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
@@ -567,7 +571,7 @@ export default function Protocols() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/protocols/${r.protocol.id}`)}
+          href={href(`/runbook/${r.protocol.id}`)}
           className="font-serif hover:text-accent hover:underline block truncate"
           style={{ maxWidth: 320 }}
           title={r.protocol.purpose}
@@ -682,7 +686,7 @@ export default function Protocols() {
   ];
 
   const header = (
-    <PageHeader
+    <PageHeader eyebrow={EYEBROW}
       title="Protocols"
       subtitle={
         <>
@@ -877,7 +881,7 @@ export default function Protocols() {
               rowKey={(r) => r.protocol.id}
               tickOf={(r) => r.prov}
               dense={density === 'dense'}
-              onOpen={(r) => navigate(`/protocols/${r.protocol.id}`)}
+              onOpen={(r) => navigate(`/runbook/${r.protocol.id}`)}
               searchOf={undefined}
               exportName="openferment-protocols"
               exportNote="CSV exports carry the corpus disclosure header, which states what each provenance class means. Capability columns are computed from protocol content."

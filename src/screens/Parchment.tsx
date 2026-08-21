@@ -32,6 +32,10 @@ import {
 import { adapters } from '@/adapters';
 import { useAdapterData } from '@/adapters/react';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('parchment', 'corpus');
 export function Parchment() {
   const papers = useStore((s) => s.papers);
   const patents = useAdapterData(() => adapters.corpus.listPatents(), []);
@@ -40,7 +44,7 @@ export function Parchment() {
     return (
       <div className="p-6 max-w-[1100px]">
         <PageHeader
-          eyebrow="Reason · Parchment"
+          eyebrow={EYEBROW}
           title="Patent scope"
           subtitle="Claims expressed in the same ontology as the literature, so a Ledger record can be tested against one rather than read beside it."
         />
@@ -69,7 +73,7 @@ export function Parchment() {
   return (
     <div className="p-6 max-w-[1100px]">
       <PageHeader
-        eyebrow="Reason · Parchment"
+        eyebrow={EYEBROW}
         title="Patent scope"
         subtitle="Claims expressed in the same ontology as the literature, so a Ledger record can be tested against one rather than read beside it."
       />

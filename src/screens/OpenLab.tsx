@@ -19,6 +19,10 @@ import { fieldName } from '@/data/ontology';
 import { Card, PageHeader, SectionTitle, Callout, Button, LinkButton, cx } from '@/components/ui';
 import type { FieldId, ResultField, RunOutcome, RunState } from '@/data/types';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('openlab', 'corpus');
 const OUTCOME_META = {
   success: { label: 'Success', Icon: CheckCircle2, tone: 'text-accent' },
   failure: { label: 'Failure', Icon: XCircle, tone: 'text-signal-warn' },
@@ -71,7 +75,7 @@ export function OpenLab() {
   return (
     <div className="p-6 max-w-[1000px]">
       <PageHeader
-        eyebrow="Return · openLab"
+        eyebrow={EYEBROW}
         title="Deposits"
         subtitle="Runs from this session, successes and failures at equal weight."
         actions={<LinkButton to="/runbook">Open the Runbook</LinkButton>}

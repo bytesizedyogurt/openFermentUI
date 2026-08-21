@@ -148,7 +148,7 @@ function AnswerStrip({ md }: { md: string }) {
               key={p.r.id}
               className="absolute -translate-x-1/2 group"
               style={{ left: `${pct}%`, top: 20 + jitter * 7 }}
-              onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
+              onClick={() => navigate(`/trawl/sources/${p.r.paperId}?span=${p.r.id}`)}
               title={`${fmt(p.v)} ${cited.def.canonicalUnit} — ${p.r.paperId} (${p.r.status})`}
             >
               <ProvDot p={provenanceOf(p.r)} size={9} />
@@ -236,7 +236,7 @@ function RetrievalCards({
               </button>
               <button
                 className="text-caption text-accent hover:underline"
-                onClick={() => navigate(`/library/papers/${h.paperId}`)}
+                onClick={() => navigate(`/trawl/sources/${h.paperId}`)}
               >
                 Open source
               </button>
@@ -993,7 +993,7 @@ function InsertInto({ md }: { md: string }) {
                   href: `#/runbook/${p.id}`,
                   hrefLabel: 'Open',
                 });
-                navigate(`/protocols/${p.id}`);
+                navigate(`/runbook/${p.id}`);
               }}
             >
               {p.title}

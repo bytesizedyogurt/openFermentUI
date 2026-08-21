@@ -24,6 +24,10 @@ import { DisclosureCard, URGENCY_RANK } from '@/components/demo/DisclosureCard';
 
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('notary', 'demo');
 export function NotaryQueue() {
   const [reason, setReason] = useState<string>('all');
 
@@ -51,8 +55,8 @@ export function NotaryQueue() {
 
   return (
     <div className="p-6 max-w-[1200px]">
-      <PageHeader
-        title="Notary queue"
+      <PageHeader eyebrow={EYEBROW}
+        title="Disclosure queue"
         subtitle={`${DISCLOSURES.length} disclosure candidates, from ${new Set(DISCLOSURES.map((d) => d.archetype)).size} archetypes.`}
       />
 

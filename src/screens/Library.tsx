@@ -30,6 +30,10 @@ import {
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('trawl', 'corpus');
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
 
@@ -287,7 +291,7 @@ export default function Library() {
       render: (r) => (
         <Tick p={r.prov} className="inline-block whitespace-nowrap">
           <a
-            href={href(`/library/papers/${r.paper.id}`)}
+            href={href(`/trawl/sources/${r.paper.id}`)}
             className="font-num text-accent hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -303,7 +307,7 @@ export default function Library() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/library/papers/${r.paper.id}`)}
+          href={href(`/trawl/sources/${r.paper.id}`)}
           className="font-serif hover:text-accent hover:underline block truncate"
           style={{ maxWidth: 340 }}
           title={r.paper.title}
@@ -500,15 +504,15 @@ export default function Library() {
           </div>
         </div>
       </Popover>
-      <LinkButton to="/library/ingest" variant="primary" size="sm">
+      <LinkButton to="/trawl/ingest" variant="primary" size="sm">
         Ingest papers
       </LinkButton>
     </>
   );
 
   const header = (
-    <PageHeader
-      title="Library"
+    <PageHeader eyebrow={EYEBROW}
+      title="Sources"
       subtitle={
         <>
           Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
@@ -542,7 +546,7 @@ export default function Library() {
           <EmptyState
             title="No papers in the corpus yet"
             body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
-            action={<LinkButton to="/library/ingest">Open the ingest board</LinkButton>}
+            action={<LinkButton to="/trawl/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
       </>
@@ -581,7 +585,7 @@ export default function Library() {
                     {r.paper.id}
                   </span>
                   <a
-                    href={href(`/library/papers/${r.paper.id}`)}
+                    href={href(`/trawl/sources/${r.paper.id}`)}
                     className="font-serif truncate flex-1 min-w-0 hover:text-accent hover:underline"
                     title={r.paper.title}
                   >
@@ -610,7 +614,7 @@ export default function Library() {
                       />
                     )}
                   </div>
-                  <LinkButton to="/library/ingest" size="sm">
+                  <LinkButton to="/trawl/ingest" size="sm">
                     Board
                   </LinkButton>
                 </div>
@@ -630,7 +634,7 @@ export default function Library() {
         rowKey={(r) => r.paper.id}
         tickOf={(r) => r.prov}
         dense={density === 'dense'}
-        onOpen={(r) => navigate(`/library/papers/${r.paper.id}`)}
+        onOpen={(r) => navigate(`/trawl/sources/${r.paper.id}`)}
         facets={facets}
         searchOf={(r) =>
           `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')} ${r.paper.topics.join(' ')}`

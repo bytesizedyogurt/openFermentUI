@@ -28,6 +28,10 @@ import {
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('ledger', 'corpus');
 // ── row model ──────────────────────────────────────────────────────────
 
 interface ExRow {
@@ -293,7 +297,7 @@ export default function Extract() {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/trawl/sources/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
           onClick={(e) => e.stopPropagation()}
@@ -552,7 +556,7 @@ export default function Extract() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow={EYEBROW}
           title="Extraction records"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
         />
@@ -593,7 +597,7 @@ export default function Extract() {
     return (
       <>
         <PageHeader
-          eyebrow="Module 0 · Evidence"
+          eyebrow={EYEBROW}
           title="Extraction records"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
           actions={headerActions}
@@ -622,11 +626,11 @@ export default function Extract() {
                 <div className="flex gap-2">
                   <Button onClick={() => navigate('/ledger/records')}>Show every record</Button>
                   {scopedPaper && !recordParam && (
-                    <LinkButton to={`/library/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
+                    <LinkButton to={`/trawl/sources/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
               ) : (
-                <LinkButton to="/library/ingest">Open the ingest board</LinkButton>
+                <LinkButton to="/trawl/ingest">Open the ingest board</LinkButton>
               )
             }
           />
@@ -641,7 +645,7 @@ export default function Extract() {
   return (
     <>
       <PageHeader
-        eyebrow="Module 0 · Evidence"
+        eyebrow={EYEBROW}
         title="Extraction records"
         subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so."
         actions={headerActions}
@@ -697,7 +701,7 @@ export default function Extract() {
         dense={density === 'dense'}
         toolbar={toolbar}
         onFilteredChange={handleFiltered}
-        onOpen={({ rec }) => navigate(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+        onOpen={({ rec }) => navigate(`/trawl/sources/${rec.paperId}?span=${rec.id}`)}
         searchOf={({ rec }) =>
           `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.field} ${rec.unit} ${
             rec.si.unit

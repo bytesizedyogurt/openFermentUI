@@ -32,6 +32,10 @@ import { DemoTickLegend, HOLD_LABEL, demoTickClass, demoTickTitle } from '@/comp
 import { DemoFooter } from '@/components/demo/DemoFooter';
 import { DISCLOSURES } from '@/data/demo/archetypes';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'demo');
 // The run channels carry authored excursion windows; the integrals over them
 // are computed. Hydrating once at module scope keeps every screen reading the
 // same numbers rather than each recomputing its own.
@@ -57,7 +61,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
 
   return (
     <div className="p-6 max-w-[1200px]">
-      <PageHeader title={dlv.title} subtitle={dlv.query} />
+      <PageHeader eyebrow={EYEBROW} title={dlv.title} subtitle={dlv.query} />
 
       <Callout>
         The bands below say three different things and only one of them is a result. The washed
@@ -194,7 +198,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
 
   return (
     <div className="p-6 max-w-[900px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={FIELD_BY_ID[factor.field]?.name ?? factor.field}
         subtitle={
           <a href={href(`/fermos/gap/${deliverableId}`)} className="hover:text-accent">
@@ -235,7 +239,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
 export function RunIndex() {
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader title="Runs" subtitle={`${RUNS.length} runs across the Ledger.`} />
+      <PageHeader eyebrow={EYEBROW} title="Runs" subtitle={`${RUNS.length} runs across the Ledger.`} />
       <Card className="p-0 overflow-x-auto">
         <table className="w-full text-body">
           <thead className="text-caption text-ink-soft text-left">
@@ -317,7 +321,7 @@ export function RunPage({ runId }: { runId: string }) {
 
   return (
     <div className="p-6 max-w-[1400px]">
-      <PageHeader
+      <PageHeader eyebrow={EYEBROW}
         title={run.id}
         subtitle={`${ORGANISM_BY_ID[run.organismId]?.binomial ?? run.organismId} · ${run.productId} · started ${run.startedAt}`}
       />
@@ -445,7 +449,7 @@ export function EnvelopePage({ plantId }: { plantId: string }) {
 
   return (
     <div className="p-6 max-w-[1100px]">
-      <PageHeader title={plant.name} subtitle={`${plant.location.city}, ${plant.location.country} · ambient ${plant.location.ambientC} °C`} />
+      <PageHeader eyebrow={EYEBROW} title={plant.name} subtitle={`${plant.location.city}, ${plant.location.country} · ambient ${plant.location.ambientC} °C`} />
 
       <Card>
         <SectionTitle>The two ceilings</SectionTitle>

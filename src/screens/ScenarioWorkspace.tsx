@@ -30,6 +30,10 @@ import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } fro
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'corpus');
 const CONVERGE_STAGES = ['Building flowsheet', 'Converging', 'Costing'];
 
 /** A "view as table" disclosure — the accessibility floor for every chart (§6.6). */
@@ -254,7 +258,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
   return (
     <div>
       <PageHeader
-        eyebrow={`${scenario.modelId} · scenario`}
+        eyebrow={`${EYEBROW} · ${scenario.modelId}`}
         title={scenario.name}
         subtitle={scenario.description}
         actions={

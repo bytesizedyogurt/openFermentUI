@@ -18,6 +18,10 @@ import { ProblemTree, PatentDensity } from '@/components/demo/ProblemTree';
 import { DisclosureSection } from './Fermos';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('postdoc', 'demo');
 export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
   const dlv =
     DELIVERABLE_BY_ID[deliverableId] ?? DELIVERABLES.find((d) => d.payload.kind === 'problem-tree');
@@ -45,7 +49,7 @@ export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
 
   return (
     <div className="p-6 max-w-[1000px]">
-      <PageHeader title={dlv.title} subtitle={dlv.query} />
+      <PageHeader eyebrow={EYEBROW} title={dlv.title} subtitle={dlv.query} />
 
       <Callout>
         The question was not answerable as asked. What follows is the restructuring — and the

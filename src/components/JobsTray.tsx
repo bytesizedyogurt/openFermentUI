@@ -32,7 +32,7 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
           <button
             className="w-full text-left px-3 py-2.5 border-b border-line hover:bg-accent-wash"
             onClick={() => {
-              navigate(`/protocols/${activeProto.id}/run/${activeRun.id}`);
+              navigate(`/runbook/${activeProto.id}/run/${activeRun.id}`);
               onClose();
             }}
           >

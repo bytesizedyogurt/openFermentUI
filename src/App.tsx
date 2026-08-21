@@ -27,7 +27,6 @@ import {
   Users,
   Stamp,
   type LucideIcon,
-  LayoutGrid,
   Database,
   Calculator} from 'lucide-react';
 import { useStore } from '@/store';
@@ -71,41 +70,54 @@ import Settings from '@/screens/Settings';
  * it — Read, Reason, Return — so a reviewer can learn the system by looking at
  * the sidebar. Shortcuts are preserved wherever the destination is the same
  * screen it was before the rename.
+ *
+ * ONE ENTRY PER PART, AND THE LABEL COMES FROM THE PART TABLE. `UPSTREAM` in
+ * `data/demo/upstream.ts` is the list of parts, and `UpstreamNote` renders that
+ * table's label at the foot of every screen. The rail used to restate the names
+ * instead of reading them, and disagreed on five of thirteen: a reader on
+ * `/trawl` saw "Trawl" in the rail and "Intake will be derived from PaperQA2"
+ * at the bottom of the same viewport. Sourcing the label from the table makes
+ * that contradiction unrepresentable rather than merely fixed. Routes are
+ * untouched — `/trawl`, `/assay` and `/openlab` still work, so an old link and
+ * a `g t` habit both survive.
+ *
+ * THE TWO OBJECT POOLS ARE STILL SEPARATE. They used to be separated in the
+ * RAIL, by a `Demo suite` group, which cost a duplicate "Bench" entry and a
+ * second home and still put `/fermos/gap` and `/geneos/routes` under the
+ * casein headings anyway. They are separated one level down instead: every
+ * screen's `eyebrow` names its movement, its part and its pool, so `Read ·
+ * BioRepo · demo suite` and `Read · Ledger · β-casein corpus` are never
+ * mistaken for one corpus. That is what lets one rail serve both.
  */
 type RailItem =
   | { group: string }
-  | { to: string; label: string; icon: LucideIcon; key: string; pending?: boolean };
+  | { to: string; part: string; label?: string; icon: LucideIcon; key: string; pending?: boolean };
+
+/** The rail's label for a part, from the one table that names the parts. */
+function partLabel(part: string): string {
+  return UPSTREAM_BY_PART[part]?.label ?? part;
+}
 
 const RAIL: RailItem[] = [
-  { to: '/', label: 'Bench', icon: HomeIcon, key: 'h' },
+  // The Bench is the home, not a part — it has no upstream software of its
+  // own, so it carries its label rather than reading one.
+  { to: '/', part: 'bench', label: 'Bench', icon: HomeIcon, key: 'h' },
   { group: 'Read' },
-  { to: '/trawl', label: 'Trawl', icon: Import, key: 't' },
-  { to: '/ledger', label: 'Ledger', icon: Table2, key: 'd' },
-  { to: '/assay', label: 'Assay', icon: Gauge, key: 'v' },
+  { to: '/trawl', part: 'trawl', icon: Import, key: 't' },
+  { to: '/repo', part: 'repo', icon: Database, key: 'r' },
+  { to: '/ledger', part: 'ledger', icon: Table2, key: 'd' },
+  { to: '/assay', part: 'assay', icon: Gauge, key: 'v' },
   { group: 'Reason' },
-  { to: '/geneos', label: 'geneOS', icon: FlaskConical, key: 'o' },
-  { to: '/fermos', label: 'fermOS', icon: LineChart, key: 's' },
-  { to: '/parchment', label: 'Parchment', icon: Scale, key: 'c' },
-  { to: '/postdoc', label: 'Postdoc', icon: MessagesSquare, key: 'a' },
+  { to: '/geneos', part: 'geneos', icon: FlaskConical, key: 'o' },
+  { to: '/fermos', part: 'fermos', icon: LineChart, key: 's' },
+  { to: '/proforma', part: 'proforma', icon: Calculator, key: 'f' },
+  { to: '/parchment', part: 'parchment', icon: Scale, key: 'c' },
+  { to: '/postdoc', part: 'postdoc', icon: MessagesSquare, key: 'a' },
   { group: 'Return' },
-  { to: '/runbook', label: 'Runbook', icon: ClipboardList, key: 'p' },
-  { to: '/openlab', label: 'openLab', icon: Users, key: 'b' },
-  { to: '/notary', label: 'Notary', icon: Stamp, key: 'y' },
-  { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
-  // ── The demo suite (OF-DEMO-001) ─────────────────────────────────────
-  //
-  // Its own group, not folded into the three above. The two object pools are
-  // deliberately separate and the rail is the first place a reader forms a
-  // mental model of what this system holds; three demo entries scattered among
-  // the casein ones would say they are the same corpus, which is the one thing
-  // the interface must not say.
-  //
-  // `y` is Notary already and the demo queue is a sub-path of it, so it needs
-  // no key of its own.
-  { group: 'Demo suite' },
-  { to: '/bench', label: 'Bench', icon: LayoutGrid, key: 'w' },
-  { to: '/repo', label: 'BioRepo', icon: Database, key: 'r' },
-  { to: '/proforma', label: 'Proforma', icon: Calculator, key: 'f' },
+  { to: '/runbook', part: 'runbook', icon: ClipboardList, key: 'p' },
+  { to: '/notary', part: 'notary', icon: Stamp, key: 'y' },
+  { to: '/openlab', part: 'openlab', icon: Users, key: 'b' },
+  { to: '/learn', part: 'learn', icon: GraduationCap, key: 'n' },
 ];
 
 function isActive(path: string, to: string) {
@@ -123,8 +135,7 @@ function isActive(path: string, to: string) {
 // a catalogued claim awaiting verification and an Accession is a normalised
 // quantity with complete provenance, and they are not the same object.
 import { UpstreamNote } from '@/components/demo/UpstreamNote';
-import { partForPath } from '@/data/demo/upstream';
-import { Bench as DemoBench } from '@/screens/demo/Bench';
+import { partForPath, UPSTREAM_BY_PART } from '@/data/demo/upstream';
 import { RepoIndex, AccessionPage, ParameterPage as DemoParameterPage, ContradictionQueue } from '@/screens/demo/Repo';
 import { GapMap, FactorDetail, RunIndex, RunPage, EnvelopePage } from '@/screens/demo/Fermos';
 import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
@@ -160,6 +171,11 @@ const ALIAS: Record<string, string> = {
 function canonicalize(segments: string[]): string[] | null {
   const [a, b, ...rest] = segments;
   if (!a) return null;
+  // The demo suite had a second home. Its composer handed every question to
+  // Postdoc, which now carries the six archetype prompts itself, and its three
+  // context bands are on the Bench. One home, one rail entry, one shortcut —
+  // and the route keeps working, permanently, like every other rename here.
+  if (a === 'bench') return [];
   if (a === 'extract' && b === 'validation') return ['assay', ...rest];
   if (a === 'extract' && !b) return ['ledger', 'records'];
   if (a === 'extract' && b !== 'review') return ['ledger', 'records', b, ...rest];
@@ -225,8 +241,6 @@ function Screen() {
       // enablement checklist. Two pools, two screens, no screen serving both.
       if (b === 'disclosures') return <NotaryQueue />;
       return <Notary />;
-    case 'bench':
-      return <DemoBench />;
     case 'repo':
       if (b === 'a' && c) return <AccessionPage id={c} />;
       if (b === 'p' && c) return <DemoParameterPage field={c as never} />;
@@ -529,14 +543,14 @@ export default function App() {
                       : 'text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',
                     ui.railCollapsed && 'justify-center px-0',
                   )}
-                  title={ui.railCollapsed ? item.label : undefined}
+                  title={ui.railCollapsed ? (item.label ?? partLabel(item.part)) : undefined}
                   aria-current={active ? 'page' : undefined}
                 >
                   <Icon size={ui.railCollapsed ? 18 : 16} className="shrink-0" />
                   {!ui.railCollapsed && (
                     <>
                       <span className={cx('truncate', item.pending && 'text-ink-soft/70')}>
-                        {item.label}
+                        {item.label ?? partLabel(item.part)}
                       </span>
                       {item.pending && (
                         // Named in the rail because the rail is the architecture,

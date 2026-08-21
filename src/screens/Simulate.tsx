@@ -7,6 +7,10 @@ import { fmt } from '@/engine/units';
 import { PageHeader, Card, Button, LinkButton, cx, EmptyState } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'corpus');
 export default function Simulate() {
   const scenarios = useStore((s) => s.scenarios);
   const grids = useStore((s) => s.grids);
@@ -17,8 +21,8 @@ export default function Simulate() {
 
   return (
     <div>
-      <PageHeader
-        title="Simulate"
+      <PageHeader eyebrow={EYEBROW}
+        title="Scenarios"
         subtitle="Turn verified parameters into economics. Each scenario is a sweep over a techno-economic model; every assumption carries its provenance."
         actions={
           <>

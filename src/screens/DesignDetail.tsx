@@ -51,6 +51,10 @@ import { useAdapterData } from '@/adapters/react';
 import { Tick } from '@/components/Provenance';
 import type { DesignRecord, TierResult } from '@/data/types';
 
+import { partEyebrow } from '@/data/parts';
+
+/** Movement · part · pool, from the one table that names the parts. */
+const EYEBROW = partEyebrow('fermos', 'corpus');
 const STATE_STYLE: Record<TierResult['state'], string> = {
   passed: 'bg-accent/15 border-accent/50 text-accent',
   failed: 'bg-signal-error/10 border-signal-error/50 text-signal-error',
@@ -71,7 +75,7 @@ export function DesignIndex() {
 
   const header = (
     <PageHeader
-      eyebrow="Reason · fermOS"
+      eyebrow={EYEBROW}
       title="Designs"
       subtitle="Points in the authored sweep grids, re-presented as designs. Modelled economics, not validated."
       actions={<LinkButton to="/fermos">Scenarios</LinkButton>}
@@ -203,7 +207,7 @@ export function DesignDetail({ designId }: { designId: string }) {
   if (found.status === 'loading') {
     return (
       <div className="p-6 max-w-[1100px]">
-        <PageHeader eyebrow="fermOS" title="Design" subtitle={designId} />
+        <PageHeader eyebrow={EYEBROW} title="Design" subtitle={designId} />
         <Card>
           <Skeleton rows={6} />
         </Card>
@@ -214,7 +218,7 @@ export function DesignDetail({ designId }: { designId: string }) {
   if (found.status === 'failed') {
     return (
       <div className="p-6 max-w-[1100px]">
-        <PageHeader eyebrow="fermOS" title="Design" subtitle={designId} />
+        <PageHeader eyebrow={EYEBROW} title="Design" subtitle={designId} />
         <Callout kind="warn" title="This design could not be read">
           {found.error.message}
         </Callout>
@@ -230,7 +234,7 @@ export function DesignDetail({ designId }: { designId: string }) {
   if (!design) {
     return (
       <div className="p-6">
-        <PageHeader eyebrow="fermOS" title="Design not found" subtitle={designId} />
+        <PageHeader eyebrow={EYEBROW} title="Design not found" subtitle={designId} />
         <LinkButton to="/fermos/d">Back to designs</LinkButton>
       </div>
     );
@@ -249,7 +253,7 @@ export function DesignDetail({ designId }: { designId: string }) {
       </a>
 
       <PageHeader
-        eyebrow={<span className="font-mono">{design.id}</span>}
+        eyebrow={<>{EYEBROW} · <span className="font-mono">{design.id}</span></>}
         title={design.label}
         subtitle="Demo model v0 — illustrative economics, not validated."
       />

@@ -1,4 +1,4 @@
-// Structured protocol editor (OF-DES-001 §5.3 `/protocols/:id/edit`, fidelity
+// Structured protocol editor (OF-DES-001 §5.3 `/runbook/:id/edit`, fidelity
 // item 14). Edits, reorders, and quantity binding are real; a saved draft
 // becomes a live new version for the rest of the session.
 import { useMemo, useState } from 'react';
@@ -136,7 +136,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
       hrefLabel: 'Open',
     });
     setConfirmOpen(false);
-    navigate(`/protocols/${protocolId}`);
+    navigate(`/runbook/${protocolId}`);
   };
 
   return (
@@ -158,7 +158,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
             <Button onClick={() => setPreview((p) => !p)}>
               <Eye size={14} /> {preview ? 'Hide preview' : 'Preview at scale'}
             </Button>
-            <Button onClick={() => navigate(`/protocols/${protocolId}`)}>Cancel</Button>
+            <Button onClick={() => navigate(`/runbook/${protocolId}`)}>Cancel</Button>
             <Button variant="primary" disabled={blocking.length > 0} onClick={() => setConfirmOpen(true)}>
               <Save size={14} /> Save as v{draftVersion.version}
             </Button>
