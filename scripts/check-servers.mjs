@@ -1,5 +1,15 @@
 /**
- * The gate over `servers/` — four things that can drift silently, watched.
+ * The gate over `servers/` — five things that can drift silently, watched.
+ *
+ * 1. every manifest agrees with the server beside it, and names corpus
+ *    files that exist;
+ * 2. the corpus snapshot id is byte-identical from TypeScript and Python;
+ * 3. the cost model matches across both implementations;
+ * 4. record attribution matches across both;
+ * 5. and neither side attributed nothing — two implementations agreeing on
+ *    an empty result prove nothing, so that agreement is a failure. This
+ *    fifth check is why the docstring used to say four: a guard against a
+ *    vacuous pass is as much a check as the comparison it guards.
  *
  * A server skeleton is mostly documentation, and documentation is exactly what
  * rots without a gate. Each check below exists because there is a specific way

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Canonical openFerment entity schema and unit engine. The single source of truth for both."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-or-later" }
 dependencies = ["pydantic>=2.9"]
 
 [project.optional-dependencies]

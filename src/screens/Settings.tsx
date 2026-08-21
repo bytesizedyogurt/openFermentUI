@@ -1295,8 +1295,14 @@ function AboutSection() {
         </SectionTitle>
         <Card className="p-3">
           <Row label="App version">
-            <span className="font-num">openFerment Sim {APP_VERSION}</span> — implements design
-            OF-DES-001 v0.1 over corpus OF-COR-001 v1.0
+            {/* The design document is not in this repository and a reader
+                cannot open it, so naming it here made the colophon the one
+                user-facing place that pointed at nothing. `docs/README.md`
+                indexes every cited document and what actually holds each rule;
+                the corpus reference stays because the corpus IS in the repo. */}
+            <span className="font-num">openFerment Sim {APP_VERSION}</span> — over corpus{' '}
+            <span className="font-num">OF-COR-001 v1.0</span>, gated by{' '}
+            <span className="font-mono">pnpm verify</span>
           </Row>
           <Row label="Corpus">
             <span className="font-num">{papers.length}</span> catalogued papers across{' '}

@@ -10,10 +10,11 @@ got to its current shape and where the older briefs disagree with it.
 pnpm verify
 ```
 
-Twenty stages, and green is the definition of done — for every change, not
+Twenty-one stages, and green is the definition of done — for every change, not
 just releases. It typechecks, checks the seed invariants, proves the corpus is
-a fixed point of its models, replays four TypeScript/Python parity gates, runs
-the canonical Python suites, checks every generated file is current, enforces
+a fixed point of its models, validates every seeded entity against the Pydantic
+models, replays four TypeScript/Python parity gates, runs the canonical Python
+suites, checks every generated file is current, enforces
 engine purity, pins the interpolation properties, holds the MCP servers to
 their manifests, checks the bioSTEAM numerics, builds, and drives the app
 through three browser suites. If a stage is in your
@@ -75,8 +76,12 @@ Anything callable by BioSTEAM, COBRApy, PaperQA2, Inspect AI, or the extraction
 pipeline is Python (`packages/core`, `packages/assay`, `servers/`). Screens,
 components and UI conveniences are TypeScript and read data only through the
 seams: `src/data/source.ts` for collections, `src/adapters/` for subsystems.
-A screen importing seed data directly is a regression — `check:purity` and the
-Phase 3 exit condition in `MIGRATION.md` say exactly what is allowed.
+A **casein-corpus** screen importing seed data directly is a regression — the
+Phase 3a exit condition in `MIGRATION.md` says exactly what is allowed. Note
+what `check:purity` does and does not do: it scans `src/engine/`, not
+`src/screens/`, and the demo pool under `src/screens/demo/` reads its modules
+directly at 31 sites by design. See the note at the foot of this file rather
+than assuming the gate covers it.
 
 ## Adding an MCP server tool
 
@@ -109,7 +114,7 @@ check whether it falls into one of these:
   is checked against it by `pnpm check:biosteam`. Completeness is the point; an
   unused function here is coverage, not litter.
 - **Seed modules behind the adapter seam** — exported for `src/adapters/`, not
-  for screens. `pnpm check:purity` is what enforces the direction.
+  for screens. `pnpm check:purity` enforces the direction for `src/engine/`.
 - **Anything a scan cannot see** — a type used only within its own file, or a
   symbol referenced from `scripts/` rather than `src/`.
 

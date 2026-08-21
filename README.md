@@ -74,13 +74,23 @@ pnpm dev            # http://localhost:5173
 pnpm build          # typecheck + production bundle
 pnpm bundle:single  # one self-contained .html (inlined CSS/JS/fonts), openable from file://
 
-pnpm verify         # the full gate, in order:
-  pnpm typecheck    #   tsc --noEmit
-  pnpm check:seed   #   every seed invariant, incl. unit dimensional analysis
-  pnpm build
-  pnpm test:smoke   #   32 routes, headless: console errors, uncaught throws, empty renders
-  pnpm test:golden  #   the ten-minute demo script, driven end to end
-  pnpm test:deep    #   ingest failure, protocol version diff, scenario compare
+pnpm verify         # the full gate — twenty-one stages, in order. The canonical
+                    # list is the `verify` script in package.json; it is not
+                    # restated here, because a restated list goes stale.
+                    #
+                    #   typecheck          tsc --noEmit
+                    #   sixteen check:*    seed invariants, cross-language
+                    #                      parity (units, protocol, metrics,
+                    #                      aggregation), generated types,
+                    #                      answer shapes, engine purity, the
+                    #                      MCP server skeletons, bioSTEAM
+                    #   build
+                    #   test:smoke         79 routes, headless: console errors,
+                    #                      uncaught throws, empty renders
+                    #   test:golden        the ten-minute demo script, end to end
+                    #   test:deep          ingest failure, protocol version diff,
+                    #                      scenario compare, narrow-viewport
+                    #                      overflow, the demo seed disclaimer
 ```
 
 The test suite is not decoration. `test:golden` is what caught a markdown-renderer infinite
@@ -122,7 +132,8 @@ The simulation holds itself to eight conditions (design §11):
 
 ```
 src/data/       seed content as typed TS modules — becomes API fixtures in production
-src/data/corpus/  the 15 literature threads, A–O, one file per thread group
+data/corpus/      the 15 literature threads, A–O, exported to JSON and read
+                  through src/adapters/ — not imported by screens directly
 src/engine/     pure logic, unit-testable without UI — see the routing table below
 src/sim/        latency model, job pacing and the chat flow player — retired last
 src/components/ shared primitives (citation chip, data table, quantity field, …)
@@ -309,6 +320,10 @@ Recorded here because the app records them rather than papering over them:
 
 ## Documents
 
+- [`docs/README.md`](docs/README.md) — **the index.** Seven documents are cited
+  about 237 times across this repository and only one of them is in it. The
+  index says which, what each governs, and — for the six that are external —
+  what in this repository actually holds the rule.
 - `docs/OF-COR-001.md` — the corpus: 15 threads, the ontology, the gold-set plan, scenarios.
 - `BUILD-SPEC.md` — the build contract: ID registry, seed invariants, content and style rules.
 - `scripts/check-seed.ts` — enforces those invariants; run before any bundle.

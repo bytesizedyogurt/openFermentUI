@@ -11,7 +11,7 @@
     "check:seed": "tsx scripts/check-seed.ts",
     "test:smoke": "node scripts/smoke.mjs",
     "test:golden": "node scripts/golden-path.mjs",
-    "verify": "pnpm typecheck && pnpm check:seed && pnpm check:demo-seed && pnpm check:corpus && pnpm check:units && pnpm check:protocol && pnpm check:metrics && pnpm check:aggregation && pnpm check:python && pnpm check:types && pnpm check:answers && pnpm check:evals && pnpm check:purity && pnpm check:interp && pnpm check:servers && pnpm check:biosteam && pnpm build && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
+    "verify": "pnpm typecheck && pnpm check:seed && pnpm check:demo-seed && pnpm check:corpus && pnpm check:units && pnpm check:protocol && pnpm check:metrics && pnpm check:aggregation && pnpm check:python && pnpm check:schema && pnpm check:types && pnpm check:answers && pnpm check:evals && pnpm check:purity && pnpm check:interp && pnpm check:servers && pnpm check:biosteam && pnpm build && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
     "test:deep": "node scripts/deep-paths.mjs",
     "bundle:single": "vite build --mode offline && node scripts/bundle-single.mjs",
     "check:biosteam": "tsx scripts/check-biosteam.ts",

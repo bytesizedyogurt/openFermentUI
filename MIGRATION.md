@@ -7,8 +7,87 @@ This file opens with a correction, because the brief that commissioned it
 describes an earlier repository. Six migration phases have already landed
 (`git log 8722f9d..723c58d`), and they did a large part of what Phases 1-3 ask
 for — by a different route, and in the opposite direction on one point that
-matters. The measurements below are the evidence; the reconciliation is at the
-bottom and needs a decision.
+matters. The phase log is first, then the reconciliation, then one section per phase
+in the order they ran. Two `## Phase 3` headings used to sit 136 lines apart
+describing different work; they are 3a and 3b now.
+
+---
+
+## Phase log
+
+| Phase | Description | Status | verify |
+|---|---|---|---|
+| 0 | Freeze, baseline, import map | [x] complete | green, 15 stages |
+| 1 | Extract the schema | [ ] **blocked — see below** | |
+| 2 | Extract the engine | [x] complete, reshaped — see Phase 2 section | green, 17 stages |
+| 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
+| 4 | Quarantine the simulation | [x] complete, reshaped — see Phase 4 section | green, 19 stages |
+| 5 | Server skeletons | [x] complete — see Phase 5 section | green, 20 stages |
+| 6 | Workspace hygiene | [x] complete, one item declined — see Phase 6 section | green, 20 stages |
+| — | OF-DEMO-001, the demo suite | [x] complete, all ten steps — see the section at the foot | green, 20 stages |
+| — | Cohesion pass over both pools | [x] complete — see the section at the foot | green, 21 stages |
+
+---
+
+## Where the brief and the repository disagree
+
+Four conflicts. The first needs a decision before Phase 1 can start; the rest
+have a recommended resolution and can proceed on it.
+
+### 1. Which language owns the schema — BLOCKING
+
+The brief, Phase 1: create `packages/schema/` in TypeScript, with Zod as the
+runtime contract. Phase 5: "generate Pydantic models from the Zod schemas".
+
+The repository does exactly the reverse, and `CLAUDE.md` — committed at the top
+of this repo — states it as the one rule:
+
+> Anything that must be callable by BioSTEAM, COBRApy, PaperQA2, Inspect AI, or
+> the extraction pipeline **must be Python**. [...] Do not hand-maintain a type
+> in both Python and TypeScript. Generate one from the other.
+
+`packages/core/openferment_core/schema/` holds the Pydantic models;
+`src/data/types.ts` is GENERATED from them and `check:types` fails if it drifts.
+The Postgres DDL is derived from the same models, and `packages/assay` imports
+them.
+
+Reversing the direction would orphan all three. **Recommendation:** keep Pydantic
+canonical and GENERATE the Zod validators from it, exactly as `types.ts` is
+generated. `packages/schema` then exists with the interface Phase 1 wants,
+Phase 5's Pydantic models are already there, and nothing is hand-maintained
+twice. This needs confirmation because it inverts the brief.
+
+### 2. `Provenance` means something else here
+
+The brief replaces `Provenance` with a three-variant discriminated union
+(`accession` / `computation` / `assumption`) as the Rule 1 write-path gate.
+
+The repository's `Provenance` is an eight-member enum — `gold`, `verified`,
+`curated`, `unverified`, `user`, `industry-estimate`, `demo`, `unsourced` —
+pinned by `CLAUDE.md` invariant 3, load-bearing across the tick system, the
+aggregation gate, `check:seed`, and all 134 records. It answers *how far has this
+been checked*.
+
+The brief's schema answers a different question: *what justifies writing this
+number*. **Recommendation:** they are orthogonal and both should exist. Add the
+brief's schema under its own name for write paths; leave `Provenance` alone.
+Replacing it would change what every record in the corpus means.
+
+### 3. Phase 2's module list is out of date
+
+`retrieval.ts` was deleted, deliberately — PaperQA2 is the retrieval layer, which
+is what the brief's own table says ("the corpus server replaces it"). No action.
+
+`units.ts`, `scale.ts`, `diff.ts` and `metrics.ts` can move to `packages/engine`,
+but they are mirrors: their headers and their parity gates must move with them,
+or `pnpm verify` loses four of its fifteen stages.
+
+### 4. Branch and tag names
+
+The brief asks for `git tag v0.1-sim` and a `restructure/monorepo` branch. This
+session is constrained to `claude/openferment-design-sim-99drgg` and may not push
+elsewhere without explicit permission. `v0.1-sim` also names a state six phases
+back — `8722f9d` is the closest commit. Both need a go-ahead.
 
 ---
 
@@ -123,147 +202,69 @@ collections already go through it. Four collections do not.
 
 ---
 
-## Phase 3 — the last seven seed imports
+## Phase 2 — extract the engine (reshaped)
 
-**Status:** complete. `pnpm verify` green, all fifteen stages, 53 routes / 48
-golden / 44 deep.
+**Status:** complete. `pnpm verify` green, seventeen stages.
 
-The seven SEED import lines Phase 0 measured are gone. Nothing was routed by
-convenience: the four modules landed behind four different answers, because the
-adapter a collection sits behind is a claim about which server will serve it.
+### Why the file movement did not happen
 
-| Module | Landed on | Why |
-|---|---|---|
-| `PATENTS` | `CorpusAdapter.listPatents` — BioRepo | Catalogued literature that carries claims, keyed by `paperId` to H17a–f. `getScope` already read the same six. Parchment is the SCREEN; naming an adapter after the page that draws it turns a UI layout into an architecture. Not the Guild — a patent is not an attestation a chapter issued. |
-| `DESIGNS` | `ProcessAdapter.listDesigns` / `getDesign` — fermOS | A design is the OUTPUT of the tier cascade, and three of its four tiers are Python (COBRApy, BioSTEAM twice). The client can sweep it today only because T1 and T2 are absent and T3 is a grid interpolation. Derived-at-module-scope is what a fixture looks like, not what the thing is. No new methods were needed, which is the seam being right already. |
-| `GOLD_SET_PLAN`, `GOLD_SET_DIFFICULTY_CASES` | `CorpusAdapter.getGoldSetPlan` — BioRepo | Audit owns the SCORE, not the SET. Every plan field is a corpus coordinate and one row's `blocked` is a fact about `ONTOLOGY_GAPS` a scorer holding no ontology could not evaluate; when annotation happens the rows become `provenance: 'gold'` records in the same store. `RUN_OUTPUTS` goes the other way — a scorer's output, Audit's whenever that seam is built. They share a file because one screen renders both. |
-| `SUGGESTED_PROMPTS` | `src/sim/prompts.ts` — the agent seam | Not corpus and not a server's. Each chip is one flow TRIGGER verbatim so a click is an exact match — a property of the scripted matcher, which retires with it. Moved next to the thing that needs it, headed for `AgentAdapter.suggestedPrompts()` in the phase that quarantines `src/sim/`. Building that adapter now, with `send`/`sendFlow` still going around it, would be a seam that lied about what passed through it. |
+The brief's rationale for moving `src/engine/` into `packages/engine/` is that
+it is "directly reusable by the production subsystems. `units.ts` in particular
+becomes Intake's normalisation layer." That goal was met by the earlier
+migration, in the other language: the production normalisation layer is
+`openferment_core.units` (Python, `packages/core`), with `protocol/scale`,
+`protocol/diff` and the `packages/assay` metrics scorer beside it. The
+TypeScript copies of those four are MIRRORS — browser-only, headed as such, held
+to parity gates inside `verify` — and CLAUDE.md's one rule forbids offering them
+for reuse by anything a production subsystem calls. Moving mirrors into a
+package named for reuse would invite exactly the second-implementation coupling
+the rule exists to prevent.
 
-`src/data/source.ts` was deliberately NOT extended. None of the four is a
-JSON-backed corpus collection: there is no `data/corpus/patents.json`, the
-exporter maps seven keys to seven Pydantic models, and that module's whole
-contract is that its collections come from the exporter and are fetchable at
-`${API_BASE}/<name>.json`. An eighth array with no file behind it and no `api`
-path would be a lie in the most-copied place in the data layer. `Patent` does
-have a Pydantic model (`schema/design.py`); when it is exported, `listPatents`
-reads it through `@/data/source` like the rest and nothing above changes.
+`interp.ts` and `grids.ts` are the two modules that are legitimately TypeScript
+forever (CLAUDE.md routing table: "Grid interpolation for sliders — legitimate
+UI convenience, stays"). They move into a JS package the day a second JS
+consumer exists (`packages/client`, Phase 6 workspaces); today the only consumer
+is the app, and a package with one tenant is filing with alias machinery as its
+only content. `retrieval.ts`, the sixth module on the brief's list, was deleted
+in the earlier migration — the brief's own table agrees ("the corpus server
+replaces it").
 
-### Loading states — the real work
+What Phase 2 is FOR — an engine that stays pure and numerics other systems can
+trust — is enforced instead of arranged:
 
-The adapter surface is async by contract, so six screens gained three states
-where they had one. Two of those screens were rendering a FALSE SENTENCE on the
-first frame, not a blank:
+### `check:purity` — the brief's purity rule, mechanical
 
-- `DesignDetail` answered "Design not found" for any unresolved id, and every
-  design's first frame is an unresolved id. `loading` and `null` are now
-  different branches; the not-found branch is still reachable and still tested.
-- `Notary`'s callout reads "N of M designs are publishable"; `0 of 0` is a
-  finding about the corpus when it is a fact about a promise. It gates.
+No runtime import of `@/store`, React/zustand, or `@/data/*` anywhere under
+`src/engine/` (28 modules scanned; type-only imports allowed, the same
+distinction the brief's Phase 3 exit condition makes). Three pre-existing
+`@/data/ontology` imports (`designs`, `balance`, `posterior` — none of them on
+the brief's six) are carried as an explicit allowlist with reasons; a NEW
+violation fails, and a RESOLVED entry left unpruned also fails, so the ledger
+stays exact. Proved in both directions before being trusted.
 
-`Home` does not gate — its two reads feed counts inside two tiles, and an
-unarrived count renders as `—` rather than `0`. `Validation` folded the read
-into the `delayClass('quick')` skeleton it already had. `Ask` gained nothing:
-its prompts never leave the client.
+### `check:interp` — the pin the brief's tests asked for
 
-This was checked rather than assumed. A frame audit recorded every DOM mutation
-from before the bundle evaluated until 2 s after load and asserted the false
-sentences appear in NO frame — not merely in the settled one the 500 ms waits in
-`test:golden` observe. Separately, the rendered text of all nine affected routes
-is byte-identical before and after, with zero console errors.
+`units.convert` was already pinned harder than any unit test: 1,632 convert
+cases plus 600 cross-family refusals in `fixtures/units.json`, replayed against
+BOTH implementations on every verify. `interp.interpolate` had **no pin at
+all** — the Phase 0 capture never recorded it, and every number a slider shows
+between two solved points passes through it.
 
-### Exit condition
-
-`grep -r "from '@/data/" src/screens/` returns 37 lines: 21 type-only, 13
-display helpers from `@/data/ontology` (`fieldName`, `ONTOLOGY_BY_ID`,
-`ONTOLOGY_GAPS`, `FAMILY_LABEL` — id-to-label lookups, not seed data), and 3
-`ONTOLOGY` reads that already go through `@/data/source`. All three categories
-are the ones the brief's own exit condition and Phase 0's import map allow.
-**SEED: 0.** Each surviving helper import is annotated in place so the next
-reader does not read it as one that was missed.
-
----
-
-## Phase log
-
-| Phase | Description | Status | verify |
-|---|---|---|---|
-| 0 | Freeze, baseline, import map | [x] complete | green, 15 stages |
-| 1 | Extract the schema | [ ] **blocked — see below** | |
-| 2 | Extract the engine | [x] complete, reshaped — see Phase 2 section | green, 17 stages |
-| 3 | The adapter seam | [x] complete — 0 seed imports in `src/screens/` | green, 15 stages |
-| 4 | Quarantine the simulation | [x] complete, reshaped — see Phase 4 section | green, 19 stages |
-| 5 | Server skeletons | [x] complete — see Phase 5 section | green, 20 stages |
-| 6 | Workspace hygiene | [x] complete, one item declined — see Phase 6 section | green, 20 stages |
-
----
-
-## Where the brief and the repository disagree
-
-Four conflicts. The first needs a decision before Phase 1 can start; the rest
-have a recommended resolution and can proceed on it.
-
-### 1. Which language owns the schema — BLOCKING
-
-The brief, Phase 1: create `packages/schema/` in TypeScript, with Zod as the
-runtime contract. Phase 5: "generate Pydantic models from the Zod schemas".
-
-The repository does exactly the reverse, and `CLAUDE.md` — committed at the top
-of this repo — states it as the one rule:
-
-> Anything that must be callable by BioSTEAM, COBRApy, PaperQA2, Inspect AI, or
-> the extraction pipeline **must be Python**. [...] Do not hand-maintain a type
-> in both Python and TypeScript. Generate one from the other.
-
-`packages/core/openferment_core/schema/` holds the Pydantic models;
-`src/data/types.ts` is GENERATED from them and `check:types` fails if it drifts.
-The Postgres DDL is derived from the same models, and `packages/assay` imports
+It is now pinned by 3,863 property checks against the live cost-model grids, no
+remembered constants: node exactness, per-axis midpoint linearity, clamping
+(including absent-keys-clamp-low), the waterfall identity (Σ cost lines = MSP)
+surviving interpolation at 200 seeded interior points per model, and a sample of
+nodes re-solved through `model.evaluate()` so the grid is tied to the plant
+rather than to itself. A 0.1% perturbation of one corner weight trips 3,215 of
 them.
 
-Reversing the direction would orphan all three. **Recommendation:** keep Pydantic
-canonical and GENERATE the Zod validators from it, exactly as `types.ts` is
-generated. `packages/schema` then exists with the interface Phase 1 wants,
-Phase 5's Pydantic models are already there, and nothing is hand-maintained
-twice. This needs confirmation because it inverts the brief.
-
-### 2. `Provenance` means something else here
-
-The brief replaces `Provenance` with a three-variant discriminated union
-(`accession` / `computation` / `assumption`) as the Rule 1 write-path gate.
-
-The repository's `Provenance` is an eight-member enum — `gold`, `verified`,
-`curated`, `unverified`, `user`, `industry-estimate`, `demo`, `unsourced` —
-pinned by `CLAUDE.md` invariant 3, load-bearing across the tick system, the
-aggregation gate, `check:seed`, and all 134 records. It answers *how far has this
-been checked*.
-
-The brief's schema answers a different question: *what justifies writing this
-number*. **Recommendation:** they are orthogonal and both should exist. Add the
-brief's schema under its own name for write paths; leave `Provenance` alone.
-Replacing it would change what every record in the corpus means.
-
-### 3. Phase 2's module list is out of date
-
-`retrieval.ts` was deleted, deliberately — PaperQA2 is the retrieval layer, which
-is what the brief's own table says ("the corpus server replaces it"). No action.
-
-`units.ts`, `scale.ts`, `diff.ts` and `metrics.ts` can move to `packages/engine`,
-but they are mirrors: their headers and their parity gates must move with them,
-or `pnpm verify` loses four of its fifteen stages.
-
-### 4. Branch and tag names
-
-The brief asks for `git tag v0.1-sim` and a `restructure/monorepo` branch. This
-session is constrained to `claude/openferment-design-sim-99drgg` and may not push
-elsewhere without explicit permission. `v0.1-sim` also names a state six phases
-back — `8722f9d` is the closest commit. Both need a go-ahead.
-
 ---
 
-## Phase 3 — the adapter seam
+## Phase 3a — the adapter seam
 
 **Status:** complete. `pnpm verify` green, fifteen stages.
 
-### Exit condition
+### Exit condition — Phase 3a
 
 The brief's own wording: `grep -r "from '@/data/" src/screens/` returns nothing
 except type imports. It now returns type imports, plus `@/data/ontology` display
@@ -322,61 +323,63 @@ a `notice` in the same object as the payload, following the rule
 
 ---
 
-## Phase 2 — extract the engine (reshaped)
+## Phase 3b — the last seven seed imports
 
-**Status:** complete. `pnpm verify` green, seventeen stages.
+**Status:** complete. `pnpm verify` green, all fifteen stages, 53 routes / 48
+golden / 44 deep.
 
-### Why the file movement did not happen
+The seven SEED import lines Phase 0 measured are gone. Nothing was routed by
+convenience: the four modules landed behind four different answers, because the
+adapter a collection sits behind is a claim about which server will serve it.
 
-The brief's rationale for moving `src/engine/` into `packages/engine/` is that
-it is "directly reusable by the production subsystems. `units.ts` in particular
-becomes Intake's normalisation layer." That goal was met by the earlier
-migration, in the other language: the production normalisation layer is
-`openferment_core.units` (Python, `packages/core`), with `protocol/scale`,
-`protocol/diff` and the `packages/assay` metrics scorer beside it. The
-TypeScript copies of those four are MIRRORS — browser-only, headed as such, held
-to parity gates inside `verify` — and CLAUDE.md's one rule forbids offering them
-for reuse by anything a production subsystem calls. Moving mirrors into a
-package named for reuse would invite exactly the second-implementation coupling
-the rule exists to prevent.
+| Module | Landed on | Why |
+|---|---|---|
+| `PATENTS` | `CorpusAdapter.listPatents` — BioRepo | Catalogued literature that carries claims, keyed by `paperId` to H17a–f. `getScope` already read the same six. Parchment is the SCREEN; naming an adapter after the page that draws it turns a UI layout into an architecture. Not the Guild — a patent is not an attestation a chapter issued. |
+| `DESIGNS` | `ProcessAdapter.listDesigns` / `getDesign` — fermOS | A design is the OUTPUT of the tier cascade, and three of its four tiers are Python (COBRApy, BioSTEAM twice). The client can sweep it today only because T1 and T2 are absent and T3 is a grid interpolation. Derived-at-module-scope is what a fixture looks like, not what the thing is. No new methods were needed, which is the seam being right already. |
+| `GOLD_SET_PLAN`, `GOLD_SET_DIFFICULTY_CASES` | `CorpusAdapter.getGoldSetPlan` — BioRepo | Audit owns the SCORE, not the SET. Every plan field is a corpus coordinate and one row's `blocked` is a fact about `ONTOLOGY_GAPS` a scorer holding no ontology could not evaluate; when annotation happens the rows become `provenance: 'gold'` records in the same store. `RUN_OUTPUTS` goes the other way — a scorer's output, Audit's whenever that seam is built. They share a file because one screen renders both. |
+| `SUGGESTED_PROMPTS` | `src/sim/prompts.ts` — the agent seam | Not corpus and not a server's. Each chip is one flow TRIGGER verbatim so a click is an exact match — a property of the scripted matcher, which retires with it. Moved next to the thing that needs it, headed for `AgentAdapter.suggestedPrompts()` in the phase that quarantines `src/sim/`. Building that adapter now, with `send`/`sendFlow` still going around it, would be a seam that lied about what passed through it. |
 
-`interp.ts` and `grids.ts` are the two modules that are legitimately TypeScript
-forever (CLAUDE.md routing table: "Grid interpolation for sliders — legitimate
-UI convenience, stays"). They move into a JS package the day a second JS
-consumer exists (`packages/client`, Phase 6 workspaces); today the only consumer
-is the app, and a package with one tenant is filing with alias machinery as its
-only content. `retrieval.ts`, the sixth module on the brief's list, was deleted
-in the earlier migration — the brief's own table agrees ("the corpus server
-replaces it").
+`src/data/source.ts` was deliberately NOT extended. None of the four is a
+JSON-backed corpus collection: there is no `data/corpus/patents.json`, the
+exporter maps seven keys to seven Pydantic models, and that module's whole
+contract is that its collections come from the exporter and are fetchable at
+`${API_BASE}/<name>.json`. An eighth array with no file behind it and no `api`
+path would be a lie in the most-copied place in the data layer. `Patent` does
+have a Pydantic model (`schema/design.py`); when it is exported, `listPatents`
+reads it through `@/data/source` like the rest and nothing above changes.
 
-What Phase 2 is FOR — an engine that stays pure and numerics other systems can
-trust — is enforced instead of arranged:
+### Loading states — the real work
 
-### `check:purity` — the brief's purity rule, mechanical
+The adapter surface is async by contract, so six screens gained three states
+where they had one. Two of those screens were rendering a FALSE SENTENCE on the
+first frame, not a blank:
 
-No runtime import of `@/store`, React/zustand, or `@/data/*` anywhere under
-`src/engine/` (28 modules scanned; type-only imports allowed, the same
-distinction the brief's Phase 3 exit condition makes). Three pre-existing
-`@/data/ontology` imports (`designs`, `balance`, `posterior` — none of them on
-the brief's six) are carried as an explicit allowlist with reasons; a NEW
-violation fails, and a RESOLVED entry left unpruned also fails, so the ledger
-stays exact. Proved in both directions before being trusted.
+- `DesignDetail` answered "Design not found" for any unresolved id, and every
+  design's first frame is an unresolved id. `loading` and `null` are now
+  different branches; the not-found branch is still reachable and still tested.
+- `Notary`'s callout reads "N of M designs are publishable"; `0 of 0` is a
+  finding about the corpus when it is a fact about a promise. It gates.
 
-### `check:interp` — the pin the brief's tests asked for
+`Home` does not gate — its two reads feed counts inside two tiles, and an
+unarrived count renders as `—` rather than `0`. `Validation` folded the read
+into the `delayClass('quick')` skeleton it already had. `Ask` gained nothing:
+its prompts never leave the client.
 
-`units.convert` was already pinned harder than any unit test: 1,632 convert
-cases plus 600 cross-family refusals in `fixtures/units.json`, replayed against
-BOTH implementations on every verify. `interp.interpolate` had **no pin at
-all** — the Phase 0 capture never recorded it, and every number a slider shows
-between two solved points passes through it.
+This was checked rather than assumed. A frame audit recorded every DOM mutation
+from before the bundle evaluated until 2 s after load and asserted the false
+sentences appear in NO frame — not merely in the settled one the 500 ms waits in
+`test:golden` observe. Separately, the rendered text of all nine affected routes
+is byte-identical before and after, with zero console errors.
 
-It is now pinned by 3,863 property checks against the live cost-model grids, no
-remembered constants: node exactness, per-axis midpoint linearity, clamping
-(including absent-keys-clamp-low), the waterfall identity (Σ cost lines = MSP)
-surviving interpolation at 200 seeded interior points per model, and a sample of
-nodes re-solved through `model.evaluate()` so the grid is tied to the plant
-rather than to itself. A 0.1% perturbation of one corner weight trips 3,215 of
-them.
+### Exit condition — Phase 3b
+
+`grep -r "from '@/data/" src/screens/` returns 37 lines: 21 type-only, 13
+display helpers from `@/data/ontology` (`fieldName`, `ONTOLOGY_BY_ID`,
+`ONTOLOGY_GAPS`, `FAMILY_LABEL` — id-to-label lookups, not seed data), and 3
+`ONTOLOGY` reads that already go through `@/data/source`. All three categories
+are the ones the brief's own exit condition and Phase 0's import map allow.
+**SEED: 0.** Each surviving helper import is annotated in place so the next
+reader does not read it as one that was missed.
 
 ---
 
@@ -597,7 +600,10 @@ takes well under two minutes.
 
 A second brief, commissioning a parallel demo pool: six query archetypes over one
 shared object pool, alongside the casein corpus rather than inside it. Steps 1–3
-of its §3 build order are complete and gated; the screens are not built yet.
+of its §3 build order were complete and gated when this section was written;
+all ten steps are complete now, and the suite's screens are live under `/repo`,
+`/proforma`, `/parchment/families`, `/notary/disclosures`, `/fermos/gap`,
+`/fermos/runs`, `/geneos/routes`, `/postdoc/tree` and `/runbook/design`.
 
 ### The brief describes an earlier repository, again
 
@@ -819,3 +825,43 @@ useful than the dependency list: Proforma's says the economics server refuses
 `solve_plant`, and Postdoc's says the model is deliberately unnamed because Rule
 1 means no number in an answer may come from weights either way.
 
+---
+
+## Cohesion pass — one interface over two pools
+
+Not a migration phase. The repository had grown by accretion — a literature
+corpus, a Python migration, five server skeletons, then a second parallel demo
+suite — and each landed green without anyone passing over the whole. It read as
+several products sharing a binary.
+
+The scope was surface and navigation only. The two DATA pools stay separate:
+that separation is an epistemic argument (an `ExtractionRecord` is a catalogued
+claim awaiting verification; an `Accession` is a normalised quantity with
+complete provenance) and merging them was never on the table.
+
+What the audit found that no gate watched:
+
+| Defect | Why no gate saw it |
+|---|---|
+| The evidence tick did not render **anywhere** in the demo suite | `.tick-cell` was written `td.tick-cell`; the 13 demo call sites are `<span>`/`<a>`/`<dd>`. Nothing in `verify` can see an absent pseudo-element. |
+| The demo suite was unreadable in dark mode | `--signal-open`/`--signal-closed` had no `[data-theme='night']` values |
+| "Enclosed by a patent" and "this is a fault" were the same colour | `--signal-closed` was byte-identical to `--signal-error` |
+| Cards had no padding while 44 of 50 demo cards assumed they did | `.card` set none; the tell was five no-op `p-0`s |
+| The Notary filter and the Proforma selector had no selected state | `.btn-active` was used at three sites and never defined |
+| Every `PF-` and `DC-` link hit "Route not found" | the hash router never split a second `#` off the path |
+| Nine demo error paths dropped the seed disclaimer | `check:demo-seed` proved the string was right, not that it was reachable |
+| `route.openSurface` disagreed with the function that computes it | both existed; nothing compared them |
+
+Two new gates now watch the last two, and both were watched failing before
+being trusted. `test:deep` also measures narrow-viewport overflow on the demo
+pool, which had never been checked at 420px.
+
+The navigation is one rail whose labels are read from `UPSTREAM` — the same
+table `UpstreamNote` renders at the foot of every screen — so the rail and the
+footnote cannot disagree, as they did on five of thirteen parts. The two pools
+are separated one level down instead of one level up: every screen header
+carries `movement · part · pool`.
+
+`pnpm verify` green at 21 stages; `check:schema` was wired in during this pass,
+having been defined, cited by `src/data/source.ts` as a live gate, and run by
+nothing.

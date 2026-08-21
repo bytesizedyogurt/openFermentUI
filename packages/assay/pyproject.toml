@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Gold-set scoring for openFerment extractor runs: per-field precision, recall and F1, as an Inspect AI scorer."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-or-later" }
 # `openferment-core` is not published; in this repo it resolves out of the tree
 # (see `[tool.pytest.ini_options].pythonpath` and `[tool.mypy].mypy_path` below)
 # or as an editable install of `packages/core`. It is declared rather than

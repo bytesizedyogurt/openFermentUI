@@ -31,8 +31,16 @@ mode this migration exists to prevent.
 ## Invariants that must never break
 
 1. `pnpm verify` passes green at the end of every phase. It is the regression
-   harness for this entire migration. It runs: typecheck → check:seed → build →
-   test:smoke → test:golden → test:deep.
+   harness for this entire migration. It is **twenty-one stages** — a typecheck,
+   sixteen `check:*` gates, a build and three browser suites. The canonical
+   list is the `verify` script in `package.json`; do not restate it here or in
+   the README, because a restated list is a list that goes stale (this one said
+   six).
+
+   The demo pool renders from its modules directly and holds no store state.
+   That is deliberate — it is read-only seeded data with no mutations to hold —
+   and adding a demo slice to `src/store.ts` is a thing to argue for before
+   doing, not a gap to fill.
 2. No fabricated data. `RUN_OUTPUTS` stays empty until a real extractor runs.
    Never invent P/R/F1, DOIs, years, authors, or venues.
 3. Provenance semantics are fixed. `curated` ≠ `verified`. `industry-estimate`

@@ -8,4 +8,13 @@ evaluated against that requirement by someone qualified to do so; this file is
 deliberately a placeholder rather than a guess, because a licence is a legal
 instrument and committing one without review is worse than committing none.
 
+The two Python packages under packages/ declare `AGPL-3.0-or-later` in their
+pyproject.toml as the WORKING ASSUMPTION consistent with the requirement above:
+network copyleft is what "no enclosure" means for software whose primary
+delivery is a web application. That declaration is a placeholder of the same
+kind as this file, not the outcome of the review this file asks for, and it is
+recorded here so the repository does not contradict itself in two places. They
+previously declared MIT, which is not copyleft and does not meet the
+requirement stated above.
+
 Until a licence is committed, default copyright applies: all rights reserved.

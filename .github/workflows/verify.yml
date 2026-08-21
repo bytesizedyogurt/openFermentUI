@@ -6,14 +6,17 @@
 # several of them exist because a gate was found watching only one side of a
 # two-sided thing — so the chain is trusted the only way a chain can be.
 #
-# verify is twenty stages: typecheck, eleven cross-implementation checks
-# (corpus fixed point, four TS/Python parity gates, the canonical Python
-# suites, generated-types drift, answer-shape and eval-flow currency, engine
-# purity, interpolation properties, the servers/ manifest-and-parity gate), the
-# bioSTEAM numerics check, build, and three browser suites. The Python steps
-# are real dependencies: check:corpus, check:aggregation and check:servers all
-# shell out to python3+pydantic, and check:python runs pytest in both
-# packages.
+# verify is twenty-one stages: a typecheck, sixteen `check:*` gates, a build and
+# three browser suites. The canonical list is the `verify` script in
+# package.json and is deliberately not restated here — an enumeration in a
+# comment is an enumeration that goes stale, and this one did (it said
+# "eleven", listed twelve, and summed to eighteen).
+#
+# What matters for CI is which stages have dependencies beyond node: check:seed
+# and check:demo-seed run under tsx; check:corpus, check:aggregation and
+# check:servers and check:schema shell out to python3 with pydantic;
+# check:python runs pytest in
+# both packages; and the three browser suites need the Playwright chromium.
 name: verify
 
 on:
