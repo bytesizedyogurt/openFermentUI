@@ -211,14 +211,10 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
                   <td className="p-2 text-right font-num text-caption">{c.timeToRevenueMonths} mo</td>
                   <td className="p-2 text-caption">
                     <span
-                      style={{
-                        color:
-                          verdict === 'promoted'
-                            ? 'rgb(var(--signal-open))'
-                            : verdict === 'excluded'
-                              ? 'rgb(var(--signal-error))'
-                              : undefined,
-                      }}
+                      className={cx(
+                        verdict === 'promoted' && 'text-signal-open',
+                        verdict === 'excluded' && 'text-signal-error',
+                      )}
                     >
                       {verdict}
                     </span>
@@ -358,7 +354,7 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
         {concepts.map((c) => (
           <button
             key={c.id}
-            className={cx('btn', c.id === open.id && 'btn-active')}
+            className={cx('btn', c.id === open.id && 'chip-active')}
             onClick={() => setOpenId(c.id)}
           >
             {c.id}

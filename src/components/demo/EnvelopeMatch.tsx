@@ -73,13 +73,13 @@ export function EnvelopeMatch({
                     <div className="relative flex-1 h-3 bg-[rgb(var(--line))]/40">
                       <div className="absolute inset-y-0 left-1/2 w-px bg-[rgb(var(--ink-soft))]/50" />
                       <div
-                        className="absolute inset-y-[2px]"
+                        className={cx(
+                          'absolute inset-y-[2px]',
+                          violated ? 'bg-signal-error' : 'bg-signal-open',
+                        )}
                         style={{
                           left: clipped >= 0 ? '50%' : `${50 + clipped / 2}%`,
                           width: `${Math.abs(clipped) / 2}%`,
-                          background: violated
-                            ? 'rgb(var(--signal-error))'
-                            : 'rgb(var(--signal-open))',
                         }}
                       />
                     </div>
@@ -96,9 +96,7 @@ export function EnvelopeMatch({
 
       <div className="mt-2 text-caption">
         {match.feasible ? (
-          <span style={{ color: 'rgb(var(--signal-open))' }}>
-            Fits the envelope on every axis.
-          </span>
+          <span className="text-signal-open">Fits the envelope on every axis.</span>
         ) : (
           <span className="text-signal-error">
             Does not fit. Binding axis:{' '}

@@ -14,16 +14,14 @@ import { DEMO_NOW } from '@/data/demo/core';
 import { monthsToExpiry } from '@/lib/demo';
 import { cx } from '@/components/ui';
 
-const STATUS: Record<ClaimStatus, { label: string; className: string; style?: React.CSSProperties }> = {
+const STATUS: Record<ClaimStatus, { label: string; className: string }> = {
   enclosed: {
     label: 'enclosed',
-    className: 'text-[rgb(var(--signal-closed))] border-[rgb(var(--signal-closed))]',
-    style: { background: 'rgb(var(--signal-closed) / 0.14)' },
+    className: 'text-signal-closed border-signal-closed bg-signal-closed/15',
   },
   expiring: {
     label: 'expiring',
-    className: 'text-signal-warn border-signal-warn',
-    style: { background: 'rgb(var(--signal-warn) / 0.12)' },
+    className: 'text-signal-warn border-signal-warn bg-signal-warn/10',
   },
   expired: { label: 'expired', className: 'text-ink-soft border-line' },
   'never-nationalised': { label: 'never nationalised', className: 'text-ink-soft border-line' },
@@ -67,7 +65,6 @@ export function ClaimChip({
         'inline-flex items-center gap-1 border rounded-[2px] px-1 text-[11px] leading-4 font-num whitespace-nowrap',
         s.className,
       )}
-      style={s.style}
       title={`${jurisdiction}: ${s.label}${detail ? `\n${detail}` : ''}`}
     >
       {jurisdiction}
@@ -94,7 +91,7 @@ export function ClaimOverlay({
             <div className="min-w-[13rem] flex-1 text-caption">
               {r.step}
               {enclosed > 0 && (
-                <span className="ml-1.5 text-[11px]" style={{ color: 'rgb(var(--signal-closed))' }}>
+                <span className="ml-1.5 text-[11px] text-signal-closed">
                   {enclosed} enclosed
                 </span>
               )}
@@ -128,11 +125,11 @@ export function OpenSurfaceSummary({
   const open = totalSteps - enclosedSteps;
   return (
     <span className="text-caption font-num">
-      <span style={{ color: open > 0 ? 'rgb(var(--signal-open))' : 'rgb(var(--signal-closed))' }}>
+      <span className={open > 0 ? 'text-signal-open' : 'text-signal-closed'}>
         {open}/{totalSteps} open
       </span>
       {enclosedSteps > 0 && (
-        <span style={{ color: 'rgb(var(--signal-closed))' }} className="ml-2">
+        <span className="ml-2 text-signal-closed">
           {enclosedSteps} enclosed
         </span>
       )}

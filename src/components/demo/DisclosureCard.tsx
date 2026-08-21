@@ -30,10 +30,10 @@ const REASON_LABEL: Record<DisclosureCandidate['reason'], string> = {
   'negative-result-unpublished': 'negative result nobody has published',
 };
 
-const URGENCY: Record<DisclosureCandidate['urgency'], { label: string; style: React.CSSProperties }> = {
-  now: { label: 'now', style: { color: 'rgb(var(--signal-closed))' } },
-  months: { label: 'months', style: { color: 'rgb(var(--signal-warn))' } },
-  watch: { label: 'watch', style: { color: 'rgb(var(--ink-soft))' } },
+const URGENCY: Record<DisclosureCandidate['urgency'], { label: string; className: string }> = {
+  now: { label: 'now', className: 'text-signal-closed' },
+  months: { label: 'months', className: 'text-signal-warn' },
+  watch: { label: 'watch', className: 'text-ink-soft' },
 };
 
 export const URGENCY_RANK: Record<DisclosureCandidate['urgency'], number> = {
@@ -56,7 +56,7 @@ export function DisclosureCard({
     <div className={cx('border border-line p-3', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
         <span className="font-num text-caption text-ink-soft">{dc.id}</span>
-        <span className="text-caption" style={u.style}>
+        <span className={cx('text-caption', u.className)}>
           {u.label}
           {dc.estimatedWindowMonths !== undefined && (
             <span className="ml-1 font-num">· ~{dc.estimatedWindowMonths} mo window</span>

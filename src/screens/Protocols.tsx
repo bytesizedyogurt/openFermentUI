@@ -324,7 +324,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
   const meta = CATEGORY_META[protocol.category];
   const Glyph = meta.Icon;
   return (
-    <Card className="overflow-hidden">
+    <Card className="p-0 overflow-hidden">
       <Tick p={prov} className="h-full flex flex-col gap-2 py-3 pr-3">
         <div className="flex items-start gap-2.5">
           <span

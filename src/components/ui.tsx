@@ -45,6 +45,38 @@ export function PageHeader({
   );
 }
 
+/**
+ * Does this class string already set padding on the element itself?
+ *
+ * A token counts if it is a padding utility, optionally variant-prefixed
+ * (`sm:p-4`, `hover:px-2`) and optionally negative. `place-items-center`,
+ * `pointer-events-none` and `max-w-prose` all start with a `p` and none of
+ * them match, because a padding utility is `p`, an optional single side
+ * letter, then a hyphen.
+ */
+const PADDING_UTILITY = /^(?:[\w-]+:)*-?p[xytrbles]?-/;
+
+function setsOwnPadding(className: string | undefined): boolean {
+  return !!className && className.split(/\s+/).some((t) => PADDING_UTILITY.test(t));
+}
+
+/**
+ * A panel. Background, hairline border, corner radius — and, unless the call
+ * site says otherwise, the inset that keeps text off the border.
+ *
+ * WHY THE DEFAULT IS DECIDED HERE AND NOT IN `.card`. Some cards must sit
+ * flush: one wrapping a table wants the header row to reach the border, and
+ * one wrapping a `Tick` needs the 3px provenance mark ON the edge, not 16px
+ * inside it. Those pass `p-0`. That opt-out cannot be left to CSS, because
+ * `p-0` and `p-4` have equal specificity and Tailwind emits `p-0` first — a
+ * `p-0` written at the call site would LOSE to a `p-4` baked into `.card`,
+ * silently and only for some values. So the default is suppressed in JS when
+ * the call site sets any padding of its own, and the emitted class list has
+ * exactly one padding utility in it.
+ *
+ * The flush cards are the ones carrying `overflow-hidden` / `overflow-x-auto`;
+ * that is the whole set, and each one now says `p-0` explicitly.
+ */
 export function Card({
   children,
   className,
@@ -52,7 +84,10 @@ export function Card({
   ...rest
 }: { children: ReactNode; className?: string; grid?: boolean } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cx('card', grid && 'of-grid', className)} {...rest}>
+    <div
+      className={cx('card', !setsOwnPadding(className) && 'p-4', grid && 'of-grid', className)}
+      {...rest}
+    >
       {children}
     </div>
   );

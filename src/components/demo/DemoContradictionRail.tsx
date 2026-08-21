@@ -159,8 +159,8 @@ export function DemoContradictionRail({
         )}
 
         {reconciled.length > 0 && (
-          <div className="mt-2 border-l-2 pl-2 text-caption" style={{ borderColor: 'rgb(var(--signal-open))' }}>
-            <div className="font-medium" style={{ color: 'rgb(var(--signal-open))' }}>
+          <div className="mt-2 border-l-2 border-signal-open pl-2 text-caption">
+            <div className="font-medium text-signal-open">
               Closed by normalisation
             </div>
             {reconciled.map(([a, b]) => (

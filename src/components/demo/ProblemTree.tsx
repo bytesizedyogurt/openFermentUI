@@ -35,11 +35,11 @@ const MATURITY_LABEL: Record<ProblemNode['technicalMaturity'], string> = {
   speculative: 'speculative',
 };
 
-const REC_STYLE: Record<ProblemNode['recommendation'], { label: string; style: React.CSSProperties }> = {
-  build: { label: 'build', style: { color: 'rgb(var(--signal-open))' } },
-  license: { label: 'license', style: { color: 'rgb(var(--signal-warn))' } },
-  partner: { label: 'partner', style: { color: 'rgb(var(--signal-info))' } },
-  avoid: { label: 'avoid', style: { color: 'rgb(var(--signal-closed))' } },
+const REC_STYLE: Record<ProblemNode['recommendation'], { label: string; className: string }> = {
+  build: { label: 'build', className: 'text-signal-open' },
+  license: { label: 'license', className: 'text-signal-warn' },
+  partner: { label: 'partner', className: 'text-signal-info' },
+  avoid: { label: 'avoid', className: 'text-signal-closed' },
 };
 
 /** Four steps, filled left to right. Readable in greyscale; that is the point. */
@@ -50,12 +50,10 @@ export function PatentDensity({ level }: { level: ProblemNode['patentDensity'] }
       {[1, 2, 3, 4].map((i) => (
         <span
           key={i}
-          className="inline-block w-[6px] h-[10px] border"
-          style={{
-            borderColor: 'rgb(var(--signal-closed))',
-            background: i <= n ? 'rgb(var(--signal-closed))' : 'transparent',
-            opacity: i <= n ? 0.85 : 0.35,
-          }}
+          className={cx(
+            'inline-block w-[6px] h-[10px] border border-signal-closed',
+            i <= n ? 'bg-signal-closed opacity-85' : 'bg-transparent opacity-35',
+          )}
         />
       ))}
     </span>
@@ -103,9 +101,7 @@ function Node({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className={cx(depth === 0 ? 'font-medium' : '')}>{node.label}</span>
             <PatentDensity level={node.patentDensity} />
-            <span className="text-caption" style={rec.style}>
-              {rec.label}
-            </span>
+            <span className={cx('text-caption', rec.className)}>{rec.label}</span>
             <span className="text-caption text-ink-soft">{MATURITY_LABEL[node.technicalMaturity]}</span>
           </div>
 

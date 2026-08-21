@@ -125,11 +125,10 @@ export function FactorBand({
             than filled, so it reads as a fence and not as a wall. */}
         {factor.ftoFlag && (
           <div
-            className="absolute inset-y-0 border-x-2 border-dashed"
+            className="absolute inset-y-0 border-x-2 border-dashed border-signal-closed"
             style={{
               left: `${x(factor.ftoFlag.recitedRange.low)}%`,
               width: `${w(factor.ftoFlag.recitedRange.low, factor.ftoFlag.recitedRange.high)}%`,
-              borderColor: 'rgb(var(--signal-closed))',
             }}
             title={`Recited by ${factor.ftoFlag.patentFamilyId} in ${factor.ftoFlag.jurisdiction}`}
           />
@@ -204,7 +203,7 @@ export function FactorBand({
       })}
 
       {factor.ftoFlag && (
-        <div className="text-caption mt-1" style={{ color: 'rgb(var(--signal-closed))' }}>
+        <div className="text-caption mt-1 text-signal-closed">
           <span className="font-num">
             {factor.ftoFlag.recitedRange.low}–{factor.ftoFlag.recitedRange.high}
           </span>{' '}

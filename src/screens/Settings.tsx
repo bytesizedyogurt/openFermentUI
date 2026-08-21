@@ -1247,7 +1247,7 @@ function AboutSection() {
             <span className="font-num">{counts.Visual}</span>
           </span>
         </div>
-        <Card className="overflow-x-auto">
+        <Card className="p-0 overflow-x-auto">
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
             <caption className="sr-only">
               Fidelity of each feature in the openFerment simulation

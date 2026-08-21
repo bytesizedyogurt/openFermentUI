@@ -151,8 +151,7 @@ export function Bench() {
                     ·{' '}
                     <span className="font-num">{dlv.accessionIds.length} Accessions</span> ·{' '}
                     <span
-                      className="font-num"
-                      style={{ color: dlv.disclosureCandidateIds.length ? undefined : 'rgb(var(--signal-error))' }}
+                      className={cx('font-num', !dlv.disclosureCandidateIds.length && 'text-signal-error')}
                     >
                       {dlv.disclosureCandidateIds.length} to publish
                     </span>
@@ -173,7 +172,7 @@ export function Bench() {
             <span className="text-caption text-ink-soft ml-2">candidates</span>
           </div>
           {urgentNow > 0 && (
-            <div className="text-caption mt-1" style={{ color: 'rgb(var(--signal-closed))' }}>
+            <div className="text-caption mt-1 text-signal-closed">
               {urgentNow} marked <span className="font-medium">now</span>
             </div>
           )}

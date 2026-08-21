@@ -113,7 +113,7 @@ export function UpstreamNote({ part, className }: { part: string; className?: st
           ))}
 
           {u.openQuestion && (
-            <div className="text-caption text-ink-soft border-l-2 pl-2 max-w-prose" style={{ borderColor: 'rgb(var(--signal-warn))' }}>
+            <div className="text-caption text-ink-soft border-l-2 border-signal-warn pl-2 max-w-prose">
               {u.openQuestion}
             </div>
           )}

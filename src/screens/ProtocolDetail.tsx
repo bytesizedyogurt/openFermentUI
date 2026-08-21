@@ -298,7 +298,7 @@ function StepCard({
   const [noteOpen, setNoteOpen] = useState(false);
   const prov = stepProvenance(step, version, records);
   return (
-    <Card className="overflow-hidden">
+    <Card className="p-0 overflow-hidden">
       <Tick p={prov} className="py-3 pr-3" title={`Step ${index + 1} — ${prov} provenance`}>
         <div className="flex items-start gap-3">
           <div className="font-num text-caption text-ink-soft w-6 shrink-0 text-right pt-[2px]">

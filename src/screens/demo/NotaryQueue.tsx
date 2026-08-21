@@ -65,13 +65,13 @@ export function NotaryQueue() {
 
       <div className="flex flex-wrap items-center gap-2 mt-4 mb-3">
         <button
-          className={cx('btn', reason === 'all' && 'btn-active')}
+          className={cx('btn', reason === 'all' && 'chip-active')}
           onClick={() => setReason('all')}
         >
           all · {DISCLOSURES.length}
         </button>
         {reasons.map((r) => (
-          <button key={r} className={cx('btn', reason === r && 'btn-active')} onClick={() => setReason(r)}>
+          <button key={r} className={cx('btn', reason === r && 'chip-active')} onClick={() => setReason(r)}>
             {r.replace(/-/g, ' ')} · {DISCLOSURES.filter((d) => d.reason === r).length}
           </button>
         ))}

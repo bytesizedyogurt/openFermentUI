@@ -152,8 +152,8 @@ export function RouteComparison({ productId }: { productId: string }) {
         <Card className="mt-6">
           <SectionTitle>Recommendation</SectionTitle>
           <div className="mt-1 max-w-prose">{dlv.payload.recommendation}</div>
-          <div className="mt-3 border-l-2 pl-3" style={{ borderColor: 'rgb(var(--signal-closed))' }}>
-            <div className="text-caption font-medium" style={{ color: 'rgb(var(--signal-closed))' }}>
+          <div className="mt-3 border-l-2 border-signal-closed pl-3">
+            <div className="text-caption font-medium text-signal-closed">
               The asymmetry
             </div>
             <div className="text-caption mt-0.5 max-w-prose">{dlv.payload.asymmetry}</div>

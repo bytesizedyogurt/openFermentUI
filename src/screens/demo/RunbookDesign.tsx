@@ -24,10 +24,10 @@ import { AccessionValue } from '@/components/demo/AccessionValue';
 import { PatentDensity } from '@/components/demo/ProblemTree';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 
-const STATUS: Record<Decision['status'], { label: string; style: React.CSSProperties }> = {
-  open: { label: 'open', style: { color: 'rgb(var(--signal-warn))' } },
-  leaning: { label: 'leaning', style: { color: 'rgb(var(--signal-info))' } },
-  'settled-enough': { label: 'settled enough', style: { color: 'rgb(var(--signal-open))' } },
+const STATUS: Record<Decision['status'], { label: string; className: string }> = {
+  open: { label: 'open', className: 'text-signal-warn' },
+  leaning: { label: 'leaning', className: 'text-signal-info' },
+  'settled-enough': { label: 'settled enough', className: 'text-signal-open' },
 };
 
 const gbp = (n: number) => `£${n.toLocaleString()}`;
@@ -97,9 +97,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span className="font-num text-page-title text-ink-soft">{i + 1}</span>
                     <span className="font-num text-caption text-ink-soft">{d.id}</span>
-                    <span className="text-caption" style={s.style}>
-                      {s.label}
-                    </span>
+                    <span className={cx('text-caption', s.className)}>{s.label}</span>
                     {node && <PatentDensity level={node.patentDensity} />}
                     <span className="text-caption text-ink-soft ml-auto font-num whitespace-nowrap">
                       {d.weeks} wk · {gbp(d.costGBP)}
@@ -141,8 +139,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
                   </div>
 
                   <div
-                    className="mt-3 border-l-2 pl-3"
-                    style={{ borderColor: 'rgb(var(--signal-warn))' }}
+                    className="mt-3 border-l-2 border-signal-warn pl-3"
                   >
                     <div className="text-caption text-ink-soft">This flips if</div>
                     <div className="text-caption">{d.flipsIf}</div>

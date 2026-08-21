@@ -907,7 +907,7 @@ export default function Validation() {
         Per-field performance
       </SectionTitle>
 
-      <Card className="overflow-x-auto mb-6">
+      <Card className="p-0 overflow-x-auto mb-6">
         {sortedFields.length === 0 ? (
           <EmptyState
             title="No fields scored"
@@ -1038,7 +1038,7 @@ export default function Validation() {
           ))}
       </div>
 
-      <Card className="overflow-x-auto">
+      <Card className="p-0 overflow-x-auto">
         {mismatches.length === 0 ? (
           <EmptyState
             title="No mismatches in this run"

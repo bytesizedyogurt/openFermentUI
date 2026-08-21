@@ -16,6 +16,12 @@ export default {
         'signal-warn': 'rgb(var(--signal-warn) / <alpha-value>)',
         'signal-error': 'rgb(var(--signal-error) / <alpha-value>)',
         'signal-info': 'rgb(var(--signal-info) / <alpha-value>)',
+        // The demo suite's pair (OF-DEMO-002 §5). Exposed as utilities so the
+        // 24 call sites that were reaching for `style={{ color: 'rgb(var(...))' }}`
+        // can use a class — and, more importantly, so the /<alpha-value> form
+        // works, which is why several of them needed an inline style at all.
+        'signal-open': 'rgb(var(--signal-open) / <alpha-value>)',
+        'signal-closed': 'rgb(var(--signal-closed) / <alpha-value>)',
       },
       fontFamily: {
         serif: ['Spectral', 'Georgia', 'serif'],

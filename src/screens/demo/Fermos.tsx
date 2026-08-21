@@ -340,15 +340,14 @@ export function RunPage({ runId }: { runId: string }) {
           <SectionTitle>Verdict</SectionTitle>
           <div className="mt-1 flex flex-wrap items-baseline gap-3">
             <span
-              className="text-body font-medium"
-              style={{
-                color:
-                  verdict.recommendation === 'terminate'
-                    ? 'rgb(var(--signal-error))'
-                    : verdict.recommendation === 'continue-flagged'
-                      ? 'rgb(var(--signal-warn))'
-                      : 'rgb(var(--signal-open))',
-              }}
+              className={cx(
+                'text-body font-medium',
+                verdict.recommendation === 'terminate'
+                  ? 'text-signal-error'
+                  : verdict.recommendation === 'continue-flagged'
+                    ? 'text-signal-warn'
+                    : 'text-signal-open',
+              )}
             >
               {verdict.recommendation}
             </span>

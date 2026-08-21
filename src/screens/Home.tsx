@@ -769,7 +769,7 @@ export default function Home() {
         <SectionTitle>
           <span id="home-activity">Recent activity</span>
         </SectionTitle>
-        <Card className="overflow-hidden">
+        <Card className="p-0 overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
               title="No activity yet"
