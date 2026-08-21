@@ -15,6 +15,13 @@
 // the answer — honest by construction rather than reconstructed afterward.
 import type { ChatFlow, ChatMessage, ChatRetrievalHit, ExtractionRecord } from '@/data/types';
 import { FLOWS } from '@/data/flows';
+// The demo suite's six archetype flows (OF-DEMO-001). They are a SEPARATE array
+// concatenated at the point of use rather than merged into FLOWS, for the same
+// reason the two object pools are separate directories: one array would make a
+// casein flow and an archetype flow indistinguishable to everything downstream,
+// including the eval fixture exporter, which must not start scoring one against
+// the other's expectations.
+import { ARCHETYPE_FLOWS } from '@/data/demo/flows';
 import { useStore, nextId, isAggregatable } from '@/store';
 import { PAPERS, STRAINS, search } from '@/data/source';
 import { ONTOLOGY } from '@/data/source';
@@ -292,7 +299,28 @@ export async function playFlow(flow: ChatFlow, sessionId: string): Promise<void>
   });
   await streamAnswer(sessionId, answerId, flow.answerMd);
   await delay(180);
-  patch(sessionId, answerId, { followups: flow.followups } as Partial<ChatMessage>);
+  patch(sessionId, answerId, { followups: deliverableFollowups(flow) } as Partial<ChatMessage>);
+}
+
+/**
+ * A flow's follow-ups, with its DELIVERABLE first when it has one.
+ *
+ * OF-DEMO-002 §7 gives the reason `deliverableId` exists: an archetype's answer
+ * ends with a card that deep-links to the rendered artifact rather than trying
+ * to render a capacity screen inside a chat bubble. A ranked table with eleven
+ * columns squeezed into a message is a screenshot of a screen, and the screen
+ * is right there.
+ *
+ * `handoffs` follow it. Archetype 5 terminates by SPAWNING route comparisons
+ * rather than by concluding, and that is the composability demonstration — a
+ * leaf is a query, not a verdict.
+ */
+function deliverableFollowups(flow: ChatFlow): string[] {
+  const demo = flow as ChatFlow & { deliverableId?: string; handoffs?: string[] };
+  const out: string[] = [];
+  if (demo.deliverableId) out.push(`deliverable:${demo.deliverableId}`);
+  for (const h of demo.handoffs ?? []) out.push(`flow:${h}|continue into ${h}`);
+  return [...out, ...flow.followups];
 }
 
 // ── Fallback (a): entity lookup answered from live store data ──────────
@@ -600,7 +628,11 @@ export async function send(input: string, sessionId: string): Promise<SlashResul
     if (res.handled) return res;
   }
 
-  const match = matchFlow(text);
+  // Both pools are offered to the matcher, casein first. Order matters only for
+  // an exact tie, and a tie between a casein trigger and an archetype trigger
+  // would mean two flows claim the same sentence — which `check:demo-seed`
+  // rejects, so the order is a formality rather than a preference.
+  const match = matchFlow(text, [...FLOWS, ...ARCHETYPE_FLOWS]);
   if (match && match.score >= MATCH_THRESHOLD) {
     await playFlow(match.flow, sessionId);
     return { handled: true };
@@ -618,7 +650,7 @@ export async function send(input: string, sessionId: string): Promise<SlashResul
 
 /** Play a flow by id — used by clarify options and follow-up chips. */
 export async function sendFlow(flowId: string, label: string, sessionId: string) {
-  const flow = FLOWS.find((f) => f.id === flowId);
+  const flow = [...FLOWS, ...ARCHETYPE_FLOWS].find((f) => f.id === flowId);
   push(sessionId, { kind: 'user', id: nextId('m'), text: label });
   await delay(160);
   if (!flow) {

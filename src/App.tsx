@@ -27,7 +27,9 @@ import {
   Users,
   Stamp,
   type LucideIcon,
-} from 'lucide-react';
+  LayoutGrid,
+  Database,
+  Calculator} from 'lucide-react';
 import { useStore } from '@/store';
 import { useRoute, navigate } from '@/router';
 import { cx, Popover, Toasts, Sheet } from '@/components/ui';
@@ -90,6 +92,20 @@ const RAIL: RailItem[] = [
   { to: '/openlab', label: 'openLab', icon: Users, key: 'b' },
   { to: '/notary', label: 'Notary', icon: Stamp, key: 'y' },
   { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
+  // ── The demo suite (OF-DEMO-001) ─────────────────────────────────────
+  //
+  // Its own group, not folded into the three above. The two object pools are
+  // deliberately separate and the rail is the first place a reader forms a
+  // mental model of what this system holds; three demo entries scattered among
+  // the casein ones would say they are the same corpus, which is the one thing
+  // the interface must not say.
+  //
+  // `y` is Notary already and the demo queue is a sub-path of it, so it needs
+  // no key of its own.
+  { group: 'Demo suite' },
+  { to: '/bench', label: 'Bench', icon: LayoutGrid, key: 'w' },
+  { to: '/repo', label: 'BioRepo', icon: Database, key: 'r' },
+  { to: '/proforma', label: 'Proforma', icon: Calculator, key: 'f' },
 ];
 
 function isActive(path: string, to: string) {

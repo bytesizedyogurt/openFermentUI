@@ -741,3 +741,49 @@ passed silently on `undefined`; the verdict lives on the deliverable payload. An
 a "watching nothing" guard in the honesty section caught my own wrong field name
 on `PatentFamily` before it could report a vacuous pass.
 
+### The agent layer
+
+The six archetype flows were shipped in the package and wired to nothing —
+`ARCHETYPE_FLOWS` had no importer. They now share one matcher with the thirteen
+casein flows, as a SEPARATE array concatenated at the point of use rather than
+merged into `FLOWS`: one array would make a casein flow and an archetype flow
+indistinguishable to everything downstream, including the eval fixture exporter,
+which must not start scoring one against the other's expectations.
+
+Three additions, each the smallest thing that made the contract real:
+
+- **`[[chip]]` resolution dispatches by PREFIX** to a demo resolver. The demo
+  flows cite `[[OF-A-00147]]`, `[[PF-003]]`, `[[RUN-047]]`; without this they
+  rendered as paper chips pointing at papers that do not exist. Prefix rather
+  than lookup order, because a chip falling through from one pool to the other
+  would be the merge §8 forbids, happening at render time where nobody would see
+  it. An id matching a demo prefix and resolving to nothing renders as a visible
+  fault.
+- **`deliverableId` becomes the first follow-up chip**, navigating to the
+  rendered artifact instead of asking another question. That is the reason the
+  field exists: a ranked table with eleven columns squeezed into a chat bubble is
+  a screenshot of a screen, and the screen is right there.
+- **`handoffs` follow it**, so Archetype 5 terminates by spawning route
+  comparisons rather than by concluding.
+
+The gate now checks that no trigger is claimed by two flows across BOTH pools —
+a shared trigger means the matcher answers by array order, and array order is not
+a product decision anybody made. Watched failing by giving an archetype flow a
+real casein trigger; it names both flows.
+
+### The rail
+
+The demo suite gets its own group rather than three entries scattered among the
+casein ones. The rail is the first place a reader forms a mental model of what
+this system holds, and interleaving them would say the two pools are one corpus.
+`f` is Proforma as the brief asks; `y` was already Notary and the demo queue is a
+sub-path of it, so it needs no key of its own.
+
+### Density — deviation
+
+§5 says to default the demo routes to dense. Density is a global `⇧D` toggle, and
+flipping it on navigation would fight the user's own setting and surprise them on
+the way back out. The dense row is applied where the brief's reason applies —
+the capacity table, which is the screen with eleven columns — and the global
+toggle is left alone. **Deviation, recorded.**
+

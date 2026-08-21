@@ -1,8 +1,17 @@
 // Minimal markdown renderer with first-class citation chips.
 // Chips are written [[SP-004]] or [[ex-0112]] in seed content and become the
 // real CitationChip component — never post-hoc decoration (§4).
+//
+// The demo pool (OF-DEMO-001) writes its own identifiers into the same syntax —
+// [[OF-A-00147]], [[PF-003]], [[RUN-047]] — and they are dispatched by PREFIX
+// to `DemoChip`. Prefix rather than lookup order, because a corpus id and a
+// demo id must never be resolvable by the same path: an ExtractionRecord and an
+// Accession are different epistemic objects and a chip that silently fell
+// through from one pool to the other would be the merge the brief forbids,
+// happening at render time where nobody would see it.
 import React, { type ReactNode } from 'react';
 import { CitationChip } from './Chip';
+import { DemoChip, isDemoId } from './demo/DemoChip';
 import { cx } from './ui';
 
 const CHIP_RE = /\[\[([A-Za-z0-9\-]+)\]\]/g;
@@ -16,7 +25,9 @@ export function inlineMarkdown(text: string, key = ''): ReactNode[] {
     if (idx % 2 === 1) {
       const id = part;
       out.push(
-        id.startsWith('r-') ? (
+        isDemoId(id) ? (
+          <DemoChip key={`${key}-c${idx}`} id={id} />
+        ) : id.startsWith('r-') ? (
           <CitationChip key={`${key}-c${idx}`} recordId={id} />
         ) : (
           <CitationChip key={`${key}-c${idx}`} paperId={id} />

@@ -13,6 +13,7 @@ import {
 } from '@/data/demo/archetypes';
 import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions } from '@/data/demo/runs';
 import { ARCHETYPE_FLOWS } from '@/data/demo/flows';
+import { FLOWS } from '@/data/flows';
 import {
   plantCeilings, matchEnvelope, normalise, monthsToExpiry, metabolicHeatKW,
   // Aliased: this file already has a local `conflictPairs`, a flat list of
@@ -506,6 +507,72 @@ for (const f of LYSINE_FACTOR_MAP) {
   for (const d of DELIVERABLES) {
     ok(d.disclosureCandidateIds.length > 0, `${d.id} names no disclosure candidate — that is a signal the archetype is wrong, not that the field is optional`);
     ok(d.accessionIds.length >= 6, `${d.id} references ${d.accessionIds.length} Accessions; every deliverable must rest on at least six`);
+  }
+}
+
+// ── The flows, and the chips inside them (OF-DEMO-003 §7) ──────────────
+//
+// The six archetype flows share one matcher with the thirteen casein flows.
+// Two things must hold for that to be safe, and neither is obvious from either
+// array on its own — which is exactly why they are checked here.
+
+{
+  // 1. No trigger may be claimed by two flows. A shared trigger means the
+  //    matcher's answer depends on array order, and array order is not a
+  //    product decision anybody made.
+  const claim = new Map<string, string>();
+  for (const f of [...FLOWS, ...ARCHETYPE_FLOWS]) {
+    for (const t of f.triggers) {
+      const norm = t.trim().toLowerCase();
+      const prev = claim.get(norm);
+      ok(!prev, `trigger "${t}" is claimed by both ${prev} and ${f.id} — the matcher would answer by array order`);
+      claim.set(norm, f.id);
+    }
+  }
+
+  // 2. Every chip in every archetype answer must resolve, and resolve to the
+  //    DEMO pool. A chip that fell through to the corpus resolver would put an
+  //    invented identifier beside real literature.
+  const CHIP = /\[\[([A-Za-z0-9-]+)\]\]/g;
+  const demoIds = new Set<string>([
+    ...ACCESSIONS.map((a) => a.id),
+    ...PATENT_FAMILIES.map((f) => f.id),
+    ...[...ORGANISMS, ...AUX_ORGANISMS].map((o) => o.id),
+    ...RUNS.map((r) => r.id),
+    ...DELIVERABLES.map((d) => d.id),
+  ]);
+  let chips = 0;
+  for (const f of ARCHETYPE_FLOWS) {
+    for (const m of f.answerMd.matchAll(CHIP)) {
+      chips += 1;
+      ok(demoIds.has(m[1]), `flow ${f.id} cites [[${m[1]}]], which is not in the demo pool`);
+    }
+    ok(f.answerMd.trim().length > 0 || !!f.clarify, `flow ${f.id} has neither an answer nor a clarify`);
+    ok(f.triggers.length > 0, `flow ${f.id} has no trigger, so nothing can reach it`);
+    ok(f.plan.length > 0, `flow ${f.id} shows no plan`);
+    // 3. A deliverableId must resolve, or the answer's closing card is a dead
+    //    link — and it is the one chip a reviewer is most likely to click.
+    const d = (f as { deliverableId?: string }).deliverableId;
+    if (d) ok(dlvIds.has(d), `flow ${f.id} names deliverable ${d}, which does not exist`);
+    for (const h of (f as { handoffs?: string[] }).handoffs ?? []) {
+      ok(
+        [...FLOWS, ...ARCHETYPE_FLOWS].some((x) => x.id === h),
+        `flow ${f.id} hands off to ${h}, which is not a flow`,
+      );
+    }
+    for (const c of f.clarify?.options ?? []) {
+      ok(
+        [...FLOWS, ...ARCHETYPE_FLOWS].some((x) => x.id === c.flowId),
+        `flow ${f.id} offers a clarify option into ${c.flowId}, which is not a flow`,
+      );
+    }
+  }
+  ok(chips > 0, 'no chips were checked in any archetype answer, which means this check is watching nothing');
+
+  // 4. Every archetype must be reachable and must produce a deliverable.
+  for (const a of ['AR1', 'AR2', 'AR3', 'AR4', 'AR5', 'AR6']) {
+    ok(ARCHETYPE_FLOWS.some((f) => f.id === a), `no flow for archetype ${a}`);
+    ok(DELIVERABLES.some((d) => d.archetype === a), `no deliverable for archetype ${a}`);
   }
 }
 
