@@ -48,3 +48,16 @@ export function quartiles(xs: number[]): { q1: number; q3: number } | null {
   if (xs.length < 4) return null;
   return { q1: quantile(xs, 0.25), q3: quantile(xs, 0.75) };
 }
+
+/**
+ * The element-wise median across several equal-length series.
+ *
+ * A run's baseline is the median of its comparison runs at each tick, not the
+ * median of their means — an excursion in one run must not move the baseline
+ * everywhere. `data/demo/runs.ts` had written this out inline while the
+ * exported version sat unused two modules away.
+ */
+export function medianSeries(rows: number[][]): number[] {
+  if (!rows.length) return [];
+  return rows[0].map((_, i) => quantile(rows.map((r) => r[i]), 0.5));
+}

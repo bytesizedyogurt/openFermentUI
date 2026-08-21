@@ -19,7 +19,7 @@ import {
   LYSINE_RUN_DESIGN,
   CANDIDATES,
 } from '@/data/demo/archetypes';
-import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions } from '@/data/demo/runs';
+import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions, C_STAR_AT_RUN_TEMP } from '@/data/demo/runs';
 import { plantCeilings, matchEnvelope } from '@/lib/demo';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout, cx } from '@/components/ui';
@@ -340,6 +340,11 @@ export function RunPage({ runId }: { runId: string }) {
           {e.integrals && (
             <dl className="mt-3 grid sm:grid-cols-3 gap-3 text-caption">
               <Metric k="Integrated O₂ deficit" v={`${e.integrals.o2DeficitMmolPerL} mmol L⁻¹`} />
+              {/* The saturation concentration the deficit is measured against.
+                  Its docstring named this readout and this readout did not
+                  use it, so the number a reader needs to interpret the deficit
+                  was the one number not on screen. */}
+              <Metric k="C* at run temperature" v={`${C_STAR_AT_RUN_TEMP} mmol L⁻¹`} />
               <Metric k="CER deviation" v={`${e.integrals.cerDeviationMmolPerL} mmol L⁻¹`} />
               <Metric
                 k="Carbon diverted (est.)"

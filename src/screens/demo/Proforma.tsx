@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 
 import type { Candidate } from '@/data/demo/types';
-import { PLANTS, PLANT_BY_ID, HS_CODES } from '@/data/demo/core';
+import { PLANTS, PLANT_BY_ID, HS_CODES, DEMO_FX_NOTE } from '@/data/demo/core';
 import { ACCESSION_BY_ID } from '@/data/demo/accessions';
 import { CANDIDATES, DELIVERABLES, DELIVERABLE_BY_ID, DISCLOSURES, BAGASSE_CONCEPTS } from '@/data/demo/archetypes';
 import { matchEnvelope, plantCeilings, organismName } from '@/lib/demo';
@@ -440,6 +440,11 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
         <div className="text-caption text-ink-soft mt-3 font-num">
           Breakeven at {open.breakevenTonnesPerYear.toLocaleString()} t a⁻¹ · opex{' '}
           {open.opexPerTonneUSD.toLocaleString()} USD t⁻¹
+          {/* The rate is fixed and said out loud. `DEMO_FX_NOTE` asserted it
+              was "stated on every converted Accession" and was rendered
+              nowhere — a methodology note that exists only in a constant is
+              not a disclosure. */}
+          <div className="text-caption text-ink-soft mt-2 max-w-prose">{DEMO_FX_NOTE}</div>
         </div>
       </Card>
 

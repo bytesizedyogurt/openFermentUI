@@ -23,6 +23,7 @@ import {
   // Aliased: this file already has a local `conflictPairs`, a flat list of
   // Accessions carrying links. These two are the pairwise resolutions.
   conflictPairs as railConflicts, reconciledPairs as railReconciled, isContradiction,
+  openSurfaceIn, trajectoryRecovered,
 } from '@/lib/demo';
 
 const fails: string[] = [];
@@ -698,6 +699,51 @@ for (const f of LYSINE_FACTOR_MAP) {
 }
 
 // ── Report ─────────────────────────────────────────────────────────────
+
+// RUN-047's excursion narrative says the off-gas CO₂ "did not return to the
+// pre-excursion trajectory". `trajectoryRecovered` is the function that tests
+// exactly that against the recorded series, and nothing called it — so the
+// sentence and the data could have disagreed indefinitely. The prose is the
+// claim; this is the check.
+{
+  const r = RUN_BY_ID['RUN-047'];
+  const exc = r?.excursions[0];
+  const cer = r?.channels.find((c) => c.id === 'cer');
+  ok(Boolean(exc && cer), 'RUN-047 must carry an excursion and an off-gas CO₂ channel');
+  if (exc && cer) {
+    ok(
+      trajectoryRecovered(cer.values, exc.startTick, exc.endTick) === false,
+      'RUN-047 off-gas CO₂ is described as not returning to its pre-excursion ' +
+        'trajectory; the recorded series must agree',
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// A stored number nobody checks is a decoration
+// ══════════════════════════════════════════════════════════════════════
+//
+// `route.openSurface` — how many of a route's steps are enclosed, expiring or
+// open — is the finding Archetype 2 turns on: the biochemistry ranks the
+// routes one way and the patent positions reverse it. It was WRITTEN OUT in
+// the seed at three sites while `openSurfaceIn`, the function that derives it
+// from the per-step claim data, was never called by anything. Either could
+// have drifted from the other without a single gate noticing, which is exactly
+// the failure 00-BRIEF §4 exists to prevent: anything that only ever renders a
+// stored number is decoration.
+for (const r of ROUTES_3HP) {
+  const computed = openSurfaceIn(
+    r.steps.map((st) => st.claims.map((c) => ({ jurisdictions: c.jurisdictions, status: c.status }))),
+    'US',
+  );
+  ok(
+    computed.totalSteps === r.openSurface.totalSteps &&
+      computed.enclosedSteps === r.openSurface.enclosedSteps &&
+      computed.expiringSteps === r.openSurface.expiringSteps,
+    `${r.id} openSurface must equal what the claim data computes — stored ` +
+      `${JSON.stringify(r.openSurface)}, computed ${JSON.stringify(computed)}`,
+  );
+}
 
 if (fails.length) {
   console.error(`\n[of] seed check FAILED — ${fails.length} problem(s):\n`);

@@ -445,21 +445,3 @@ export const PATENT_FAMILIES: PatentFamily[] = [
 
 export const PATENT_BY_ID: Record<string, PatentFamily> = Object.fromEntries(PATENT_FAMILIES.map((p) => [p.id, p]));
 
-/**
- * The finding the capacity screen turns on, computed rather than asserted.
- * Returns families with no in-force claim in the given jurisdiction.
- */
-export function openIn(jurisdiction: string, familyIds?: string[]): PatentFamily[] {
-  const pool = familyIds ? PATENT_FAMILIES.filter((f) => familyIds.includes(f.id)) : PATENT_FAMILIES;
-  return pool.filter((f) => {
-    const j = f.jurisdictions.find((x) => x.code === jurisdiction);
-    return !j || j.status === 'never-nationalised' || j.status === 'expired';
-  });
-}
-
-/** Months until expiry, against the frozen DEMO_NOW. Never `new Date()`. */
-export function monthsToExpiry(iso: string, demoNow: string): number {
-  const a = new Date(demoNow);
-  const b = new Date(iso);
-  return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
-}

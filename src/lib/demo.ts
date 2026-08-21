@@ -83,19 +83,6 @@ export function normalise(acc: Accession, pool: Record<string, Accession>): numb
   }
 }
 
-/** The display string. Never render the normalised value alone (§2.4). */
-export function accessionDisplay(acc: Accession, pool: Record<string, Accession>): string {
-  const v = normalise(acc, pool);
-  const orig = `${acc.reported.value} ${acc.reported.unit}`.trim();
-  const aux = acc.derivation.usingAccessionIds
-    .map((id) => pool[id])
-    .filter(Boolean)
-    .map((x) => `@ ${x.normalized.value} ${x.normalized.unit}`)
-    .join(' ');
-  if (acc.reported.unit === acc.normalized.unit) return `${v} ${acc.normalized.unit}`.trim();
-  return `${round(v, 4)} ${acc.normalized.unit} (orig. ${orig}${aux ? ' ' + aux : ''})`;
-}
-
 const round = (v: number, d = 3) => +v.toFixed(d);
 
 // ══════════════════════════════════════════════════════════════════════
@@ -332,12 +319,6 @@ export function breakevenTonnesPerYear(capexUSD: number, refScale: number, opexP
   return Math.round((lo + hi) / 2);
 }
 
-/** Annual capacity a plant can actually turn out, from cycle time and turns. */
-export function annualCapacityTonnes(titerGPerL: number, volumeL: number, vessels: number, cycleTimeH: number, downstreamYield: number): number {
-  const turnsPerYear = (OPERATING_DAYS * 24) / cycleTimeH;
-  return (titerGPerL * volumeL * vessels * turnsPerYear * downstreamYield) / 1e6;
-}
-
 export function importDisplacementUSD(capacityTonnes: number, importVolumeTonnes: number, cifUSDPerTonne: number, landedCostUSDPerTonne: number): number {
   return Math.min(capacityTonnes, importVolumeTonnes) * (cifUSDPerTonne - landedCostUSDPerTonne);
 }
@@ -350,13 +331,6 @@ export function trapezoid(y: number[], dx: number): number {
   let s = 0;
   for (let i = 1; i < y.length; i++) s += ((y[i] + y[i - 1]) / 2) * dx;
   return s;
-}
-
-export function medianSeries(rows: number[][]): number[] {
-  return rows[0].map((_, i) => {
-    const col = rows.map((r) => r[i]).sort((a, b) => a - b);
-    return col[Math.floor(col.length / 2)];
-  });
 }
 
 /**
@@ -394,17 +368,33 @@ export function statusIn(family: PatentFamily, jurisdiction: string, horizonMont
 }
 
 /** Open surface for a route, recomputed per jurisdiction rather than stored. */
+/**
+ * How much of a route is enclosed in one jurisdiction.
+ *
+ * Counts the status DECLARED on each step's claim, not one re-derived from the
+ * family's expiry date. That distinction was a live bug: this function used to
+ * call `statusIn`, whose default horizon calls anything more than 24 months
+ * out `enclosed`, and it therefore reported the glycerol route as 2 enclosed
+ * / 0 expiring while every screen showing that route said 0 / 2.
+ *
+ * The declared status is the datum. PF-001 carries the SAME expiry date in CN
+ * and in the US and is `enclosed` in one and `expiring` in the other, so these
+ * statuses are a curator's judgement about a position, not arithmetic on a
+ * date. `statusIn` remains the right thing for a chip's countdown tooltip,
+ * where a months-to-expiry figure is what is being shown.
+ *
+ * A step counts once, at its loudest position: enclosed beats expiring.
+ */
 export function openSurfaceIn(
-  stepClaims: { patentFamilyId: string; jurisdictions: string[] }[][],
-  families: Record<string, PatentFamily>,
+  stepClaims: { jurisdictions: string[]; status: ClaimStatus }[][],
   jurisdiction: string,
 ) {
   let enclosed = 0;
   let expiring = 0;
   for (const claims of stepClaims) {
-    const s = claims.map((c) => (c.jurisdictions.includes(jurisdiction) ? statusIn(families[c.patentFamilyId], jurisdiction) : 'never-nationalised'));
-    if (s.includes('enclosed')) enclosed++;
-    else if (s.includes('expiring')) expiring++;
+    const here = claims.filter((c) => c.jurisdictions.includes(jurisdiction)).map((c) => c.status);
+    if (here.includes('enclosed')) enclosed++;
+    else if (here.includes('expiring')) expiring++;
   }
   return { totalSteps: stepClaims.length, enclosedSteps: enclosed, expiringSteps: expiring };
 }
@@ -432,7 +422,7 @@ export function countable(accs: _Accession[]): _Accession[] {
 
 // Order statistics live in `lib/stats.ts`, shared with the corpus pool and the
 // aggregate engine. Re-exported here so demo call sites keep one import.
-export { median, quartiles } from './stats';
+export { median, quartiles, medianSeries } from './stats';
 
 /**
  * Is there a real disagreement on this field?
@@ -487,8 +477,6 @@ export function conflictPairs(accs: _Accession[]): [Accession, Accession][] {
   }
   return out;
 }
-
-
 
 /**
  * Every curator-linked pair in the pool, unresolved and reconciled alike.

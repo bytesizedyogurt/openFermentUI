@@ -11,6 +11,9 @@
 import type { RunRecord, Channel, Excursion } from './types';
 import { HEAT_PER_MOL_O2_KJ, O2_SOLUBILITY } from './core';
 
+// Order statistics, from the one module that has them. `lib/stats` imports
+// nothing, so a seed module can use it without a cycle.
+import { medianSeries } from '@/lib/stats';
 // ── Deterministic PRNG ─────────────────────────────────────────────────
 
 export function mulberry32(seed: number): () => number {
@@ -288,15 +291,9 @@ export function excursionIntegrals(runId: string, basisIds: string[]) {
   const hi = Math.min(exc.endTick + 120, r.channels[0].values.length); // window plus 2 h of tail
 
   const pick = (rec: RunRecord, id: string) => rec.channels.find((c) => c.id === id)!.values.slice(lo, hi);
-  const median = (rows: number[][]) =>
-    rows[0].map((_, i) => {
-      const col = rows.map((x) => x[i]).sort((p, q) => p - q);
-      return col[Math.floor(col.length / 2)];
-    });
-
   const basis = basisIds.map((id) => RUN_BY_ID[id]);
-  const ourBasis = median(basis.map((b) => pick(b, 'our')));
-  const cerBasis = median(basis.map((b) => pick(b, 'cer')));
+  const ourBasis = medianSeries(basis.map((b) => pick(b, 'our')));
+  const cerBasis = medianSeries(basis.map((b) => pick(b, 'cer')));
   const ourRun = pick(r, 'our');
   const cerRun = pick(r, 'cer');
 

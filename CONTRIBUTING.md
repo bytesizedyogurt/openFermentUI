@@ -95,3 +95,46 @@ A tool that cannot answer honestly yet is DECLARED and REFUSES: it keeps its
 shape so callers do not change later, its manifest entry says
 `"status": "declared-refuses"`, and its refusal message names what is missing
 and what it will return once that exists.
+
+## Unused exports: what is exempt from a dead-code sweep
+
+A naive scan of this repository reports around 180 unused exports. Most are
+unused on purpose, and deleting them would do damage. Before removing anything,
+check whether it falls into one of these:
+
+- **`src/data/types.generated.ts`** — generated from the Pydantic models.
+  Hand-editing it breaks the round-trip that `pnpm check:types` guards. Change
+  the Python model and regenerate.
+- **`src/engine/biosteam/`** — a port that mirrors the BioSTEAM Python API and
+  is checked against it by `pnpm check:biosteam`. Completeness is the point; an
+  unused function here is coverage, not litter.
+- **Seed modules behind the adapter seam** — exported for `src/adapters/`, not
+  for screens. `pnpm check:purity` is what enforces the direction.
+- **Anything a scan cannot see** — a type used only within its own file, or a
+  symbol referenced from `scripts/` rather than `src/`.
+
+What is *not* exempt, and what to look for instead of a symbol count:
+
+- **A second implementation of something already implemented.** Four medians
+  and two expiry calculations lived here at once. `src/lib/stats.ts` holds the
+  order statistics for both pools and the aggregate engine, and it imports
+  nothing so it can be reached from `src/engine/` without tripping
+  `check:purity`.
+- **A function that computes what the seed hard-codes.** `openSurfaceIn` and
+  `trajectoryRecovered` both sat unused beside stored numbers and prose making
+  the same claim. That is not dead code, it is an ungated assertion — wire it
+  into `scripts/check-demo-seed.ts` rather than deleting it.
+- **A constant that describes a disclosure nobody renders.** `DEMO_FX_NOTE`
+  said it was "stated on every converted Accession" while appearing on no
+  screen. A methodology note that exists only in a constant is not a
+  disclosure.
+
+Do not enable `noUnusedLocals`: it fails on the generated file.
+
+### `check:purity` covers `src/engine/`, not the demo pool
+
+`pnpm check:purity` scans `src/engine/` for seed imports. It does **not** scan
+`src/screens/`, and `src/screens/demo/` imports its seed modules directly at
+31 sites. That is deliberate — the demo pool is read-only seeded data with no
+adapter seam of its own — but the gate does not enforce anything there, and it
+should not be described as if it does.
