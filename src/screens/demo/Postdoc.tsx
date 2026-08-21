@@ -13,6 +13,7 @@ import { useMemo } from 'react';
 import { DELIVERABLES, DELIVERABLE_BY_ID, DISCLOSURES, ROUTES_3HP } from '@/data/demo/archetypes';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout } from '@/components/ui';
+import { BURGER_PROGRAMME, programmeTotals } from '@/data/demo/runbook';
 import { ProblemTree, PatentDensity } from '@/components/demo/ProblemTree';
 import { DisclosureSection } from './Fermos';
 import { DemoFooter } from '@/components/demo/DemoFooter';
@@ -96,6 +97,22 @@ export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
           </div>
         </Card>
       )}
+
+      <Card className="mt-4">
+        <SectionTitle>What to do about it</SectionTitle>
+        <div className="text-caption text-ink-soft max-w-prose">
+          A tree is a diagram, and a diagram is not a plan. The programme takes the branches above
+          and orders them by how much each would reduce uncertainty per bench-week — naming, for
+          each, the one measurement that would settle it and what a result would have to say to move
+          the recommendation.
+        </div>
+        <a
+          href={href(`/runbook/design/${BURGER_PROGRAMME.id}`)}
+          className="text-caption text-accent hover:underline mt-2 inline-block"
+        >
+          open the decision programme — {programmeTotals().decisions} decisions, {programmeTotals().weeks} bench weeks →
+        </a>
+      </Card>
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />

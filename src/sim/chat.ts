@@ -318,7 +318,7 @@ export async function playFlow(flow: ChatFlow, sessionId: string): Promise<void>
 function deliverableFollowups(flow: ChatFlow): string[] {
   const demo = flow as ChatFlow & { deliverableId?: string; handoffs?: string[] };
   const out: string[] = [];
-  if (demo.deliverableId) out.push(`deliverable:${demo.deliverableId}`);
+  if (demo.deliverableId) out.push(`chip:${demo.deliverableId}|Open the deliverable`);
   for (const h of demo.handoffs ?? []) out.push(`flow:${h}|continue into ${h}`);
   return [...out, ...flow.followups];
 }

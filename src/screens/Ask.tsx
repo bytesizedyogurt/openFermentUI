@@ -28,7 +28,7 @@ import { href, navigate, useRoute } from '@/router';
 // One route table for demo deliverables, shared with the Accession page's
 // "Uses" list — so a chat chip and a provenance link cannot disagree about
 // where an artifact lives.
-import { deliverableRoute as demoDeliverableRoute } from '@/screens/demo/Repo';
+import { chipRoute } from '@/screens/demo/Repo';
 import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 // The chips belong to the scripted agent, not the corpus, and moved to sit
 // beside it: each is one flow trigger verbatim, so a click is an exact match —
@@ -740,20 +740,25 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                       {m.followups.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">
                           {m.followups.map((f) => {
-                            // `deliverable:DLV-...` is the demo suite's third
-                            // follow-up kind (OF-DEMO-002 §7). It navigates to
-                            // the rendered artifact instead of asking another
-                            // question, because a capacity screen does not fit
+                            // `chip:<id>|<label>` NAVIGATES rather than asking
+                            // another question — a capacity screen does not fit
                             // in a chat bubble and should not be made to.
-                            if (f.startsWith('deliverable:')) {
-                              const id = f.slice('deliverable:'.length);
+                            //
+                            // The demo flows have used this spelling since they
+                            // were written and nothing rendered it: the button
+                            // showed the raw `chip:DLV-…|…` string and clicking
+                            // fed it back to the matcher as a question. It is
+                            // the seed's vocabulary, so the seed wins and the
+                            // UI learns it.
+                            if (f.startsWith('chip:')) {
+                              const [id, label] = f.slice(5).split('|');
                               return (
                                 <a
                                   key={f}
-                                  href={href(demoDeliverableRoute(id))}
+                                  href={href(chipRoute(id))}
                                   className="chip hover:border-accent hover:bg-accent-wash inline-flex items-center gap-1"
                                 >
-                                  open the deliverable
+                                  {label ?? 'open'}
                                   <span className="font-num text-ink-soft">{id}</span>
                                 </a>
                               );

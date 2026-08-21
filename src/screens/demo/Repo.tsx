@@ -431,6 +431,24 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
   );
 }
 
+/**
+ * Where a `chip:<id>` follow-up goes.
+ *
+ * The archetype flows end with `chip:DLV-AR5-001|Open the decomposition tree`
+ * and nothing in the UI knew what `chip:` meant — the button rendered with the
+ * raw string as its label and clicking it fed that string back to the matcher
+ * as a question. One resolver, covering every id kind a follow-up can name, so
+ * a new chip kind is one line here rather than a new prefix nobody handles.
+ */
+export function chipRoute(id: string): string {
+  if (id.startsWith('DLV-')) return deliverableRoute(id);
+  if (id.startsWith('RB-')) return `/runbook/design/${id}`;
+  if (id.startsWith('RUN-')) return `/fermos/runs/${id}`;
+  if (id.startsWith('OF-A-')) return `/repo/a/${id}`;
+  if (id.startsWith('PF-')) return `/parchment#${id}`;
+  return '/bench';
+}
+
 /** Where a deliverable renders. One table, so no screen invents a route. */
 export function deliverableRoute(deliverableId: string): string {
   const d = DELIVERABLES.find((x) => x.id === deliverableId);

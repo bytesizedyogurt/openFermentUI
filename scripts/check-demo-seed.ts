@@ -13,6 +13,10 @@ import {
 } from '@/data/demo/archetypes';
 import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions } from '@/data/demo/runs';
 import { ARCHETYPE_FLOWS } from '@/data/demo/flows';
+import { BURGER_PROGRAMME, programmeOrder } from '@/data/demo/runbook';
+import { FIELD_BY_ID } from '@/data/demo/core';
+import protocolsJson from '../data/corpus/protocols.json';
+const PROTOCOL_IDS = new Set((protocolsJson as { id: string }[]).map((x) => x.id));
 import { FLOWS } from '@/data/flows';
 import {
   plantCeilings, matchEnvelope, normalise, monthsToExpiry, metabolicHeatKW,
@@ -85,7 +89,11 @@ ARCHETYPE_FLOWS.forEach((f) => {
     const [kind, rest] = String(s).split(':');
     const target = (rest ?? '').split('|')[0];
     if (kind === 'flow') ok(flowIds.has(target), `${f.id}: followup to unknown flow ${target}`);
-    if (kind === 'chip') ok(dlvIds.has(target) || runIds.has(target) || accIds.has(target), `${f.id}: followup chip ${target} does not resolve`);
+    if (kind === 'chip')
+      ok(
+        dlvIds.has(target) || runIds.has(target) || accIds.has(target) || target === BURGER_PROGRAMME.id,
+        `${f.id}: followup chip ${target} does not resolve`,
+      );
   });
   const chips = [...String(f.answerMd).matchAll(/\[\[([A-Za-z0-9-]+)\]\]/g)].map((m) => m[1]);
   chips.forEach((c) =>
@@ -574,6 +582,52 @@ for (const f of LYSINE_FACTOR_MAP) {
     ok(ARCHETYPE_FLOWS.some((f) => f.id === a), `no flow for archetype ${a}`);
     ok(DELIVERABLES.some((d) => d.archetype === a), `no deliverable for archetype ${a}`);
   }
+}
+
+// ── The decision programme (Archetype 5's terminus) ────────────────────
+//
+// The tree restructures the question; the programme says what to do about it.
+// Its ORDER is derived from information value per pound-week subject to
+// dependencies, which is the kind of thing that looks right and silently is
+// not — so it is checked rather than admired.
+
+{
+  const order = programmeOrder();
+  const ids = new Set(BURGER_PROGRAMME.decisions.map((d) => d.id));
+  const nodeIds = new Set(BURGER_TREE.map((n) => n.id));
+
+  ok(order.length === BURGER_PROGRAMME.decisions.length, `programme order drops ${BURGER_PROGRAMME.decisions.length - order.length} decision(s) — a cycle in blockedBy`);
+
+  // Every decision must land after everything that would change its answer.
+  const seen = new Set<string>();
+  for (const d of order) {
+    for (const b of d.blockedBy ?? []) {
+      ok(ids.has(b), `${d.id} is blocked by ${b}, which is not a decision`);
+      if (ids.has(b)) ok(seen.has(b), `${d.id} is scheduled before ${b}, which it depends on`);
+    }
+    seen.add(d.id);
+  }
+
+  for (const d of BURGER_PROGRAMME.decisions) {
+    ok(nodeIds.has(d.nodeId), `${d.id} settles ${d.nodeId}, which is not a node in the tree`);
+    ok(!!FIELD_BY_ID[d.wouldProduce], `${d.id} would produce an Accession on ${d.wouldProduce}, which is not a field`);
+    checkAcc(d.restsOn, `${d.id} restsOn`);
+    if (d.protocolId) ok(PROTOCOL_IDS.has(d.protocolId), `${d.id} names protocol ${d.protocolId}, which is not in the corpus`);
+    // A decisive measurement with no flip condition is just a measurement.
+    ok(d.flipsIf.trim().length > 20, `${d.id} names a decisive measurement but not what would flip it`);
+    ok(d.weeks > 0 && d.costGBP > 0, `${d.id} costs nothing and takes no time, which is not a decision`);
+    ok(d.informationValue > 0 && d.informationValue <= 1, `${d.id} has an information value outside 0–1`);
+  }
+
+  // The question actually asked must be IN the programme and must not be first.
+  const terminal = order.findIndex((d) => d.nodeId === 'PN-000');
+  ok(terminal >= 0, 'the programme must contain the question that was asked');
+  ok(terminal === order.length - 1, 'the triangle test must be last — it is the terminal measurement, and a programme that ran it first would spend the budget learning nothing about which branch failed');
+
+  // The ordering must be doing work. If it equals declaration order, nothing
+  // was optimised and the "derived, not authored" claim is decoration.
+  const declared = BURGER_PROGRAMME.decisions.map((d) => d.id).join();
+  ok(order.map((d) => d.id).join() !== declared, 'the derived order equals declaration order, so the ordering is not doing anything');
 }
 
 // ── Honesty ────────────────────────────────────────────────────────────

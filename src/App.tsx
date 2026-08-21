@@ -131,6 +131,7 @@ import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
 import { ProformaIndex, CapacityScreen, CandidateDetail, FacilityConceptPage } from '@/screens/demo/Proforma';
 import { ProblemTreePage } from '@/screens/demo/Postdoc';
 import { NotaryQueue } from '@/screens/demo/NotaryQueue';
+import { RunbookDesign } from '@/screens/demo/RunbookDesign';
 
 // ── Route dispatch ─────────────────────────────────────────────────────
 
@@ -238,6 +239,9 @@ function Screen() {
       if (b === 'routes' && c) return <RouteComparison productId={c} />;
       return b ? <StrainPage strainId={b} /> : <Organisms />;
     case 'runbook':
+      // The generated programme from Archetype 5. Before the protocol branches,
+      // because `design` would otherwise be read as a protocol id.
+      if (b === 'design' && c) return <RunbookDesign programmeId={c} />;
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;

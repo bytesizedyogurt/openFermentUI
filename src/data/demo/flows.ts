@@ -274,8 +274,24 @@ It decomposes into three independent problems with three different organisms, th
 
 **A constraint arriving from somewhere else entirely.** Lipid accumulation is aerobic and high-OUR, so branch two inherits the cooling wall from the capacity screen — in a warm ambient this is a siting decision, not a strain decision.
 
-**Where this goes next.** Three follow-on queries, each a route comparison: candidate organisms and routes to the target melting profile; non-globin Maillard precursor systems as a partial heme substitute; and native-morphology versus texturised matrix at equal anisotropy. The first is the one worth running now, and it is running.`,
+**Where this goes next.** Three follow-on queries, each a route comparison: candidate organisms and routes to the target melting profile; non-globin Maillard precursor systems as a partial heme substitute; and native-morphology versus texturised matrix at equal anisotropy. The first is the one worth running now, and it is running.
+
+**What to do about it.** Six branches is a diagram, not a plan. The programme orders them by how much each would reduce uncertainty per bench-week and names, for every one, the single measurement that would settle it and what a result would have to *say* to move the recommendation:
+
+| # | decides | measurement | flips if |
+|---|---|---|---|
+| 1 | the fat phase | solid fat content by pNMR, 4–45 °C | it melts below 25 °C |
+| 2 | siting that fat phase | crystallisation hold at 26 °C ambient | it will not set without chilling |
+| 3 | binding and cook-loss | cook-loss at 71 °C core, three binders | an unencumbered one lands within two points |
+| 4 | the fibrous matrix | anisotropy by tensile ratio, blind | the native route lands under 3.0 |
+| … | | | |
+| 8 | the question you asked | triangle test, n = 60, against beef | nothing — it is terminal |
+
+Eight decisions. **29 bench weeks on one bench, 13 on the critical path**, £90,100. The order is not the order the branches were found in: it maximises information per pound-week discounted by how much is still unknown on each branch, so the fat phase goes first and the heme question — the one with the highest stakes — waits, because it is the most expensive way to learn something the cheaper branches partly determine.
+
+The triangle test sits last, behind five dependencies. That is the answer to what you asked: **the thing you asked for is not the first thing to measure.** A programme that ran it first would spend £22,000 learning that the patty is distinguishable, without learning which branch made it so.`,
     followups: [
+      'chip:RB-AR5-001|Open the decision programme',
       'flow:AR2|Run the fat-phase route comparison',
       'flow:AR3|Where could the fat phase be produced?',
       'chip:DLV-AR5-001|Open the decomposition tree',

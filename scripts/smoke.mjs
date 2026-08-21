@@ -70,6 +70,7 @@ const ROUTES = [
   ['/proforma/screen/PLT-KGL-01/c/CND-001', 'AR3 — the rescued candidate'],
   ['/proforma/concept/DLV-AR4-001', 'AR4 — facility concepts'],
   ['/postdoc/tree/DLV-AR5-001', 'AR5 — problem tree'],
+  ['/runbook/design/RB-AR5-001', 'AR5 — the decision programme'],
   ['/notary/disclosures', 'Notary queue'],
   ['/postdoc', 'Postdoc'],
   ['/trawl', 'Trawl'],
