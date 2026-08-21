@@ -73,7 +73,7 @@ export function OpenLab() {
   const rate = deposits.length ? Math.round((failures / deposits.length) * 100) : null;
 
   return (
-    <div className="p-6 max-w-[1000px]">
+    <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Deposits"
@@ -230,7 +230,7 @@ export function OpenLab() {
           </div>
         </section>
       )}
-    </div>
+    </>
   );
 }
 

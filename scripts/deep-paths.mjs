@@ -201,7 +201,11 @@ await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 // usual way that breaks.
 const narrow = await b.newPage({ viewport: { width: 420, height: 900 } });
 let overflow = [];
-for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/trawl/ingest', '/']) {
+// The demo pool had never been measured narrow — every route here was a
+// casein screen, and the demo suite's tables and chip rows are the widest
+// things in the build.
+for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/trawl/ingest', '/',
+                 '/repo', '/proforma/screen/PLT-KGL-01', '/parchment/families', '/notary/disclosures']) {
   await narrow.goto('http://localhost:4324/#' + r, { waitUntil: 'networkidle' });
   await narrow.waitForTimeout(400);
   const over = await narrow.evaluate(() => {

@@ -13,6 +13,64 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // ── Page scaffolding ───────────────────────────────────────────────────
 
 /**
+ * Named page widths. Nothing outside this table may set a page max-width.
+ *
+ * `full` is 1600px because that is what the shell capped at before this
+ * existed, so a screen that had no wrapper at all gets `<Page>` with no width
+ * prop and renders byte-identically.
+ */
+export const PAGE_WIDTH = {
+  default: 'max-w-[1100px]', // a detail page: header, prose, one or two panels
+  wide: 'max-w-[1400px]',    // an index or a table
+  full: 'max-w-[1600px]',    // a workbench that needs the viewport
+} as const;
+
+export type PageWidth = keyof typeof PAGE_WIDTH;
+
+/** The single page gutter. Exported so the shell can inset chrome to match. */
+export const PAGE_PAD = 'p-5';
+
+/**
+ * The page frame. Rendered ONCE, by the shell, around whatever screen the
+ * route resolves to.
+ *
+ * WHY THE SHELL OWNS IT AND SCREENS DO NOT. There used to be two page layouts:
+ * twenty-one screens wrapped in nothing and inherited the shell's
+ * `p-5 max-w-[1600px]`, while thirteen wrapped themselves in `p-6 max-w-[Npx]`
+ * — thirteen different widths between them — and were therefore inset twice.
+ * Nobody noticed, because a screen that forgets its wrapper still looks right
+ * when the shell pads.
+ *
+ * A convention that says "every screen returns a `<Page>`" has the same
+ * failure mode: it is invisible when broken. So there is no convention. The
+ * shell renders exactly one `<Page>` and picks its width from the route, which
+ * makes a double inset unrepresentable rather than merely discouraged, and
+ * turns thirteen scattered literals into one table you can read.
+ *
+ * The gutter is a flat `p-5` with no responsive bump, matching what the shell
+ * already applied, so nothing shifts. It is load-bearing beyond appearance:
+ * `Ask` sizes its transcript with `calc(100vh - 132px)`, a constant derived
+ * from the banner, the header and this gutter, and nothing in `pnpm verify`
+ * would catch it drifting.
+ */
+export function Page({
+  width = 'full',
+  className,
+  children,
+  ...rest
+}: {
+  width?: PageWidth;
+  className?: string;
+  children: ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cx(PAGE_PAD, PAGE_WIDTH[width], className)} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+/**
  * Header block. The action slot both wraps and shrinks. Wrapping alone does
  * nothing while the slot is shrink-0: flex lays items onto lines using their
  * hypothetical — unwrapped — main size, so a shrink-0 row of buttons beside a

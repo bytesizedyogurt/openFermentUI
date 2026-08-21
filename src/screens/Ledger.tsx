@@ -86,7 +86,7 @@ export function Ledger() {
   const empty = views.filter((v) => v.recordIds.length === 0);
 
   return (
-    <div className="p-6 max-w-[1400px]">
+    <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Parameters"
@@ -227,7 +227,7 @@ export function Ledger() {
           ))}
         </div>
       </section>
-    </div>
+    </>
   );
 }
 
@@ -288,7 +288,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
     : null;
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <>
       <a
         href={href('/ledger')}
         className="text-caption text-ink-soft hover:text-ink inline-flex items-center gap-1 mb-2"
@@ -580,7 +580,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
           {def.notes && <div className="text-caption text-ink-soft">{def.notes}</div>}
         </Card>
       </section>
-    </div>
+    </>
   );
 }
 
@@ -594,7 +594,7 @@ export function Contradictions() {
   const closed = contradictions.filter((c) => c.status !== 'open');
 
   return (
-    <div className="p-6 max-w-[1000px]">
+    <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Contradictions"
@@ -682,7 +682,7 @@ export function Contradictions() {
           </Card>
         );
       })}
-    </div>
+    </>
   );
 }
 

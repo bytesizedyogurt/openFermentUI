@@ -56,7 +56,7 @@ export function ProformaIndex() {
   const screens = DELIVERABLES.filter((d) => d.payload.kind === 'capacity-screen');
   const concepts = DELIVERABLES.filter((d) => d.payload.kind === 'facility-concept');
   return (
-    <div className="p-6 max-w-[900px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title="Proforma" subtitle="Techno-economics against an explicit regional and temporal basis." />
       <div className="space-y-3">
         {[...screens, ...concepts].map((d) => (
@@ -76,7 +76,7 @@ export function ProformaIndex() {
         ))}
       </div>
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -113,7 +113,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
   }, [failing]);
 
   return (
-    <div className="p-6 max-w-[1500px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={dlv?.title ?? `${plant.name} — capacity screen`}
         subtitle={dlv?.query ?? `What can this plant actually make?`}
@@ -248,7 +248,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -262,7 +262,7 @@ export function CandidateDetail({ plantId, candidateId }: { plantId: string; can
   const hs = HS_CODES.find((h) => h.code === c.hsCode);
 
   return (
-    <div className="p-6 max-w-[1000px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={`${c.id} — ${c.product}`}
         subtitle={
@@ -326,7 +326,7 @@ export function CandidateDetail({ plantId, candidateId }: { plantId: string; can
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -344,7 +344,7 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
   if (!concepts.length) return <EmptyState title="No concepts" body="Nothing to render." />;
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title={dlv?.title ?? 'Greenfield concept'} subtitle={dlv?.query} />
 
       <Card>
@@ -456,6 +456,6 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }

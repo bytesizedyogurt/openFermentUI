@@ -42,7 +42,7 @@ export function Parchment() {
 
   if (patents.status !== 'ready') {
     return (
-      <div className="p-6 max-w-[1100px]">
+      <>
         <PageHeader
           eyebrow={EYEBROW}
           title="Patent scope"
@@ -60,7 +60,7 @@ export function Parchment() {
             <Skeleton rows={6} />
           </Card>
         )}
-      </div>
+      </>
     );
   }
 
@@ -71,7 +71,7 @@ export function Parchment() {
   const totalClaims = catalogued.reduce((n, pt) => n + pt.claims.length, 0);
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Patent scope"
@@ -201,6 +201,6 @@ export function Parchment() {
       <div className="mt-5">
         <LinkButton to="/ledger">Back to the Ledger</LinkButton>
       </div>
-    </div>
+    </>
   );
 }

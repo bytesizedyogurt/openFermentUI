@@ -63,7 +63,7 @@ export function RepoIndex() {
   }, []);
 
   return (
-    <div className="p-6 max-w-[1400px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title="BioRepo"
         subtitle={`${ACCESSIONS.length} Accessions. One quantity each, with complete provenance under a permanent identifier.`}
@@ -164,7 +164,7 @@ export function RepoIndex() {
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -196,7 +196,7 @@ export function AccessionPage({ id }: { id: string }) {
   const org = acc.context.organismId ? ORGANISM_BY_ID[acc.context.organismId] : undefined;
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={acc.id}
         subtitle={
@@ -443,7 +443,7 @@ export function AccessionPage({ id }: { id: string }) {
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -471,7 +471,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
   }
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title={def.name} subtitle={`${def.family} · canonical unit ${def.canonicalUnit}`} />
       <div className="text-caption text-ink-soft mb-4">{def.definition}</div>
 
@@ -523,7 +523,7 @@ export function ParameterPage({ field }: { field: FieldId }) {
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -536,7 +536,7 @@ export function ContradictionQueue() {
   const reconciled = rows.filter((r) => r.kind === 'reconciled');
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title="Contradictions"
         subtitle="Where the record disagrees with itself, and where it only looked like it did."
@@ -585,6 +585,6 @@ export function ContradictionQueue() {
       )}
 
       <DemoFooter />
-    </div>
+    </>
   );
 }

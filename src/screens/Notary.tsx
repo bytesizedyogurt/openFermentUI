@@ -164,7 +164,7 @@ export function Notary() {
   // but the sentence has to be false-proof against the backend that is not.
   if (queue.status !== 'ready') {
     return (
-      <div className="p-6 max-w-[1100px]">
+      <>
         {header}
         {queue.status === 'failed' ? (
           <Callout kind="warn" title="The design queue could not be read">
@@ -175,12 +175,12 @@ export function Notary() {
             <Skeleton rows={6} />
           </Card>
         )}
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       {header}
 
       <div className="max-w-3xl mb-5">
@@ -316,6 +316,6 @@ export function Notary() {
           </p>
         </section>
       )}
-    </div>
+    </>
   );
 }

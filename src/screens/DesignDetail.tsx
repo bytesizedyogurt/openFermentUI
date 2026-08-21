@@ -88,7 +88,7 @@ export function DesignIndex() {
   // states are told apart here rather than left to the reader.
   if (all.status !== 'ready') {
     return (
-      <div className="p-6 max-w-[1100px]">
+      <>
         {header}
         {all.status === 'failed' ? (
           <Callout kind="warn" title="Designs could not be read">
@@ -99,7 +99,7 @@ export function DesignIndex() {
             <Skeleton rows={8} />
           </Card>
         )}
-      </div>
+      </>
     );
   }
 
@@ -111,7 +111,7 @@ export function DesignIndex() {
     .filter((g) => g.designs.length > 0);
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       {header}
 
       {groups.map(({ sc, designs }) => (
@@ -162,7 +162,7 @@ export function DesignIndex() {
           </div>
         </section>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -206,18 +206,18 @@ export function DesignDetail({ designId }: { designId: string }) {
   // `loading` state means nobody has looked yet.
   if (found.status === 'loading') {
     return (
-      <div className="p-6 max-w-[1100px]">
+      <>
         <PageHeader eyebrow={EYEBROW} title="Design" subtitle={designId} />
         <Card>
           <Skeleton rows={6} />
         </Card>
-      </div>
+      </>
     );
   }
 
   if (found.status === 'failed') {
     return (
-      <div className="p-6 max-w-[1100px]">
+      <>
         <PageHeader eyebrow={EYEBROW} title="Design" subtitle={designId} />
         <Callout kind="warn" title="This design could not be read">
           {found.error.message}
@@ -225,7 +225,7 @@ export function DesignDetail({ designId }: { designId: string }) {
         <div className="mt-4">
           <LinkButton to="/fermos/d">Back to designs</LinkButton>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -244,7 +244,7 @@ export function DesignDetail({ designId }: { designId: string }) {
   const msp = t3?.values.msp;
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <a
         href={href('/fermos/d')}
         className="text-caption text-ink-soft hover:text-ink inline-flex items-center gap-1 mb-2"
@@ -423,6 +423,6 @@ export function DesignDetail({ designId }: { designId: string }) {
           </Callout>
         </Card>
       </section>
-    </div>
+    </>
   );
 }

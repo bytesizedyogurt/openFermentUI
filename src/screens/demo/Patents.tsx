@@ -53,7 +53,7 @@ export function DemoPatents() {
   const open = positions.filter((j) => j.status === 'never-nationalised' || j.status === 'expired').length;
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Patent families"
@@ -196,6 +196,6 @@ export function DemoPatents() {
       </div>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }

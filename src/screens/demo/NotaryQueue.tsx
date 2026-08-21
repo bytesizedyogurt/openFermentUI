@@ -54,7 +54,7 @@ export function NotaryQueue() {
   const orphans = DISCLOSURES.filter((d) => !producer.has(d.id));
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title="Disclosure queue"
         subtitle={`${DISCLOSURES.length} disclosure candidates, from ${new Set(DISCLOSURES.map((d) => d.archetype)).size} archetypes.`}
@@ -117,6 +117,6 @@ export function NotaryQueue() {
       )}
 
       <DemoFooter />
-    </div>
+    </>
   );
 }

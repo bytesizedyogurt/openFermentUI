@@ -48,7 +48,7 @@ export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
   }, [nodes]);
 
   return (
-    <div className="p-6 max-w-[1000px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title={dlv.title} subtitle={dlv.query} />
 
       <Callout>
@@ -120,6 +120,6 @@ export function ProblemTreePage({ deliverableId }: { deliverableId: string }) {
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }

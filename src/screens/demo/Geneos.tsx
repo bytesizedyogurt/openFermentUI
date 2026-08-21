@@ -83,7 +83,7 @@ export function RouteComparison({ productId }: { productId: string }) {
   );
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={dlv?.title ?? `${productId} — route comparison`}
         subtitle={dlv?.query ?? 'Which route, and is it available?'}
@@ -167,7 +167,7 @@ export function RouteComparison({ productId }: { productId: string }) {
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -178,7 +178,7 @@ export function RouteDetail({ productId, routeId }: { productId: string; routeId
   if (!route) return <EmptyState title={`No route ${routeId}`} body="Not in this comparison." />;
 
   return (
-    <div className="p-6 max-w-[1000px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={route.name}
         subtitle={
@@ -267,6 +267,6 @@ export function RouteDetail({ productId, routeId }: { productId: string; routeId
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }

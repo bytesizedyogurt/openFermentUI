@@ -46,7 +46,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
   if (!p) return <EmptyState title="No programme" body={`Nothing under ${programmeId}.`} />;
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={p.title}
         subtitle={
@@ -207,7 +207,7 @@ export function RunbookDesign({ programmeId }: { programmeId: string }) {
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 

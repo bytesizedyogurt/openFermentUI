@@ -31,7 +31,7 @@ import {
   Calculator} from 'lucide-react';
 import { useStore } from '@/store';
 import { useRoute, navigate, useFragmentScroll } from '@/router';
-import { cx, Popover, Toasts, Sheet } from '@/components/ui';
+import { cx, Popover, Toasts, Sheet, Page, type PageWidth } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
@@ -194,6 +194,63 @@ function canonicalize(segments: string[]): string[] | null {
  */
 function segAt(segments: string[], i: number): string {
   return segments[i] ?? '';
+}
+
+/**
+ * How wide the page frame is, per route.
+ *
+ * This replaces thirteen files' worth of `p-6 max-w-[Npx]` wrappers written in
+ * thirteen different widths, several of which also double-inset against the
+ * shell's own padding. Naming three widths and choosing between them here
+ * means a screen cannot disagree with its neighbours by accident, and the
+ * whole layout vocabulary fits on one screen.
+ *
+ * Anything not listed is `full`, which is what the shell already capped at —
+ * so every screen that never carried a wrapper renders exactly as before.
+ *
+ * Mirrors the `switch` in `Screen()`; keep the two in the same order.
+ */
+function pageWidth(segments: string[]): PageWidth {
+  const [a, b, c, d] = segments;
+  switch (a) {
+    case 'ledger':
+      if (b === 'p' && c) return 'wide';
+      if (b === 'contradictions') return 'default';
+      if (b === 'records') return 'full';
+      return 'wide';
+    case 'repo':
+      if (b) return 'default';
+      return 'wide';
+    case 'fermos':
+      if (b === 'gap' && c && d === 'f') return 'default';
+      if (b === 'gap' && c) return 'wide';
+      if (b === 'runs' && c) return 'wide';
+      if (b === 'runs') return 'default';
+      if (b === 'envelope') return 'default';
+      if (b === 'd') return 'default';
+      return 'full';
+    case 'proforma':
+      if (b === 'screen' && c && d === 'c') return 'default';
+      if (b === 'screen' && c) return 'wide';
+      if (b === 'concept') return 'wide';
+      return 'default';
+    case 'geneos':
+      if (b === 'routes' && c && d) return 'default';
+      if (b === 'routes' && c) return 'wide';
+      return 'full';
+    case 'postdoc':
+      return b === 'tree' ? 'default' : 'full';
+    case 'notary':
+      return b === 'disclosures' ? 'wide' : 'default';
+    case 'parchment':
+      return 'default';
+    case 'openlab':
+      return 'default';
+    case 'runbook':
+      return b === 'design' ? 'default' : 'full';
+    default:
+      return 'full';
+  }
 }
 
 function Screen() {
@@ -684,7 +741,11 @@ export default function App() {
           </header>
 
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
-            <div className="p-5 max-w-[1600px]">
+            {/* The one page frame. Screens return their content bare; the
+                width comes from the route, so no screen can inset itself
+                twice or invent a fourteenth width. Run Mode never reaches
+                here — it is a full-screen takeover and returns above. */}
+            <Page width={pageWidth(canonicalize(route.segments) ?? route.segments)}>
               <Screen />
               {/* "What this part will be derived from", on every page.
                   Rendered HERE rather than inside each screen: twenty-six
@@ -693,7 +754,7 @@ export default function App() {
                   updated. Driven off the route, so a new screen under an
                   existing part inherits the note without being asked to. */}
               <UpstreamNote part={partForPath(route.path)} className="mt-8 mb-2" />
-            </div>
+            </Page>
           </main>
         </div>
       </div>

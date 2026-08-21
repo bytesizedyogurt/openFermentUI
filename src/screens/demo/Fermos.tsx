@@ -60,7 +60,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
   const disclosures = DISCLOSURES.filter((d) => dlv.disclosureCandidateIds.includes(d.id));
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title={dlv.title} subtitle={dlv.query} />
 
       <Callout>
@@ -161,7 +161,7 @@ export function GapMap({ deliverableId }: { deliverableId: string }) {
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -197,7 +197,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
   const supporting = factor.explored.flatMap((e) => e.accessionIds);
 
   return (
-    <div className="p-6 max-w-[900px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={FIELD_BY_ID[factor.field]?.name ?? factor.field}
         subtitle={
@@ -230,7 +230,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
         </div>
       </Card>
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -238,7 +238,7 @@ export function FactorDetail({ deliverableId, factorId }: { deliverableId: strin
 
 export function RunIndex() {
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title="Runs" subtitle={`${RUNS.length} runs across the Ledger.`} />
       <Card className="p-0 overflow-x-auto">
         <table className="w-full text-body">
@@ -294,7 +294,7 @@ export function RunIndex() {
       </div>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -320,7 +320,7 @@ export function RunPage({ runId }: { runId: string }) {
   const disclosures = dlv ? DISCLOSURES.filter((d) => dlv.disclosureCandidateIds.includes(d.id)) : [];
 
   return (
-    <div className="p-6 max-w-[1400px]">
+    <>
       <PageHeader eyebrow={EYEBROW}
         title={run.id}
         subtitle={`${ORGANISM_BY_ID[run.organismId]?.binomial ?? run.organismId} · ${run.productId} · started ${run.startedAt}`}
@@ -425,7 +425,7 @@ export function RunPage({ runId }: { runId: string }) {
 
       <DisclosureSection disclosures={disclosures} />
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
@@ -448,7 +448,7 @@ export function EnvelopePage({ plantId }: { plantId: string }) {
   const pressed = useMemo(() => plantCeilings(plant, { pressureBara: 1.5 }), [plant]);
 
   return (
-    <div className="p-6 max-w-[1100px]">
+    <>
       <PageHeader eyebrow={EYEBROW} title={plant.name} subtitle={`${plant.location.city}, ${plant.location.country} · ambient ${plant.location.ambientC} °C`} />
 
       <Card>
@@ -507,7 +507,7 @@ export function EnvelopePage({ plantId }: { plantId: string }) {
       </Card>
 
       <DemoFooter />
-    </div>
+    </>
   );
 }
 
