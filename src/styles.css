@@ -422,6 +422,25 @@ td.tick-cell::before {
     text-decoration-color var(--motion-fast) var(--ease-out);
 }
 
+/* The skip link. Off-screen until focused, then the first thing you see. */
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transform: translateY(-120%);
+  background: rgb(var(--surface-1));
+  color: rgb(var(--ink));
+  border: 1px solid rgb(var(--accent));
+  border-radius: 0 0 var(--radius-btn, 6px) 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* ── Focus ring (§6.6) ───────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid rgb(var(--accent));

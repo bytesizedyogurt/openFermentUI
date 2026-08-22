@@ -1,6 +1,6 @@
 // Hash-based router (OF-DES-001 §13.2) — self-contained, no history API,
 // so deep links survive inside an embedded artifact frame.
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 
 export interface Route {
@@ -141,4 +141,54 @@ export function useNavigate() {
 /** <a href> that routes internally; keeps middle-click / cmd-click semantics. */
 export function href(path: string): string {
   return `#${path}`;
+}
+
+/**
+ * Move focus to the new screen and say its name.
+ *
+ * A hash router changes the document without a page load, so a screen reader
+ * is told nothing and the keyboard focus stays wherever it was — usually on a
+ * rail link, meaning the next Tab continues through the navigation rather than
+ * entering the content. Both were true here on all 79 routes.
+ *
+ * Focus goes to the page's `<h1>` rather than to the main region, because the
+ * heading is what answers "where am I"; `PageHeader` gives it `tabIndex={-1}`
+ * so it can receive focus without joining the tab order.
+ *
+ * Returns the announcement text for a polite live region. Two separate
+ * mechanisms on purpose: moving focus reads the heading in most screen
+ * readers, but not all, and the live region is what makes it reliable.
+ */
+export function useRouteAnnouncement(path: string, fragment: string): string {
+  const [label, setLabel] = useState('');
+  // The FIRST render is not a navigation. Taking focus on arrival would both
+  // surprise a reader who has not asked to go anywhere and put the skip link
+  // permanently out of reach, since it sits before the heading in the document
+  // and Tab only moves forward.
+  //
+  // Tracked by comparing the PATH rather than by a "have I run yet" boolean.
+  // StrictMode double-invokes effects, so the boolean flipped true on the first
+  // pass and the second pass stole focus on arrival — the exact behaviour it
+  // was written to prevent, and invisible in dev because both passes look the
+  // same from outside.
+  const seen = useRef(path);
+  useEffect(() => {
+    let raf = 0;
+    const attempt = (tries: number) => {
+      const h1 = document.querySelector<HTMLElement>('#of-main h1');
+      if (h1) {
+        setLabel(h1.textContent?.trim() ?? '');
+        // Never steal focus from a fragment deep link — `useFragmentScroll` is
+        // already taking the reader somewhere specific, and two things
+        // competing for the viewport is worse than neither.
+        if (!fragment && seen.current !== path) h1.focus({ preventScroll: true });
+        seen.current = path;
+        return;
+      }
+      if (tries > 0) raf = requestAnimationFrame(() => attempt(tries - 1));
+    };
+    raf = requestAnimationFrame(() => attempt(3));
+    return () => cancelAnimationFrame(raf);
+  }, [path, fragment]);
+  return label;
 }

@@ -30,7 +30,7 @@ import {
   Database,
   Calculator} from 'lucide-react';
 import { useStore } from '@/store';
-import { useRoute, navigate, useFragmentScroll } from '@/router';
+import { useRoute, navigate, useFragmentScroll, useRouteAnnouncement } from '@/router';
 import { cx, Popover, Toasts, Sheet, Page, type PageWidth } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
@@ -442,6 +442,7 @@ export default function App() {
   const tickTimers = useStore((s) => s.tickTimers);
   const route = useRoute();
   useFragmentScroll(route.fragment);
+  const announced = useRouteAnnouncement(route.path, route.fragment);
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
@@ -541,6 +542,33 @@ export default function App() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* First focusable thing on the page. A keyboard reader arriving at any
+          of the 79 routes previously had to tab the whole rail before reaching
+          the content, on every navigation.
+
+          It moves focus itself rather than being an `href="#of-main"`, because
+          in a HASH ROUTER the fragment IS the route: that href sets
+          location.hash to `#of-main`, the router parses `of-main` as a path,
+          nothing matches, and the skip link lands the reader on "Route not
+          found". The conventional implementation is the broken one here. */}
+      <button
+        type="button"
+        className="skip-link"
+        onClick={() => {
+          const main = document.getElementById('of-main');
+          if (!main) return;
+          main.setAttribute('tabindex', '-1');
+          main.focus({ preventScroll: true });
+        }}
+      >
+        Skip to the main content
+      </button>
+      {/* Route changes were silent to a screen reader: no focus moved and
+          nothing was announced, so navigating told the user nothing had
+          happened. */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announced}
+      </div>
       <DemoBanner />
       <div className="flex-1 flex min-h-0">
         {/* Left rail */}

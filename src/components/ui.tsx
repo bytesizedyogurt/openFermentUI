@@ -95,7 +95,12 @@ export function PageHeader({
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
         )}
-        <h1 className="font-serif text-page-title font-semibold leading-tight vt-page-title">{title}</h1>
+        <h1
+          tabIndex={-1}
+          className="font-serif text-page-title font-semibold leading-tight vt-page-title outline-none"
+        >
+          {title}
+        </h1>
         {subtitle && <div className="text-body text-ink-soft mt-1 max-w-3xl">{subtitle}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>}

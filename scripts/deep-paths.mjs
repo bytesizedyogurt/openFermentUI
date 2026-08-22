@@ -196,6 +196,61 @@ ck('Dense mode actually shortens the record table',
    `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
 await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 
+// ROUTE-CHANGE ACCESSIBILITY. None of this existed: no skip link, no focus
+// management, no announcement. A keyboard reader tabbed the whole rail on every
+// navigation and a screen-reader user was told nothing had happened.
+// A genuine ARRIVAL, not a navigation. `go()` cannot produce one here: two
+// URLs differing only in the hash are a same-document fragment navigation, so
+// `p.goto('…/#/')` from another route never reloads and the app correctly
+// treats it as a route change. Forcing a reload is what makes this an arrival.
+await go('/');
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(700);
+{
+  await p.keyboard.press('Tab');
+  await p.waitForTimeout(320);
+  const first = await p.evaluate(() => {
+    const a = document.activeElement;
+    const r = a?.getBoundingClientRect();
+    return {
+      text: a?.textContent?.trim() ?? '',
+      onScreen: r ? r.top >= 0 && r.bottom <= innerHeight : false,
+    };
+  });
+  ck('The first tab stop is a skip link', /skip to the main content/i.test(first.text), first.text.slice(0, 40));
+  ck('...and it is visible once focused', first.onScreen);
+
+  // The trap: `href="#of-main"` is the CONVENTIONAL skip link and it breaks a
+  // hash router — the fragment is the route, so it navigates to a path called
+  // `of-main` and lands the reader on "Route not found". Written that way once.
+  await p.keyboard.press('Enter');
+  await p.waitForTimeout(350);
+  const after = await p.locator('#of-main').innerText();
+  ck(
+    '...and activating it does not navigate away from the page',
+    !/Route not found/i.test(after),
+    after.trim().slice(0, 50).replace(/\s+/g, ' '),
+  );
+}
+
+for (const [route, expect] of [['/ledger', /Parameters/i], ['/repo', /BioRepo/i]]) {
+  await go(route);
+  await p.waitForTimeout(600);
+  // Arriving is not navigating: focus must NOT be taken on first paint, or the
+  // skip link is unreachable. So navigate once more within the SPA and check.
+  await p.evaluate((h) => { location.hash = h; }, route === '/ledger' ? '/repo' : '/ledger');
+  await p.waitForTimeout(700);
+  await p.evaluate((h) => { location.hash = h; }, route);
+  await p.waitForTimeout(700);
+  const st = await p.evaluate(() => ({
+    tag: document.activeElement?.tagName ?? '',
+    focused: document.activeElement?.textContent?.trim().slice(0, 40) ?? '',
+    live: document.querySelector('[aria-live="polite"]')?.textContent?.trim() ?? '',
+  }));
+  ck(`Navigating to ${route} moves focus to the heading`, st.tag === 'H1' && expect.test(st.focused), `${st.tag} "${st.focused}"`);
+  ck('...and announces it', expect.test(st.live), st.live.slice(0, 40));
+}
+
 // MOTION. Two properties, both invisible to a typecheck and both the kind of
 // thing that rots quietly: nothing animates longer than the slow token, and
 // EVERY animation is inert under reduced motion. The second matters more —
