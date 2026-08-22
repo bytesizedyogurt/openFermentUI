@@ -952,7 +952,11 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
   return (
     <>
       {stalePatches.length > 0 && (
-        <div className="mb-3">
+        // `just-stale` fires once, on mount — which is precisely when the
+        // propagation reached this screen. The value does not merely acquire a
+        // badge; it visibly loses confidence at the moment it stops being
+        // trustworthy, which is the thing a badge alone cannot say.
+        <div className="mb-3 just-stale">
           <Callout
             kind="warn"
             title={`Stale — ${stalePatches.length} source record${stalePatches.length === 1 ? '' : 's'} changed since this was last read`}

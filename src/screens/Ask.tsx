@@ -528,7 +528,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                   {ARCHETYPE_PROMPTS.map((a) => (
                     <button
                       key={a.id}
-                      className="text-left border border-line px-2.5 py-2 hover:border-accent hover:bg-[rgb(var(--accent-wash))]/40 transition-colors"
+                      className="text-left border border-line px-2.5 py-2 hover:border-accent hover:bg-[rgb(var(--accent-wash))]/40 motion-colors"
                       onClick={() => void run(a.prompt)}
                     >
                       <div className="flex items-baseline gap-2">

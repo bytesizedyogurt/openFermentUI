@@ -1345,7 +1345,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   <li key={protocol.id}>
                     <a
                       href={href(`/runbook/${protocol.id}`)}
-                      className="block rounded-card border border-line p-2.5 hover:border-accent hover:bg-accent-wash transition-colors"
+                      className="block rounded-card border border-line p-2.5 hover:border-accent hover:bg-accent-wash motion-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-serif font-semibold leading-snug">{protocol.title}</div>

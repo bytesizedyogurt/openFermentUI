@@ -411,7 +411,7 @@ export function DataTable<T>({
                     onClick={() => setFocusIdx(idx)}
                     onDoubleClick={() => onOpen?.(row)}
                     className={cx(
-                      'border-b border-line/70 transition-colors',
+                      'border-b border-line/70 motion-colors',
                       isSel ? 'bg-accent-wash' : isFocus ? 'bg-ink-soft/[0.06]' : 'hover:bg-ink-soft/[0.04]',
                       onOpen && 'cursor-pointer',
                     )}

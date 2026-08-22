@@ -594,7 +594,13 @@ export default function App() {
                   key={item.to}
                   href={`#${item.to}`}
                   className={cx(
-                    'flex items-center gap-2.5 rounded-btn px-2 py-1.5 text-body transition-colors',
+                    'flex items-center gap-2.5 rounded-btn px-2 py-1.5 text-body motion-colors',
+                    // Named so the active marker MORPHS down the rail between
+                    // routes rather than blinking out here and in there. Only
+                    // the active one is named: two elements sharing a
+                    // view-transition-name in one frame is an error, and only
+                    // one rail item is ever active.
+                    active && 'vt-rail-active',
                     active
                       ? 'bg-accent-wash text-accent font-medium'
                       : 'text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',
@@ -677,7 +683,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setUI({ paletteOpen: true })}
-              className="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-btn border border-line text-ink-soft hover:border-accent/40 hover:text-ink transition-colors min-w-[280px] max-w-[420px] flex-1"
+              className="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-btn border border-line text-ink-soft hover:border-accent/40 hover:text-ink motion-colors min-w-[280px] max-w-[420px] flex-1"
             >
               <Search size={14} />
               <span className="text-body truncate">Search papers, parameters, protocols…</span>

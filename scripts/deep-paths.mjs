@@ -196,6 +196,58 @@ ck('Dense mode actually shortens the record table',
    `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
 await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 
+// MOTION. Two properties, both invisible to a typecheck and both the kind of
+// thing that rots quietly: nothing animates longer than the slow token, and
+// EVERY animation is inert under reduced motion. The second matters more —
+// `reducedMotion` is a setting a person turns on because motion makes them
+// unwell, and an animation that ignores it is not a polish bug.
+for (const route of ['/', '/ledger/p/titer_intracellular', '/repo']) {
+  await go(route);
+  await p.waitForTimeout(500);
+  const long = await p.evaluate(() => {
+    // CSS time values come back normalised — `320ms` computes to `.32s` — so a
+    // bare parseFloat reads 0.32 and every animation looks over budget. Parse
+    // the unit, both here and for animationDuration.
+    const ms = (v) => {
+      const n = parseFloat(v);
+      if (Number.isNaN(n)) return NaN;
+      return v.trim().endsWith('ms') ? n : n * 1000;
+    };
+    const slow = ms(getComputedStyle(document.documentElement).getPropertyValue('--motion-slow')) || 320;
+    const over = [];
+    for (const el of document.querySelectorAll('*')) {
+      for (const pseudo of [null, '::before', '::after']) {
+        const cs = getComputedStyle(el, pseudo);
+        if (cs.animationName === 'none') continue;
+        const durs = cs.animationDuration.split(',').map(ms);
+        const worst = Math.max(...durs.filter((n) => !Number.isNaN(n)), 0);
+        if (worst > slow + 1) over.push(`${cs.animationName} ${worst}ms`);
+      }
+    }
+    return [...new Set(over)];
+  });
+  ck(`No animation outruns --motion-slow on ${route}`, long.length === 0, long.join(', '));
+
+  // Now with the setting on. The attribute is what App.tsx stamps.
+  const moving = await p.evaluate(() => {
+    document.documentElement.dataset.reducedMotion = 'true';
+    const bad = [];
+    for (const el of document.querySelectorAll('*')) {
+      for (const pseudo of [null, '::before', '::after']) {
+        const cs = getComputedStyle(el, pseudo);
+        if (cs.animationName === 'none') continue;
+        const durs = cs.animationDuration
+          .split(',')
+          .map((d) => (d.trim().endsWith('ms') ? parseFloat(d) : parseFloat(d) * 1000));
+        if (Math.max(...durs.filter((n) => !Number.isNaN(n)), 0) > 1) bad.push(cs.animationName);
+      }
+    }
+    delete document.documentElement.dataset.reducedMotion;
+    return [...new Set(bad)];
+  });
+  ck(`Reduced motion stills every animation on ${route}`, moving.length === 0, moving.join(', '));
+}
+
 // The trace gesture (§the 2030 pass, workstream 1). Any provenance-bearing
 // value can unfold its own address in place. Two things must hold, and neither
 // is visible to a typecheck: the gesture must actually open, and its third step

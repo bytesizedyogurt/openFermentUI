@@ -90,7 +90,7 @@ export function DemoContradictionRail({
           preserveAspectRatio="none"
           role="img"
           aria-label={`${def?.name ?? field}: ${accs.length} Accessions`}
-          className="border border-line bg-[rgb(var(--accent-wash))]/20"
+          className="border border-line bg-accent-wash/20 rail-settle"
         >
           {/* IQR, behind everything. */}
           {stats.iqr && aggregatable && (

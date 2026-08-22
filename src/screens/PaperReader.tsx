@@ -317,7 +317,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           <button
             key={s.id}
             onClick={() => sectionRefs.current[s.id]?.scrollIntoView({ behavior, block: 'start' })}
-            className="w-full rounded-[2px] border border-line hover:border-accent transition-colors"
+            className="w-full rounded-[2px] border border-line hover:border-accent motion-colors"
             style={{
               flexGrow: Math.max(1, s.text.length / totalChars * 100),
               background: alpha === 0 ? 'rgb(var(--surface-1))' : `rgb(var(--accent) / ${alpha})`,
@@ -587,7 +587,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                         : `${r.id}: the quoted text was not found in this paper's sections`
                   }
                   className={cx(
-                    'w-full text-left rounded-input pr-1.5 py-1.5 mb-0.5 border transition-colors',
+                    'w-full text-left rounded-input pr-1.5 py-1.5 mb-0.5 border motion-colors',
                     tickClass(p),
                     isActive
                       ? 'border-accent/50 bg-accent-wash'

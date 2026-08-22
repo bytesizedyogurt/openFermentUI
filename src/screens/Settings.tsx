@@ -113,7 +113,7 @@ function RadioCards<T extends string | number>({
           <label
             key={String(o.value)}
             className={cx(
-              'card p-3 flex items-start gap-2.5 cursor-pointer transition-colors',
+              'card p-3 flex items-start gap-2.5 cursor-pointer motion-colors',
               on ? 'border-accent bg-accent-wash' : 'hover:border-accent/40',
             )}
           >
@@ -1369,7 +1369,7 @@ export default function Settings({ section }: { section: string }) {
                     href={`#/settings/${s.id}`}
                     aria-current={on ? 'page' : undefined}
                     className={cx(
-                      'flex items-center gap-2 rounded-btn px-2.5 py-1.5 text-body whitespace-nowrap transition-colors',
+                      'flex items-center gap-2 rounded-btn px-2.5 py-1.5 text-body whitespace-nowrap motion-colors',
                       on
                         ? 'bg-accent-wash text-accent font-medium'
                         : 'text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',

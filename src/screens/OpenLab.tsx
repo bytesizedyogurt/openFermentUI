@@ -287,7 +287,7 @@ function DepositCard({
               role="radio"
               aria-checked={outcome === o}
               className={cx(
-                'text-caption border rounded-btn px-2.5 py-1 transition-colors',
+                'text-caption border rounded-btn px-2.5 py-1 motion-colors',
                 outcome === o
                   ? 'border-accent bg-accent-wash text-accent font-medium'
                   : 'border-line text-ink-soft hover:text-ink',

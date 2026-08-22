@@ -230,7 +230,7 @@ export function Notary() {
                 onClick={() => setSelected(d.id)}
                 aria-pressed={active}
                 className={cx(
-                  'text-left border rounded-card px-2.5 py-2 transition-colors min-w-0',
+                  'text-left border rounded-card px-2.5 py-2 motion-colors min-w-0',
                   active
                     ? 'border-accent bg-accent-wash'
                     : 'border-line hover:border-accent/45',

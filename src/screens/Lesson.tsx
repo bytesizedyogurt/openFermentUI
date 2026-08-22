@@ -68,7 +68,7 @@ function Checkpoint({
                 disabled={submitted}
                 onClick={() => setChoice(i)}
                 className={cx(
-                  'w-full text-left px-3 py-2 rounded-btn border transition-colors flex items-start gap-2',
+                  'w-full text-left px-3 py-2 rounded-btn border motion-colors flex items-start gap-2',
                   submitted && isAnswer && 'border-accent bg-accent-wash',
                   submitted && chosen && !isAnswer && 'border-signal-error bg-signal-error/[0.07]',
                   !submitted && chosen && 'border-accent bg-accent-wash',

@@ -67,7 +67,7 @@ export function CitationChip({
         <button
           {...p}
           className={cx(
-            'font-num text-[12px] px-1.5 py-[1px] rounded-input border align-baseline transition-colors',
+            'font-num text-[12px] px-1.5 py-[1px] rounded-input border align-baseline motion-colors',
             'border-line hover:border-accent hover:bg-accent-wash',
             prov === 'gold' && 'border-gold/45',
             prov === 'verified' && 'border-accent/40',

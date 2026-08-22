@@ -284,6 +284,134 @@ body {
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+/* ── The four animations that carry information ───────────────────────
+   And no others. The rule is narrow on purpose: an animation must tell the
+   reader something they could not otherwise see. Everything here is disabled
+   by the reduced-motion block further down, which is why that block was worth
+   keeping when it governed nothing.
+
+   1. A TICK DRAWS ITSELF. The 3px mark is the design system's signature and it
+      means "this quantity has an address". Drawing it top-to-bottom on first
+      paint spends 200ms saying the mark is a claim rather than a border. It
+      runs once per mount, never on hover, and never in a table cell — 134 rows
+      of drawing marks is a light show, not a signal. */
+@keyframes tick-draw {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.tick::before,
+.tick-cell::before {
+  animation: tick-draw var(--motion-base) var(--ease-out);
+}
+/* A table's ticks arrive already drawn. See above. */
+td.tick-cell::before {
+  animation: none;
+}
+
+/* 2. A STALE VALUE AGES. When a record it rests on has been corrected, the
+      number is not merely flagged — it visibly loses confidence, once, at the
+      moment the propagation reaches it. */
+@keyframes stale-age {
+  0% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.35;
+    filter: saturate(0.4);
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.just-stale {
+  animation: stale-age var(--motion-slow) var(--ease-in-out);
+}
+
+/* 3. A CONTRADICTION RAIL SETTLES into its spread rather than appearing at it.
+      The eye follows the marks outward and reads the spread as a measurement
+      rather than as a picture that was always there. */
+@keyframes rail-settle {
+  from {
+    transform: scaleX(0.55);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+.rail-settle {
+  animation: rail-settle var(--motion-slow) var(--ease-out);
+  transform-origin: center;
+}
+
+/* 4. THE TRACE UNFOLDS along the chain, one step at a time, so the ORDER is
+      legible — a source precedes a record precedes a check precedes a use, and
+      the sequence is the argument. 40ms apart: enough to read as a sequence,
+      not enough to wait for. */
+@keyframes trace-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.trace-step {
+  animation: trace-step-in var(--motion-base) var(--ease-out) backwards;
+}
+.trace-step:nth-child(2) {
+  animation-delay: 40ms;
+}
+.trace-step:nth-child(3) {
+  animation-delay: 80ms;
+}
+.trace-step:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+/* ── View transitions ─────────────────────────────────────────────────
+   Two elements are NAMED, and only two. A named element morphs between routes
+   instead of vanishing and reappearing elsewhere, which is how a reader is
+   told "same application, different place" — the one thing a hash router is
+   otherwise bad at saying. Naming more than two would make the whole page
+   slide, which says nothing and costs 300ms of every navigation. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--motion-base);
+  animation-timing-function: var(--ease-out);
+}
+
+.vt-page-title {
+  view-transition-name: of-page-title;
+}
+.vt-rail-active {
+  view-transition-name: of-rail-active;
+}
+
+/* Reduced motion kills the animation, not the transition: the callback still
+   runs and the swap still happens, it just arrives instantly. Skipping the
+   transition entirely would take a different code path on the setting most
+   likely to be used by someone who cannot easily re-test it. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+[data-reduced-motion='true']::view-transition-group(*),
+[data-reduced-motion='true']::view-transition-old(*),
+[data-reduced-motion='true']::view-transition-new(*) {
+  animation: none !important;
+}
+
 /* The house hover transition. Replaces sixteen hand-written `transition-colors`
    so a single token governs the whole surface. */
 .motion-colors {
@@ -483,7 +611,9 @@ input[type='range']::-moz-range-thumb {
   font-weight: 500;
   color: rgb(var(--ink));
   cursor: pointer;
-  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out);
   white-space: nowrap;
 }
 .btn:hover:not(:disabled) {

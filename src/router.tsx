@@ -1,6 +1,7 @@
 // Hash-based router (OF-DES-001 §13.2) — self-contained, no history API,
 // so deep links survive inside an embedded artifact frame.
 import { useEffect, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 
 export interface Route {
   path: string; // "/trawl/sources/SP-004"
@@ -38,7 +39,43 @@ function parseHash(): Route {
 }
 
 let listeners: (() => void)[] = [];
-window.addEventListener('hashchange', () => listeners.forEach((l) => l()));
+
+/**
+ * Route changes go through a View Transition where the browser has one.
+ *
+ * Hooked HERE and not in `navigate()`, which is the obvious-looking place and
+ * the wrong one: 120 links in this build are plain `<a href={href(...)}>` and
+ * never call `navigate` at all. The `hashchange` listener is the single funnel
+ * every navigation passes through, whichever way it started.
+ *
+ * What it buys is not decoration. Two elements carry `view-transition-name`s —
+ * the page title and the active rail item — so they MORPH between screens
+ * instead of disappearing and reappearing somewhere else. That tells a reader
+ * the two screens are the same application in a different place, which is the
+ * one thing a hash router is otherwise bad at saying.
+ *
+ * Feature-detected, no polyfill, and inert under reduced motion: the CSS that
+ * drives the transition is disabled by `[data-reduced-motion]`, so on that
+ * setting the callback still runs and simply swaps without animating.
+ */
+function announce() {
+  listeners.forEach((l) => l());
+}
+
+window.addEventListener('hashchange', () => {
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => { finished: Promise<void> };
+  };
+  if (typeof doc.startViewTransition !== 'function') {
+    announce();
+    return;
+  }
+  doc.startViewTransition(() => {
+    // React must have committed before the browser takes its "after"
+    // screenshot, so the swap happens synchronously inside the callback.
+    flushSync(announce);
+  });
+});
 
 export function useRoute(): Route {
   const [route, setRoute] = useState<Route>(parseHash);

@@ -110,7 +110,9 @@ export function TraceStep({
   );
 
   const shell = cx(
-    'card block motion-colors',
+    // `trace-step` staggers the chain so its ORDER reads: a source precedes a
+    // record precedes a check precedes a use, and that sequence is the argument.
+    'card block motion-colors trace-step',
     compact ? 'p-2' : 'p-3',
     step.to && 'hover:border-accent/45 hover:bg-accent-wash/40',
     step.missing && 'border-dashed',

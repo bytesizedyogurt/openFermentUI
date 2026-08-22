@@ -141,7 +141,7 @@ function ResumeCard({
   return (
     <a
       href={href(to)}
-      className="card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
+      className="card p-3 block motion-colors hover:border-accent/45 hover:bg-accent-wash/40"
     >
       <Tick p={prov} className="h-full">
         <div className="flex items-start justify-between gap-2">

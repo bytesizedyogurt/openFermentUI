@@ -90,7 +90,7 @@ export default function Learn() {
                           key={lesson.id}
                           href={`#/learn/${mod.id}/${lesson.id}`}
                           className={cx(
-                            'flex items-center gap-2.5 px-2.5 py-2 rounded-btn border transition-colors',
+                            'flex items-center gap-2.5 px-2.5 py-2 rounded-btn border motion-colors',
                             complete
                               ? 'border-accent/35 bg-accent-wash'
                               : 'border-line hover:border-accent/40 hover:bg-ink-soft/[0.04]',
