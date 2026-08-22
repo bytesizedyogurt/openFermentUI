@@ -62,3 +62,50 @@ export function partEyebrow(part: string, pool: Pool): string {
   const movement = MOVEMENT[part];
   return [movement, label, POOL_LABEL[pool]].filter(Boolean).join(' · ');
 }
+
+/**
+ * The rail key and route for each part.
+ *
+ * The rail in `App.tsx` used to hold these inline. They are here so the Bench's
+ * parts map and the rail cannot disagree about where a part lives or which `g`
+ * chord reaches it — the map's whole job is to teach the navigation, and a map
+ * that taught a stale shortcut would be worse than no map.
+ */
+export const PART_ROUTE: Record<string, string> = {
+  trawl: '/trawl',
+  repo: '/repo',
+  ledger: '/ledger',
+  assay: '/assay',
+  geneos: '/geneos',
+  fermos: '/fermos',
+  proforma: '/proforma',
+  parchment: '/parchment',
+  postdoc: '/postdoc',
+  runbook: '/runbook',
+  notary: '/notary',
+  openlab: '/openlab',
+  learn: '/learn',
+};
+
+export const PART_KEY: Record<string, string> = {
+  trawl: 't',
+  repo: 'r',
+  ledger: 'd',
+  assay: 'v',
+  geneos: 'o',
+  fermos: 's',
+  proforma: 'f',
+  parchment: 'c',
+  postdoc: 'a',
+  runbook: 'p',
+  notary: 'y',
+  openlab: 'b',
+  learn: 'n',
+};
+
+/** The parts of one movement, in the order the architecture lists them. */
+export function partsIn(movement: Movement): string[] {
+  return Object.keys(MOVEMENT).filter((p) => MOVEMENT[p] === movement);
+}
+
+export const MOVEMENTS: Movement[] = ['Read', 'Reason', 'Return'];

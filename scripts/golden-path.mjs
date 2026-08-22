@@ -74,13 +74,30 @@ async function main() {
   }
   check('Sim speed control responds', speedSet);
 
-  // ── 1. Home vitals reflect seed data ────────────────────────────────
+  // ── 1. The Bench orients a stranger ─────────────────────────────────
+  //
+  // Live seed figures, plus the four things the redesign exists to put on the
+  // front door: the worked example, the parts map, the pool separation, and
+  // the refusal to report a metric nobody has earned. The old check looked for
+  // a number alone, which a seeded activity row in the right rail satisfied on
+  // its own — so it could not have failed even if every figure were removed.
   await go('/');
-  const homeText = await page.locator('body').innerText();
+  const homeText = await page.locator('#of-main').innerText();
   check(
-    'Home shows live corpus vitals',
+    'Bench shows live corpus figures',
     /1[23]\d/.test(homeText),
     homeText.match(/\b1[23]\d\b/g)?.slice(0, 3).join(', ') ?? '',
+  );
+  check('Bench walks one number through its address', /Follow one number/i.test(homeText));
+  check('Bench names all thirteen parts', /Thirteen parts, three movements/i.test(homeText));
+  check('Bench keeps the two pools apart', /Two pools, never merged/i.test(homeText));
+  check(
+    'Bench leads with what it has not measured, not with a vanity metric',
+    /has not measured/i.test(homeText) && /no extractor has ever been run/i.test(homeText),
+  );
+  check(
+    'Bench says no language model is called',
+    /No language model is called anywhere in this build/i.test(homeText),
   );
 
   // ── 2. Ask: a scripted flow plays and produces chips ────────────────

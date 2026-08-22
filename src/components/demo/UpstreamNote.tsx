@@ -18,39 +18,12 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
-import { UPSTREAM_BY_PART, type UpstreamStatus } from '@/data/demo/upstream';
+import { UPSTREAM_BY_PART } from '@/data/demo/upstream';
+// The mark and its key are pool-neutral — they describe PARTS, not either
+// object pool — so they live outside this directory and the Bench can draw
+// the parts map without importing from `components/demo/`.
+import { StatusMark, STATUS_LABEL } from '@/components/Upstream';
 import { cx } from '@/components/ui';
-
-const STATUS_LABEL: Record<UpstreamStatus, string> = {
-  ported: 'in the repo now',
-  named: 'decided, not yet called',
-  candidate: 'candidate — nobody has committed',
-};
-
-/** Tick geometry, reusing the house rule: form carries the epistemic state. */
-function StatusMark({ status }: { status: UpstreamStatus }) {
-  const base = 'inline-block w-[3px] h-3.5 align-middle shrink-0';
-  if (status === 'ported')
-    return <span className={base} style={{ background: 'rgb(var(--accent))' }} aria-hidden />;
-  if (status === 'named')
-    return (
-      <span
-        className={base}
-        style={{ border: '1px solid rgb(var(--accent))', background: 'transparent' }}
-        aria-hidden
-      />
-    );
-  return (
-    <span
-      className={base}
-      style={{
-        backgroundImage:
-          'repeating-linear-gradient(to bottom, rgb(var(--ink-soft)) 0 2px, transparent 2px 4px)',
-      }}
-      aria-hidden
-    />
-  );
-}
 
 export function UpstreamNote({ part, className }: { part: string; className?: string }) {
   const u = UPSTREAM_BY_PART[part];

@@ -16,8 +16,8 @@ interface Stop {
 const STOPS: Stop[] = [
   {
     route: '/',
-    title: 'Corpus vitals',
-    body: 'Home answers three questions in five seconds: what is in the corpus, what needs your attention, and where you left off. Every tile is ticked by the provenance of the data behind it, and clicks through to its home screen.',
+    title: 'Follow one number',
+    body: 'The Bench teaches by demonstration and then hands over the map. It opens by walking one real quantity through its whole address — the source, the record, the check that has not happened, and the model that already uses it — then lays out the thirteen parts, the two object pools, and what this build has not measured. The step drawn with a dash is the one the product is about.',
   },
   {
     route: '/postdoc',

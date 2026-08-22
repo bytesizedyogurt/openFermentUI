@@ -34,11 +34,17 @@ export const COLLECTIONS: Collection[] = [
   },
 ];
 
+// The seeded feed. These rows are authored prose, and two of them used to state
+// corpus sizes that had drifted from the corpus — "125 real entries" against 132
+// papers, and "60 records" against a 66-record gold plan. They render in the
+// Bench's right rail, one column away from the live counts, so the page stated
+// two different corpus sizes at once. `check:seed` now asserts that any count in
+// this prose matches the seed it describes.
 export const ACTIVITY: ActivityEvent[] = [
   {
     at: '2026-08-10 14:20',
     icon: 'file',
-    text: 'Corpus OF-COR-001 v1.0 catalogued — 125 real entries across 15 threads',
+    text: 'Corpus OF-COR-001 v1.0 catalogued — 132 real entries across 15 threads',
     href: '#/trawl',
     provenance: 'curated',
   },
@@ -87,7 +93,7 @@ export const ACTIVITY: ActivityEvent[] = [
   {
     at: '2026-08-08 10:15',
     icon: 'check',
-    text: 'Gold-set plan drafted — 60 records across 14 papers, pending tranche-1 ingest',
+    text: 'Gold-set plan drafted — 66 records across 14 papers, pending tranche-1 ingest',
     href: '#/assay',
     provenance: 'gold',
   },

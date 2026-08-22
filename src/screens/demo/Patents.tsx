@@ -26,7 +26,7 @@ import { Scale, FlaskConical } from 'lucide-react';
 
 import { PATENT_FAMILIES } from '@/data/demo/patents';
 import { FIELD_BY_ID, DEMO_NOW } from '@/data/demo/core';
-import { monthsToExpiry } from '@/lib/demo';
+import { monthsToExpiry, jurisdictionRollup } from '@/lib/demo';
 import { href } from '@/router';
 import { Card, PageHeader, SectionTitle, Callout } from '@/components/ui';
 import { ClaimChip } from '@/components/demo/ClaimOverlay';
@@ -48,16 +48,18 @@ const RANK: Record<string, number> = {
 };
 
 export function DemoPatents() {
-  const positions = PATENT_FAMILIES.flatMap((f) => f.jurisdictions);
-  const enclosed = positions.filter((j) => j.status === 'enclosed').length;
-  const open = positions.filter((j) => j.status === 'never-nationalised' || j.status === 'expired').length;
+  // One definition of "open", shared with the Bench. Two screens counting the
+  // same positions two ways is how a reader ends up unable to tell which figure
+  // is the finding.
+  const roll = jurisdictionRollup();
+  const { total: positionCount, enclosed, open } = roll;
 
   return (
     <>
       <PageHeader
         eyebrow={EYEBROW}
         title="Patent families"
-        subtitle={`${PATENT_FAMILIES.length} families across ${positions.length} national positions. Claim scope is expressed in the same field vocabulary as an Accession, so a recited range and a measured value can be compared rather than read beside each other.`}
+        subtitle={`${PATENT_FAMILIES.length} families across ${positionCount} national positions. Claim scope is expressed in the same field vocabulary as an Accession, so a recited range and a measured value can be compared rather than read beside each other.`}
       />
 
       <div className="max-w-3xl">
@@ -71,7 +73,7 @@ export function DemoPatents() {
             What is real is the <em>shape</em>: which enzymatic step attracts the claims, how
             families cluster on the commercially decisive one, and the fact that the great
             majority of fermentation patents are never nationalised beyond US/EP/CN/JP/KR. Of the{' '}
-            <span className="font-num">{positions.length}</span> positions below,{' '}
+            <span className="font-num">{positionCount}</span> positions below,{' '}
             <span className="font-num text-signal-closed">{enclosed}</span> are enclosed and{' '}
             <span className="font-num text-signal-open">{open}</span> are open ground. That
             asymmetry is the argument, and it survives the numbers being invented.

@@ -518,6 +518,43 @@ export function organismName(id: string): string {
 import { ORGANISM_BY_ID as _ORGANISM_BY_ID } from '@/data/demo/core';
 import { AUX_ORGANISMS as _AUX_ORGANISMS } from '@/data/demo/archetypes';
 
+/**
+ * Every national position the demo's patent families hold, tallied by status.
+ *
+ * `/parchment/families` counts "open" as never-nationalised OR expired; a Bench
+ * band that said "97 never nationalised" while the screen one click away said
+ * "100 open" would be two definitions of one sentence, and a reader has no way
+ * to tell which is the finding. One helper, one definition, both surfaces.
+ *
+ * These are MODELLED positions, not measured ones. The families are synthetic
+ * and were authored to carry a real pattern — the great majority of
+ * fermentation patents are never nationalised beyond US/EP/CN/JP/KR — so the
+ * ratio is a property of the model, and any caller stating it must say so.
+ */
+export function jurisdictionRollup(): {
+  total: number;
+  open: number;
+  neverNationalised: number;
+  expired: number;
+  enclosed: number;
+  expiring: number;
+} {
+  const positions = _PATENT_FAMILIES.flatMap((f) => f.jurisdictions);
+  const count = (st: ClaimStatus) => positions.filter((j) => j.status === st).length;
+  const neverNationalised = count('never-nationalised');
+  const expired = count('expired');
+  return {
+    total: positions.length,
+    open: neverNationalised + expired,
+    neverNationalised,
+    expired,
+    enclosed: count('enclosed'),
+    expiring: count('expiring'),
+  };
+}
+
+import { PATENT_FAMILIES as _PATENT_FAMILIES } from '@/data/demo/patents';
+
 // ══════════════════════════════════════════════════════════════════════
 // routes
 // ══════════════════════════════════════════════════════════════════════

@@ -22,6 +22,7 @@ import { FLOWS } from '../src/data/flows';
 import { SUGGESTED_PROMPTS } from '../src/sim/prompts';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
+import { GOLD_SET_PLAN } from '../src/data/runOutputs';
 import { ONTOLOGY } from '../src/data/source';
 import { ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
@@ -175,6 +176,44 @@ for (const a of ACTIVITY) {
   const path = a.href.replace(/^#/, '');
   const known = /^\/(|ask|library|extract|organisms|protocols|simulate|learn|settings)/.test(path);
   if (!known) warn(`activity href does not look like a real route: ${a.href}`);
+}
+
+// A COUNT IN AUTHORED PROSE MUST MATCH THE SEED IT DESCRIBES.
+//
+// Two of these rows had drifted: "125 real entries" against 132 papers, and
+// "60 records" against a 66-record gold plan. They render in the Bench's right
+// rail, one column from the live figures, so the landing page stated two
+// different corpus sizes at once — on a product whose whole claim is that
+// every number has an address. Prose is not exempt from that claim just
+// because a human typed it.
+const PROSE_COUNTS: { pattern: RegExp; actual: () => number; what: string }[] = [
+  { pattern: /(\d+) real entries/, actual: () => PAPERS.length, what: 'catalogued papers' },
+  {
+    pattern: /Gold-set plan drafted — (\d+) records/,
+    actual: () => GOLD_SET_PLAN.reduce((n, g) => n + g.records, 0),
+    what: 'records in the gold-set plan',
+  },
+  {
+    pattern: /(\d+) records across \d+ papers/,
+    actual: () => GOLD_SET_PLAN.reduce((n, g) => n + g.records, 0),
+    what: 'records in the gold-set plan',
+  },
+  {
+    pattern: /across (\d+) papers/,
+    actual: () => GOLD_SET_PLAN.length,
+    what: 'sources in the gold-set plan',
+  },
+];
+for (const a of ACTIVITY) {
+  for (const { pattern, actual, what } of PROSE_COUNTS) {
+    const m = a.text.match(pattern);
+    if (!m) continue;
+    const stated = Number(m[1]);
+    const real = actual();
+    if (stated !== real) {
+      fail(`seeded activity prose states ${stated} ${what}; the seed holds ${real} — "${a.text}"`);
+    }
+  }
 }
 
 // ── 3. record integrity for the real corpus ────────────────────────────
