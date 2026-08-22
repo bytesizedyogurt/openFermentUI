@@ -2,9 +2,9 @@
 // overlays (OF-DES-001 §6.4).
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, Info, CheckCircle2, XCircle } from 'lucide-react';
+import { X, AlertTriangle, ArrowLeft, Info, CheckCircle2, XCircle } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { href, navigate, useBack } from '@/router';
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ');
@@ -92,9 +92,36 @@ export function PageHeader({
   /** The one screen that gets the 36px register. See the h1 below. */
   hero?: boolean;
 }) {
+  const previous = useBack();
+
   return (
     <div className="flex items-start justify-between gap-x-6 gap-y-2 flex-wrap mb-5">
       <div className="min-w-0">
+        {/* ── BACK TO WHERE YOU WERE ───────────────────────────────────────
+            Named, not generic. "Back" alone makes a reader click to find out
+            where they are going; the screen's own title tells them before they
+            do. It sits above the eyebrow because that is where a back link
+            belongs in a document — the first thing on the page, before the page
+            announces what it is.
+
+            Only when there IS somewhere to go back to: on a cold arrival, a
+            deep link, or the Bench, the trail has one entry and this renders
+            nothing rather than a dead control. */}
+        {previous && (
+          <a
+            href={href(previous.to)}
+            // A hook for the browser suite. The link's TEXT is the previous
+            // screen's title and therefore changes with the corpus; an
+            // assertion pinned to it would be pinned to seed data.
+            data-back=""
+            className="inline-flex items-center gap-1 text-caption text-ink-soft hover:text-accent motion-colors mb-1"
+          >
+            <ArrowLeft size={12} aria-hidden />
+            <span className="truncate max-w-[26rem]">
+              {previous.label || 'Back'}
+            </span>
+          </a>
+        )}
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
         )}

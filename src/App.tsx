@@ -31,7 +31,7 @@ import {
   Database,
   Calculator} from 'lucide-react';
 import { useStore } from '@/store';
-import { useRoute, navigate, useFragmentScroll, useRouteAnnouncement } from '@/router';
+import { back, navigate, previousEntry, useFragmentScroll, useRoute, useRouteAnnouncement } from '@/router';
 import { cx, Popover, Toasts, Sheet, Page, type PageWidth } from '@/components/ui';
 import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
@@ -532,6 +532,26 @@ export default function App() {
           navigate(item.to);
         }
         setGPressed(false);
+      } else if (e.key === 'Escape') {
+        // Back, on the key a reader already reaches for to leave something.
+        //
+        // Not Backspace: it is the browser's own back on some platforms and a
+        // delete elsewhere, and binding it means a stray press in a text field
+        // loses work.
+        //
+        // AN OVERLAY GETS THE KEY FIRST, and this is checked in the DOM rather
+        // than against the store's five `*Open` flags. Written the obvious way
+        // it was wrong: pressing Escape on the open shortcut sheet closed the
+        // sheet AND navigated back, because the sheet's focus is on a button
+        // rather than in a field, so the `typing` guard above did not catch it.
+        // `Popover`, `Sheet` and `Modal` all render `role="dialog"`, so one
+        // query covers every overlay in the build and any overlay added later.
+        const overlayOpen = document.querySelector('[role="dialog"]') !== null;
+        const prev = previousEntry();
+        if (!overlayOpen && prev) {
+          e.preventDefault();
+          back();
+        }
       } else if (e.key === 'D' && e.shiftKey) {
         setUI({ density: ui.density === 'dense' ? 'comfortable' : 'dense' });
       } else if (e.key === 'T' && e.shiftKey) {

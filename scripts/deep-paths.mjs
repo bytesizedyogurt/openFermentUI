@@ -626,6 +626,55 @@ ck('...and names Proforma as the part that priced it', /Priced by Proforma/i.tes
 ck('...and no longer holds the cost build-up',
    !/Cost build-up/i.test(wsp) && !/Sensitivity/i.test(wsp));
 
+
+// ── Going back means going back to where you were ────────────────────────
+//
+// Browser back returned to the right route at scroll position zero, so a reader
+// two thousand pixels down a six-thousand-pixel statement came back to the top
+// with no idea where they had been. And inside the published artifact the
+// visible back button belongs to the HOST page, not to this app in its iframe,
+// so there was no back at all for anybody reading the shared build.
+await go('/proforma');
+// A RELOAD, not just a `go`. The trail is in-memory and per-document, and
+// `p.goto` between two URLs differing only by hash is a fragment navigation —
+// the document survives, so this block would otherwise inherit the trail left
+// by every test above it and "cold arrival" would be a lie.
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(700);
+const coldBack = await p.locator('#of-main a[data-back]').count();
+ck('A cold arrival offers no back link', coldBack === 0);
+
+await p.locator('#of-main a[href$="/proforma/price/sc-s2"]').first().click();
+await p.waitForTimeout(1100);
+const named = await p.locator('#of-main a[data-back]').first().innerText();
+ck('...and one screen in, the back link NAMES where it goes', /Proforma/i.test(named), named);
+
+await p.evaluate(() => document.getElementById('of-main').scrollTo({ top: 2200 }));
+await p.waitForTimeout(250);
+await p.locator('#of-main a[href$="/fermos/s/sc-s2/plant"]').first().click();
+await p.waitForTimeout(1100);
+const freshTop = await p.evaluate(() => document.getElementById('of-main').scrollTop);
+ck('A screen you have not seen opens at its top', freshTop < 40, String(freshTop));
+
+await p.keyboard.press('Escape');
+await p.waitForTimeout(1200);
+const returned = await p.evaluate(() => ({
+  hash: location.hash,
+  top: document.getElementById('of-main').scrollTop,
+}));
+ck('Escape goes back to the screen you were on', /proforma\/price\/sc-s2/.test(returned.hash), returned.hash);
+ck('...and to WHERE you were on it', Math.abs(returned.top - 2200) < 60, String(returned.top));
+
+// An overlay owns the key first. Written the obvious way this was wrong: the
+// shortcut sheet's Escape closed the sheet AND navigated, because its focus is
+// on a button rather than in a field.
+await p.keyboard.press('?');
+await p.waitForTimeout(500);
+await p.keyboard.press('Escape');
+await p.waitForTimeout(900);
+ck('An open overlay takes Escape before the router does',
+   /proforma\/price\/sc-s2/.test(await p.evaluate(() => location.hash)));
+
 await b.close(); server.close();
 console.log(`\n${res.filter(Boolean).length}/${res.length} extra checks passed`);
 if(errs.length){console.log('errors:'); [...new Set(errs)].slice(0,6).forEach(e=>console.log('  - '+e));}
