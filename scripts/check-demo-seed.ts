@@ -9,7 +9,7 @@ import { PATENT_FAMILIES, PATENT_BY_ID } from '@/data/demo/patents';
 import { ACCESSIONS, ACCESSION_BY_ID, verifyNormalisation, heldAccessions } from '@/data/demo/accessions';
 import {
   AUX_ORGANISMS, LYSINE_FACTOR_MAP, LYSINE_RUN_DESIGN, ROUTES_3HP, CANDIDATES,
-  BAGASSE_CONCEPTS, BURGER_TREE, DISCLOSURES, DELIVERABLES, LYSINE_RESCUE, applyRescues,
+  BAGASSE_CONCEPTS, BURGER_TREE, DISCLOSURES, DELIVERABLES, LYSINE_RESCUE,
 } from '@/data/demo/archetypes';
 import { RUNS, RUN_BY_ID, excursionIntegrals, hydrateExcursions } from '@/data/demo/runs';
 import { ARCHETYPE_FLOWS } from '@/data/demo/flows';
@@ -239,7 +239,29 @@ LYSINE_FACTOR_MAP.forEach((f) => {
 ok(LYSINE_RUN_DESIGN.length === 12, `run design should be twelve runs, got ${LYSINE_RUN_DESIGN.length}`);
 ok(LYSINE_RUN_DESIGN.filter((r) => r.cell === 'centre').length === 2, 'the block needs a centre replicate or it has no error term');
 
-applyRescues(CANDIDATES);
+// The rescue must already be ON the candidate, not applied by this gate.
+//
+// It used to read `applyRescues(CANDIDATES)` right here, which made the check
+// pass while the APP never called it — so `Candidate.rescue` was undefined in
+// every browser, the rescued badge never rendered, and the only Proforma →
+// fermOS link in the build was unreachable. A gate that performs the derivation
+// it is checking proves the function works and says nothing about whether
+// anything calls it. Same rule as `openSurfaceIn` further down: anything that
+// only ever renders a stored number is decoration, and anything only a gate
+// ever calls is not wired up.
+{
+  const rescued = CANDIDATES.find((c) => c.id === LYSINE_RESCUE.candidateId);
+  ok(Boolean(rescued?.rescue), `${LYSINE_RESCUE.candidateId} carries no rescue — data/demo/archetypes.ts must apply it at load, not this gate`);
+  ok(
+    rescued?.rescue?.byDeliverableId === LYSINE_RESCUE.byDeliverableId,
+    'the rescue must name the deliverable that produced it — that link is the cross-part argument',
+  );
+  ok(
+    CANDIDATES.filter((c) => c.rescue).length === 1,
+    'exactly one candidate is rescued in this pool; more means applyRescues ran against the wrong set',
+  );
+}
+
 const jurisdiction = PLANTS[0].location.jurisdiction;
 const matches = CANDIDATES.map((cand) => ({ cand, m: matchEnvelope(PLANTS[0], cand) }));
 const survivors = matches.filter((x) => x.m.feasible);

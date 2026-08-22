@@ -490,6 +490,32 @@ ck('The cash-flow table has rows', cashRows > 10, cashRows + ' years');
 const costRows = await p.locator('#of-main table[data-table="equipment-cost"] tbody tr').count();
 ck('The same equipment appears again, costed', costRows > 5, costRows + ' units');
 
+// ── The cross-part round trip ────────────────────────────────────────────
+//
+// `screens/demo/Proforma.tsx`'s header calls the rescue link "the argument for
+// the shared object pool": a candidate that fails Proforma's envelope at its
+// naive operating point and survives at a de-rating fermOS worked out. The link
+// existed in the markup and was unreachable in a browser, because nothing
+// applied the rescue outside a gate. So this walks it.
+await go('/proforma/screen/PLT-KGL-01');
+const cap = await p.locator('#of-main').innerText();
+ck('The capacity screen shows a promoted candidate, not just viable and excluded',
+   /promoted/i.test(cap));
+ck('...and marks the rescued one as rescued', /rescued/i.test(cap));
+
+await go('/proforma/screen/PLT-KGL-01/c/CND-001');
+const cand = await p.locator('#of-main').innerText();
+ck('A rescued candidate explains what was changed and what it cost', /Rescued/i.test(cand));
+const backToFermos = p.locator('#of-main a[href$="/fermos/gap/DLV-AR1-001"]');
+ck('...and links back to the fermOS factor map that produced the de-rating',
+   (await backToFermos.count()) > 0);
+if (await backToFermos.count()) {
+  await backToFermos.first().click();
+  await p.waitForTimeout(500);
+  ck('...and that link actually lands on the factor map',
+     /factor map|gap map|Lysine process-space/i.test(await p.locator('#of-main').innerText()));
+}
+
 // The authored-versus-bioSTEAM split has to be visible on the algal route,
 // where it is the whole caveat. Capital is Proforma's, so the callout is too —
 // but fermOS still has to say the photobioreactor is unmodelled.

@@ -13,11 +13,11 @@
 import { useMemo, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 
-import type { Candidate } from '@/data/demo/types';
+import type { Candidate, EnvelopeMatchResult } from '@/data/demo/types';
 import { PLANTS, PLANT_BY_ID, HS_CODES } from '@/data/demo/core';
 import { ACCESSION_BY_ID } from '@/data/demo/accessions';
 import { CANDIDATES, DELIVERABLES, DELIVERABLE_BY_ID, DISCLOSURES, BAGASSE_CONCEPTS } from '@/data/demo/archetypes';
-import { matchEnvelope, plantCeilings, organismName, demoBasis } from '@/lib/demo';
+import { matchEnvelope, plantCeilings, organismName, demoBasis, verdictFor } from '@/lib/demo';
 import { BasisPanel } from '@/components/Basis';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout, cx } from '@/components/ui';
@@ -33,6 +33,27 @@ import { partEyebrow } from '@/data/parts';
 import { DemoEmpty } from '@/components/demo/DemoEmpty';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('proforma', 'demo');
+/**
+ * A candidate's verdict, from the two places that hold one.
+ *
+ * `verdictFor` screens: it fails a candidate whose patents are enclosed in this
+ * jurisdiction, marks a rescued infeasible one `marginal`, and passes the rest
+ * on headroom. What it cannot produce is `promoted` — that is not a property of
+ * the envelope, it is the deliverable's judgement about which survivor to
+ * advance, and `Deliverable.payload.promotedId` is where it has been sitting
+ * unread. Screening and choosing are different acts; this is the seam between
+ * them, and it is why the table can show four verdicts rather than two.
+ */
+function verdictOf(
+  c: Candidate,
+  m: EnvelopeMatchResult,
+  jurisdiction: string,
+  promotedId: string | undefined,
+): Candidate['verdict'] {
+  const screened = verdictFor(m, c, jurisdiction);
+  return c.id === promotedId && screened !== 'excluded' ? 'promoted' : screened;
+}
+
 const VERDICT_ORDER: Record<string, number> = {
   promoted: 0,
   viable: 1,
@@ -49,17 +70,21 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
   );
   const disclosures = dlv ? DISCLOSURES.filter((d) => dlv.disclosureCandidateIds.includes(d.id)) : [];
   const ceilings = useMemo(() => plantCeilings(plant), [plant]);
+  // The deliverable's own answer to "which one do we take", read rather than
+  // recomputed. It was stored and nothing rendered it, so the `promoted`
+  // verdict — a colour and a sort slot the table already reserved — could
+  // never appear.
+  const promotedId = dlv?.payload.kind === 'capacity-screen' ? dlv.payload.promotedId : undefined;
 
   const rows = useMemo(
     () =>
       [...CANDIDATES]
-        .map((c) => ({ c, m: c.match ?? matchEnvelope(plant, c) }))
-        .sort((a, b) => {
-          const va = VERDICT_ORDER[a.c.verdict ?? (a.m.feasible ? 'viable' : 'excluded')] ?? 9;
-          const vb = VERDICT_ORDER[b.c.verdict ?? (b.m.feasible ? 'viable' : 'excluded')] ?? 9;
-          return va - vb;
-        }),
-    [plant],
+        .map((c) => {
+          const m = c.match ?? matchEnvelope(plant, c);
+          return { c, m, verdict: verdictOf(c, m, plant.location.jurisdiction, promotedId) };
+        })
+        .sort((a, b) => (VERDICT_ORDER[a.verdict ?? 'viable'] ?? 9) - (VERDICT_ORDER[b.verdict ?? 'viable'] ?? 9)),
+    [plant, promotedId],
   );
 
   const failing = rows.filter((r) => !r.m.feasible);
@@ -108,8 +133,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ c, m }) => {
-              const verdict = c.verdict ?? (m.feasible ? 'viable' : 'excluded');
+            {rows.map(({ c, m, verdict }) => {
               const dead = verdict === 'excluded';
               const binding = m.axes.find((a) => a.binding);
               const feedstock = ACCESSION_BY_ID[c.feedstockCostAccessionId];

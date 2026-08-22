@@ -292,8 +292,23 @@ export const CANDIDATES: Candidate[] = [
     'Xylitol bioconversion runs oxygen-limited by design — the cofactor balance requires it — so the modest OUR is a feature of the chemistry rather than a concession. Fits, high unit value, and PF-013 has expired almost everywhere. The bridge candidate into the greenfield concept.'),
 ];
 
-/** Applied by Archetype 3 once the Archetype 1 factor map exists. */
-/** Attached to CND-001 at load so `verdictFor` can see it. */
+/**
+ * Attach the Archetype 1 de-rating to the candidate it rescues.
+ *
+ * ── THIS USED TO BE CALLED BY NOTHING BUT A GATE ──────────────────────────
+ *
+ * `scripts/check-demo-seed.ts` invoked it, asserted against the result, and the
+ * app never did — so `Candidate.rescue` was `undefined` at runtime for every
+ * candidate, and the rescue card on `/proforma/screen/:plant/c/CND-001` never
+ * rendered. That card holds the only Proforma → fermOS link in the build, and
+ * `screens/demo/Proforma.tsx`'s own header calls it "the argument for the
+ * shared object pool". The argument was unreachable in a browser.
+ *
+ * Applied at module scope now, which is this pool's established shape for
+ * anything derived rather than authored (`data/designs.ts` sweeps its grids the
+ * same way). Idempotent, so a double invocation under StrictMode sets the same
+ * object twice and changes nothing.
+ */
 export function applyRescues(cands: Candidate[]): void {
   const c = cands.find((x) => x.id === LYSINE_RESCUE.candidateId);
   if (c) c.rescue = { byDeliverableId: LYSINE_RESCUE.byDeliverableId, change: LYSINE_RESCUE.change, cost: LYSINE_RESCUE.cost };
@@ -307,6 +322,11 @@ export const LYSINE_RESCUE = {
   cost:
     'Volumetric productivity falls roughly 45 % and cycle time extends. Cooling headroom at the de-rated point is 4.6 %, which is not a comfortable margin — it is the reason this candidate is promoted with a named risk rather than promoted clean.',
 };
+
+// Derived at load, never authored: the rescue is a fact Archetype 1 produced
+// about an Archetype 3 candidate, and it has to be on the object before any
+// screen reads it.
+applyRescues(CANDIDATES);
 
 // ══════════════════════════════════════════════════════════════════════
 // ARCHETYPE 4 — bagasse greenfield. Capex left for lib/economics.ts.
