@@ -269,7 +269,11 @@ export default function Organisms() {
       const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
       const scenarioCount = scenarios.filter(
         (sc) =>
-          sc.assumptions.some((a) => a.recordId && ids.has(a.recordId)) ||
+          // `a.basis.recordId`. The top-level `recordId` is the
+          // pre-discriminator binding and is populated on no assumption in the
+          // corpus, so this arm of the match was dead and a scenario could only
+          // ever be linked to a strain through a sweep dimension.
+          sc.assumptions.some((a) => a.basis.kind === 'record' && ids.has(a.basis.recordId)) ||
           sc.dims.some((d) => d.sourceRecordId && ids.has(d.sourceRecordId)),
       ).length;
       const prov: ProvKind = gold > 0 ? 'gold' : verified > 0 ? 'verified' : 'unverified';

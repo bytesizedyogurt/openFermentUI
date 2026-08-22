@@ -46,6 +46,7 @@ import {
 import { Boxes, Download, Factory, Wallet } from 'lucide-react';
 
 import { useStore } from '@/store';
+import { evaluateGrid } from '@/engine/grids';
 import { href, navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { usePlantSolve } from '@/lib/use-plant';
@@ -56,6 +57,7 @@ import { money, USD } from '@/lib/money';
 import { exportCSV } from '@/lib/csv';
 import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { ChartTable } from '@/components/ChartTable';
+import { CostBuildUp } from '@/components/CostBuildUp';
 import { SettingsPanel, UtilityAgentTable } from '@/components/BiosteamSettings';
 import { partEyebrow } from '@/data/parts';
 import type { PlantResult } from '@/engine/plant';
@@ -364,6 +366,7 @@ function Tornado({ u }: { u: PlantUncertainty }) {
 
 export default function Price({ scenarioId }: { scenarioId: string }) {
   const toast = useStore((s) => s.toast);
+  const grids = useStore((s) => s.grids);
   const theme = useChartTheme();
   const seriesColor = useSeriesColor();
 
@@ -380,6 +383,7 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
     restore,
     restoreBasis,
   } = usePlantSolve(scenarioId);
+  const grid = scenario ? grids[scenario.modelId] : undefined;
 
   const { uncertainty, running, run: runUncertainty } = usePlantUncertainty(scenarioId);
 
@@ -419,6 +423,14 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
   // declares — the settings panel below IS the basis, so a stamp that ignored
   // an edit would describe a plant nobody is on.
   const basis = corpusBasis(scenario.modelId, { tea: overrides.tea, CE: overrides.CE });
+
+  // The build-up reads the precomputed sweep, not the solve. `evaluateGrid` is
+  // the interpolation CLAUDE.md keeps in TypeScript, and its lines sum to its
+  // own headline by construction — which is the property the golden path
+  // asserts. The solved `result.msp` above may differ from it by the
+  // interpolation error, and that is the honest difference between reading a
+  // grid and building a plant.
+  const gridPoint = grid ? evaluateGrid(grid, scenario.point) : null;
 
   const split = result.costSourceSplit;
   const authoredShare =
@@ -545,6 +557,14 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
           </Callout>
         )}
       </div>
+
+      {/* Where the price comes from. These three moved off `/fermos/s/:id`,
+          which was a process screen holding a price decomposition, a tornado
+          ranked on price and a sweep of price. */}
+      <section className="mb-6">
+        <SectionTitle>Where the price comes from</SectionTitle>
+        {grid && <CostBuildUp scenario={scenario} grid={grid} result={gridPoint} />}
+      </section>
 
       <section className="mb-6">
         <SectionTitle

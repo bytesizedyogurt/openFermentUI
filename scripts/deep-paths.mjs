@@ -609,12 +609,22 @@ if (sel) {
      'no unit in the diagram exposed an enum attribute');
 }
 
-// The tornado in the workspace is derived now, so it must say so rather than
-// claiming a fixed ±20% swing it never performed.
-await go('/fermos/s/sc-s2');
+// The tornado is derived, so it must say so rather than claiming a fixed ±20%
+// swing it never performed. It sits on Proforma now: a chart whose bars are
+// "what this does to the price" is economics, not process.
+await go('/proforma/price/sc-s2');
 const ws = await p.locator('#of-main').innerText();
-ck('The workspace tornado states it re-solves the plant', /re-solving the plant/i.test(ws));
+ck('The tornado states it re-solves the plant', /re-solving the plant/i.test(ws));
 ck('...and no longer claims a ±20% perturbation', !/±20%/.test(ws));
+
+// And fermOS's workspace is a process screen again: it quotes the price and
+// shows what the point BUILDS, rather than decomposing, ranking and sweeping it.
+await go('/fermos/s/sc-s2');
+const wsp = await p.locator('#of-main').innerText();
+ck('The workspace shows what the point builds', /What this point builds/i.test(wsp));
+ck('...and names Proforma as the part that priced it', /Priced by Proforma/i.test(wsp));
+ck('...and no longer holds the cost build-up',
+   !/Cost build-up/i.test(wsp) && !/Sensitivity/i.test(wsp));
 
 await b.close(); server.close();
 console.log(`\n${res.filter(Boolean).length}/${res.length} extra checks passed`);

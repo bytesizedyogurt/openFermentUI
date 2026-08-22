@@ -57,7 +57,16 @@ export default function Simulate() {
           {scenarios.map((sc) => {
             const grid = grids[sc.modelId];
             const result = grid ? evaluateGrid(grid, sc.point) : null;
-            const linked = sc.assumptions.filter((a) => a.recordId).length;
+            // `a.basis.recordId`, not `a.recordId`.
+            //
+            // The top-level field is the pre-discriminator binding and is
+            // populated on ZERO assumptions in the corpus, so this card reported
+            // "0 of 12 assumptions linked to corpus records" while the corpus
+            // holds six of them. The product's central claim is that a cost
+            // assumption binds to a Ledger record; its own index denied it.
+            // `ScenarioWorkspace` reads `basis.kind` and has always printed the
+            // right number on the very next screen.
+            const linked = sc.assumptions.filter((a) => a.basis.kind === 'record').length;
             return (
               <Card key={sc.id} className="p-4 flex flex-col">
                 <div className="flex items-start justify-between gap-2 mb-1">
@@ -80,28 +89,39 @@ export default function Simulate() {
                 </a>
                 <p className="text-body text-ink-soft mt-1 mb-3 flex-1">{sc.description}</p>
 
-                <Tick p="demo" className="mb-3">
-                  <div className="text-caption uppercase tracking-wide text-ink-soft">
-                    Minimum selling price
-                  </div>
-                  <div className="font-num text-display leading-none">
-                    {result ? fmt(result.msp, 1) : '—'}
-                    <span className="text-body text-ink-soft ml-1">USD kg⁻¹</span>
-                  </div>
-                  <div className="text-caption text-ink-soft mt-0.5">
-                    Demo model v0 — illustrative economics, not validated
-                  </div>
-                </Tick>
+                {/* WHAT fermOS OWNS, FIRST.
+                    This card led with the minimum selling price — Proforma's
+                    number, at Proforma's weight — which is what made the two
+                    parts' indexes the same screen. A scenario IS a space: a set
+                    of axes and a point on them. */}
+                <dl className="text-caption mb-3 border-y border-line divide-y divide-line">
+                  {sc.dims.map((d) => (
+                    <div key={d.key} className="flex items-baseline justify-between gap-3 py-1">
+                      <dt className="text-ink-soft truncate">{d.label}</dt>
+                      <dd className="font-num text-ink whitespace-nowrap">
+                        {fmt(sc.point[d.key])}
+                        <span className="text-ink-soft ml-1">{d.unit}</span>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
 
-                <div className="text-caption text-ink-soft space-y-0.5 mb-3">
-                  <div>
-                    Sweep:{' '}
-                    <span className="text-ink">{sc.dims.map((d) => d.label).join(' × ')}</span>
-                  </div>
-                  <div className="font-num">
-                    {linked} of {sc.assumptions.length} assumptions linked to corpus records
-                  </div>
+                <div className="text-caption text-ink-soft mb-3">
+                  <span className="font-num text-ink">{linked}</span> of{' '}
+                  <span className="font-num text-ink">{sc.assumptions.length}</span> assumptions
+                  bind to a Ledger record.
                 </div>
+
+                {/* Proforma's number, named as Proforma's — the same quotation
+                    form the plant and workspace screens use. */}
+                <a
+                  href={`#/proforma/price/${sc.id}`}
+                  className="text-caption text-ink-soft hover:text-accent motion-colors mb-3 block"
+                >
+                  Priced by Proforma at{' '}
+                  <span className="font-num text-ink">{result ? fmt(result.msp, 1) : '—'}</span> USD
+                  kg⁻¹ →
+                </a>
 
                 <LinkButton to={`/simulate/${sc.id}`} variant="primary" className="justify-center">
                   Open scenario

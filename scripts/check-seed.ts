@@ -332,6 +332,36 @@ if (RUN_OUTPUTS.length === 0) {
   }
 }
 
+// ── 4a. the record bindings are reachable, and non-zero ────────────────
+//
+// `ScenarioAssumption` carries BOTH a top-level `recordId` and a
+// `basis: { kind: 'record', recordId }`. The first is the pre-discriminator
+// binding; the discriminator replaced it and the corpus populates only the
+// second. Five screens went on reading the first — `Simulate` printed "0 of 12
+// assumptions linked to corpus records" on fermOS's front door while the corpus
+// held six, and three link-finding sites silently never matched.
+//
+// The circuit `AssumptionBasis` exists to close is the architecture's central
+// one: a corrected record has to be able to reach an MSP. A gate that only
+// checked the binding RESOLVES would have passed throughout, because the
+// bindings were always fine — what was broken was every reader. So this asserts
+// the count is non-zero, which is the thing a screen can get wrong.
+for (const sc of SCENARIOS) {
+  const bound = sc.assumptions.filter((a) => a.basis.kind === 'record');
+  if (bound.length === 0)
+    fail(
+      `scenario ${sc.id}: no assumption binds to a record. Either the corpus lost its ` +
+        `bindings or something is reading the wrong field — the top-level \`recordId\` is ` +
+        `populated on nothing and is not the binding.`,
+    );
+  const stale = sc.assumptions.filter((a) => a.recordId).length;
+  if (stale > 0)
+    fail(
+      `scenario ${sc.id}: ${stale} assumption(s) carry a top-level recordId. That field is ` +
+        `superseded by \`basis.recordId\`; two bindings on one assumption can disagree.`,
+    );
+}
+
 // ── 4b. every plant's price declares the frame it is quoted in ─────────
 //
 // Proforma's charter is "techno-economics against an explicit regional and

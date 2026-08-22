@@ -2,35 +2,23 @@
 // assumption ticked, the waterfall always summing to the headline, and
 // simulation treated as work rather than magic.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart as RLineChart,
-  Line,
-  ReferenceDot,
-  Cell,
-  Legend,
-} from 'recharts';
 import { AlertTriangle, Copy, Download, Factory, GitCompare, Pin, PinOff, Table2, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { href, navigate } from '@/router';
 import type { CostLine } from '@/data/types';
-import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
+import { evaluateGrid } from '@/engine/grids';
 import { plantFails } from '@/lib/use-plant';
 import { fmt } from '@/engine/units';
 import { scaled } from '@/sim/latency';
 import { exportCSV } from '@/lib/csv';
-import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
-import { ChartTable } from '@/components/ChartTable';
+import { ArrowUpRight } from 'lucide-react';
+import { corpusBasis } from '@/lib/basis-corpus';
+import { BasisLine } from '@/components/Basis';
+import { ProcessConsequence } from '@/components/ProcessConsequence';
 import { partEyebrow } from '@/data/parts';
 
 /** Movement · part · pool, from the one table that names the parts. */
@@ -133,9 +121,6 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
     return () => window.removeEventListener('keydown', onKey);
   }, [scenario, activeDim, togglePin, setScenarioPoint]);
 
-  const theme = useChartTheme();
-  const seriesColor = useSeriesColor();
-  const tip = tooltipStyle(theme);
 
   if (!scenario || !grid) {
     return (
@@ -147,41 +132,12 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
     );
   }
 
+  const basis = corpusBasis(scenario.modelId);
   const primaryDim = scenario.dims[0];
   const secondaryDim = scenario.dims[1];
 
-  // Waterfall: a transparent base plus a visible delta per cost line, so the
-  // bars stack up to the headline. They sum exactly because evaluateGrid
-  // computes the total from these same interpolated lines.
-  const waterfall = useMemo(() => {
-    if (!result) return [];
-    let cum = 0;
-    const rows = COST_LINES.map((line) => {
-      const value = result.costLines[line];
-      const row = { name: COST_LINE_LABEL[line], base: cum, value, line };
-      cum += value;
-      return row;
-    });
-    return [...rows, { name: 'MSP', base: 0, value: cum, line: 'total' as const }];
-  }, [result]);
 
-  const sweep = useMemo(
-    () => (primaryDim ? mspSweep(grid, primaryDim.key, scenario.point, 48) : []),
-    [grid, primaryDim, scenario.point],
-  );
 
-  // Small multiples: the primary sweep repeated at each value of dim 2.
-  const smallMultiples = useMemo(() => {
-    if (!secondaryDim || !primaryDim) return [];
-    return secondaryDim.values.map((v) => ({
-      label: `${fmt(v)} ${secondaryDim.unit}`,
-      data: mspSweep(grid, primaryDim.key, { ...scenario.point, [secondaryDim.key]: v }, 24),
-    }));
-  }, [grid, primaryDim, secondaryDim, scenario.point]);
-
-  const tornado = [...grid.sensitivity]
-    .map((s) => ({ ...s, mag: Math.max(Math.abs(s.lowPct), Math.abs(s.hiPct)) }))
-    .sort((a, b) => b.mag - a.mag);
 
   const exportAll = () => {
     const headers = ['Section', 'Item', 'Value', 'Unit', 'Provenance', 'Record', 'Note'];
@@ -195,28 +151,24 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
         d.sourceRecordId ?? '',
         'Sweep dimension at its current point',
       ]),
+      // `a.basis.recordId`, not `a.recordId`. The top-level field is the
+      // pre-discriminator binding and is populated on ZERO assumptions in the
+      // corpus, so this column exported an empty string for every row that
+      // actually had a record behind it.
       ...scenario.assumptions.map((a) => [
         'Assumption',
         a.label,
         fmt(a.value),
         a.unit,
         a.provenance,
-        a.recordId ?? '',
+        a.basis.kind === 'record' ? a.basis.recordId : '',
         a.note,
       ]),
+      // The cost lines are Proforma's and are exported from its own screen.
+      // What leaves fermOS is the point, its assumptions, and the price that
+      // point is quoted at — named as a quotation, not as this part's result.
       ...(result
-        ? COST_LINES.map((l) => [
-            'Result',
-            COST_LINE_LABEL[l],
-            result.costLines[l].toFixed(2),
-            'USD kg⁻¹',
-            'demo',
-            '',
-            'Interpolated from the precomputed grid',
-          ])
-        : []),
-      ...(result
-        ? [['Result', 'Minimum selling price', result.msp.toFixed(2), 'USD kg⁻¹', 'demo', '', 'Modelled economics — no regional basis, no accuracy class']]
+        ? [['Quoted by Proforma', 'Minimum selling price', result.msp.toFixed(2), 'USD kg⁻¹', 'demo', '', 'Interpolated from the precomputed sweep — no regional basis, no accuracy class']]
         : []),
     ];
     exportCSV(`${scenario.id}-assumptions-results.csv`, headers, rows);
@@ -394,27 +346,39 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
               </div>
             </Card>
           ) : (
-            <>
-              <Card className="p-4">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <Tick p="demo">
+<>
+              {/* ── The seam ──────────────────────────────────────────────
+                  The price is Proforma's, quoted here the same way the plant
+                  screen quotes it. Moving a slider moves it, which is the whole
+                  argument — but this screen no longer decomposes it, ranks it or
+                  sweeps it. Those are economics and they are on Proforma. */}
+              <a
+                href={href(`/proforma/price/${scenario.id}`)}
+                className="card block p-4 motion-colors hover:border-accent/45 hover:bg-accent-wash/40"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                  <div>
                     <div className="text-caption uppercase tracking-wide text-ink-soft">
-                      Minimum selling price
+                      Priced by Proforma
                     </div>
                     <div
                       className={cx(
-                        'font-num text-display leading-none transition-opacity',
+                        'font-num text-page-title leading-none mt-0.5 transition-opacity',
                         converging !== null && 'opacity-40',
                       )}
                     >
                       {result ? fmt(result.msp, 1) : '—'}
-                      <span className="text-section-title text-ink-soft ml-1">USD kg⁻¹</span>
+                      <span className="text-body text-ink-soft ml-1.5">USD kg⁻¹</span>
                     </div>
-                    <div className="text-caption text-ink-soft mt-1">
-                      Demo model v0 — illustrative economics, not validated
-                    </div>
-                  </Tick>
-
+                    {basis && <BasisLine basis={basis} className="mt-1" />}
+                  </div>
+                  <div className="text-caption text-ink-soft max-w-prose flex items-start gap-1.5">
+                    <span>
+                      Interpolated off the sweep grid. The build-up, the tornado and the cash flow
+                      behind it are Proforma&rsquo;s.
+                    </span>
+                    <ArrowUpRight size={14} className="shrink-0 mt-[2px]" aria-hidden />
+                  </div>
                   {converging !== null && (
                     <div className="flex items-center gap-2 text-body text-signal-info">
                       <span className="inline-block w-3 h-3 rounded-full border-2 border-signal-info border-t-transparent animate-spin" />
@@ -442,201 +406,11 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                     </Callout>
                   </div>
                 )}
-              </Card>
+              </a>
 
-              {/* Waterfall */}
-              <Card className="p-4">
-                <h2 className="font-serif text-section-title font-semibold mb-1">Cost build-up</h2>
-                <p className="text-caption text-ink-soft mb-3">
-                  The six lines are computed together and sum to the headline exactly.
-                </p>
-                <div style={{ height: 260 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={waterfall} margin={{ top: 5, right: 8, bottom: 40, left: 4 }}>
-                      <CartesianGrid stroke={theme.grid} vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: theme.axis, fontSize: 11 }}
-                        angle={-28}
-                        textAnchor="end"
-                        interval={0}
-                        height={54}
-                      />
-                      <YAxis
-                        tick={{ fill: theme.axis, fontSize: 11 }}
-                        tickFormatter={(v) => `$${v}`}
-                        width={52}
-                      />
-                      <Tooltip
-                        {...tip}
-                        formatter={(v: number, name: string) =>
-                          name === 'value' ? [`${v.toFixed(2)} USD kg⁻¹`, 'Contribution'] : null
-                        }
-                      />
-                      <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
-                      <Bar dataKey="value" stackId="w" isAnimationActive={false} radius={[3, 3, 0, 0]}>
-                        {waterfall.map((row, i) => (
-                          <Cell
-                            key={row.name}
-                            fill={row.line === 'total' ? theme.accent : seriesColor(i)}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <ChartTable
-                  headers={['Cost line', 'USD kg⁻¹', 'Share']}
-                  rows={
-                    result
-                      ? COST_LINES.map((l) => [
-                          COST_LINE_LABEL[l],
-                          result.costLines[l].toFixed(2),
-                          `${((result.costLines[l] / result.msp) * 100).toFixed(1)}%`,
-                        ]).concat([['Minimum selling price', result.msp.toFixed(2), '100%']])
-                      : []
-                  }
-                />
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Tornado */}
-                <Card className="p-4">
-                  <h2 className="font-serif text-section-title font-semibold mb-1">
-                    Sensitivity{' '}
-                    <Explain label="How to read a tornado">
-                      Each bar takes one parameter to the bottom and the top of its modelled range,
-                      holds the rest at the reference point, and rebuilds the entire plant — new
-                      equipment sizes, new capital, a fresh cash flow — to see what the price does.
-                      Longer bars matter more. Asymmetric bars mean the risk is one-sided, which is
-                      usually more decision-relevant than the length. One-at-a-time analysis cannot
-                      see interactions; the rank correlation on the plant screen can.
-                    </Explain>
-                  </h2>
-                  <p className="text-caption text-ink-soft mb-3">
-                    Derived by re-solving the plant at each parameter’s bounds, evaluated at the
-                    model’s reference point — not at your current slider position. Drag a slider to
-                    a bound and the headline will agree with the bar.
-                  </p>
-                  <div style={{ height: 220 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={tornado}
-                        layout="vertical"
-                        margin={{ top: 4, right: 12, bottom: 4, left: 8 }}
-                      >
-                        <CartesianGrid stroke={theme.grid} horizontal={false} />
-                        <XAxis
-                          type="number"
-                          tick={{ fill: theme.axis, fontSize: 11 }}
-                          tickFormatter={(v) => `${v}%`}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="assumption"
-                          tick={{ fill: theme.axis, fontSize: 10 }}
-                          width={124}
-                        />
-                        <Tooltip {...tip} formatter={(v: number) => [`${v.toFixed(1)}%`, 'MSP change']} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="lowPct" name="at the lower bound" fill={seriesColor(0)} isAnimationActive={false} />
-                        <Bar dataKey="hiPct" name="at the upper bound" fill={seriesColor(1)} isAnimationActive={false} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartTable
-                    headers={['Parameter', 'At the lower bound', 'At the upper bound']}
-                    rows={tornado.map((t) => [
-                      t.assumption,
-                      `${t.lowPct.toFixed(1)}%`,
-                      `${t.hiPct.toFixed(1)}%`,
-                    ])}
-                  />
-                </Card>
-
-                {/* Sweep */}
-                <Card className="p-4">
-                  <h2 className="font-serif text-section-title font-semibold mb-1">
-                    MSP vs {primaryDim?.label}
-                  </h2>
-                  <p className="text-caption text-ink-soft mb-3">
-                    {secondaryDim
-                      ? `Small multiples hold ${primaryDim?.label.toLowerCase()} on the axis and step ${secondaryDim.label.toLowerCase()}.`
-                      : 'Current point marked.'}
-                  </p>
-                  <div style={{ height: 220 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RLineChart margin={{ top: 4, right: 10, bottom: 4, left: 0 }}>
-                        <CartesianGrid stroke={theme.grid} />
-                        <XAxis
-                          type="number"
-                          dataKey="x"
-                          domain={['dataMin', 'dataMax']}
-                          tick={{ fill: theme.axis, fontSize: 11 }}
-                          label={{
-                            value: `${primaryDim?.label} (${primaryDim?.unit})`,
-                            position: 'insideBottom',
-                            offset: -2,
-                            fill: theme.axis,
-                            fontSize: 10,
-                          }}
-                        />
-                        <YAxis
-                          tick={{ fill: theme.axis, fontSize: 11 }}
-                          tickFormatter={(v) => `$${v}`}
-                          width={50}
-                        />
-                        <Tooltip
-                          {...tip}
-                          formatter={(v: number) => [`${v.toFixed(1)} USD kg⁻¹`, 'MSP']}
-                          labelFormatter={(l) => `${fmt(Number(l))} ${primaryDim?.unit}`}
-                        />
-                        {smallMultiples.length > 0
-                          ? smallMultiples.map((sm, i) => (
-                              <Line
-                                key={sm.label}
-                                data={sm.data}
-                                dataKey="msp"
-                                name={sm.label}
-                                stroke={seriesColor(i)}
-                                strokeWidth={1.5}
-                                dot={false}
-                                isAnimationActive={false}
-                              />
-                            ))
-                          : (
-                            <Line
-                              data={sweep}
-                              dataKey="msp"
-                              stroke={seriesColor(0)}
-                              strokeWidth={2}
-                              dot={false}
-                              isAnimationActive={false}
-                            />
-                          )}
-                        {result && primaryDim && (
-                          <ReferenceDot
-                            x={scenario.point[primaryDim.key]}
-                            y={result.msp}
-                            r={5}
-                            fill={theme.accent}
-                            stroke={theme.surface}
-                            strokeWidth={2}
-                            isFront
-                          />
-                        )}
-                        <Legend wrapperStyle={{ fontSize: 10 }} />
-                      </RLineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartTable
-                    headers={[primaryDim?.label ?? 'x', 'MSP (USD kg⁻¹)']}
-                    rows={sweep
-                      .filter((_, i) => i % 6 === 0)
-                      .map((p) => [fmt(p.x), p.msp.toFixed(1)])}
-                  />
-                </Card>
-              </div>
+              {/* What the point actually builds — fermOS's own subject, and
+                  what this screen was missing while it held the economics. */}
+              <ProcessConsequence scenarioId={scenario.id} />
             </>
           )}
         </div>

@@ -723,7 +723,11 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     const out: ScenarioLink[] = [];
     for (const sc of scenarios) {
       const viaRecord =
-        sc.assumptions.find((a) => a.recordId && recordIds.has(a.recordId))?.recordId ??
+        // `a.basis.recordId` — see Organisms.tsx. This arm never matched, so a
+        // strain's scenario links have only ever come from sweep dimensions.
+        sc.assumptions
+          .map((a) => (a.basis.kind === 'record' ? a.basis.recordId : null))
+          .find((id): id is string => id !== null && recordIds.has(id)) ??
         sc.dims.find((d) => d.sourceRecordId && recordIds.has(d.sourceRecordId))?.sourceRecordId;
       if (viaRecord) {
         out.push({ sc, via: 'record', recordId: viaRecord });

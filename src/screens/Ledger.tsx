@@ -281,7 +281,15 @@ export function ParameterPage({ field }: { field: FieldId }) {
   );
   const usingScenarios = scenarios.filter(
     (s) =>
-      s.assumptions.some((a) => a.recordId && mine.some((r) => r.id === a.recordId)) ||
+      // `a.basis.recordId`. The top-level field is the pre-discriminator
+      // binding and no assumption in the corpus carries it, so a parameter page
+      // could never list a scenario that used one of its records through an
+      // assumption — only through a sweep dimension.
+      s.assumptions.some((a) => {
+        if (a.basis.kind !== 'record') return false;
+        const bound = a.basis.recordId;
+        return mine.some((r) => r.id === bound);
+      }) ||
       s.dims.some((d) => d.sourceRecordId && mine.some((r) => r.id === d.sourceRecordId)),
   );
 

@@ -274,7 +274,7 @@ async function main() {
     check('Start run enters Run Mode', false, 'start-run button not found');
   }
 
-  // ── 8. Simulate: slider moves MSP; waterfall agrees with headline ───
+  // ── 8. fermOS: a slider moves the price Proforma quotes ─────────────
   await go('/fermos/s/sc-s2');
   await page.waitForTimeout(800);
   // Matched on the unit rather than on a `$` sigil.
@@ -301,7 +301,14 @@ async function main() {
     `${mspBefore} → ${mspAfter} USD kg⁻¹`,
   );
 
-  // Waterfall lines must sum to the headline
+  // ── 8b. Proforma: the waterfall sums to the headline ────────────────
+  //
+  // This assertion followed its content. The cost build-up was on the scenario
+  // workspace, which made a process screen the place a reader checked that six
+  // cost lines add up to a price. It is on `/proforma/price/:id` now, beside the
+  // capital ladder and the cash flow it belongs with.
+  await go('/proforma/price/sc-s2');
+  await page.waitForTimeout(900);
   const sums = await page.evaluate(() => {
     const details = [...document.querySelectorAll('details')];
     for (const d of details) {
