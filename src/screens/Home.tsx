@@ -54,6 +54,7 @@ import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
 import { Bar, Card, EmptyState, PageHeader, SectionTitle, Skeleton, cx } from '@/components/ui';
 import { Tick, type ProvKind } from '@/components/Provenance';
+import { TraceSteps, type Trace } from '@/components/Trace';
 import { DemoPoolCard } from '@/components/demo/DemoPoolCard';
 import { DemoFooter } from '@/components/demo/DemoFooter';
 import { PartsMap } from '@/components/PartsMap';
@@ -79,61 +80,6 @@ function dominant(list: ProvKind[], fallback: ProvKind): ProvKind {
   for (const p of list) counts.set(p, (counts.get(p) ?? 0) + 1);
   const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   return ranked.length > 0 ? ranked[0][0] : fallback;
-}
-
-/**
- * One step of the Bench's worked example.
- *
- * The heading names the OBJECT — the source, the record, the check, the model —
- * and the owning part sits under it as a label rather than as the link text.
- * Naming the step after a part would be a lie of navigation: boxes 01 and 02
- * both resolve to the paper reader under Intake, so a box labelled "Ledger"
- * would light the Intake rail entry and teach the reader that the parts are
- * decoration.
- *
- * `dashed` is for the step that has not happened. It gets no tick, because
- * there is no datum to carry one, and it does NOT get `.held` — that class
- * means "in the record and out of the statistic", which is a different claim.
- */
-function TraceStep({
-  n,
-  what,
-  part,
-  to,
-  prov,
-  dashed,
-  children,
-}: {
-  n: string;
-  what: string;
-  part: string;
-  to: string;
-  prov?: ProvKind;
-  dashed?: boolean;
-  children: ReactNode;
-}) {
-  const body = (
-    <>
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-num text-caption text-ink-soft">{n}</span>
-        <span className="text-caption uppercase tracking-wide text-ink-soft">{what}</span>
-        <ArrowUpRight size={12} className="text-ink-soft shrink-0 ml-auto" aria-hidden />
-      </div>
-      <div className="text-caption text-ink-soft">{part}</div>
-      <div className="mt-1.5 text-body">{children}</div>
-    </>
-  );
-  return (
-    <a
-      href={href(to)}
-      className={cx(
-        'card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40',
-        dashed && 'border-dashed',
-      )}
-    >
-      {prov ? <Tick p={prov} className="h-full">{body}</Tick> : body}
-    </a>
-  );
 }
 
 /** A parameter's display name, or its id when the ontology has no entry. */
@@ -365,6 +311,121 @@ export default function Home() {
     [records, traceRecord],
   );
 
+  // The Bench's four steps, rendered by the same component the trace popover
+  // uses everywhere else, but with copy written to TEACH rather than to
+  // summarise. `corpusTrace()` in `lib/trace-corpus.ts` produces the generic
+  // version of this for the gesture; the front door gets to say more, and the
+  // shared renderer keeps the two from becoming different vocabularies for the
+  // same four ideas.
+  const benchTrace: Trace | null = useMemo(() => {
+    if (!tracePaper || !traceRecord) return null;
+    return {
+      id: traceRecord.id,
+      steps: [
+        {
+          label: 'The source',
+          part: 'Intake',
+          to: `/trawl/sources/${tracePaper.id}`,
+          headline: tracePaper.title,
+          body: (
+            <>
+              {tracePaper.authors.join(', ')} · <span className="italic">{tracePaper.venue}</span> ·{' '}
+              <span className="font-num">{tracePaper.year}</span>
+              {tracePaper.doi && <> · <span className="font-num">{tracePaper.doi}</span></>}
+              <div className="mt-1.5">
+                Catalogued, not ingested — no PDF has been fetched for any of the{' '}
+                <span className="font-num">{papers.length}</span> entries, so the next box quotes
+                the curator&rsquo;s note, not the paper.
+              </div>
+            </>
+          ),
+          prov: traceProv,
+        },
+        {
+          label: 'The record',
+          part: 'Ledger',
+          to: `/trawl/sources/${tracePaper.id}?span=${traceRecord.id}`,
+          headline: (
+            <>
+              {traceRecord.quote && (
+                <div className="border-l-2 border-line pl-2 italic leading-snug mb-1.5">
+                  &ldquo;{traceRecord.quote}&rdquo;
+                </div>
+              )}
+              <span className="font-num">
+                {traceRecord.value} {traceRecord.unit}
+              </span>
+            </>
+          ),
+          body: (
+            <>
+              {fieldName(traceRecord.field)} · <span className="font-num">{traceRecord.id}</span> ·
+              curated, unverified.
+              {traceRecord.range && (
+                <>
+                  {' '}The source states a range; the curator recorded the midpoint and kept{' '}
+                  <span className="font-num">
+                    {traceRecord.range.low}–{traceRecord.range.high}
+                  </span>{' '}
+                  on the record, so a reader can see which is which.
+                </>
+              )}
+              <div className="mt-1.5">
+                <span className="text-accent">
+                  <span className="font-num">{onSameField}</span> values sit on this parameter →
+                </span>
+              </div>
+            </>
+          ),
+          prov: traceProv,
+        },
+        {
+          label: 'The missing check',
+          part: 'Audit',
+          to: '/assay',
+          missing: true,
+          headline: (
+            <>
+              Nobody has checked this number against its source.{' '}
+              <span className="font-num">{status.verified}</span> of{' '}
+              <span className="font-num">{records.length}</span> records are verified, and no
+              extractor has ever been run — so there is no precision, recall or F1 to show either.
+            </>
+          ),
+          body: 'This box is the product.',
+        },
+        {
+          label: 'The model that uses it',
+          part: 'fermOS',
+          to: traceScenario ? `/fermos/s/${traceScenario.id}` : '/fermos',
+          headline: traceScenario ? (
+            <>
+              <span className="font-num">{traceScenario.id}</span> — {traceScenario.name}
+            </>
+          ) : (
+            'Nothing consumes it yet'
+          ),
+          body: traceScenario ? (
+            <>
+              {traceAssumption && (
+                <>
+                  cited as <span className="text-ink">{traceAssumption.label}</span> —{' '}
+                  <span className="font-num text-ink">
+                    {traceAssumption.value} {traceAssumption.unit}
+                  </span>
+                  <br />
+                </>
+              )}
+              Correct the record and this scenario is marked stale by propagation, not by anybody
+              remembering to.
+            </>
+          ) : undefined,
+          prov: traceProv,
+        },
+      ],
+    };
+  }, [tracePaper, traceRecord, traceScenario, traceAssumption, traceProv, onSameField, papers.length, records.length, status.verified]);
+
   const shownActivity = showAllActivity ? activity : activity.slice(0, 12);
 
   return (
@@ -419,121 +480,9 @@ export default function Home() {
             including the step in the middle that has not happened.
           </p>
 
-          {tracePaper && traceRecord ? (
+          {benchTrace ? (
             <TileBoundary label="Follow one number">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <TraceStep
-                n="01"
-                what="The source"
-                part="Intake"
-                to={`/trawl/sources/${tracePaper.id}`}
-                prov={traceProv}
-              >
-                <div className="font-num text-caption">{tracePaper.id}</div>
-                <div className="leading-snug">{tracePaper.title}</div>
-                <div className="text-caption text-ink-soft mt-1 break-words">
-                  {tracePaper.authors.join(', ')} · <span className="italic">{tracePaper.venue}</span>{' '}
-                  · <span className="font-num">{tracePaper.year}</span>
-                  {tracePaper.doi && <> · <span className="font-num">{tracePaper.doi}</span></>}
-                </div>
-                <div className="text-caption text-ink-soft mt-1.5">
-                  Catalogued, not ingested — no PDF has been fetched for any of the{' '}
-                  <span className="font-num">{papers.length}</span> entries, so the next box quotes
-                  the curator&rsquo;s note, not the paper.
-                </div>
-              </TraceStep>
-
-              <TraceStep
-                n="02"
-                what="The record"
-                part="Ledger"
-                to={`/trawl/sources/${tracePaper.id}?span=${traceRecord.id}`}
-                prov={traceProv}
-              >
-                {traceRecord.quote && (
-                  <div className="border-l-2 border-line pl-2 italic leading-snug">
-                    &ldquo;{traceRecord.quote}&rdquo;
-                  </div>
-                )}
-                <div className="font-num mt-1.5">
-                  {traceRecord.value} {traceRecord.unit}
-                </div>
-                <div className="text-caption text-ink-soft">
-                  {fieldName(traceRecord.field)}
-                </div>
-                <div className="text-caption text-ink-soft mt-1.5">
-                  <span className="font-num">{traceRecord.id}</span> · curated, unverified.
-                  {traceRecord.range && (
-                    <>
-                      {' '}The source states a range; the curator recorded the midpoint and kept{' '}
-                      <span className="font-num">
-                        {traceRecord.range.low}–{traceRecord.range.high}
-                      </span>{' '}
-                      on the record, so a reader can see which is which.
-                    </>
-                  )}
-                </div>
-                <a
-                  href={href(`/ledger/p/${traceRecord.field}`)}
-                  className="text-caption text-accent hover:underline mt-1.5 inline-block"
-                >
-                  <span className="font-num">{onSameField}</span> values sit on this parameter →
-                </a>
-              </TraceStep>
-
-              {/* No tick: there is no datum here to carry one. `.held` would be
-                  wrong too — that class means "in the record and out of the
-                  statistic", not "never happened". */}
-              <TraceStep
-                n="03"
-                what="The missing check"
-                part="Audit"
-                to="/assay"
-                dashed
-              >
-                <div className="font-num text-display leading-none text-ink-soft">—</div>
-                <div className="mt-1.5">
-                  Nobody has checked this number against its source.{' '}
-                  <span className="font-num">{status.verified}</span> of{' '}
-                  <span className="font-num">{records.length}</span> records are verified, and no
-                  extractor has ever been run — so there is no precision, recall or F1 to show
-                  either.
-                </div>
-                <div className="text-caption text-ink-soft mt-1.5">This box is the product.</div>
-              </TraceStep>
-
-              <TraceStep
-                n="04"
-                what="The model that uses it"
-                part="fermOS"
-                to={traceScenario ? `/fermos/s/${traceScenario.id}` : '/fermos'}
-                prov={traceProv}
-              >
-                {traceScenario ? (
-                  <>
-                    <div className="font-num text-caption">{traceScenario.id}</div>
-                    <div className="leading-snug">{traceScenario.name}</div>
-                    {traceAssumption && (
-                      <div className="text-caption text-ink-soft mt-1.5">
-                        cited as{' '}
-                        <span className="text-ink">{traceAssumption.label}</span> —{' '}
-                        <span className="font-num text-ink">
-                          {traceAssumption.value} {traceAssumption.unit}
-                        </span>
-                      </div>
-                    )}
-                    <div className="text-caption text-ink-soft mt-1.5">
-                      Correct the record and this scenario is marked stale by propagation, not by
-                      anybody remembering to.
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-caption text-ink-soft">
-                    Nothing in this session consumes it yet.
-                  </div>
-                )}
-              </TraceStep>
-            </div>
+              <TraceSteps trace={benchTrace} />
             </TileBoundary>
           ) : (
             <Card>

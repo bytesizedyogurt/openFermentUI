@@ -264,6 +264,36 @@ body {
   opacity: 0.5;
 }
 
+/* ── Motion (§6.7) ────────────────────────────────────────────────────
+   Three durations and two easings, and nothing hardcodes a duration again.
+
+   The build already had `prefers-reduced-motion`, a `reducedMotion` setting
+   and a `[data-reduced-motion]` attribute — a complete governor over two
+   keyframes and sixteen colour transitions. There was nothing to govern. The
+   rule for what may be added is narrow on purpose: an animation has to tell
+   the reader something they could not otherwise see. A tick drawing itself
+   says "this mark means something". A panel sliding for the sake of sliding
+   says nothing, and on an instrument it costs trust rather than buying it. */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  /* Decelerate: things arriving. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Symmetric: things moving between two states they both belong in. */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* The house hover transition. Replaces sixteen hand-written `transition-colors`
+   so a single token governs the whole surface. */
+.motion-colors {
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    text-decoration-color var(--motion-fast) var(--ease-out);
+}
+
 /* ── Focus ring (§6.6) ───────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid rgb(var(--accent));

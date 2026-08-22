@@ -70,6 +70,23 @@ export type HoldReason =
   | 'upper-reported-case' // best observed, not expected
   | 'unit-ambiguous';     // normalisation could not be closed
 
+/**
+ * Why a value is held out of the statistics.
+ *
+ * Data, not presentation: `lib/demo.ts` needs it to describe a held Accession,
+ * and `lib/demo.ts` runs under node in `check:demo-seed`. It used to live in
+ * `components/demo/DemoTick.tsx`, which meant reaching for it dragged React and
+ * lucide into the seed gate — `ReferenceError: window is not defined`.
+ */
+export const HOLD_LABEL: Record<HoldReason, string> = {
+  recitation: 'recites another study’s measurement',
+  'industry-estimate': 'vendor or market claim, not evidence',
+  'excursion-flagged': 'the run behind it deviated',
+  superseded: 'a correction replaced it',
+  'upper-reported-case': 'best observed, not expected',
+  'unit-ambiguous': 'normalisation could not be closed',
+};
+
 // ── Quantities ─────────────────────────────────────────────────────────
 
 export interface Quantity {

@@ -196,6 +196,74 @@ ck('Dense mode actually shortens the record table',
    `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
 await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 
+// The trace gesture (§the 2030 pass, workstream 1). Any provenance-bearing
+// value can unfold its own address in place. Two things must hold, and neither
+// is visible to a typecheck: the gesture must actually open, and its third step
+// — the check that has not happened — must be in it. A trace that quietly
+// dropped that step when it had nothing to show would turn the product's
+// central admission into a footnote, which is the failure this exists to
+// prevent.
+for (const [route, idRe, poolName] of [
+  ['/ledger/p/titer_intracellular', /Where r-[\w-]+ comes from/i, 'corpus record'],
+  ['/notary/disclosures', /Where OF-A-\d+ comes from/i, 'demo Accession'],
+]) {
+  // eslint-disable-next-line no-unused-vars
+  await go(route);
+  await p.waitForTimeout(500);
+  const trigger = p.locator('button[title*="press t to follow"]').first();
+  const n = await p.locator('button[title*="press t to follow"]').count();
+  if (!n) {
+    ck(`A ${poolName} offers the trace gesture`, false, `no trigger on ${route}`);
+    continue;
+  }
+  ck(`A ${poolName} offers the trace gesture`, true, `${n} on ${route}`);
+  // Keyboard, not click: the gesture has to work without a mouse.
+  await trigger.focus();
+  await p.keyboard.press('t');
+  await p.waitForTimeout(350);
+  // Scoped to the PANEL, not the body. Against the body these assertions
+  // passed even with the missing step deleted from the renderer — the words
+  // appear elsewhere on both screens. A gate that cannot fail is not a gate.
+  const panel = p.locator('[role="dialog"][aria-label^="Where "]');
+  const opened = (await panel.count()) > 0;
+  ck(`...and \`t\` opens the chain on a ${poolName}`, opened);
+  if (!opened) continue;
+  const inside = await panel.first().innerText();
+  ck(`...labelled with the id it traces (${poolName})`, idRe.test(await panel.first().getAttribute('aria-label') ?? ''));
+  // All four steps, by ORDINAL rather than by keyword. Keyword matching passed
+  // with the step deleted, because "Held" and "Standing" appear on both screens
+  // anyway; the ordinals only exist inside the chain.
+  const ordinals = ['01', '02', '03', '04'].filter((n) => inside.includes(n));
+  ck(
+    `...with all four steps (${poolName})`,
+    ordinals.length === 4,
+    `found ${ordinals.join(' ')} — ${inside.replace(/\s+/g, ' ').slice(0, 80)}`,
+  );
+  await p.keyboard.press('Escape');
+}
+
+// Nothing in this corpus is verified, so a corpus trace must ALWAYS carry the
+// missing-check step. This is the assertion the whole gesture exists for, and
+// it is stated separately from the four-step check because the two fail for
+// different reasons: one means the chain is broken, the other means the
+// product stopped admitting what it has not done.
+await go('/ledger/p/titer_intracellular');
+await p.waitForTimeout(500);
+{
+  const trig = p.locator('button[title*="press t to follow"]').first();
+  await trig.focus();
+  await p.keyboard.press('t');
+  await p.waitForTimeout(350);
+  const panel = p.locator('[role="dialog"][aria-label^="Where "]');
+  const inside = (await panel.count()) ? await panel.first().innerText() : '';
+  ck(
+    'An unverified corpus record admits nobody has checked it',
+    /THE MISSING CHECK/i.test(inside) && /Nobody has checked/i.test(inside),
+    inside.replace(/\s+/g, ' ').slice(0, 100),
+  );
+  await p.keyboard.press('Escape');
+}
+
 // The seed disclaimer must survive the error paths. `check:demo-seed` proves
 // the string says what it must; this proves a reader actually reaches it. Nine
 // demo screens used to early-return a bare EmptyState with no footer, so the

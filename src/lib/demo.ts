@@ -556,6 +556,115 @@ export function jurisdictionRollup(): {
 import { PATENT_FAMILIES as _PATENT_FAMILIES } from '@/data/demo/patents';
 
 // ══════════════════════════════════════════════════════════════════════
+// trace — an Accession's address
+// ══════════════════════════════════════════════════════════════════════
+//
+// The demo pool's half of the trace gesture. The corpus half lives in
+// `lib/trace-corpus.ts` and nothing imports both: a single dispatcher choosing
+// a resolver by id prefix would be the first module in the build holding an
+// ExtractionRecord and an Accession at once.
+//
+// THE THIRD STEP IS WHERE THE TWO POOLS DIFFER, and it should. A corpus record
+// admits that nobody has checked it. An Accession arrives with complete
+// provenance, so its third step carries the other admission this suite makes:
+// that some values are held out of the statistic, and that where two records
+// disagree the system declines to resolve them rather than averaging.
+
+/** The chain behind one Accession, or null when the id resolves to nothing. */
+export function accessionTrace(id: string): Trace | null {
+  const acc = _BY_ID[id];
+  if (!acc) return null;
+  const src = _SOURCE_BY_ID[acc.sourceId];
+  const field = _FIELD_BY_ID[acc.field];
+  const prov = acc.provenance as ProvKind;
+
+  const source: Trace['steps'][number] = src
+    ? {
+        label: 'The source',
+        part: 'Intake',
+        to: acc.patentFamilyId ? `/parchment/families#${acc.patentFamilyId}` : `/repo/a/${acc.id}`,
+        headline: src.title,
+        body: `${[src.authors.join(', '), src.venue, src.year].filter(Boolean).join(' · ')} · ${acc.locator}`,
+        prov,
+      }
+    : {
+        label: 'The source',
+        part: 'Intake',
+        headline: acc.sourceId,
+        body: 'Not in this pool.',
+        prov,
+      };
+
+  const reported = `${acc.reported.value} ${acc.reported.unit}`.trim();
+  const normalised = `${acc.normalized.value} ${acc.normalized.unit}`.trim();
+  const record: Trace['steps'][number] = {
+    label: 'The Accession',
+    part: 'BioRepo',
+    to: `/repo/a/${acc.id}`,
+    headline: normalised,
+    body:
+      reported === normalised
+        ? `${field?.name ?? acc.field} · ${acc.id}. Reported in the canonical unit; nothing was converted.`
+        : `${field?.name ?? acc.field} · ${acc.id}. Reported as ${reported} and normalised here, with both kept.`,
+    prov,
+  };
+
+  // The pool's own caveat, in the same slot the corpus uses for its own.
+  const conflicts = acc.conflictsWith ?? [];
+  const standing: Trace['steps'][number] = conflicts.length
+    ? {
+        label: 'Unresolved',
+        part: 'BioRepo',
+        to: `/repo/p/${acc.field}`,
+        missing: true,
+        headline: `Disagrees with ${conflicts.join(', ')}.`,
+        body: 'A curator linked the pair. This system shows both and does not average across them.',
+      }
+    : acc.hold
+      ? {
+          label: 'Held',
+          part: 'Audit',
+          to: `/repo/p/${acc.field}`,
+          missing: true,
+          headline: `Out of the statistic — ${_HOLD_LABEL[acc.hold]}.`,
+          body: 'In the record and excluded from any aggregate. Held, never hidden.',
+        }
+      : {
+          label: 'Standing',
+          part: 'Audit',
+          to: `/repo/p/${acc.field}`,
+          headline: 'Aggregatable',
+          body: 'Nothing holds this value out of the statistics on its parameter.',
+          prov,
+        };
+
+  const uses = _DELIVERABLES.filter((d) => d.accessionIds.includes(acc.id));
+  const use: Trace['steps'][number] = uses.length
+    ? {
+        label: 'What uses it',
+        part: 'Postdoc',
+        to: deliverableRoute(uses[0].id),
+        headline: uses.map((d) => d.id).join(' · '),
+        body: uses[0].title,
+        prov,
+      }
+    : {
+        label: 'What uses it',
+        part: 'Postdoc',
+        headline: 'No answer rests on it yet',
+        body: 'It is in the pool and no archetype has needed it.',
+        prov,
+      };
+
+  return { id: acc.id, steps: [source, record, standing, use] };
+}
+
+import type { Trace } from '@/components/Trace';
+import type { ProvKind } from '@/components/Provenance';
+import { SOURCE_BY_ID as _SOURCE_BY_ID, FIELD_BY_ID as _FIELD_BY_ID } from '@/data/demo/core';
+import { HOLD_LABEL as _HOLD_LABEL } from '@/data/demo/types';
+
+// ══════════════════════════════════════════════════════════════════════
 // routes
 // ══════════════════════════════════════════════════════════════════════
 //

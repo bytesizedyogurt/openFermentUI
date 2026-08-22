@@ -24,6 +24,8 @@ import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
 import { partEyebrow } from '@/data/parts';
 
+import { TraceAffordance } from '@/components/Trace';
+import { corpusTrace } from '@/lib/trace-corpus';
 /** Movement · part · pool, from the one table that names the parts. */
 const EYEBROW = partEyebrow('ledger', 'corpus');
 // ── shared helpers ─────────────────────────────────────────────────────
@@ -441,10 +443,18 @@ export function ParameterPage({ field }: { field: FieldId }) {
                 className={cx('card px-3 py-2', held && 'opacity-75')}
               >
                 <div className="grid gap-x-3 gap-y-1 items-baseline grid-cols-[7.5rem_5.5rem_1fr] sm:grid-cols-[8rem_6rem_7rem_1fr]">
-                  <span className="font-num tabular-nums">
-                    {String(r.value)}{' '}
-                    <span className="text-ink-soft text-caption">{r.unit}</span>
-                  </span>
+                  {/* The trace gesture. A reader comparing seven values on one
+                      parameter is exactly the reader who needs to ask where any
+                      one of them came from, and navigating away to find out is
+                      what loses the comparison. */}
+                  <TraceAffordance
+                    trace={corpusTrace(r.id, { records, papers, protocols, scenarios })}
+                  >
+                    <span className="font-num tabular-nums">
+                      {String(r.value)}{' '}
+                      <span className="text-ink-soft text-caption">{r.unit}</span>
+                    </span>
+                  </TraceAffordance>
 
                   <span className="text-caption">
                     {r.isPrimary ? (

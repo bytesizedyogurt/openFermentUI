@@ -21,7 +21,10 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-import type { Provenance, SourceType, HoldReason } from '@/data/demo/types';
+import { type Provenance, type SourceType, type HoldReason, HOLD_LABEL } from '@/data/demo/types';
+// Re-exported: it is a data map and lives in the type module now, but a
+// dozen call sites import it from here and the indirection costs nothing.
+export { HOLD_LABEL };
 import { cx } from '@/components/ui';
 
 /**
@@ -79,15 +82,6 @@ const SOURCE_LABEL: Record<SourceType, string> = {
   'trade-statistic': 'trade statistic',
   'vendor-datasheet': 'vendor datasheet',
   computed: 'computed',
-};
-
-export const HOLD_LABEL: Record<HoldReason, string> = {
-  recitation: 'recites another study’s measurement',
-  'industry-estimate': 'vendor or market claim, not evidence',
-  'excursion-flagged': 'the run behind it deviated',
-  superseded: 'a correction replaced it',
-  'upper-reported-case': 'best observed, not expected',
-  'unit-ambiguous': 'normalisation could not be closed',
 };
 
 export function demoTickClass(p: Provenance, st: SourceType): string {

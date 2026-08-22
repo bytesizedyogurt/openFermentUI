@@ -6,6 +6,7 @@ export const SHORTCUTS: { context: string; keys: { key: string; does: string }[]
       { key: '⌘K', does: 'Command palette' },
       { key: '/', does: 'Focus search' },
       { key: 'g then a rail key', does: 'Go to rail item — h t r d v o s f c a p y b n' },
+      { key: 't', does: 'Follow the focused number back to its source' },
       { key: '⇧D', does: 'Toggle density' },
       { key: '⇧T', does: 'Toggle theme' },
       { key: '?', does: 'This shortcut sheet' },

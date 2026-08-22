@@ -22,6 +22,9 @@ import { href } from '@/router';
 import { cx } from '@/components/ui';
 import { DemoTick } from './DemoTick';
 
+import { ArrowUpRight } from 'lucide-react';
+import { TraceAffordance } from '@/components/Trace';
+import { accessionTrace } from '@/lib/demo';
 const round = (v: number, d = 4) => {
   const r = +v.toFixed(d);
   return Object.is(r, -0) ? 0 : r;
@@ -128,14 +131,32 @@ export function AccessionValue({
     </DemoTick>
   );
 
-  if (!link) return <span className={className}>{titled}</span>;
+  // The trace gesture. A value that already declares its provenance should be
+  // able to SHOW it: hover, click, or focus and press `t`, and the Accession
+  // unfolds its source, its normalisation, whether anything holds it out of the
+  // statistics, and what rests on it — without leaving the screen.
+  //
+  // It wraps rather than replaces the link, because "open the Accession" and
+  // "tell me where this came from" are different questions and a reader
+  // following a number mid-sentence usually wants the second.
+  if (!link) {
+    return (
+      <span className={className}>
+        <TraceAffordance trace={accessionTrace(acc.id)}>{titled}</TraceAffordance>
+      </span>
+    );
+  }
   return (
-    <a
-      href={href(`/repo/a/${acc.id}`)}
-      className={cx('hover:text-accent', className)}
-      title={`${acc.id} — ${acc.derivation.note}`}
-    >
-      {titled}
-    </a>
+    <span className={cx('inline-flex items-baseline gap-1', className)}>
+      <TraceAffordance trace={accessionTrace(acc.id)}>{titled}</TraceAffordance>
+      <a
+        href={href(`/repo/a/${acc.id}`)}
+        className="text-caption text-ink-soft hover:text-accent shrink-0"
+        title={`Open ${acc.id} — ${acc.derivation.note}`}
+        aria-label={`Open Accession ${acc.id}`}
+      >
+        <ArrowUpRight size={11} aria-hidden />
+      </a>
+    </span>
   );
 }
