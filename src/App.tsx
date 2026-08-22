@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Home as HomeIcon,
+  Menu,
   MessagesSquare,
   Library as LibraryIcon,
   Table2,
@@ -136,6 +137,7 @@ function isActive(path: string, to: string) {
 // quantity with complete provenance, and they are not the same object.
 import { UpstreamNote } from '@/components/demo/UpstreamNote';
 import { partForPath, UPSTREAM_BY_PART } from '@/data/demo/upstream';
+import { PartsMap } from '@/components/PartsMap';
 import { RepoIndex, AccessionPage, ParameterPage as DemoParameterPage, ContradictionQueue } from '@/screens/demo/Repo';
 import { GapMap, FactorDetail, RunIndex, RunPage, EnvelopePage } from '@/screens/demo/Fermos';
 import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
@@ -443,7 +445,12 @@ export default function App() {
   const route = useRoute();
   useFragmentScroll(route.fragment);
   const announced = useRouteAnnouncement(route.path, route.fragment);
+  // Close the phone navigation whenever the route changes. Without this it
+  // stays open over the screen it just took you to — and the `onClick` on the
+  // sheet body only fires for clicks, not for the `g`-chord shortcuts.
+  useEffect(() => setNavOpen(false), [route.path]);
   const [gPressed, setGPressed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const lastFrame = useRef(performance.now());
 
   // Canonicalised routes reach Run Mode as /runbook/:id/run/:runId; gating on
@@ -542,6 +549,16 @@ export default function App() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* The phone's navigation. `PartsMap` is the component the Bench uses to
+          lay out the thirteen parts, reused rather than duplicated, so the map
+          a phone reader navigates by and the map the front door teaches from
+          cannot drift apart. */}
+      <Sheet open={navOpen} onClose={() => setNavOpen(false)} title="Go to" width={420}>
+        <div onClick={() => setNavOpen(false)}>
+          <PartsMap />
+        </div>
+      </Sheet>
+
       {/* First focusable thing on the page. A keyboard reader arriving at any
           of the 79 routes previously had to tab the whole rail before reaching
           the content, on every navigation.
@@ -702,10 +719,23 @@ export default function App() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top utility bar */}
           <header className="h-12 shrink-0 border-b border-line bg-surface-1 flex items-center gap-2 px-3">
+            {/* Below `md` the rail is `hidden md:flex`, and this was the only
+                control: a SEARCH icon labelled "Menu" that opened the command
+                palette. The label was a lie, and the thirteen parts were
+                reachable on a phone only by typing their names. Two controls
+                now, each doing what it says. */}
+            <button
+              className="md:hidden btn btn-sm"
+              onClick={() => setNavOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={navOpen}
+            >
+              <Menu size={14} />
+            </button>
             <button
               className="md:hidden btn btn-sm"
               onClick={() => setUI({ paletteOpen: true })}
-              aria-label="Menu"
+              aria-label="Search"
             >
               <Search size={14} />
             </button>

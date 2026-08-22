@@ -50,13 +50,18 @@ export function PartsMap({ className }: { className?: string }) {
                   <li key={part}>
                     <a
                       href={href(PART_ROUTE[part] ?? '/')}
-                      className="group flex items-baseline gap-1.5"
+                      className="group flex items-baseline gap-1.5 motion-colors"
+                      // Without this the accessible name runs together as
+                      // "Intakeg t", because the chord is a sibling span with
+                      // only a flex gap between them — a visual space is not a
+                      // textual one.
+                      aria-label={`${u.label} — shortcut g then ${PART_KEY[part]}`}
                     >
                       <span className="font-medium group-hover:text-accent">{u.label}</span>
                       {/* The chord, beside the name it reaches. The rail is
-                          `hidden md:flex`, so on a phone this is the only way
-                          the navigation is visible at all. */}
-                      <span className="font-num text-caption text-ink-soft shrink-0">
+                          `hidden md:flex`, so below that width this map is the
+                          navigation rather than a description of it. */}
+                      <span className="font-num text-caption text-ink-soft shrink-0" aria-hidden>
                         g {PART_KEY[part]}
                       </span>
                     </a>

@@ -196,6 +196,37 @@ ck('Dense mode actually shortens the record table',
    `row ${comfy.row}→${dense.row}px, table ${comfy.table}→${dense.table}px`);
 await p.keyboard.press('Shift+D'); await p.waitForTimeout(400);
 
+// MOBILE NAVIGATION. Below `md` the rail is `hidden md:flex`, and the only
+// control used to be a SEARCH icon labelled "Menu" that opened the command
+// palette — the label was a lie and the thirteen parts were reachable on a
+// phone only by typing their names.
+{
+  const phone = await b.newPage({ viewport: { width: 390, height: 844 } });
+  await phone.goto('http://localhost:4324/#/', { waitUntil: 'networkidle' });
+  await phone.waitForTimeout(700);
+  const nav = phone.locator('button[aria-label="Open navigation"]');
+  const hasNav = (await nav.count()) > 0;
+  ck('A phone has a navigation control', hasNav);
+  if (hasNav) {
+    await nav.click();
+    await phone.waitForTimeout(500);
+    const names = await phone.evaluate(() => {
+      const d = document.querySelector('[role="dialog"]');
+      return d ? [...d.querySelectorAll('a')].map((a) => a.getAttribute('aria-label') ?? a.textContent.trim()) : [];
+    });
+    ck('...reaching all thirteen parts', names.length === 13, `${names.length}: ${names.slice(0, 3).join(' / ')}`);
+    // A visual gap is not a textual one: without an explicit label the name
+    // reads "Intakeg t".
+    ck('...each with a legible accessible name', names.every((n) => /shortcut g then \w/.test(n)), names[0] ?? '');
+    await phone.locator('[role="dialog"] a').first().click();
+    await phone.waitForTimeout(700);
+    const closed = (await phone.locator('[role="dialog"]').count()) === 0;
+    const moved = await phone.evaluate(() => location.hash);
+    ck('...and tapping one navigates and closes the sheet', closed && moved !== '#/', `${moved} sheet=${closed ? 'closed' : 'OPEN'}`);
+  }
+  await phone.close();
+}
+
 // ROUTE-CHANGE ACCESSIBILITY. None of this existed: no skip link, no focus
 // management, no announcement. A keyboard reader tabbed the whole rail on every
 // navigation and a screen-reader user was told nothing had happened.
