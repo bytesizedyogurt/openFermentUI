@@ -61,6 +61,8 @@ import RunMode from '@/screens/RunMode';
 import Simulate from '@/screens/Simulate';
 import ScenarioWorkspace from '@/screens/ScenarioWorkspace';
 import Plant from '@/screens/Plant';
+import Price from '@/screens/Price';
+import Proforma from '@/screens/Proforma';
 import Compare from '@/screens/Compare';
 import Learn from '@/screens/Learn';
 import Lesson from '@/screens/Lesson';
@@ -141,7 +143,7 @@ import { PartsMap } from '@/components/PartsMap';
 import { RepoIndex, AccessionPage, ParameterPage as DemoParameterPage, ContradictionQueue } from '@/screens/demo/Repo';
 import { GapMap, FactorDetail, RunIndex, RunPage, EnvelopePage } from '@/screens/demo/Fermos';
 import { RouteComparison, RouteDetail } from '@/screens/demo/Geneos';
-import { ProformaIndex, CapacityScreen, CandidateDetail, FacilityConceptPage } from '@/screens/demo/Proforma';
+import { CapacityScreen, CandidateDetail, FacilityConceptPage } from '@/screens/demo/Proforma';
 import { ProblemTreePage } from '@/screens/demo/Postdoc';
 import { NotaryQueue } from '@/screens/demo/NotaryQueue';
 import { DemoPatents } from '@/screens/demo/Patents';
@@ -232,6 +234,7 @@ function pageWidth(segments: string[]): PageWidth {
       if (b === 'd') return 'default';
       return 'full';
     case 'proforma':
+      if (b === 'price' && c) return 'full';
       if (b === 'screen' && c && d === 'c') return 'default';
       if (b === 'screen' && c) return 'wide';
       if (b === 'concept') return 'wide';
@@ -306,10 +309,14 @@ function Screen() {
       if (b === 'contradictions') return <ContradictionQueue />;
       return <RepoIndex />;
     case 'proforma':
+      // The corpus half first, and `/proforma` itself is now the corpus index —
+      // Proforma's first screens of its own. The demo branches below are
+      // unchanged; two pools, two screen files, no screen serving both.
+      if (b === 'price' && c) return <Price scenarioId={c} />;
       if (b === 'screen' && c && d === 'c') return <CandidateDetail plantId={c} candidateId={segAt(canonical ?? route.segments, 4)} />;
       if (b === 'screen' && c) return <CapacityScreen plantId={c} />;
       if (b === 'concept' && c) return <FacilityConceptPage deliverableId={c} />;
-      return <ProformaIndex />;
+      return <Proforma />;
     case 'geneos':
       // `routes` before the strain branch: a strain id is a bare segment, so
       // `/geneos/routes/3-HP` would otherwise render a chassis page for a

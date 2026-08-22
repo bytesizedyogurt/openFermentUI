@@ -8,11 +8,12 @@
 // The point of this file is that a reviewer can change an input and watch the
 // output move. Anything that only ever renders a stored number is decoration.
 import type {
-  Accession, Plant, Candidate, EnvelopeMatchResult, PatentFamily, ClaimStatus,
+  Accession, Plant, Candidate, EnvelopeMatchResult, PatentFamily, ClaimStatus, FacilityConcept,
 } from '@/data/demo/types';
+import type { QuotationBasis } from '@/data/types';
 import {
   O2_SOLUBILITY, HEAT_PER_MOL_O2_KJ, KLA_CORRELATION, UNIT_TABLE, MOLAR_MASS,
-  CAPEX_SCALE_EXPONENT, CAPITAL_CHARGE, OPERATING_DAYS, DEMO_NOW,
+  CAPEX_SCALE_EXPONENT, CAPITAL_CHARGE, OPERATING_DAYS, DEMO_NOW, DEMO_FX_NOTE,
 } from '@/data/demo/core';
 
 // ══════════════════════════════════════════════════════════════════════
@@ -321,6 +322,87 @@ export function breakevenTonnesPerYear(capexUSD: number, refScale: number, opexP
 
 export function importDisplacementUSD(capacityTonnes: number, importVolumeTonnes: number, cifUSDPerTonne: number, landedCostUSDPerTonne: number): number {
   return Math.min(capacityTonnes, importVolumeTonnes) * (cifUSDPerTonne - landedCostUSDPerTonne);
+}
+
+/**
+ * The frame a demo-pool price is quoted in.
+ *
+ * Mirrors `corpusBasis` in `lib/basis-corpus.ts` — same `QuotationBasis`, same
+ * component renders it — and the two are deliberately not one function. Nothing
+ * imports both pools, and a resolver that dispatched on an id prefix would be
+ * the first module in the build to hold a `Scenario` and a `FacilityConcept` at
+ * once.
+ *
+ * ── THIS POOL HAS THE HALF THE CORPUS LACKS ───────────────────────────────
+ *
+ * The corpus plants have a rigorous flowsheet and no region. These concepts
+ * have the reverse: a sited plant with a jurisdiction, a stated AACE class, a
+ * fixed exchange rate and a frozen present — and a capital estimate that is
+ * six-tenths scaling rather than a solve. Each pool holds what the other is
+ * missing, which is exactly why the two bases render through one component: a
+ * reader who sees both learns what a complete one would look like.
+ *
+ * `discountRateKind: 'capital-charge'` is load-bearing. `CAPITAL_CHARGE = 0.12`
+ * is a flat charge on installed capital, NOT an internal rate of return solved
+ * against a cash flow the way the corpus pool's 10 % is. Quoting them as the
+ * same kind of number would invite a comparison neither supports.
+ */
+export function demoBasis(concept: FacilityConcept, plant?: Plant): QuotationBasis {
+  const band = concept.capexAccuracyClass.match(/([−-]?\d+)\s*\/\s*\+?(\d+)\s*%/);
+  return {
+    statedFor: concept.id,
+    currency: 'USD',
+    fx: {
+      pair: 'EUR/USD',
+      rate: 1.08,
+      note: DEMO_FX_NOTE,
+    },
+    costIndex: {
+      name: 'None applied',
+      value: 1,
+      note:
+        'These are bottom-up equipment estimates in present-day dollars, not correlations scaled ' +
+        'by a cost index. There is no published index behind them to scale from, and inventing ' +
+        'one would make the estimate look better travelled than it is.',
+    },
+    discountRate: CAPITAL_CHARGE,
+    discountRateKind: 'capital-charge',
+    incomeTax: undefined,
+    taxNote: 'No tax is modelled. This is a cash cost of production, not an after-tax price.',
+    operatingDays: OPERATING_DAYS,
+    region: plant
+      ? {
+          kind: 'declared',
+          jurisdiction: plant.location.jurisdiction,
+          locality: `${plant.location.city}, ${plant.location.country}`,
+          source: `Sited at ${plant.name}. Feedstock costs are delivered to that gate.`,
+        }
+      : {
+          kind: 'declared',
+          jurisdiction: 'RW',
+          locality: 'Kigali, Rwanda',
+          source:
+            'The demo suite is sited in Rwanda throughout — feedstock haulage distances, grid ' +
+            'reliability and the patent positions are all stated for that jurisdiction.',
+        },
+    accuracy: band
+      ? {
+          kind: 'class',
+          label: concept.capexAccuracyClass,
+          lowPct: Number(band[1].replace('−', '-')),
+          highPct: Number(band[2]),
+        }
+      : {
+          kind: 'unstated',
+          why: `The stated class "${concept.capexAccuracyClass}" could not be parsed into a band.`,
+        },
+    excludes: [
+      'No detailed engineering — equipment is sized from throughput, not from a P&ID.',
+      'No working capital, no financing cost and no tax: this is a cash cost, not a solved price.',
+      'No escalation to a construction year. Present-day dollars, undated.',
+      'Every identifier, price and patent number in this pool is synthetic.',
+    ] as [string, ...string[]],
+  };
 }
 
 // ══════════════════════════════════════════════════════════════════════

@@ -27,6 +27,7 @@ import { ONTOLOGY } from '../src/data/source';
 import { ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
+import { corpusBasis } from '@/lib/basis-corpus';
 
 const errors: string[] = [];
 const warnings: string[] = [];
@@ -329,6 +330,35 @@ if (RUN_OUTPUTS.length === 0) {
     for (const fp of run.falsePositives)
       if (!paperIds.has(fp.paperId)) fail(`run ${run.run}: false positive ${fp.id} paperId unresolved`);
   }
+}
+
+// ── 4b. every plant's price declares the frame it is quoted in ─────────
+//
+// Proforma's charter is "techno-economics against an explicit regional and
+// temporal basis". A basis that resolves but says nothing is the failure mode
+// that charter names, so `excludes` is checked for content and both declared
+// gaps are checked for a reason. The region is EXPECTED to be undeclared here —
+// the β-casein corpus says nothing about where a plant would be sited, and
+// inventing one would be fabrication — but an undeclared region with no `why`
+// would be a null wearing a sentinel's clothes.
+for (const m of COST_MODELS) {
+  const basis = corpusBasis(m.modelId);
+  if (!basis) {
+    fail(`model ${m.modelId}: no quotation basis resolves — a price with no basis is a number`);
+    continue;
+  }
+  if (basis.excludes.length === 0)
+    fail(`model ${m.modelId}: basis excludes nothing. Every estimate excludes something.`);
+  for (const e of basis.excludes)
+    if (e.trim().length < 20) fail(`model ${m.modelId}: exclusion "${e}" says too little to act on`);
+  if (basis.region.kind === 'undeclared' && basis.region.why.trim().length < 20)
+    fail(`model ${m.modelId}: region is undeclared with no reason — that is a null, not a sentinel`);
+  if (basis.accuracy.kind === 'unstated' && basis.accuracy.why.trim().length < 20)
+    fail(`model ${m.modelId}: accuracy is unstated with no reason`);
+  if (basis.costIndex.value <= 0)
+    fail(`model ${m.modelId}: cost index value ${basis.costIndex.value} is not positive`);
+  if (basis.discountRate === undefined)
+    fail(`model ${m.modelId}: no discount rate on the basis — the MSP is solved against one`);
 }
 
 // ── 5. grid dims ascending; grids finite and positive ──────────────────

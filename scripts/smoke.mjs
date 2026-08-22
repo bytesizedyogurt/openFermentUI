@@ -104,6 +104,11 @@ const ROUTES = [
   ['/fermos/d', 'Design index'],
   ['/fermos/d/sc-s1-d01', 'Design detail (cascade)'],
   ['/fermos/compare', 'Compare'],
+  // Proforma's corpus half — the price, its capital and its cash flow. New in
+  // the pass that gave each part the subject its charter names.
+  ['/proforma/price/sc-s1', 'Proforma — the price behind S1'],
+  ['/proforma/price/sc-s2', 'Proforma — the price behind S2'],
+  ['/proforma/price/sc-s3', 'Proforma — the price behind S3'],
   ['/parchment', 'Parchment'],
   ['/parchment/families', 'Parchment — demo patent families'],
   ['/parchment/families#PF-003', 'A PF- chip resolves to its family'],

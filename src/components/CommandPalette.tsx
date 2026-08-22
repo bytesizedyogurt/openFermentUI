@@ -10,6 +10,8 @@ import {
   FlaskConical,
   ClipboardList,
   LineChart,
+  Calculator,
+  Factory,
   GraduationCap,
   Scale,
   Settings as SettingsIcon,
@@ -83,6 +85,8 @@ export function CommandPalette() {
       { id: 'n-pro', group: 'Navigate', label: 'Runbook — protocols', icon: ClipboardList, run: () => navigate('/runbook') },
       { id: 'n-sim', group: 'Navigate', label: 'fermOS — scenarios (simulate)', icon: LineChart, run: () => navigate('/fermos') },
       { id: 'n-cmp', group: 'Navigate', label: 'Compare scenarios', icon: LineChart, run: () => navigate('/fermos/compare') },
+      { id: 'n-prf', group: 'Navigate', label: 'Proforma — the plants, priced', icon: Calculator, run: () => navigate('/proforma') },
+      { id: 'n-dsg', group: 'Navigate', label: 'fermOS — designs (the tier cascade)', icon: LineChart, run: () => navigate('/fermos/d') },
       { id: 'n-par', group: 'Navigate', label: 'Parchment — catalogued patents', icon: Scale, run: () => navigate('/parchment') },
       { id: 'n-not', group: 'Navigate', label: 'Notary — enablement check', icon: ClipboardList, run: () => navigate('/notary') },
       { id: 'n-lab', group: 'Navigate', label: 'Guild — deposits (openLab)', icon: FlaskConical, run: () => navigate('/openlab') },
@@ -90,7 +94,7 @@ export function CommandPalette() {
       // ── The demo suite. Same rail, second pool, labelled as such. ──────
       { id: 'n-repo', group: 'Navigate', label: 'BioRepo — Accessions (demo suite)', icon: Table2, run: () => navigate('/repo') },
       { id: 'n-repcx', group: 'Navigate', label: 'BioRepo — contradictions (demo suite)', icon: Table2, run: () => navigate('/repo/contradictions') },
-      { id: 'n-prf', group: 'Navigate', label: 'Proforma — capacity and concepts (demo suite)', icon: LineChart, run: () => navigate('/proforma') },
+      { id: 'n-cap', group: 'Navigate', label: 'Proforma — capacity screen (demo suite)', icon: LineChart, run: () => navigate('/proforma/screen/PLT-KGL-01') },
       { id: 'n-runs', group: 'Navigate', label: 'fermOS — runs (demo suite)', icon: LineChart, run: () => navigate('/fermos/runs') },
       { id: 'n-fams', group: 'Navigate', label: 'Parchment — patent families (demo suite)', icon: Scale, run: () => navigate('/parchment/families') },
       { id: 'n-disc', group: 'Navigate', label: 'Notary — disclosure queue (demo suite)', icon: ClipboardList, run: () => navigate('/notary/disclosures') },
@@ -155,8 +159,8 @@ export function CommandPalette() {
       {
         id: 'n-plant',
         group: 'Navigate',
-        label: 'Plant — the flowsheet and cash flow behind a price',
-        icon: LineChart,
+        label: 'Plant — the flowsheet behind a price (fermOS)',
+        icon: Factory,
         run: () => navigate('/fermos/s/sc-s2/plant'),
       },
       {

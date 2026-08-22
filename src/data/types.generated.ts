@@ -334,6 +334,8 @@ export type FieldId2 =
  * GENERATED from the Pydantic models in packages/core/openferment_core/schema. Do not edit. Edit the models and re-run `pnpm gen:types`.
  */
 export interface GeneratedSchemaIndex {
+  AccuracyStated?: AccuracyStated;
+  AccuracyUnstated?: AccuracyUnstated;
   ActivityEvent?: ActivityEvent;
   Aggregate?: Aggregate;
   AggregateStratum?: AggregateStratum;
@@ -365,6 +367,7 @@ export interface GeneratedSchemaIndex {
   ContradictionStatus?: ContradictionStatus;
   CorpusThread?: CorpusThread;
   CorrectedValue?: CorrectedValue;
+  CostIndex?: CostIndex;
   CostLine?: CostLine;
   CoverageDispute?: CoverageDispute;
   CuratorNote?: CuratorNote;
@@ -383,6 +386,7 @@ export interface GeneratedSchemaIndex {
   ExtractorRun?: ExtractorRun1;
   FalsePositive?: FalsePositive;
   FieldId?: FieldId;
+  FxTreatment?: FxTreatment;
   GoldValue?: GoldValue;
   GridPointResult?: GridPointResult;
   IngestStage?: IngestStage;
@@ -413,9 +417,12 @@ export interface GeneratedSchemaIndex {
   ProtocolVersion?: ProtocolVersion;
   Provenance?: Provenance;
   PublicationStatus?: PublicationStatus;
+  QuotationBasis?: QuotationBasis;
   RecordStatus?: RecordStatus;
   RefereeStatus?: RefereeStatus;
   RefuseConversion?: RefuseConversion;
+  RegionDeclared?: RegionDeclared;
+  RegionUndeclared?: RegionUndeclared;
   ResultField?: ResultField;
   RunOutcome?: RunOutcome;
   RunOutcomeKind?: RunOutcomeKind;
@@ -445,6 +452,28 @@ export interface GeneratedSchemaIndex {
   UncheckedStatus?: UncheckedStatus;
   UserMessage?: UserMessage;
   ValueRange?: ValueRange1;
+}
+/**
+ * An estimate that declares how wrong it may be.
+ *
+ * AACE Class 5 carries −30/+50 %. A crisp line drawn without that band is a
+ * promise the number cannot keep.
+ */
+export interface AccuracyStated {
+  highPct: number;
+  kind: 'class';
+  /**
+   * e.g. 'AACE Class 5 (−30 / +50 %)'.
+   */
+  label: string;
+  lowPct: number;
+}
+/**
+ * No class has been assigned, and that is said rather than left to be assumed.
+ */
+export interface AccuracyUnstated {
+  kind: 'unstated';
+  why: string;
 }
 export interface ActivityEvent {
   at: string;
@@ -806,6 +835,33 @@ export interface CorrectedValue {
   value: number;
 }
 /**
+ * The index a capital estimate is scaled to.
+ *
+ * A correlation fitted against 2007 quotations returns 2007 dollars. Dropping
+ * the ratio is not a rounding error, it is a different answer, and it is the
+ * easiest way to make a capital estimate look cheap without lying about
+ * anything a reviewer can see.
+ */
+export interface CostIndex {
+  /**
+   * The years the index table actually spans. Stated because a project priced outside that span is being indexed by extrapolation, and the gap is a fact about the estimate rather than a bug to paper over.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  covers?: [number, number];
+  /**
+   * e.g. 'CEPCI' — the index, not the value.
+   */
+  name: string;
+  note?: string;
+  value: number;
+  /**
+   * The year the index value is taken from. None means the value was set directly rather than chosen from a year, which is a legitimate thing to do and a thing a reader is entitled to be told.
+   */
+  year?: number;
+}
+/**
  * A reader filed "something's missing" against a source (OF-FE-003 §8.4).
  *
  * Inline in the TypeScript; named here because Pydantic has no anonymous
@@ -1080,6 +1136,24 @@ export interface FalsePositive {
   id: string;
   note: string;
   paperId: string;
+}
+/**
+ * How a conversion between currencies was performed, when one was.
+ *
+ * A floating rate makes two identical quantities disagree by the date they
+ * were viewed. Whatever is done here, it is stated.
+ */
+export interface FxTreatment {
+  /**
+   * ISO date, or None when the rate is fixed by convention rather than dated.
+   */
+  asOf?: string;
+  note?: string;
+  /**
+   * e.g. 'EUR/USD'.
+   */
+  pair: string;
+  rate: number;
 }
 export interface GridPointResult {
   costLines: {
@@ -1404,6 +1478,88 @@ export interface Step {
   text: string;
   timerLabel?: string;
   timerSec?: number;
+}
+/**
+ * Everything a price has to declare before it means anything.
+ *
+ * `excludes` is the field the whole model exists for. A basis that lists what
+ * it covers is marketing; one that lists what it does not is an estimate.
+ */
+export interface QuotationBasis {
+  accuracy: AccuracyStated | AccuracyUnstated;
+  costIndex: CostIndex;
+  currency?: string;
+  discountRate?: number;
+  /**
+   * An internal rate of return solved against a full cash flow and a flat capital charge applied to installed cost are different claims, and a reader comparing two numbers has to know which they are looking at.
+   */
+  discountRateKind?: 'IRR' | 'capital-charge';
+  /**
+   * What is explicitly NOT in this price, in a reader's words. Required and non-empty: every estimate excludes something, and an empty list means nobody has looked rather than that nothing is missing.
+   *
+   * @minItems 1
+   */
+  excludes: [string, ...string[]];
+  fx?: FxTreatment1;
+  incomeTax?: number;
+  operatingDays?: number;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  projectLife?: [number, number];
+  region: RegionDeclared | RegionUndeclared;
+  /**
+   * The model, plant or concept this frames. A basis has an address too.
+   */
+  statedFor: string;
+  taxNote?: string;
+}
+/**
+ * None means no conversion was performed.
+ */
+export interface FxTreatment1 {
+  /**
+   * ISO date, or None when the rate is fixed by convention rather than dated.
+   */
+  asOf?: string;
+  note?: string;
+  /**
+   * e.g. 'EUR/USD'.
+   */
+  pair: string;
+  rate: number;
+}
+/**
+ * A stated place, with whatever adjustment that place implies.
+ */
+export interface RegionDeclared {
+  /**
+   * ISO country or jurisdiction code, e.g. 'RW', 'US'.
+   */
+  jurisdiction: string;
+  kind: 'declared';
+  locality?: string;
+  /**
+   * Multiplier applied to installed capital for this location. None means no factor was applied, which is different from a factor of 1.0 — one is a decision not to adjust, the other is a claim that no adjustment is due.
+   */
+  locationFactor?: number;
+  /**
+   * What established the factor, or how the place was chosen.
+   */
+  source: string;
+}
+/**
+ * No place has been stated, and the reason is carried rather than implied.
+ *
+ * NOT A DEFECT, unlike `BasisUnsourced`. A corpus of β-casein literature says
+ * nothing about where a plant would be built, so naming a region would be
+ * fabrication. This is the same move as `year: 0` and the venue sentinel: the
+ * gap is shown rather than guessed.
+ */
+export interface RegionUndeclared {
+  kind: 'undeclared';
+  why: string;
 }
 /**
  * A failed run is a first-class outcome, not an error.

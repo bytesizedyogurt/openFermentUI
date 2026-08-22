@@ -436,7 +436,8 @@ let overflow = [];
 // casein screen, and the demo suite's tables and chip rows are the widest
 // things in the build.
 for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/trawl/ingest', '/',
-                 '/repo', '/proforma/screen/PLT-KGL-01', '/parchment/families', '/notary/disclosures']) {
+                 '/repo', '/proforma/screen/PLT-KGL-01', '/proforma/price/sc-s2', '/parchment/families',
+                 '/notary/disclosures']) {
   await narrow.goto('http://localhost:4324/#' + r, { waitUntil: 'networkidle' });
   await narrow.waitForTimeout(400);
   const over = await narrow.evaluate(() => {
@@ -448,37 +449,64 @@ for (const r of ['/ledger/records', '/fermos/s/sc-s1', '/runbook/PR-PHOS-01', '/
 await narrow.close();
 ck('No page-level horizontal overflow at 420px', overflow.length === 0, overflow.join(', '));
 
-// fermOS is a plant now, not a cost curve. The checks below are the ones that
-// would have caught the old model pretending to be one: an equipment list, a
-// cash flow that reaches zero at the quoted price, and the split between
-// bioSTEAM's correlations and ours stated rather than blended.
+// fermOS owns the plant; Proforma owns the price. These checks walk both
+// halves and, between them, the seam: an equipment list and a mass balance on
+// one screen, a capital ladder and a cash flow that reaches zero at the quoted
+// price on the other, and the split between bioSTEAM's correlations and ours
+// stated rather than blended.
 await go('/fermos/s/sc-s2/plant');
 const plant = await p.locator('#of-main').innerText();
 ck('The plant view lists sized equipment', /Bioreactor/i.test(plant) && /Centrifuge/i.test(plant));
-ck('...with a capital ladder that names each step',
-   /Direct permanent investment/i.test(plant) && /Total capital investment/i.test(plant));
-ck('...and a discounted cash flow', /Cumulative NPV/i.test(plant) && /Discount factor/i.test(plant));
-ck('MSP is stated as solved at NPV = 0, not summed', /NPV\s*=\s*0/i.test(plant));
 ck('ThermoSTEAM is declared as not ported', /ThermoSTEAM is not ported/i.test(plant));
-const equipRows = await p.locator('#of-main table[data-table="equipment"] tbody tr').count();
-const cashRows = await p.locator('#of-main table[data-table="cashflow"] tbody tr').count();
-ck('The equipment and cash-flow tables have rows', equipRows > 5 && cashRows > 10,
-   equipRows + ' units, ' + cashRows + ' years');
+ck('MSP is stated as solved at NPV = 0, not summed', /NPV\s*=\s*0/i.test(plant));
+// The seam: fermOS quotes Proforma's price rather than computing one, and says so.
+ck('The plant names Proforma as the part that priced it',
+   /Priced by Proforma/i.test(plant));
+ck('...and links to where the price is argued',
+   (await p.locator('#of-main a[href$="/proforma/price/sc-s2"]').count()) > 0);
+// The economics is NOT here any more. A capital ladder on the process screen
+// would mean the split had been announced and not performed.
+ck('The plant screen no longer holds the capital ladder',
+   !/Direct permanent investment/i.test(plant) && !/Cumulative NPV/i.test(plant));
 
-// A design result behind a purchase cost, one click away.
+const equipRows = await p.locator('#of-main table[data-table="equipment"] tbody tr').count();
+ck('The equipment table has rows', equipRows > 5, equipRows + ' units');
+
+// A design result behind a unit, one click away.
 const firstUnit = p.locator('#of-main table[data-table="equipment"] tbody tr').first();
 await firstUnit.click(); await p.waitForTimeout(400);
 ck('A unit opens to its design results', /Design results/i.test(await p.locator('#of-main').innerText()));
 
+// ── Proforma's corpus half ───────────────────────────────────────────────
+await go('/proforma/price/sc-s2');
+const price = await p.locator('#of-main').innerText();
+ck('Proforma has a corpus surface at all', /β-casein corpus/i.test(price));
+ck('...with a capital ladder that names each step',
+   /Direct permanent investment/i.test(price) && /Total capital investment/i.test(price));
+ck('...and a discounted cash flow', /Cumulative NPV/i.test(price) && /Discount factor/i.test(price));
+ck('...solved at NPV = 0, not summed', /NPV\s*=\s*0/i.test(price));
+const cashRows = await p.locator('#of-main table[data-table="cashflow"] tbody tr').count();
+ck('The cash-flow table has rows', cashRows > 10, cashRows + ' years');
+const costRows = await p.locator('#of-main table[data-table="equipment-cost"] tbody tr').count();
+ck('The same equipment appears again, costed', costRows > 5, costRows + ' units');
+
 // The authored-versus-bioSTEAM split has to be visible on the algal route,
-// where it is the whole caveat.
+// where it is the whole caveat. Capital is Proforma's, so the callout is too —
+// but fermOS still has to say the photobioreactor is unmodelled.
+await go('/proforma/price/sc-s1');
+const s1price = await p.locator('#of-main').innerText();
+ck('The algal price declares how much capital is an authored correlation',
+   /authored/i.test(s1price) && /photobioreactor/i.test(s1price));
+
 await go('/fermos/s/sc-s1/plant');
 const s1 = await p.locator('#of-main').innerText();
-ck('The algal plant declares how much capital is an authored correlation',
+ck('...and the algal plant still states what it does not model',
    /authored/i.test(s1) && /photobioreactor/i.test(s1));
 
 // Uncertainty is work, not decoration: nothing runs until it is asked for.
-ck('Monte Carlo does not run on arrival', /No Monte Carlo has been run/i.test(s1));
+await go('/proforma/price/sc-s1');
+const s1u = await p.locator('#of-main').innerText();
+ck('Monte Carlo does not run on arrival', /No Monte Carlo has been run/i.test(s1u));
 const mc = p.locator('button', { hasText: /Run the samples|Run 200 samples/ }).first();
 if (await mc.count()) {
   await mc.click();
@@ -497,32 +525,63 @@ ck('The plant renders a flowsheet diagram', (await p.locator('#of-main svg[role=
 ck('...with a stream table beside it', /Source/.test(wb) && /Composition/i.test(wb));
 ck('The powder’s purity is stated, not just its price', /purity/i.test(wb));
 
-const unitNode = p.locator('#of-main svg [role="button"], #of-main svg button').first();
-if (await unitNode.count()) {
-  await unitNode.click();
+const unitNodes = p.locator('#of-main svg [role="button"], #of-main svg button');
+if (await unitNodes.count()) {
+  await unitNodes.first().click();
   await p.waitForTimeout(600);
   const opened = await p.locator('#of-main').innerText();
   ck('Clicking a unit in the diagram opens its bioSTEAM attributes',
      /tau|V_wf|vessel_material|heat_exchanger_type|split/.test(opened));
 } else ck('Clicking a unit in the diagram opens its bioSTEAM attributes', false, 'no clickable unit node');
 
-// The decisive one: an edited attribute has to move the number.
+// THE DECISIVE ONE: an edited equipment attribute has to move Proforma's price,
+// on fermOS's screen, without a navigation.
+//
+// This used to read `#of-main select` and take the first hit. That was not
+// testing what its name said: the plant screen also carried the financial
+// settings panel, whose CEPCI dropdown sits in the DOM whether or not a unit is
+// selected, so the check passed by changing the COST INDEX — a basis change,
+// not an equipment change. Splitting the screens moved the settings panel to
+// Proforma and the assertion went red, which is how the substitution surfaced.
+//
+// Now it walks the diagram until it finds a unit that actually exposes an enum
+// attribute (vessel_material, centrifuge_type, heat_exchanger_type), and edits
+// that. Not every unit has one, and depending on which node the layout happens
+// to place first is what made this fragile in the first place.
 const before = await p.locator('#of-main').innerText();
 const mspBefore = (before.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
-const sel = p.locator('#of-main select').first();
-if (await sel.count()) {
+let sel = null;
+const nodeCount = await unitNodes.count();
+for (let i = 0; i < nodeCount; i += 1) {
+  await unitNodes.nth(i).click();
+  await p.waitForTimeout(350);
+  const candidate = p.locator('#of-main select').first();
+  if ((await candidate.count()) && (await candidate.locator('option').count()) > 1) {
+    sel = candidate;
+    break;
+  }
+}
+if (sel) {
   const opts = await sel.locator('option').allTextContents();
-  if (opts.length > 1) {
-    await sel.selectOption({ index: opts.length - 1 });
-    await p.waitForTimeout(1200);
-    const after = await p.locator('#of-main').innerText();
-    const mspAfter = (after.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
-    ck('Editing a bioSTEAM attribute re-solves the plant', !!mspBefore && mspBefore !== mspAfter,
-       `${mspBefore} -> ${mspAfter}`);
-    ck('...and the screen says the plant no longer matches the scenario',
-       /modified|edited|no longer matches/i.test(after));
-  } else ck('Editing a bioSTEAM attribute re-solves the plant', false, 'select had one option');
-} else ck('Editing a bioSTEAM attribute re-solves the plant', false, 'no select control found');
+  await sel.selectOption({ index: opts.length - 1 });
+  await p.waitForTimeout(1200);
+  const after = await p.locator('#of-main').innerText();
+  const mspAfter = (after.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
+  ck('Editing a bioSTEAM attribute moves the price fermOS quotes from Proforma',
+     !!mspBefore && mspBefore !== mspAfter, `${mspBefore} -> ${mspAfter}`);
+  ck('...and the screen says the plant no longer matches the scenario',
+     /modified|edited|no longer matches/i.test(after));
+  // And the same edit has to be there when Proforma is asked directly — one
+  // solve, two screens. Two copies of the overrides would show up exactly here.
+  await go('/proforma/price/sc-s2');
+  const priced = await p.locator('#of-main').innerText();
+  const mspOnProforma = (priced.match(/([\d,]+\.?\d*)\s*USD\s*kg/) || [])[1];
+  ck('...and Proforma quotes that same edited price, not the declared one',
+     mspOnProforma === mspAfter, `fermOS ${mspAfter} vs Proforma ${mspOnProforma}`);
+} else {
+  ck('Editing a bioSTEAM attribute moves the price fermOS quotes from Proforma', false,
+     'no unit in the diagram exposed an enum attribute');
+}
 
 // The tornado in the workspace is derived now, so it must say so rather than
 // claiming a fixed ±20% swing it never performed.

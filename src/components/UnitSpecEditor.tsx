@@ -20,6 +20,7 @@ import { AlertTriangle, RotateCcw, Table2, Undo2 } from 'lucide-react';
 import type { UnitResult } from '@/engine/biosteam/types';
 import type { UnitSpec } from '@/engine/biosteam/unit';
 import { fmt } from '@/engine/units';
+import { money } from '@/lib/money';
 import { Button, EmptyState, Explain, cx } from '@/components/ui';
 
 /**
@@ -32,16 +33,6 @@ import { Button, EmptyState, Explain, cx } from '@/components/ui';
  */
 const AUTHORED = '—';
 
-/** Money at the magnitude a capital cost is read in, matching the plant screen. */
-function money(v: number): string {
-  if (!Number.isFinite(v)) return '—';
-  const abs = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
-  if (abs >= 1e3) return `${sign}$${Math.round(abs).toLocaleString('en-US')}`;
-  return `${sign}$${abs.toFixed(2)}`;
-}
 
 /** The value a control should show: the reader's edit if there is one. */
 function currentValue(spec: UnitSpec, overrides: Record<string, number | string>): number | string {

@@ -14,10 +14,11 @@ import { useMemo, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 
 import type { Candidate } from '@/data/demo/types';
-import { PLANTS, PLANT_BY_ID, HS_CODES, DEMO_FX_NOTE } from '@/data/demo/core';
+import { PLANTS, PLANT_BY_ID, HS_CODES } from '@/data/demo/core';
 import { ACCESSION_BY_ID } from '@/data/demo/accessions';
 import { CANDIDATES, DELIVERABLES, DELIVERABLE_BY_ID, DISCLOSURES, BAGASSE_CONCEPTS } from '@/data/demo/archetypes';
-import { matchEnvelope, plantCeilings, organismName } from '@/lib/demo';
+import { matchEnvelope, plantCeilings, organismName, demoBasis } from '@/lib/demo';
+import { BasisPanel } from '@/components/Basis';
 import { href, navigate } from '@/router';
 import { PageHeader, Card, SectionTitle, EmptyState, Callout, cx } from '@/components/ui';
 import { AccessionValue } from '@/components/demo/AccessionValue';
@@ -38,36 +39,6 @@ const VERDICT_ORDER: Record<string, number> = {
   marginal: 2,
   excluded: 3,
 };
-
-// ── /proforma — the index ──────────────────────────────────────────────
-
-export function ProformaIndex() {
-  const screens = DELIVERABLES.filter((d) => d.payload.kind === 'capacity-screen');
-  const concepts = DELIVERABLES.filter((d) => d.payload.kind === 'facility-concept');
-  return (
-    <>
-      <PageHeader eyebrow={EYEBROW} title="Proforma" subtitle="Techno-economics against an explicit regional and temporal basis." />
-      <div className="space-y-3">
-        {[...screens, ...concepts].map((d) => (
-          <Card key={d.id}>
-            <a
-              href={href(
-                d.payload.kind === 'capacity-screen'
-                  ? `/proforma/screen/${d.payload.plantId}`
-                  : `/proforma/concept/${d.id}`,
-              )}
-              className="hover:text-accent"
-            >
-              <div>{d.title}</div>
-              <div className="text-caption text-ink-soft mt-0.5">{d.query}</div>
-            </a>
-          </Card>
-        ))}
-      </div>
-      <DemoFooter />
-    </>
-  );
-}
 
 // ── /proforma/screen/:plantId — ARCHETYPE 3 ────────────────────────────
 
@@ -440,11 +411,18 @@ export function FacilityConceptPage({ deliverableId }: { deliverableId: string }
         <div className="text-caption text-ink-soft mt-3 font-num">
           Breakeven at {open.breakevenTonnesPerYear.toLocaleString()} t a⁻¹ · opex{' '}
           {open.opexPerTonneUSD.toLocaleString()} USD t⁻¹
-          {/* The rate is fixed and said out loud. `DEMO_FX_NOTE` asserted it
-              was "stated on every converted Accession" and was rendered
-              nowhere — a methodology note that exists only in a constant is
-              not a disclosure. */}
-          <div className="text-caption text-ink-soft mt-2 max-w-prose">{DEMO_FX_NOTE}</div>
+        </div>
+
+        {/* The frame this capital number is quoted in, in the same component
+            the corpus plants use. `DEMO_FX_NOTE` travels inside it now — it
+            asserted it was "stated on every converted Accession" and was
+            rendered nowhere, and a methodology note that exists only in a
+            constant is not a disclosure. */}
+        <div className="mt-4 pt-3 border-t border-line">
+          <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">
+            What this estimate is quoted against
+          </div>
+          <BasisPanel basis={demoBasis(open, PLANTS[0])} />
         </div>
       </Card>
 

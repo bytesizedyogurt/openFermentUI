@@ -1,5 +1,60 @@
 {
   "$defs": {
+    "AccuracyStated": {
+      "additionalProperties": false,
+      "description": "An estimate that declares how wrong it may be.\n\nAACE Class 5 carries −30/+50 %. A crisp line drawn without that band is a\npromise the number cannot keep.",
+      "properties": {
+        "highPct": {
+          "type": "number"
+        },
+        "kind": {
+          "const": "class",
+          "default": "class",
+          "enum": [
+            "class"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "description": "e.g. 'AACE Class 5 (−30 / +50 %)'.",
+          "type": "string"
+        },
+        "lowPct": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "lowPct",
+        "highPct",
+        "kind"
+      ],
+      "title": "AccuracyStated",
+      "type": "object"
+    },
+    "AccuracyUnstated": {
+      "additionalProperties": false,
+      "description": "No class has been assigned, and that is said rather than left to be assumed.",
+      "properties": {
+        "kind": {
+          "const": "unstated",
+          "default": "unstated",
+          "enum": [
+            "unstated"
+          ],
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "why",
+        "kind"
+      ],
+      "title": "AccuracyUnstated",
+      "type": "object"
+    },
     "ActivityEvent": {
       "additionalProperties": false,
       "properties": {
@@ -926,6 +981,47 @@
       "title": "CorrectedValue",
       "type": "object"
     },
+    "CostIndex": {
+      "additionalProperties": false,
+      "description": "The index a capital estimate is scaled to.\n\nA correlation fitted against 2007 quotations returns 2007 dollars. Dropping\nthe ratio is not a rounding error, it is a different answer, and it is the\neasiest way to make a capital estimate look cheap without lying about\nanything a reviewer can see.",
+      "properties": {
+        "covers": {
+          "description": "The years the index table actually spans. Stated because a project priced outside that span is being indexed by extrapolation, and the gap is a fact about the estimate rather than a bug to paper over.",
+          "items": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "name": {
+          "description": "e.g. 'CEPCI' — the index, not the value.",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        },
+        "year": {
+          "description": "The year the index value is taken from. None means the value was set directly rather than chosen from a year, which is a legitimate thing to do and a thing a reader is entitled to be told.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "CostIndex",
+      "type": "object"
+    },
     "CostLine": {
       "enum": [
         "capex",
@@ -1447,6 +1543,33 @@
       ],
       "title": "FieldId",
       "type": "string"
+    },
+    "FxTreatment": {
+      "additionalProperties": false,
+      "description": "How a conversion between currencies was performed, when one was.\n\nA floating rate makes two identical quantities disagree by the date they\nwere viewed. Whatever is done here, it is stated.",
+      "properties": {
+        "asOf": {
+          "description": "ISO date, or None when the rate is fixed by convention rather than dated.",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "type": "string"
+        },
+        "pair": {
+          "description": "e.g. 'EUR/USD'.",
+          "type": "string"
+        },
+        "rate": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "pair",
+        "rate"
+      ],
+      "title": "FxTreatment",
+      "type": "object"
     },
     "GoldValue": {
       "additionalProperties": false,
@@ -2431,6 +2554,113 @@
       ],
       "title": "PublicationStatus"
     },
+    "QuotationBasis": {
+      "additionalProperties": false,
+      "description": "Everything a price has to declare before it means anything.\n\n`excludes` is the field the whole model exists for. A basis that lists what\nit covers is marketing; one that lists what it does not is an estimate.",
+      "properties": {
+        "accuracy": {
+          "discriminator": {
+            "mapping": {
+              "class": "#/$defs/AccuracyStated",
+              "unstated": "#/$defs/AccuracyUnstated"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AccuracyStated"
+            },
+            {
+              "$ref": "#/$defs/AccuracyUnstated"
+            }
+          ]
+        },
+        "costIndex": {
+          "$ref": "#/$defs/CostIndex"
+        },
+        "currency": {
+          "default": "USD",
+          "type": "string"
+        },
+        "discountRate": {
+          "type": "number"
+        },
+        "discountRateKind": {
+          "default": "IRR",
+          "description": "An internal rate of return solved against a full cash flow and a flat capital charge applied to installed cost are different claims, and a reader comparing two numbers has to know which they are looking at.",
+          "enum": [
+            "IRR",
+            "capital-charge"
+          ],
+          "type": "string"
+        },
+        "excludes": {
+          "description": "What is explicitly NOT in this price, in a reader's words. Required and non-empty: every estimate excludes something, and an empty list means nobody has looked rather than that nothing is missing.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "fx": {
+          "$ref": "#/$defs/FxTreatment",
+          "description": "None means no conversion was performed."
+        },
+        "incomeTax": {
+          "type": "number"
+        },
+        "operatingDays": {
+          "type": "integer"
+        },
+        "projectLife": {
+          "items": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "region": {
+          "discriminator": {
+            "mapping": {
+              "declared": "#/$defs/RegionDeclared",
+              "undeclared": "#/$defs/RegionUndeclared"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RegionDeclared"
+            },
+            {
+              "$ref": "#/$defs/RegionUndeclared"
+            }
+          ]
+        },
+        "statedFor": {
+          "description": "The model, plant or concept this frames. A basis has an address too.",
+          "type": "string"
+        },
+        "taxNote": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statedFor",
+        "costIndex",
+        "region",
+        "accuracy",
+        "excludes"
+      ],
+      "title": "QuotationBasis",
+      "type": "object"
+    },
     "RecordStatus": {
       "enum": [
         "unverified",
@@ -2478,6 +2708,65 @@
         "because"
       ],
       "title": "RefuseConversion",
+      "type": "object"
+    },
+    "RegionDeclared": {
+      "additionalProperties": false,
+      "description": "A stated place, with whatever adjustment that place implies.",
+      "properties": {
+        "jurisdiction": {
+          "description": "ISO country or jurisdiction code, e.g. 'RW', 'US'.",
+          "type": "string"
+        },
+        "kind": {
+          "const": "declared",
+          "default": "declared",
+          "enum": [
+            "declared"
+          ],
+          "type": "string"
+        },
+        "locality": {
+          "type": "string"
+        },
+        "locationFactor": {
+          "description": "Multiplier applied to installed capital for this location. None means no factor was applied, which is different from a factor of 1.0 — one is a decision not to adjust, the other is a claim that no adjustment is due.",
+          "type": "number"
+        },
+        "source": {
+          "description": "What established the factor, or how the place was chosen.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "jurisdiction",
+        "source",
+        "kind"
+      ],
+      "title": "RegionDeclared",
+      "type": "object"
+    },
+    "RegionUndeclared": {
+      "additionalProperties": false,
+      "description": "No place has been stated, and the reason is carried rather than implied.\n\nNOT A DEFECT, unlike `BasisUnsourced`. A corpus of β-casein literature says\nnothing about where a plant would be built, so naming a region would be\nfabrication. This is the same move as `year: 0` and the venue sentinel: the\ngap is shown rather than guessed.",
+      "properties": {
+        "kind": {
+          "const": "undeclared",
+          "default": "undeclared",
+          "enum": [
+            "undeclared"
+          ],
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "why",
+        "kind"
+      ],
+      "title": "RegionUndeclared",
       "type": "object"
     },
     "ResultField": {
@@ -3366,6 +3655,12 @@
   "additionalProperties": false,
   "description": "GENERATED from the Pydantic models in packages/core/openferment_core/schema. Do not edit. Edit the models and re-run `pnpm gen:types`.",
   "properties": {
+    "AccuracyStated": {
+      "$ref": "#/$defs/AccuracyStated"
+    },
+    "AccuracyUnstated": {
+      "$ref": "#/$defs/AccuracyUnstated"
+    },
     "ActivityEvent": {
       "$ref": "#/$defs/ActivityEvent"
     },
@@ -3459,6 +3754,9 @@
     "CorrectedValue": {
       "$ref": "#/$defs/CorrectedValue"
     },
+    "CostIndex": {
+      "$ref": "#/$defs/CostIndex"
+    },
     "CostLine": {
       "$ref": "#/$defs/CostLine"
     },
@@ -3512,6 +3810,9 @@
     },
     "FieldId": {
       "$ref": "#/$defs/FieldId"
+    },
+    "FxTreatment": {
+      "$ref": "#/$defs/FxTreatment"
     },
     "GoldValue": {
       "$ref": "#/$defs/GoldValue"
@@ -3603,6 +3904,9 @@
     "PublicationStatus": {
       "$ref": "#/$defs/PublicationStatus"
     },
+    "QuotationBasis": {
+      "$ref": "#/$defs/QuotationBasis"
+    },
     "RecordStatus": {
       "$ref": "#/$defs/RecordStatus"
     },
@@ -3611,6 +3915,12 @@
     },
     "RefuseConversion": {
       "$ref": "#/$defs/RefuseConversion"
+    },
+    "RegionDeclared": {
+      "$ref": "#/$defs/RegionDeclared"
+    },
+    "RegionUndeclared": {
+      "$ref": "#/$defs/RegionUndeclared"
     },
     "ResultField": {
       "$ref": "#/$defs/ResultField"

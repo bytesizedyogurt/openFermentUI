@@ -31,12 +31,21 @@ from .corpus import Provenance
 from .ontology import FieldId
 
 __all__ = [
+    "AccuracyClass",
+    "AccuracyStated",
+    "AccuracyUnstated",
     "AssumptionBasis",
     "BasisModel",
     "BasisRecord",
     "BasisUnsourced",
+    "CostIndex",
     "CostLine",
+    "FxTreatment",
     "GridPointResult",
+    "QuotationBasis",
+    "Region",
+    "RegionDeclared",
+    "RegionUndeclared",
     "Scenario",
     "ScenarioAssumption",
     "ScenarioDim",
@@ -154,4 +163,167 @@ class SensitivityRow(OFModel):
             "the entry to the whole experiment loop and the single most valuable "
             "navigation in the app."
         ),
+    )
+
+
+# ── The frame a price is quoted in ────────────────────────────────────────
+#
+# A techno-economic result is a function of two things: the flowsheet, and the
+# basis it is discounted and indexed against. The flowsheet gets a whole screen.
+# The basis usually gets a footnote — which is how two plants end up compared at
+# two different discount rates and nobody notices.
+#
+# `AssumptionBasis` above is a different thing and the names must not be
+# confused: that says where ONE NUMBER came from, this says what frame a PRICE
+# is quoted in. A record binding and a discount rate are not the same kind of
+# claim.
+#
+# WHY THIS IS PYTHON. Every member is a BioSTEAM TEA constructor argument — IRR,
+# duration, income tax, operating days, the cost index — and CLAUDE.md routes
+# cost-model authoring to BioSTEAM. More decisively, `EconomicsAdapter` has to
+# be able to return one: a server that hands back a minimum selling price
+# without the basis it was solved against has handed back a number, not an
+# answer. A TypeScript-only twin would be hand-maintained the day that server
+# exists, which is the failure this package exists to prevent.
+
+
+class CostIndex(OFModel):
+    """The index a capital estimate is scaled to.
+
+    A correlation fitted against 2007 quotations returns 2007 dollars. Dropping
+    the ratio is not a rounding error, it is a different answer, and it is the
+    easiest way to make a capital estimate look cheap without lying about
+    anything a reviewer can see.
+    """
+
+    name: str = Field(description="e.g. 'CEPCI' — the index, not the value.")
+    year: int | None = Field(
+        default=None,
+        description=(
+            "The year the index value is taken from. None means the value was set "
+            "directly rather than chosen from a year, which is a legitimate thing to "
+            "do and a thing a reader is entitled to be told."
+        ),
+    )
+    value: float
+    covers: tuple[int, int] | None = Field(
+        default=None,
+        description=(
+            "The years the index table actually spans. Stated because a project "
+            "priced outside that span is being indexed by extrapolation, and the "
+            "gap is a fact about the estimate rather than a bug to paper over."
+        ),
+    )
+    note: str = ""
+
+
+class FxTreatment(OFModel):
+    """How a conversion between currencies was performed, when one was.
+
+    A floating rate makes two identical quantities disagree by the date they
+    were viewed. Whatever is done here, it is stated.
+    """
+
+    pair: str = Field(description="e.g. 'EUR/USD'.")
+    rate: float
+    as_of: str | None = Field(
+        default=None,
+        description="ISO date, or None when the rate is fixed by convention rather than dated.",
+    )
+    note: str = ""
+
+
+class RegionDeclared(OFModel):
+    """A stated place, with whatever adjustment that place implies."""
+
+    kind: Literal["declared"] = "declared"
+    jurisdiction: str = Field(description="ISO country or jurisdiction code, e.g. 'RW', 'US'.")
+    locality: str | None = None
+    location_factor: float | None = Field(
+        default=None,
+        description=(
+            "Multiplier applied to installed capital for this location. None means no "
+            "factor was applied, which is different from a factor of 1.0 — one is a "
+            "decision not to adjust, the other is a claim that no adjustment is due."
+        ),
+    )
+    source: str = Field(description="What established the factor, or how the place was chosen.")
+
+
+class RegionUndeclared(OFModel):
+    """No place has been stated, and the reason is carried rather than implied.
+
+    NOT A DEFECT, unlike `BasisUnsourced`. A corpus of β-casein literature says
+    nothing about where a plant would be built, so naming a region would be
+    fabrication. This is the same move as `year: 0` and the venue sentinel: the
+    gap is shown rather than guessed.
+    """
+
+    kind: Literal["undeclared"] = "undeclared"
+    why: str
+
+
+Region = Annotated[RegionDeclared | RegionUndeclared, Field(discriminator="kind")]
+
+
+class AccuracyStated(OFModel):
+    """An estimate that declares how wrong it may be.
+
+    AACE Class 5 carries −30/+50 %. A crisp line drawn without that band is a
+    promise the number cannot keep.
+    """
+
+    kind: Literal["class"] = "class"
+    label: str = Field(description="e.g. 'AACE Class 5 (−30 / +50 %)'.")
+    low_pct: float
+    high_pct: float
+
+
+class AccuracyUnstated(OFModel):
+    """No class has been assigned, and that is said rather than left to be assumed."""
+
+    kind: Literal["unstated"] = "unstated"
+    why: str
+
+
+AccuracyClass = Annotated[AccuracyStated | AccuracyUnstated, Field(discriminator="kind")]
+
+
+class QuotationBasis(OFModel):
+    """Everything a price has to declare before it means anything.
+
+    `excludes` is the field the whole model exists for. A basis that lists what
+    it covers is marketing; one that lists what it does not is an estimate.
+    """
+
+    stated_for: str = Field(
+        description="The model, plant or concept this frames. A basis has an address too."
+    )
+    currency: str = "USD"
+    fx: FxTreatment | None = Field(
+        default=None, description="None means no conversion was performed."
+    )
+    cost_index: CostIndex
+    discount_rate: float | None = None
+    discount_rate_kind: Literal["IRR", "capital-charge"] = Field(
+        default="IRR",
+        description=(
+            "An internal rate of return solved against a full cash flow and a flat "
+            "capital charge applied to installed cost are different claims, and a "
+            "reader comparing two numbers has to know which they are looking at."
+        ),
+    )
+    project_life: tuple[int, int] | None = None
+    income_tax: float | None = None
+    tax_note: str = ""
+    operating_days: int | None = None
+    region: Region
+    accuracy: AccuracyClass
+    excludes: list[str] = Field(
+        description=(
+            "What is explicitly NOT in this price, in a reader's words. Required and "
+            "non-empty: every estimate excludes something, and an empty list means "
+            "nobody has looked rather than that nothing is missing."
+        ),
+        min_length=1,
     )

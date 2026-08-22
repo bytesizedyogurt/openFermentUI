@@ -21,7 +21,7 @@ import { useStore } from '@/store';
 import { navigate } from '@/router';
 import type { CostLine } from '@/data/types';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
-import { plantFails } from '@/engine/plant';
+import { plantFails } from '@/lib/use-plant';
 import { fmt } from '@/engine/units';
 import { scaled } from '@/sim/latency';
 import { exportCSV } from '@/lib/csv';
@@ -30,6 +30,7 @@ import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } fro
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 
+import { ChartTable } from '@/components/ChartTable';
 import { partEyebrow } from '@/data/parts';
 
 /** Movement · part · pool, from the one table that names the parts. */
@@ -37,40 +38,6 @@ const EYEBROW = partEyebrow('fermos', 'corpus');
 const CONVERGE_STAGES = ['Building flowsheet', 'Converging', 'Costing'];
 
 /** A "view as table" disclosure — the accessibility floor for every chart (§6.6). */
-function ChartTable({ headers, rows }: { headers: string[]; rows: (string | number)[][] }) {
-  return (
-    <details className="mt-2">
-      <summary className="text-caption text-ink-soft cursor-pointer hover:text-ink inline-flex items-center gap-1">
-        <Table2 size={12} /> View as table
-      </summary>
-      <div className="overflow-x-auto mt-1.5">
-        <table className="w-full text-caption">
-          <thead>
-            <tr className="border-b border-line text-ink-soft">
-              {headers.map((h, i) => (
-                <th key={h} className={cx('py-1', i === 0 ? 'text-left' : 'text-right')}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className="border-b border-line/50">
-                {r.map((c, j) => (
-                  <td key={j} className={cx('py-1', j === 0 ? 'text-left' : 'text-right font-num')}>
-                    {c}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </details>
-  );
-}
-
 export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const grids = useStore((s) => s.grids);

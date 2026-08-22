@@ -32,7 +32,7 @@ import { markStale, type StalePatch } from '@/engine/stale';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
-import { clearPlantCache } from '@/engine/plant';
+import { clearPlantCache, type PlantOverrides } from '@/engine/plant';
 import { toSI } from '@/engine/units';
 import { createSimulatedJobRunner, type JobRunner } from '@/sim/jobs';
 
@@ -119,6 +119,23 @@ export interface OFState {
   checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
+  /**
+   * Equipment and financial-basis edits, keyed by scenario id.
+   *
+   * WHY THIS IS IN THE STORE AND NOT IN A SCREEN. It used to be `useState` in
+   * `screens/Plant.tsx`, which was correct while one screen held both the
+   * flowsheet and the price. fermOS now owns the plant and Proforma owns the
+   * price, and an edit made on one has to be the same edit the other quotes —
+   * two screens solving one plant from two copies of the overrides would
+   * disagree with each other, and the disagreement would look like a modelling
+   * result rather than like a bug.
+   *
+   * Keyed by scenario so an experiment on S1 is not carried into S2, and NOT
+   * persisted: like every other slice here it is gone on refresh, which is what
+   * lets the reset restore the plant the corpus declares.
+   */
+  plantOverrides: Record<string, PlantOverrides>;
+
   ui: {
     theme: Theme;
     density: Density;
@@ -138,6 +155,8 @@ export interface OFState {
 
   // ── actions ──────────────────────────────────────────────────────────
   setUI: (patch: Partial<OFState['ui']>) => void;
+  /** Replace one scenario's plant edits. Passing `{}` restores the declared plant. */
+  setPlantOverrides: (scenarioId: string, next: PlantOverrides) => void;
   toast: (t: Omit<Toast, 'id'>) => void;
   dismissToast: (id: string) => void;
 
@@ -235,6 +254,7 @@ const seedState = () => ({
   learnProgress: {} as Record<string, boolean>,
   checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
+  plantOverrides: {} as Record<string, PlantOverrides>,
 });
 
 /**
@@ -288,6 +308,9 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   setUI: (patch) => set((s) => ({ ui: { ...s.ui, ...patch } })),
+
+  setPlantOverrides: (scenarioId, next) =>
+    set((s) => ({ plantOverrides: { ...s.plantOverrides, [scenarioId]: next } })),
 
   toast: (t) => {
     const id = nextId('toast');
