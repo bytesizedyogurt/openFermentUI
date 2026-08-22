@@ -331,29 +331,14 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
         </Card>
       </div>
 
-      <div className="mb-4 space-y-3">
-        <Callout kind="info" title="What is doing the arithmetic here">
-          Equipment sizing, purchase-cost correlations, bare-module installation factors, CEPCI
-          indexing, utility prices, MACRS depreciation and the discounted cash flow are ported from{' '}
-          <span className="font-serif">bioSTEAM</span> v2.53.11 and keep its constants and its
-          argument order. <span className="font-medium">ThermoSTEAM is not ported.</span> There is no
-          property package, no vapour–liquid equilibrium and no recycle convergence: streams are
-          lumped component mass flows. A separation whose cost turns on a relative volatility cannot
-          be sized by this code, and this plant does not contain one.
-        </Callout>
-        {result.warnings.length > 0 && (
-          <Callout kind="warn" title={`${result.warnings.length} design warnings`}>
-            <ul className="space-y-0.5 mt-1">
-              {result.warnings.map((w) => (
-                <li key={`${w.ID}-${w.message}`}>
-                  <span className="font-num">{w.ID}</span> — {w.message}
-                </li>
-              ))}
-            </ul>
-          </Callout>
-        )}
-      </div>
+      {/* THE FLOWSHEET IS THE SPINE, so it comes first.
 
+          It used to sit seven hundred pixels down, beneath two large prose
+          callouts — which put an explanation of the arithmetic above the thing
+          the arithmetic was performed on. The diagram is what this part IS: the
+          one artifact on any screen in this build that says process
+          engineering. What bioSTEAM does and does not model is a caveat on it,
+          and a caveat reads after its subject. */}
       <section className="mb-6">
         <SectionTitle
           right={
@@ -403,6 +388,29 @@ export default function Plant({ scenarioId }: { scenarioId: string }) {
           </p>
         )}
       </section>
+
+      <div className="mb-4 space-y-3">
+        <Callout kind="info" title="What is doing the arithmetic here">
+          Equipment sizing, purchase-cost correlations, bare-module installation factors, CEPCI
+          indexing, utility prices, MACRS depreciation and the discounted cash flow are ported from{' '}
+          <span className="font-serif">bioSTEAM</span> v2.53.11 and keep its constants and its
+          argument order. <span className="font-medium">ThermoSTEAM is not ported.</span> There is no
+          property package, no vapour–liquid equilibrium and no recycle convergence: streams are
+          lumped component mass flows. A separation whose cost turns on a relative volatility cannot
+          be sized by this code, and this plant does not contain one.
+        </Callout>
+        {result.warnings.length > 0 && (
+          <Callout kind="warn" title={`${result.warnings.length} design warnings`}>
+            <ul className="space-y-0.5 mt-1">
+              {result.warnings.map((w) => (
+                <li key={`${w.ID}-${w.message}`}>
+                  <span className="font-num">{w.ID}</span> — {w.message}
+                </li>
+              ))}
+            </ul>
+          </Callout>
+        )}
+      </div>
 
       <section className="mb-6">
         <SectionTitle
