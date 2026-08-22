@@ -432,6 +432,7 @@ export default function Home() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0">
         <PageHeader
+          hero
           eyebrow="openFerment · Bench"
           title="Bioprocess literature you can operate on"
           subtitle="Ask a question and get back a number with its address attached — the source it came from, the parameter it belongs to, and the model that already uses it. Thirteen parts in three movements, over two object pools that never mix."

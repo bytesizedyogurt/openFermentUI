@@ -1,14 +1,34 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource/spectral/300.css';
-import '@fontsource/spectral/400.css';
-import '@fontsource/spectral/500.css';
-import '@fontsource/spectral/600.css';
-import '@fontsource/ibm-plex-sans/400.css';
-import '@fontsource/ibm-plex-sans/500.css';
-import '@fontsource/ibm-plex-sans/600.css';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
+// FONTS, BY SUBSET RATHER THAN BY FACE.
+//
+// The bare `400.css` entrypoints pull every subset a family ships — cyrillic,
+// cyrillic-ext, vietnamese, greek — and the single-file bundle inlines all of
+// them. That was 732KB of the 2.84MB artifact, of which only 200KB was latin,
+// in an application whose content is English scientific prose.
+//
+// `latin-ext` stays: author names in this corpus carry accents (Jiménez-Flores)
+// and dropping it would render them from a fallback face mid-word.
+//
+// `greek` stays for IBM Plex Sans, and ONLY there, because β-casein and µ are
+// on nearly every screen and β is U+03B2 — in the greek subset, not latin.
+// Spectral and IBM Plex Mono ship no greek subset at all, so those glyphs
+// already came from the fallback stack in the serif and the numeric face; that
+// is unchanged here, not newly broken.
+import '@fontsource/spectral/latin-300.css';
+import '@fontsource/spectral/latin-400.css';
+import '@fontsource/spectral/latin-500.css';
+import '@fontsource/spectral/latin-600.css';
+import '@fontsource/spectral/latin-ext-400.css';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-500.css';
+import '@fontsource/ibm-plex-sans/latin-600.css';
+import '@fontsource/ibm-plex-sans/latin-ext-400.css';
+import '@fontsource/ibm-plex-sans/greek-400.css';
+import '@fontsource/ibm-plex-sans/greek-500.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-ext-400.css';
 import './styles.css';
 import { initCorpus } from './data/source';
 

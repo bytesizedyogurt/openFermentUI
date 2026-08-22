@@ -83,11 +83,14 @@ export function PageHeader({
   subtitle,
   actions,
   eyebrow,
+  hero,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
   eyebrow?: ReactNode;
+  /** The one screen that gets the 36px register. See the h1 below. */
+  hero?: boolean;
 }) {
   return (
     <div className="flex items-start justify-between gap-x-6 gap-y-2 flex-wrap mb-5">
@@ -97,7 +100,14 @@ export function PageHeader({
         )}
         <h1
           tabIndex={-1}
-          className="font-serif text-page-title font-semibold leading-tight vt-page-title outline-none"
+          className={cx(
+            'font-serif font-semibold leading-tight vt-page-title outline-none',
+            // `hero` is 36px and was defined in the type scale and used
+            // nowhere — a whole register sitting unspent. It is spent once, on
+            // the front door, because a hero on every screen is a template
+            // rather than a decision.
+            hero ? 'text-hero' : 'text-page-title',
+          )}
         >
           {title}
         </h1>
