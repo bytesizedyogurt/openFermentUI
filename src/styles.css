@@ -94,7 +94,8 @@ body {
   background-image:
     linear-gradient(to right, rgb(var(--grid-ink) / var(--grid-alpha)) 1px, transparent 1px),
     linear-gradient(to bottom, rgb(var(--grid-ink) / var(--grid-alpha)) 1px, transparent 1px);
-  background-size: 24px 24px;
+  /* A variable, so a part can be drawn on different paper. See `[data-part]`. */
+  background-size: var(--grid-pitch, 24px) var(--grid-pitch, 24px);
 }
 
 /* ── Evidence tick (§6.1) — the system's signature ───────────────────── */
@@ -750,4 +751,131 @@ input[type='range']::-moz-range-thumb {
 .rail-mark-correction {
   -webkit-mask-image: linear-gradient(115deg, transparent 0 2px, #000 2px 100%);
   mask-image: linear-gradient(115deg, transparent 0 2px, #000 2px 100%);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   TWO PARTS, TWO REGISTERS
+   ══════════════════════════════════════════════════════════════════════
+
+   fermOS and Proforma are the same architecture's two halves and they had
+   the same screen. Three cards, a big number, the same green, the same
+   rhythm — nothing told a reader which part they were in but a 12px grey
+   eyebrow. The parts own different subjects and different document
+   genres, and the genres are real ones an engineer already knows how to
+   read: a process schematic and a financial statement.
+
+   ── WHAT THIS MAY NOT TOUCH ──────────────────────────────────────────
+
+   Almost every visual axis in this app is already carrying meaning, and a
+   part identity that borrowed one would be making a claim it does not
+   mean:
+
+     hue                 provenance — verification state (`.tick-*`)
+     the 3px bar         evidence class, AND upstream port status
+     dashes and gaps     evidence geometry (patent, computed, trade…)
+     --accent            selected, focused, verified, primary, ported
+     --signal-open/closed  open versus enclosed ground, in the demo pool
+     the Okabe–Ito index   process area, and chart series
+
+   So the register is carried by TEXTURE, TYPE, GEOMETRY and RHYTHM only.
+   No part gets a colour. Both halves stay recognisably one product; they
+   stop being one template.
+
+   ── THE PAPER IS THE LOUDEST HALF ────────────────────────────────────
+
+   The engineering grid already exists and is painted uniformly behind
+   every screen in the app, which means it distinguishes nothing. fermOS
+   takes it and tightens it to drafting pitch; Proforma gives it up
+   entirely, because a statement of account is printed on plain stock and
+   a ruled sheet would read as squared paper under a balance sheet. That
+   one difference is legible at a glance, from across a room, with no text
+   readable at all — which is the test this pass has to pass.           */
+
+/* ── fermOS · a process schematic ─────────────────────────────────── */
+
+[data-part='fermos'] {
+  /* Drafting pitch, and more ink in it.
+     Half the app's default pitch alone was not enough — at the ambient
+     0.03 alpha a 12px grid reads as noise rather than as a sheet, because
+     halving the spacing halves the contrast of any one line against its
+     neighbours. The alpha goes up with the density so the ground reads as
+     something drawn on. */
+  --grid-pitch: 12px;
+  --grid-alpha: 0.055;
+}
+
+/* Squarer corners. `rounded-card` is 8px everywhere else; a P&ID's boxes
+   are not lozenges, and `Flowsheet` already draws its units at rx=7. */
+[data-part='fermos'] .card {
+  border-radius: 4px;
+}
+
+/* Section headings in the drawing's own voice: the title-block register,
+   not the essay register. Spectral stays on the page title, so the screen
+   still belongs to this product. */
+[data-part='fermos'] h2 {
+  font-family: 'IBM Plex Sans', -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--ink-soft));
+}
+
+/* ── Proforma · a statement of account ────────────────────────────── */
+
+[data-part='proforma'] {
+  /* No grid. A statement is printed, not drafted. */
+  --grid-alpha: 0;
+}
+
+/* ── The ledger row ───────────────────────────────────────────────────
+
+   A statement puts its figures in one column, right-aligned, with a rule
+   above every total and a double rule under the last one. That is not
+   decoration; it is what lets an eye run down a column and check that the
+   parts add to the whole, which is the only thing anybody does with a
+   statement. The capital ladder was already an accumulation rendered as a
+   list of cards.                                                      */
+
+.ledger {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 24px;
+}
+
+.ledger-row {
+  display: contents;
+}
+
+.ledger-row > dt {
+  padding: 5px 0;
+  border-bottom: 1px solid rgb(var(--line) / 0.6);
+}
+
+.ledger-row > dd {
+  padding: 5px 0;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(var(--line) / 0.6);
+}
+
+/* The rule above a total is heavier than the rules between rows, and the
+   figure it carries is the one the rows above add up to. */
+.ledger-total > dt,
+.ledger-total > dd {
+  border-top: 1px solid rgb(var(--ink-soft) / 0.55);
+  border-bottom: none;
+  padding-top: 6px;
+  font-weight: 500;
+}
+
+/* The closing total gets the double rule an accountant would draw under
+   it — two lines, not a thick one. */
+.ledger-close > dt,
+.ledger-close > dd {
+  border-bottom: 3px double rgb(var(--ink-soft) / 0.55);
+  padding-bottom: 6px;
 }

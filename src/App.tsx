@@ -811,7 +811,18 @@ export default function App() {
             </div>
           </header>
 
-          <main id="of-main" className="flex-1 overflow-y-auto of-grid">
+          <main
+          id="of-main"
+          // The part a reader is in, as an attribute, so the stylesheet can give
+          // each one a register. fermOS is a process schematic and Proforma is a
+          // financial statement; those are two real document genres and they do
+          // not look alike. See the `[data-part]` block in styles.css for what
+          // the attribute is allowed to change — and, more importantly, for the
+          // list of axes it may not touch, because hue, the 3px bar and the
+          // accent are all carrying meaning already.
+          data-part={partForPath(route.path)}
+          className="flex-1 overflow-y-auto of-grid"
+        >
             {/* The one page frame. Screens return their content bare; the
                 width comes from the route, so no screen can inset itself
                 twice or invent a fourteenth width. Run Mode never reaches

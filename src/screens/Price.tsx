@@ -109,27 +109,34 @@ function CapitalLadder({ r }: { r: PlantResult }) {
     { label: 'Total capital investment (TCI)', value: c.TCI, note: 'What has to be raised.' },
   ];
   const max = Math.max(...rows.map((x) => x.value));
+  // Working capital is the one step that is not an accumulation — it is added
+  // alongside FCI to reach TCI, not on top of the running total — so the total
+  // rule falls under TCI and nowhere else.
+  const closing = rows.length - 1;
   return (
-    <div className="divide-y divide-line">
-      {rows.map((row) => (
+    <dl className="ledger">
+      {rows.map((row, i) => (
         <div
           key={row.label}
-          className="py-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 items-baseline"
+          className={cx('ledger-row', i === closing && 'ledger-total ledger-close')}
         >
-          <div className="min-w-0">
+          <dt className="min-w-0">
             <div className="text-body">{row.label}</div>
             <div className="text-caption text-ink-soft">{row.note}</div>
-          </div>
-          <div className="font-num text-body whitespace-nowrap">{money(row.value)}</div>
-          <div className="col-span-2 h-1 rounded-full bg-ink-soft/15 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-accent/70"
-              style={{ width: `${max > 0 ? (row.value / max) * 100 : 0}%` }}
-            />
-          </div>
+            {/* The bar sits under the label rather than in the figure column,
+                so the column stays a column — a statement's figures line up or
+                they are not a statement. */}
+            <div className="h-[3px] mt-1.5 rounded-[1px] bg-ink-soft/12 overflow-hidden">
+              <div
+                className="h-full rounded-[1px] bg-accent/60"
+                style={{ width: `${max > 0 ? (row.value / max) * 100 : 0}%` }}
+              />
+            </div>
+          </dt>
+          <dd className="font-num text-body">{money(row.value)}</dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
@@ -474,46 +481,65 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-4">
-        <Card className="p-4">
-          <Stat
-            label="Minimum selling price"
-            value={USD(result.msp)}
-            unit="USD kg⁻¹"
-            sub={
-              <>
-                solved at NPV = 0, residual{' '}
-                <span className="font-num">{result.npvResidual.toExponential(1)}</span> USD
-              </>
-            }
-          />
-          {basis && <BasisLine basis={basis} className="mt-2 pt-2 border-t border-line" />}
-        </Card>
-        <Card className="p-4">
-          <Stat
-            label="Total capital investment"
-            value={money(result.capital.TCI).replace(/^\$/, '')}
-            unit="USD"
-            sub={`${result.units.length} unit operations`}
-          />
-        </Card>
-        <Card className="p-4">
-          <Stat
-            label="Annual operating cost"
-            value={money(result.operating.AOC).replace(/^\$/, '')}
-            unit="USD yr⁻¹"
-            sub={`${money(result.operating.materialCost)} feedstock`}
-          />
-        </Card>
-        <Card className="p-4">
-          <Stat
-            label="Annual production"
-            value={USD(result.annualProduction / 1000)}
-            unit="t yr⁻¹"
-            sub={`${(result.product.purity * 100).toFixed(0)}% pure — the price is for this powder`}
-          />
-        </Card>
-      </div>
+      {/* ── THE STATEMENT HEAD ────────────────────────────────────────────
+          A statement of account names its basis before its first figure — "in
+          USD thousands, year ended 31 December" — because a number without one
+          cannot be compared with anything. This screen had that backwards: four
+          equal stat cards, the headline one quarter of a row, and the basis in
+          11px grey beneath it. The price is the largest object on the page now
+          and its frame is stated beside it at a size a reader will actually
+          read. */}
+      <Card className="p-5 mb-4">
+        <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,20rem)_1fr] items-start">
+          <div>
+            <div className="text-caption uppercase tracking-wide text-ink-soft">
+              Minimum selling price
+            </div>
+            <div className="font-num text-hero leading-none mt-1">{USD(result.msp)}</div>
+            <div className="text-body text-ink-soft mt-1">
+              USD kg⁻¹ of {spec.productLabel.toLowerCase()}
+            </div>
+            <div className="text-caption text-ink-soft mt-2 max-w-prose">
+              Solved at NPV = 0, not summed from assumed lines. Residual{' '}
+              <span className="font-num">{result.npvResidual.toExponential(1)}</span> USD on a
+              cash flow of{' '}
+              <span className="font-num">{money(result.capital.TCI)}</span>.
+            </div>
+          </div>
+
+          {/* The three figures that frame it, ruled and right-aligned — the
+              column an eye runs down. */}
+          <dl className="ledger text-body">
+            <div className="ledger-row">
+              <dt className="text-ink-soft">Total capital investment</dt>
+              <dd className="font-num">{money(result.capital.TCI)}</dd>
+            </div>
+            <div className="ledger-row">
+              <dt className="text-ink-soft">Annual operating cost</dt>
+              <dd className="font-num">{money(result.operating.AOC)}</dd>
+            </div>
+            <div className="ledger-row">
+              <dt className="text-ink-soft">Annual production</dt>
+              <dd className="font-num">
+                {USD(result.annualProduction / 1000)}
+                <span className="text-ink-soft ml-1">t yr⁻¹</span>
+              </dd>
+            </div>
+            <div className="ledger-row ledger-total ledger-close">
+              <dt>
+                Price
+                <span className="text-ink-soft"> at {(result.product.purity * 100).toFixed(0)}% purity</span>
+              </dt>
+              <dd className="font-num">
+                {USD(result.msp)}
+                <span className="text-ink-soft ml-1">USD kg⁻¹</span>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        {basis && <BasisLine basis={basis} className="mt-4 pt-3 border-t border-line" />}
+      </Card>
 
       <div className="mb-4 space-y-3">
         {editCount > 0 && (
@@ -646,7 +672,7 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">
               Annual cost
             </div>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-3 text-body">
+            <dl className="ledger text-body">
               {[
                 ['Feedstock and media', result.operating.materialCost],
                 ['Utilities', result.operating.utilityCost],
@@ -654,11 +680,12 @@ export default function Price({ scenarioId }: { scenarioId: string }) {
                 ['Fixed operating cost', result.operating.FOC],
                 ['Annual operating cost', result.operating.AOC],
               ].map(([label, v], i) => (
-                <div key={label as string} className={cx('contents', i === 4 && 'font-medium')}>
-                  <dt className="py-0.5 text-ink-soft">{label}</dt>
-                  <dd className="py-0.5 text-right font-num whitespace-nowrap">
-                    {money(v as number)}
-                  </dd>
+                <div
+                  key={label as string}
+                  className={cx('ledger-row', i === 4 && 'ledger-total ledger-close')}
+                >
+                  <dt className={cx(i !== 4 && 'text-ink-soft')}>{label}</dt>
+                  <dd className="font-num">{money(v as number)}</dd>
                 </div>
               ))}
             </dl>

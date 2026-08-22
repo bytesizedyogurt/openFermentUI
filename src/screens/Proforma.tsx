@@ -31,6 +31,7 @@ import { fmt } from '@/engine/units';
 import { href } from '@/router';
 import { partEyebrow } from '@/data/parts';
 import { ProformaDemoCard } from '@/components/demo/ProformaDemoCard';
+import { PriceScale, PriceScaleTable, type PricePoint } from '@/components/PriceScale';
 import { Tick } from '@/components/Provenance';
 import { PageHeader, Card, SectionTitle, EmptyState } from '@/components/ui';
 
@@ -41,6 +42,23 @@ export default function Proforma() {
   const scenarios = useStore((s) => s.scenarios);
   const grids = useStore((s) => s.grids);
 
+  // S3 is conventional isolation from milk — the route that exists today and
+  // the one OF-COR-001 calls "what any recombinant route has to beat". It is
+  // the reference by argument, not by being cheapest.
+  const pricePoints: PricePoint[] = scenarios
+    .map((sc) => {
+      const grid = grids[sc.modelId];
+      const r = grid ? evaluateGrid(grid, sc.point) : null;
+      return {
+        id: sc.id,
+        tag: sc.modelId,
+        label: sc.name,
+        msp: r?.msp ?? NaN,
+        incumbent: sc.modelId === 'S3',
+      };
+    })
+    .filter((p) => Number.isFinite(p.msp) && p.msp > 0);
+
   return (
     <>
       <PageHeader
@@ -49,9 +67,41 @@ export default function Proforma() {
         subtitle="Techno-economics against an explicit regional and temporal basis. fermOS sizes a plant; this part discounts it and says what frame the answer is quoted in."
       />
 
+      {/* THE COMPARISON, BEFORE THE CARDS.
+          Three routes to one protein whose prices span three orders of
+          magnitude. In three equal boxes that is three numbers; on a log axis
+          it is the finding. S3 is the incumbent every recombinant route has to
+          beat, so it is the line the others are measured against. */}
       <section className="mb-6">
         <SectionTitle right={<span className="text-caption text-ink-soft">β-casein corpus</span>}>
-          The plants, priced
+          What the three routes cost
+        </SectionTitle>
+        <Card className="p-4">
+          {pricePoints.length >= 2 ? (
+            <>
+              <PriceScale points={pricePoints} />
+              <p className="text-caption text-ink-soft mt-2 max-w-prose">
+                Logarithmic, because a linear axis holding{' '}
+                <span className="font-num">{money0(Math.max(...pricePoints.map((p) => p.msp)))}</span>{' '}
+                cannot also show{' '}
+                <span className="font-num">{money0(Math.min(...pricePoints.map((p) => p.msp)))}</span>.
+                Read off the precomputed sweep at each scenario’s current point; every one is
+                modelled economics with no regional basis and no accuracy class, which is stated on
+                each price’s own screen.
+              </p>
+              <PriceScaleTable points={pricePoints} />
+            </>
+          ) : (
+            <p className="text-caption text-ink-soft">
+              Fewer than two scenarios price at their current point, so there is nothing to compare.
+            </p>
+          )}
+        </Card>
+      </section>
+
+      <section className="mb-6">
+        <SectionTitle right={<span className="text-caption text-ink-soft">β-casein corpus</span>}>
+          What each route is
         </SectionTitle>
         {scenarios.length === 0 ? (
           <EmptyState
@@ -77,24 +127,20 @@ export default function Proforma() {
                   </a>
                   <p className="text-body text-ink-soft mt-1 mb-3 flex-1">{sc.product}</p>
 
-                  <Tick p="demo" className="mb-2">
-                    <div className="text-caption uppercase tracking-wide text-ink-soft">
-                      Minimum selling price
-                    </div>
-                    <div className="font-num text-display leading-none">
-                      {result ? USD_KG(result.msp) : '—'}
-                    </div>
-                    <div className="text-caption text-ink-soft mt-0.5">
-                      USD kg⁻¹ — read off the precomputed sweep. The solve at this point, with its
-                      capital ladder and cash flow, is one click away.
-                    </div>
+                  {/* The price is stated twice above — once on the scale and
+                      once in its table. A third big number here would be the
+                      flat hierarchy this pass exists to remove, so the card
+                      carries what the scale cannot: what the route IS. */}
+                  <Tick p="demo" className="text-caption text-ink-soft mb-3">
+                    <span className="font-num text-ink">{result ? USD_KG(result.msp) : '—'}</span>{' '}
+                    USD kg⁻¹, off the sweep
                   </Tick>
 
                   <a
                     href={href(`/proforma/price/${sc.id}`)}
                     className="text-caption text-accent hover:underline"
                   >
-                    The price and its basis →
+                    The solved price, its capital and its basis →
                   </a>
                 </Card>
               );
@@ -109,6 +155,11 @@ export default function Proforma() {
       </section>
     </>
   );
+}
+
+/** Whole dollars with separators, for prose that names a magnitude. */
+function money0(v: number): string {
+  return `$${Math.round(v).toLocaleString('en-US')}`;
 }
 
 /** One format for a price, everywhere in this part. */
