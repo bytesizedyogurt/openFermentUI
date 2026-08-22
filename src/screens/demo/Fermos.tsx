@@ -339,16 +339,17 @@ export function RunPage({ runId }: { runId: string }) {
           <div className="text-caption text-ink-soft mt-1">{e.description}</div>
           {e.integrals && (
             <dl className="mt-3 grid sm:grid-cols-3 gap-3 text-caption">
-              <Metric k="Integrated O₂ deficit" v={`${e.integrals.o2DeficitMmolPerL} mmol L⁻¹`} />
+              <Metric k="Integrated O₂ deficit" v={`${e.integrals.o2DeficitMmolPerL} mmol L⁻¹`} how={BY_TRAPEZOID} />
               {/* The saturation concentration the deficit is measured against.
                   Its docstring named this readout and this readout did not
                   use it, so the number a reader needs to interpret the deficit
                   was the one number not on screen. */}
-              <Metric k="C* at run temperature" v={`${C_STAR_AT_RUN_TEMP} mmol L⁻¹`} />
-              <Metric k="CER deviation" v={`${e.integrals.cerDeviationMmolPerL} mmol L⁻¹`} />
+              <Metric k="C* at run temperature" v={`${C_STAR_AT_RUN_TEMP} mmol L⁻¹`} how={FROM_SOLUBILITY} />
+              <Metric k="CER deviation" v={`${e.integrals.cerDeviationMmolPerL} mmol L⁻¹`} how={BY_TRAPEZOID} />
               <Metric
                 k="Carbon diverted (est.)"
                 v={`${e.integrals.estimatedCarbonDivertedCmolPerL} C-mol L⁻¹`}
+                how={BY_TRAPEZOID}
               />
             </dl>
           )}
@@ -435,16 +436,35 @@ export function RunPage({ runId }: { runId: string }) {
   );
 }
 
-function Metric({ k, v }: { k: string; v: string }) {
+/**
+ * A computed readout, ticked as computed.
+ *
+ * `how` is a required prop rather than a constant because this component has
+ * two callers and the constant was only true for one of them. The excursion
+ * integrals ARE trapezoids over a recorded series; the envelope ceilings are
+ * correlation output — van 't Riet for kLa, a solubility interpolation for C* —
+ * and calling those a trapezoid described the wrong arithmetic on the tick that
+ * exists to say what arithmetic was done.
+ */
+function Metric({ k, v, how }: { k: string; v: string; how: string }) {
   return (
     <div>
       <dt className="text-ink-soft">{k}</dt>
-      <dd className="font-num tick-cell tick-user tick-ev-computed pl-2" title="Computed by trapezoid, not measured">
+      <dd className="font-num tick-cell tick-user tick-ev-computed pl-2" title={how}>
         {v}
       </dd>
     </div>
   );
 }
+
+/** Integrals over the recorded series. */
+const BY_TRAPEZOID = 'Computed by trapezoid over the recorded series, not measured';
+/** Correlation output at the plant's geometry — van 't Riet, and a solubility table. */
+const BY_CORRELATION =
+  'Computed from the vessel geometry and the utilities by correlation, not measured';
+/** A table lookup at the run temperature. Not an integral and not a correlation. */
+const FROM_SOLUBILITY =
+  'Read from the oxygen solubility table at the run temperature, not measured';
 
 // ── /fermos/envelope/:plantId ──────────────────────────────────────────
 
@@ -467,20 +487,20 @@ export function EnvelopePage({ plantId }: { plantId: string }) {
           <div>
             <div className="text-caption text-ink-soft">At 1 atm</div>
             <dl className="text-caption space-y-1 mt-1">
-              <Metric k="Superficial gas velocity" v={`${ceilings.superficialGasVelocity} m s⁻¹`} />
-              <Metric k="kLa, clean water" v={`${ceilings.klaClean} h⁻¹`} />
-              <Metric k="kLa, effective" v={`${ceilings.klaEffective} h⁻¹`} />
-              <Metric k="C*" v={`${ceilings.cStar} mmol L⁻¹`} />
-              <Metric k="OTR ceiling" v={`${ceilings.otrCeiling} mmol L⁻¹ h⁻¹`} />
-              <Metric k="Cooling ceiling" v={`${ceilings.coolingCeiling} mmol L⁻¹ h⁻¹`} />
+              <Metric k="Superficial gas velocity" v={`${ceilings.superficialGasVelocity} m s⁻¹`} how={BY_CORRELATION} />
+              <Metric k="kLa, clean water" v={`${ceilings.klaClean} h⁻¹`} how={BY_CORRELATION} />
+              <Metric k="kLa, effective" v={`${ceilings.klaEffective} h⁻¹`} how={BY_CORRELATION} />
+              <Metric k="C*" v={`${ceilings.cStar} mmol L⁻¹`} how={FROM_SOLUBILITY} />
+              <Metric k="OTR ceiling" v={`${ceilings.otrCeiling} mmol L⁻¹ h⁻¹`} how={BY_CORRELATION} />
+              <Metric k="Cooling ceiling" v={`${ceilings.coolingCeiling} mmol L⁻¹ h⁻¹`} how={BY_CORRELATION} />
             </dl>
           </div>
           <div>
             <div className="text-caption text-ink-soft">At 1.5 bara</div>
             <dl className="text-caption space-y-1 mt-1">
-              <Metric k="C*" v={`${pressed.cStar} mmol L⁻¹`} />
-              <Metric k="OTR ceiling" v={`${pressed.otrCeiling} mmol L⁻¹ h⁻¹`} />
-              <Metric k="Cooling ceiling" v={`${pressed.coolingCeiling} mmol L⁻¹ h⁻¹`} />
+              <Metric k="C*" v={`${pressed.cStar} mmol L⁻¹`} how={FROM_SOLUBILITY} />
+              <Metric k="OTR ceiling" v={`${pressed.otrCeiling} mmol L⁻¹ h⁻¹`} how={BY_CORRELATION} />
+              <Metric k="Cooling ceiling" v={`${pressed.coolingCeiling} mmol L⁻¹ h⁻¹`} how={BY_CORRELATION} />
             </dl>
             <div className="text-caption text-ink-soft mt-3 max-w-prose">
               At one atmosphere transfer fails {(ceilings.coolingCeiling - ceilings.otrCeiling).toFixed(1)}{' '}

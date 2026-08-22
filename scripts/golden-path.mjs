@@ -277,7 +277,15 @@ async function main() {
   // ── 8. Simulate: slider moves MSP; waterfall agrees with headline ───
   await go('/fermos/s/sc-s2');
   await page.waitForTimeout(800);
-  const mspBefore = (await page.locator('body').innerText()).match(/\$([\d.]+)/)?.[1];
+  // Matched on the unit rather than on a `$` sigil.
+  //
+  // This used to read `/\$([\d.]+)/` over the whole body and take the first hit,
+  // which stopped being the headline the moment anything else on the page
+  // carried a dollar figure — it was reporting `$0 → $0` off a waterfall cell.
+  // `USD kg⁻¹` appears exactly once on this screen, on the number this check is
+  // about, and it is the same format `deep-paths.mjs` pins on the price screen.
+  const MSP = /([\d,]+\.?\d*)\s*USD\s*kg/;
+  const mspBefore = (await page.locator('body').innerText()).match(MSP)?.[1];
   const slider = page.locator('input[type=range]').first();
   await slider.evaluate((el) => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -286,11 +294,11 @@ async function main() {
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.waitForTimeout(1200);
-  const mspAfter = (await page.locator('body').innerText()).match(/\$([\d.]+)/)?.[1];
+  const mspAfter = (await page.locator('body').innerText()).match(MSP)?.[1];
   check(
     'Moving a sweep slider changes the MSP',
-    mspBefore !== mspAfter,
-    `$${mspBefore} → $${mspAfter}`,
+    Boolean(mspBefore) && mspBefore !== mspAfter,
+    `${mspBefore} → ${mspAfter} USD kg⁻¹`,
   );
 
   // Waterfall lines must sum to the headline

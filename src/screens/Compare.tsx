@@ -46,7 +46,7 @@ function summarize(a: Evaluated, b: Evaluated): string {
   }
   const share = (biggestDelta / gap) * 100;
   const label = COST_LINE_LABEL[biggest].toLowerCase();
-  return `${cheaper.scenario.name} undercuts ${dearer.scenario.name} by $${fmt(gap, 1)}/kg, and ${share >= 50 ? 'most' : 'the largest single share'} of that gap (${share.toFixed(0)}%) is ${label}.`;
+  return `${cheaper.scenario.name} undercuts ${dearer.scenario.name} by ${fmt(gap, 1)} USD kg⁻¹, and ${share >= 50 ? 'most' : 'the largest single share'} of that gap (${share.toFixed(0)}%) is ${label}.`;
 }
 
 export default function Compare() {
@@ -90,7 +90,7 @@ export default function Compare() {
   }
 
   const exportDeltas = () => {
-    const headers = ['Cost line', ...evaluated.map((e) => `${e.scenario.name} ($/kg)`)];
+    const headers = ['Cost line', ...evaluated.map((e) => `${e.scenario.name} (USD kg⁻¹)`)];
     const rows: (string | number)[][] = COST_LINES.map((l) => [
       COST_LINE_LABEL[l],
       ...evaluated.map((e) => e.costLines[l].toFixed(2)),
@@ -145,8 +145,8 @@ export default function Compare() {
             </a>
             <Tick p="demo" className="mt-2">
               <div className="font-num text-display leading-none">
-                ${fmt(e.msp, 1)}
-                <span className="text-body text-ink-soft ml-1">/kg</span>
+                {fmt(e.msp, 1)}
+                <span className="text-body text-ink-soft ml-1">USD kg⁻¹</span>
               </div>
               <div className="text-caption text-ink-soft">
                 Demo model v0 — illustrative economics, not validated
@@ -200,7 +200,7 @@ export default function Compare() {
                       tickFormatter={(v) => `$${v}`}
                       width={44}
                     />
-                    <Tooltip {...tip} formatter={(v: number) => [`$${v.toFixed(2)}/kg`, 'Cost']} />
+                    <Tooltip {...tip} formatter={(v: number) => [`${v.toFixed(2)} USD kg⁻¹`, 'Cost']} />
                     <Bar dataKey="value" isAnimationActive={false} radius={[3, 3, 0, 0]}>
                       {data.map((_, i) => (
                         <Cell key={i} fill={seriesColor(i)} />

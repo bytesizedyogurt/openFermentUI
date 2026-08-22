@@ -76,9 +76,21 @@ export function ClaimChip({
 export function ClaimOverlay({
   rows,
   className,
+  showStep = true,
 }: {
   rows: { step: string; status?: ClaimStatus; positions?: { jurisdiction: string; status: ClaimStatus; familyIds: string[] }[]; familyIds?: string[] }[];
   className?: string;
+  /**
+   * Whether to draw the step column.
+   *
+   * A PROP RATHER THAN A CSS OVERRIDE. The capacity screen used to hide this
+   * column with an arbitrary variant reaching into the component's own utility
+   * class — and it never worked: the escaping made esbuild emit a
+   * css-syntax-error and no rule at all, so the column has been visible in
+   * every build since it was written while the code said otherwise. A caller
+   * that wants a column gone should be able to say so, and be believed.
+   */
+  showStep?: boolean;
 }) {
   return (
     <div className={cx('min-w-0', className)}>
@@ -88,14 +100,16 @@ export function ClaimOverlay({
         const enclosed = positions.filter((p) => p.status === 'enclosed').length;
         return (
           <div key={`${r.step}-${i}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-1 border-b border-line/60 last:border-0">
-            <div className="min-w-[13rem] flex-1 text-caption">
-              {r.step}
-              {enclosed > 0 && (
-                <span className="ml-1.5 text-[11px] text-signal-closed">
-                  {enclosed} enclosed
-                </span>
-              )}
-            </div>
+            {showStep && (
+              <div className="min-w-[13rem] flex-1 text-caption">
+                {r.step}
+                {enclosed > 0 && (
+                  <span className="ml-1.5 text-[11px] text-signal-closed">
+                    {enclosed} enclosed
+                  </span>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-1">
               {sorted.length ? (
                 sorted.map((p) => (

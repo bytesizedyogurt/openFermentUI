@@ -468,8 +468,8 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
             Minimum selling price
           </div>
           <div className="font-num text-display leading-none">
-            ${result ? fmt(result.msp, 1) : '—'}
-            <span className="text-body text-ink-soft ml-1">/kg</span>
+            {result ? fmt(result.msp, 1) : '—'}
+            <span className="text-body text-ink-soft ml-1">USD kg⁻¹</span>
           </div>
           <div className="text-caption text-ink-soft">
             Demo model v0 — illustrative economics, not validated

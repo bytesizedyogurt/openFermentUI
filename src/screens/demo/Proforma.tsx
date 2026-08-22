@@ -168,10 +168,7 @@ export function CapacityScreen({ plantId }: { plantId: string }) {
                   </td>
                   <td className="p-2">
                     <div className="flex flex-wrap gap-1">
-                      <ClaimOverlay
-                        rows={[{ step: '', positions: c.patentPosition }]}
-                        className="[&_.min-w-\\[13rem\\]]:hidden"
-                      />
+<ClaimOverlay rows={[{ positions: c.patentPosition, step: '' }]} showStep={false} />
                     </div>
                   </td>
                   <td className="p-2 text-right whitespace-nowrap">

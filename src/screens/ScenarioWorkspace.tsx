@@ -209,14 +209,14 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
             'Result',
             COST_LINE_LABEL[l],
             result.costLines[l].toFixed(2),
-            '$/kg',
+            'USD kg⁻¹',
             'demo',
             '',
             'Interpolated from the precomputed grid',
           ])
         : []),
       ...(result
-        ? [['Result', 'Minimum selling price', result.msp.toFixed(2), '$/kg', 'demo', '', 'Demo model v0 — illustrative, not validated']]
+        ? [['Result', 'Minimum selling price', result.msp.toFixed(2), 'USD kg⁻¹', 'demo', '', 'Modelled economics — no regional basis, no accuracy class']]
         : []),
     ];
     exportCSV(`${scenario.id}-assumptions-results.csv`, headers, rows);
@@ -407,8 +407,8 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                         converging !== null && 'opacity-40',
                       )}
                     >
-                      ${result ? fmt(result.msp, 1) : '—'}
-                      <span className="text-section-title text-ink-soft ml-1">/kg</span>
+                      {result ? fmt(result.msp, 1) : '—'}
+                      <span className="text-section-title text-ink-soft ml-1">USD kg⁻¹</span>
                     </div>
                     <div className="text-caption text-ink-soft mt-1">
                       Demo model v0 — illustrative economics, not validated
@@ -470,7 +470,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                       <Tooltip
                         {...tip}
                         formatter={(v: number, name: string) =>
-                          name === 'value' ? [`$${v.toFixed(2)}/kg`, 'Contribution'] : null
+                          name === 'value' ? [`${v.toFixed(2)} USD kg⁻¹`, 'Contribution'] : null
                         }
                       />
                       <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
@@ -486,7 +486,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                   </ResponsiveContainer>
                 </div>
                 <ChartTable
-                  headers={['Cost line', '$/kg', 'Share']}
+                  headers={['Cost line', 'USD kg⁻¹', 'Share']}
                   rows={
                     result
                       ? COST_LINES.map((l) => [
@@ -588,7 +588,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                         />
                         <Tooltip
                           {...tip}
-                          formatter={(v: number) => [`$${v.toFixed(1)}/kg`, 'MSP']}
+                          formatter={(v: number) => [`${v.toFixed(1)} USD kg⁻¹`, 'MSP']}
                           labelFormatter={(l) => `${fmt(Number(l))} ${primaryDim?.unit}`}
                         />
                         {smallMultiples.length > 0
@@ -630,7 +630,7 @@ export default function ScenarioWorkspace({ scenarioId }: { scenarioId: string }
                     </ResponsiveContainer>
                   </div>
                   <ChartTable
-                    headers={[primaryDim?.label ?? 'x', 'MSP ($/kg)']}
+                    headers={[primaryDim?.label ?? 'x', 'MSP (USD kg⁻¹)']}
                     rows={sweep
                       .filter((_, i) => i % 6 === 0)
                       .map((p) => [fmt(p.x), p.msp.toFixed(1)])}

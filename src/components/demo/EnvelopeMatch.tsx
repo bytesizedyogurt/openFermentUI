@@ -5,22 +5,21 @@
 // bar is longest — a reader should be able to say what killed a candidate
 // without measuring anything.
 //
-// The axes are the plant's, not the product's: OTR, cooling, installed power,
-// viscosity class, sterility class, separation class, cycle time. A candidate
-// does not fail "because it is hard"; it fails on one of seven things, and the
+// The axes are the plant's, not the product's: oxygen transfer, cooling duty,
+// installed power, rheology, separation, thermal driving force. A candidate
+// does not fail "because it is hard"; it fails on one of six things, and the
 // screen's job is to name which.
+//
+// This used to say seven, and to carry an `AXIS_LABEL` map translating short
+// keys — `otr`, `cooling`, `sterility`, `cycle` — into prose. `matchEnvelope`
+// has never emitted a short key: it emits the prose directly, and it emits six
+// axes, two of which (`sterility`, `cycle`) the map named and three of which
+// (`Rheology`, `Separation`, `Thermal driving force`) it had no entry for at
+// all. Every lookup fell through the `?? ax.axis` fallback, so the map was
+// doing nothing while reading as the authority on what the axes are. Both the
+// map and the count are gone; `lib/demo.ts` is the one place that names them.
 import type { EnvelopeMatchResult } from '@/data/demo/types';
 import { cx } from '@/components/ui';
-
-const AXIS_LABEL: Record<string, string> = {
-  otr: 'Oxygen transfer',
-  cooling: 'Cooling duty',
-  power: 'Installed power',
-  viscosity: 'Viscosity class',
-  sterility: 'Sterility class',
-  separation: 'Separation class',
-  cycle: 'Cycle time',
-};
 
 /** A categorical axis has no headroom to draw; it passes or it does not. */
 const isNumeric = (v: number | string): v is number => typeof v === 'number';
@@ -53,7 +52,7 @@ export function EnvelopeMatch({
             return (
               <tr key={ax.axis} className={cx('align-middle', violated && 'text-signal-error')}>
                 <td className="py-0.5 pr-2 whitespace-nowrap">
-                  {AXIS_LABEL[ax.axis] ?? ax.axis}
+                  {ax.axis}
                   {ax.binding && (
                     <span className="ml-1.5 px-1 rounded-[2px] text-[10px] uppercase tracking-wide bg-signal-error/10 text-signal-error">
                       binding
@@ -101,7 +100,7 @@ export function EnvelopeMatch({
           <span className="text-signal-error">
             Does not fit. Binding axis:{' '}
             <span className="font-medium">
-              {AXIS_LABEL[match.bindingAxis ?? ''] ?? match.bindingAxis}
+              {match.bindingAxis}
             </span>
             . Every other axis has room, which is why this is a named failure rather than a
             verdict.

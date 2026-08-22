@@ -1195,11 +1195,15 @@ function AboutSection() {
               the only way anything leaves.
             </li>
             <li>
-              <span className="font-medium">Simulation economics are illustrative.</span> The cost
-              models are authored spreadsheets swept over a grid — Demo model v0, illustrative
-              economics, not validated. This is the part of the build that really is synthetic.
-              Treat a minimum selling price here as a shape to reason about, never as a number to
-              plan against.
+  <span className="font-medium">Simulation economics carry no regional basis.</span> The
+              cost models are not spreadsheets: each point builds a flowsheet, sizes the equipment,
+              costs it against bioSTEAM&rsquo;s correlations and solves a discounted cash flow at
+              NPV&nbsp;= 0. What is synthetic is narrower and more specific than &ldquo;the
+              economics&rdquo;. No region is declared, so no location factor, labour rate or
+              utility price is adjusted for anywhere; capital is indexed to CEPCI 567.5, a 2017
+              basis, on a plant built from 2026; a share of installed capital on the algal route
+              uses correlations written here because bioSTEAM ships none; and no accuracy class has
+              been assigned. Proforma states all of that beside every price it quotes.
             </li>
             <li>
               <span className="font-medium">The agent&rsquo;s answers are written, not generated.</span>{' '}
