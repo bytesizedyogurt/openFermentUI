@@ -230,7 +230,101 @@ export const STRAINS: Strain[] = [
       },
     ],
   },
-];
+  // ── OF-BLD-005 · platform hosts ────────────────────────────────────
+  //
+  // Eight hosts added for breadth, not depth. The corpus stands behind
+  // Chlamydomonas and the four organisms already here; these eight are
+  // catalogued so a molecule can name the chassis it would actually be
+  // made in, and the Organisms index says plainly that nothing in the
+  // corpus is attributed to them yet.
+  {
+    id: 's-cerevisiae',
+    binomial: 'Saccharomyces cerevisiae',
+    designation: 'S288C-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes'],
+    description:
+      'Budding yeast. GRAS status, deepest genetic toolkit of any eukaryote, strong terpene and glycoside track record. Secretion is weaker than Pichia.',
+    badges: ['GRAS', 'terpenes', 'well-characterised'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'y-lipolytica',
+    binomial: 'Yarrowia lipolytica',
+    designation: 'W29-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes'],
+    description:
+      'Oleaginous yeast. High acetyl-CoA flux and tolerance of lipophilic products make it a strong terpene and lipid chassis.',
+    badges: ['oleaginous', 'terpenes'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'a-niger',
+    binomial: 'Aspergillus niger',
+    designation: 'ATCC 1015-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Eurotiomycetes'],
+    description:
+      'Filamentous fungus with decades of food-enzyme regulatory precedent. Requires a documented mycotoxin-free strain lineage.',
+    badges: ['food enzyme', 'high secretion'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'a-oryzae',
+    binomial: 'Aspergillus oryzae',
+    designation: 'RIB40-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Eurotiomycetes'],
+    description:
+      'Koji mould. Excellent secretion and strong food-safety acceptance; native protease background needs management.',
+    badges: ['GRAS', 'koji', 'high secretion'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'b-subtilis',
+    binomial: 'Bacillus subtilis',
+    designation: '168-derived',
+    taxonomy: ['Bacteria', 'Firmicutes', 'Bacilli'],
+    description:
+      'Gram-positive bacterium that secretes to the medium with no lysis step. GRAS. High native protease activity is the main obstacle.',
+    badges: ['GRAS', 'true secretion'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'c-glutamicum',
+    binomial: 'Corynebacterium glutamicum',
+    designation: 'ATCC 13032-derived',
+    taxonomy: ['Bacteria', 'Actinobacteria', 'Actinomycetia'],
+    description:
+      'Amino-acid industry workhorse. No endotoxin, which removes a whole downstream clearance burden relative to E. coli.',
+    badges: ['no endotoxin', 'industrial heritage'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'k-lactis',
+    binomial: 'Kluyveromyces lactis',
+    designation: 'GG799-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes'],
+    description:
+      'Lactose-utilising yeast with dairy-enzyme precedent. Fewer engineering tools than Pichia or Saccharomyces.',
+    badges: ['dairy', 'lactose utilisation'],
+    bsl: 1,
+    notes: [],
+  },
+  {
+    id: 'm-thermophila',
+    binomial: 'Myceliophthora thermophila',
+    designation: 'C1-derived',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Sordariomycetes'],
+    description:
+      'Thermophilic filamentous fungus. High secretion at elevated temperature lowers the cooling load at scale.',
+    badges: ['thermophilic', 'high secretion'],
+    bsl: 1,
+    notes: [],
+  },];
 
 export const STRAINS_BY_ID: Record<string, Strain> = Object.fromEntries(
   STRAINS.map((s) => [s.id, s]),
