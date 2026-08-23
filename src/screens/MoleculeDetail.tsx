@@ -34,7 +34,7 @@ import {
 } from '@/data/vocabulary';
 import { STRAINS_BY_ID } from '@/data/strains';
 import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
-import { territorialityNote } from '@/engine/clearance';
+import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
   ClearanceChip,
   ClearanceStrip,
@@ -151,6 +151,10 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
   const formats = product.storageIds.map((s) => STORAGE_FORMATS_BY_ID[s]).filter(Boolean);
   const warmestId = [...formats].sort((a, b) => b.tempC - a.tempC)[0]?.id;
   const territoriality = territorialityNote(product);
+  // A populated finding carries patent numbers, statuses and sources. That does
+  // not fit in a side column, so the matrix takes the full width as soon as
+  // there is anything in it and stays beside the strip while it is empty.
+  const assessedOffices = matrixCoverage(product).assessed;
   const heaviestRoute = [...product.regulatoryIds]
     .map((r) => REGULATORY_PATHWAYS_BY_ID[r])
     .filter(Boolean)
@@ -210,15 +214,22 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
               application — because that is what decides whether designing around it is possible.
               A claim reciting a specific sequence can be enumerated around; one reciting a
               functional class usually cannot, however much molecular diversity you throw at it.
-              The stored state is the worst case across jurisdictions, and the matrix below
-              spreads it back out. None of it is a search of national registers.
+              That reading is the headline state, and it is a statement about claim architecture,
+              not about any particular office. The matrix beside it is a separate question with a
+              separate answer per jurisdiction, filled in only where somebody has done the work
+              and cited it. The two never infer from each other.
             </Explain>
           }
         >
           <span id="band-clearance">Clearance</span>
         </SectionTitle>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4">
+        <div
+          className={cx(
+            'grid grid-cols-1 gap-4',
+            assessedOffices === 0 && 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]',
+          )}
+        >
           <Card className="p-4">
             <ClearanceStrip state={product.clearanceState} />
             {territoriality && (

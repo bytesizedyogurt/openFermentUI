@@ -11,6 +11,14 @@
 // Where a stage has produced no count the funnel says so rather than
 // interpolating. An unquantified step is a real state — often the interesting
 // one, because it is where the run stopped.
+// LONG TERM this is the wrong shape. Parsing prose for populations is a
+// heuristic dressed as a data model: it works on the stages written so far and
+// will mis-read the first one phrased differently, and the failure is silent —
+// a missed count just vanishes from the chart. The right fix is optional typed
+// `inputCount` / `outputCount` fields on RunbookStage, authored alongside the
+// prose, with this parser kept only as a fallback for stages that predate them.
+// Deliberately not built here: it changes the stage fixture format, which is a
+// separate change from the screens that read it.
 import type { Runbook, RunbookStage } from '@/data/types';
 
 export interface FunnelStep {

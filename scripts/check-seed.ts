@@ -12,6 +12,8 @@ import { RUN_OUTPUTS } from '../src/data/runOutputs';
 import { STRAINS } from '../src/data/strains';
 import { PRODUCTS } from '../src/data/products';
 import { RUNBOOKS } from '../src/data/runbooks';
+import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
+import { JURISDICTIONS } from '../src/engine/clearance';
 import {
   CLEARANCE_STATES,
   PATHWAYS,
@@ -402,6 +404,54 @@ for (const r of RUNBOOKS) {
   }
 }
 
+// ── 7. authored clearance findings (OF-BLD-005 §8) ─────────────────────
+//
+// Jurisdiction cells are populated ONLY from this list; everything else reads
+// unknown. That makes the list the whole trust surface for the feature, so it
+// is checked harder than the data around it. A finding that names no patent,
+// cites no source, or claims a provenance it has not earned is worse than no
+// finding at all — it puts a specific, actionable-looking verdict in front of
+// somebody on the one screen where being wrong is expensive.
+const jurisdictionIds = new Set(JURISDICTIONS.map((j) => j.id));
+const seenFinding = new Set<string>();
+for (const f of CLEARANCE_FINDINGS) {
+  const where = `clearance finding ${f.productId}/${f.jurisdictionId}`;
+  if (!productIds.has(f.productId)) fail(`${where}: productId does not resolve against PRODUCTS`);
+  if (!jurisdictionIds.has(f.jurisdictionId))
+    fail(`${where}: jurisdictionId is not a known office`);
+  if (!clearanceIds.has(f.state)) fail(`${where}: state "${f.state}" is not a known clearance state`);
+
+  const key = `${f.productId}/${f.jurisdictionId}`;
+  if (seenFinding.has(key)) fail(`${where}: duplicate finding for this product and office`);
+  seenFinding.add(key);
+
+  // A finding must name what it rests on and where it was read. Without both,
+  // it is an assertion, and an assertion is what this feature was rebuilt to
+  // stop rendering.
+  if (f.patents.length === 0) fail(`${where}: names no patent — a finding must cite what it rests on`);
+  if (f.sources.length === 0) fail(`${where}: cites no source`);
+  for (const src of f.sources)
+    if (!/^https?:\/\//.test(src.url)) fail(`${where}: source "${src.label}" has no resolvable URL`);
+  for (const pt of f.patents) {
+    if (!pt.number.trim()) fail(`${where}: a patent entry has no number`);
+    if (!pt.status.trim()) fail(`${where}: ${pt.number} has no status`);
+  }
+  if (!f.readAt.trim()) fail(`${where}: no read date`);
+  if (!f.toVerify.trim())
+    fail(`${where}: does not say what would promote it to verified`);
+
+  // 'verified' means checked against the source document. Nothing reaches that
+  // from secondary reporting, so the bar is explicit rather than assumed.
+  if (f.provenance === 'verified' && !/register|file wrapper|opinion|primary/i.test(f.toVerify))
+    warn(
+      `${where}: claims 'verified' — confirm a primary document was actually pulled, not just cited`,
+    );
+  if (!['curated', 'verified'].includes(f.provenance))
+    fail(
+      `${where}: provenance "${f.provenance}" — a jurisdiction finding must be curated or verified, never modeled`,
+    );
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -417,6 +467,7 @@ console.log(`  strains           ${STRAINS.length}`);
 console.log(`  molecules         ${PRODUCTS.length} across ${new Set(PRODUCTS.map((p) => p.category)).size} categories, ${new Set(PRODUCTS.map((p) => p.processCode)).size} process families (all modeled)`);
 console.log(`  clearance         ${PRODUCTS.filter((p) => p.clearanceState === 'blocked').length} blocked, ${PRODUCTS.filter((p) => p.clearanceState === 'unknown').length} unassessed, ${PRODUCTS.filter((p) => p.clearanceState.startsWith('clear')).length} clear`);
 console.log(`  vocabulary        ${UNIT_OPERATIONS.length} unit operations, ${STORAGE_FORMATS.length} storage formats, ${REGULATORY_PATHWAYS.length} regulatory routes, ${PATHWAYS.length} pathways`);
+console.log(`  clearance cells   ${CLEARANCE_FINDINGS.length} authored of ${PRODUCTS.length * JURISDICTIONS.length} (${PRODUCTS.length} molecules x ${JURISDICTIONS.length} offices) — every other cell reads 'not assessed'`);
 console.log(`  runbooks          ${RUNBOOKS.length} over ${new Set(RUNBOOKS.map((r) => r.status)).size} states (${RUNBOOKS.filter((r) => r.kind === 'industrial').length} industrial, ${RUNBOOKS.filter((r) => r.kind === 'research').length} research)`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);

@@ -29,7 +29,7 @@ export const RUNBOOKS: Runbook[] = [
         name: 'Clearance sweep',
         status: 'done',
         detail: 'Foundational composition IP expired; 3 variant families flagged',
-        value: 'clear-variant',
+        value: 'watch-variant',
       },
       {
         name: 'Host & construct selection',

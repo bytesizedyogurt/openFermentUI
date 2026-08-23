@@ -32,7 +32,7 @@ import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { STRAINS_BY_ID } from '@/data/strains';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
 import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/enumeration';
-import { territorialityNote } from '@/engine/clearance';
+import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
   ClearanceChip,
   ClearanceStrip,
@@ -621,13 +621,28 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
 
         {product ? (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4">
+            <div
+              className={cx(
+                'grid grid-cols-1 gap-4',
+                matrixCoverage(product).assessed === 0 &&
+                  'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]',
+              )}
+            >
               <Card className="p-4">
                 <ClearanceStrip state={product.clearanceState} />
-                <div className="mt-3 pt-3 border-t border-line text-body text-ink-soft">
-                  {territoriality ??
-                    'Every office in the model reads this molecule the same way, so the manufacture and export answers do not diverge here.'}
-                </div>
+                {territoriality ? (
+                  <div className="mt-3 pt-3 border-t border-line text-body text-ink-soft">
+                    {territoriality}
+                  </div>
+                ) : (
+                  // No note is NOT agreement between offices. Saying "they all
+                  // read the same" from an unassessed matrix would be the same
+                  // fabrication the matrix itself was rebuilt to avoid.
+                  <div className="mt-3 pt-3 border-t border-line text-body text-ink-soft">
+                    No divergence has been established between offices, because the offices have
+                    not been compared. That is an absence of work, not an agreement.
+                  </div>
+                )}
                 <div className="mt-3">
                   <a
                     href={href(`/molecules/${product.id}`)}

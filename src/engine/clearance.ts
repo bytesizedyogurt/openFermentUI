@@ -6,14 +6,23 @@
 // A product that reads "clear" on one line and then gets exported is the
 // failure mode this module exists to prevent.
 //
-// A product's stored `clearanceState` is the WORST case across jurisdictions —
-// the headline. This module spreads that headline back out over the
-// jurisdictions that matter for a landlocked East African facility, using a
-// filing-propensity model rather than a search of national registers. It is
-// modeled, it says so on every surface that renders it, and it is never legal
-// advice. openFerment produces research leads; counsel produces opinions.
+// So the matrix is the point, not the cells. A per-office table makes a global
+// verdict structurally impossible to express, and it does that whether or not
+// anybody has filled it in. An EMPTY matrix satisfies §8.
+//
+// WHAT THIS MODULE DOES NOT DO. It does not infer a jurisdiction's position
+// from the product's stored state. An earlier version did: it walked the
+// stored state down a severity ladder per office using a filing-propensity
+// weight plus a deterministic jitter, and produced a specific, plausible,
+// actionable-looking divergence for all 117 molecules out of nothing at all.
+// It was labelled "modeled · not searched" and that did not rescue it — on
+// this surface a fabricated divergence is worse than no divergence, because
+// it looks like a finding and reads as a reason to act. It is gone. Cells are
+// populated from authored, sourced findings in `data/clearanceFindings.ts` or
+// they are `unknown`.
 import type { ClearanceStateId, Product } from '@/data/types';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
+import { findingFor, type ClearanceFinding } from '@/data/clearanceFindings';
 
 export interface Jurisdiction {
   id: string;
@@ -22,18 +31,17 @@ export interface Jurisdiction {
   name: string;
   /** Where the facility is, versus where the product would be sold. */
   role: 'manufacture' | 'export';
-  /**
-   * How reliably a biotech family is actually prosecuted and maintained here,
-   * expressed as how many severity steps the headline relaxes by. 0 means
-   * assume the family is live; 2 means assume it usually is not.
-   */
-  relax: 0 | 1 | 2;
-  because: string;
+  /** Why this office is on the list at all — never a claim about coverage. */
+  why: string;
 }
 
 /**
  * The six offices that decide whether a Kigali facility can build and sell.
  * Rwanda first, because manufacture is the question you answer before export.
+ *
+ * Note what these entries carry and what they do not: a reason the office
+ * matters commercially, and nothing whatsoever about how likely a patent is to
+ * exist there. That judgement is what the removed model was making up.
  */
 export const JURISDICTIONS: Jurisdiction[] = [
   {
@@ -41,51 +49,42 @@ export const JURISDICTIONS: Jurisdiction[] = [
     code: 'RW',
     name: 'Rwanda',
     role: 'manufacture',
-    relax: 2,
-    because:
-      'Few biotech families are filed and maintained here. Manufacture is usually clear where export is not — which is exactly why a single global verdict misleads.',
+    why: 'Where the facility would be built, so this is the office that decides whether you may make the molecule at all.',
   },
   {
     id: 'us',
     code: 'US',
     name: 'United States',
     role: 'export',
-    relax: 0,
-    because: 'Primary filing jurisdiction. Assume any live family is prosecuted here.',
+    why: 'Largest research-reagent and diagnostics market; the usual first filing jurisdiction.',
   },
   {
     id: 'ep',
     code: 'EP',
     name: 'European Patent Office',
     role: 'export',
-    relax: 0,
-    because:
-      'Primary filing jurisdiction, and the validation states that matter for food and diagnostics are almost always designated.',
+    why: 'One examination, then validation in the states that matter for food, feed and diagnostics.',
   },
   {
     id: 'cn',
     code: 'CN',
     name: 'China',
     role: 'export',
-    relax: 0,
-    because: 'Heavily filed in fermentation and enzymes; assume coverage unless shown otherwise.',
+    why: 'Large fermentation and enzyme market, and a major source of competing supply.',
   },
   {
     id: 'jp',
     code: 'JP',
     name: 'Japan',
     role: 'export',
-    relax: 1,
-    because: 'Filed selectively. Coverage is common for high-value families and patchy below them.',
+    why: 'High-value reagent and diagnostics market.',
   },
   {
     id: 'in',
     code: 'IN',
     name: 'India',
     role: 'export',
-    relax: 1,
-    because:
-      'Filed selectively, and the excluded-subject-matter rules narrow what survives. A family live in the US is often narrower or absent here.',
+    why: 'Large generics and reagent manufacturing base, and a regional export route.',
   },
 ];
 
@@ -94,9 +93,11 @@ export const JURISDICTIONS_BY_ID: Record<string, Jurisdiction> = Object.fromEntr
 );
 
 /**
- * Severity ladder. The two watch states sit at the same height because they
- * are equally live — they differ in what you design around, not in how much
- * they cost you. 'unknown' is off the ladder: not assessed is not a verdict.
+ * Severity ladder, used only to compare two states that are both KNOWN. The
+ * two watch states sit at the same height because they are equally live — they
+ * differ in what you design around, not in how much they cost you. 'unknown'
+ * is off the ladder at -1 and never compares: not assessed is not a verdict,
+ * and must never sort as though it were a mild one.
  */
 const SEVERITY: Record<ClearanceStateId, number> = {
   'clear-expired': 0,
@@ -111,71 +112,67 @@ export function clearanceSeverity(state: ClearanceStateId): number {
   return SEVERITY[state];
 }
 
-/** Cheap deterministic hash — the matrix must not change between renders. */
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
-
-/**
- * Walk a headline state down the severity ladder by `steps`. The watch flavour
- * is preserved on the way down, because "core free, variants fenced" and
- * "process claims live" imply different work and collapsing them would lose
- * the only useful thing the state says.
- */
-function relaxState(headline: ClearanceStateId, steps: number): ClearanceStateId {
-  if (headline === 'unknown') return 'unknown';
-  const target = Math.max(0, SEVERITY[headline] - steps);
-  if (target >= 3) return 'blocked';
-  if (target === 2) return headline === 'watch-process' ? 'watch-process' : 'watch-variant';
-  if (target === 1) return 'clear-none';
-  return 'clear-expired';
-}
-
 export interface JurisdictionVerdict {
   jurisdiction: Jurisdiction;
   state: ClearanceStateId;
-  /** Whether this office is stricter than where the facility would build. */
+  /** The authored finding behind this cell, or null when nobody has looked. */
+  finding: ClearanceFinding | null;
+  /**
+   * True only when this office and the manufacturing office are BOTH known and
+   * this one is materially stricter. Two unknowns never produce a divergence,
+   * because the absence of a finding is not evidence of a difference.
+   */
   blocksExport: boolean;
 }
 
 /**
  * The per-jurisdiction matrix for one product.
  *
- * Modeled, not searched. Each office relaxes the headline by its own filing
- * propensity plus one deterministic step of variation drawn from the product
- * and office ids, so the matrix is stable across renders and sessions but not
- * uniform across a catalogue. No office is ever stricter than the headline,
- * because the headline is defined as the worst case.
+ * Every cell defaults to `unknown` and is populated only from an authored,
+ * sourced finding. Nothing is derived from the product's stored state.
  */
 export function clearanceMatrix(product: Product): JurisdictionVerdict[] {
-  const headline = product.clearanceState;
-  const rows = JURISDICTIONS.map((jurisdiction) => {
-    const jitter = hash(`${product.id}:${jurisdiction.id}`) % 3 === 0 ? 1 : 0;
+  const rows: JurisdictionVerdict[] = JURISDICTIONS.map((jurisdiction) => {
+    const finding = findingFor(product.id, jurisdiction.id);
     return {
       jurisdiction,
-      state: relaxState(headline, jurisdiction.relax + jitter),
+      state: finding ? finding.state : 'unknown',
+      finding,
       blocksExport: false,
     };
   });
+
   const home = rows.find((r) => r.jurisdiction.role === 'manufacture');
-  const homeSeverity = home ? SEVERITY[home.state] : SEVERITY[headline];
-  for (const r of rows) {
-    r.blocksExport =
-      r.jurisdiction.role === 'export' &&
-      SEVERITY[r.state] > homeSeverity &&
-      SEVERITY[r.state] >= 2;
+  const homeSeverity = home ? SEVERITY[home.state] : -1;
+  if (homeSeverity >= 0) {
+    for (const r of rows) {
+      r.blocksExport =
+        r.jurisdiction.role === 'export' &&
+        SEVERITY[r.state] >= 2 &&
+        SEVERITY[r.state] > homeSeverity;
+    }
   }
   return rows;
 }
 
+/** How much of the matrix anybody has actually looked at. */
+export function matrixCoverage(product: Product): {
+  assessed: number;
+  total: number;
+  resolved: number;
+} {
+  const rows = clearanceMatrix(product);
+  return {
+    assessed: rows.filter((r) => r.finding !== null).length,
+    total: rows.length,
+    resolved: rows.filter((r) => r.finding !== null && r.state !== 'unknown').length,
+  };
+}
+
 /**
- * Export markets strictly worse than the manufacturing jurisdiction — the
- * cases where "we can make it" and "we can sell it" give different answers.
+ * Export markets known to be stricter than the manufacturing jurisdiction.
+ * Empty whenever the comparison would rest on an unknown, which — until
+ * somebody does the work — is almost always.
  */
 export function exportBlockers(product: Product): JurisdictionVerdict[] {
   return clearanceMatrix(product).filter((r) => r.blocksExport);
@@ -187,8 +184,9 @@ export function clearanceAction(state: ClearanceStateId): string {
 }
 
 /**
- * One sentence naming the divergence, for a summary line. Null when every
- * office agrees, so a caller can stay quiet rather than printing a non-fact.
+ * One sentence naming a real divergence, or null. Returns null when the
+ * offices simply have not been compared, which is not the same as agreeing —
+ * so the caller must not print "every office agrees" on a null.
  */
 export function territorialityNote(product: Product): string | null {
   const blockers = exportBlockers(product);
@@ -198,9 +196,13 @@ export function territorialityNote(product: Product): string | null {
 }
 
 /**
- * Shown wherever the matrix is. Says what the model is and what it is not, in
- * the platform's own voice — the counsel warning is a separate, fixed callout
- * and this does not stand in for it.
+ * Shown wherever the matrix is. Says what the table is and, more importantly,
+ * what an empty cell means — because the failure mode here is reading a blank
+ * as a green light.
  */
 export const CLEARANCE_MODEL_NOTE =
-  'Modeled from filing propensity per office, not read off national registers. The stored state is the worst case across jurisdictions; the rows below spread it back out. Treat it as where to look, never as what is true.';
+  'Cells are populated only from authored findings that name the patents they rest on and cite where they were read. Nothing is inferred from the molecule’s headline state, and nothing is inferred from one office to another. An empty cell means nobody has looked — it is not a clearance, and it is not a lack of a patent.';
+
+/** The one sentence that must sit next to the stored state, everywhere. */
+export const HEADLINE_SCOPE_NOTE =
+  'Not resolved to any jurisdiction. This describes claim architecture — what the claims recite and therefore whether designing around them is possible — not whether a patent is in force in any particular office.';
