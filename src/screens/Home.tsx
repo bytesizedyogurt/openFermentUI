@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Award,
   BookOpen,
+  Boxes,
   Check,
   CircleDot,
   ClipboardList,
@@ -14,6 +15,7 @@ import {
   Download,
   FileText,
   FlaskConical,
+  GitBranch,
   GraduationCap,
   LineChart,
   MessagesSquare,
@@ -27,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
+import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 
@@ -171,6 +174,8 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
   chat: MessagesSquare,
   chart: LineChart,
   simulate: LineChart,
+  runbook: GitBranch,
+  molecule: Boxes,
   search: Search,
   clock: Clock,
   timer: Clock,
@@ -204,6 +209,18 @@ const ENTRY_CARDS: { to: string; title: string; desc: string; Icon: LucideIcon }
     desc: 'Sweep a scenario and see where the cost per kilogram actually goes.',
     Icon: LineChart,
   },
+  {
+    to: '/molecules',
+    title: 'Browse molecules',
+    desc: 'What could be made, in which host, on which train — and who already owns it.',
+    Icon: Boxes,
+  },
+  {
+    to: '/runbooks',
+    title: 'Open a runbook',
+    desc: 'A synthesised answer to "how would we make this", with the stages it took to get there.',
+    Icon: GitBranch,
+  },
 ];
 
 const COLD_START_QUESTIONS = [
@@ -219,6 +236,8 @@ export default function Home() {
   const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
+  const products = useStore((s) => s.products);
+  const runbooks = useStore((s) => s.runbooks);
   const sessions = useStore((s) => s.sessions);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -275,6 +294,28 @@ export default function Home() {
     return dominant(provs, 'demo');
   }, [protocols, records]);
 
+  // ── catalogue numbers (OF-BLD-005) ───────────────────────────────────
+  //
+  // Deliberately not folded into Corpus vitals. Those tiles count real
+  // literature; these count a modeled catalogue. Putting them in one row would
+  // quietly imply the same standard of evidence stands behind both, which is
+  // the one thing this page is built not to do.
+  const blockedProducts = useMemo(
+    () => products.filter((p) => p.clearanceState === 'blocked').length,
+    [products],
+  );
+  const runbooksWaiting = useMemo(
+    () =>
+      runbooks.filter((r) =>
+        ['blocked_unverified', 'needs_review', 'awaiting_budget'].includes(r.status),
+      ),
+    [runbooks],
+  );
+  const runbooksRunning = useMemo(
+    () => runbooks.filter((r) => r.status === 'running').length,
+    [runbooks],
+  );
+
   // ── band 2 state ─────────────────────────────────────────────────────
   const lastSession = sessions.length > 0 ? sessions[0] : null;
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
@@ -296,7 +337,8 @@ export default function Home() {
     lastSession !== null ||
     reviewQueue.length > 0 ||
     activeRun !== null ||
-    pinnedScenarios.length > 0;
+    pinnedScenarios.length > 0 ||
+    runbooksWaiting.length > 0;
 
   const shownActivity = showAllActivity ? activity : activity.slice(0, 12);
 
@@ -441,6 +483,70 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── Band 1b · Catalogue (OF-BLD-005) ───────────────────────── */}
+        <section aria-labelledby="home-catalogue" className="mb-7">
+          <SectionTitle
+            right={
+              <Explain label="Why these are a separate band">
+                The tiles above count real literature: papers with DOIs, records that resolve to a
+                span, protocols bound to those records. These two count a modeled catalogue —
+                molecules assembled from a facet vocabulary and runbooks synthesised from them.
+                Both are useful and only one is evidence, so they wear the dashed amber tick and
+                sit in their own row rather than blurring into the corpus count.
+              </Explain>
+            }
+          >
+            <span id="home-catalogue">Catalogue</span>
+          </SectionTitle>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TileBoundary label="Molecules catalogued">
+              <VitalTile
+                to="/molecules"
+                label="Molecules catalogued"
+                prov="demo"
+                tickTitle="Modeled — a map of the option space, not a set of measurements"
+                sub={
+                  <>
+                    <span className="font-num text-signal-error">{blockedProducts}</span> behind
+                    live blocking claims ·{' '}
+                    <span className="font-num">
+                      {new Set(products.map((p) => p.processCode)).size}
+                    </span>{' '}
+                    process families
+                  </>
+                }
+              >
+                <div className="font-num text-display leading-tight">{products.length}</div>
+              </VitalTile>
+            </TileBoundary>
+
+            <TileBoundary label="Runbooks">
+              <VitalTile
+                to="/runbooks"
+                label="Runbooks"
+                prov="demo"
+                tickTitle="Synthesised answers — modeled throughout, and never a clearance opinion"
+                sub={
+                  <>
+                    <span className="font-num">{runbooksRunning}</span> running ·{' '}
+                    <span
+                      className={
+                        runbooksWaiting.length > 0 ? 'font-num text-signal-warn' : 'font-num'
+                      }
+                    >
+                      {runbooksWaiting.length}
+                    </span>{' '}
+                    waiting on a person
+                  </>
+                }
+              >
+                <div className="font-num text-display leading-tight">{runbooks.length}</div>
+              </VitalTile>
+            </TileBoundary>
+          </div>
+        </section>
+
         {/* ── Band 2 · Your work / cold start ────────────────────────── */}
         <section aria-labelledby="home-work" className="mb-7">
           <SectionTitle>
@@ -513,6 +619,32 @@ export default function Home() {
                 </ResumeCard>
               )}
 
+              {runbooksWaiting.length > 0 && (
+                <ResumeCard
+                  to={
+                    runbooksWaiting.length === 1
+                      ? `/runbooks/${runbooksWaiting[0].id}`
+                      : '/runbooks'
+                  }
+                  kicker="Runbooks waiting on you"
+                  title={
+                    runbooksWaiting.length === 1
+                      ? runbooksWaiting[0].title
+                      : `${runbooksWaiting.length} runbooks need a decision`
+                  }
+                  prov="demo"
+                  meta={runbooksWaiting
+                    .map((r) => RUNBOOK_STATUS_LABEL[r.status])
+                    .join(' · ')}
+                >
+                  <Bar
+                    value={runbooks.length - runbooksWaiting.length}
+                    max={Math.max(1, runbooks.length)}
+                    className="bg-signal-warn"
+                  />
+                </ResumeCard>
+              )}
+
               {pinnedScenarios.length > 0 && (
                 <ResumeCard
                   to="/simulate/compare"
@@ -557,7 +689,7 @@ export default function Home() {
           <SectionTitle>
             <span id="home-start">Start something</span>
           </SectionTitle>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {ENTRY_CARDS.map((c) => (
               <a
                 key={c.to}

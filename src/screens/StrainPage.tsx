@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BookOpen,
+  Boxes,
   ClipboardCheck,
   ClipboardList,
   Download,
@@ -22,11 +23,13 @@ import {
   Table2,
   X,
 } from 'lucide-react';
-import type { ExtractionRecord, FieldId, ParameterDef, Protocol, Scenario } from '@/data/types';
+import type { ExtractionRecord, FieldId, ParameterDef, Product, Protocol, Scenario } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
 import { href, navigate } from '@/router';
 import { convert, fmt, asNumber } from '@/engine/units';
+import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
+import { ClearanceChip, CounselCallout } from '@/components/Clearance';
 import { CitationChip } from '@/components/Chip';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -546,6 +549,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
+  const products = useStore((s) => s.products);
+  const runbooks = useStore((s) => s.runbooks);
   const collections = useStore((s) => s.collections);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
@@ -698,6 +703,37 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     }
     return out;
   }, [scenarios, recordIds, strain, strainId]);
+
+  // ── products made in this host (OF-BLD-005 §6) ───────────────────────
+  //
+  // A different kind of link from the ones above. Papers, protocols and
+  // scenarios say what the corpus KNOWS about this organism; products say what
+  // it could be pointed at. Two of the fifteen strains carry corpus depth and
+  // the rest carry catalogue breadth, and the section says which it is holding.
+  const hostProducts = useMemo(
+    () => products.filter((p) => p.defaultStrainId === strainId),
+    [products, strainId],
+  );
+
+  const hostProductGroups = useMemo(() => {
+    const by = new Map<Product['category'], Product[]>();
+    for (const p of hostProducts) {
+      const arr = by.get(p.category);
+      if (arr) arr.push(p);
+      else by.set(p.category, [p]);
+    }
+    return [...by.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+  }, [hostProducts]);
+
+  const hostRunbooks = useMemo(
+    () => runbooks.filter((r) => r.strainId === strainId),
+    [runbooks, strainId],
+  );
+
+  const hostBlocked = useMemo(
+    () => hostProducts.filter((p) => p.clearanceState === 'blocked'),
+    [hostProducts],
+  );
 
   const linkedCollections = useMemo(() => {
     const ids = new Set(strainPapers.map((p) => p.id));
@@ -1513,6 +1549,111 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             </div>
           </Card>
         </div>
+      </section>
+
+      {/* ── BAND 3.5 — products made in this host (OF-BLD-005 §6) ─────── */}
+      <section className="mb-6" aria-labelledby="band-products">
+        <SectionTitle
+          right={
+            hostProducts.length > 0 ? (
+              <a
+                href={href(`/molecules?host=${strainId}`)}
+                className="text-caption text-accent hover:underline"
+              >
+                Open in the catalogue
+              </a>
+            ) : undefined
+          }
+        >
+          <span id="band-products">Products made in this host</span>
+        </SectionTitle>
+        <p className="text-caption text-ink-soft mb-2 max-w-3xl">
+          A different kind of link from the ones above. Papers, protocols and scenarios describe
+          what the corpus <em>knows</em> about this organism; these describe what it could be
+          pointed at. Every one is modeled — a plausible assignment of molecule to chassis, not a
+          record of anything having been made.{' '}
+          <Explain label="Why these are not evidence">
+            A product names this strain as its default host because the pairing is conventional in
+            industry, not because a paper in this corpus reports it. That is a useful map and a bad
+            citation. The organism&rsquo;s parameter summary above is the part backed by
+            literature; this section is the part backed by a catalogue.
+          </Explain>
+        </p>
+
+        {hostProducts.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={<Boxes size={22} aria-hidden />}
+              title="No molecule in the catalogue defaults to this host"
+              body="Nothing in the 117-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate."
+              action={<LinkButton to="/molecules">Browse the catalogue</LinkButton>}
+            />
+          </Card>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
+              <span>
+                <span className="font-num text-ink">{hostProducts.length}</span>{' '}
+                {hostProducts.length === 1 ? 'molecule' : 'molecules'}
+              </span>
+              <span>
+                <span className="font-num text-ink">{hostProductGroups.length}</span>{' '}
+                {hostProductGroups.length === 1 ? 'category' : 'categories'}
+              </span>
+              <span>
+                <span className="font-num text-ink">
+                  {new Set(hostProducts.map((p) => p.processCode)).size}
+                </span>{' '}
+                process families
+              </span>
+              {hostBlocked.length > 0 && (
+                <span>
+                  <span className="font-num text-signal-error">{hostBlocked.length}</span> behind
+                  live blocking claims
+                </span>
+              )}
+              {hostRunbooks.length > 0 && (
+                <span>
+                  <span className="font-num text-accent">{hostRunbooks.length}</span>{' '}
+                  {hostRunbooks.length === 1 ? 'runbook uses' : 'runbooks use'} this host
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {hostProductGroups.map(([category, items]) => (
+                <Card key={category} className="p-4">
+                  <div className="flex items-baseline justify-between gap-3 mb-2">
+                    <div className="text-caption uppercase tracking-wide text-ink-soft">
+                      {PRODUCT_CATEGORY_LABEL[category]}
+                    </div>
+                    <span className="font-num text-caption text-ink-soft">{items.length}</span>
+                  </div>
+                  <ul className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+                    {items.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-2">
+                        <a
+                          href={href(`/molecules/${p.id}`)}
+                          className="text-body hover:text-accent hover:underline truncate"
+                          title={p.note ?? p.name}
+                        >
+                          {p.name}
+                        </a>
+                        <span className="shrink-0">
+                          <ClearanceChip state={p.clearanceState} compact />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              ))}
+            </div>
+
+            <div className="mt-3">
+              <CounselCallout scope={`the ${hostProducts.length} molecules assigned to this host`} />
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── BAND 4 — curator notes ─────────────────────────────────────── */}
