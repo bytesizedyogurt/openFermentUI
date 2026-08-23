@@ -57,6 +57,17 @@ import {
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
 
+/**
+ * A stage `value` is free text on purpose — stages produce titres, CAPEX
+ * figures, candidate counts and clearance verdicts, and forcing one shape
+ * would lose most of them. This spots the ones written as vocabulary ids so an
+ * unresolved term can be labelled rather than printed as though it were a
+ * finding.
+ */
+function looksLikeVocabularyId(value: string): boolean {
+  return /^[a-z]+(-[a-z]+)+$/.test(value);
+}
+
 // ── the state panel — what this runbook is waiting on ──────────────────
 
 function StatePanel({ runbook }: { runbook: Runbook }) {
@@ -533,6 +544,18 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
                               compact
                               title={`Stage verdict — ${CLEARANCE_STATES_BY_ID[s.value].label}`}
                             />
+                          ) : looksLikeVocabularyId(s.value) ? (
+                            // A hyphenated lowercase token that resolves to
+                            // nothing is a term this build does not carry, not
+                            // a finding. Showing it as one would dress an
+                            // unresolved reference up as an answer, so it is
+                            // labelled instead — and check-seed warns about it.
+                            <span
+                              className="chip text-ink-soft font-num text-[11px] py-0"
+                              title="This stage recorded a term that is not in the clearance vocabulary. Shown as written rather than mapped onto a state it may not mean."
+                            >
+                              {s.value} · not in the vocabulary
+                            </span>
                           ) : (
                             <span className="font-num text-body text-accent">{s.value}</span>
                           )}

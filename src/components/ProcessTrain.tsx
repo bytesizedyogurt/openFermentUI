@@ -40,8 +40,8 @@ function Terminal({
           {kind === 'start' ? 'Fermenter' : 'Finished form'}
         </div>
         <div className="text-body font-medium mt-1 leading-snug">{title}</div>
-        {lines.map((l) => (
-          <div key={l.text} className={cx('text-caption mt-0.5 leading-snug', l.className ?? 'text-ink-soft')}>
+        {lines.map((l, i) => (
+          <div key={i} className={cx('text-caption mt-0.5 leading-snug', l.className ?? 'text-ink-soft')}>
             {l.text}
           </div>
         ))}

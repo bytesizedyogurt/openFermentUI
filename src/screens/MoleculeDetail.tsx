@@ -22,7 +22,6 @@ import {
   Tag,
   Thermometer,
 } from 'lucide-react';
-import type { Product } from '@/data/types';
 import { useStore, PROVENANCE_LABEL } from '@/store';
 import { href, navigate } from '@/router';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';

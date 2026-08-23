@@ -340,7 +340,9 @@ const vocab = {
   regulatoryIds: new Set(REGULATORY_PATHWAYS.map((x) => x.id)),
   pathwayIds: new Set(PATHWAYS.map((x) => x.id)),
 } as const;
-const clearanceIds = new Set(CLEARANCE_STATES.map((x) => x.id));
+// Widened to string: these sets are tested against free-text stage values
+// as well as typed product fields.
+const clearanceIds = new Set<string>(CLEARANCE_STATES.map((x) => x.id));
 const scaleIds = new Set(SCALES.map((x) => x.id));
 
 for (const p of PRODUCTS) {
@@ -387,6 +389,17 @@ for (const r of RUNBOOKS) {
     fail(`runbook ${r.id}: blocked_unverified but no stage is marked blocked`);
   if (r.status === 'needs_review' && !r.stages.some((st) => st.status === 'review'))
     fail(`runbook ${r.id}: needs_review but no stage is held for review`);
+
+  // A stage `value` is free text by design, but one written as a hyphenated
+  // lowercase token reads as a vocabulary id. When it does not resolve, the
+  // detail page labels it rather than printing it as a finding — this surfaces
+  // the same thing at seed time so it is a known gap, not a silent one.
+  for (const st of r.stages) {
+    if (st.value && /^[a-z]+(-[a-z]+)+$/.test(st.value) && !clearanceIds.has(st.value))
+      warn(
+        `runbook ${r.id} stage "${st.name}": value "${st.value}" reads as a clearance state but is not one — rendered as an unrecognised term`,
+      );
+  }
 }
 
 // ── report ─────────────────────────────────────────────────────────────
