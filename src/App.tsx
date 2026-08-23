@@ -7,7 +7,9 @@ import {
   Library as LibraryIcon,
   Table2,
   FlaskConical,
+  Boxes,
   ClipboardList,
+  GitBranch,
   LineChart,
   GraduationCap,
   Settings as SettingsIcon,
@@ -40,6 +42,10 @@ import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
+import Molecules from '@/screens/Molecules';
+import MoleculeDetail from '@/screens/MoleculeDetail';
+import Runbooks from '@/screens/Runbooks';
+import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
@@ -57,7 +63,9 @@ const RAIL = [
   { to: '/library', label: 'Library', icon: LibraryIcon, key: 'l' },
   { to: '/extract', label: 'Extract', icon: Table2, key: 'e' },
   { to: '/organisms', label: 'Organisms', icon: FlaskConical, key: 'o' },
+  { to: '/molecules', label: 'Molecules', icon: Boxes, key: 'm' },
   { to: '/protocols', label: 'Protocols', icon: ClipboardList, key: 'p' },
+  { to: '/runbooks', label: 'Runbooks', icon: GitBranch, key: 'r' },
   { to: '/simulate', label: 'Simulate', icon: LineChart, key: 's' },
   { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
 ];
@@ -87,10 +95,14 @@ function Screen() {
       return <Extract />;
     case 'organisms':
       return b ? <StrainPage strainId={b} /> : <Organisms />;
+    case 'molecules':
+      return b ? <MoleculeDetail productId={b} /> : <Molecules />;
     case 'protocols':
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
+    case 'runbooks':
+      return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
     case 'simulate':
       if (b === 'compare') return <Compare />;
       return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;

@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import type {
   ActivityEvent,
   ChatMessage,
+  ClearanceStateId,
   ChatSession,
   Collection,
   Deviation,
@@ -12,10 +13,13 @@ import type {
   Job,
   LearnModule,
   Paper,
+  Product,
   Protocol,
   Provenance,
   RecordStatus,
   ResultGrid,
+  Runbook,
+  RunbookStage,
   RunOutput,
   RunState,
   Scenario,
@@ -26,6 +30,8 @@ import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
 import { STRAINS } from '@/data/strains';
+import { PRODUCTS } from '@/data/products';
+import { RUNBOOKS } from '@/data/runbooks';
 import { PROTOCOLS } from '@/data/protocols';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
@@ -67,6 +73,14 @@ export interface OFState {
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
   strains: Strain[];
+  /** The molecule catalogue (OF-BLD-005). Session-mutable like the rest. */
+  products: Product[];
+  /**
+   * Synthesised runbooks. Kept separate from `jobs` on purpose: a Job is a
+   * progress bar the tray owns and discards, a Runbook is a record with
+   * content. A running runbook borrows the tray for its progress affordance.
+   */
+  runbooks: Runbook[];
   protocols: Protocol[];
   scenarios: Scenario[];
   grids: Record<string, ResultGrid>;
@@ -148,6 +162,28 @@ export interface OFState {
   finishRun: (runId: string) => void;
   addProtocolVersion: (protocolId: string, version: Protocol['versions'][number]) => void;
 
+  // runbooks (OF-BLD-005 §7) — a slice of its own, never folded into jobs
+  /**
+   * Blocked → research handoff (§8). Builds a research runbook that enumerates
+   * around whatever fence the product is behind, and is honest when
+   * enumeration would not help: a claim reciting a functional class is not
+   * escaped by molecular diversity, and the runbook says so instead of
+   * spending compute to find out again.
+   */
+  handoffToResearchRunbook: (productId: string) => string | null;
+  /** Research → industrial in one action, carrying the finding across. */
+  promoteRunbook: (runbookId: string) => string | null;
+  /**
+   * Unblock a runbook halted on an unsourced value. Two honest ways forward:
+   * attach a source, or mark the number an explicit assumption and continue
+   * with it labelled as one.
+   */
+  resolveRunbookInput: (runbookId: string, mode: 'source' | 'assumption') => void;
+  /** Authorise the priced compute for a runbook waiting on a budget decision. */
+  authoriseRunbookBudget: (runbookId: string) => void;
+  /** Record that a person has ruled on a runbook held for review. */
+  resolveRunbookReview: (runbookId: string, verdict: string) => void;
+
   // scenarios
   setScenarioPoint: (id: string, point: Record<string, number>) => void;
   togglePin: (id: string) => void;
@@ -170,6 +206,88 @@ export interface OFState {
   resetDemo: () => void;
 }
 
+/**
+ * How a claim reads, per clearance state — the input to the blocked → research
+ * handoff (OF-BLD-005 §8).
+ *
+ * The distinction that matters is what the claim RECITES. A claim reciting a
+ * sequence or a structure fences a region you can walk around, and enumeration
+ * is worth paying for. A claim reciting a function or an application fences the
+ * job itself, and no amount of molecular diversity gets you out — the
+ * cross-kingdom substitution that still infringed is the documented case. The
+ * handoff therefore declines as readily as it accepts, and says which.
+ */
+const CLAIM_READING: Record<
+  ClearanceStateId,
+  { reading: string; enumerable: boolean; stages: RunbookStage[] }
+> = {
+  blocked: {
+    reading: 'Structure-reciting — the claims name sequences, so the genus around them is enumerable',
+    enumerable: true,
+    stages: [
+      { name: 'Homolog retrieval', status: 'running', detail: 'Cross-genus sequence search', value: null },
+      { name: 'Identity-band mapping', status: 'pending', detail: 'Where the claimed band ends', value: null },
+      { name: 'Activity prediction', status: 'pending', detail: null, value: null },
+      { name: 'Enablement package', status: 'pending', detail: null, value: null },
+    ],
+  },
+  'watch-variant': {
+    reading: 'Core free, engineered variants fenced — the boundary is worth mapping precisely',
+    enumerable: true,
+    stages: [
+      { name: 'Boundary map', status: 'running', detail: 'Where the fenced variants start', value: null },
+      { name: 'Free-region candidates', status: 'pending', detail: null, value: null },
+      { name: 'Enablement package', status: 'pending', detail: null, value: null },
+    ],
+  },
+  'watch-process': {
+    reading:
+      'Process-reciting — the fence is on the route, not the molecule, so enumerating sequences would not move it',
+    enumerable: false,
+    stages: [
+      {
+        name: 'Recommendation',
+        status: 'done',
+        detail: 'Design around the process. Enumerating the molecule spends compute on the wrong axis.',
+        value: null,
+      },
+    ],
+  },
+  unknown: {
+    reading: 'Not yet assessed — classification has to happen before anything else is worth running',
+    enumerable: true,
+    stages: [
+      { name: 'Clearance sweep', status: 'running', detail: 'Claim classification first', value: null },
+      { name: 'Claim classification', status: 'pending', detail: null, value: null },
+      { name: 'Recommendation', status: 'pending', detail: null, value: null },
+    ],
+  },
+  'clear-none': {
+    reading: 'No blocking claims found — there is no fence here to enumerate around',
+    enumerable: false,
+    stages: [
+      {
+        name: 'Recommendation',
+        status: 'done',
+        detail: 'Proceed with counsel confirmation. Enumeration compute would buy nothing.',
+        value: null,
+      },
+    ],
+  },
+  'clear-expired': {
+    reading: 'Foundational IP expired — the region is open and the evidence trail is the deliverable',
+    enumerable: false,
+    stages: [
+      {
+        name: 'Recommendation',
+        status: 'done',
+        detail: 'Proceed and document the expiry evidence. Nothing to design around.',
+        value: null,
+      },
+    ],
+  },
+};
+
 const seedGrids = (): Record<string, ResultGrid> =>
   Object.fromEntries(COST_MODELS.map((m) => [m.modelId, buildGrid(m)]));
 
@@ -178,6 +296,8 @@ const seedState = () => ({
   records: structuredClone(RECORDS),
   runOutputs: structuredClone(RUN_OUTPUTS),
   strains: structuredClone(STRAINS),
+  products: structuredClone(PRODUCTS),
+  runbooks: structuredClone(RUNBOOKS),
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
   collections: structuredClone(COLLECTIONS),
@@ -661,6 +781,291 @@ export const useStore = create<OFState>()((set, get) => ({
           : p,
       ),
     })),
+
+  // ── runbooks (OF-BLD-005 §7, §8) ─────────────────────────────────────
+
+  handoffToResearchRunbook: (productId) => {
+    const s = get();
+    const product = s.products.find((p) => p.id === productId);
+    if (!product) return null;
+
+    const id = nextId('rb');
+    const stages: RunbookStage[] = [
+      {
+        name: 'Claim classification',
+        status: 'done',
+        detail: CLAIM_READING[product.clearanceState].reading,
+        value: null,
+      },
+      ...CLAIM_READING[product.clearanceState].stages,
+    ];
+    const enumerable = CLAIM_READING[product.clearanceState].enumerable;
+
+    const runbook: Runbook = {
+      id,
+      kind: 'research',
+      title: `${product.name} — enumeration around the claim`,
+      status: enumerable ? 'running' : 'complete',
+      stages,
+      note: enumerable
+        ? 'Handed off from the molecule catalogue. The industrial route is fenced, so this asks the question the fence does not cover: what else does the job, and does any of it fall outside the claim.'
+        : 'Handed off from the molecule catalogue and stopped immediately, on purpose. Claim architecture, not molecular diversity, decides whether enumeration is worth paying for — and here it is not. Recorded so nobody funds the same sweep next quarter.',
+      eta: enumerable ? '~3 h' : null,
+      outputs: enumerable ? [] : ['Claim reading', 'Recommendation not to enumerate'],
+      productId: product.id,
+      progressPct: enumerable ? 18 : 100,
+      estCostUsd: enumerable ? 140 : 2,
+      strainId: product.defaultStrainId,
+    };
+
+    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
+
+    if (enumerable) {
+      get().startJob({
+        title: `Enumerating around ${product.name}`,
+        kind: 'runbook',
+        stages: [
+          { label: 'Classify', ms: 1200 },
+          { label: 'Retrieve', ms: 2600 },
+          { label: 'Rank', ms: 2200 },
+          { label: 'Package', ms: 1400 },
+        ],
+        href: `#/runbooks/${id}`,
+      });
+    }
+
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: enumerable
+        ? `Research runbook opened — enumerating around the claims on ${product.name}`
+        : `Enumeration declined for ${product.name} — the claim recites a function, not a sequence`,
+      href: `#/runbooks/${id}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text: enumerable
+        ? `Enumerating around ${product.name}. This is a research lead, not clearance.`
+        : `Enumeration would not help ${product.name} — opened the reasoning instead.`,
+      kind: enumerable ? 'info' : 'warn',
+      href: `#/runbooks/${id}`,
+      hrefLabel: 'Open',
+    });
+    return id;
+  },
+
+  promoteRunbook: (runbookId) => {
+    const s = get();
+    const source = s.runbooks.find((r) => r.id === runbookId);
+    if (!source || source.kind !== 'research') return null;
+
+    const product = source.productId
+      ? s.products.find((p) => p.id === source.productId)
+      : undefined;
+    const id = nextId('rb');
+
+    // The research runbook's own findings become the industrial one's first
+    // stage. Promotion carries the answer across; it does not restart the work.
+    const carried = source.stages
+      .filter((st) => st.status === 'done' && (st.value || st.detail))
+      .map((st) => st.value ?? st.detail)
+      .filter(Boolean)
+      .join('; ');
+
+    const runbook: Runbook = {
+      id,
+      kind: 'industrial',
+      title: `${product?.name ?? source.title} — process definition`,
+      status: 'running',
+      stages: [
+        {
+          name: 'Clearance sweep',
+          status: 'done',
+          detail: carried || `Carried from ${source.id}`,
+          value: product?.clearanceState ?? null,
+        },
+        {
+          name: 'Host & construct selection',
+          status: 'running',
+          detail: product ? `Starting from ${product.defaultStrainId}` : null,
+          value: null,
+        },
+        { name: 'Process train', status: 'queued', detail: null, value: null },
+        { name: 'Titre & yield model', status: 'pending', detail: null, value: null },
+        { name: 'Equipment & CAPEX', status: 'pending', detail: null, value: null },
+        { name: 'Quality spec', status: 'pending', detail: null, value: null },
+        {
+          name: 'Storage & export',
+          status: 'pending',
+          detail: 'The cold-chain decision — ambient if the molecule tolerates it',
+          value: null,
+        },
+      ],
+      note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
+      eta: '~50 min',
+      outputs: [],
+      productId: source.productId,
+      progressPct: 14,
+      estCostUsd: 52,
+      strainId: source.strainId ?? product?.defaultStrainId ?? null,
+    };
+
+    set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
+    get().startJob({
+      title: `Industrial runbook — ${product?.name ?? source.title}`,
+      kind: 'runbook',
+      stages: [
+        { label: 'Host', ms: 1800 },
+        { label: 'Train', ms: 2400 },
+        { label: 'Titre', ms: 2600 },
+        { label: 'CAPEX', ms: 2000 },
+      ],
+      href: `#/runbooks/${id}`,
+    });
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: `Promoted ${source.title} to an industrial runbook`,
+      href: `#/runbooks/${id}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text: 'Promoted to an industrial runbook — the clearance finding came across with it',
+      kind: 'success',
+      href: `#/runbooks/${id}`,
+      hrefLabel: 'Open',
+    });
+    return id;
+  },
+
+  resolveRunbookInput: (runbookId, mode) => {
+    set((s) => ({
+      runbooks: s.runbooks.map((r) => {
+        if (r.id !== runbookId || r.status !== 'blocked_unverified') return r;
+        let unblocked = false;
+        const stages = r.stages.map((st) => {
+          if (st.status === 'blocked') {
+            unblocked = true;
+            return {
+              ...st,
+              status: 'running' as const,
+              detail:
+                mode === 'source'
+                  ? 'Source attached — the value now carries a citation and the cascade may consume it'
+                  : 'Continuing on an explicit assumption — the value is labelled, and every number downstream of it inherits the label',
+            };
+          }
+          // The stage that was waiting behind the block moves to the queue.
+          if (unblocked && st.status === 'pending') {
+            unblocked = false;
+            return { ...st, status: 'queued' as const };
+          }
+          return st;
+        });
+        return { ...r, status: 'running' as const, stages, eta: '~90 min' };
+      }),
+    }));
+
+    const r = get().runbooks.find((x) => x.id === runbookId);
+    get().startJob({
+      title: `Resuming ${r?.title ?? 'runbook'}`,
+      kind: 'runbook',
+      stages: [
+        { label: 'Re-check', ms: 1200 },
+        { label: 'Cascade', ms: 3000 },
+      ],
+      href: `#/runbooks/${runbookId}`,
+    });
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text:
+        mode === 'source'
+          ? `Source attached — ${r?.title ?? runbookId} resumed`
+          : `Marked an input an explicit assumption — ${r?.title ?? runbookId} resumed, labelled`,
+      href: `#/runbooks/${runbookId}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text:
+        mode === 'source'
+          ? 'Source attached. The cascade may consume the value now.'
+          : 'Continuing on a labelled assumption. Everything downstream inherits the label.',
+      kind: mode === 'source' ? 'success' : 'warn',
+    });
+  },
+
+  authoriseRunbookBudget: (runbookId) => {
+    set((s) => ({
+      runbooks: s.runbooks.map((r) =>
+        r.id === runbookId && r.status === 'awaiting_budget'
+          ? {
+              ...r,
+              status: 'running' as const,
+              stages: r.stages.map((st, i) =>
+                st.status === 'queued' && i === r.stages.findIndex((x) => x.status === 'queued')
+                  ? { ...st, status: 'running' as const }
+                  : st,
+              ),
+            }
+          : r,
+      ),
+    }));
+    const r = get().runbooks.find((x) => x.id === runbookId);
+    if (!r) return;
+    // A Job with no stages would divide by zero in tickJobs, so the tray gets
+    // at least one even for a runbook whose stages are all already done.
+    const jobStages = r.stages
+      .filter((st) => st.status !== 'done')
+      .slice(0, 4)
+      .map((st) => ({ label: st.name.split(' ')[0], ms: 2400 }));
+    get().startJob({
+      title: r.title,
+      kind: 'runbook',
+      stages: jobStages.length > 0 ? jobStages : [{ label: 'Run', ms: 2400 }],
+      href: `#/runbooks/${runbookId}`,
+    });
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: `Budget authorised — ${r.title} started`,
+      href: `#/runbooks/${runbookId}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text: `Authorised. Estimated spend ${r.estCostUsd === null ? 'unpriced' : `$${r.estCostUsd}`}.`,
+      kind: 'info',
+    });
+  },
+
+  resolveRunbookReview: (runbookId, verdict) => {
+    set((s) => ({
+      runbooks: s.runbooks.map((r) =>
+        r.id === runbookId && r.status === 'needs_review'
+          ? {
+              ...r,
+              status: 'complete' as const,
+              progressPct: 100,
+              stages: r.stages.map((st) =>
+                st.status === 'review'
+                  ? { ...st, status: 'done' as const, detail: `Ruled on by a person — ${verdict}` }
+                  : st,
+              ),
+              outputs: [...r.outputs, 'Boundary map', 'Reviewer decision'],
+            }
+          : r,
+      ),
+    }));
+    const r = get().runbooks.find((x) => x.id === runbookId);
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: `Review recorded on ${r?.title ?? runbookId} — ${verdict}`,
+      href: `#/runbooks/${runbookId}`,
+      provenance: 'user',
+    });
+    get().toast({ text: 'Decision recorded against the runbook.', kind: 'success' });
+  },
 
   // ── scenarios ────────────────────────────────────────────────────────
   setScenarioPoint: (id, point) =>

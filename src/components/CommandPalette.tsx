@@ -8,7 +8,9 @@ import {
   Library,
   Table2,
   FlaskConical,
+  Boxes,
   ClipboardList,
+  GitBranch,
   LineChart,
   GraduationCap,
   Settings as SettingsIcon,
@@ -19,6 +21,8 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store';
 import { navigate } from '@/router';
+import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
+import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
 import { cx } from './ui';
 
 interface Item {
@@ -48,6 +52,8 @@ export function CommandPalette() {
   const setUI = useStore((s) => s.setUI);
   const papers = useStore((s) => s.papers);
   const strains = useStore((s) => s.strains);
+  const products = useStore((s) => s.products);
+  const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
@@ -73,7 +79,9 @@ export function CommandPalette() {
       { id: 'n-rev', group: 'Navigate', label: 'Extract — review queue', icon: Table2, run: () => navigate('/extract/review') },
       { id: 'n-val', group: 'Navigate', label: 'Validation dashboard', icon: Table2, run: () => navigate('/extract/validation') },
       { id: 'n-org', group: 'Navigate', label: 'Organisms', icon: FlaskConical, run: () => navigate('/organisms') },
+      { id: 'n-mol', group: 'Navigate', label: 'Molecules', icon: Boxes, run: () => navigate('/molecules') },
       { id: 'n-pro', group: 'Navigate', label: 'Protocols', icon: ClipboardList, run: () => navigate('/protocols') },
+      { id: 'n-run', group: 'Navigate', label: 'Runbooks', icon: GitBranch, run: () => navigate('/runbooks') },
       { id: 'n-sim', group: 'Navigate', label: 'Simulate', icon: LineChart, run: () => navigate('/simulate') },
       { id: 'n-cmp', group: 'Navigate', label: 'Compare scenarios', icon: LineChart, run: () => navigate('/simulate/compare') },
       { id: 'n-lrn', group: 'Navigate', label: 'Learn', icon: GraduationCap, run: () => navigate('/learn') },
@@ -98,6 +106,26 @@ export function CommandPalette() {
         hint: 'strain',
         icon: FlaskConical,
         run: () => navigate(`/organisms/${s.id}`),
+      });
+    }
+    for (const p of products) {
+      nav.push({
+        id: `mo-${p.id}`,
+        group: 'Navigate',
+        label: p.name,
+        hint: `${PRODUCT_CATEGORY_LABEL[p.category]} · molecule`,
+        icon: Boxes,
+        run: () => navigate(`/molecules/${p.id}`),
+      });
+    }
+    for (const r of runbooks) {
+      nav.push({
+        id: `rb-${r.id}`,
+        group: 'Navigate',
+        label: r.title,
+        hint: `${r.kind} runbook · ${RUNBOOK_STATUS_LABEL[r.status]}`,
+        icon: GitBranch,
+        run: () => navigate(`/runbooks/${r.id}`),
       });
     }
     for (const p of protocols) {
@@ -173,12 +201,26 @@ export function CommandPalette() {
           });
         },
       },
+      {
+        id: 'a-rb-example',
+        group: 'Actions',
+        label: 'Open the worked runbook (brazzein, complete)',
+        hint: 'what a finished industrial runbook contains',
+        run: () => navigate('/runbooks/rb-brazzein'),
+      },
+      {
+        id: 'a-blocked',
+        group: 'Actions',
+        label: 'Show molecules with blocking patent claims',
+        hint: `${products.filter((p) => p.clearanceState === 'blocked').length} blocked`,
+        run: () => navigate('/molecules?clearance=blocked'),
+      },
       { id: 'a-help', group: 'Actions', label: 'Keyboard shortcuts', run: () => useStore.getState().setUI({ helpOpen: true }) },
       { id: 'a-reset', group: 'Actions', label: 'Reset demo data', run: resetDemo },
     ];
 
     return [...nav, ...actions];
-  }, [papers, strains, protocols, scenarios, records, resetDemo]);
+  }, [papers, strains, products, runbooks, protocols, scenarios, records, resetDemo]);
 
   const results = useMemo(() => {
     const scored = items
