@@ -558,3 +558,252 @@ export interface Job {
   href?: string;
   startedAt: number;
 }
+
+// ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
+//
+// Breadth alongside the Chlamydomonas β-casein throughline. Products are the
+// molecules a facility could make; the vocabulary below is the facet set they
+// are described with; runbooks are synthesised answers to "how would we make
+// this". None of it touches the corpus — PAPERS, RECORDS and PROTOCOLS are
+// unaffected, and every value here carries a modeled provenance.
+
+/**
+ * Where a unit operation sits in a downstream train, fermenter to vial. The
+ * order of `UNIT_OP_STAGE_ORDER` in `vocabulary.ts` is the display order; a
+ * product's own `unitOperationIds` array is the authority on its actual train,
+ * because two products can use the same operation at different points.
+ */
+export type UnitOperationStage =
+  | 'harvest'
+  | 'clarification'
+  | 'cell disruption'
+  | 'recovery'
+  | 'capture'
+  | 'capture/polish'
+  | 'polish'
+  | 'concentration'
+  | 'desalting'
+  | 'isolation'
+  | 'purification'
+  | 'drying'
+  | 'formulation'
+  | 'finishing';
+
+export interface UnitOperation {
+  id: string;
+  label: string;
+  stage: UnitOperationStage;
+  /** Scale band where the operation is used at all, when it is not universal. */
+  scale?: string;
+  /** Chemistry detail, e.g. the resin family for a chromatography step. */
+  resin?: string;
+  note?: string;
+}
+
+export type GeneticElementKind =
+  | 'promoter'
+  | 'signal_peptide'
+  | 'fusion_tag'
+  | 'maintenance'
+  | 'sequence_design'
+  | 'dosage';
+
+export interface GeneticElement {
+  id: string;
+  label: string;
+  kind: GeneticElementKind;
+  /**
+   * Hosts the element is described for, as vocabulary labels — NOT `Strain`
+   * ids. The construct vocabulary predates the host catalogue and names
+   * organisms at a coarser grain ('e-coli-bl21' covers every BL21 derivative),
+   * so these must never be resolved against STRAINS.
+   */
+  hostFit?: string[];
+  induction?: string;
+  strength?: string;
+  purification?: string;
+  /** `true` needs a protease; 'autocatalytic' cleaves itself and costs nothing. */
+  cleavable?: boolean | 'autocatalytic';
+  stability?: string;
+  copy?: string;
+  tool?: string;
+  note?: string;
+}
+
+export interface Pathway {
+  id: string;
+  label: string;
+  products: string[];
+  /** The metabolic branch point flux has to be pushed through. */
+  fluxNode: string;
+  note?: string;
+}
+
+export type CostBand = 'low' | 'moderate' | 'high';
+
+export interface StorageFormat {
+  id: string;
+  label: string;
+  tempC: number;
+  shelfLife: string;
+  /** What shipping this format actually requires — the cold-chain question. */
+  logistics: string;
+  cost: CostBand;
+  note?: string;
+}
+
+export type RegulatoryBurden = 'low' | 'low-moderate' | 'moderate' | 'high' | 'very high';
+
+export interface RegulatoryPathway {
+  id: string;
+  label: string;
+  burden: RegulatoryBurden;
+  note?: string;
+}
+
+export interface ProcessScale {
+  id: string;
+  label: string;
+  volumeL: string;
+  role: string;
+}
+
+/**
+ * Patent clearance is an ambient property of every molecule, never a separate
+ * mode (OF-BLD-005 §8). Six states, each with the action it implies. None of
+ * them is a legal opinion — every clearance surface carries the counsel
+ * callout alongside.
+ */
+export type ClearanceStateId =
+  | 'clear-expired'
+  | 'clear-none'
+  | 'watch-variant'
+  | 'watch-process'
+  | 'blocked'
+  | 'unknown';
+
+export type ClearanceRisk = 'low' | 'low-moderate' | 'moderate' | 'high' | 'unknown';
+
+export interface ClearanceState {
+  id: ClearanceStateId;
+  label: string;
+  risk: ClearanceRisk;
+  /** What a team should do next, in the platform's voice — not counsel's. */
+  action: string;
+}
+
+export type ProductCategory =
+  | 'molecular_biology_enzyme'
+  | 'diagnostic'
+  | 'research_protein'
+  | 'food_protein'
+  | 'hmo'
+  | 'sweet_protein'
+  | 'structural_protein'
+  | 'terpene'
+  | 'glycoside'
+  | 'industrial_enzyme'
+  | 'therapeutic_protein';
+
+/**
+ * Value per kilogram, banded rather than priced. A band is defensible from
+ * public catalogue prices; a number would imply an economics model the
+ * platform does not have.
+ */
+export type ValueDensityBand = 'low-moderate' | 'moderate' | 'high' | 'very high' | 'extreme';
+
+export interface Product {
+  id: string;
+  name: string;
+  aliases: string[];
+  category: ProductCategory;
+  /** Process family code (P1–P11) — the downstream train archetype. */
+  processCode: string;
+  /** Resolves against STRAINS once the OF-BLD-005 hosts are appended. */
+  defaultStrainId: string;
+  /** Ordered fermenter to vial. This array, not stage order, is the train. */
+  unitOperationIds: string[];
+  storageIds: string[];
+  regulatoryIds: string[];
+  clearanceState: ClearanceStateId;
+  scaleId: string;
+  pathwayIds: string[];
+  tags: string[];
+  valueDensityBand: ValueDensityBand;
+  /**
+   * Always 'demo' — every product record is modeled, not measured, and renders
+   * as "Modeled · not measured" through the existing provenance system.
+   */
+  provenance: Provenance;
+  note: string | null;
+  /**
+   * Always 'industry-estimate'. Value density and scale come from market
+   * framing, not from evidence, and `aggregateExclusion()` already holds that
+   * class out of every median, range and count.
+   */
+  economicsProvenance: Provenance;
+}
+
+/**
+ * A runbook is a synthesised, followable answer to a question about making
+ * something. It is deliberately NOT a `Job` (OF-BLD-005 §7): `Job` models a
+ * progress bar and is owned by the jobs tray; `Runbook` is a record with
+ * content that outlives the run that produced it. The tray still provides the
+ * running affordance — the two types cooperate, they do not merge.
+ */
+export type RunbookKind = 'industrial' | 'research';
+
+export type RunbookStatus =
+  | 'draft'
+  | 'running'
+  | 'complete'
+  /** Enumeration compute priced but not authorised. */
+  | 'awaiting_budget'
+  /** Resolved from a prior run's artifacts at near-zero cost. */
+  | 'cache_hit'
+  /** Held for a human — the model declines to rule on it. */
+  | 'needs_review'
+  /** Halted: a stage tried to consume a value with no source. */
+  | 'blocked_unverified';
+
+export type RunbookStageStatus =
+  | 'done'
+  | 'running'
+  | 'queued'
+  | 'pending'
+  | 'review'
+  | 'blocked'
+  | 'draft';
+
+export interface RunbookStage {
+  name: string;
+  status: RunbookStageStatus;
+  /** What the stage did or is doing, in one line. */
+  detail: string | null;
+  /**
+   * The stage's headline result when it has one — a titre, a CAPEX figure, a
+   * candidate count, or a clearance verdict. Free text on purpose: stages
+   * produce different kinds of answer and forcing a shape would lose them.
+   */
+  value: string | null;
+}
+
+export interface Runbook {
+  id: string;
+  kind: RunbookKind;
+  title: string;
+  status: RunbookStatus;
+  stages: RunbookStage[];
+  /** Curator's framing — why this runbook is worth looking at. */
+  note: string;
+  eta: string | null;
+  /** Artifacts a complete runbook hands over. */
+  outputs: string[];
+  /** Resolves against PRODUCTS, or null for a cross-cutting question. */
+  productId: string | null;
+  progressPct: number;
+  /** Modeled compute spend, in USD. Null before a run is priced. */
+  estCostUsd: number | null;
+  /** Resolves against STRAINS, or null when no host has been chosen. */
+  strainId: string | null;
+}
