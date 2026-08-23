@@ -549,7 +549,12 @@ export interface JobStage {
 export interface Job {
   id: string;
   title: string;
-  kind: 'ingest' | 'extraction' | 'simulation' | 'run';
+  /**
+   * 'runbook' is a Job that fronts a Runbook, not a Runbook itself — the tray
+   * shows the progress bar while the record it belongs to lives in its own
+   * slice (OF-BLD-005 §7). The two cooperate; they never merge.
+   */
+  kind: 'ingest' | 'extraction' | 'simulation' | 'run' | 'runbook';
   stages: JobStage[];
   stageIndex: number;
   stageProgress: number; // 0-1 within current stage
