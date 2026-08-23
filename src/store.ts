@@ -12,10 +12,12 @@ import type {
   Job,
   LearnModule,
   Paper,
+  Product,
   Protocol,
   Provenance,
   RecordStatus,
   ResultGrid,
+  Runbook,
   RunOutput,
   RunState,
   Scenario,
@@ -26,6 +28,8 @@ import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
 import { RUN_OUTPUTS } from '@/data/runOutputs';
 import { STRAINS } from '@/data/strains';
+import { PRODUCTS } from '@/data/products';
+import { RUNBOOKS } from '@/data/runbooks';
 import { PROTOCOLS } from '@/data/protocols';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
@@ -67,6 +71,14 @@ export interface OFState {
   records: ExtractionRecord[];
   runOutputs: RunOutput[];
   strains: Strain[];
+  /** The molecule catalogue (OF-BLD-005). Session-mutable like the rest. */
+  products: Product[];
+  /**
+   * Synthesised runbooks. Kept separate from `jobs` on purpose: a Job is a
+   * progress bar the tray owns and discards, a Runbook is a record with
+   * content. A running runbook borrows the tray for its progress affordance.
+   */
+  runbooks: Runbook[];
   protocols: Protocol[];
   scenarios: Scenario[];
   grids: Record<string, ResultGrid>;
@@ -178,6 +190,8 @@ const seedState = () => ({
   records: structuredClone(RECORDS),
   runOutputs: structuredClone(RUN_OUTPUTS),
   strains: structuredClone(STRAINS),
+  products: structuredClone(PRODUCTS),
+  runbooks: structuredClone(RUNBOOKS),
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
   collections: structuredClone(COLLECTIONS),
