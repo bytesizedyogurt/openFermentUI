@@ -42,6 +42,8 @@ import Review from '@/screens/Review';
 import Validation from '@/screens/Validation';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
+import Molecules from '@/screens/Molecules';
+import MoleculeDetail from '@/screens/MoleculeDetail';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
@@ -91,6 +93,8 @@ function Screen() {
       return <Extract />;
     case 'organisms':
       return b ? <StrainPage strainId={b} /> : <Organisms />;
+    case 'molecules':
+      return b ? <MoleculeDetail productId={b} /> : <Molecules />;
     case 'protocols':
       if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
