@@ -435,6 +435,24 @@ for (const f of CLEARANCE_FINDINGS) {
   for (const pt of f.patents) {
     if (!pt.number.trim()) fail(`${where}: a patent entry has no number`);
     if (!pt.status.trim()) fail(`${where}: ${pt.number} has no status`);
+
+    // Term expiry is arithmetic and usually decides the clearance question,
+    // where a litigation outcome is contingent and may never resolve at all.
+    // So the field is mandatory: a date, or an explicit null that says why it
+    // is not known. Silently omitting it would let a finding lead with a
+    // dispute when the patent had simply run out.
+    if (pt.expiresOnTerm === undefined)
+      fail(
+        `${where}: ${pt.number} has no expiresOnTerm — give a date, or null with a termBasis saying why it is not established`,
+      );
+    if (pt.expiresOnTerm !== null && !/^\d{4}-\d{2}(-\d{2})?$/.test(pt.expiresOnTerm))
+      fail(`${where}: ${pt.number} expiresOnTerm "${pt.expiresOnTerm}" is not an ISO date`);
+    if (pt.expiresOnTerm === null && !pt.termBasis?.trim())
+      fail(`${where}: ${pt.number} has no term date and does not say why not`);
+    // A date that was computed rather than read must say so, or a reader will
+    // take arithmetic for a register readout.
+    if (pt.expiresOnTerm !== null && !pt.termBasis?.trim())
+      warn(`${where}: ${pt.number} gives a term date with no basis — say whether it was read or computed`);
   }
   if (!f.readAt.trim()) fail(`${where}: no read date`);
   if (!f.toVerify.trim())
@@ -467,6 +485,8 @@ console.log(`  strains           ${STRAINS.length}`);
 console.log(`  molecules         ${PRODUCTS.length} across ${new Set(PRODUCTS.map((p) => p.category)).size} categories, ${new Set(PRODUCTS.map((p) => p.processCode)).size} process families (all modeled)`);
 console.log(`  clearance         ${PRODUCTS.filter((p) => p.clearanceState === 'blocked').length} blocked, ${PRODUCTS.filter((p) => p.clearanceState === 'unknown').length} unassessed, ${PRODUCTS.filter((p) => p.clearanceState.startsWith('clear')).length} clear`);
 console.log(`  vocabulary        ${UNIT_OPERATIONS.length} unit operations, ${STORAGE_FORMATS.length} storage formats, ${REGULATORY_PATHWAYS.length} regulatory routes, ${PATHWAYS.length} pathways`);
+const patentEntries = CLEARANCE_FINDINGS.flatMap((f) => f.patents);
+console.log(`  patents on file   ${patentEntries.length} across ${CLEARANCE_FINDINGS.length} findings · ${patentEntries.filter((p) => p.expiresOnTerm !== null).length} with an established term date`);
 console.log(`  clearance cells   ${CLEARANCE_FINDINGS.length} authored of ${PRODUCTS.length * JURISDICTIONS.length} (${PRODUCTS.length} molecules x ${JURISDICTIONS.length} offices) — every other cell reads 'not assessed'`);
 console.log(`  runbooks          ${RUNBOOKS.length} over ${new Set(RUNBOOKS.map((r) => r.status)).size} states (${RUNBOOKS.filter((r) => r.kind === 'industrial').length} industrial, ${RUNBOOKS.filter((r) => r.kind === 'research').length} research)`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);

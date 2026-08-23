@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import type { ClearanceStateId, Product } from '@/data/types';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
-import type { ClearanceFinding } from '@/data/clearanceFindings';
+import { termFalls, type ClearanceFinding } from '@/data/clearanceFindings';
 import {
   CLEARANCE_MODEL_NOTE,
   HEADLINE_SCOPE_NOTE,
@@ -185,25 +185,74 @@ export function ClearanceStrip({ state }: { state: ClearanceStateId }) {
   );
 }
 
+/**
+ * One patent, with its term expiry given primacy over its litigation history.
+ *
+ * That ordering is the point, not a layout preference. Term expiry is
+ * arithmetic and it is usually the whole answer; a dispute is contingent, and
+ * can run for years without ever producing a result you could rely on. Reading
+ * the litigation first is how somebody concludes a patent is unenforceable
+ * when what actually happened is that it expired.
+ */
+function PatentEntry({ patent }: { patent: ClearanceFinding['patents'][number] }) {
+  return (
+    <li className="text-caption">
+      <span className="font-num text-ink">{patent.number}</span>{' '}
+      <span className="text-ink-soft">— {patent.title}</span>
+      <div className="text-ink-soft">{patent.assignee}</div>
+
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="uppercase tracking-wide text-ink-soft shrink-0">Term</span>
+        {patent.expiresOnTerm ? (
+          <span className="font-num text-accent">expires {patent.expiresOnTerm}</span>
+        ) : (
+          <span className="text-signal-warn">not established</span>
+        )}
+      </div>
+      {patent.termBasis && <div className="text-ink-soft">{patent.termBasis}</div>}
+
+      <div className="mt-1 text-ink-soft">
+        <span className="uppercase tracking-wide">History</span>
+        {patent.at && (
+          <>
+            {' · '}
+            <span className="font-num">{patent.at}</span>
+          </>
+        )}
+      </div>
+      <div className="text-ink-soft">{patent.status}</div>
+    </li>
+  );
+}
+
 function FindingDetail({ finding }: { finding: ClearanceFinding }) {
+  const falls = termFalls(finding);
   return (
     <div className="mt-2 space-y-2">
-      <ul className="space-y-1.5">
+      <div
+        className={cx(
+          'rounded-input border px-2 py-1.5',
+          falls ? 'border-accent/40 bg-accent/[0.07]' : 'border-signal-warn/40 bg-signal-warn/[0.07]',
+        )}
+      >
+        <div className="text-caption uppercase tracking-wide text-ink-soft">
+          When the fence falls on term
+        </div>
+        {falls ? (
+          <div className="text-body font-num text-accent">{falls}</div>
+        ) : (
+          <div className="text-body text-signal-warn">Not established</div>
+        )}
+        <div className="text-caption text-ink-soft mt-0.5">
+          {falls
+            ? 'Latest term expiry across the patents below — arithmetic, and independent of how any dispute over them turned out.'
+            : 'At least one patent below has no established term date, so the latest expiry across the family is unknown. The maximum of a partial set is not the maximum.'}
+        </div>
+      </div>
+
+      <ul className="space-y-2.5">
         {finding.patents.map((p) => (
-          <li key={p.number} className="text-caption">
-            <span className="font-num text-ink">{p.number}</span>{' '}
-            <span className="text-ink-soft">— {p.title}</span>
-            <div className="text-ink-soft">
-              {p.assignee}
-              {p.at && (
-                <>
-                  {' · '}
-                  <span className="font-num">{p.at}</span>
-                </>
-              )}
-            </div>
-            <div className="text-ink-soft">{p.status}</div>
-          </li>
+          <PatentEntry key={p.number} patent={p} />
         ))}
       </ul>
       <p className="text-caption text-ink-soft">{finding.summary}</p>
