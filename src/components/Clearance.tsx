@@ -43,6 +43,7 @@ import {
   matrixCoverage,
   type JurisdictionVerdict,
 } from '@/engine/clearance';
+import { ComponentTag } from './ComponentTag';
 import { Callout, cx } from './ui';
 
 /**
@@ -385,7 +386,13 @@ export function JurisdictionMatrix({ product }: { product: Product }) {
         </table>
       </div>
 
-      <p className="text-caption text-ink-soft mt-2">{CLEARANCE_MODEL_NOTE}</p>
+      <div className="mt-2">
+        <ComponentTag
+          component="Clearance"
+          action={assessed === 0 ? 'not searched' : `${assessed} of ${total} offices read`}
+        />
+      </div>
+      <p className="text-caption text-ink-soft mt-1">{CLEARANCE_MODEL_NOTE}</p>
 
       {assessed === 0 && (
         <div className="mt-2 flex items-start gap-1.5 text-caption text-signal-warn">

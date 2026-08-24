@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { FieldId } from '@/data/types';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
-import { parseQuantity, toSI, sameFamily, convert, fmt } from '@/engine/units';
+import { parseQuantity, toSI, sameFamily, convert, fmt, explainRefusal } from '@/engine/units';
+import { ComponentTag } from './ComponentTag';
 import { cx } from './ui';
 
 export interface QuantityValue {
@@ -95,9 +96,22 @@ export function QuantityField({
           </div>
         )}
         {parsed && !dimensionOK && (
-          <div className="text-signal-error">
-            Wrong dimension for {def.name} — expects units compatible with{' '}
-            <span className="font-num">{def.canonicalUnit || 'a dimensionless value'}</span>.
+          // A refusal that names its reason turns a dead end into a
+          // measurement plan, which is the whole point of explainRefusal():
+          // %TSP to g/L is not a dimension error to be scolded for, it is two
+          // quantities nobody recorded. Where the engine has no specific
+          // reason, the generic dimension message still stands.
+          <div className="text-signal-error space-y-0.5">
+            <div>
+              Wrong dimension for {def.name} — expects units compatible with{' '}
+              <span className="font-num">{def.canonicalUnit || 'a dimensionless value'}</span>.
+            </div>
+            {explainRefusal(parsed.unit, def.canonicalUnit) && (
+              <div className="text-ink-soft">
+                {explainRefusal(parsed.unit, def.canonicalUnit)}
+              </div>
+            )}
+            <ComponentTag component="Primer" action="conversion refused" />
           </div>
         )}
         {showTwin && (

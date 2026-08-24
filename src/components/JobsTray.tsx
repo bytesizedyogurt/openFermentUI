@@ -2,9 +2,24 @@
 // stage-level progress here, completion toast that deep-links to the result.
 // Jobs never modally block the interface.
 import { CheckCircle2, Loader2, XCircle, Trash2 } from 'lucide-react';
+import type { Job } from '@/data/types';
 import { useStore } from '@/store';
 import { navigate } from '@/router';
+import { ComponentTag, type ComponentName } from './ComponentTag';
 import { cx, EmptyState } from './ui';
+
+/**
+ * Which component owns each kind of job (COMPONENTS.md). Derived rather than
+ * stored: a job's kind already says who ran it, and duplicating that onto the
+ * record would let the two disagree.
+ */
+const JOB_COMPONENT: Record<Job['kind'], ComponentName> = {
+  ingest: 'Intake',
+  extraction: 'Intake',
+  simulation: 'Proforma',
+  run: 'Deposition',
+  runbook: 'Runbook',
+};
 
 export function JobsPanel({ onClose }: { onClose: () => void }) {
   const jobs = useStore((s) => s.jobs);
@@ -39,6 +54,9 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
             <div className="flex items-center gap-2">
               <Loader2 size={14} className="text-accent animate-spin" />
               <span className="font-medium text-body">Run in progress</span>
+            </div>
+            <div className="pl-6 mt-0.5">
+              <ComponentTag component="Deposition" action="bench execution" />
             </div>
             <div className="text-caption text-ink-soft mt-0.5 pl-6">
               {activeProto.title} · {Object.keys(activeRun.completed).length}/
@@ -80,6 +98,12 @@ export function JobsPanel({ onClose }: { onClose: () => void }) {
                     View
                   </button>
                 )}
+              </div>
+              <div className="pl-6 mt-0.5">
+                <ComponentTag
+                  component={JOB_COMPONENT[j.kind]}
+                  action={j.status === 'failed' ? 'failed' : j.status === 'done' ? 'complete' : 'working'}
+                />
               </div>
               <div className="pl-6 mt-1.5">
                 <div className="h-1 rounded-full bg-ink-soft/15 overflow-hidden">

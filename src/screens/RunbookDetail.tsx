@@ -41,6 +41,7 @@ import {
 } from '@/components/Clearance';
 import { ProcessTrain } from '@/components/ProcessTrain';
 import { RunbookStatusIcon, StageIcon, stageMeta } from '@/components/RunbookBits';
+import { ComponentTag } from '@/components/ComponentTag';
 import { Tick } from '@/components/Provenance';
 import {
   Bar,
@@ -505,6 +506,12 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         >
           <span id="band-stages">Stages</span>
         </SectionTitle>
+        <div className="mb-2">
+          <ComponentTag
+            component="Runbook"
+            action={`${runbook.kind} claim · ${runbook.stages.length} stages`}
+          />
+        </div>
 
         <div
           className={cx(
