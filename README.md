@@ -66,6 +66,58 @@ PDF*. It does not mean verified. Nothing in the corpus is currently `verified`.
  13 chat flows       3 scenarios · 6 learn modules / 9 lessons
 ```
 
+## Postdoc runs on Claude Haiku
+
+Postdoc's answers come from a real model call, routed through `core/` — a
+Python service (`openferment-core`) that is the first surface of the tool layer
+everything else will eventually orchestrate. The key lives in `core/.env`,
+which is gitignored; it never reaches the browser, and `pnpm check:secrets`
+fails the build if anything under `src/` so much as names it.
+
+```
+browser ──POST /api/ask──▶ FastAPI
+                             ├─ BM25 retrieval over corpus.json (≤30 records)
+                             ├─ Claude Haiku 4.5, one forced tool call
+                             ├─ Rule 1 enforcement
+                             └─ AnswerPlan
+browser ◀────────────────────┘   renders values from the cited records
+```
+
+**Claim text may not contain a number.** The model writes prose and cites a
+record; the interface renders the value from that record. This is the strongest
+available form of Rule 1 — the model is not being asked to be careful with
+quantities, it has no slot to put one in. A claim carrying a number, citing an
+id that does not resolve, or citing nothing without admitting it is **dropped
+and counted, never repaired**: a validator that patches model output is a
+validator that hides model failure.
+
+Provenance on a claim is computed server-side as the weakest of its cited
+records. A claim resting on one gold record and one industry estimate is an
+industry estimate.
+
+To run it:
+
+```bash
+cp core/.env.example core/.env      # add your key; the file is gitignored
+pnpm export:corpus                  # project the TS seed to core/.../corpus.json
+cd core && uv run uvicorn openferment_core.api:app --reload
+pnpm dev                            # /api proxies to localhost:8000
+```
+
+Then switch Postdoc to **Live**. If the service is not running the screen says
+so and tells you what to type — it never falls back to the scripted flows. A
+convincing fake standing in for a broken service is worse than a blank screen,
+because everything looks like it is working.
+
+The thirteen authored conversations are still here, and they are the acceptance
+criteria now rather than a parallel implementation: `pnpm test:live` asks the
+real pipeline each one and checks the plan cites the records a human said were
+the answer. `pnpm verify` stays offline and needs no key.
+
+Roughly $0.011 a query at 30 records. Set a spend limit in the Anthropic console
+first — not because the volume is risky, but because a cap turns a runaway loop
+from a bill into a bug report.
+
 ## Running it
 
 ```bash
@@ -277,4 +329,5 @@ Recorded here because the app records them rather than papering over them:
 - `docs/OF-COR-001.md` — the corpus: 15 threads, the ontology, the gold-set plan, scenarios.
 - `BUILD-SPEC.md` — the build contract: ID registry, seed invariants, content and style rules.
 - `COMPONENTS.md` — the eighteen components, seven layers, and what has no name yet.
+- `core/` — openferment-core, the Python service. Postdoc's model call lives here.
 - `scripts/check-seed.ts` — enforces those invariants; run before any bundle.
