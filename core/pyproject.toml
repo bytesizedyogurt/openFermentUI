@@ -1,0 +1,31 @@
+[project]
+name = "openferment-core"
+version = "0.1.0"
+description = "openFerment's Python service layer. Postdoc's first surface; every tool it will eventually orchestrate is Python."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "anthropic>=0.40",
+    "pydantic>=2.9",
+    "rank-bm25>=0.2.2",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["openferment_core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    # §9 — the live tests spend money and need a key. They are excluded from
+    # `pnpm verify`, which must stay runnable offline with no key present.
+    "live: requires ANTHROPIC_API_KEY and makes real API calls",
+]
