@@ -16,10 +16,12 @@
     "test:reconcile": "node scripts/check-reconcile.mjs",
     "test:smoke": "node scripts/smoke.mjs",
     "test:golden": "node scripts/golden-path.mjs",
-    "verify": "pnpm check:secrets && pnpm typecheck && pnpm check:seed && pnpm check:lock && pnpm check:capture && pnpm build && pnpm test:durable && pnpm test:deposition && pnpm test:reconcile && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
+    "verify": "pnpm check:secrets && pnpm typecheck && pnpm check:plan && pnpm check:seed && pnpm check:lock && pnpm check:capture && pnpm build && pnpm test:durable && pnpm test:deposition && pnpm test:reconcile && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
     "test:deep": "node scripts/deep-paths.mjs",
     "bundle:single": "pnpm build && node scripts/bundle-single.mjs",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "export:corpus": "tsx scripts/export-corpus.ts",
+    "check:plan": "node scripts/check-plan.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

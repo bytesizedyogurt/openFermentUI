@@ -1022,3 +1022,57 @@ export interface Runbook {
    */
   lockHash: string | null;
 }
+
+// ── AnswerPlan (OF-BLD-007 §3) ─────────────────────────────────────────
+//
+// The only representation of an answer in the system. Mirrored exactly from
+// `core/openferment_core/models.py`; `pnpm check:plan` fails the build if the
+// two drift, because a shape that exists twice and is enforced once is a shape
+// that is about to disagree with itself.
+//
+// A PLAN IS NOT A TRANSCRIPT. The scripted path this replaces replayed prose a
+// human wrote, and the UI printed it. A plan is a set of claims, each a
+// sentence with NO NUMBER IN IT plus the records it rests on. The browser
+// renders every value from the cited record, never from the model's text.
+// That is the whole mechanism of Rule 1 here: the model has no slot to put a
+// quantity in, so it cannot originate one.
+
+export type ClaimSupport = 'direct' | 'inferred' | 'unsupported';
+
+export interface Claim {
+  id: string;
+  /** Prose WITHOUT numbers. The interface renders the value from the record. */
+  text: string;
+  /** Must resolve against RECORDS. A claim citing a ghost is dropped, not repaired. */
+  recordIds: string[];
+  /** Must resolve against PAPERS. */
+  paperIds: string[];
+  support: ClaimSupport;
+  /**
+   * The WEAKEST provenance across the cited records, computed server-side and
+   * never chosen by the model — a model that grades its own evidence grades it
+   * generously. A claim is worth exactly as much as its worst citation.
+   */
+  provenance: Provenance;
+}
+
+export interface AnswerPlanUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** Computed from the response's own token counts, not estimated. */
+  costUsd: number;
+}
+
+export interface AnswerPlan {
+  question: string;
+  claims: Claim[];
+  /** What evidence is missing. Naming an absence is a useful answer. */
+  gaps: string[];
+  /** Set when the corpus cannot support an answer, and says what is missing. */
+  declined: string | null;
+  usage: AnswerPlanUsage;
+  /** How many claims the validator dropped (§5). Never repaired — dropped and counted. */
+  rejected: number;
+  /** Why each was dropped. A rising rate is the signal that the prompt has drifted. */
+  rejectionReasons: string[];
+}
