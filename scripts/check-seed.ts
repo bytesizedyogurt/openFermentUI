@@ -13,6 +13,7 @@ import { STRAINS } from '../src/data/strains';
 import { PRODUCTS } from '../src/data/products';
 import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
+import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { JURISDICTIONS } from '../src/engine/clearance';
 import {
   CLEARANCE_STATES,
@@ -404,6 +405,89 @@ for (const r of RUNBOOKS) {
   }
 }
 
+// ── 6b. the Assay layer (OF-BLD-006 §3) ────────────────────────────────
+//
+// Locking is what stops the platform grading its own homework, so the seed has
+// to demonstrate it working rather than merely declaring it. Three things get
+// checked: that a runbook which has executed is frozen, that its hash still
+// matches its content, and that every measure points at a prediction that
+// exists. A dangling predictionId would silently drop a row out of the
+// reconciliation, which is the one comparison the Assay layer exists to make.
+for (const r of RUNBOOKS) {
+  const seenPred = new Set<string>();
+  for (const p of r.predictions) {
+    if (seenPred.has(p.id)) fail(`runbook ${r.id}: duplicate prediction id ${p.id}`);
+    seenPred.add(p.id);
+    if (!p.label.trim()) fail(`runbook ${r.id}: prediction ${p.id} has no label`);
+    if (!p.unit.trim()) fail(`runbook ${r.id}: prediction ${p.id} has no unit`);
+    if (!p.basis.trim())
+      fail(`runbook ${r.id}: prediction ${p.id} does not say what produced it`);
+    if (!isFinite(p.value)) fail(`runbook ${r.id}: prediction ${p.id} value is not finite`);
+  }
+
+  const seenMeas = new Set<string>();
+  for (const m of r.measurementSchema) {
+    if (seenMeas.has(m.id)) fail(`runbook ${r.id}: duplicate measure id ${m.id}`);
+    seenMeas.add(m.id);
+    if (!m.unit.trim()) fail(`runbook ${r.id}: measure ${m.id} has no unit`);
+    if (!m.timepoint.trim()) fail(`runbook ${r.id}: measure ${m.id} has no timepoint`);
+    if (m.predictionId && !seenPred.has(m.predictionId))
+      fail(
+        `runbook ${r.id}: measure ${m.id} tests prediction ${m.predictionId}, which this runbook does not make`,
+      );
+  }
+
+  // §3.3 — predictions freeze before execution.
+  const mustLock = shouldBeLocked(r.status, r.progressPct);
+  if (mustLock && !r.lockedAt)
+    fail(
+      `runbook ${r.id}: status "${r.status}" at ${r.progressPct}% but predictions are not locked — it would be grading its own homework`,
+    );
+  if (!mustLock && r.lockedAt)
+    warn(`runbook ${r.id}: locked while still "${r.status}" — nothing has run against these yet`);
+
+  if (r.lockedAt) {
+    if (r.predictions.length === 0)
+      fail(`runbook ${r.id}: locked with no predictions — freezing nothing means nothing`);
+    // The seed derives its hashes at module load, so comparing them back is
+    // near-vacuous here — it catches a broken derivation and nothing else.
+    // Runtime drift is guarded in the store, where content can actually be
+    // mutated after locking.
+    if (!r.lockHash) fail(`runbook ${r.id}: locked but carries no content hash`);
+    else if (!lockIntact(r)) fail(`runbook ${r.id}: stored hash does not match stored content`);
+  } else if (r.lockHash) {
+    fail(`runbook ${r.id}: carries a lockHash but is not locked`);
+  }
+}
+
+// The hash itself is worth testing, because every lock check downstream trusts
+// it. Three properties: deterministic, sensitive to content, and indifferent to
+// the order keys happen to be written in — the last one matters because a hash
+// that changed when someone reordered two properties would cry wolf forever.
+{
+  const p0 = [
+    { id: 'a', label: 'Titre', value: 8, unit: 'g/L', confidence: 'medium' as const, basis: 'model' },
+  ];
+  const m0 = [
+    { id: 'm', label: 'Titre', unit: 'g/L', timepoint: 'harvest', predictionId: 'a' },
+  ];
+  if (runbookLockHash(p0, m0) !== runbookLockHash(p0, m0))
+    fail('lock hash: not deterministic across calls');
+
+  const bumped = [{ ...p0[0], value: 8.1 }];
+  if (runbookLockHash(p0, m0) === runbookLockHash(bumped, m0))
+    fail('lock hash: a changed prediction value produced the same digest');
+
+  const reordered = [
+    { basis: 'model', unit: 'g/L', value: 8, confidence: 'medium' as const, label: 'Titre', id: 'a' },
+  ];
+  if (runbookLockHash(p0, m0) !== runbookLockHash(reordered, m0))
+    fail('lock hash: key order in the literal changed the digest');
+
+  if (runbookLockHash(p0, m0) === runbookLockHash(p0, []))
+    fail('lock hash: dropping the measurement schema produced the same digest');
+}
+
 // ── 7. authored clearance findings (OF-BLD-005 §8) ─────────────────────
 //
 // Jurisdiction cells are populated ONLY from this list; everything else reads
@@ -488,6 +572,10 @@ console.log(`  vocabulary        ${UNIT_OPERATIONS.length} unit operations, ${ST
 const patentEntries = CLEARANCE_FINDINGS.flatMap((f) => f.patents);
 console.log(`  patents on file   ${patentEntries.length} across ${CLEARANCE_FINDINGS.length} findings · ${patentEntries.filter((p) => p.expiresOnTerm !== null).length} with an established term date`);
 console.log(`  clearance cells   ${CLEARANCE_FINDINGS.length} authored of ${PRODUCTS.length * JURISDICTIONS.length} (${PRODUCTS.length} molecules x ${JURISDICTIONS.length} offices) — every other cell reads 'not assessed'`);
+const preds = RUNBOOKS.flatMap((r) => r.predictions);
+console.log(`  predictions       ${preds.length} across ${RUNBOOKS.filter((r) => r.predictions.length > 0).length} runbooks (${preds.filter((p) => p.confidence === 'high').length} high, ${preds.filter((p) => p.confidence === 'medium').length} medium, ${preds.filter((p) => p.confidence === 'low').length} low)`);
+console.log(`  measures          ${RUNBOOKS.flatMap((r) => r.measurementSchema).length}, of which ${RUNBOOKS.flatMap((r) => r.measurementSchema).filter((m) => m.predictionId === null).length} recorded without a prediction to test`);
+console.log(`  locked            ${RUNBOOKS.filter((r) => r.lockedAt).length}/${RUNBOOKS.length} runbooks frozen, all hashes recomputed and matching`);
 console.log(`  runbooks          ${RUNBOOKS.length} over ${new Set(RUNBOOKS.map((r) => r.status)).size} states (${RUNBOOKS.filter((r) => r.kind === 'industrial').length} industrial, ${RUNBOOKS.filter((r) => r.kind === 'research').length} research)`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);

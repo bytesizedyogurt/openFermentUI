@@ -38,6 +38,7 @@ import { MODULES } from '@/data/learn';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
+import { runbookLockHash } from '@/engine/lock';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -816,7 +817,36 @@ export const useStore = create<OFState>()((set, get) => ({
       progressPct: enumerable ? 18 : 100,
       estCostUsd: enumerable ? 140 : 2,
       strainId: product.defaultStrainId,
+      // The prediction IS the claim being handed off. When the claim recites a
+      // function rather than a sequence the honest prediction is zero escapes
+      // — the same call rb-heme-calib records, reached the same way.
+      predictions: [
+        {
+          id: `${id}-escapes`,
+          label: 'Candidates falling outside the claim',
+          value: enumerable ? 120 : 0,
+          unit: 'candidates',
+          confidence: enumerable ? 'low' : 'high',
+          basis: enumerable
+            ? 'Structure-reciting claim, so the genus around it is enumerable. Count is an opening estimate and is what the sweep will test.'
+            : 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
+        },
+      ],
+      measurementSchema: [
+        {
+          id: `${id}-ms-escapes`,
+          label: 'Candidates outside the claim on counsel review',
+          unit: 'candidates',
+          timepoint: 'analysis',
+          predictionId: `${id}-escapes`,
+        },
+      ],
+      // Locked at creation: it starts consuming compute immediately, and a
+      // prediction editable after the sweep runs is not a prediction.
+      lockedAt: new Date().toISOString(),
+      lockHash: null,
     };
+    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
 
@@ -908,7 +938,38 @@ export const useStore = create<OFState>()((set, get) => ({
       progressPct: 14,
       estCostUsd: 52,
       strainId: source.strainId ?? product?.defaultStrainId ?? null,
+      // Promotion carries the research finding across verbatim. It does NOT
+      // invent process predictions: the titre and recovery models have not run,
+      // so those are measured with `predictionId: null` rather than predicted
+      // against a number somebody made up at promotion time. When the process
+      // stages do produce predictions, that is a new version — this one is
+      // locked, and locked means superseded, not edited.
+      predictions: source.predictions.map((p) => ({ ...p, id: `${id}-${p.id}` })),
+      measurementSchema: [
+        ...source.measurementSchema.map((m) => ({
+          ...m,
+          id: `${id}-${m.id}`,
+          predictionId: m.predictionId ? `${id}-${m.predictionId}` : null,
+        })),
+        {
+          id: `${id}-ms-titre`,
+          label: 'Titre at harvest',
+          unit: 'g/L',
+          timepoint: 'harvest',
+          predictionId: null,
+        },
+        {
+          id: `${id}-ms-recovery`,
+          label: 'Overall recovery',
+          unit: '%',
+          timepoint: 'post-purification',
+          predictionId: null,
+        },
+      ],
+      lockedAt: new Date().toISOString(),
+      lockHash: null,
     };
+    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
     get().startJob({

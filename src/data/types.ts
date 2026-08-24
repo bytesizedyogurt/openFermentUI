@@ -793,6 +793,41 @@ export interface RunbookStage {
   value: string | null;
 }
 
+/**
+ * A single falsifiable claim a runbook makes before anything is run
+ * (OF-BLD-006 §3.1). A report says here is what we found; a runbook says do
+ * this and you will get that. Being testable is exactly why the Assay layer is
+ * terminal — software cannot go further than a prediction.
+ */
+export interface Prediction {
+  id: string;
+  /** What is being predicted, in bench language. "Final titre". */
+  label: string;
+  value: number;
+  unit: string;
+  /**
+   * How much prior support the number has. Not a probability — nobody has
+   * calibrated one — but an honest three-way sort a person can act on.
+   */
+  confidence: 'high' | 'medium' | 'low';
+  /** What produced it. A model, a precedent, an assumption someone made. */
+  basis: string;
+}
+
+/**
+ * One value the bench will record, declared before the run so the operator
+ * knows what is being asked of them and the comparison is fixed in advance.
+ */
+export interface Measure {
+  id: string;
+  label: string;
+  unit: string;
+  /** When it is taken: 't=0', 'harvest', 'post-purification'. */
+  timepoint: string;
+  /** The prediction this tests, or null for context nobody predicted. */
+  predictionId: string | null;
+}
+
 export interface Runbook {
   id: string;
   kind: RunbookKind;
@@ -811,4 +846,25 @@ export interface Runbook {
   estCostUsd: number | null;
   /** Resolves against STRAINS, or null when no host has been chosen. */
   strainId: string | null;
+
+  // ── Assay (OF-BLD-006 §3) ────────────────────────────────────────────
+  /** What the runbook commits to, before a fermenter is touched. */
+  predictions: Prediction[];
+  /** What the bench will record, and when. */
+  measurementSchema: Measure[];
+  /**
+   * When the predictions and schema were frozen, or null if still editable.
+   *
+   * Locking exists because without it the system grades its own homework:
+   * predictions drift toward results and the hit rate stops meaning anything.
+   * A locked runbook may be superseded by a new version; it may not be edited.
+   */
+  lockedAt: string | null;
+  /**
+   * Content hash over the predictions and schema at lock time, so a later
+   * reader can tell whether what they are looking at is what was frozen.
+   * Full timestamping and attestation belong to Common Seal; a hash plus an
+   * ISO timestamp is what this build can honestly offer.
+   */
+  lockHash: string | null;
 }

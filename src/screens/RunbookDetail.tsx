@@ -19,6 +19,8 @@ import {
   Clock,
   FileCheck2,
   FlaskConical,
+  Lock,
+  Target,
   GitBranch,
   Link2,
   Sparkles,
@@ -32,6 +34,7 @@ import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { STRAINS_BY_ID } from '@/data/strains';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
 import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/enumeration';
+import { lockIntact } from '@/engine/lock';
 import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
   ClearanceChip,
@@ -259,6 +262,125 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
   }
 
   return null;
+}
+
+/**
+ * What the runbook commits to, and what the bench will record against it.
+ *
+ * This is the falsifiable half of the Assay layer (OF-BLD-006 §3.1): a report
+ * says here is what we found, a runbook says do this and you will get that.
+ * The lock state sits at the top rather than in a footnote, because a
+ * prediction that could still be edited is not evidence of anything.
+ */
+function PredictionPanel({ runbook }: { runbook: Runbook }) {
+  const intact = lockIntact(runbook);
+  const measuresFor = (predictionId: string) =>
+    runbook.measurementSchema.filter((m) => m.predictionId === predictionId);
+  const unpredicted = runbook.measurementSchema.filter((m) => m.predictionId === null);
+
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-2">
+        <div className="text-caption uppercase tracking-wide text-ink-soft inline-flex items-center gap-1.5">
+          <Target size={13} aria-hidden /> What this predicts
+        </div>
+        {runbook.lockedAt ? (
+          <span
+            className={cx(
+              'chip text-[11px] py-0 inline-flex items-center gap-1',
+              intact ? 'text-accent border-accent/40' : 'text-signal-error border-signal-error/40',
+            )}
+            title={
+              intact
+                ? `Frozen ${runbook.lockedAt}. Content hash ${runbook.lockHash}.`
+                : 'The stored content no longer matches the hash taken at lock time.'
+            }
+          >
+            <Lock size={11} aria-hidden />
+            {intact ? 'locked' : 'lock broken'}
+          </span>
+        ) : (
+          <span className="chip text-signal-warn border-signal-warn/40 text-[11px] py-0">
+            not yet locked
+          </span>
+        )}
+      </div>
+
+      {runbook.predictions.length === 0 ? (
+        <EmptyState
+          title="Nothing predicted yet"
+          body="This runbook is scoped but has not committed to a number. Until it does there is nothing for a bench result to confirm or refute."
+        />
+      ) : (
+        <ul className="space-y-3">
+          {runbook.predictions.map((p) => {
+            const tests = measuresFor(p.id);
+            return (
+              <li key={p.id}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-body">{p.label}</span>
+                  <span className="font-num text-body shrink-0">
+                    {p.value.toLocaleString()}{' '}
+                    <span className="text-ink-soft text-caption">{p.unit}</span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                  <span
+                    className={cx(
+                      'text-caption',
+                      p.confidence === 'high'
+                        ? 'text-accent'
+                        : p.confidence === 'low'
+                          ? 'text-signal-warn'
+                          : 'text-ink-soft',
+                    )}
+                  >
+                    {p.confidence} confidence
+                  </span>
+                  <span className="text-caption text-ink-soft">
+                    {tests.length === 0
+                      ? 'no measure tests this'
+                      : `tested at ${tests.map((m) => m.timepoint).join(', ')}`}
+                  </span>
+                </div>
+                <div className="text-caption text-ink-soft mt-0.5">{p.basis}</div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {unpredicted.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-line">
+          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
+            Recorded, not predicted
+          </div>
+          <ul className="space-y-0.5">
+            {unpredicted.map((m) => (
+              <li key={m.id} className="text-caption text-ink-soft">
+                <span className="text-ink">{m.label}</span> · {m.unit} · {m.timepoint}
+              </li>
+            ))}
+          </ul>
+          <p className="text-caption text-ink-soft mt-1">
+            Measured because it is worth having, not because anything forecast it. A value with no
+            prediction behind it cannot confirm or refute the runbook — it is context.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <ComponentTag
+          component="Runbook"
+          action={
+            runbook.lockedAt
+              ? `frozen ${runbook.lockedAt.slice(0, 10)}`
+              : 'predictions still editable'
+          }
+        />
+      </div>
+    </Card>
+  );
 }
 
 // ── the enumeration funnel (research runbooks only) ────────────────────
@@ -597,6 +719,19 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
 
           {runbook.kind === 'research' && <EnumerationFunnel runbook={runbook} />}
         </div>
+      </section>
+
+      {/* ── predictions ─────────────────────────────────────────────────── */}
+      <section className="mb-6" aria-labelledby="band-predictions">
+        <SectionTitle>
+          <span id="band-predictions">Predictions</span>
+        </SectionTitle>
+        <p className="text-caption text-ink-soft mb-2 max-w-3xl">
+          A runbook is a falsifiable claim. These are the numbers it commits to before anything is
+          run, and the measurements that will test them — frozen together, so the platform cannot
+          quietly move a prediction toward a result it has already seen.
+        </p>
+        <PredictionPanel runbook={runbook} />
       </section>
 
       {/* ── process train ──────────────────────────────────────────────── */}

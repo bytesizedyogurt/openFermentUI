@@ -17,8 +17,9 @@
 // The ten seeded runbooks sit across all seven states at once, so the board
 // shows what each state looks like without anyone having to wait for a run.
 import type { Runbook, RunbookStatus } from './types';
+import { runbookLockHash } from '@/engine/lock';
 
-export const RUNBOOKS: Runbook[] = [
+const SEED: Runbook[] = [
   {
     id: 'rb-taq-kigali',
     kind: 'industrial',
@@ -76,6 +77,106 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 62,
     estCostUsd: 48,
     strainId: 'ecoli',
+    predictions: [
+      {
+        id: 'pr-taq-titre',
+        label: 'Final titre',
+        value: 8,
+        unit: 'g/L',
+        confidence: 'medium',
+        basis:
+          'Fed-batch model at 2,000 L, E. coli BL21(DE3) under T7 induction',
+      },
+      {
+        id: 'pr-taq-recovery',
+        label: 'Overall recovery',
+        value: 62,
+        unit: '%',
+        confidence: 'medium',
+        basis:
+          'Seven-step train; thermal clarification recovery taken from Taq-class precedent',
+      },
+      {
+        id: 'pr-taq-endo',
+        label: 'Endotoxin at release',
+        value: 5,
+        unit: 'EU/mg',
+        confidence: 'medium',
+        basis:
+          'IEX plus HIC plus dedicated endotoxin clearance, RUO grade',
+      },
+      {
+        id: 'pr-taq-dna',
+        label: 'Residual host DNA',
+        value: 10,
+        unit: 'pg/U',
+        confidence: 'low',
+        basis:
+          'Nuclease clearance is the defining step for this grade and is not calibrated here',
+      },
+      {
+        id: 'pr-taq-capex',
+        label: 'Installed capital',
+        value: 4200000,
+        unit: 'USD',
+        confidence: 'low',
+        basis:
+          'Equipment and CAPEX stage has not run; figure is a placeholder to be tested',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-taq-od',
+        label: 'Cell density at harvest',
+        unit: 'OD600',
+        timepoint: 'harvest',
+        predictionId: null,
+      },
+      {
+        id: 'ms-taq-titre',
+        label: 'Titre at harvest',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-taq-titre',
+      },
+      {
+        id: 'ms-taq-mass',
+        label: 'Purified mass',
+        unit: 'g',
+        timepoint: 'post-purification',
+        predictionId: null,
+      },
+      {
+        id: 'ms-taq-recovery',
+        label: 'Overall recovery',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-taq-recovery',
+      },
+      {
+        id: 'ms-taq-act',
+        label: 'Specific activity',
+        unit: 'U/mg',
+        timepoint: 'release',
+        predictionId: null,
+      },
+      {
+        id: 'ms-taq-endo',
+        label: 'Endotoxin',
+        unit: 'EU/mg',
+        timepoint: 'release',
+        predictionId: 'pr-taq-endo',
+      },
+      {
+        id: 'ms-taq-dna',
+        label: 'Residual host DNA',
+        unit: 'pg/U',
+        timepoint: 'release',
+        predictionId: 'pr-taq-dna',
+      },
+    ],
+    lockedAt: '2026-08-18T09:12:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-lnfp1',
@@ -116,6 +217,60 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 0,
     estCostUsd: 310,
     strainId: 'ecoli',
+    predictions: [
+      {
+        id: 'pr-lnfp-titre',
+        label: 'Final titre',
+        value: 12,
+        unit: 'g/L',
+        confidence: 'low',
+        basis:
+          'HMO fed-batch precedent; this route has not been modelled',
+      },
+      {
+        id: 'pr-lnfp-purity',
+        label: 'Purity after desalting',
+        value: 94,
+        unit: '%',
+        confidence: 'low',
+        basis:
+          'Electrodialysis plus nanofiltration, literature typical',
+      },
+      {
+        id: 'pr-lnfp-routes',
+        label: 'Viable route configurations',
+        value: 1400,
+        unit: 'configurations',
+        confidence: 'low',
+        basis:
+          'Route enumeration estimate; the enumeration has not been run',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-lnfp-titre',
+        label: 'Titre at harvest',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-lnfp-titre',
+      },
+      {
+        id: 'ms-lnfp-purity',
+        label: 'Purity after desalting',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-lnfp-purity',
+      },
+      {
+        id: 'ms-lnfp-lactose',
+        label: 'Residual lactose',
+        unit: 'g/L',
+        timepoint: 'post-purification',
+        predictionId: null,
+      },
+    ],
+    lockedAt: null,
+    lockHash: null,
   },
   {
     id: 'rb-brazzein',
@@ -173,6 +328,76 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 100,
     estCostUsd: 71,
     strainId: 'gs115',
+    predictions: [
+      {
+        id: 'pr-braz-titre',
+        label: 'Final titre',
+        value: 2.4,
+        unit: 'g/L',
+        confidence: 'high',
+        basis:
+          'AOX1 methanol-induced fed-batch with alpha-MF secretion, pilot-scale precedent',
+      },
+      {
+        id: 'pr-braz-capex',
+        label: 'Installed capital',
+        value: 1800000,
+        unit: 'USD',
+        confidence: 'medium',
+        basis:
+          'Equipment list costed at 2,000 L with a spray-dry finish',
+      },
+      {
+        id: 'pr-braz-recovery',
+        label: 'Overall recovery',
+        value: 71,
+        unit: '%',
+        confidence: 'high',
+        basis:
+          'Centrifuge, MF, UF/DF, IEX, spray dry',
+      },
+      {
+        id: 'pr-braz-sweet',
+        label: 'Sweetness potency',
+        value: 800,
+        unit: 'x sucrose',
+        confidence: 'medium',
+        basis:
+          'Reported range for brazzein; assayed at release',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-braz-titre',
+        label: 'Titre at harvest',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-braz-titre',
+      },
+      {
+        id: 'ms-braz-recovery',
+        label: 'Overall recovery',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-braz-recovery',
+      },
+      {
+        id: 'ms-braz-sweet',
+        label: 'Sweetness potency',
+        unit: 'x sucrose',
+        timepoint: 'release',
+        predictionId: 'pr-braz-sweet',
+      },
+      {
+        id: 'ms-braz-moisture',
+        label: 'Residual moisture',
+        unit: '%',
+        timepoint: 'release',
+        predictionId: null,
+      },
+    ],
+    lockedAt: '2026-07-02T11:40:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-diag-panel',
@@ -213,6 +438,60 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 100,
     estCostUsd: 0.8,
     strainId: 'ecoli',
+    predictions: [
+      {
+        id: 'pr-diag-titre',
+        label: 'Soluble titre',
+        value: 1.1,
+        unit: 'g/L',
+        confidence: 'medium',
+        basis:
+          'MBP fusion in BL21(DE3); resolved from a prior run on the same host and train',
+      },
+      {
+        id: 'pr-diag-purity',
+        label: 'Purity at release',
+        value: 95,
+        unit: '%',
+        confidence: 'medium',
+        basis:
+          'IMAC then SEC, IVD component specification',
+      },
+      {
+        id: 'pr-diag-endo',
+        label: 'Endotoxin at release',
+        value: 1,
+        unit: 'EU/mg',
+        confidence: 'medium',
+        basis:
+          'Dedicated endotoxin clearance step, cached from the prior run',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-diag-titre',
+        label: 'Soluble titre',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-diag-titre',
+      },
+      {
+        id: 'ms-diag-purity',
+        label: 'Purity',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-diag-purity',
+      },
+      {
+        id: 'ms-diag-endo',
+        label: 'Endotoxin',
+        unit: 'EU/mg',
+        timepoint: 'release',
+        predictionId: 'pr-diag-endo',
+      },
+    ],
+    lockedAt: '2026-08-05T14:05:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-chymosin',
@@ -253,6 +532,69 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 84,
     estCostUsd: 26,
     strainId: 'a-niger',
+    predictions: [
+      {
+        id: 'pr-chym-imcu',
+        label: 'Milk-clotting activity',
+        value: 1200,
+        unit: 'IMCU/mg',
+        confidence: 'medium',
+        basis:
+          'Predicted across 41 chymosin orthologs against a camel-type parent',
+      },
+      {
+        id: 'pr-chym-ratio',
+        label: 'Clotting-to-proteolysis ratio',
+        value: 3.2,
+        unit: 'ratio',
+        confidence: 'medium',
+        basis:
+          'The property that decides whether the enzyme is usable, not the titre',
+      },
+      {
+        id: 'pr-chym-titre',
+        label: 'Secreted titre',
+        value: 1.6,
+        unit: 'g/L',
+        confidence: 'medium',
+        basis:
+          'A. oryzae secretion with a strong native promoter',
+      },
+      {
+        id: 'pr-chym-free',
+        label: 'Candidates outside the claimed identity band',
+        value: 38,
+        unit: 'candidates',
+        confidence: 'low',
+        basis:
+          'Boundary map: 3 of 41 sit close to the band and are held for human review',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-chym-titre',
+        label: 'Secreted titre',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-chym-titre',
+      },
+      {
+        id: 'ms-chym-imcu',
+        label: 'Milk-clotting activity',
+        unit: 'IMCU/mg',
+        timepoint: 'post-purification',
+        predictionId: 'pr-chym-imcu',
+      },
+      {
+        id: 'ms-chym-ratio',
+        label: 'Clotting-to-proteolysis ratio',
+        unit: 'ratio',
+        timepoint: 'post-purification',
+        predictionId: 'pr-chym-ratio',
+      },
+    ],
+    lockedAt: '2026-08-11T08:30:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-nootkatone',
@@ -293,6 +635,60 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 31,
     estCostUsd: 39,
     strainId: 's-cerevisiae',
+    predictions: [
+      {
+        id: 'pr-noot-titre',
+        label: 'Nootkatone titre',
+        value: 1.2,
+        unit: 'g/L',
+        confidence: 'low',
+        basis:
+          'MVA flux model; the P450 conversion is the bottleneck and is not calibrated',
+      },
+      {
+        id: 'pr-noot-val',
+        label: 'Valencene intermediate',
+        value: 3.5,
+        unit: 'g/L',
+        confidence: 'low',
+        basis:
+          'Upstream of the P450 step, so it accumulates when conversion lags',
+      },
+      {
+        id: 'pr-noot-purity',
+        label: 'Fragrance-grade purity',
+        value: 98,
+        unit: '%',
+        confidence: 'medium',
+        basis:
+          'LLE then distillation; grade is set by the rectification cut',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-noot-val',
+        label: 'Valencene at harvest',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-noot-val',
+      },
+      {
+        id: 'ms-noot-titre',
+        label: 'Nootkatone at harvest',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: 'pr-noot-titre',
+      },
+      {
+        id: 'ms-noot-purity',
+        label: 'Purity after distillation',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-noot-purity',
+      },
+    ],
+    lockedAt: '2026-08-19T16:20:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-thermo-ligase',
@@ -338,6 +734,67 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 47,
     estCostUsd: 63,
     strainId: 'ecoli',
+    predictions: [
+      {
+        id: 'pr-lig-cands',
+        label: 'Candidates above the thermostability threshold',
+        value: 45,
+        unit: 'candidates',
+        confidence: 'medium',
+        basis:
+          'Predicted Tm at or above 85 C across the 112 unpublished homologs',
+      },
+      {
+        id: 'pr-lig-tm',
+        label: 'Best-candidate melting temperature',
+        value: 92,
+        unit: 'C',
+        confidence: 'low',
+        basis:
+          'Structure-free Tm prediction with no experimental anchor in this set',
+      },
+      {
+        id: 'pr-lig-act',
+        label: 'Activity retained after 30 min at 95 C',
+        value: 70,
+        unit: '%',
+        confidence: 'low',
+        basis:
+          'Predicted, not measured. This is the claim the assay exists to test',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-lig-sol',
+        label: 'Candidates expressing solubly',
+        unit: 'candidates',
+        timepoint: 'harvest',
+        predictionId: null,
+      },
+      {
+        id: 'ms-lig-tm',
+        label: 'Measured Tm',
+        unit: 'C',
+        timepoint: 'post-purification',
+        predictionId: 'pr-lig-tm',
+      },
+      {
+        id: 'ms-lig-act',
+        label: 'Residual activity after 95 C',
+        unit: '%',
+        timepoint: 'post-purification',
+        predictionId: 'pr-lig-act',
+      },
+      {
+        id: 'ms-lig-pass',
+        label: 'Candidates above threshold on assay',
+        unit: 'candidates',
+        timepoint: 'post-purification',
+        predictionId: 'pr-lig-cands',
+      },
+    ],
+    lockedAt: '2026-08-14T10:00:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-sialyl-genus',
@@ -378,6 +835,35 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 22,
     estCostUsd: 180,
     strainId: 'ecoli',
+    predictions: [
+      {
+        id: 'pr-sial-cands',
+        label: 'Candidates outside the claimed structure',
+        value: 240,
+        unit: 'candidates',
+        confidence: 'medium',
+        basis:
+          'Structure-reciting claim, enumerated across the 8,900 retrieved sequences',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-sial-cands',
+        label: 'Candidates confirmed active',
+        unit: 'candidates',
+        timepoint: 'post-purification',
+        predictionId: 'pr-sial-cands',
+      },
+      {
+        id: 'ms-sial-titre',
+        label: 'Product titre',
+        unit: 'g/L',
+        timepoint: 'harvest',
+        predictionId: null,
+      },
+    ],
+    lockedAt: '2026-08-20T13:15:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-heme-calib',
@@ -406,6 +892,28 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 100,
     estCostUsd: 2,
     strainId: null,
+    predictions: [
+      {
+        id: 'pr-heme-escapes',
+        label: 'Candidates falling outside the claim',
+        value: 0,
+        unit: 'candidates',
+        confidence: 'high',
+        basis:
+          'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-heme-escapes',
+        label: 'Candidates outside the claim on counsel review',
+        unit: 'candidates',
+        timepoint: 'analysis',
+        predictionId: 'pr-heme-escapes',
+      },
+    ],
+    lockedAt: '2026-06-28T09:00:00Z',
+    lockHash: null,
   },
   {
     id: 'rb-lyo-ambient',
@@ -428,8 +936,60 @@ export const RUNBOOKS: Runbook[] = [
     progressPct: 0,
     estCostUsd: null,
     strainId: null,
+    predictions: [
+      {
+        id: 'pr-lyo-share',
+        label: 'Share of the enzyme panel tolerating lyophilisation',
+        value: 60,
+        unit: '%',
+        confidence: 'low',
+        basis:
+          'Prior art on lyophilised molecular-biology enzymes; no panel has been run',
+      },
+      {
+        id: 'pr-lyo-shelf',
+        label: 'Shelf life at 25 C',
+        value: 18,
+        unit: 'months',
+        confidence: 'low',
+        basis:
+          'Accelerated-stability extrapolation, not measured',
+      },
+    ],
+    measurementSchema: [
+      {
+        id: 'ms-lyo-act',
+        label: 'Activity retained after lyophilisation',
+        unit: '%',
+        timepoint: 'post-lyophilisation',
+        predictionId: 'pr-lyo-share',
+      },
+      {
+        id: 'ms-lyo-shelf',
+        label: 'Activity at 12 months ambient',
+        unit: '%',
+        timepoint: 't=12 months',
+        predictionId: 'pr-lyo-shelf',
+      },
+    ],
+    lockedAt: null,
+    lockHash: null,
   },
 ];
+
+/**
+ * Lock hashes are computed here rather than authored into the literals above.
+ *
+ * A hand-written hash is a hash nobody can check and everybody will eventually
+ * get wrong: edit a prediction, forget the digest, and the fixture ships
+ * claiming an integrity it does not have. Computing it at module load means
+ * the seed cannot lie about itself, and check-seed still recomputes
+ * independently so a broken hash function would not hide behind its own
+ * output.
+ */
+export const RUNBOOKS: Runbook[] = SEED.map((r) =>
+  r.lockedAt ? { ...r, lockHash: runbookLockHash(r.predictions, r.measurementSchema) } : r,
+);
 
 export const RUNBOOKS_BY_ID: Record<string, Runbook> = Object.fromEntries(
   RUNBOOKS.map((r) => [r.id, r]),
