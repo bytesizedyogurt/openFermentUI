@@ -184,6 +184,22 @@ export interface OFState {
   authoriseRunbookBudget: (runbookId: string) => void;
   /** Record that a person has ruled on a runbook held for review. */
   resolveRunbookReview: (runbookId: string, verdict: string) => void;
+  /**
+   * Freeze a runbook's predictions and schema (§3.3). After this the content
+   * is immutable at the object level, not merely by agreement.
+   */
+  lockRunbook: (runbookId: string) => void;
+  /**
+   * Change one prediction's value. Refuses on a locked runbook and says why —
+   * the refusal is the feature, and silently succeeding would let the platform
+   * grade its own homework.
+   */
+  reviseRunbookPrediction: (runbookId: string, predictionId: string, value: number) => boolean;
+  /**
+   * The legitimate way past a lock: a new, unlocked revision carrying the same
+   * content. Supersede, never edit.
+   */
+  supersedeRunbook: (runbookId: string) => string | null;
 
   // scenarios
   setScenarioPoint: (id: string, point: Record<string, number>) => void;
@@ -292,13 +308,35 @@ const CLAIM_READING: Record<
 const seedGrids = (): Record<string, ResultGrid> =>
   Object.fromEntries(COST_MODELS.map((m) => [m.modelId, buildGrid(m)]));
 
+/**
+ * Enforcement rather than convention (OF-BLD-006 §3.3).
+ *
+ * A comment saying "do not mutate this after locking" is a comment. Freezing
+ * the arrays and the objects inside them means a stray `push` or an assignment
+ * throws in module strict mode, at the line that did it, instead of quietly
+ * shifting a prediction toward a result somebody has already seen.
+ *
+ * Applied after `structuredClone`, because cloning produces fresh mutable
+ * objects and freezing the module constant would not protect the store's copy.
+ */
+function freezeLocked(runbooks: Runbook[]): Runbook[] {
+  for (const r of runbooks) {
+    if (!r.lockedAt) continue;
+    r.predictions.forEach((p) => Object.freeze(p));
+    r.measurementSchema.forEach((m) => Object.freeze(m));
+    Object.freeze(r.predictions);
+    Object.freeze(r.measurementSchema);
+  }
+  return runbooks;
+}
+
 const seedState = () => ({
   papers: structuredClone(PAPERS),
   records: structuredClone(RECORDS),
   runOutputs: structuredClone(RUN_OUTPUTS),
   strains: structuredClone(STRAINS),
   products: structuredClone(PRODUCTS),
-  runbooks: structuredClone(RUNBOOKS),
+  runbooks: freezeLocked(structuredClone(RUNBOOKS)),
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
   collections: structuredClone(COLLECTIONS),
@@ -1126,6 +1164,100 @@ export const useStore = create<OFState>()((set, get) => ({
       provenance: 'user',
     });
     get().toast({ text: 'Decision recorded against the runbook.', kind: 'success' });
+  },
+
+  lockRunbook: (runbookId) => {
+    const r = get().runbooks.find((x) => x.id === runbookId);
+    if (!r) return;
+    if (r.lockedAt) {
+      get().toast({ text: 'Already locked — supersede it to change anything.', kind: 'warn' });
+      return;
+    }
+    if (r.predictions.length === 0) {
+      get().toast({
+        text: 'Nothing to lock. A runbook with no predictions has made no claim.',
+        kind: 'warn',
+      });
+      return;
+    }
+    const lockedAt = new Date().toISOString();
+    const lockHash = runbookLockHash(r.predictions, r.measurementSchema);
+    set((s) => ({
+      runbooks: freezeLocked(
+        s.runbooks.map((x) => (x.id === runbookId ? { ...x, lockedAt, lockHash } : x)),
+      ),
+    }));
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: `Predictions frozen on ${r.title} — ${r.predictions.length} claim${r.predictions.length === 1 ? '' : 's'}`,
+      href: `#/runbooks/${runbookId}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text: `Locked. ${r.predictions.length} prediction${r.predictions.length === 1 ? '' : 's'} frozen against hash ${lockHash.slice(0, 8)}.`,
+      kind: 'success',
+    });
+  },
+
+  reviseRunbookPrediction: (runbookId, predictionId, value) => {
+    const r = get().runbooks.find((x) => x.id === runbookId);
+    if (!r) return false;
+    if (r.lockedAt) {
+      // The refusal names the way forward, in the house style: a dead end that
+      // explains itself is a next step.
+      get().toast({
+        text: 'Refused — these predictions were frozen before the run. Supersede the runbook to revise them.',
+        kind: 'warn',
+      });
+      return false;
+    }
+    if (!isFinite(value)) return false;
+    set((s) => ({
+      runbooks: s.runbooks.map((x) =>
+        x.id === runbookId
+          ? {
+              ...x,
+              predictions: x.predictions.map((p) => (p.id === predictionId ? { ...p, value } : p)),
+            }
+          : x,
+      ),
+    }));
+    return true;
+  },
+
+  supersedeRunbook: (runbookId) => {
+    const s = get();
+    const source = s.runbooks.find((x) => x.id === runbookId);
+    if (!source) return null;
+    const id = nextId('rb');
+    const revision: Runbook = {
+      ...structuredClone({ ...source, predictions: source.predictions, measurementSchema: source.measurementSchema }),
+      id,
+      title: `${source.title} — revised`,
+      status: 'draft',
+      progressPct: 0,
+      eta: null,
+      outputs: [],
+      note: `Supersedes ${source.id}, whose predictions were frozen on ${source.lockedAt?.slice(0, 10) ?? 'an unknown date'}. The original is left exactly as it was: a locked runbook is replaced, never rewritten, so the record of what was actually predicted survives the revision.`,
+      lockedAt: null,
+      lockHash: null,
+    };
+    set((st) => ({ runbooks: [revision, ...st.runbooks] }));
+    get().logActivity({
+      at: stamp(),
+      icon: 'runbook',
+      text: `${source.title} superseded — predictions editable again in the revision`,
+      href: `#/runbooks/${id}`,
+      provenance: 'user',
+    });
+    get().toast({
+      text: 'Revision opened. The locked original is untouched.',
+      kind: 'info',
+      href: `#/runbooks/${id}`,
+      hrefLabel: 'Open',
+    });
+    return id;
   },
 
   // ── scenarios ────────────────────────────────────────────────────────

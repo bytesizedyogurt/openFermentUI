@@ -273,7 +273,11 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
  * prediction that could still be edited is not evidence of anything.
  */
 function PredictionPanel({ runbook }: { runbook: Runbook }) {
+  const lock = useStore((st) => st.lockRunbook);
+  const revise = useStore((st) => st.reviseRunbookPrediction);
+  const supersede = useStore((st) => st.supersedeRunbook);
   const intact = lockIntact(runbook);
+  const locked = runbook.lockedAt !== null;
   const measuresFor = (predictionId: string) =>
     runbook.measurementSchema.filter((m) => m.predictionId === predictionId);
   const unpredicted = runbook.measurementSchema.filter((m) => m.predictionId === null);
@@ -319,8 +323,21 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
               <li key={p.id}>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-body">{p.label}</span>
-                  <span className="font-num text-body shrink-0">
-                    {p.value.toLocaleString()}{' '}
+                  <span className="font-num text-body shrink-0 inline-flex items-baseline gap-1">
+                    {locked ? (
+                      p.value.toLocaleString()
+                    ) : (
+                      <input
+                        type="number"
+                        className="input font-num w-[110px] text-right py-0.5"
+                        value={p.value}
+                        aria-label={`${p.label} predicted value`}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (e.target.value !== '' && isFinite(v)) revise(runbook.id, p.id, v);
+                        }}
+                      />
+                    )}
                     <span className="text-ink-soft text-caption">{p.unit}</span>
                   </span>
                 </div>
@@ -369,14 +386,40 @@ function PredictionPanel({ runbook }: { runbook: Runbook }) {
         </div>
       )}
 
-      <div className="mt-3">
+      <div className="mt-3 pt-3 border-t border-line flex flex-wrap items-center gap-2">
+        {locked ? (
+          <>
+            <Button onClick={() => { const id = supersede(runbook.id); if (id) navigate(`/runbooks/${id}`); }}>
+              <GitBranch size={14} /> Supersede to revise
+            </Button>
+            <span className="text-caption text-ink-soft">
+              Frozen {runbook.lockedAt?.slice(0, 10)} · hash{' '}
+              <span className="font-num">{runbook.lockHash?.slice(0, 12)}</span>. Editing is
+              refused at the store, not discouraged by a note.
+            </span>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="primary"
+              onClick={() => lock(runbook.id)}
+              disabled={runbook.predictions.length === 0}
+            >
+              <Lock size={14} /> Lock predictions
+            </Button>
+            <span className="text-caption text-ink-soft">
+              {runbook.predictions.length === 0
+                ? 'Nothing to freeze yet.'
+                : 'Editable until frozen. After that the runbook is superseded, never rewritten.'}
+            </span>
+          </>
+        )}
+      </div>
+
+      <div className="mt-2">
         <ComponentTag
           component="Runbook"
-          action={
-            runbook.lockedAt
-              ? `frozen ${runbook.lockedAt.slice(0, 10)}`
-              : 'predictions still editable'
-          }
+          action={locked ? `frozen ${runbook.lockedAt?.slice(0, 10)}` : 'predictions still editable'}
         />
       </div>
     </Card>
