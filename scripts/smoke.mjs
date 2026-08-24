@@ -77,6 +77,7 @@ const ROUTES = [
   ['/settings/units', 'Settings — units'],
   ['/settings/corpus', 'Settings — corpus'],
   ['/settings/export', 'Settings — export'],
+  ['/settings/architecture', 'Architecture — the eighteen components'],
   ['/settings/about', 'Settings — colophon'],
 ];
 

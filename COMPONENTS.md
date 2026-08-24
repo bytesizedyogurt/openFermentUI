@@ -49,7 +49,7 @@ defect against this rule.
 
 ## Reading the map
 
-**"not built" is a real entry.** Six of the eighteen have no code behind them.
+**"not built" is a real entry.** Seven of the eighteen have no code behind them.
 They are in the table because the table is the architecture, not an inventory
 of what happens to exist — and because a name with nothing under it is a
 smaller problem than a system with no name for the thing it is missing.

@@ -56,6 +56,7 @@ import Compare from '@/screens/Compare';
 import Learn from '@/screens/Learn';
 import Lesson from '@/screens/Lesson';
 import Settings from '@/screens/Settings';
+import Architecture from '@/screens/Architecture';
 
 const RAIL = [
   { to: '/', label: 'Home', icon: HomeIcon, key: 'h' },
@@ -109,6 +110,9 @@ function Screen() {
     case 'learn':
       return b && c ? <Lesson moduleId={b} lessonId={c} /> : <Learn />;
     case 'settings':
+      // Architecture is its own screen rather than a Settings pane: it is a
+      // reference map, not a preference, and it needs the full width.
+      if (b === 'architecture') return <Architecture />;
       return <Settings section={b ?? 'appearance'} />;
     default:
       return (

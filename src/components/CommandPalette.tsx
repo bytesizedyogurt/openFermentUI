@@ -86,6 +86,7 @@ export function CommandPalette() {
       { id: 'n-cmp', group: 'Navigate', label: 'Compare scenarios', icon: LineChart, run: () => navigate('/simulate/compare') },
       { id: 'n-lrn', group: 'Navigate', label: 'Learn', icon: GraduationCap, run: () => navigate('/learn') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
+      { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', icon: Boxes, run: () => navigate('/settings/architecture') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
     ];
     for (const p of papers) {

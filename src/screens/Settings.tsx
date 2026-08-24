@@ -69,6 +69,12 @@ const SECTIONS: SectionDef[] = [
       'Choose how quantities are shown, and inspect the 24-field parameter ontology every number is validated against.',
   },
   {
+    id: 'architecture',
+    label: 'Architecture',
+    blurb:
+      'The eighteen named components and the seven layers they sit in — the map the system is built from.',
+  },
+  {
     id: 'corpus',
     label: 'Corpus & ontology',
     blurb: 'Owner controls: the ontology reference, the gold set, and demo data reset.',

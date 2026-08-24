@@ -13,6 +13,8 @@ import { STRAINS } from '../src/data/strains';
 import { PRODUCTS } from '../src/data/products';
 import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
+import { COMPONENTS, FULL_NAME, LAYERS, isBuilt } from '../src/data/components';
+import { readFileSync, existsSync } from 'node:fs';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { JURISDICTIONS } from '../src/engine/clearance';
 import {
@@ -405,6 +407,80 @@ for (const r of RUNBOOKS) {
   }
 }
 
+// ── 6c. the component map (OF-BLD-006 §2.3) ────────────────────────────
+//
+// COMPONENTS.md is the reference every future spec points at, and src/data/
+// components.ts is what the UI renders. Two copies of the same table drift the
+// moment somebody edits one, and the drift is invisible: the doc keeps saying
+// a component lives somewhere it no longer does. So the doc is checked against
+// the module, row for row, and a mismatch fails the build.
+{
+  const doc = 'COMPONENTS.md';
+  if (!existsSync(doc)) {
+    fail(`${doc} is missing — it is the canonical map §2.3 requires`);
+  } else {
+    const md = readFileSync(doc, 'utf8');
+    const rows = md
+      .split('\n')
+      .filter((l) => /^\| [A-Za-z]/.test(l) && !l.startsWith('| Component'))
+      .map((l) => l.split('|').map((c) => c.trim()).filter(Boolean));
+
+    if (rows.length !== COMPONENTS.length)
+      fail(`${doc}: ${rows.length} component rows, but components.ts defines ${COMPONENTS.length}`);
+
+    for (const c of COMPONENTS) {
+      const display = FULL_NAME[c.name] ?? c.name;
+      const row = rows.find((r) => r[0] === display);
+      if (!row) {
+        fail(`${doc}: no row for "${display}"`);
+        continue;
+      }
+      if (row[1] !== c.layer)
+        fail(`${doc}: "${display}" is layer "${row[1]}" in the doc, "${c.layer}" in components.ts`);
+
+      const docPaths = row[2] === 'not built' ? [] : row[2].split(',').map((x) => x.replace(/`/g, '').trim());
+      const codePaths = c.livesIn;
+      if (docPaths.join(' | ') !== codePaths.join(' | '))
+        fail(
+          `${doc}: "${display}" paths disagree\n      doc:  ${docPaths.join(', ') || '(none)'}\n      code: ${codePaths.join(', ') || '(none)'}`,
+        );
+
+      const docSurface = row[3] === '\u2014' ? null : row[3];
+      if (docSurface !== c.surfacedAs)
+        fail(
+          `${doc}: "${display}" is surfaced as "${docSurface}" in the doc, "${c.surfacedAs}" in components.ts`,
+        );
+    }
+    // The prose count is checked as well as the table. A doc that says "six"
+    // over a table of seven is the kind of error a reader trusts and a
+    // reviewer skims past.
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    const notBuilt = COMPONENTS.filter((c) => !isBuilt(c)).length;
+    const claimed = md.match(/\*\*"not built" is a real entry\.\*\*\s+(\w+) of the eighteen/i)?.[1];
+    if (claimed && claimed.toLowerCase() !== WORDS[notBuilt])
+      fail(
+        `${doc}: prose says "${claimed} of the eighteen" have no code, but ${notBuilt} components are not built`,
+      );
+  }
+
+  // Every built component must point at code that exists, or the map is a
+  // promise rather than a description.
+  for (const c of COMPONENTS) {
+    for (const path of c.livesIn) {
+      const file = path.replace(/^aggregateExclusion\(\) in /, '');
+      if (!existsSync(file)) fail(`component ${c.name}: declares ${file}, which does not exist`);
+    }
+    if (isBuilt(c) && !c.surfacedAs)
+      warn(`component ${c.name}: has code but no stated surface — how does anyone reach it?`);
+    if (!isBuilt(c) && c.surfacedAs)
+      fail(`component ${c.name}: claims a surface but has no code behind it`);
+  }
+
+  const layerIds = new Set(LAYERS.map((l) => l.id));
+  for (const c of COMPONENTS)
+    if (!layerIds.has(c.layer)) fail(`component ${c.name}: layer "${c.layer}" is not a known layer`);
+}
+
 // ── 6b. the Assay layer (OF-BLD-006 §3) ────────────────────────────────
 //
 // Locking is what stops the platform grading its own homework, so the seed has
@@ -573,6 +649,7 @@ const patentEntries = CLEARANCE_FINDINGS.flatMap((f) => f.patents);
 console.log(`  patents on file   ${patentEntries.length} across ${CLEARANCE_FINDINGS.length} findings · ${patentEntries.filter((p) => p.expiresOnTerm !== null).length} with an established term date`);
 console.log(`  clearance cells   ${CLEARANCE_FINDINGS.length} authored of ${PRODUCTS.length * JURISDICTIONS.length} (${PRODUCTS.length} molecules x ${JURISDICTIONS.length} offices) — every other cell reads 'not assessed'`);
 const preds = RUNBOOKS.flatMap((r) => r.predictions);
+console.log(`  components        ${COMPONENTS.length} in ${LAYERS.length} layers (${COMPONENTS.filter(isBuilt).length} built, ${COMPONENTS.filter((c) => !isBuilt(c)).length} named only) — COMPONENTS.md matches`);
 console.log(`  predictions       ${preds.length} across ${RUNBOOKS.filter((r) => r.predictions.length > 0).length} runbooks (${preds.filter((p) => p.confidence === 'high').length} high, ${preds.filter((p) => p.confidence === 'medium').length} medium, ${preds.filter((p) => p.confidence === 'low').length} low)`);
 console.log(`  measures          ${RUNBOOKS.flatMap((r) => r.measurementSchema).length}, of which ${RUNBOOKS.flatMap((r) => r.measurementSchema).filter((m) => m.predictionId === null).length} recorded without a prediction to test`);
 console.log(`  locked            ${RUNBOOKS.filter((r) => r.lockedAt).length}/${RUNBOOKS.length} runbooks frozen, all hashes recomputed and matching`);
