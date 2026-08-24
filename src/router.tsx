@@ -22,7 +22,13 @@ function parseHash(): Route {
 }
 
 let listeners: (() => void)[] = [];
-window.addEventListener('hashchange', () => listeners.forEach((l) => l()));
+// Guarded so this module can be imported outside a browser. The check scripts
+// pull in components that transitively reach the router, and a bare
+// addEventListener at module scope makes the whole graph unimportable in Node
+// for no benefit — the listener is useless there anyway.
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => listeners.forEach((l) => l()));
+}
 
 export function useRoute(): Route {
   const [route, setRoute] = useState<Route>(parseHash);

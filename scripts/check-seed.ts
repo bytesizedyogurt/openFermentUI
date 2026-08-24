@@ -6,6 +6,7 @@
  * locates extraction spans by searching for `quote` inside the section text, so
  * a quote that isn't present silently loses its highlight rather than erroring.
  */
+import type { Provenance } from '../src/data/types';
 import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
 import { RUN_OUTPUTS } from '../src/data/runOutputs';
@@ -16,6 +17,8 @@ import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, isBuilt } from '../src/data/components';
 import { readFileSync, existsSync } from 'node:fs';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
+import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
+import { provMeta } from '../src/components/Provenance';
 import { JURISDICTIONS } from '../src/engine/clearance';
 import {
   CLEARANCE_STATES,
@@ -628,6 +631,42 @@ for (const f of CLEARANCE_FINDINGS) {
     fail(
       `${where}: provenance "${f.provenance}" — a jurisdiction finding must be curated or verified, never modeled`,
     );
+}
+
+// ── 6d. the measured provenance level (OF-BLD-006 §6) ──────────────────
+//
+// A provenance class that exists in the union but is missing from one of the
+// surfaces that render it fails silently: the value shows up with an
+// undefined tick class or a blank label, and nobody notices until a screenshot
+// looks wrong. §6 names five places it has to land, so all five are checked.
+{
+  const ALL: Provenance[] = [
+    'measured', 'gold', 'verified', 'curated', 'unverified', 'user', 'industry-estimate', 'demo',
+  ];
+  for (const p of ALL) {
+    if (!PROVENANCE_LABEL[p]) fail(`provenance ${p}: no label in PROVENANCE_LABEL`);
+    if (!tickClass(p)?.includes('tick-')) fail(`provenance ${p}: tickClass() returns no tick class`);
+    if (!provMeta(p)) fail(`provenance ${p}: missing from META in Provenance.tsx`);
+    if (PROVENANCE_RANK[p] === undefined) fail(`provenance ${p}: no entry in PROVENANCE_RANK`);
+  }
+
+  if (PROVENANCE_LABEL.measured !== 'Measured · first-party')
+    fail(`provenance measured: label is "${PROVENANCE_LABEL.measured}", §6 specifies "Measured · first-party"`);
+
+  // §6: ranks above gold. First-party data with its conditions attached beats
+  // a hand-curated reading of somebody else's paper.
+  if (!(PROVENANCE_RANK.measured < PROVENANCE_RANK.gold))
+    fail('provenance measured: must rank above gold');
+
+  // §6: included in aggregation. It is the strongest evidence the system can
+  // hold, so an exclusion here would be exactly backwards.
+  const probe = { status: 'verified', provenance: 'measured', isPrimary: true } as never;
+  if (aggregateExclusion(probe) !== null)
+    fail('provenance measured: held out of aggregates, but §6 says it is included');
+
+  const css = readFileSync('src/styles.css', 'utf8');
+  if (!css.includes('.tick-measured::before'))
+    fail('provenance measured: no .tick-measured rule in styles.css');
 }
 
 // ── report ─────────────────────────────────────────────────────────────
