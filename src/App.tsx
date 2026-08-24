@@ -50,6 +50,7 @@ import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
 import RunMode from '@/screens/RunMode';
+import DepositionDetail from '@/screens/DepositionDetail';
 import Simulate from '@/screens/Simulate';
 import ScenarioWorkspace from '@/screens/ScenarioWorkspace';
 import Compare from '@/screens/Compare';
@@ -104,6 +105,11 @@ function Screen() {
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
     case 'runbooks':
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
+    case 'depositions':
+      // A deposition is reached from the runbook that predicted it or from the
+      // run that wrote it — it earns no rail slot of its own (§5 caps the rail
+      // at ten, and this is a record, not a destination).
+      return b ? <DepositionDetail depositionId={b} /> : <Runbooks />;
     case 'simulate':
       if (b === 'compare') return <Compare />;
       return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;

@@ -30,6 +30,8 @@ import { fmt } from '@/engine/units';
 import { exportText } from '@/lib/csv';
 import { Button, Modal, cx, EmptyState, Callout } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
+import { DepositionPanel } from '@/components/DepositionPanel';
+import { ComponentTag } from '@/components/ComponentTag';
 
 const SKIP_REASONS = [
   'Not applicable to this batch',
@@ -98,6 +100,17 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
   const extendTimer = useStore((s) => s.extendTimer);
   const dismissTimer = useStore((s) => s.dismissTimer);
   const finishRun = useStore((s) => s.finishRun);
+  // A run may or may not be writing into a Deposition. When it is not, this
+  // screen behaves exactly as it did before OF-BLD-006 — the capture surface
+  // is additive, not a replacement for bench execution.
+  const deposition = useStore((s) =>
+    run?.depositionId ? (s.depositions.find((d) => d.id === run.depositionId) ?? null) : null,
+  );
+  const runbook = useStore((s) =>
+    deposition ? (s.runbooks.find((r) => r.id === deposition.runbookId) ?? null) : null,
+  );
+  const beginDeposition = useStore((s) => s.beginDeposition);
+  const closeDeposition = useStore((s) => s.closeDeposition);
   const startRun = useStore((s) => s.startRun);
   const toast = useStore((s) => s.toast);
 
@@ -252,6 +265,109 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
     );
   }
 
+  // ── Staged (OF-BLD-006 §4.5) ─────────────────────────────────────────
+  //
+  // Quantities scaled to the volume actually being run, and the measurement
+  // schema shown BEFORE starting — this is the last moment it can change.
+  // After Begin, the runbook's predictions are what the result is judged
+  // against, and a schema edited afterwards would be judging a different
+  // question.
+  if (deposition && deposition.state === 'staged') {
+    const materials = scaleMaterials(version, run.scale);
+    return (
+      <div className="h-full overflow-y-auto bg-surface-0">
+        <div className="max-w-[860px] mx-auto p-6">
+          <div className="text-caption uppercase tracking-wide text-ink-soft">
+            Deposition · staged
+          </div>
+          <h1 className="font-serif text-page-title font-semibold mt-0.5">{protocol.title}</h1>
+          <div className="text-body text-ink mt-1">
+            v{version.version} · {batchLabel(version, run.scale)}
+            {runbook && (
+              <>
+                {' · against '}
+                <a className="text-accent hover:underline" href={`#/runbooks/${runbook.id}`}>
+                  {runbook.title}
+                </a>
+              </>
+            )}
+          </div>
+
+          <div className="card p-4 mt-5">
+            <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">
+              What will be recorded
+            </div>
+            {runbook && runbook.measurementSchema.length > 0 ? (
+              <>
+                <ul className="space-y-2">
+                  {runbook.measurementSchema.map((m) => {
+                    const p = runbook.predictions.find((x) => x.id === m.predictionId);
+                    return (
+                      <li key={m.id} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-reading text-ink">{m.label}</span>
+                        <span className="font-num text-body text-ink-soft">
+                          {m.unit} · {m.timepoint}
+                        </span>
+                        {p ? (
+                          <span className="font-num text-body text-accent">
+                            tests {p.value} {p.unit}
+                          </span>
+                        ) : (
+                          <span className="text-body text-ink-soft">context, nothing predicted</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-body text-ink-soft mt-3">
+                  This is the last moment this list can change. Once recording starts it is what the
+                  run is judged against, and a schema edited afterwards would be answering a
+                  different question.
+                </p>
+              </>
+            ) : (
+              <p className="text-body text-ink-soft">
+                This runbook declares no measurements, so nothing here will be reconciled. Anything
+                you record will be kept as an observation.
+              </p>
+            )}
+          </div>
+
+          <div className="card p-4 mt-4">
+            <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">
+              Quantities at this scale
+            </div>
+            <ul className="space-y-1">
+              {materials.map((m) => (
+                <li key={m.name} className="flex items-baseline justify-between gap-4 text-reading">
+                  <span className="text-ink">{m.name}</span>
+                  <span className="font-num text-ink shrink-0">
+                    {fmt(m.scaledAmount)} {m.unit}
+                    {!m.scales && <span className="text-ink-soft"> (fixed)</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 mt-5">
+            <Button
+              variant="primary"
+              style={{ minHeight: 56, fontSize: 17 }}
+              onClick={() => beginDeposition(deposition.id)}
+            >
+              <Play size={17} /> Begin recording
+            </Button>
+            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/protocols/${protocolId}`)}>
+              Not yet
+            </Button>
+            <ComponentTag component="Deposition" action="staged" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Run summary ──────────────────────────────────────────────────────
   if (summary) {
     const totalMin = (Date.now() - run.startedAt) / 60000;
@@ -395,17 +511,57 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              onClick={() => {
-                finishRun(runId);
-                toast({ text: 'Run summary saved to this protocol’s history', kind: 'success' });
-                navigate(`/protocols/${protocolId}`);
-              }}
-            >
-              <Check size={15} /> Save to run history
-            </Button>
+          {deposition && deposition.state !== 'closed' && (
+            <Callout kind="info" title="Closing this deposition stops new entries">
+              <span className="font-num">{deposition.entries.length}</span> measurement
+              {deposition.entries.length === 1 ? '' : 's'} and{' '}
+              <span className="font-num">{deposition.observations.length}</span> observation
+              {deposition.observations.length === 1 ? '' : 's'} recorded.
+              {deposition.entries.some((e) => !e.confirmed) && (
+                <>
+                  {' '}
+                  <span className="text-signal-warn">
+                    {deposition.entries.filter((e) => !e.confirmed).length} value
+                    {deposition.entries.filter((e) => !e.confirmed).length === 1 ? '' : 's'} were
+                    never read back and will be marked unconfirmed in the record.
+                  </span>
+                </>
+              )}{' '}
+              The record is append-only either way — closing prevents additions, it does not lock
+              anything you already wrote.
+            </Callout>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            {deposition && deposition.state !== 'closed' ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  closeDeposition(deposition.id);
+                  finishRun(runId);
+                  toast({
+                    text: 'Deposition closed. Reconcile it against the runbook when you are ready.',
+                    kind: 'success',
+                    href: `#/depositions/${deposition.id}`,
+                    hrefLabel: 'Open',
+                  });
+                  navigate(`/depositions/${deposition.id}`);
+                }}
+              >
+                <Check size={15} /> Close the deposition
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  finishRun(runId);
+                  toast({ text: 'Run summary saved to this protocol’s history', kind: 'success' });
+                  navigate(`/protocols/${protocolId}`);
+                }}
+              >
+                <Check size={15} /> Save to run history
+              </Button>
+            )}
             <Button onClick={() => exportText(`run-${protocol.id}-${runId}.txt`, textLog)}>
               <Download size={15} /> Export as text log
             </Button>
@@ -624,6 +780,14 @@ export default function RunMode({ protocolId, runId }: { protocolId: string; run
                   </>
                 )}
               </div>
+            )}
+
+            {deposition && step && (
+              <DepositionPanel
+                deposition={deposition}
+                schema={runbook?.measurementSchema ?? []}
+                stepId={step.id}
+              />
             )}
 
             <div className="mt-4">

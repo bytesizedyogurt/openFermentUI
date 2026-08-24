@@ -231,6 +231,34 @@ export interface OFState {
   completeLesson: (lessonId: string) => void;
   recordCheckpoint: (qid: string, correct: boolean) => void;
 
+  // deposition (OF-BLD-006 §4)
+  /**
+   * Open a Deposition in `staged` and start the run session that writes into
+   * it. Staged is the last moment the measurement schema can change (§4.5).
+   */
+  openDeposition: (runbookId: string, protocolId: string, scale: number) => { depositionId: string; runId: string } | null;
+  /** Staged → running. Nothing is recorded before this. */
+  beginDeposition: (depositionId: string) => void;
+  /**
+   * Record something the operator reported. A value matching the runbook's
+   * schema becomes an entry; everything else becomes an observation, kept
+   * verbatim (§4.3).
+   */
+  captureDeposition: (
+    depositionId: string,
+    stepId: string,
+    raw: string,
+    match: { measureId: string; value: number; unit: string } | null,
+  ) => void;
+  /** The read-back beat on a number (§4.4). */
+  confirmEntry: (depositionId: string, entryId: string) => void;
+  /** Correct a mis-parse by appending, never by overwriting `raw`. */
+  amendEntry: (depositionId: string, entryId: string, value: number) => void;
+  /** Attach a later structured reading to an observation, leaving raw alone. */
+  structureObservation: (depositionId: string, observationId: string, structured: string) => void;
+  /** Running → closed. Append-only throughout; closing stops new entries. */
+  closeDeposition: (depositionId: string) => void;
+
   // durable tier (OF-BLD-006 §4.6)
   /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
   hydrateDurable: () => Promise<void>;
@@ -1281,6 +1309,158 @@ export const useStore = create<OFState>()((set, get) => ({
       hrefLabel: 'Open',
     });
     return id;
+  },
+
+  // ── deposition (OF-BLD-006 §4) ───────────────────────────────────────
+
+  openDeposition: (runbookId, protocolId, scale) => {
+    const s = get();
+    const protocol = s.protocols.find((p) => p.id === protocolId);
+    if (!protocol) return null;
+    const depositionId = nextId('dep');
+    const deposition: Deposition = {
+      id: depositionId,
+      runbookId,
+      protocolId,
+      operatorId: null, // Guild will populate this once people exist.
+      startedAt: new Date().toISOString(),
+      closedAt: null,
+      state: 'staged',
+      entries: [],
+      observations: [],
+      reconciliation: null,
+    };
+    const runId = s.startRun(protocolId, protocol.currentVersion, scale);
+    set((st) => ({
+      depositions: [deposition, ...st.depositions],
+      runs: { ...st.runs, [runId]: { ...st.runs[runId], depositionId } },
+    }));
+    get().logActivity({
+      at: stamp(),
+      icon: 'run',
+      text: `Deposition staged — ${protocol.title}`,
+      href: `#/protocols/${protocolId}/run/${runId}`,
+      provenance: 'user',
+    });
+    return { depositionId, runId };
+  },
+
+  beginDeposition: (depositionId) =>
+    set((s) => ({
+      depositions: s.depositions.map((d) =>
+        d.id === depositionId && d.state === 'staged' ? { ...d, state: 'running' } : d,
+      ),
+    })),
+
+  captureDeposition: (depositionId, stepId, raw, match) => {
+    const at = new Date().toISOString();
+    set((s) => ({
+      depositions: s.depositions.map((d) => {
+        if (d.id !== depositionId || d.state === 'closed') return d;
+        if (match) {
+          return {
+            ...d,
+            entries: [
+              ...d.entries,
+              {
+                id: nextId('de'),
+                measureId: match.measureId,
+                stepId,
+                at,
+                value: match.value,
+                unit: match.unit,
+                raw,
+                // Numbers entering the schema wait for a read-back (§4.4).
+                confirmed: false,
+              },
+            ],
+          };
+        }
+        // Everything the schema has no field for. This is the point: an
+        // unexpected result has no column waiting for it, by definition.
+        return {
+          ...d,
+          observations: [
+            ...d.observations,
+            { id: nextId('ob'), stepId, at, raw, structured: null },
+          ],
+        };
+      }),
+    }));
+  },
+
+  confirmEntry: (depositionId, entryId) =>
+    set((s) => ({
+      depositions: s.depositions.map((d) =>
+        d.id === depositionId
+          ? {
+              ...d,
+              entries: d.entries.map((e) => (e.id === entryId ? { ...e, confirmed: true } : e)),
+            }
+          : d,
+      ),
+    })),
+
+  amendEntry: (depositionId, entryId, value) => {
+    // Append-only: the mis-parse stays in the record with its raw text, and the
+    // correction arrives as a new entry against the same measure. Overwriting
+    // would destroy the evidence that the parse was ever wrong.
+    const at = new Date().toISOString();
+    set((s) => ({
+      depositions: s.depositions.map((d) => {
+        if (d.id !== depositionId || d.state === 'closed') return d;
+        const original = d.entries.find((e) => e.id === entryId);
+        if (!original) return d;
+        return {
+          ...d,
+          entries: [
+            ...d.entries,
+            {
+              ...original,
+              id: nextId('de'),
+              at,
+              value,
+              raw: `${original.raw} → corrected to ${value} ${original.unit}`,
+              confirmed: true,
+            },
+          ],
+        };
+      }),
+    }));
+  },
+
+  structureObservation: (depositionId, observationId, structured) =>
+    set((s) => ({
+      depositions: s.depositions.map((d) =>
+        d.id === depositionId
+          ? {
+              ...d,
+              // `raw` is untouched. `structured` is derived and can be
+              // re-derived; raw is its provenance.
+              observations: d.observations.map((o) =>
+                o.id === observationId ? { ...o, structured } : o,
+              ),
+            }
+          : d,
+      ),
+    })),
+
+  closeDeposition: (depositionId) => {
+    set((s) => ({
+      depositions: s.depositions.map((d) =>
+        d.id === depositionId
+          ? { ...d, state: 'closed' as const, closedAt: new Date().toISOString() }
+          : d,
+      ),
+    }));
+    const d = get().depositions.find((x) => x.id === depositionId);
+    get().logActivity({
+      at: stamp(),
+      icon: 'check',
+      text: `Deposition closed — ${d?.entries.length ?? 0} measured, ${d?.observations.length ?? 0} observed`,
+      href: `#/depositions/${depositionId}`,
+      provenance: 'user',
+    });
   },
 
   // ── scenarios ────────────────────────────────────────────────────────

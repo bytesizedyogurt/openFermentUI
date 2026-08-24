@@ -20,6 +20,7 @@ import {
   FileCheck2,
   FlaskConical,
   Lock,
+  Play,
   Target,
   GitBranch,
   Link2,
@@ -54,6 +55,7 @@ import {
   EmptyState,
   Explain,
   LinkButton,
+  Modal,
   PageHeader,
   SectionTitle,
   Skeleton,
@@ -498,6 +500,107 @@ function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
   );
 }
 
+/**
+ * Launching a Deposition (OF-BLD-006 §4, COMPONENTS.md).
+ *
+ * Deposition is launched FROM a Runbook, not from a protocol: the runbook is
+ * what supplies the predictions and the measurement schema, and without those
+ * a run has nothing to be reconciled against. The protocol supplies the steps.
+ */
+function StartDeposition({ runbook }: { runbook: Runbook }) {
+  const protocols = useStore((s) => s.protocols);
+  const depositions = useStore((s) => s.depositions);
+  const openDeposition = useStore((s) => s.openDeposition);
+  const [pick, setPick] = useState(false);
+  const [scale, setScale] = useState(1);
+
+  const mine = depositions.filter((d) => d.runbookId === runbook.id);
+  const blocked = runbook.lockedAt === null;
+
+  return (
+    <Card className="p-4">
+      <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Assay</div>
+      <h3 className="font-serif text-section-title font-semibold leading-snug">
+        Take this to a bench
+      </h3>
+      <p className="text-body text-ink-soft mt-1">
+        A Deposition records what actually happened, against what this runbook predicted. It is the
+        only ground truth the platform ever gets about its own numbers — nothing in the literature
+        can tell you whether a yield model works.
+      </p>
+
+      {blocked && (
+        <p className="text-body text-signal-warn mt-2">
+          Lock the predictions first. Running against predictions that can still be edited is how
+          the platform ends up grading its own homework.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <Button variant="primary" disabled={blocked} onClick={() => setPick(true)}>
+          <Play size={14} /> Start a deposition
+        </Button>
+        <ComponentTag component="Deposition" action={`${mine.length} on this runbook`} />
+      </div>
+
+      {mine.length > 0 && (
+        <ul className="mt-3 pt-3 border-t border-line space-y-1">
+          {mine.map((d) => (
+            <li key={d.id}>
+              <a
+                href={href(`/depositions/${d.id}`)}
+                className="text-body text-accent hover:underline"
+              >
+                {d.state === 'closed' ? 'Closed' : d.state === 'running' ? 'Running' : 'Staged'} ·{' '}
+                <span className="font-num">{d.entries.length}</span> measured ·{' '}
+                <span className="font-num">{d.observations.length}</span> observed
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal open={pick} onClose={() => setPick(false)} title="Which protocol will you run?" width={520}>
+        <p className="text-body text-ink-soft mb-3">
+          The runbook supplies the predictions and the measurement schema. The protocol supplies the
+          steps and the quantities.
+        </p>
+        <label className="block text-caption uppercase tracking-wide text-ink-soft mb-1">
+          Scale versus the base batch
+        </label>
+        <input
+          className="input font-num mb-3"
+          type="number"
+          min={0.1}
+          step={0.1}
+          value={scale}
+          onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
+          aria-label="Scale multiplier"
+        />
+        <ul className="space-y-1.5 max-h-[320px] overflow-y-auto">
+          {protocols.map((p) => (
+            <li key={p.id}>
+              <button
+                className="w-full text-left card p-3 hover:border-accent/45 hover:bg-accent-wash/40"
+                onClick={() => {
+                  const started = openDeposition(runbook.id, p.id, scale);
+                  setPick(false);
+                  if (started) navigate(`/protocols/${p.id}/run/${started.runId}`);
+                }}
+              >
+                <div className="font-medium">{p.title}</div>
+                <div className="text-caption text-ink-soft">
+                  {p.id} · {p.category} · v{p.currentVersion}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Modal>
+    </Card>
+  );
+}
+
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function RunbookDetail({ runbookId }: { runbookId: string }) {
@@ -774,7 +877,10 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           run, and the measurements that will test them — frozen together, so the platform cannot
           quietly move a prediction toward a result it has already seen.
         </p>
-        <PredictionPanel runbook={runbook} />
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
+          <PredictionPanel runbook={runbook} />
+          <StartDeposition runbook={runbook} />
+        </div>
       </section>
 
       {/* ── process train ──────────────────────────────────────────────── */}

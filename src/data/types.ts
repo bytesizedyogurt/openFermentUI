@@ -363,6 +363,17 @@ export interface RunState {
   deviations: Deviation[];
   timers: TimerState[];
   finishedAt?: number;
+  /**
+   * The durable Deposition this session is writing into, when there is one
+   * (OF-BLD-006 §4.2).
+   *
+   * A RunState is the transient half — current step, live timers, scroll
+   * position — and it legitimately dies with the tab. The Deposition is the
+   * record, and it does not. Keeping the link here rather than putting a runId
+   * on Deposition keeps the durable object free of a reference to something
+   * that will not survive alongside it.
+   */
+  depositionId?: string;
 }
 
 export interface TimerState {
