@@ -25,7 +25,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Provenance, RecordStatus } from '@/data/types';
+import type { Deposition, MeasuredEvidence, Provenance, RecordStatus } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -47,6 +47,8 @@ export interface DurableSnapshot {
   version: 1;
   savedAt: string;
   depositions: Deposition[];
+  /** First-party measurements released by reconciliation. */
+  measuredEvidence: MeasuredEvidence[];
   /** Keyed by record id. Re-applied over the seeded records at hydrate. */
   reviewDecisions: Record<string, ReviewDecision>;
   /** Keyed by runbook id. Locks only — the runbook itself comes from seed. */
@@ -57,6 +59,7 @@ export const EMPTY_SNAPSHOT: DurableSnapshot = {
   version: 1,
   savedAt: '',
   depositions: [],
+  measuredEvidence: [],
   reviewDecisions: {},
   runbookLocks: {},
 };

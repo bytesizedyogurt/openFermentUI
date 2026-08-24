@@ -31,6 +31,7 @@ export interface FacetDef<T> {
 }
 
 const TICK_BG: Record<ProvKind, string> = {
+  measured: 'rgb(var(--gold))',
   gold: 'rgb(var(--gold))',
   verified: 'rgb(var(--accent))',
   curated: 'rgb(var(--accent) / 0.45)',

@@ -19,6 +19,14 @@
  * set and from aggregate statistics by default.
  */
 export type Provenance =
+  /**
+   * First-party experimental measurement (OF-BLD-006 §6). The strongest
+   * evidence the system can hold, and the only class it produces itself: you
+   * have the raw data and you know the conditions it was taken under. Ranks
+   * above 'gold', which is a hand-curated reading of somebody else's paper.
+   * Created by reconciling a Deposition against the Runbook that predicted it.
+   */
+  | 'measured'
   | 'gold'
   | 'verified'
   | 'curated'
@@ -882,6 +890,47 @@ export interface Reconciliation {
     pctDelta: number;
   }[];
   note: string;
+}
+
+/**
+ * A measured value released into BioRepo by a reconciliation (§5).
+ *
+ * EVIDENCE, NEVER AN OVERRIDE. One result under one set of conditions must not
+ * silently shift a global parameter: a titre of 7.4 g/L in one 2,000 L run
+ * with two logged deviations is a fact about that run, not a correction to
+ * every model that mentions titre. So this is a record with its conditions and
+ * deviations attached, and it passes the same aggregation gate as everything
+ * else rather than jumping the queue because it is first-party.
+ *
+ * It is a separate type from ExtractionRecord because that type is bound to
+ * the corpus — a paper, a section, a verbatim quote — and a bench result has
+ * none of those. It reuses the same `Provenance` union rather than inventing a
+ * second confidence vocabulary.
+ */
+export interface MeasuredEvidence {
+  id: string;
+  depositionId: string;
+  runbookId: string;
+  /** The molecule this was measured for, when the runbook names one. */
+  productId: string | null;
+  /** The prediction it tests, so the claim and the result stay linked. */
+  predictionId: string;
+  label: string;
+  value: number;
+  unit: string;
+  /** Always 'measured'. Present so the field reads the same as everywhere else. */
+  provenance: Provenance;
+  /** What it was true under. Without these the number is not reusable. */
+  conditions: {
+    protocolId: string;
+    scale: number;
+    strainId: string | null;
+  };
+  /** Verbatim deviations logged during the run that produced it. */
+  deviations: string[];
+  /** False when the operator never read the value back (§4.4). */
+  confirmed: boolean;
+  at: string;
 }
 
 export interface Deposition {

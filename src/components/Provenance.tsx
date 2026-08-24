@@ -1,13 +1,19 @@
 // Provenance badge (explicit) and evidence tick (ambient) — both derive from
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
-import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, TrendingUp } from 'lucide-react';
+import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp } from 'lucide-react';
 import type { Provenance } from '@/data/types';
 import { cx } from './ui';
 
 export type ProvKind = Provenance | 'rejected';
 
 const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string; tick: string }> = {
+  measured: {
+    label: 'Measured · first-party',
+    Icon: Microscope,
+    color: 'text-gold',
+    tick: 'tick-measured',
+  },
   gold: { label: 'Curated · gold set', Icon: Award, color: 'text-gold', tick: 'tick-gold' },
   verified: { label: 'Verified against source', Icon: ShieldCheck, color: 'text-accent', tick: 'tick-verified' },
   curated: {
@@ -81,6 +87,7 @@ export function ProvenanceBadge({
 /** Just the colored dot — for dense strip plots and legends. */
 export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
   const bg: Record<ProvKind, string> = {
+    measured: 'bg-gold',
     gold: 'bg-gold',
     verified: 'bg-accent',
     curated: 'bg-accent/45',
@@ -103,7 +110,7 @@ export function ProvenanceLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft">
       {(
-        ['gold', 'verified', 'curated', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
+        ['measured', 'gold', 'verified', 'curated', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
       ).map((p) => (
         <span key={p} className="inline-flex items-center gap-1.5">
           <ProvDot p={p} />

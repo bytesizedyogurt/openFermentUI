@@ -12,6 +12,7 @@ import type {
   Deviation,
   ExtractionRecord,
   Job,
+  MeasuredEvidence,
   LearnModule,
   Paper,
   Product,
@@ -40,6 +41,7 @@ import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
+import { computeDeltas } from '@/engine/reconcile';
 import {
   EMPTY_SNAPSHOT,
   clearDurable,
@@ -97,6 +99,12 @@ export interface OFState {
    * session: a fermentation at hour 14 cannot be lost to a page reload.
    */
   depositions: Deposition[];
+  /**
+   * First-party measurements released by reconciliation. Durable, and
+   * deliberately a separate list from `records`: these are evidence about a
+   * run, not extractions from a paper (OF-BLD-006 §5).
+   */
+  measuredEvidence: MeasuredEvidence[];
   protocols: Protocol[];
   scenarios: Scenario[];
   grids: Record<string, ResultGrid>;
@@ -258,6 +266,15 @@ export interface OFState {
   structureObservation: (depositionId: string, observationId: string, structured: string) => void;
   /** Running → closed. Append-only throughout; closing stops new entries. */
   closeDeposition: (depositionId: string) => void;
+  /**
+   * Record the verdict and release the measured values into BioRepo as
+   * evidence. Never writes a parameter override (§5).
+   */
+  reconcileDeposition: (
+    depositionId: string,
+    outcome: 'confirmed' | 'refuted' | 'inconclusive',
+    note: string,
+  ) => void;
 
   // durable tier (OF-BLD-006 §4.6)
   /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
@@ -387,6 +404,7 @@ const seedState = () => ({
   products: structuredClone(PRODUCTS),
   runbooks: freezeLocked(structuredClone(RUNBOOKS)),
   depositions: [] as Deposition[],
+  measuredEvidence: [] as MeasuredEvidence[],
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
   collections: structuredClone(COLLECTIONS),
@@ -1549,6 +1567,83 @@ export const useStore = create<OFState>()((set, get) => ({
       ),
     })),
 
+  reconcileDeposition: (depositionId, outcome, note) => {
+    const s = get();
+    const d = s.depositions.find((x) => x.id === depositionId);
+    if (!d) return;
+    const runbook = s.runbooks.find((r) => r.id === d.runbookId);
+    if (!runbook) return;
+    const deltas = computeDeltas(d, runbook);
+    const at = new Date().toISOString();
+
+    // The run's deviations travel with the evidence. A number measured during
+    // a run that went sideways is still a number, but it is not the same
+    // number as one measured during a clean run, and stripping that context is
+    // how a single result quietly becomes a global truth.
+    const run = Object.values(s.runs).find((r) => r.depositionId === depositionId);
+    const deviations = (run?.deviations ?? []).map((x) => x.text);
+
+    const evidence: MeasuredEvidence[] = deltas.map((delta) => ({
+      id: nextId('me'),
+      depositionId,
+      runbookId: runbook.id,
+      productId: runbook.productId,
+      predictionId: delta.predictionId,
+      label: delta.label,
+      value: delta.observed,
+      unit: delta.unit,
+      provenance: 'measured',
+      conditions: {
+        protocolId: d.protocolId,
+        scale: run?.scale ?? 1,
+        strainId: runbook.strainId,
+      },
+      deviations,
+      confirmed: delta.confirmed,
+      at,
+    }));
+
+    set((st) => ({
+      depositions: st.depositions.map((x) =>
+        x.id === depositionId
+          ? {
+              ...x,
+              reconciliation: {
+                at,
+                outcome,
+                deltas: deltas.map((delta) => ({
+                  predictionId: delta.predictionId,
+                  predicted: delta.predicted,
+                  observed: delta.observed,
+                  unit: delta.unit,
+                  pctDelta: delta.pctDelta,
+                })),
+                note,
+              },
+            }
+          : x,
+      ),
+      measuredEvidence: [...evidence, ...st.measuredEvidence],
+    }));
+
+    get().logActivity({
+      at: stamp(),
+      icon: 'check',
+      text: `Reconciled — ${outcome}, ${evidence.length} measured value${evidence.length === 1 ? '' : 's'} released as evidence`,
+      href: `#/depositions/${depositionId}`,
+      provenance: 'measured',
+    });
+    get().toast({
+      text:
+        outcome === 'refuted'
+          ? 'Recorded as refuted. That is the useful one — it is ground truth about the model.'
+          : outcome === 'inconclusive'
+            ? 'Recorded as inconclusive. The hit rate stays honest because of entries like this.'
+            : 'Recorded as confirmed.',
+      kind: outcome === 'refuted' ? 'warn' : 'success',
+    });
+  },
+
   hydrateDurable: async () => {
     const snap = await loadDurable();
     if (!snap) {
@@ -1574,6 +1669,7 @@ export const useStore = create<OFState>()((set, get) => ({
         records,
         runbooks: freezeLocked(runbooks),
         depositions: snap.depositions,
+        measuredEvidence: snap.measuredEvidence ?? [],
         durableReady: durableAvailable(),
       };
     });
@@ -1622,6 +1718,7 @@ function snapshotOf(s: OFState): DurableSnapshot {
     ...EMPTY_SNAPSHOT,
     savedAt: new Date().toISOString(),
     depositions: s.depositions,
+    measuredEvidence: s.measuredEvidence,
     reviewDecisions,
     runbookLocks,
   };
@@ -1629,7 +1726,12 @@ function snapshotOf(s: OFState): DurableSnapshot {
 
 if (durableAvailable()) {
   useStore.subscribe((s, prev) => {
-    if (s.depositions === prev.depositions && s.records === prev.records && s.runbooks === prev.runbooks)
+    if (
+      s.depositions === prev.depositions &&
+      s.records === prev.records &&
+      s.runbooks === prev.runbooks &&
+      s.measuredEvidence === prev.measuredEvidence
+    )
       return;
     saveDurable(snapshotOf(s));
   });
@@ -1647,6 +1749,7 @@ if (durableAvailable()) {
  * 'industry-estimate'.
  */
 export function provenanceOf(r: ExtractionRecord): Provenance {
+  if (r.provenance === 'measured') return 'measured';
   if (r.gold) return 'gold';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
   if (r.status === 'verified') return 'verified';
@@ -1686,8 +1789,26 @@ export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
   'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
 };
 
+/**
+ * Strength order, strongest first (OF-BLD-006 §6). 'measured' outranks 'gold'
+ * because a gold-set value is a careful reading of somebody else's paper,
+ * while a measured one is data this platform holds with its own conditions
+ * attached.
+ */
+export const PROVENANCE_RANK: Record<Provenance, number> = {
+  measured: 0,
+  gold: 1,
+  verified: 2,
+  curated: 3,
+  unverified: 4,
+  user: 5,
+  'industry-estimate': 6,
+  demo: 7,
+};
+
 export const tickClass = (p: Provenance | 'rejected'): string =>
   ({
+    measured: 'tick tick-measured',
     gold: 'tick tick-gold',
     verified: 'tick tick-verified',
     curated: 'tick tick-curated',
@@ -1699,6 +1820,7 @@ export const tickClass = (p: Provenance | 'rejected'): string =>
   })[p];
 
 export const PROVENANCE_LABEL: Record<Provenance, string> = {
+  measured: 'Measured · first-party',
   gold: 'Curated · gold set',
   verified: 'Verified against source',
   curated: 'Curated · pending source check',

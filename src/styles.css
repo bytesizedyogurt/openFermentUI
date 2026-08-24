@@ -87,6 +87,13 @@ body {
   border-radius: 1px;
   background: rgb(var(--ink-soft));
 }
+/* Measured: first-party experimental data, the strongest class in the system.
+   Solid gold with an accent edge, so it reads as wider and heavier than every
+   other tick without introducing a colour the palette does not already have. */
+.tick-measured::before {
+  background: rgb(var(--gold));
+  box-shadow: 1.5px 0 0 rgb(var(--accent));
+}
 .tick-gold::before {
   background: rgb(var(--gold));
 }
