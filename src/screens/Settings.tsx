@@ -583,6 +583,7 @@ function CorpusSection() {
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const resetDemo = useStore((s) => s.resetDemo);
+  const depositions = useStore((s) => s.depositions);
   const [confirm, setConfirm] = useState(false);
 
   const gold = useMemo(() => records.filter((r) => r.gold), [records]);
@@ -754,12 +755,20 @@ function CorpusSection() {
           Restores all <span className="font-num">{SEEDED.records}</span> records,{' '}
           <span className="font-num">{SEEDED.protocols}</span> protocols, and{' '}
           <span className="font-num">{SEEDED.scenarios}</span> scenarios to their seeded state.
-          Exports you've downloaded are unaffected.
+          Exports you&rsquo;ve downloaded are unaffected.
+        </p>
+        <p className="text-body mt-2">
+          This also clears the durable store in this browser, so{' '}
+          <span className="font-num">{depositions.length}</span> deposition
+          {depositions.length === 1 ? '' : 's'}, every review decision, and every runbook lock are
+          discarded — including the ones that would otherwise survive a refresh. A reset that left
+          them behind would restore itself on the next reload.
         </p>
         <div className="text-caption text-ink-soft mt-2">
           Currently in session: <span className="font-num">{records.length}</span> records,{' '}
           <span className="font-num">{protocols.length}</span> protocols,{' '}
-          <span className="font-num">{scenarios.length}</span> scenarios.
+          <span className="font-num">{scenarios.length}</span> scenarios,{' '}
+          <span className="font-num">{depositions.length}</span> depositions.
         </div>
         <div className="flex items-center justify-end gap-2 mt-4">
           <Button onClick={() => setConfirm(false)}>Cancel</Button>
@@ -1276,7 +1285,13 @@ function AboutSection() {
             &ldquo;Embed&rdquo; stage in ingest is a timed animation.
           </Row>
           <Row label="Storage">
-            In-memory only. No localStorage, no sessionStorage, no cookies, no telemetry.
+            Split by lifetime. Reference data — papers, protocols, molecules, vocabulary — is never
+            mutated and is read from the build every load. The Durable tier — depositions, review
+            decisions and runbook locks — is written to IndexedDB in this browser, because a
+            fermentation at hour 14 with timers running cannot be lost to a page reload. Everything
+            else is memory only and resets: open panels, density, theme, simulation speed. No
+            localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
+            browser. &ldquo;Reset demo data&rdquo; clears the durable store as well as memory.
           </Row>
           <Row label="Type">
             <span className="inline-flex items-center gap-1.5">

@@ -8,6 +8,7 @@ import type {
   ClearanceStateId,
   ChatSession,
   Collection,
+  Deposition,
   Deviation,
   ExtractionRecord,
   Job,
@@ -39,6 +40,15 @@ import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
+import {
+  EMPTY_SNAPSHOT,
+  clearDurable,
+  durableAvailable,
+  flushDurable,
+  loadDurable,
+  saveDurable,
+  type DurableSnapshot,
+} from '@/lib/durable';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -82,6 +92,11 @@ export interface OFState {
    * content. A running runbook borrows the tray for its progress affordance.
    */
   runbooks: Runbook[];
+  /**
+   * The Durable tier (OF-BLD-006 §4.6). A deposition is a record, not a
+   * session: a fermentation at hour 14 cannot be lost to a page reload.
+   */
+  depositions: Deposition[];
   protocols: Protocol[];
   scenarios: Scenario[];
   grids: Record<string, ResultGrid>;
@@ -216,6 +231,12 @@ export interface OFState {
   completeLesson: (lessonId: string) => void;
   recordCheckpoint: (qid: string, correct: boolean) => void;
 
+  // durable tier (OF-BLD-006 §4.6)
+  /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
+  hydrateDurable: () => Promise<void>;
+  /** Whether this browser can persist at all — surfaced honestly in Settings. */
+  durableReady: boolean;
+
   // misc
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
@@ -337,6 +358,7 @@ const seedState = () => ({
   strains: structuredClone(STRAINS),
   products: structuredClone(PRODUCTS),
   runbooks: freezeLocked(structuredClone(RUNBOOKS)),
+  depositions: [] as Deposition[],
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
   collections: structuredClone(COLLECTIONS),
@@ -373,6 +395,7 @@ export const useStore = create<OFState>()((set, get) => ({
   ...seedState(),
   grids: seedGrids(),
   toasts: [],
+  durableReady: false,
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
@@ -1346,14 +1369,93 @@ export const useStore = create<OFState>()((set, get) => ({
       ),
     })),
 
+  hydrateDurable: async () => {
+    const snap = await loadDurable();
+    if (!snap) {
+      set({ durableReady: durableAvailable() });
+      return;
+    }
+    set((s) => {
+      // Review decisions are re-applied over the seeded records rather than
+      // replacing them, so a corpus update ships new records without
+      // discarding what a reviewer already decided.
+      const records = s.records.map((r) => {
+        const d = snap.reviewDecisions[r.id];
+        return d ? { ...r, ...d } : r;
+      });
+      // Locks re-apply only to runbooks that still exist. A lock whose runbook
+      // was created in a previous session and is not in this one is dropped —
+      // a lock with nothing under it is not worth keeping.
+      const runbooks = s.runbooks.map((r) => {
+        const l = snap.runbookLocks[r.id];
+        return l ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
+      });
+      return {
+        records,
+        runbooks: freezeLocked(runbooks),
+        depositions: snap.depositions,
+        durableReady: durableAvailable(),
+      };
+    });
+  },
+
   resetDemo: () => {
+    // Clear persistence as well as memory. A reset that leaves a durable
+    // snapshot behind would restore itself on the next reload, which is the
+    // opposite of what the button says.
+    void clearDurable();
     set({ ...seedState(), grids: seedGrids(), toasts: [] });
     get().toast({
-      text: 'Workspace restored to the seeded corpus — review decisions, runs and scenario edits discarded',
+      text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
       kind: 'info',
     });
   },
 }));
+
+// ── durable persistence (OF-BLD-006 §4.6) ──────────────────────────────
+//
+// Only the Durable tier is written. Reference data is never mutated so there
+// is nothing to save, and Ephemeral UI state is deliberately excluded — a
+// collapsed panel that followed you across sessions would be a bug, not a
+// feature.
+
+function snapshotOf(s: OFState): DurableSnapshot {
+  const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
+  for (const r of s.records) {
+    // Only records a reviewer has actually touched. Persisting all 134 every
+    // time would write the seed back to disk on every keystroke.
+    if (r.status === 'unverified' && !r.gold && !r.corrected && !r.reviewer) continue;
+    reviewDecisions[r.id] = {
+      status: r.status,
+      provenance: r.provenance,
+      gold: r.gold,
+      corrected: r.corrected,
+      rejectReason: r.rejectReason,
+      reviewer: r.reviewer,
+    };
+  }
+  const runbookLocks: DurableSnapshot['runbookLocks'] = {};
+  for (const r of s.runbooks) {
+    if (r.lockedAt && r.lockHash) runbookLocks[r.id] = { lockedAt: r.lockedAt, lockHash: r.lockHash };
+  }
+  return {
+    ...EMPTY_SNAPSHOT,
+    savedAt: new Date().toISOString(),
+    depositions: s.depositions,
+    reviewDecisions,
+    runbookLocks,
+  };
+}
+
+if (durableAvailable()) {
+  useStore.subscribe((s, prev) => {
+    if (s.depositions === prev.depositions && s.records === prev.records && s.runbooks === prev.runbooks)
+      return;
+    saveDurable(snapshotOf(s));
+  });
+  // A tab closing mid-run must not lose the last few hundred milliseconds.
+  window.addEventListener('pagehide', flushDurable);
+}
 
 // ── derived selectors ──────────────────────────────────────────────────
 

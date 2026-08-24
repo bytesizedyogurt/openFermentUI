@@ -793,6 +793,100 @@ export interface RunbookStage {
   value: string | null;
 }
 
+// ── Deposition (OF-BLD-006 §4) ─────────────────────────────────────────
+//
+// The inbound account of what actually happened, against a Runbook's outbound
+// claim. This is the only ground truth the platform gets about its own
+// predictions — nothing in the literature can tell you whether a yield model
+// works — which is why a Deposition is a record rather than a session.
+
+export type DepositionState = 'staged' | 'running' | 'closed';
+
+/**
+ * One value the operator reported that matched something in the runbook's
+ * measurement schema.
+ */
+export interface DepositionEntry {
+  id: string;
+  /** The `Measure` this satisfies, from the runbook's schema. */
+  measureId: string;
+  stepId: string;
+  at: string;
+  value: number;
+  unit: string;
+  /**
+   * Exactly what the operator said or typed, before anything parsed it.
+   *
+   * Never overwritten. "Four two" is 4.2 or 42 and the failure is silent, so
+   * the parse has to stay auditable against the words that produced it.
+   */
+  raw: string;
+  /**
+   * Whether a person has confirmed the parsed number. Numbers entering the
+   * schema get one confirmation beat; narrative does not (§4.4).
+   */
+  confirmed: boolean;
+}
+
+/**
+ * Something the operator reported that fits no field — which is the whole
+ * point. An unexpected result has no column waiting for it, by definition, and
+ * a schema-first capture would discard exactly the observation worth having.
+ */
+export interface Observation {
+  id: string;
+  stepId: string;
+  at: string;
+  /** Free text, kept verbatim. The provenance of anything derived from it. */
+  raw: string;
+  /**
+   * A later structured reading of `raw`, or null.
+   *
+   * Derived, never authoritative. `raw` is not replaced by it: a mis-reading
+   * stays recoverable, and a better model in six months can re-derive from
+   * source. This is OF-COR-001 Rule 1 applied one level below where it was
+   * designed.
+   */
+  structured: string | null;
+}
+
+/**
+ * Predicted beside observed, with the delta (OF-BLD-006 §5). The one thing in
+ * this system that exists in no other tool.
+ */
+export interface Reconciliation {
+  at: string;
+  /**
+   * 'refuted' is the valuable one — it is the only ground truth the system
+   * gets about itself. 'inconclusive' is the honest one: deviations too large
+   * for the comparison to mean anything, recorded rather than rounded into a
+   * verdict, which is what keeps the hit rate real.
+   */
+  outcome: 'confirmed' | 'refuted' | 'inconclusive';
+  deltas: {
+    predictionId: string;
+    predicted: number;
+    observed: number;
+    unit: string;
+    pctDelta: number;
+  }[];
+  note: string;
+}
+
+export interface Deposition {
+  id: string;
+  runbookId: string;
+  protocolId: string;
+  /** Guild will populate this once people and permissions exist. */
+  operatorId: string | null;
+  startedAt: string;
+  closedAt: string | null;
+  state: DepositionState;
+  entries: DepositionEntry[];
+  observations: Observation[];
+  reconciliation: Reconciliation | null;
+}
+
 /**
  * A single falsifiable claim a runbook makes before anything is run
  * (OF-BLD-006 §3.1). A report says here is what we found; a runbook says do

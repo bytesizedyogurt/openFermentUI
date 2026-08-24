@@ -661,8 +661,8 @@ export default function Review() {
           <Callout kind="warn" title="This queue entry no longer resolves">
             <p className="mb-2">
               <span className="font-num">{queue[index]}</span> is in the queue but not in this
-              session&rsquo;s records. Session state resets on refresh, so a queue built before a
-              reset can outlive its rows.
+              session&rsquo;s records. The queue itself is session-only — your decisions persist,
+              but a queue built before a reset can outlive the rows it points at.
             </p>
             <Button size="sm" onClick={() => advanceReview(1)}>
               Skip past it <ChevronRight size={13} />

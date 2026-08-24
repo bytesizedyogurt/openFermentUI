@@ -149,7 +149,8 @@ function DemoBanner() {
       <span className="text-signal-warn font-medium">Real literature · modeled economics</span>
       <span className="text-ink-soft hidden sm:inline">
         — papers and values are real and citable. Simulation outputs are illustrative models,
-        not validated economics. Session state resets on refresh.
+        not validated economics. Depositions and review decisions survive a refresh; everything
+        else resets.
       </span>
       <a href="#/settings/about" className="text-accent hover:underline hidden md:inline">
         Read the colophon
@@ -213,11 +214,19 @@ export default function App() {
   const activeRunId = useStore((s) => s.activeRunId);
   const tickJobs = useStore((s) => s.tickJobs);
   const tickTimers = useStore((s) => s.tickTimers);
+  const hydrateDurable = useStore((s) => s.hydrateDurable);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
   const inRunMode = route.segments[0] === 'protocols' && route.segments[2] === 'run';
+
+  // Restore the Durable tier before anything reads it (OF-BLD-006 §4.6).
+  // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
+  // memory and Settings says so, rather than blocking the screen on storage.
+  useEffect(() => {
+    void hydrateDurable();
+  }, [hydrateDurable]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {
