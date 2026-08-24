@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { navigate, useRoute } from '@/router';
-import type { ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
+import type { AnswerPlan, ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
 import { SUGGESTED_PROMPTS } from '@/data/flows';
 import { send, sendFlow } from '@/sim/chat';
 import { fieldName } from '@/data/ontology';
@@ -37,6 +37,8 @@ import { CitationChip } from '@/components/Chip';
 import { Markdown } from '@/components/Markdown';
 import { ProvDot } from '@/components/Provenance';
 import { useSeriesColor } from '@/lib/viz';
+import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
+import { askPostdoc, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
 
 const SLASH_HINTS = [
   { cmd: '/extract <paper>', does: 'queue an extraction job' },
@@ -253,6 +255,101 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
   );
 }
 
+/**
+ * The live turn (OF-BLD-007 §8).
+ *
+ * Deliberately not a chat transcript. There is one question and one plan,
+ * because this increment makes one retrieval and one call — no agent loop —
+ * and drawing it as a conversation would imply a history the service does not
+ * keep.
+ */
+function LivePanel({
+  question,
+  plan,
+  down,
+  busy,
+  health,
+  onAsk,
+}: {
+  question: string;
+  plan: AnswerPlan | null;
+  down: { message: string; remedy: string } | null;
+  busy: boolean;
+  health: PostdocHealth | null;
+  onAsk: (q: string) => void;
+}) {
+  return (
+    <div className="space-y-3 pt-1">
+      {/* The service is up but cannot answer. A different problem from being
+          down, and a different fix — restarting it would not help. */}
+      {health && health.ok && !health.hasKey && (
+        <Callout kind="warn" title="Postdoc is running without an API key">
+          {/* The variable is deliberately NOT named here. check:secrets forbids
+              src/ from naming it at all — src/ is the browser bundle, and the
+              rule is absence rather than care. Pointing at the template is a
+              better instruction anyway: it names the exact file operation. */}
+          <p className="text-ink">
+            Copy <span className="font-num">core/.env.example</span> to{' '}
+            <span className="font-num">core/.env</span>, fill in the key it names, and restart
+            the service. That file is gitignored, and the key never reaches the browser — which
+            is the whole reason the service exists.
+          </p>
+        </Callout>
+      )}
+      {health && !health.ok && health.corpusError && (
+        <Callout kind="warn" title="Postdoc is running without a corpus">
+          <p className="text-ink">
+            Run <span className="font-num">pnpm export:corpus</span> from the repository root and
+            restart the service.
+          </p>
+        </Callout>
+      )}
+
+      {question && (
+        <div className="flex items-baseline gap-2">
+          <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
+          <p className="text-reading text-ink">{question}</p>
+        </div>
+      )}
+
+      {busy && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 text-body text-ink-soft">
+            <RefreshCw size={14} className="animate-spin shrink-0" aria-hidden />
+            Retrieving over the corpus, then asking{' '}
+            <span className="font-num">{health?.model ?? 'the model'}</span>…
+          </div>
+        </Card>
+      )}
+
+      {down && <PostdocDownNotice message={down.message} remedy={down.remedy} />}
+
+      {plan && !busy && <AnswerPlanView plan={plan} />}
+
+      {!question && !busy && !down && (
+        <div className="pt-6">
+          <EmptyState
+            title="Ask the corpus a question"
+            body="Postdoc retrieves over the corpus, then writes claims that carry no numbers of their own — every value on the answer is rendered from the record it cites. A question the corpus cannot support gets an explicit decline."
+            icon={<Sparkles size={28} />}
+          />
+          <div className="flex flex-wrap gap-2 justify-center mt-2">
+            {SUGGESTED_PROMPTS.map((p) => (
+              <button
+                key={p}
+                className="chip hover:border-accent hover:bg-accent-wash"
+                onClick={() => onAsk(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Postdoc({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
   const sessions = useStore((s) => s.sessions);
   const createSession = useStore((s) => s.createSession);
@@ -273,6 +370,27 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   const [feedbackText, setFeedbackText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
+
+  // ── live mode (OF-BLD-007) ──────────────────────────────────────────
+  // A plan is NOT a message. A scripted turn is a transcript the store holds;
+  // a live turn is an AnswerPlan the service returned. Conflating them would
+  // mean inventing a message shape for something that is not one, which is the
+  // mistake §1 warns about — bolting the API onto the transcript shape.
+  const [livePlan, setLivePlan] = useState<AnswerPlan | null>(null);
+  const [liveQuestion, setLiveQuestion] = useState('');
+  const [down, setDown] = useState<{ message: string; remedy: string } | null>(null);
+  const [health, setHealth] = useState<PostdocHealth | null>(null);
+
+  // Probed once. Lets the screen tell "not running" from "running without a
+  // key" — two different problems with two different fixes — and offer the
+  // switch to Live when the service is actually there.
+  useEffect(() => {
+    const ac = new AbortController();
+    postdocHealth(ac.signal)
+      .then(setHealth)
+      .catch(() => setHealth(null));
+    return () => ac.abort();
+  }, []);
 
   const session = sessions.find((s) => s.id === activeId) ?? null;
 
@@ -337,6 +455,32 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   };
 
   async function run(text: string, sid?: string) {
+    // Live: one call to openferment-core, which retrieves, asks Haiku, and
+    // validates. NO FALLBACK to the scripted flows when it fails — a
+    // convincing fake standing in for a broken service is the one outcome
+    // worth avoiding, because everything looks like it is working and the
+    // thing being demonstrated is not running.
+    if (chatMode === 'live') {
+      setBusy(true);
+      setDown(null);
+      setLiveQuestion(text);
+      setLivePlan(null);
+      try {
+        setLivePlan(await askPostdoc(text));
+      } catch (err) {
+        if (err instanceof PostdocDown) setDown({ message: err.message, remedy: err.remedy });
+        else if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          setDown({
+            message: 'The request to Postdoc failed.',
+            remedy: 'Check the service log — it will name what went wrong.',
+          });
+        }
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     const id = sid ?? ensureSession(text);
     setBusy(true);
     try {
@@ -450,7 +594,16 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-          {!session || session.messages.length === 0 ? (
+          {chatMode === 'live' ? (
+            <LivePanel
+              question={liveQuestion}
+              plan={livePlan}
+              down={down}
+              busy={busy}
+              health={health}
+              onAsk={(q) => void run(q)}
+            />
+          ) : !session || session.messages.length === 0 ? (
             <div className="pt-6">
               <EmptyState
                 title="Ask the corpus a question"
@@ -672,13 +825,17 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
         {/* Composer */}
         <div className="pt-3 mt-2 border-t border-line">
-          {chatMode === 'live' && (
-            <div className="mb-2">
-              <Callout kind="warn" title="Live mode is not wired in this build">
-                Live mode would call a model API and retrieve over the seeded corpus client-side. It
-                is not connected here, and it is deliberately not on the demo path. Turns will
-                continue to run in Scripted mode.
-              </Callout>
+          {/* Scripted mode is now a fixture player, not a fallback. When the
+              service is up and keyed, say so rather than letting somebody
+              demo the transcript by accident (§9). */}
+          {chatMode === 'scripted' && health?.ok && health.hasKey && (
+            <div className="mb-2 text-caption text-ink-soft">
+              Postdoc service is running on <span className="font-num">{health.model}</span>.
+              These are authored transcripts —{' '}
+              <button className="text-accent hover:underline" onClick={() => setUI({ chatMode: 'live' })}>
+                switch to Live
+              </button>{' '}
+              for a real answer over the same corpus.
             </div>
           )}
 
@@ -727,7 +884,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                   onClick={() => setUI({ chatMode: mode })}
                   aria-pressed={chatMode === mode}
                 >
-                  {mode === 'scripted' ? 'Scripted' : 'Live (needs network)'}
+                  {mode === 'scripted' ? 'Scripted' : 'Live (Postdoc service)'}
                 </button>
               ))}
             </div>

@@ -1,0 +1,340 @@
+[
+  {
+    "id": "F1",
+    "question": "what titers have been achieved for recombinant β-casein",
+    "alternates": [
+      "what titers have been achieved for recombinant beta-casein and in which hosts",
+      "recombinant casein titers by host",
+      "how much beta-casein has anyone actually made",
+      "best reported casein yields across hosts"
+    ],
+    "recordIds": [
+      "r-H1-4",
+      "r-H12-1",
+      "r-H13-1",
+      "r-H14-1",
+      "r-H15-1",
+      "r-H15-2",
+      "r-H2-1",
+      "r-H2-2",
+      "r-H3-1",
+      "r-H3-2",
+      "r-H4-1",
+      "r-H4-2",
+      "r-H4-3",
+      "r-H4-4",
+      "r-H5-1",
+      "r-H7-1",
+      "r-H7-2"
+    ],
+    "paperIds": [
+      "H1",
+      "H11",
+      "H12",
+      "H13",
+      "H14",
+      "H15",
+      "H16",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6",
+      "H7"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F2",
+    "question": "is recombinant casein phosphorylated",
+    "alternates": [
+      "does recombinant beta-casein carry phosphate",
+      "has anyone phosphorylated a recombinant casein",
+      "can ck2 phosphorylate bovine casein",
+      "phosphorylation status of recombinant casein"
+    ],
+    "recordIds": [
+      "r-F5-1",
+      "r-H2-1",
+      "r-H2-2",
+      "r-H3-1",
+      "r-H3-2",
+      "r-H4-4",
+      "r-H8-6"
+    ],
+    "paperIds": [
+      "H2",
+      "H3",
+      "H4",
+      "H8"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F3",
+    "question": "does phosphorylation actually matter for making cheese",
+    "alternates": [
+      "does phosphorylation matter for cheese",
+      "do i need phosphorylated casein to make cheese",
+      "why does casein phosphorylation matter",
+      "can i make cheese with unphosphorylated casein"
+    ],
+    "recordIds": [
+      "r-I1-1",
+      "r-I1-2",
+      "r-I1-3",
+      "r-I2-1",
+      "r-I9-1"
+    ],
+    "paperIds": [
+      "I1",
+      "I2",
+      "I9"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F4",
+    "question": "what is the maximum secreted protein yield from chlamydomonas",
+    "alternates": [
+      "max secreted yield from chlamydomonas",
+      "how much protein can chlamydomonas secrete",
+      "best secretion titer in c reinhardtii",
+      "highest secreted protein from uvm4"
+    ],
+    "recordIds": [
+      "r-A1-1",
+      "r-C2-1",
+      "r-C2-2",
+      "r-C6-1",
+      "r-C6-2",
+      "r-K1-1"
+    ],
+    "paperIds": [
+      "C2",
+      "C6",
+      "K1"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F5",
+    "question": "why cw15 rather than a walled strain",
+    "alternates": [
+      "why use cw15",
+      "why a cell wall deficient strain",
+      "what is the case for cw15 over wild type",
+      "why not a walled chlamydomonas strain"
+    ],
+    "recordIds": [
+      "r-A1-1",
+      "r-B5-1",
+      "r-B5-3",
+      "r-J10-1",
+      "r-J10-2",
+      "r-J10-3"
+    ],
+    "paperIds": [
+      "A1",
+      "B5",
+      "C6",
+      "J10"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F6",
+    "question": "has anyone expressed a casein in an alga",
+    "alternates": [
+      "has casein been expressed in algae",
+      "any algal casein papers",
+      "is there prior art for casein in microalgae",
+      "casein expression in chlamydomonas prior art"
+    ],
+    "recordIds": [
+      "r-H1-1",
+      "r-H1-2",
+      "r-H1-3"
+    ],
+    "paperIds": [
+      "H1",
+      "H17e",
+      "K5",
+      "N4"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F7",
+    "question": "what signal peptide should i use",
+    "alternates": [
+      "which signal peptide for secretion in chlamydomonas",
+      "best signal peptide for csn2",
+      "compare secretory signal peptides",
+      "which sp should i fuse to my transgene"
+    ],
+    "recordIds": [
+      "r-H4-3"
+    ],
+    "paperIds": [
+      "C3",
+      "C4",
+      "C7",
+      "C8",
+      "H4"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F8",
+    "question": "how is casein phosphorylation measured",
+    "alternates": [
+      "how do you measure phosphorylation",
+      "what methods detect casein phosphorylation",
+      "phosphorylation analysis methods",
+      "how do i assay phospho sites on casein"
+    ],
+    "recordIds": [
+      "r-H1-4",
+      "r-H15-2",
+      "r-H2-2",
+      "r-H4-4"
+    ],
+    "paperIds": [
+      "H1",
+      "H15",
+      "H2",
+      "H4"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F9",
+    "question": "compare chlamydomonas and pichia as casein hosts",
+    "alternates": [
+      "chlamydomonas vs pichia",
+      "algae or yeast for casein",
+      "which host is better for beta casein",
+      "head to head chlamydomonas pichia"
+    ],
+    "recordIds": [
+      "r-A1-1",
+      "r-C2-1",
+      "r-H4-1",
+      "r-H4-2",
+      "r-H4-3",
+      "r-H4-4",
+      "r-J10-1",
+      "r-J10-2",
+      "r-M5-1",
+      "r-M6-1"
+    ],
+    "paperIds": [
+      "H1",
+      "J10",
+      "M5",
+      "M8",
+      "N2",
+      "O3"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F10",
+    "question": "what does β-casein cost to produce today",
+    "alternates": [
+      "what does beta-casein cost to produce",
+      "cost per kg of recombinant casein",
+      "how much does precision fermentation casein cost",
+      "production cost of recombinant milk protein"
+    ],
+    "recordIds": [
+      "r-O2-1",
+      "r-O2-3",
+      "r-O2-4",
+      "r-O3-2",
+      "r-O3-3",
+      "r-O8-1",
+      "r-O8-2",
+      "r-O8-3",
+      "r-O8m-1",
+      "r-O8m-2"
+    ],
+    "paperIds": [
+      "O2",
+      "O3",
+      "O8",
+      "O8m"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F11",
+    "question": "what is fam20c and why cant e coli make it",
+    "alternates": [
+      "what is fam20c",
+      "why cant e coli express fam20c",
+      "why does fam20c need a secretory pathway",
+      "fam20c expression failure in bacteria"
+    ],
+    "recordIds": [
+      "r-G1-1",
+      "r-G1-2",
+      "r-G2-1",
+      "r-G4-1",
+      "r-G9-1",
+      "r-G9-2",
+      "r-G9-3",
+      "r-G9-4",
+      "r-H8-6"
+    ],
+    "paperIds": [
+      "D5",
+      "G1",
+      "G2",
+      "G4",
+      "G9",
+      "H8"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F12",
+    "question": "what is the regulatory status of c reinhardtii as food",
+    "alternates": [
+      "is chlamydomonas approved as food",
+      "regulatory status of chlamydomonas reinhardtii",
+      "is c reinhardtii gras",
+      "efsa opinion on chlamydomonas"
+    ],
+    "recordIds": [],
+    "paperIds": [
+      "N2",
+      "N3"
+    ],
+    "unresolvedChips": []
+  },
+  {
+    "id": "F-SIALYL",
+    "question": "does chlamydomonas sialylate n glycans",
+    "alternates": [
+      "algal glycosylation of recombinant proteins",
+      "what glycans does chlamydomonas add",
+      "are chlamydomonas n glycans sialylated",
+      "sialylation in green algae"
+    ],
+    "recordIds": [
+      "r-D1-1",
+      "r-D1-2",
+      "r-D2-1",
+      "r-D2-2",
+      "r-D4-1"
+    ],
+    "paperIds": [
+      "D1",
+      "D2",
+      "D4"
+    ],
+    "unresolvedChips": []
+  }
+]
