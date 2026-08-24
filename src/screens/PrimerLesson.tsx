@@ -144,7 +144,7 @@ function Checkpoint({
   );
 }
 
-export default function Lesson({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
+export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
   const modules = useStore((s) => s.modules);
   const progress = useStore((s) => s.learnProgress);
   const completeLesson = useStore((s) => s.completeLesson);
@@ -168,7 +168,7 @@ export default function Lesson({ moduleId, lessonId }: { moduleId: string; lesso
       <EmptyState
         title="Lesson not found"
         body={`No lesson ${lessonId} exists in module ${moduleId}.`}
-        action={<Button onClick={() => navigate('/learn')}>Back to Learn</Button>}
+        action={<Button onClick={() => navigate('/primer')}>Back to Primer</Button>}
       />
     );
   }
@@ -191,7 +191,7 @@ export default function Lesson({ moduleId, lessonId }: { moduleId: string; lesso
       {/* Sticky nav */}
       <div className="sticky top-0 z-20 -mx-5 px-5 py-2.5 bg-surface-0/95 backdrop-blur border-b border-line mb-5">
         <div className="flex items-center gap-3">
-          <a href="#/learn" className="text-caption text-ink-soft hover:text-accent shrink-0">
+          <a href="#/primer" className="text-caption text-ink-soft hover:text-accent shrink-0">
             Module {mod.index}
           </a>
           <span className="text-ink-soft">·</span>
@@ -250,7 +250,7 @@ export default function Lesson({ moduleId, lessonId }: { moduleId: string; lesso
       <nav className="flex items-center justify-between gap-3 mt-8 pt-4 border-t border-line">
         {prev ? (
           <a
-            href={`#/learn/${prev.moduleId}/${prev.lessonId}`}
+            href={`#/primer/${prev.moduleId}/${prev.lessonId}`}
             className="btn max-w-[45%]"
             title={prev.title}
           >
@@ -261,14 +261,14 @@ export default function Lesson({ moduleId, lessonId }: { moduleId: string; lesso
         )}
         {next ? (
           <a
-            href={`#/learn/${next.moduleId}/${next.lessonId}`}
+            href={`#/primer/${next.moduleId}/${next.lessonId}`}
             className={cx('btn max-w-[45%]', isComplete && 'btn-primary')}
             title={next.title}
           >
             <span className="truncate">{next.title}</span> <ArrowRight size={14} />
           </a>
         ) : (
-          <a href="#/learn" className="btn">
+          <a href="#/primer" className="btn">
             Back to the module map <ArrowRight size={14} />
           </a>
         )}

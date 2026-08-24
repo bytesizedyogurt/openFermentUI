@@ -108,7 +108,7 @@ function AnswerStrip({ md }: { md: string }) {
               key={p.r.id}
               className="absolute -translate-x-1/2 group"
               style={{ left: `${pct}%`, top: 20 + jitter * 7 }}
-              onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
+              onClick={() => navigate(`/biorepo/papers/${p.r.paperId}?span=${p.r.id}`)}
               title={`${fmt(p.v)} ${cited.def.canonicalUnit} — ${p.r.paperId} (${p.r.status})`}
             >
               <ProvDot p={provenanceOf(p.r)} size={9} />
@@ -196,7 +196,7 @@ function RetrievalCards({
               </button>
               <button
                 className="text-caption text-accent hover:underline"
-                onClick={() => navigate(`/library/papers/${h.paperId}`)}
+                onClick={() => navigate(`/biorepo/papers/${h.paperId}`)}
               >
                 Open source
               </button>
@@ -242,7 +242,7 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
         <div className="mt-2">
           <Callout kind="info">
             No passages in this corpus match. Broaden the question, or{' '}
-            <a href="#/library" className="text-accent hover:underline">
+            <a href="#/biorepo" className="text-accent hover:underline">
               check Library coverage
             </a>
             .
@@ -253,7 +253,7 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
   );
 }
 
-export default function Ask({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
+export default function Postdoc({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
   const sessions = useStore((s) => s.sessions);
   const createSession = useStore((s) => s.createSession);
   const appendMessage = useStore((s) => s.appendMessage);
@@ -388,7 +388,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
             onClick={() => {
               const id = createSession('New session');
               setActiveId(id);
-              navigate(`/ask/${id}`);
+              navigate(`/postdoc/${id}`);
             }}
           >
             <MessageSquarePlus size={14} /> New session
@@ -399,7 +399,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
                 key={s.id}
                 onClick={() => {
                   setActiveId(s.id);
-                  navigate(`/ask/${s.id}`);
+                  navigate(`/postdoc/${s.id}`);
                 }}
                 className={cx(
                   'w-full text-left px-2.5 py-2 rounded-btn',
@@ -432,7 +432,7 @@ export default function Ask({ sessionId, initialQuery }: { sessionId?: string; i
             <PanelLeft size={13} />
           </button>
           <h1 className="font-serif text-page-title font-semibold truncate flex-1">
-            {session?.title ?? 'Ask'}
+            {session?.title ?? 'Postdoc'}
           </h1>
           {session?.scope && (
             <span className="chip text-signal-info border-signal-info/40">
@@ -889,10 +889,10 @@ function InsertInto({ md }: { md: string }) {
                 toast({
                   text: `${ids.length} references staged for ${s.name}`,
                   kind: 'success',
-                  href: `#/simulate/${s.id}`,
+                  href: `#/proforma/${s.id}`,
                   hrefLabel: 'Open',
                 });
-                navigate(`/simulate/${s.id}`);
+                navigate(`/proforma/${s.id}`);
               }}
             >
               {s.name}

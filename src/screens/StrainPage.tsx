@@ -326,7 +326,7 @@ function StripPlot({
                   onFocus={() => setFocus(i)}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
-                  onClick={() => navigate(`/library/papers/${p.rec.paperId}?span=${p.rec.id}`)}
+                  onClick={() => navigate(`/biorepo/papers/${p.rec.paperId}?span=${p.rec.id}`)}
                   className={cx(
                     'absolute -translate-x-1/2 rounded-full leading-none p-0 border-0 bg-transparent',
                     'hover:scale-125 focus-visible:scale-125 transition-transform',
@@ -794,10 +794,10 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         at: stamp(),
         icon: 'clipboard-check',
         text: `Review session started — ${label} for ${strainId} (${ids.length} record${ids.length === 1 ? '' : 's'})`,
-        href: '#/extract/review',
+        href: '#/guild',
         provenance: 'user',
       });
-      navigate('/extract/review');
+      navigate('/guild');
     },
     [startReview, logActivity, strainId],
   );
@@ -858,7 +858,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           onClick={(e) => e.stopPropagation()}
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
@@ -1180,8 +1180,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               body={`Nothing in this session's corpus is attributed to ${strain.designation}, either by a per-record organism tag or by a paper's organism list. The extraction table is the place to check what the corpus does cover.`}
               action={
                 <div className="flex gap-2">
-                  <LinkButton to="/extract">Open the extraction table</LinkButton>
-                  <LinkButton to="/library">Browse the library</LinkButton>
+                  <LinkButton to="/intake">Open Intake</LinkButton>
+                  <LinkButton to="/biorepo">Browse BioRepo</LinkButton>
                 </div>
               }
             />
@@ -1205,7 +1205,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             dense={density === 'dense'}
             exportName={`openferment-${strainId}-records`}
             exportNote="Canonical values are converted from the stored published pair on every render, so the table and the plots can never disagree."
-            onOpen={({ rec }) => navigate(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+            onOpen={({ rec }) => navigate(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
             searchOf={({ rec }) =>
               `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.unit} ${rec.componentTag ?? ''} ${rec.quote}`
             }
@@ -1461,7 +1461,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedScenarios.length === 0 ? (
               <div className="text-body text-ink-soft">
                 No scenario draws on a record for this strain or names it.{' '}
-                <a className="text-accent hover:underline" href={href('/simulate')}>
+                <a className="text-accent hover:underline" href={href('/proforma')}>
                   Open the simulation index
                 </a>
                 .
@@ -1471,7 +1471,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 {linkedScenarios.map(({ sc, via, recordId }) => (
                   <li key={sc.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
                     <a
-                      href={href(`/simulate/${sc.id}`)}
+                      href={href(`/proforma/${sc.id}`)}
                       className="font-serif font-semibold hover:text-accent hover:underline"
                     >
                       {sc.name}
@@ -1505,7 +1505,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedCollections.length === 0 ? (
               <div className="text-body text-ink-soft">
                 None of this strain&rsquo;s papers sit in a collection yet.{' '}
-                <a className="text-accent hover:underline" href={href('/library')}>
+                <a className="text-accent hover:underline" href={href('/biorepo')}>
                   Open the library
                 </a>
                 .
@@ -1540,7 +1540,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 <span className="font-num text-ink">{strainPapers.length}</span> paper
                 {strainPapers.length === 1 ? '' : 's'} list this organism
               </span>
-              <a className="text-accent hover:underline" href={href('/library')}>
+              <a className="text-accent hover:underline" href={href('/biorepo')}>
                 Open the library
               </a>
               <span className="w-full text-ink-soft">
@@ -1700,7 +1700,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           {strainPapers.length === 1 ? '' : 's'} — real, citable sources, but most records are
           transcribed from the curation document and not yet checked against the source PDF. Medians
           over a handful of records are descriptions of this corpus, not of the published literature.{' '}
-          <a className="text-accent hover:underline" href={href('/extract')}>
+          <a className="text-accent hover:underline" href={href('/intake')}>
             Open the full extraction table
           </a>{' '}
           to audit the rows behind them.

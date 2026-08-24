@@ -578,12 +578,12 @@ async function handleSlash(input: string, sessionId: string): Promise<SlashResul
         { label: 'Embed', ms: 1100 },
         { label: 'Extract', ms: 1900 },
       ],
-      href: `#/extract?paper=${paper.id}`,
+      href: `#/intake?paper=${paper.id}`,
     });
     push(sessionId, {
       kind: 'system',
       id: nextId('m'),
-      text: `Extraction queued for ${paper.id}. Track it in the Jobs tray — results land in the Extract table.`,
+      text: `Extraction queued for ${paper.id}. Track it in the Jobs tray — results land in Intake.`,
     });
     return { handled: true };
   }

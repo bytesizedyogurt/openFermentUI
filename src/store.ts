@@ -674,7 +674,7 @@ export const useStore = create<OFState>()((set, get) => ({
         { label: 'Embed', ms: 1100 },
         { label: 'Extract', ms: 1800 },
       ],
-      href: `#/library/papers/${paperId}`,
+      href: `#/biorepo/papers/${paperId}`,
     });
     if (fails) {
       // Scripted failure path (§8.5): halts at Parse with a specific reason.
@@ -689,8 +689,9 @@ export const useStore = create<OFState>()((set, get) => ({
         get().toast({
           text: `Ingest ${paperId} halted at Fetch`,
           kind: 'error',
-          href: '#/library/ingest',
-          hrefLabel: 'Review',
+          href: '#/biorepo/ingest',
+          // Not 'Review' — that word now names a screen this does not go to.
+          hrefLabel: 'Open the board',
         });
       }, wait);
     }
@@ -698,7 +699,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'download',
       text: `Ingest started for ${paperId}`,
-      href: `#/library/ingest`,
+      href: `#/biorepo/ingest`,
       provenance: 'demo',
     });
   },

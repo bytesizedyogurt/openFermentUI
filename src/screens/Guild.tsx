@@ -137,7 +137,7 @@ function Hint({ k, faded }: { k: string; faded: boolean }) {
 
 // ── screen ─────────────────────────────────────────────────────────────
 
-export default function Review() {
+export default function Guild() {
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
   const queue = useStore((s) => s.reviewQueue);
@@ -417,8 +417,8 @@ export default function Review() {
       <>
         <PageHeader
           eyebrow="Module 0 · Evidence"
-          title="Review queue"
-          subtitle="Accept, correct, or reject each extraction against the span it came from."
+          title="Guild"
+          subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
         <Card className="max-w-2xl">
           <EmptyState
@@ -427,10 +427,10 @@ export default function Review() {
             body="Every extraction in this session has already been decided. Queue a new batch from the Extract table — filter it first and only those rows enter the queue."
             action={
               <div className="flex gap-2">
-                <LinkButton to="/extract" variant="primary">
+                <LinkButton to="/intake" variant="primary">
                   Open Extract
                 </LinkButton>
-                <LinkButton to="/extract/validation">Open validation</LinkButton>
+                <LinkButton to="/witness">Open Witness</LinkButton>
               </div>
             }
           />
@@ -521,7 +521,7 @@ export default function Review() {
       <>
         <PageHeader
           eyebrow="Module 0 · Evidence"
-          title="Queue complete"
+          title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
         {topStrip}
@@ -588,13 +588,13 @@ export default function Review() {
               <Button onClick={exportLog}>
                 <FileDown size={14} /> Export session log
               </Button>
-              <LinkButton to="/extract/validation" variant="primary">
-                <Gauge size={14} /> Open validation
+              <LinkButton to="/witness" variant="primary">
+                <Gauge size={14} /> Open Witness
               </LinkButton>
               <Button onClick={() => advanceReview(-1)} title="Step back into the last record">
                 <ChevronLeft size={14} /> Back to the last record
               </Button>
-              <LinkButton to="/extract">Back to Extract</LinkButton>
+              <LinkButton to="/intake">Back to Intake</LinkButton>
             </div>
           </Card>
 
@@ -838,7 +838,7 @@ export default function Review() {
                 </span>
               </div>
               <a
-                href={href(`/library/papers/${record.paperId}?span=${record.id}`)}
+                href={href(`/biorepo/papers/${record.paperId}?span=${record.id}`)}
                 className="text-caption text-accent hover:underline"
               >
                 Open in the reader

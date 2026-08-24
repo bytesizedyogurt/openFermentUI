@@ -200,7 +200,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           <EmptyState
             title="No such paper"
             body={`${paperId} is not in this session's corpus. It may have been a link from an older session — session state resets on refresh.`}
-            action={<LinkButton to="/library">Back to Library</LinkButton>}
+            action={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
             icon={<AlertTriangle size={22} />}
           />
         </Card>
@@ -230,12 +230,12 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         { label: 'Score confidence', ms: 800 },
         { label: 'Stage for review', ms: 500 },
       ],
-      href: `#/extract?paper=${paper.id}`,
+      href: `#/intake?paper=${paper.id}`,
     });
     toast({
       text: `${label} queued for ${paper.id} — the demo extractor replays this paper's seeded records rather than minting new ones`,
       kind: 'info',
-      href: '#/extract',
+      href: '#/intake',
       hrefLabel: 'Extract',
     });
   };
@@ -326,7 +326,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
-        <a href={href('/library')} className="inline-flex items-center gap-1 hover:text-accent">
+        <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library
         </a>
         <span aria-hidden>/</span>
@@ -389,14 +389,14 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Ingest started for ${paper.id}`,
                     kind: 'info',
-                    href: '#/library/ingest',
+                    href: '#/biorepo/ingest',
                     hrefLabel: 'Board',
                   });
                 }}
               >
                 Ingest this paper
               </Button>
-              <LinkButton to="/library/ingest" size="sm">
+              <LinkButton to="/biorepo/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -431,14 +431,14 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Retrying ingest for ${paper.id}`,
                     kind: 'info',
-                    href: '#/library/ingest',
+                    href: '#/biorepo/ingest',
                     hrefLabel: 'Board',
                   });
                 }}
               >
                 <RefreshCw size={12} /> Retry ingest
               </Button>
-              <LinkButton to="/library/ingest" size="sm">
+              <LinkButton to="/biorepo/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -539,7 +539,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
             }
             action={
               parseFailed ? (
-                <LinkButton to="/library/ingest" size="sm">
+                <LinkButton to="/biorepo/ingest" size="sm">
                   Open ingest board
                 </LinkButton>
               ) : (
@@ -623,7 +623,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           <Button
             size="sm"
             onClick={() =>
-              navigate(`/ask?q=${encodeURIComponent(askQuery)}&scope=${encodeURIComponent(paper.id)}`)
+              navigate(`/postdoc?q=${encodeURIComponent(askQuery)}&scope=${encodeURIComponent(paper.id)}`)
             }
             title={askQuery}
           >

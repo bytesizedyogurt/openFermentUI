@@ -119,7 +119,7 @@ function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
   );
 }
 
-export default function Library() {
+export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
   const collections = useStore((s) => s.collections);
@@ -227,19 +227,19 @@ export default function Library() {
         { label: 'Score confidence', ms: 700 },
         { label: 'Stage for review', ms: 500 },
       ],
-      href: n === 1 ? `#/extract?paper=${selected[0].paper.id}` : '#/extract',
+      href: n === 1 ? `#/intake?paper=${selected[0].paper.id}` : '#/intake',
     });
     logActivity({
       at: nowStamp(),
       icon: 'table',
       text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'}`,
-      href: '#/extract',
+      href: '#/intake',
       provenance: 'demo',
     });
     toast({
       text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — the demo extractor replays the seeded records, it does not mint new ones`,
       kind: 'info',
-      href: '#/extract',
+      href: '#/intake',
       hrefLabel: 'Extract',
     });
     clear();
@@ -287,7 +287,7 @@ export default function Library() {
       render: (r) => (
         <Tick p={r.prov} className="inline-block whitespace-nowrap">
           <a
-            href={href(`/library/papers/${r.paper.id}`)}
+            href={href(`/biorepo/papers/${r.paper.id}`)}
             className="font-num text-accent hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -303,7 +303,7 @@ export default function Library() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/library/papers/${r.paper.id}`)}
+          href={href(`/biorepo/papers/${r.paper.id}`)}
           className="font-serif hover:text-accent hover:underline block truncate"
           style={{ maxWidth: 340 }}
           title={r.paper.title}
@@ -366,7 +366,7 @@ export default function Library() {
           <span className="font-num text-ink-soft">0</span>
         ) : (
           <a
-            href={href(`/extract?paper=${r.paper.id}`)}
+            href={href(`/intake?paper=${r.paper.id}`)}
             className="font-num text-accent hover:underline"
             title={`Open Extract filtered to ${r.paper.id}`}
             onClick={(e) => e.stopPropagation()}
@@ -386,7 +386,7 @@ export default function Library() {
         if (r.ingestKey === 'failed') {
           return (
             <a
-              href={href('/library/ingest')}
+              href={href('/biorepo/ingest')}
               className="chip text-signal-error border-signal-error/40 hover:bg-signal-error/10"
               title="Ingest halted — open the board for the reason and a retry"
               onClick={(e) => e.stopPropagation()}
@@ -500,7 +500,7 @@ export default function Library() {
           </div>
         </div>
       </Popover>
-      <LinkButton to="/library/ingest" variant="primary" size="sm">
+      <LinkButton to="/biorepo/ingest" variant="primary" size="sm">
         Ingest papers
       </LinkButton>
     </>
@@ -508,7 +508,8 @@ export default function Library() {
 
   const header = (
     <PageHeader
-      title="Library"
+      eyebrow="Papers and records"
+      title="BioRepo"
       subtitle={
         <>
           Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
@@ -542,7 +543,7 @@ export default function Library() {
           <EmptyState
             title="No papers in the corpus yet"
             body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
-            action={<LinkButton to="/library/ingest">Open the ingest board</LinkButton>}
+            action={<LinkButton to="/biorepo/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
       </>
@@ -558,7 +559,7 @@ export default function Library() {
           <Callout kind="error" title={`${brokenRows.length} paper${brokenRows.length === 1 ? '' : 's'} failed to parse`}>
             {brokenRows.map((r) => r.paper.id).join(', ')} could not be segmented into sections. Retry the
             ingest or continue with abstract-only text on the{' '}
-            <a href={href('/library/ingest')} className="text-accent hover:underline">
+            <a href={href('/biorepo/ingest')} className="text-accent hover:underline">
               ingest board
             </a>
             .
@@ -581,7 +582,7 @@ export default function Library() {
                     {r.paper.id}
                   </span>
                   <a
-                    href={href(`/library/papers/${r.paper.id}`)}
+                    href={href(`/biorepo/papers/${r.paper.id}`)}
                     className="font-serif truncate flex-1 min-w-0 hover:text-accent hover:underline"
                     title={r.paper.title}
                   >
@@ -610,7 +611,7 @@ export default function Library() {
                       />
                     )}
                   </div>
-                  <LinkButton to="/library/ingest" size="sm">
+                  <LinkButton to="/biorepo/ingest" size="sm">
                     Board
                   </LinkButton>
                 </div>
@@ -630,7 +631,7 @@ export default function Library() {
         rowKey={(r) => r.paper.id}
         tickOf={(r) => r.prov}
         dense={density === 'dense'}
-        onOpen={(r) => navigate(`/library/papers/${r.paper.id}`)}
+        onOpen={(r) => navigate(`/biorepo/papers/${r.paper.id}`)}
         facets={facets}
         searchOf={(r) =>
           `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')} ${r.paper.topics.join(' ')}`

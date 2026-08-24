@@ -123,7 +123,7 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
 
 // ── screen ─────────────────────────────────────────────────────────────
 
-export default function Extract() {
+export default function Intake() {
   const route = useRoute();
   const paperParam = route.query.get('paper');
 
@@ -193,10 +193,10 @@ export default function Extract() {
       at: nowStamp(),
       icon: 'clipboard-check',
       text: `Review session started — ${ids.length} unverified record${ids.length === 1 ? '' : 's'}`,
-      href: '#/extract/review',
+      href: '#/guild',
       provenance: 'user',
     });
-    navigate('/extract/review');
+    navigate('/guild');
   };
 
   const exportBoth = () => {
@@ -274,7 +274,7 @@ export default function Extract() {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
           onClick={(e) => e.stopPropagation()}
@@ -481,7 +481,7 @@ export default function Extract() {
           Scoped to <span className="font-num">{paperParam}</span>
           <button
             className="text-ink-soft hover:text-ink ml-1"
-            onClick={() => navigate('/extract')}
+            onClick={() => navigate('/intake')}
             aria-label={`Clear the ${paperParam} scope`}
             title="Show every record again"
           >
@@ -499,7 +499,7 @@ export default function Extract() {
       <>
         <PageHeader
           eyebrow="Module 0 · Evidence"
-          title="Extraction records"
+          title="Intake"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
         />
         <Card>
@@ -529,8 +529,8 @@ export default function Extract() {
       <Button onClick={exportBoth} title="CSV with both unit forms and the provenance of every row">
         <Download size={14} /> Export CSV
       </Button>
-      <LinkButton to="/extract/validation">
-        <Gauge size={14} /> Open validation
+      <LinkButton to="/witness">
+        <Gauge size={14} /> Open Witness
       </LinkButton>
     </>
   );
@@ -540,7 +540,7 @@ export default function Extract() {
       <>
         <PageHeader
           eyebrow="Module 0 · Evidence"
-          title="Extraction records"
+          title="Intake"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
           actions={headerActions}
         />
@@ -558,13 +558,13 @@ export default function Extract() {
             action={
               paperParam ? (
                 <div className="flex gap-2">
-                  <Button onClick={() => navigate('/extract')}>Show every record</Button>
+                  <Button onClick={() => navigate('/intake')}>Show every record</Button>
                   {scopedPaper && (
-                    <LinkButton to={`/library/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
+                    <LinkButton to={`/biorepo/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
               ) : (
-                <LinkButton to="/library/ingest">Open the ingest board</LinkButton>
+                <LinkButton to="/biorepo/ingest">Open the ingest board</LinkButton>
               )
             }
           />
@@ -580,7 +580,7 @@ export default function Extract() {
     <>
       <PageHeader
         eyebrow="Module 0 · Evidence"
-        title="Extraction records"
+        title="Intake"
         subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so."
         actions={headerActions}
       />
@@ -604,7 +604,7 @@ export default function Extract() {
             Showing only records extracted from{' '}
             <span className="font-serif">{scopedPaper.title}</span>. Facet counts below describe this
             subset.{' '}
-            <button className="text-accent hover:underline" onClick={() => navigate('/extract')}>
+            <button className="text-accent hover:underline" onClick={() => navigate('/intake')}>
               Show every record
             </button>
             .
@@ -621,7 +621,7 @@ export default function Extract() {
         dense={density === 'dense'}
         toolbar={toolbar}
         onFilteredChange={handleFiltered}
-        onOpen={({ rec }) => navigate(`/library/papers/${rec.paperId}?span=${rec.id}`)}
+        onOpen={({ rec }) => navigate(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
         searchOf={({ rec }) =>
           `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.field} ${rec.unit} ${
             rec.si.unit

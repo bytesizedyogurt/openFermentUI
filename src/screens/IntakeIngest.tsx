@@ -128,7 +128,7 @@ const CELL_BORDER: Record<CellState, string> = {
   notrun: 'border-line border-dashed',
 };
 
-export default function Ingest() {
+export default function IntakeIngest() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
   const jobs = useStore((s) => s.jobs);
@@ -200,7 +200,7 @@ export default function Ingest() {
     toast({
       text: `${row.paper.id} joined the corpus with abstract-only text — extractions are limited to the abstract until it re-parses`,
       kind: 'warn',
-      href: `#/library/papers/${row.paper.id}`,
+      href: `#/biorepo/papers/${row.paper.id}`,
       hrefLabel: 'Open',
     });
   };
@@ -208,6 +208,7 @@ export default function Ingest() {
   return (
     <>
       <PageHeader
+        eyebrow="Intake"
         title="Ingest papers"
         subtitle={
           <>
@@ -218,7 +219,7 @@ export default function Ingest() {
             access.
           </>
         }
-        actions={<LinkButton to="/library">Back to Library</LinkButton>}
+        actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-5 items-start">
@@ -408,7 +409,7 @@ export default function Ingest() {
                           )}
                         </div>
                         <a
-                          href={href(`/library/papers/${row.paper.id}`)}
+                          href={href(`/biorepo/papers/${row.paper.id}`)}
                           className="font-serif leading-snug hover:text-accent hover:underline block mt-0.5"
                         >
                           {row.paper.title}
@@ -419,7 +420,7 @@ export default function Ingest() {
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0 justify-end">
                         {(row.state === 'complete' || row.state === 'degraded') && (
-                          <LinkButton to={`/library/papers/${row.paper.id}`} size="sm">
+                          <LinkButton to={`/biorepo/papers/${row.paper.id}`} size="sm">
                             View paper
                           </LinkButton>
                         )}

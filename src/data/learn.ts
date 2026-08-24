@@ -286,7 +286,7 @@ Count both and a strip plot shows two independent sources agreeing. There is one
           { kind: 'embed', embed: 'mini-queue' },
           {
             kind: 'prose',
-            md: `Whatever you decide there is real. The queue calls the same store actions the full review screen does, and the consequences propagate — organism pages, strip plots and the validation dashboard all read the records you just changed.
+            md: `Whatever you decide there is real. The queue calls the same store actions the Guild review screen does, and the consequences propagate — organism pages, strip plots and Witness all read the records you just changed.
 `,
           },
         ],
@@ -425,7 +425,7 @@ Two limits: it costs one configuration per held-out paper, and it does not rescu
           {
             id: 'c0-4-2',
             prompt:
-              'Why does the validation dashboard show an empty state rather than a precision, recall and F1 figure?',
+              'Why does Witness show an empty state rather than a precision, recall and F1 figure?',
             kind: 'mc',
             options: [
               'No extractor has been run and no gold set annotated, because the corpus is catalogued rather than ingested — so any number would describe nothing',
@@ -1047,7 +1047,7 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             ],
             answerIndex: 0,
             explanation:
-              'A fact present in a paper but absent from its summary is unfindable, so a decline may be correct about the corpus and wrong about the literature. Stating the limitation costs one sentence and lets the reader calibrate; omitting it lets a decline read as a finding about the world. This is the same discipline as the empty validation dashboard — describe the state you are actually in, and let the reader decide what it is worth.',
+              'A fact present in a paper but absent from its summary is unfindable, so a decline may be correct about the corpus and wrong about the literature. Stating the limitation costs one sentence and lets the reader calibrate; omitting it lets a decline read as a finding about the world. This is the same discipline as the empty Witness screen — describe the state you are actually in, and let the reader decide what it is worth.',
           },
         ],
       },

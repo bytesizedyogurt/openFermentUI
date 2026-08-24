@@ -1,11 +1,12 @@
 // Component attribution (OF-BLD-006 §2.4). When a named component does work,
 // this says which one.
 //
-// openFerment's architecture has eighteen named components (COMPONENTS.md).
-// The names are deliberately absent from nav labels — someone looking for a
-// chat interface finds "Ask", not "Postdoc" — so this tag is one of only two
-// places a name reaches the screen at all. It answers "who produced this", not
-// "what is this".
+// openFerment's architecture has eighteen named components (COMPONENTS.md),
+// and since §2.2 was reversed those names are also what the rail says. This
+// tag still has a separate job from the label above it: the label names the
+// surface you are standing on, and the tag names the component that produced a
+// particular piece of work. It answers "who did this", not "where am I" — so
+// it survives the rename unchanged, and it must not be mistaken for a heading.
 //
 // A THIRD VISUAL FAMILY. The screen already carries two labelled vocabularies
 // and this must not read as either:
@@ -59,7 +60,7 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
   geneOS: 'Computing — construct and strain design (not built)',
   fermOS: 'Computing — fermentation and process modelling (not built)',
   Proforma: 'Computing — cost models, sweeps and scenario economics',
-  Primer: 'Keeping it honest — units, scaling, and refusals with their reasons',
+  Primer: 'Keeping it honest — the introductory text: the platform taught through itself',
   Audit: 'Keeping it honest — provenance, and what is held out of aggregates',
   Witness: 'Keeping it honest — extractor validation against the gold set',
   'Common Seal': 'Keeping it honest — timestamping and attestation (not built)',
@@ -83,16 +84,26 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
  */
 export function ComponentTag({
   component,
+  unnamed,
   action,
   className,
   title,
 }: {
-  component: ComponentName;
+  component?: ComponentName;
+  /**
+   * For work done by code that has no name (COMPONENTS.md, "Named nothing
+   * yet"). The unit engine lost its name when Primer moved to the Learn
+   * screens, and its refusals still need attributing: saying "the unit engine
+   * refused this" is honest, and leaving the refusal unattributed or crediting
+   * it to a component that no longer does that job is not.
+   */
+  unnamed?: string;
   action?: string;
   className?: string;
   /** Overrides the default role tooltip when the context needs something sharper. */
   title?: string;
 }) {
+  const who = component ?? unnamed ?? '';
   return (
     <span
       className={cx(
@@ -100,10 +111,10 @@ export function ComponentTag({
         'inline-flex items-baseline gap-1 font-num text-[11px] leading-tight text-ink-soft',
         className,
       )}
-      title={title ?? `${component} — ${COMPONENT_ROLE[component]}`}
+      title={title ?? (component ? `${component} — ${COMPONENT_ROLE[component]}` : who)}
     >
       <span className="sr-only">Produced by </span>
-      <span className="text-ink/75">{component}</span>
+      <span className={cx('text-ink/75', !component && 'font-sans italic')}>{who}</span>
       {action && (
         <>
           <span aria-hidden className="opacity-45">

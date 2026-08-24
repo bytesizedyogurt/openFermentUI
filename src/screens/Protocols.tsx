@@ -92,7 +92,7 @@ const CALC_TEXT_RE = /\{\{stock:|\b(?:calculat|dilut|inocul)|\b(?:adjust|make up
  *
  *   scalable   — at least one material declares a `scaling` class other than
  *                'fixed', so changing the batch size moves a real quantity.
- *   timed      — at least one step declares `timerSec`, so Run Mode can put a
+ *   timed      — at least one step declares `timerSec`, so Deposition can put a
  *                real countdown on the bench.
  *   calculator — either (a) at least one material declares a `.stock`
  *                concentration, which forces stock-solution volume math, or

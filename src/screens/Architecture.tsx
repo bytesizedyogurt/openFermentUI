@@ -1,24 +1,27 @@
-// The component architecture, made visible (OF-BLD-006 §2).
+// The component architecture, made visible (OF-BLD-006 §2, §2.2 reversed).
 //
-// The eighteen names and seven layers previously existed only in COMPONENTS.md
-// and in attribution tags scattered a few pixels high. That is enough for
-// building the system and not enough for reading it, so this screen renders
-// the architecture as the thing it actually is: a pipeline with a direction,
-// seven components not yet built, and one layer where the arrow reverses.
+// The eighteen names and seven layers used to live only in COMPONENTS.md and
+// in attribution tags a few pixels high. This screen renders the architecture
+// as the thing it actually is: a pipeline with a direction, seven components
+// not yet built, one piece of code with no name at all, and one layer where
+// the arrow reverses.
 //
-// It does NOT rename anything. The rail still says Ask, Extract, Simulate —
-// §2.2 is explicit that a user hunting a chat interface should find "Ask", and
-// a reference screen is not an excuse to relitigate that. Each component says
-// which nav label it sits under, which is the mapping a reader actually needs.
-import { ArrowDown, CircleDashed, FileCode2 } from 'lucide-react';
+// It is now also the glossary. §2.2 originally kept these names out of the
+// product — "Ask" in the rail, "Postdoc" only in code — and that is reversed:
+// the names ARE the vocabulary, so this page is where a reader who has met
+// four of them in the rail can see all eighteen at once and find out which
+// ones they have not met because there is nothing there yet.
+import { ArrowDown, CircleDashed, FileCode2, Tag } from 'lucide-react';
 import {
   COMPONENTS,
   FULL_NAME,
   LAYERS,
+  UNNAMED,
   componentsInLayer,
   isBuilt,
   type ComponentDef,
 } from '@/data/components';
+import { DESCRIPTOR } from '@/data/nav';
 import { COMPONENT_ROLE } from '@/components/ComponentTag';
 import { Callout, Card, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
 
@@ -38,9 +41,12 @@ function ComponentRow({ c }: { c: ComponentDef }) {
         >
           {FULL_NAME[c.name] ?? c.name}
         </span>
+        {DESCRIPTOR[c.name] && (
+          <span className="text-caption text-ink-soft">{DESCRIPTOR[c.name]}</span>
+        )}
         {c.surfacedAs ? (
           <span className="text-caption text-ink-soft">
-            reached through <span className="text-ink">{c.surfacedAs}</span>
+            · read as <span className="text-ink">{c.surfacedAs}</span>
           </span>
         ) : (
           <span className="chip text-ink-soft text-[11px] py-0 inline-flex items-center gap-1">
@@ -75,7 +81,7 @@ export default function Architecture() {
       <PageHeader
         eyebrow="Settings · Architecture"
         title="Components"
-        subtitle="Eighteen named components in seven layers. This is the architecture the system is built from — not a menu, and deliberately not the nav rail."
+        subtitle="Eighteen named components in seven layers. This is both the architecture the system is built from and the vocabulary it is used through — the words in the rail are these words."
       />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
@@ -90,14 +96,15 @@ export default function Architecture() {
           <span className="font-num text-ink">{LAYERS.length}</span> layers
         </span>
         <span className="inline-flex items-center gap-1">
-          Why the rail does not say these
-          <Explain label="Why nav labels are not component names">
-            Because the names are for building the system, not for navigating it. Somebody looking
-            for a chat interface types &ldquo;Ask&rdquo;; renaming that button to
-            &ldquo;Postdoc&rdquo; would make the product worse in exchange for making the
-            architecture louder. The names surface in three places instead: the module a
-            component&rsquo;s code lives in, an attribution tag beside work it performed, and this
-            table.
+          Why the rail says these
+          <Explain label="Why the rail uses component names">
+            Because you are going to use this daily, and a precise name learned once beats a
+            generic one re-read forever. &ldquo;Ask&rdquo; names the verb and tells you nothing
+            about what you are talking to; &ldquo;Postdoc&rdquo; tells you it plans, retrieves,
+            shows its working, and can be handed a half-formed question. Three things keep that
+            from being hostile on day one: every label carries a descriptor, the command palette
+            still answers to the old words, and every old link redirects rather than 404s. Type
+            &ldquo;library&rdquo; in the palette and BioRepo comes up.
           </Explain>
         </span>
       </div>
@@ -133,6 +140,33 @@ export default function Architecture() {
                 <ul>
                   {items.map((c) => (
                     <ComponentRow key={c.name} c={c} />
+                  ))}
+                  {/* §3 — code in this layer that has no name. Primer used to
+                      name the unit engine and now names the Learn screens; the
+                      engine was not handed a replacement on the spot. It is on
+                      the map as unnamed rather than quietly dropped. */}
+                  {UNNAMED.filter((u) => u.layer === layer.id).map((u) => (
+                    <li key={u.what} className="py-2.5 border-b border-line/70 last:border-0">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="font-serif italic text-body text-ink-soft">{u.what}</span>
+                        <span className="chip text-ink-soft text-[11px] py-0 inline-flex items-center gap-1">
+                          <Tag size={11} aria-hidden />
+                          no name yet
+                        </span>
+                      </div>
+                      <div className="text-body text-ink-soft mt-0.5">{u.role}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        {u.livesIn.map((path) => (
+                          <span
+                            key={path}
+                            className="font-num text-caption text-ink-soft inline-flex items-center gap-1"
+                          >
+                            <FileCode2 size={11} aria-hidden />
+                            {path}
+                          </span>
+                        ))}
+                      </div>
+                    </li>
                   ))}
                 </ul>
               </Card>

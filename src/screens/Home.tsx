@@ -184,40 +184,56 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
   pin: Pin,
 };
 
-const ENTRY_CARDS: { to: string; title: string; desc: string; Icon: LucideIcon }[] = [
+// Each card says the verb AND names the surface it lands on, because the
+// surface names are the vocabulary now (§2.2 as revised) and Home is where a
+// first-time reader meets them. The verb is what they came to do; the name is
+// what they will type next time.
+const ENTRY_CARDS: {
+  to: string;
+  title: string;
+  where: string;
+  desc: string;
+  Icon: LucideIcon;
+}[] = [
   {
-    to: '/ask',
+    to: '/postdoc',
     title: 'Ask a question',
+    where: 'Postdoc',
     desc: 'Get a cited answer with the plan, tool calls and retrieved passages shown.',
     Icon: MessagesSquare,
   },
   {
-    to: '/extract/review',
+    to: '/guild',
     title: 'Review extractions',
+    where: 'Guild',
     desc: 'Triage machine-extracted parameters against the span they came from.',
     Icon: Table2,
   },
   {
     to: '/protocols',
     title: 'Run a protocol',
+    where: 'Protocols → Deposition',
     desc: 'Scale a verified procedure to your batch size and execute it at the bench.',
     Icon: ClipboardList,
   },
   {
-    to: '/simulate',
+    to: '/proforma',
     title: 'Model a process',
+    where: 'Proforma',
     desc: 'Sweep a scenario and see where the cost per kilogram actually goes.',
     Icon: LineChart,
   },
   {
     to: '/molecules',
     title: 'Browse molecules',
+    where: 'Molecules',
     desc: 'What could be made, in which host, on which train — and who already owns it.',
     Icon: Boxes,
   },
   {
     to: '/runbooks',
     title: 'Open a runbook',
+    where: 'Runbooks',
     desc: 'A synthesised answer to "how would we make this", with the stages it took to get there.',
     Icon: GitBranch,
   },
@@ -348,7 +364,7 @@ export default function Home() {
         <PageHeader
           eyebrow="openFerment"
           title="Bioprocess literature you can operate on"
-          subtitle="Ask questions against a curated corpus, verify every extracted number against its source span, turn verified parameters into runnable protocols, and model what they cost at scale."
+          subtitle="Ask Postdoc against a curated corpus, verify every extracted number against the span it came from, turn verified parameters into runnable protocols, and model what they cost at scale."
         />
 
         {/* ── Band 1 · Corpus vitals ─────────────────────────────────── */}
@@ -370,7 +386,7 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <TileBoundary label="Papers catalogued">
               <VitalTile
-                to="/library"
+                to="/biorepo"
                 label="Papers catalogued"
                 prov="curated"
                 tickTitle="Real literature, curated by hand — metadata and a curator note, no full text retrieved"
@@ -395,7 +411,7 @@ export default function Home() {
 
             <TileBoundary label="Extraction records">
               <VitalTile
-                to="/extract"
+                to="/intake"
                 label="Extraction records"
                 prov={recordProv}
                 sub={
@@ -443,7 +459,7 @@ export default function Home() {
 
             <TileBoundary label="Gold set">
               <VitalTile
-                to="/extract/validation"
+                to="/witness"
                 label="Gold set"
                 prov="gold"
                 sub={
@@ -557,7 +573,7 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {lastSession && (
                 <ResumeCard
-                  to={`/ask/${lastSession.id}`}
+                  to={`/postdoc/${lastSession.id}`}
                   kicker="Last conversation"
                   title={lastSession.title}
                   prov="user"
@@ -574,7 +590,7 @@ export default function Home() {
 
               {reviewQueue.length > 0 ? (
                 <ResumeCard
-                  to="/extract/review"
+                  to="/guild"
                   kicker="Review queue"
                   title={`${queueRemaining} of ${reviewQueue.length} remaining`}
                   prov="user"
@@ -584,7 +600,7 @@ export default function Home() {
                 </ResumeCard>
               ) : (
                 <ResumeCard
-                  to="/extract/review"
+                  to="/guild"
                   kicker="Review queue"
                   title={
                     unverifiedCount === 0
@@ -647,7 +663,7 @@ export default function Home() {
 
               {pinnedScenarios.length > 0 && (
                 <ResumeCard
-                  to="/simulate/compare"
+                  to="/proforma/compare"
                   kicker="Pinned scenarios"
                   title={pinnedScenarios.map((s) => s.name).join(' · ')}
                   prov="demo"
@@ -671,7 +687,7 @@ export default function Home() {
                 {COLD_START_QUESTIONS.map((q) => (
                   <li key={q}>
                     <a
-                      href={href(`/ask?q=${encodeURIComponent(q)}`)}
+                      href={href(`/postdoc?q=${encodeURIComponent(q)}`)}
                       className="card p-3 h-full flex flex-col gap-2 transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
                     >
                       <MessagesSquare size={15} className="text-accent shrink-0" aria-hidden />
@@ -700,6 +716,9 @@ export default function Home() {
                   <c.Icon size={17} className="text-accent" aria-hidden />
                 </span>
                 <span className="min-w-0">
+                  <span className="block font-num text-[11px] leading-tight text-ink-soft truncate">
+                    {c.where}
+                  </span>
                   <span className="block font-serif text-section-title font-semibold leading-snug">
                     {c.title}
                   </span>
@@ -709,13 +728,25 @@ export default function Home() {
             ))}
           </div>
 
-          <button
-            className="mt-3 inline-flex items-center gap-1.5 text-body text-ink-soft hover:text-accent"
-            onClick={() => useStore.getState().setUI({ tourStop: 0 })}
-          >
-            <Compass size={14} aria-hidden />
-            What is this platform?
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <button
+              className="inline-flex items-center gap-1.5 text-body text-ink-soft hover:text-accent"
+              onClick={() => useStore.getState().setUI({ tourStop: 0 })}
+            >
+              <Compass size={14} aria-hidden />
+              What is this platform?
+            </button>
+            {/* §7 — the full map, one click from Home. The rail teaches a name
+                at a time; this is where all eighteen are laid out at once,
+                including the seven with nothing under them yet. */}
+            <a
+              href={href('/settings/architecture')}
+              className="inline-flex items-center gap-1.5 text-body text-ink-soft hover:text-accent"
+            >
+              <Boxes size={14} aria-hidden />
+              What do these names mean?
+            </a>
+          </div>
         </section>
       </div>
 

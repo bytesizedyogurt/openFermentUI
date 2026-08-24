@@ -30,7 +30,7 @@ function Ring({ done, total }: { done: number; total: number }) {
   );
 }
 
-export default function Learn() {
+export default function Primer() {
   const modules = useStore((s) => s.modules);
   const progress = useStore((s) => s.learnProgress);
 
@@ -43,7 +43,8 @@ export default function Learn() {
   return (
     <div>
       <PageHeader
-        title="Learn"
+        eyebrow="Learn the system"
+        title="Primer"
         subtitle="Bioprocess taught through the live platform rather than beside it. Every embedded widget in these lessons is the real component, operating on the real session state."
         actions={
           <span className="text-body text-ink-soft font-num">
@@ -84,7 +85,7 @@ export default function Learn() {
                       return (
                         <a
                           key={lesson.id}
-                          href={`#/learn/${mod.id}/${lesson.id}`}
+                          href={`#/primer/${mod.id}/${lesson.id}`}
                           className={cx(
                             'flex items-center gap-2.5 px-2.5 py-2 rounded-btn border transition-colors',
                             complete
@@ -126,7 +127,7 @@ export default function Learn() {
                   {mod.lessons.length > 0 && (
                     <div className="mt-3">
                       <LinkButton
-                        to={`/learn/${mod.id}/${mod.lessons[0].id}`}
+                        to={`/primer/${mod.id}/${mod.lessons[0].id}`}
                         variant={isFlagship ? 'primary' : 'default'}
                         size="sm"
                       >

@@ -196,7 +196,7 @@ function MiniQueue() {
               ? `${decided.length} decision${decided.length === 1 ? '' : 's'} recorded — they are live, and the strain pages and validation metrics have already moved.`
               : 'No unverified records left in this session.'}
           </p>
-          <Button className="mt-3" onClick={() => navigate('/extract/review')}>
+          <Button className="mt-3" onClick={() => navigate('/guild')}>
             Open the full review queue <ArrowRight size={13} />
           </Button>
         </div>
@@ -299,7 +299,7 @@ function MetricsTiles() {
       <p className="text-caption text-ink-soft mt-2">
         Computed from this session's gold set. TP {metrics.micro.tp} · FP {metrics.micro.fp} · FN{' '}
         {metrics.micro.fn}.{' '}
-        <button className="text-accent hover:underline" onClick={() => navigate('/extract/validation')}>
+        <button className="text-accent hover:underline" onClick={() => navigate('/witness')}>
           Open the full dashboard
         </button>
       </p>
@@ -363,7 +363,7 @@ function StripPlot({ field }: { field: FieldId }) {
                 key={p.r.id}
                 className="absolute -translate-x-1/2 hover:scale-150 transition-transform"
                 style={{ left: `${((p.v - lo) / span) * 96 + 2}%`, top: 22 + ((i % 5) - 2) * 6 }}
-                onClick={() => navigate(`/library/papers/${p.r.paperId}?span=${p.r.id}`)}
+                onClick={() => navigate(`/biorepo/papers/${p.r.paperId}?span=${p.r.id}`)}
                 title={`${fmt(p.v)} ${def.canonicalUnit} — ${p.r.paperId} · ${p.r.status}${
                   excl ? ` · ${EXCLUSION_NOTE[excl]}` : ''
                 }`}
@@ -433,7 +433,7 @@ function AskPrompt({ question }: { question: string }) {
         <p className="font-serif text-reading italic flex-1 min-w-[200px]">“{question}”</p>
         <Button
           variant="primary"
-          onClick={() => navigate(`/ask?q=${encodeURIComponent(question)}`)}
+          onClick={() => navigate(`/postdoc?q=${encodeURIComponent(question)}`)}
         >
           Ask the agent <ArrowRight size={13} />
         </Button>

@@ -42,15 +42,15 @@ const server = createServer(async (req, res) => {
 
 const ROUTES = [
   ['/', 'Home'],
-  ['/ask', 'Ask'],
-  ['/library', 'Library'],
-  ['/library/ingest', 'Ingest'],
-  ['/library/papers/H4', 'Paper reader (P. pastoris precedent)'],
-  ['/library/papers/D5', 'Paper reader (the open question, no records)'],
-  ['/library/papers/O8m', 'Paper reader (industry estimates)'],
-  ['/extract', 'Extract records'],
-  ['/extract/review', 'Review queue'],
-  ['/extract/validation', 'Validation dashboard'],
+  ['/postdoc', 'Postdoc'],
+  ['/biorepo', 'BioRepo'],
+  ['/biorepo/ingest', 'Intake — ingest board'],
+  ['/biorepo/papers/H4', 'Paper reader (P. pastoris precedent)'],
+  ['/biorepo/papers/D5', 'Paper reader (the open question, no records)'],
+  ['/biorepo/papers/O8m', 'Paper reader (industry estimates)'],
+  ['/intake', 'Intake'],
+  ['/guild', 'Guild — review queue'],
+  ['/witness', 'Witness'],
   ['/organisms', 'Organism index'],
   ['/organisms/cw15', 'Strain page (cw15)'],
   ['/organisms/creinhardtii-wt', 'Strain page (walled comparator)'],
@@ -65,14 +65,14 @@ const ROUTES = [
   ['/runbooks', 'Runbook board'],
   ['/runbooks/rb-brazzein', 'Runbook (complete)'],
   ['/runbooks/rb-taq-kigali', 'Runbook (running)'],
-  ['/simulate', 'Scenario index'],
-  ['/simulate/sc-s1', 'Scenario S1'],
-  ['/simulate/sc-s2', 'Scenario S2'],
-  ['/simulate/sc-s3', 'Scenario S3 (the incumbent)'],
-  ['/simulate/compare', 'Compare'],
-  ['/learn', 'Learn map'],
-  ['/learn/m0/l0-1', 'Lesson 0.1'],
-  ['/learn/m0/l0-4', 'Lesson 0.4 (metrics)'],
+  ['/proforma', 'Proforma'],
+  ['/proforma/sc-s1', 'Scenario S1'],
+  ['/proforma/sc-s2', 'Scenario S2'],
+  ['/proforma/sc-s3', 'Scenario S3 (the incumbent)'],
+  ['/proforma/compare', 'Compare'],
+  ['/primer', 'Primer'],
+  ['/primer/m0/l0-1', 'Primer lesson 0.1'],
+  ['/primer/m0/l0-4', 'Primer lesson 0.4 (metrics)'],
   ['/settings/appearance', 'Settings — appearance'],
   ['/settings/units', 'Settings — units'],
   ['/settings/corpus', 'Settings — corpus'],
@@ -80,6 +80,29 @@ const ROUTES = [
   ['/depositions/dep-not-in-this-session', 'Deposition (durable, absent here)'],
   ['/settings/architecture', 'Architecture — the eighteen components'],
   ['/settings/about', 'Settings — colophon'],
+];
+
+/**
+ * Old path → where it must land (OF-BLD-006 §8).
+ *
+ * Checked as landings rather than as routes: a redirect that renders is not
+ * enough, because the interstitial renders too. The URL has to have moved and
+ * the deep-link tail has to have survived, or a bookmark to a specific paper
+ * silently becomes a bookmark to the top of the corpus.
+ */
+const REDIRECTS = [
+  ['/ask', '/postdoc'],
+  ['/library', '/biorepo'],
+  ['/library/papers/H4', '/biorepo/papers/H4'],
+  ['/extract', '/intake'],
+  ['/extract/review', '/guild'],
+  ['/extract/validation', '/witness'],
+  ['/simulate', '/proforma'],
+  ['/simulate/sc-s2', '/proforma/sc-s2'],
+  ['/learn', '/primer'],
+  ['/learn/m0/l0-1', '/primer/m0/l0-1'],
+  ['/review', '/guild'],
+  ['/validation', '/witness'],
 ];
 
 const IGNORE = [/Download the React DevTools/i, /favicon/i];
@@ -123,11 +146,35 @@ async function main() {
     await page.close();
   }
 
+  // ── §8 — old paths land on the new screens ─────────────────────────
+  let redirectFails = 0;
+  for (const [from, to] of REDIRECTS) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(`http://localhost:${PORT}/#${from}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(700);
+      const landed = decodeURIComponent(page.url().split('#')[1] ?? '');
+      const text = (await page.locator('body').innerText()).trim();
+      const ok = landed === to && !/Route not found/i.test(text) && text.length > 60;
+      if (ok) {
+        console.log(`✓ ${from.padEnd(28)} → ${to}`);
+      } else {
+        redirectFails++;
+        console.log(`✗ ${from.padEnd(28)} → ${landed || '(nowhere)'}, expected ${to}`);
+      }
+    } catch (e) {
+      redirectFails++;
+      console.log(`✗ ${from.padEnd(28)} ${String(e).slice(0, 160)}`);
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
   console.log(`\n${ROUTES.length - failures.length}/${ROUTES.length} routes clean`);
-  if (failures.length) process.exit(1);
+  console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
+  if (failures.length || redirectFails) process.exit(1);
 }
 
 main();

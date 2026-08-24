@@ -83,13 +83,13 @@ async function main() {
     homeText.match(/\b1[23]\d\b/g)?.slice(0, 3).join(', ') ?? '',
   );
 
-  // ── 2. Ask: a scripted flow plays and produces chips ────────────────
-  await go('/ask');
+  // ── 2. Postdoc: a scripted flow plays and produces chips ────────────────
+  await go('/postdoc');
   const suggested = page.locator('button', { hasText: /titers have been achieved/i }).first();
   await suggested.click();
   await page.waitForTimeout(2500);
   const askText = await page.locator('body').innerText();
-  check('Ask plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
+  check('Postdoc plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
   const chips = page.locator('button', { hasText: /^\[[A-O]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
   const chipCount = await chips.count();
   check('Answer carries working citation chips', chipCount > 0, `${chipCount} chips`);
@@ -106,15 +106,15 @@ async function main() {
   }
 
   // ── 3. Chip → reader, anchored on the span ──────────────────────────
-  await go('/library/papers/H4?span=r-H4-1');
+  await go('/biorepo/papers/H4?span=r-H4-1');
   await page.waitForTimeout(700);
   const marks = await page.locator('mark').count();
   const activeMark = await page.locator('mark.span-active').count();
   check('Reader highlights extraction spans', marks > 0, `${marks} spans`);
   check('Deep link anchors the requested span', activeMark > 0);
 
-  // ── 4. Review: keyboard triage mutates a record ─────────────────────
-  await go('/extract/review');
+  // ── 4. Guild: keyboard triage mutates a record ─────────────────────
+  await go('/guild');
   await page.waitForTimeout(600);
   const beforeReview = await page.locator('body').innerText();
   const progressBefore = beforeReview.match(/(\d+)\s*\/\s*(\d+)/)?.[1];
@@ -123,7 +123,7 @@ async function main() {
   const afterReview = await page.locator('body').innerText();
   const progressAfter = afterReview.match(/(\d+)\s*\/\s*(\d+)/)?.[1];
   check(
-    'Review accepts by keyboard and advances',
+    'Guild accepts by keyboard and advances',
     progressBefore !== progressAfter,
     `${progressBefore} → ${progressAfter}`,
   );
@@ -134,17 +134,17 @@ async function main() {
   const afterUndo = (await page.locator('body').innerText()).match(/(\d+)\s*\/\s*(\d+)/)?.[1];
   check('Undo restores queue position', afterUndo === progressBefore, `back to ${afterUndo}`);
 
-  // ── 5. Validation states the gap honestly ───────────────────────────
-  await go('/extract/validation');
+  // ── 5. Witness states the gap honestly ───────────────────────────
+  await go('/witness');
   await page.waitForTimeout(600);
   const valText = await page.locator('body').innerText();
   check(
-    'Validation refuses to show metrics it has not earned',
+    'Witness refuses to show metrics it has not earned',
     /no extractor has been run/i.test(valText) && !/\bF1\s*0\.\d/.test(valText),
   );
-  check('Validation shows the gold-set plan instead', /gold set — planned|0 of \d+ annotated/i.test(valText));
+  check('Witness shows the gold-set plan instead', /gold set — planned|0 of \d+ annotated/i.test(valText));
   check(
-    'Validation surfaces values the ontology cannot hold',
+    'Witness surfaces values the ontology cannot hold',
     /cannot hold/i.test(valText) && /Would need/i.test(valText),
   );
 
@@ -172,13 +172,13 @@ async function main() {
     check('Scaling 1 L → 5 L recomputes bound quantities', false, 'scale chip not found');
   }
 
-  // ── 7. Run Mode: start a run, complete a step, run a timer ──────────
+  // ── 7. Deposition: start a run, complete a step, run a timer ──────────
   const startRun = page.locator('button', { hasText: /start run/i }).first();
   if (await startRun.count()) {
     await startRun.click();
     await page.waitForTimeout(900);
     const inRun = page.url().includes('/run/');
-    check('Start run enters Run Mode', inRun, page.url().split('#')[1] ?? '');
+    check('Start run enters Deposition', inRun, page.url().split('#')[1] ?? '');
     if (inRun) {
       const runBefore = await page.locator('body').innerText();
       await page.keyboard.press(' ');
@@ -216,11 +216,11 @@ async function main() {
       }
     }
   } else {
-    check('Start run enters Run Mode', false, 'start-run button not found');
+    check('Start run enters Deposition', false, 'start-run button not found');
   }
 
-  // ── 8. Simulate: slider moves MSP; waterfall agrees with headline ───
-  await go('/simulate/sc-s2');
+  // ── 8. Proforma: slider moves MSP; waterfall agrees with headline ───
+  await go('/proforma/sc-s2');
   await page.waitForTimeout(800);
   const mspBefore = (await page.locator('body').innerText()).match(/\$([\d.]+)/)?.[1];
   const slider = page.locator('input[type=range]').first();
@@ -269,8 +269,8 @@ async function main() {
     sums ? `Σ${sums.sum.toFixed(2)} vs $${sums.total.toFixed(2)}` : 'table not found',
   );
 
-  // ── 9. Learn: unit-aware numeric checkpoint grading ─────────────────
-  await go('/learn/m0/l0-2');
+  // ── 9. Primer: unit-aware numeric checkpoint grading ─────────────────
+  await go('/primer/m0/l0-2');
   await page.waitForTimeout(600);
   const numInput = page.locator('input[placeholder*="e.g."]').first();
   if (await numInput.count()) {
@@ -285,7 +285,7 @@ async function main() {
   }
 
   // ── 10. Agent declines an out-of-corpus question ────────────────────
-  await go('/ask');
+  await go('/postdoc');
   await page.waitForTimeout(400);
   const composer = page.locator('textarea').first();
   await composer.fill('What is the optimal sous-vide temperature for brisket?');
@@ -304,7 +304,7 @@ async function main() {
 
   // The algal-casein question is NOT a decline — the corpus answers it with a
   // substantive "no", which is the demo's whole point (OF-COR-001 §21 F6).
-  await go('/ask');
+  await go('/postdoc');
   await page.waitForTimeout(400);
   const c2 = page.locator('textarea').first();
   await c2.fill('Has anyone expressed a casein in an alga?');
@@ -326,11 +326,18 @@ async function main() {
   const paletteOpen = (await page.locator('input[aria-label="Command palette"]').count()) > 0;
   check('Command palette opens', paletteOpen);
   if (paletteOpen) {
+    // Typed as the OLD word on purpose (OF-BLD-006 §6). People will reach for
+    // "validation" for months after the rename, and the palette has to take
+    // them to Witness rather than punish them for not having learned it yet.
     await page.locator('input[aria-label="Command palette"]').fill('validation');
     await page.waitForTimeout(300);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(700);
-    check('Palette navigates to the chosen route', page.url().includes('validation'), page.url().split('#')[1] ?? '');
+    check(
+      'Palette resolves an old word to the renamed screen',
+      (page.url().split('#')[1] ?? '') === '/witness',
+      page.url().split('#')[1] ?? '',
+    );
   }
 
   await browser.close();

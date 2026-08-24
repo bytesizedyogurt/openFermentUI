@@ -112,11 +112,23 @@ The simulation holds itself to eight conditions (design §11):
 
 | Module | Name | What it proves | Where it lives |
 |---|---|---|---|
-| 0 | PhycoExtract | Extraction quality is measurable | `/library`, `/extract`, `/extract/validation` |
-| 1 | Corpus & Ask | Agentic RAG with visible retrieval | `/ask`, `/library` |
+| 0 | PhycoExtract | Extraction quality is measurable | `/biorepo`, `/intake`, `/guild`, `/witness` |
+| 1 | Corpus & Postdoc | Agentic RAG with visible retrieval | `/postdoc`, `/biorepo` |
 | 2 | Organisms & Protocols | Verified parameters become executable | `/organisms`, `/protocols` |
-| 3 | Simulate | Parameters feed techno-economics | `/simulate` |
-| 4 | Learn | The platform doubles as curriculum | `/learn` |
+| 3 | Proforma | Parameters feed techno-economics | `/proforma` |
+| 4 | Primer | The platform doubles as curriculum | `/primer` |
+| 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/depositions` |
+
+## The vocabulary
+
+The rail says Postdoc, BioRepo, Intake, Proforma, Primer — component names, not generic
+verbs. `COMPONENTS.md` is the canonical map of all eighteen; `/settings/architecture` is the
+same map in the app. Every label carries a one-line descriptor, the ⌘K palette still answers
+to the old words (`library` finds BioRepo), and every old path redirects rather than 404s, so
+`/library/papers/H4` lands on `/biorepo/papers/H4` with its deep link intact.
+
+Organisms, Molecules and Protocols keep their plain names: they are catalogue views of domain
+objects, not components.
 
 ## Architecture
 
@@ -126,7 +138,8 @@ src/data/corpus/  the 15 literature threads, A–O, one file per thread group
 src/engine/     pure logic, unit-testable without UI, ships to production unchanged
 src/sim/        latency model and chat flow player — two files, retired last
 src/components/ shared primitives (citation chip, data table, quantity field, …)
-src/screens/    one file per screen
+src/screens/    one file per screen, named after the component it is
+src/data/nav.ts the navigation vocabulary — labels, descriptors, aliases, redirects
 ```
 
 The split is deliberate. `engine/` (units, scaling, diff, metrics, interpolation, retrieval)
@@ -168,7 +181,8 @@ provenance is conveyed by colour alone; the `Tick` component used everywhere els
 
 ### Units that refuse
 
-The unit engine does dimensional analysis over 25 unit families and converts freely inside a
+The unit engine — which has no name of its own; Primer used to name it and now names the
+Learn screens — does dimensional analysis over 25 unit families and converts freely inside a
 family. Across families it does not guess — it fails. For the three crossings that actually
 come up in this corpus it fails **with a reason**: %TSP ↔ g/L explains that the conversion
 needs the cell density and the total-protein fraction of the biomass; %TSP ↔ % explains why a
@@ -239,7 +253,7 @@ Recorded here because the app records them rather than papering over them:
 
 - **Papers are catalogued, not ingested.** Metadata and a curator note only; no full text was
   retrieved, so extraction spans anchor to curator prose and the reader says so. `RUN_OUTPUTS`
-  is deliberately empty — no extractor has run against un-ingested papers, so Validation shows
+  is deliberately empty — no extractor has run against un-ingested papers, so Witness shows
   the 66-record gold-set *plan* and 6 difficulty cases rather than fabricated P/R/F1.
 - **49 entries are flagged `[verify]`, and they are thinner than that flag suggests.** Only 7 of
   the 49 hold title, a named journal, a real year and a DOI together. 28 carry no `doi`, `pmcid`
@@ -262,4 +276,5 @@ Recorded here because the app records them rather than papering over them:
 
 - `docs/OF-COR-001.md` — the corpus: 15 threads, the ontology, the gold-set plan, scenarios.
 - `BUILD-SPEC.md` — the build contract: ID registry, seed invariants, content and style rules.
+- `COMPONENTS.md` — the eighteen components, seven layers, and what has no name yet.
 - `scripts/check-seed.ts` — enforces those invariants; run before any bundle.

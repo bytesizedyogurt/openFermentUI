@@ -2,16 +2,7 @@
 // with the persistent demo banner, jobs tray, palette, and global shortcuts.
 import { useEffect, useRef, useState } from 'react';
 import {
-  Home as HomeIcon,
-  MessagesSquare,
-  Library as LibraryIcon,
-  Table2,
   FlaskConical,
-  Boxes,
-  ClipboardList,
-  GitBranch,
-  LineChart,
-  GraduationCap,
   Settings as SettingsIcon,
   HelpCircle,
   Search,
@@ -31,15 +22,16 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
 import { SHORTCUTS } from '@/data/shortcuts';
+import { RAIL, redirectFor } from '@/data/nav';
 
 import Home from '@/screens/Home';
-import Ask from '@/screens/Ask';
-import Library from '@/screens/Library';
+import Postdoc from '@/screens/Postdoc';
+import BioRepo from '@/screens/BioRepo';
 import PaperReader from '@/screens/PaperReader';
-import Ingest from '@/screens/Ingest';
-import Extract from '@/screens/Extract';
-import Review from '@/screens/Review';
-import Validation from '@/screens/Validation';
+import IntakeIngest from '@/screens/IntakeIngest';
+import Intake from '@/screens/Intake';
+import Guild from '@/screens/Guild';
+import Witness from '@/screens/Witness';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
 import Molecules from '@/screens/Molecules';
@@ -49,28 +41,15 @@ import RunbookDetail from '@/screens/RunbookDetail';
 import Protocols from '@/screens/Protocols';
 import ProtocolDetail from '@/screens/ProtocolDetail';
 import ProtocolEditor from '@/screens/ProtocolEditor';
-import RunMode from '@/screens/RunMode';
+import Deposition from '@/screens/Deposition';
 import DepositionDetail from '@/screens/DepositionDetail';
-import Simulate from '@/screens/Simulate';
-import ScenarioWorkspace from '@/screens/ScenarioWorkspace';
+import Proforma from '@/screens/Proforma';
+import ProformaScenario from '@/screens/ProformaScenario';
 import Compare from '@/screens/Compare';
-import Learn from '@/screens/Learn';
-import Lesson from '@/screens/Lesson';
+import Primer from '@/screens/Primer';
+import PrimerLesson from '@/screens/PrimerLesson';
 import Settings from '@/screens/Settings';
 import Architecture from '@/screens/Architecture';
-
-const RAIL = [
-  { to: '/', label: 'Home', icon: HomeIcon, key: 'h' },
-  { to: '/ask', label: 'Ask', icon: MessagesSquare, key: 'a' },
-  { to: '/library', label: 'Library', icon: LibraryIcon, key: 'l' },
-  { to: '/extract', label: 'Extract', icon: Table2, key: 'e' },
-  { to: '/organisms', label: 'Organisms', icon: FlaskConical, key: 'o' },
-  { to: '/molecules', label: 'Molecules', icon: Boxes, key: 'm' },
-  { to: '/protocols', label: 'Protocols', icon: ClipboardList, key: 'p' },
-  { to: '/runbooks', label: 'Runbooks', icon: GitBranch, key: 'r' },
-  { to: '/simulate', label: 'Simulate', icon: LineChart, key: 's' },
-  { to: '/learn', label: 'Learn', icon: GraduationCap, key: 'n' },
-];
 
 function isActive(path: string, to: string) {
   if (to === '/') return path === '/';
@@ -83,24 +62,44 @@ function Screen() {
   const route = useRoute();
   const [a, b, c, d] = route.segments;
 
+  // §8 — an old path lands on the new screen rather than the not-found page.
+  // Replace rather than push, so Back does not bounce the reader between the
+  // dead path and the live one.
+  const redirect = redirectFor(route.path);
+  useEffect(() => {
+    if (!redirect) return;
+    const query = route.hash.split('?')[1];
+    navigate(query ? `${redirect}?${query}` : redirect, { replace: true });
+  }, [redirect, route.hash]);
+  if (redirect) {
+    return (
+      <div className="p-8 text-ink-soft text-body">
+        <span className="font-num">{route.path}</span> moved to{' '}
+        <span className="font-num text-ink">{redirect}</span> — taking you there.
+      </div>
+    );
+  }
+
   if (!a) return <Home />;
   switch (a) {
-    case 'ask':
-      return <Ask sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
-    case 'library':
-      if (b === 'ingest') return <Ingest />;
+    case 'postdoc':
+      return <Postdoc sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
+    case 'biorepo':
+      if (b === 'ingest') return <IntakeIngest />;
       if (b === 'papers' && c) return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
-      return <Library />;
-    case 'extract':
-      if (b === 'review') return <Review />;
-      if (b === 'validation') return <Validation />;
-      return <Extract />;
+      return <BioRepo />;
+    case 'intake':
+      return <Intake />;
+    case 'guild':
+      return <Guild />;
+    case 'witness':
+      return <Witness />;
     case 'organisms':
       return b ? <StrainPage strainId={b} /> : <Organisms />;
     case 'molecules':
       return b ? <MoleculeDetail productId={b} /> : <Molecules />;
     case 'protocols':
-      if (b && c === 'run' && d) return <RunMode protocolId={b} runId={d} />;
+      if (b && c === 'run' && d) return <Deposition protocolId={b} runId={d} />;
       if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
       return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
     case 'runbooks':
@@ -110,11 +109,11 @@ function Screen() {
       // run that wrote it — it earns no rail slot of its own (§5 caps the rail
       // at ten, and this is a record, not a destination).
       return b ? <DepositionDetail depositionId={b} /> : <Runbooks />;
-    case 'simulate':
+    case 'proforma':
       if (b === 'compare') return <Compare />;
-      return b ? <ScenarioWorkspace scenarioId={b} /> : <Simulate />;
-    case 'learn':
-      return b && c ? <Lesson moduleId={b} lessonId={c} /> : <Learn />;
+      return b ? <ProformaScenario scenarioId={b} /> : <Proforma />;
+    case 'primer':
+      return b && c ? <PrimerLesson moduleId={b} lessonId={c} /> : <Primer />;
     case 'settings':
       // Architecture is its own screen rather than a Settings pane: it is a
       // reference map, not a preference, and it needs the full width.
@@ -229,7 +228,7 @@ export default function App() {
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
-  const inRunMode = route.segments[0] === 'protocols' && route.segments[2] === 'run';
+  const inDeposition = route.segments[0] === 'protocols' && route.segments[2] === 'run';
 
   // Restore the Durable tier before anything reads it (OF-BLD-006 §4.6).
   // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
@@ -287,6 +286,19 @@ export default function App() {
       }
       if (typing) return;
 
+      // The chord is resolved BEFORE 'g' re-arms it, because Organisms' own
+      // key is 'g': `g g` has to reach Organisms rather than pressing the
+      // leader twice and going nowhere.
+      if (gPressed) {
+        const item = RAIL.find((r) => r.key === e.key.toLowerCase());
+        if (item) {
+          e.preventDefault();
+          navigate(item.to);
+        }
+        setGPressed(false);
+        return;
+      }
+
       if (e.key === '/') {
         e.preventDefault();
         setUI({ paletteOpen: true });
@@ -296,13 +308,6 @@ export default function App() {
       } else if (e.key === 'g') {
         setGPressed(true);
         window.setTimeout(() => setGPressed(false), 1200);
-      } else if (gPressed) {
-        const item = RAIL.find((r) => r.key === e.key.toLowerCase());
-        if (item) {
-          e.preventDefault();
-          navigate(item.to);
-        }
-        setGPressed(false);
       } else if (e.key === 'D' && e.shiftKey) {
         setUI({ density: ui.density === 'dense' ? 'comfortable' : 'dense' });
       } else if (e.key === 'T' && e.shiftKey) {
@@ -315,8 +320,9 @@ export default function App() {
 
   const runningJobs = jobs.filter((j) => j.status === 'running').length + (activeRunId ? 1 : 0);
 
-  // Run Mode is a full-screen takeover (§8.12).
-  if (inRunMode) {
+  // Deposition is a full-screen takeover (§8.12) — a tablet at the bench has
+  // no room for a rail, and nothing on it should compete with the step.
+  if (inDeposition) {
     return (
       <>
         <Screen />
@@ -365,17 +371,36 @@ export default function App() {
                   key={item.to}
                   href={`#${item.to}`}
                   className={cx(
-                    'flex items-center gap-2.5 rounded-btn px-2 py-1.5 text-body transition-colors',
+                    'flex items-start gap-2.5 rounded-btn px-2 py-1.5 text-body transition-colors',
                     active
                       ? 'bg-accent-wash text-accent font-medium'
                       : 'text-ink-soft hover:text-ink hover:bg-ink-soft/[0.06]',
-                    ui.railCollapsed && 'justify-center px-0',
+                    ui.railCollapsed && 'items-center justify-center px-0',
                   )}
-                  title={ui.railCollapsed ? item.label : undefined}
+                  title={`${item.label} — ${item.descriptor}`}
+                  aria-label={`${item.label}: ${item.descriptor}`}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon size={ui.railCollapsed ? 18 : 16} className="shrink-0" />
-                  {!ui.railCollapsed && <span className="truncate">{item.label}</span>}
+                  <Icon
+                    size={ui.railCollapsed ? 18 : 16}
+                    className={cx('shrink-0', !ui.railCollapsed && 'mt-[3px]')}
+                  />
+                  {!ui.railCollapsed && (
+                    <span className="min-w-0">
+                      <span className="block truncate leading-tight">{item.label}</span>
+                      {/* §7 — the gloss. Eight invented words with no
+                          explanation is friction the names have not earned
+                          yet, and this is the cheapest possible fix. */}
+                      <span
+                        className={cx(
+                          'block truncate text-caption leading-tight',
+                          active ? 'text-accent/70' : 'text-ink-soft/70',
+                        )}
+                      >
+                        {item.descriptor}
+                      </span>
+                    </span>
+                  )}
                 </a>
               );
             })}

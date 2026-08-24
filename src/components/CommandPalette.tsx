@@ -1,18 +1,19 @@
 // ⌘K palette (OF-DES-001 §7.2) — the demo driver's steering wheel. Three
 // groups: Navigate, Actions, Ask. Every golden-path step is reachable here.
+//
+// It is also the escape hatch for the renamed vocabulary (§6). Every surface
+// carries the words it used to be called, so someone who reaches for "library"
+// or "run mode" lands on the right screen and learns the new name from the
+// result rather than from a dead search.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Home,
-  MessagesSquare,
   Library,
-  Table2,
   FlaskConical,
   Boxes,
   ClipboardList,
   GitBranch,
   LineChart,
-  GraduationCap,
   Settings as SettingsIcon,
   Search,
   Sparkles,
@@ -23,6 +24,7 @@ import { useStore } from '@/store';
 import { navigate } from '@/router';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
+import { OFF_RAIL, RAIL } from '@/data/nav';
 import { cx } from './ui';
 
 interface Item {
@@ -30,8 +32,27 @@ interface Item {
   group: 'Navigate' | 'Actions' | 'Ask';
   label: string;
   hint?: string;
+  /**
+   * Words that should find this item without appearing on it (§6). The old
+   * names live here: someone who has typed "library" for months should not
+   * have to learn that it is called BioRepo before they can go there.
+   */
+  aliases?: string[];
   icon?: LucideIcon;
   run: () => void;
+}
+
+/**
+ * Best score across a label and its aliases.
+ *
+ * An alias is discounted so that a real label match always outranks it: typing
+ * "review" should reach Guild, but if a record were ever literally titled
+ * "review" that record would come first, which is right.
+ */
+function scoreItem(query: string, it: Item): number {
+  const direct = score(query, it.label) + (it.hint ? score(query, it.hint) * 0.3 : 0);
+  const viaAlias = Math.max(0, ...(it.aliases ?? []).map((a) => score(query, a) * 0.9));
+  return Math.max(direct, viaAlias);
 }
 
 function score(query: string, label: string): number {
@@ -70,23 +91,31 @@ export function CommandPalette() {
   };
 
   const items = useMemo<Item[]>(() => {
+    // Built from the vocabulary module rather than restated here, so a name
+    // can only be changed in one place (§2.2 as revised).
     const nav: Item[] = [
-      { id: 'n-home', group: 'Navigate', label: 'Home', icon: Home, run: () => navigate('/') },
-      { id: 'n-ask', group: 'Navigate', label: 'Ask the agent', icon: MessagesSquare, run: () => navigate('/ask') },
-      { id: 'n-lib', group: 'Navigate', label: 'Library', icon: Library, run: () => navigate('/library') },
-      { id: 'n-ing', group: 'Navigate', label: 'Ingest papers', icon: Library, run: () => navigate('/library/ingest') },
-      { id: 'n-ext', group: 'Navigate', label: 'Extract — records', icon: Table2, run: () => navigate('/extract') },
-      { id: 'n-rev', group: 'Navigate', label: 'Extract — review queue', icon: Table2, run: () => navigate('/extract/review') },
-      { id: 'n-val', group: 'Navigate', label: 'Validation dashboard', icon: Table2, run: () => navigate('/extract/validation') },
-      { id: 'n-org', group: 'Navigate', label: 'Organisms', icon: FlaskConical, run: () => navigate('/organisms') },
-      { id: 'n-mol', group: 'Navigate', label: 'Molecules', icon: Boxes, run: () => navigate('/molecules') },
-      { id: 'n-pro', group: 'Navigate', label: 'Protocols', icon: ClipboardList, run: () => navigate('/protocols') },
-      { id: 'n-run', group: 'Navigate', label: 'Runbooks', icon: GitBranch, run: () => navigate('/runbooks') },
-      { id: 'n-sim', group: 'Navigate', label: 'Simulate', icon: LineChart, run: () => navigate('/simulate') },
-      { id: 'n-cmp', group: 'Navigate', label: 'Compare scenarios', icon: LineChart, run: () => navigate('/simulate/compare') },
-      { id: 'n-lrn', group: 'Navigate', label: 'Learn', icon: GraduationCap, run: () => navigate('/learn') },
+      ...RAIL.map((r) => ({
+        id: `n-${r.label.toLowerCase()}`,
+        group: 'Navigate' as const,
+        label: r.label,
+        hint: r.descriptor,
+        aliases: r.aliases,
+        icon: r.icon,
+        run: () => navigate(r.to),
+      })),
+      ...OFF_RAIL.filter((r) => r.to !== '/depositions').map((r) => ({
+        id: `n-${r.label.toLowerCase()}`,
+        group: 'Navigate' as const,
+        label: r.label,
+        hint: r.descriptor,
+        aliases: r.aliases,
+        icon: r.icon,
+        run: () => navigate(r.to),
+      })),
+      { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest board', hint: 'what is queued, fetched, failed', aliases: ['ingest', 'library ingest', 'fetch'], icon: Library, run: () => navigate('/biorepo/ingest') },
+      { id: 'n-cmp', group: 'Navigate', label: 'Proforma — compare scenarios', aliases: ['compare', 'simulate compare'], icon: LineChart, run: () => navigate('/proforma/compare') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
-      { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', icon: Boxes, run: () => navigate('/settings/architecture') },
+      { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', hint: 'what every name means', aliases: ['components', 'names', 'glossary', 'vocabulary', 'map'], icon: Boxes, run: () => navigate('/settings/architecture') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
     ];
     for (const p of papers) {
@@ -96,7 +125,7 @@ export function CommandPalette() {
         label: `${p.id} — ${p.title}`,
         hint: `${p.year} · paper`,
         icon: Library,
-        run: () => navigate(`/library/papers/${p.id}`),
+        run: () => navigate(`/biorepo/papers/${p.id}`),
       });
     }
     for (const s of strains) {
@@ -146,7 +175,7 @@ export function CommandPalette() {
         label: s.name,
         hint: `${s.modelId} · scenario`,
         icon: LineChart,
-        run: () => navigate(`/simulate/${s.id}`),
+        run: () => navigate(`/proforma/${s.id}`),
       });
     }
 
@@ -154,15 +183,15 @@ export function CommandPalette() {
       {
         id: 'a-review',
         group: 'Actions',
-        label: 'Start review session',
+        label: 'Open Guild — start a review session',
         hint: `${records.filter((r) => r.status === 'unverified').length} unverified`,
-        run: () => navigate('/extract/review'),
+        run: () => navigate('/guild'),
       },
       {
         id: 'a-newsc',
         group: 'Actions',
-        label: 'New scenario from cw15 defaults',
-        run: () => navigate('/simulate/sc-s1'),
+        label: 'New Proforma scenario from cw15 defaults',
+        run: () => navigate('/proforma/sc-s1'),
       },
       {
         id: 'a-tour',
@@ -225,7 +254,7 @@ export function CommandPalette() {
 
   const results = useMemo(() => {
     const scored = items
-      .map((it) => ({ it, s: score(query, it.label) + (it.hint ? score(query, it.hint) * 0.3 : 0) }))
+      .map((it) => ({ it, s: scoreItem(query, it) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 30)
@@ -238,7 +267,7 @@ export function CommandPalette() {
         group: 'Ask',
         label: `Ask the agent: “${query.trim()}”`,
         icon: Sparkles,
-        run: () => navigate(`/ask?q=${encodeURIComponent(query.trim())}`),
+        run: () => navigate(`/postdoc?q=${encodeURIComponent(query.trim())}`),
       });
     }
     return scored;

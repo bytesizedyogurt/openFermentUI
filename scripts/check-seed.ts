@@ -14,7 +14,8 @@ import { STRAINS } from '../src/data/strains';
 import { PRODUCTS } from '../src/data/products';
 import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
-import { COMPONENTS, FULL_NAME, LAYERS, isBuilt } from '../src/data/components';
+import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
+import { ALL_SURFACES, OFF_RAIL, RAIL, REDIRECTS, redirectFor } from '../src/data/nav';
 import { readFileSync, existsSync } from 'node:fs';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
@@ -423,10 +424,18 @@ for (const r of RUNBOOKS) {
     fail(`${doc} is missing — it is the canonical map §2.3 requires`);
   } else {
     const md = readFileSync(doc, 'utf8');
-    const rows = md
-      .split('\n')
-      .filter((l) => /^\| [A-Za-z]/.test(l) && !l.startsWith('| Component'))
-      .map((l) => l.split('|').map((c) => c.trim()).filter(Boolean));
+    // Scoped to the map section: the doc carries a second table ("Named
+    // nothing yet") whose rows must not be counted as components.
+    const section = (heading: string) =>
+      md.split(`\n## ${heading}\n`)[1]?.split('\n## ')[0] ?? '';
+    const tableRows = (heading: string) =>
+      section(heading)
+        .split('\n')
+        .filter((l) => l.startsWith('| ') && !/^\|\s*-+/.test(l))
+        .slice(1)
+        .map((l) => l.split('|').map((c) => c.trim()).filter(Boolean));
+
+    const rows = tableRows('The map');
 
     if (rows.length !== COMPONENTS.length)
       fail(`${doc}: ${rows.length} component rows, but components.ts defines ${COMPONENTS.length}`);
@@ -457,6 +466,31 @@ for (const r of RUNBOOKS) {
     // The prose count is checked as well as the table. A doc that says "six"
     // over a table of seven is the kind of error a reader trusts and a
     // reviewer skims past.
+    // §3 — the unnamed table. The unit engine lost its name when Primer moved
+    // to the Learn screens, and it is on the map as unnamed rather than
+    // quietly dropped; a component that vanishes from the map still exists in
+    // the code, which is exactly the drift this doc is supposed to prevent.
+    const unnamedRows = tableRows('Named nothing yet');
+    if (unnamedRows.length !== UNNAMED.length)
+      fail(`${doc}: ${unnamedRows.length} unnamed rows, but components.ts declares ${UNNAMED.length}`);
+    for (const u of UNNAMED) {
+      const row = unnamedRows.find((r) => r[0].replace(/_/g, '') === u.what);
+      if (!row) {
+        fail(`${doc}: no unnamed row for "${u.what}"`);
+        continue;
+      }
+      if (row[1] !== u.layer)
+        fail(`${doc}: "${u.what}" is layer "${row[1]}" in the doc, "${u.layer}" in components.ts`);
+      const docPaths = row[2].split(',').map((x) => x.replace(/`/g, '').trim());
+      if (docPaths.join(' | ') !== u.livesIn.join(' | '))
+        fail(`${doc}: "${u.what}" paths disagree — doc ${docPaths.join(', ')}, code ${u.livesIn.join(', ')}`);
+    }
+    for (const c of COMPONENTS)
+      for (const u of UNNAMED)
+        for (const path of u.livesIn)
+          if (c.livesIn.includes(path))
+            fail(`${path} is claimed by both "${c.name}" and the unnamed "${u.what}"`);
+
     const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
     const notBuilt = COMPONENTS.filter((c) => !isBuilt(c)).length;
     const claimed = md.match(/\*\*"not built" is a real entry\.\*\*\s+(\w+) of the eighteen/i)?.[1];
@@ -667,6 +701,92 @@ for (const f of CLEARANCE_FINDINGS) {
   const css = readFileSync('src/styles.css', 'utf8');
   if (!css.includes('.tick-measured::before'))
     fail('provenance measured: no .tick-measured rule in styles.css');
+}
+
+// ── 6e. the navigation vocabulary (OF-BLD-006 §1, §2.2 reversed) ───────
+//
+// The rename put the component names on screen. Three things can break it
+// silently, and all three are checked here rather than found by a user:
+// a rail item pointing at a route the dispatcher does not handle, two items
+// claiming the same chord key, and a redirect that lands somewhere as dead as
+// the path it replaced.
+{
+  const app = readFileSync('src/App.tsx', 'utf8');
+  const handled = new Set(
+    [...app.matchAll(/case '([a-z]+)':/g)].map((m) => m[1]),
+  );
+
+  const seenKey = new Map<string, string>();
+  for (const item of RAIL) {
+    const first = item.to.split('/').filter(Boolean)[0];
+    if (first && !handled.has(first))
+      fail(`nav: rail item "${item.label}" points at ${item.to}, which App.tsx does not dispatch`);
+    const clash = seenKey.get(item.key);
+    if (clash) fail(`nav: "${item.label}" and "${clash}" both claim the chord key '${item.key}'`);
+    seenKey.set(item.key, item.label);
+    if (!item.descriptor) fail(`nav: "${item.label}" has no descriptor — §7 requires one per rail item`);
+  }
+  if (RAIL.length > 10) fail(`nav: ${RAIL.length} rail items, and the rail is capped at ten`);
+
+  for (const item of OFF_RAIL) {
+    const first = item.to.split('/').filter(Boolean)[0];
+    if (first && !handled.has(first))
+      fail(`nav: "${item.label}" points at ${item.to}, which App.tsx does not dispatch`);
+  }
+
+  // §6 — the old words must still resolve. This is the list the spec names,
+  // and it is checked by resolution rather than by reading the alias arrays,
+  // so a word that is present but attached to the wrong surface still fails.
+  const REQUIRED_ALIASES: [string, string][] = [
+    ['ask', 'Postdoc'],
+    ['library', 'BioRepo'],
+    ['extract', 'Intake'],
+    ['simulate', 'Proforma'],
+    ['learn', 'Primer'],
+    ['review', 'Guild'],
+    ['validation', 'Witness'],
+    ['run mode', 'Deposition'],
+  ];
+  for (const [word, label] of REQUIRED_ALIASES) {
+    const hits = ALL_SURFACES.filter((sf) => sf.aliases.includes(word));
+    if (hits.length === 0) fail(`nav: "${word}" resolves to nothing — §6 requires it to reach ${label}`);
+    else if (!hits.some((h) => h.label === label))
+      fail(`nav: "${word}" resolves to ${hits.map((h) => h.label).join(', ')}, not ${label}`);
+    else if (hits.length > 1)
+      fail(`nav: "${word}" is claimed by ${hits.map((h) => h.label).join(' and ')} — an alias must be unambiguous`);
+  }
+
+  // §8 — every redirect target is a path the dispatcher actually serves, and
+  // no redirect target is itself redirected (which would bounce the reader).
+  for (const [from, to] of Object.entries(REDIRECTS)) {
+    const first = to.split('/').filter(Boolean)[0];
+    if (first && !handled.has(first))
+      fail(`nav: ${from} redirects to ${to}, which App.tsx does not dispatch`);
+    if (redirectFor(to)) fail(`nav: ${from} redirects to ${to}, which is itself redirected`);
+    if (!redirectFor(from)) fail(`nav: ${from} is in REDIRECTS but redirectFor() does not resolve it`);
+  }
+  // The tail has to survive, or a deep link lands on an index page and the
+  // reader has to find their paper again.
+  if (redirectFor('/library/papers/H4') !== '/biorepo/papers/H4')
+    fail('nav: a deep link loses its tail — /library/papers/H4 must reach /biorepo/papers/H4');
+  // The two paths that moved to a different screen, not just a renamed one.
+  if (redirectFor('/extract/review') !== '/guild')
+    fail('nav: /extract/review must reach /guild, not a sub-path of Intake');
+  if (redirectFor('/extract/validation') !== '/witness')
+    fail('nav: /extract/validation must reach /witness, not a sub-path of Intake');
+  if (redirectFor('/postdoc') !== null) fail('nav: a current path must not redirect');
+
+  // The screen files carry the names now (§4), so a rename that misses the
+  // map leaves the map pointing at a file that is no longer there. Entries
+  // that name a symbol rather than a path ("aggregateExclusion() in ...") are
+  // prose and are skipped.
+  const isPath = (x: string) => !x.includes(' ') && !x.includes('(');
+  for (const c of COMPONENTS)
+    for (const path of c.livesIn.filter(isPath))
+      if (!existsSync(path)) fail(`components: "${c.name}" claims ${path}, which does not exist`);
+  for (const u of UNNAMED)
+    for (const path of u.livesIn.filter(isPath))
+      if (!existsSync(path)) fail(`components: the unnamed "${u.what}" claims ${path}, which does not exist`);
 }
 
 // ── report ─────────────────────────────────────────────────────────────

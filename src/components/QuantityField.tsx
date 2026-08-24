@@ -111,7 +111,7 @@ export function QuantityField({
                 {explainRefusal(parsed.unit, def.canonicalUnit)}
               </div>
             )}
-            <ComponentTag component="Primer" action="conversion refused" />
+            <ComponentTag unnamed="the unit engine" action="conversion refused" />
           </div>
         )}
         {showTwin && (

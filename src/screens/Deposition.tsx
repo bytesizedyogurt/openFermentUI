@@ -1,10 +1,19 @@
-// Run Mode (OF-DES-001 §8.12). Bench execution: one step at a time,
-// glove-tolerant, timed, and logged. Full-screen takeover — App renders this
-// without the shell.
+// Deposition (OF-DES-001 §8.12, named per OF-BLD-006 §2). Bench execution:
+// one step at a time, glove-tolerant, timed, and logged. Full-screen takeover
+// — App renders this without the shell.
 //
-// Explicit responsive target: 810px tablet portrait at arm's length. Touch
-// targets ≥ 44px, step text on `ink` (not ink-soft) for ≥ 7:1 contrast, and no
-// hover-dependent affordances anywhere on this screen.
+// This screen was called Run Mode. The name changed; NONE OF THE CONSTRAINTS
+// DID, and they are load-bearing rather than incidental:
+//
+//   - 810px tablet portrait at arm's length is the explicit responsive target;
+//   - touch targets ≥ 44px, because the hand operating this is gloved;
+//   - step text on `ink`, never `ink-soft`, for ≥ 7:1 contrast;
+//   - no hover-dependent affordance anywhere — a tablet has no hover state to
+//     give, so anything that only appears on hover does not exist here;
+//   - full-screen takeover, because nothing should compete with the step.
+//
+// A Deposition is the inbound account of what actually happened, against a
+// Runbook's outbound claim. Extend this screen; do not rewrite it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -87,7 +96,7 @@ function TimerRing({ remaining, total }: { remaining: number; total: number }) {
   );
 }
 
-export default function RunMode({ protocolId, runId }: { protocolId: string; runId: string }) {
+export default function Deposition({ protocolId, runId }: { protocolId: string; runId: string }) {
   const run = useStore((s) => s.runs[runId]);
   const protocol = useStore((s) => s.protocols.find((p) => p.id === protocolId));
   const setRunStep = useStore((s) => s.setRunStep);

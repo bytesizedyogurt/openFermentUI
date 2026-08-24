@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 
 export interface Route {
-  path: string; // "/library/papers/SP-004"
+  path: string; // "/biorepo/papers/SP-004"
   segments: string[];
   query: URLSearchParams;
   hash: string; // full raw hash

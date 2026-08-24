@@ -1,6 +1,10 @@
 // Guided tour / demo autopilot (OF-DES-001 §8.1, §19 fallback narrator).
 // Six stops that walk the golden path; doubles as the contingency if a live
 // demo goes sideways.
+//
+// It is also the first place a new reader meets the vocabulary, so every stop
+// names the surface it is standing on. Six stops is six names learned in
+// context — which is the only way a coined word ever sticks.
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, ArrowLeft, X } from 'lucide-react';
@@ -9,6 +13,8 @@ import { navigate } from '@/router';
 
 interface Stop {
   route: string;
+  /** The surface this stop is standing on, named. */
+  surface: string;
   title: string;
   body: string;
 }
@@ -16,33 +22,39 @@ interface Stop {
 const STOPS: Stop[] = [
   {
     route: '/',
+    surface: 'Home',
     title: 'Corpus vitals',
     body: 'Home answers three questions in five seconds: what is in the corpus, what needs your attention, and where you left off. Every tile is ticked by the provenance of the data behind it, and clicks through to its home screen.',
   },
   {
-    route: '/ask',
+    route: '/postdoc',
+    surface: 'Postdoc',
     title: 'Ask, with the work shown',
-    body: 'The agent’s plan, tool calls, and retrieved passages are first-class UI — collapsed by default, never hidden. Every number in an answer carries a citation chip that resolves to a source span in two interactions.',
+    body: 'Postdoc is the thing you talk to. Its plan, tool calls, and retrieved passages are first-class UI — collapsed by default, never hidden. Every number in an answer carries a citation chip that resolves to a source span in two interactions.',
   },
   {
-    route: '/library/papers/SP-002',
+    route: '/biorepo/papers/SP-002',
+    surface: 'BioRepo',
     title: 'Evidence in context',
-    body: 'A chip’s promise is kept here: the span is highlighted in the source, and the right rail lists every extraction anchored to this paper. Hovering either side previews the other; clicking commits the scroll.',
+    body: 'BioRepo is the corpus and everything retrieved from it. A chip’s promise is kept here: the span is highlighted in the source, and the right rail lists every extraction anchored to this paper. Hovering either side previews the other; clicking commits the scroll.',
   },
   {
-    route: '/extract/review',
+    route: '/guild',
+    surface: 'Guild',
     title: 'Human-in-the-loop',
-    body: 'Reviewers triage by keyboard: a accept, r reject, e edit, g flag for gold, u undo. Every decision lands in the record’s audit trail immediately — and propagates to the strain pages and the validation metrics.',
+    body: 'The Guild of Applied Life is who may verify. Reviewers triage by keyboard: a accept, r reject, e edit, g flag for gold, u undo. Every decision lands in the record’s audit trail immediately — and propagates to the strain pages and to Witness.',
   },
   {
     route: '/protocols/PR-TAP-01',
+    surface: 'Protocols',
     title: 'Verified numbers become procedures',
-    body: 'Scaling is real arithmetic: change the batch size and every bound quantity, stock volume, and materials row recomputes, rounded to each material’s precision so the recipe stays pipettable. Run Mode then executes it at the bench.',
+    body: 'Scaling is real arithmetic: change the batch size and every bound quantity, stock volume, and materials row recomputes, rounded to each material’s precision so the recipe stays pipettable. Deposition then executes it at the bench.',
   },
   {
-    route: '/extract/validation',
+    route: '/witness',
+    surface: 'Witness',
     title: 'How we know, and how we’re honest when we’re wrong',
-    body: 'No extractor has been run against this corpus, so this screen shows no precision, recall or F1 — it shows the gold-set plan those numbers would be earned against, the six cases chosen to be hard, and the real values the ontology has no field for. Refusing to display a metric it has not earned is the point of the screen.',
+    body: 'Witness asks whether it reproduces. No extractor has been run against this corpus, so this screen shows no precision, recall or F1 — it shows the gold-set plan those numbers would be earned against, the six cases chosen to be hard, and the real values the ontology has no field for. Refusing to display a metric it has not earned is the point of the screen.',
   },
 ];
 
@@ -76,6 +88,8 @@ export function GuidedTour() {
         <div className="flex items-start justify-between gap-3 mb-1">
           <div className="text-caption uppercase tracking-wide text-ink-soft">
             Guided tour · stop {stop + 1} of {STOPS.length}
+            <span className="text-ink-soft/60"> · </span>
+            <span className="font-num normal-case tracking-normal text-ink">{s.surface}</span>
           </div>
           <button
             className="text-ink-soft hover:text-ink"

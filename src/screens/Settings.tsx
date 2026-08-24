@@ -328,7 +328,7 @@ function AppearanceSection() {
         />
         <p className="text-caption text-ink-soft mt-2 max-w-3xl">
           This scales <span className="font-medium text-ink">simulated latency only</span> — ingest
-          stages, extraction and solver jobs, and Run Mode timers. It changes nothing about the
+          stages, extraction and solver jobs, and Deposition timers. It changes nothing about the
           numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so a
           demo audience is never misled about how fast the real thing would be.
         </p>
@@ -731,7 +731,7 @@ function CorpusSection() {
                 ))}
               </ul>
               <div className="mt-3">
-                <LinkButton to="/extract/validation" size="sm">
+                <LinkButton to="/witness" size="sm">
                   <Beaker size={13} /> See the validation plan
                 </LinkButton>
               </div>
@@ -990,7 +990,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
       'Real arithmetic with per-material rounding precision and stock-solution volumes, so a scaled recipe stays pipettable.',
   },
   {
-    feature: 'Run Mode timers and summary',
+    feature: 'Deposition timers and summary',
     fidelity: 'Full',
     notes: 'Timers, checks, deviations and the end-of-run summary all run in the browser.',
   },

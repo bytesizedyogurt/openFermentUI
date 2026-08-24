@@ -7,7 +7,7 @@ import { fmt } from '@/engine/units';
 import { PageHeader, Card, Button, LinkButton, cx, EmptyState } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
 
-export default function Simulate() {
+export default function Proforma() {
   const scenarios = useStore((s) => s.scenarios);
   const grids = useStore((s) => s.grids);
   const duplicateScenario = useStore((s) => s.duplicateScenario);
@@ -18,11 +18,12 @@ export default function Simulate() {
   return (
     <div>
       <PageHeader
-        title="Simulate"
+        eyebrow="Cost and scale"
+        title="Proforma"
         subtitle="Turn verified parameters into economics. Each scenario is a sweep over a techno-economic model; every assumption carries its provenance."
         actions={
           <>
-            <LinkButton to="/simulate/compare">
+            <LinkButton to="/proforma/compare">
               <GitCompare size={14} /> Compare
               {pinnedCount > 0 && (
                 <span className="font-num text-caption ml-1">({pinnedCount} pinned)</span>
@@ -32,7 +33,7 @@ export default function Simulate() {
               variant="primary"
               onClick={() => {
                 const id = duplicateScenario(scenarios[0]?.id ?? '');
-                navigate(`/simulate/${id}`);
+                navigate(`/proforma/${id}`);
               }}
               disabled={scenarios.length === 0}
             >
@@ -69,7 +70,7 @@ export default function Simulate() {
                 </div>
 
                 <a
-                  href={`#/simulate/${sc.id}`}
+                  href={`#/proforma/${sc.id}`}
                   className="font-serif text-section-title font-semibold hover:text-accent leading-snug"
                 >
                   {sc.name}
@@ -99,7 +100,7 @@ export default function Simulate() {
                   </div>
                 </div>
 
-                <LinkButton to={`/simulate/${sc.id}`} variant="primary" className="justify-center">
+                <LinkButton to={`/proforma/${sc.id}`} variant="primary" className="justify-center">
                   Open scenario
                 </LinkButton>
               </Card>

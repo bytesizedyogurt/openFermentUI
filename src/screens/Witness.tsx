@@ -206,7 +206,7 @@ function relativeGap(
 
 type SortKey = 'field' | 'nGold' | 'precision' | 'recall' | 'f1' | 'topFailure';
 
-export default function Validation() {
+export default function Witness() {
   const runOutputs = useStore((s) => s.runOutputs);
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
@@ -335,13 +335,13 @@ export default function Validation() {
       text: `Correction note filed on ${label} (${RUN_LABEL[run.run]} · ${
         OUTCOME_LABEL[open.outcome]
       })${body ? ` — ${body.slice(0, 90)}` : ''}`,
-      href: '#/extract/validation',
+      href: '#/witness',
       provenance: 'user',
     });
     toast({
       text: `Correction note filed on ${label} — it appears in the activity feed for this session only`,
       kind: 'success',
-      href: '#/extract/validation',
+      href: '#/witness',
       hrefLabel: 'Stay',
     });
     setFiled((s) => new Set(s).add(open.key));
@@ -411,8 +411,8 @@ export default function Validation() {
   const header = (actions?: ReactNode) => (
     <PageHeader
       eyebrow="Module 0 · Evidence"
-      title="Extraction validation"
-      subtitle="What the extractor would be scored on, and what it has been scored on so far."
+      title="Witness"
+      subtitle="Witness asks one question — does it reproduce. This is what the extractor would be scored on, and what it has been scored on so far."
       actions={actions}
     />
   );
@@ -436,7 +436,7 @@ export default function Validation() {
     const plannedRecords = GOLD_SET_PLAN.reduce((n, p) => n + p.records, 0);
     return (
       <>
-        {header(<LinkButton to="/library">Open the Library</LinkButton>)}
+        {header(<LinkButton to="/biorepo">Open BioRepo</LinkButton>)}
 
         <div className="max-w-3xl space-y-4">
           <Callout kind="info" title="No extractor has been run against this corpus yet">
@@ -545,7 +545,7 @@ export default function Validation() {
               <li>Run an extractor and score it here.</li>
             </ol>
             <div className="mt-3">
-              <LinkButton to="/library/ingest" variant="primary">
+              <LinkButton to="/biorepo/ingest" variant="primary">
                 Open the ingest pipeline
               </LinkButton>
             </div>
@@ -569,7 +569,7 @@ export default function Validation() {
       <Button onClick={exportMetrics} title="Headline and per-field metrics for every run">
         <Download size={14} /> Export metrics CSV
       </Button>
-      <LinkButton to="/extract/review">
+      <LinkButton to="/guild">
         <ScrollText size={14} /> Review queue
       </LinkButton>
     </>
@@ -1129,7 +1129,7 @@ function ComparisonBody({
         <CitationChip paperId={row.paperId} recordId={row.recordId} />
         {record && (
           <a
-            href={href(`/library/papers/${record.paperId}?span=${record.id}`)}
+            href={href(`/biorepo/papers/${record.paperId}?span=${record.id}`)}
             className="text-caption text-accent hover:underline"
           >
             Open in the reader

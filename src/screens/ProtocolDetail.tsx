@@ -313,7 +313,7 @@ function StepCard({
                 {step.timerSec !== undefined && (
                   <span
                     className="chip text-signal-info border-signal-info/40"
-                    title="Run Mode starts this countdown when the step opens"
+                    title="Deposition starts this countdown when the step opens"
                   >
                     <TimerIcon size={11} aria-hidden />
                     Timer: <span className="font-num">{fmtTimer(step.timerSec)}</span>
@@ -1226,7 +1226,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
               <Play size={14} /> Start run at {batchLabel(version, scale)}
             </Button>
             <p className="text-caption text-ink-soft mt-1.5">
-              Run Mode records step completions, deviations and timers for this session only.
+              Deposition records step completions, deviations and timers for this session only.
             </p>
           </Card>
 

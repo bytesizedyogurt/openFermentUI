@@ -79,7 +79,7 @@ export default function Compare() {
           title="Nothing pinned yet"
           body="Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once."
           icon={<GitCompare size={28} />}
-          action={<Button onClick={() => navigate('/simulate')}>Browse scenarios</Button>}
+          action={<Button onClick={() => navigate('/proforma')}>Browse scenarios</Button>}
         />
       </div>
     );
@@ -134,7 +134,7 @@ export default function Compare() {
               <Pin size={12} className="text-accent" />
             </div>
             <a
-              href={`#/simulate/${e.scenario.id}`}
+              href={`#/proforma/${e.scenario.id}`}
               className="font-serif text-section-title font-semibold hover:text-accent block leading-snug"
             >
               {e.scenario.name}
