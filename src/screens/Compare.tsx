@@ -13,6 +13,8 @@ import { exportCSV } from '@/lib/csv';
 import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, EmptyState, Callout, cx } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { BIOREPO_TABS } from '@/data/tabs';
 
 interface Evaluated {
   scenario: Scenario;
@@ -75,6 +77,7 @@ export default function Compare() {
     return (
       <div>
         <PageHeader title="Compare scenarios" subtitle="Pin scenarios to line them up side by side." />
+        <OwnerTabs tabs={BIOREPO_TABS} />
         <EmptyState
           title="Nothing pinned yet"
           body="Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once."
@@ -102,6 +105,7 @@ export default function Compare() {
         subtitle={`${evaluated.length} pinned scenario${evaluated.length === 1 ? '' : 's'} at their current settings. Every delta is computed from the same interpolated cost lines the workspaces show.`}
         actions={<Button onClick={exportDeltas}>Export deltas CSV</Button>}
       />
+      <OwnerTabs tabs={BIOREPO_TABS} />
 
       {pinned.length > 3 && (
         <div className="mb-4">
@@ -134,7 +138,7 @@ export default function Compare() {
               <Pin size={12} className="text-accent" />
             </div>
             <a
-              href={`#/proforma/${e.scenario.id}`}
+              href={`#/proforma/scenario/${e.scenario.id}`}
               className="font-serif text-section-title font-semibold hover:text-accent block leading-snug"
             >
               {e.scenario.name}

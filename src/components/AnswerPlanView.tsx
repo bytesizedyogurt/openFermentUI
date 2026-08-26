@@ -33,7 +33,7 @@ function RecordValue({ record }: { record: ExtractionRecord }) {
         <ProvenanceBadge p={prov} compact />
         <button
           className="font-num text-caption text-ink-soft hover:text-accent inline-flex items-center gap-1"
-          onClick={() => navigate(`/biorepo/papers/${record.paperId}?span=${record.id}`)}
+          onClick={() => navigate(`/biorepo/paper/${record.paperId}?span=${record.id}`)}
           title="Open the span in the source"
         >
           {record.id} <ExternalLink size={10} aria-hidden />
@@ -90,7 +90,7 @@ function ClaimRow({ claim, index }: { claim: Claim; index: number }) {
               {citedPapers.map((paper) => (
                 <a
                   key={paper.id}
-                  href={`#/biorepo/papers/${paper.id}`}
+                  href={`#/biorepo/paper/${paper.id}`}
                   className="text-caption text-ink-soft hover:text-accent inline-flex items-baseline gap-1"
                   title={paper.title}
                 >

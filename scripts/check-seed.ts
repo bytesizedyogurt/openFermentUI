@@ -15,7 +15,7 @@ import { PRODUCTS } from '../src/data/products';
 import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
-import { ALL_SURFACES, OFF_RAIL, RAIL, REDIRECTS, redirectFor } from '../src/data/nav';
+import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
 import { readFileSync, existsSync } from 'node:fs';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
@@ -435,7 +435,7 @@ for (const r of RUNBOOKS) {
         .slice(1)
         .map((l) => l.split('|').map((c) => c.trim()).filter(Boolean));
 
-    const rows = tableRows('The map');
+    const rows = tableRows('The full component map');
 
     if (rows.length !== COMPONENTS.length)
       fail(`${doc}: ${rows.length} component rows, but components.ts defines ${COMPONENTS.length}`);
@@ -493,7 +493,7 @@ for (const r of RUNBOOKS) {
 
     const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
     const notBuilt = COMPONENTS.filter((c) => !isBuilt(c)).length;
-    const claimed = md.match(/\*\*"not built" is a real entry\.\*\*\s+(\w+) of the eighteen/i)?.[1];
+    const claimed = md.match(/\*\*"not built" is a real entry\.\*\*\s+(\w+) of the components/i)?.[1];
     if (claimed && claimed.toLowerCase() !== WORDS[notBuilt])
       fail(
         `${doc}: prose says "${claimed} of the eighteen" have no code, but ${notBuilt} components are not built`,
@@ -703,13 +703,18 @@ for (const f of CLEARANCE_FINDINGS) {
     fail('provenance measured: no .tick-measured rule in styles.css');
 }
 
-// ── 6e. the navigation vocabulary (OF-BLD-006 §1, §2.2 reversed) ───────
+// ── 6e. the navigation vocabulary (OF-BLD-008 §1, §10) ─────────────────
 //
-// The rename put the component names on screen. Three things can break it
-// silently, and all three are checked here rather than found by a user:
-// a rail item pointing at a route the dispatcher does not handle, two items
-// claiming the same chord key, and a redirect that lands somewhere as dead as
-// the path it replaced.
+// THE LIST IS CLOSED: Home plus eleven destinations, twelve rail entries
+// exactly. That is the one rule of OF-BLD-008 and the only place it can be
+// enforced rather than remembered — a rail that quietly grows to thirteen
+// looks fine in review and is the whole failure.
+//
+// Four other things can break the vocabulary silently, and all four are
+// checked here rather than found by a user: a rail item pointing at a route
+// the dispatcher does not handle, two items claiming the same chord key, a
+// retired word that no longer resolves in search, and a redirect that lands
+// somewhere as dead as the path it replaced.
 {
   const app = readFileSync('src/App.tsx', 'utf8');
   const handled = new Set(
@@ -726,9 +731,24 @@ for (const f of CLEARANCE_FINDINGS) {
     seenKey.set(item.key, item.label);
     if (!item.descriptor) fail(`nav: "${item.label}" has no descriptor — §7 requires one per rail item`);
   }
-  if (RAIL.length > 10) fail(`nav: ${RAIL.length} rail items, and the rail is capped at ten`);
+  // Not <=, not >=. Exactly twelve, because the failure this guards against
+  // is a thirteenth destination appearing rather than the rail getting long.
+  if (RAIL.length !== 12)
+    fail(
+      `nav: ${RAIL.length} rail entries. The list is CLOSED at Home plus eleven — ` +
+        'anything new lives inside one of the eleven, and the question is which ' +
+        'one owns it, never whether to add a twelfth.',
+    );
+  if (ELEVEN.length !== 11) fail(`nav: ${ELEVEN.length} destinations besides Home, expected 11`);
+  const EXPECTED_ORDER = [
+    'Home', 'Intake', 'BioRepo', 'Postdoc', 'geneOS', 'fermOS',
+    'pureOS', 'Proforma', 'Runbooks', 'Dominion', 'Primer', 'Guild',
+  ];
+  const actual = RAIL.map((r) => r.label);
+  if (actual.join(' · ') !== EXPECTED_ORDER.join(' · '))
+    fail(`nav: rail order is\n      ${actual.join(' · ')}\n      expected\n      ${EXPECTED_ORDER.join(' · ')}`);
 
-  for (const item of OFF_RAIL) {
+  for (const item of SUB_VIEWS) {
     const first = item.to.split('/').filter(Boolean)[0];
     if (first && !handled.has(first))
       fail(`nav: "${item.label}" points at ${item.to}, which App.tsx does not dispatch`);
@@ -737,23 +757,56 @@ for (const f of CLEARANCE_FINDINGS) {
   // §6 — the old words must still resolve. This is the list the spec names,
   // and it is checked by resolution rather than by reading the alias arrays,
   // so a word that is present but attached to the wrong surface still fails.
+  // Retired words must still find their thing. Checked by resolution rather
+  // than by reading the alias arrays, so a word that is present but attached
+  // to the wrong surface still fails. Several words legitimately resolve to
+  // two places now — "organisms" reaches both fermOS and its Organisms view —
+  // so the assertion is that the RIGHT one is among them, and that the first
+  // (rail before sub-view) is the destination.
   const REQUIRED_ALIASES: [string, string][] = [
+    // OF-BLD-008: the five that stopped being destinations.
+    ['organisms', 'fermOS'],
+    ['strains', 'fermOS'],
+    ['molecules', 'Dominion'],
+    ['products', 'Dominion'],
+    ['protocols', 'Runbooks'],
+    ['run mode', 'Runbooks'],
+    ['deposition', 'Runbooks'],
+    ['witness', 'BioRepo'],
+    ['validation', 'BioRepo'],
+    // OF-BLD-006 legacy, still typed daily.
     ['ask', 'Postdoc'],
     ['library', 'BioRepo'],
     ['extract', 'Intake'],
     ['simulate', 'Proforma'],
     ['learn', 'Primer'],
     ['review', 'Guild'],
-    ['validation', 'Witness'],
-    ['run mode', 'Deposition'],
   ];
   for (const [word, label] of REQUIRED_ALIASES) {
     const hits = ALL_SURFACES.filter((sf) => sf.aliases.includes(word));
-    if (hits.length === 0) fail(`nav: "${word}" resolves to nothing — §6 requires it to reach ${label}`);
+    if (hits.length === 0) fail(`nav: "${word}" resolves to nothing — it must reach ${label}`);
     else if (!hits.some((h) => h.label === label))
       fail(`nav: "${word}" resolves to ${hits.map((h) => h.label).join(', ')}, not ${label}`);
-    else if (hits.length > 1)
-      fail(`nav: "${word}" is claimed by ${hits.map((h) => h.label).join(' and ')} — an alias must be unambiguous`);
+    else if (hits[0].label !== label)
+      fail(
+        `nav: "${word}" reaches ${label} but ${hits[0].label} is ranked first — ` +
+          'the destination must outrank the view inside it',
+      );
+  }
+
+  // Every sub-view is owned by one of the eleven, and the owner is real.
+  const railLabels = new Set(RAIL.map((r) => r.label));
+  for (const view of SUB_VIEWS) {
+    const owner = RAIL.find((r) => r.label === view.owner);
+    if (!owner) {
+      // Bail before the path check rather than dereferencing an owner that is
+      // not there: a stack trace fails the build too, and tells the reader
+      // considerably less than the sentence above it would have.
+      fail(`nav: "${view.label}" is owned by "${view.owner}", which is not one of the eleven`);
+      continue;
+    }
+    if (!view.to.startsWith(owner.to + '/'))
+      fail(`nav: "${view.label}" lives at ${view.to}, which is not under its owner ${owner.to}`);
   }
 
   // §8 — every redirect target is a path the dispatcher actually serves, and
@@ -767,14 +820,49 @@ for (const f of CLEARANCE_FINDINGS) {
   }
   // The tail has to survive, or a deep link lands on an index page and the
   // reader has to find their paper again.
-  if (redirectFor('/library/papers/H4') !== '/biorepo/papers/H4')
-    fail('nav: a deep link loses its tail — /library/papers/H4 must reach /biorepo/papers/H4');
-  // The two paths that moved to a different screen, not just a renamed one.
-  if (redirectFor('/extract/review') !== '/guild')
-    fail('nav: /extract/review must reach /guild, not a sub-path of Intake');
-  if (redirectFor('/extract/validation') !== '/witness')
-    fail('nav: /extract/validation must reach /witness, not a sub-path of Intake');
-  if (redirectFor('/postdoc') !== null) fail('nav: a current path must not redirect');
+  // Every retired path, resolved to where it must actually land. Written as
+  // pairs rather than as prose because "no 404 from an old link" is only true
+  // if somebody checks each one, and two of these moved twice.
+  const LANDINGS: [string, string | null][] = [
+    ['/organisms', '/fermos/organisms'],
+    ['/organisms/cw15', '/fermos/organisms/cw15'],
+    ['/molecules', '/dominion/molecules'],
+    ['/molecules/taq-dna-polymerase', '/dominion/molecules/taq-dna-polymerase'],
+    ['/protocols', '/runbooks/protocols'],
+    ['/protocols/PR-TAP-01', '/runbooks/protocols/PR-TAP-01'],
+    ['/protocols/PR-TAP-01/edit', '/runbooks/protocols/PR-TAP-01/edit'],
+    ['/witness', '/biorepo/witness'],
+    ['/depositions/dep-1', '/runbooks/depositions/dep-1'],
+    // Moved twice: /library/papers → /biorepo/papers → /biorepo/paper. Longest
+    // prefix wins, so this must not stop at the intermediate form.
+    ['/library/papers/H4', '/biorepo/paper/H4'],
+    ['/biorepo/papers/H4', '/biorepo/paper/H4'],
+    ['/library/ingest', '/intake/ingest'],
+    ['/biorepo/ingest', '/intake/ingest'],
+    ['/extract/review', '/guild'],
+    ['/extract/validation', '/biorepo/witness'],
+    ['/simulate/compare', '/biorepo/compare'],
+    ['/proforma/compare', '/biorepo/compare'],
+    // Tail changes shape, not just prefix.
+    ['/simulate/sc-s1', '/proforma/scenario/sc-s1'],
+    ['/proforma/sc-s1', '/proforma/scenario/sc-s1'],
+    ['/learn/m0/l0-1', '/primer/l0-1'],
+    // Current paths must NOT redirect, or the reader bounces on arrival.
+    ['/postdoc', null],
+    ['/fermos/organisms/cw15', null],
+    ['/dominion/molecules', null],
+    ['/runbooks/protocols/PR-TAP-01', null],
+    ['/biorepo/paper/H4', null],
+    ['/proforma/scenario/sc-s1', null],
+    ['/primer/l0-1', null],
+    ['/geneos', null],
+    ['/pureos', null],
+  ];
+  for (const [from, to] of LANDINGS) {
+    const got = redirectFor(from);
+    if (got !== to)
+      fail(`nav: ${from} lands on ${got ?? '(no redirect)'}, expected ${to ?? '(no redirect)'}`);
+  }
 
   // The screen files carry the names now (§4), so a rename that misses the
   // map leaves the map pointing at a file that is no longer there. Entries

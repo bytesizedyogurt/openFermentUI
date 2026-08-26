@@ -6,11 +6,11 @@
 // not yet built, one piece of code with no name at all, and one layer where
 // the arrow reverses.
 //
-// It is now also the glossary. §2.2 originally kept these names out of the
-// product — "Ask" in the rail, "Postdoc" only in code — and that is reversed:
-// the names ARE the vocabulary, so this page is where a reader who has met
-// four of them in the rail can see all eighteen at once and find out which
-// ones they have not met because there is nothing there yet.
+// It is also the glossary, and since OF-BLD-008 it is the map of the ELEVEN:
+// the rail carries Home plus eleven destinations and nothing else, and every
+// component below is owned by one of them. A reader who has met a few names in
+// the rail sees the whole architecture here, including which parts they have
+// not met because there is nothing there yet.
 import { ArrowDown, CircleDashed, FileCode2, Tag } from 'lucide-react';
 import {
   COMPONENTS,
@@ -43,6 +43,13 @@ function ComponentRow({ c }: { c: ComponentDef }) {
         </span>
         {DESCRIPTOR[c.name] && (
           <span className="text-caption text-ink-soft">{DESCRIPTOR[c.name]}</span>
+        )}
+        {/* OF-BLD-008 — which of the eleven owns this. Shown on machinery
+            rather than on destinations, where it would just repeat the name. */}
+        {c.owner !== c.name && (
+          <span className="text-caption text-ink-soft">
+            inside <span className="text-ink">{c.owner}</span>
+          </span>
         )}
         {c.surfacedAs ? (
           <span className="text-caption text-ink-soft">
@@ -81,7 +88,7 @@ export default function Architecture() {
       <PageHeader
         eyebrow="Settings · Architecture"
         title="Components"
-        subtitle="Eighteen named components in seven layers. This is both the architecture the system is built from and the vocabulary it is used through — the words in the rail are these words."
+        subtitle="Home plus eleven destinations, and the components each one owns. This is both the architecture the system is built from and the vocabulary it is used through — the words in the rail are these words, and the list is closed."
       />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">

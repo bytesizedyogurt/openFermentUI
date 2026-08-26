@@ -66,7 +66,7 @@ function matchesScope(p: Product, key: ScopeKey, value: string): boolean {
 
 // ── screen ─────────────────────────────────────────────────────────────
 
-export default function Molecules() {
+export default function Molecules({ embedded = false }: { embedded?: boolean } = {}) {
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
   const density = useStore((s) => s.ui.density);
@@ -128,7 +128,7 @@ export default function Molecules() {
       render: (p) => (
         <div className="min-w-0">
           <a
-            href={href(`/molecules/${p.id}`)}
+            href={href(`/dominion/molecules/${p.id}`)}
             className="text-accent hover:underline block truncate"
             onClick={(e) => e.stopPropagation()}
             title={p.name}
@@ -170,7 +170,7 @@ export default function Molecules() {
         const s = STRAINS_BY_ID[p.defaultStrainId];
         return s ? (
           <a
-            href={href(`/organisms/${s.id}`)}
+            href={href(`/fermos/organisms/${s.id}`)}
             className="hover:text-accent hover:underline block truncate"
             onClick={(e) => e.stopPropagation()}
             title={`${s.binomial} ${s.designation}`}
@@ -338,7 +338,7 @@ export default function Molecules() {
   if (!ready) {
     return (
       <>
-        <PageHeader eyebrow="Module 5 · Molecules" title="Molecules" subtitle={subtitle} />
+        {!embedded && <PageHeader eyebrow="Module 5 · Molecules" title="Molecules" subtitle={subtitle} />}
         <Card>
           <Skeleton rows={12} />
         </Card>
@@ -348,10 +348,11 @@ export default function Molecules() {
 
   return (
     <>
+      {/* Suppressed when Dominion mounts this as its default view. */}
       <PageHeader
-        eyebrow="Module 5 · Molecules"
-        title="Molecules"
-        subtitle={subtitle}
+        eyebrow={embedded ? undefined : 'Module 5 · Molecules'}
+        title={embedded ? null : 'Molecules'}
+        subtitle={embedded ? undefined : subtitle}
         actions={
           <a href={href('/runbooks')} className="btn">
             Runbooks <ArrowRight size={14} />
@@ -400,7 +401,7 @@ export default function Molecules() {
               onClick={() => {
                 const next = scopes.filter((x) => x.key !== s.key);
                 const qs = next.map((x) => `${x.key}=${encodeURIComponent(x.value)}`).join('&');
-                navigate(qs ? `/molecules?${qs}` : '/molecules');
+                navigate(qs ? `/dominion/molecules?${qs}` : '/dominion/molecules');
               }}
               title={`Remove the ${SCOPE_LABEL[s.key].toLowerCase()} scope`}
             >
@@ -428,7 +429,7 @@ export default function Molecules() {
         rowKey={(p) => p.id}
         tickOf={(p) => p.provenance}
         dense={density === 'dense'}
-        onOpen={(p) => navigate(`/molecules/${p.id}`)}
+        onOpen={(p) => navigate(`/dominion/molecules/${p.id}`)}
         facets={facets}
         searchOf={(p) =>
           `${p.name} ${p.aliases.join(' ')} ${PRODUCT_CATEGORY_LABEL[p.category]} ${p.tags.join(' ')} ${p.processCode} ${p.note ?? ''}`

@@ -470,7 +470,7 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
         />
         {protocol && (
           <a
-            href={href(`/protocols/${protocol.id}`)}
+            href={href(`/runbooks/protocols/${protocol.id}`)}
             className="text-caption text-accent hover:underline inline-flex items-center gap-1"
           >
             <FlaskConical size={12} aria-hidden /> {protocol.title} <ArrowRight size={12} />

@@ -18,7 +18,8 @@ export function PageHeader({
   actions,
   eyebrow,
 }: {
-  title: ReactNode;
+  /** null mounts the screen under an owner's header — see the note below. */
+  title: ReactNode | null;
   subtitle?: ReactNode;
   actions?: ReactNode;
   eyebrow?: ReactNode;
@@ -29,7 +30,13 @@ export function PageHeader({
         {eyebrow && (
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">{eyebrow}</div>
         )}
-        <h1 className="font-serif text-page-title font-semibold leading-tight">{title}</h1>
+        {/* A null title is a screen mounted inside an owner that already has a
+            header (OF-BLD-008 §6). The actions still belong on screen, so the
+            row survives and only the heading is dropped — an empty <h1> would
+            hold its line height and leave a gap nobody can explain. */}
+        {title !== null && title !== undefined && (
+          <h1 className="font-serif text-page-title font-semibold leading-tight">{title}</h1>
+        )}
         {subtitle && <div className="text-body text-ink-soft mt-1 max-w-3xl">{subtitle}</div>}
       </div>
       {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}

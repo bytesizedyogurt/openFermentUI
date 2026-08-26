@@ -164,23 +164,56 @@ The simulation holds itself to eight conditions (design §11):
 
 | Module | Name | What it proves | Where it lives |
 |---|---|---|---|
-| 0 | PhycoExtract | Extraction quality is measurable | `/biorepo`, `/intake`, `/guild`, `/witness` |
+| 0 | PhycoExtract | Extraction quality is measurable | `/intake`, `/biorepo`, `/guild`, `/biorepo/witness` |
 | 1 | Corpus & Postdoc | Agentic RAG with visible retrieval | `/postdoc`, `/biorepo` |
-| 2 | Organisms & Protocols | Verified parameters become executable | `/organisms`, `/protocols` |
+| 2 | Organisms & Protocols | Verified parameters become executable | `/fermos/organisms`, `/runbooks/protocols` |
 | 3 | Proforma | Parameters feed techno-economics | `/proforma` |
+| — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
-| 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/depositions` |
+| 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/runbooks/depositions` |
 
-## The vocabulary
+## The eleven
 
-The rail says Postdoc, BioRepo, Intake, Proforma, Primer — component names, not generic
-verbs. `COMPONENTS.md` is the canonical map of all eighteen; `/settings/architecture` is the
-same map in the app. Every label carries a one-line descriptor, the ⌘K palette still answers
-to the old words (`library` finds BioRepo), and every old path redirects rather than 404s, so
-`/library/papers/H4` lands on `/biorepo/papers/H4` with its deep link intact.
+**openFerment is Home plus eleven destinations, and the list is closed.**
 
-Organisms, Molecules and Protocols keep their plain names: they are catalogue views of domain
-objects, not components.
+```
+Home
+Intake · BioRepo · Postdoc · geneOS · fermOS · pureOS · Proforma
+Runbooks · Dominion · Primer · Guild
+```
+
+Twelve rail entries. It does not grow. Everything that exists now, and
+everything built later, lives inside one of the eleven — when something new
+appears the question is which of the eleven owns it, never whether to add a
+twelfth. `src/data/nav.ts` is the single source of truth for the rail, the
+command palette, the Architecture screen and the smoke tests, and `check:seed`
+fails the build if `RAIL` is not exactly twelve.
+
+Five things used to be rail entries and are now views inside their owner. **No
+screen was deleted** — each is the same file, mounted somewhere else:
+
+| Was | Is now |
+|---|---|
+| Organisms | fermOS's default view — `/fermos/organisms` |
+| Molecules | Dominion's default view — `/dominion/molecules` |
+| Protocols | a Runbooks tab — `/runbooks/protocols` |
+| Deposition | a Runbooks tab — `/runbooks/depositions` |
+| Witness | a BioRepo tab — `/biorepo/witness` |
+
+Every retired path redirects with its tail intact, so `/organisms/cw15` lands
+on `/fermos/organisms/cw15` rather than a 404, and the palette still answers to
+the old words. `COMPONENTS.md` is the full map; `/settings/architecture` is the
+same map in the app.
+
+Two destinations are deliberately empty. **geneOS** has a screen and no
+tooling; **pureOS** has the unit-operation vocabulary and no process model.
+Both say so on the screen rather than implying otherwise, and Home shows the
+current state of each of the eleven beside its name. Putting them in the rail
+from day one means that when the work arrives the question is what they do with
+it, not where it goes.
+
+Organisms, Molecules and Protocols keep their plain names as views. They are
+catalogue views of domain objects, not components.
 
 ## Architecture
 

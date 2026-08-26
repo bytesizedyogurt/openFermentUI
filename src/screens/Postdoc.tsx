@@ -110,7 +110,7 @@ function AnswerStrip({ md }: { md: string }) {
               key={p.r.id}
               className="absolute -translate-x-1/2 group"
               style={{ left: `${pct}%`, top: 20 + jitter * 7 }}
-              onClick={() => navigate(`/biorepo/papers/${p.r.paperId}?span=${p.r.id}`)}
+              onClick={() => navigate(`/biorepo/paper/${p.r.paperId}?span=${p.r.id}`)}
               title={`${fmt(p.v)} ${cited.def.canonicalUnit} — ${p.r.paperId} (${p.r.status})`}
             >
               <ProvDot p={provenanceOf(p.r)} size={9} />
@@ -198,7 +198,7 @@ function RetrievalCards({
               </button>
               <button
                 className="text-caption text-accent hover:underline"
-                onClick={() => navigate(`/biorepo/papers/${h.paperId}`)}
+                onClick={() => navigate(`/biorepo/paper/${h.paperId}`)}
               >
                 Open source
               </button>
@@ -1027,10 +1027,10 @@ function InsertInto({ md }: { md: string }) {
                 toast({
                   text: `${ids.length} references staged for ${p.id}`,
                   kind: 'success',
-                  href: `#/protocols/${p.id}`,
+                  href: `#/runbooks/protocols/${p.id}`,
                   hrefLabel: 'Open',
                 });
-                navigate(`/protocols/${p.id}`);
+                navigate(`/runbooks/protocols/${p.id}`);
               }}
             >
               {p.title}
@@ -1046,10 +1046,10 @@ function InsertInto({ md }: { md: string }) {
                 toast({
                   text: `${ids.length} references staged for ${s.name}`,
                   kind: 'success',
-                  href: `#/proforma/${s.id}`,
+                  href: `#/proforma/scenario/${s.id}`,
                   hrefLabel: 'Open',
                 });
-                navigate(`/proforma/${s.id}`);
+                navigate(`/proforma/scenario/${s.id}`);
               }}
             >
               {s.name}

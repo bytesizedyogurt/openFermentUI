@@ -25,6 +25,8 @@ import {
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { INTAKE_TABS } from '@/data/tabs';
 
 // ── row model ──────────────────────────────────────────────────────────
 
@@ -274,7 +276,7 @@ export default function Intake() {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
           onClick={(e) => e.stopPropagation()}
@@ -502,6 +504,7 @@ export default function Intake() {
           title="Intake"
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
         />
+        <OwnerTabs tabs={INTAKE_TABS} />
         <Card>
           <Skeleton rows={12} />
         </Card>
@@ -529,7 +532,7 @@ export default function Intake() {
       <Button onClick={exportBoth} title="CSV with both unit forms and the provenance of every row">
         <Download size={14} /> Export CSV
       </Button>
-      <LinkButton to="/witness">
+      <LinkButton to="/biorepo/witness">
         <Gauge size={14} /> Open Witness
       </LinkButton>
     </>
@@ -544,6 +547,7 @@ export default function Intake() {
           subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from."
           actions={headerActions}
         />
+        <OwnerTabs tabs={INTAKE_TABS} />
         <Card>
           <EmptyState
             icon={<Table2 size={22} />}
@@ -560,11 +564,11 @@ export default function Intake() {
                 <div className="flex gap-2">
                   <Button onClick={() => navigate('/intake')}>Show every record</Button>
                   {scopedPaper && (
-                    <LinkButton to={`/biorepo/papers/${scopedPaper.id}`}>Open the paper</LinkButton>
+                    <LinkButton to={`/biorepo/paper/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
               ) : (
-                <LinkButton to="/biorepo/ingest">Open the ingest board</LinkButton>
+                <LinkButton to="/intake/ingest">Open the ingest board</LinkButton>
               )
             }
           />
@@ -584,6 +588,7 @@ export default function Intake() {
         subtitle="Every quantitative claim the pipeline has pulled out of the corpus, with the span it came from. Nothing here is trusted until a reviewer says so."
         actions={headerActions}
       />
+      <OwnerTabs tabs={INTAKE_TABS} />
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
         <span>
@@ -621,7 +626,7 @@ export default function Intake() {
         dense={density === 'dense'}
         toolbar={toolbar}
         onFilteredChange={handleFiltered}
-        onOpen={({ rec }) => navigate(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
+        onOpen={({ rec }) => navigate(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
         searchOf={({ rec }) =>
           `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.field} ${rec.unit} ${
             rec.si.unit

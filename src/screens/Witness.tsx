@@ -41,6 +41,8 @@ import {
 import { useCategorical } from '@/lib/viz';
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
 
@@ -335,13 +337,13 @@ export default function Witness() {
       text: `Correction note filed on ${label} (${RUN_LABEL[run.run]} · ${
         OUTCOME_LABEL[open.outcome]
       })${body ? ` — ${body.slice(0, 90)}` : ''}`,
-      href: '#/witness',
+      href: '#/biorepo/witness',
       provenance: 'user',
     });
     toast({
       text: `Correction note filed on ${label} — it appears in the activity feed for this session only`,
       kind: 'success',
-      href: '#/witness',
+      href: '#/biorepo/witness',
       hrefLabel: 'Stay',
     });
     setFiled((s) => new Set(s).add(open.key));
@@ -409,12 +411,15 @@ export default function Witness() {
   // ── states ───────────────────────────────────────────────────────────
 
   const header = (actions?: ReactNode) => (
+    <>
     <PageHeader
       eyebrow="Module 0 · Evidence"
       title="Witness"
       subtitle="Witness asks one question — does it reproduce. This is what the extractor would be scored on, and what it has been scored on so far."
       actions={actions}
     />
+    <OwnerTabs tabs={BIOREPO_TABS} />
+    </>
   );
 
   if (!ready) {
@@ -545,7 +550,7 @@ export default function Witness() {
               <li>Run an extractor and score it here.</li>
             </ol>
             <div className="mt-3">
-              <LinkButton to="/biorepo/ingest" variant="primary">
+              <LinkButton to="/intake/ingest" variant="primary">
                 Open the ingest pipeline
               </LinkButton>
             </div>
@@ -1129,7 +1134,7 @@ function ComparisonBody({
         <CitationChip paperId={row.paperId} recordId={row.recordId} />
         {record && (
           <a
-            href={href(`/biorepo/papers/${record.paperId}?span=${record.id}`)}
+            href={href(`/biorepo/paper/${record.paperId}?span=${record.id}`)}
             className="text-caption text-accent hover:underline"
           >
             Open in the reader

@@ -15,6 +15,8 @@ import {
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { INTAKE_TABS } from '@/data/tabs';
 import {
   Button,
   Callout,
@@ -200,7 +202,7 @@ export default function IntakeIngest() {
     toast({
       text: `${row.paper.id} joined the corpus with abstract-only text — extractions are limited to the abstract until it re-parses`,
       kind: 'warn',
-      href: `#/biorepo/papers/${row.paper.id}`,
+      href: `#/biorepo/paper/${row.paper.id}`,
       hrefLabel: 'Open',
     });
   };
@@ -221,6 +223,7 @@ export default function IntakeIngest() {
         }
         actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
       />
+      <OwnerTabs tabs={INTAKE_TABS} />
 
       <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-5 items-start">
         {/* ── LEFT: input methods ───────────────────────────────────── */}
@@ -409,7 +412,7 @@ export default function IntakeIngest() {
                           )}
                         </div>
                         <a
-                          href={href(`/biorepo/papers/${row.paper.id}`)}
+                          href={href(`/biorepo/paper/${row.paper.id}`)}
                           className="font-serif leading-snug hover:text-accent hover:underline block mt-0.5"
                         >
                           {row.paper.title}
@@ -420,7 +423,7 @@ export default function IntakeIngest() {
                       </div>
                       <div className="flex flex-wrap gap-2 shrink-0 justify-end">
                         {(row.state === 'complete' || row.state === 'degraded') && (
-                          <LinkButton to={`/biorepo/papers/${row.paper.id}`} size="sm">
+                          <LinkButton to={`/biorepo/paper/${row.paper.id}`} size="sm">
                             View paper
                           </LinkButton>
                         )}

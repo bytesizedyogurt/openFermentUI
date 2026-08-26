@@ -243,7 +243,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
         <EmptyState
           title="Protocol not found"
           body={`No protocol with id ${protocolId} exists in this session.`}
-          action={<Button onClick={() => navigate('/protocols')}>Back to protocols</Button>}
+          action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>}
         />
       </div>
     );
@@ -261,12 +261,12 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
                 variant="primary"
                 onClick={() => {
                   const id = startRun(protocolId, protocol.currentVersion, 1);
-                  navigate(`/protocols/${protocolId}/run/${id}`);
+                  navigate(`/runbooks/protocols/${protocolId}/run/${id}`);
                 }}
               >
                 Start a fresh run
               </Button>
-              <Button onClick={() => navigate(`/protocols/${protocolId}`)}>Open the protocol</Button>
+              <Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Open the protocol</Button>
             </div>
           }
         />
@@ -367,7 +367,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             >
               <Play size={17} /> Begin recording
             </Button>
-            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/protocols/${protocolId}`)}>
+            <Button style={{ minHeight: 56 }} onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>
               Not yet
             </Button>
             <ComponentTag component="Deposition" action="staged" />
@@ -551,10 +551,10 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
                   toast({
                     text: 'Deposition closed. Reconcile it against the runbook when you are ready.',
                     kind: 'success',
-                    href: `#/depositions/${deposition.id}`,
+                    href: `#/runbooks/depositions/${deposition.id}`,
                     hrefLabel: 'Open',
                   });
-                  navigate(`/depositions/${deposition.id}`);
+                  navigate(`/runbooks/depositions/${deposition.id}`);
                 }}
               >
                 <Check size={15} /> Close the deposition
@@ -565,7 +565,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
                 onClick={() => {
                   finishRun(runId);
                   toast({ text: 'Run summary saved to this protocol’s history', kind: 'success' });
-                  navigate(`/protocols/${protocolId}`);
+                  navigate(`/runbooks/protocols/${protocolId}`);
                 }}
               >
                 <Check size={15} /> Save to run history
@@ -970,10 +970,10 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               toast({
                 text: 'Run kept active — find it in the Jobs tray',
                 kind: 'info',
-                href: `#/protocols/${protocolId}/run/${runId}`,
+                href: `#/runbooks/protocols/${protocolId}/run/${runId}`,
                 hrefLabel: 'Resume',
               });
-              navigate(`/protocols/${protocolId}`);
+              navigate(`/runbooks/protocols/${protocolId}`);
             }}
           >
             Keep active

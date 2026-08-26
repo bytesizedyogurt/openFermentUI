@@ -1,18 +1,18 @@
-// Keyboard shortcut map (OF-DES-001 Appendix A, OF-BLD-006 §5 as revised).
+// Keyboard shortcut map (OF-DES-001 Appendix A, OF-BLD-008 §5).
 //
-// The rail chord keys are initials of the names a user now reads, so the chord
-// is learnable from the rail itself rather than from this sheet: o for
-// Postdoc, b for BioRepo, i for Intake, f for Proforma, n for Primer. Two are
-// not initials and cannot be — 'p' went to Protocols before Postdoc existed
-// and moving it would break a reflex for no gain, and Primer's 'p' is taken,
-// so it keeps 'n'. Nothing collides, which is the actual requirement.
+// The rail chord keys are initials of the names a user reads, so the chord is
+// learnable from the rail itself rather than from this sheet: i for Intake,
+// b for BioRepo, f for fermOS, d for Dominion, g for Guild. Three cannot be
+// initials and are not: Postdoc takes 'o' because 'p' reads as a word nobody
+// types; Proforma takes 'c' for cost; Primer keeps 'n'. Twelve keys, all
+// distinct, which is the actual requirement.
 export const SHORTCUTS: { context: string; keys: { key: string; does: string }[] }[] = [
   {
     context: 'Global',
     keys: [
       { key: '⌘K', does: 'Command palette' },
       { key: '/', does: 'Focus search' },
-      { key: 'g then h/o/b/i/g/m/p/r/f/n', does: 'Go to rail item' },
+      { key: 'g then h/i/b/o/e/f/u/c/r/d/n/g', does: 'Go to one of the twelve' },
       { key: '⇧D', does: 'Toggle density' },
       { key: '⇧T', does: 'Toggle theme' },
       { key: '?', does: 'This shortcut sheet' },

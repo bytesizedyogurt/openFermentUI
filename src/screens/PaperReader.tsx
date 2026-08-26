@@ -389,14 +389,14 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Ingest started for ${paper.id}`,
                     kind: 'info',
-                    href: '#/biorepo/ingest',
+                    href: '#/intake/ingest',
                     hrefLabel: 'Board',
                   });
                 }}
               >
                 Ingest this paper
               </Button>
-              <LinkButton to="/biorepo/ingest" size="sm">
+              <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -431,14 +431,14 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                   toast({
                     text: `Retrying ingest for ${paper.id}`,
                     kind: 'info',
-                    href: '#/biorepo/ingest',
+                    href: '#/intake/ingest',
                     hrefLabel: 'Board',
                   });
                 }}
               >
                 <RefreshCw size={12} /> Retry ingest
               </Button>
-              <LinkButton to="/biorepo/ingest" size="sm">
+              <LinkButton to="/intake/ingest" size="sm">
                 Open ingest board
               </LinkButton>
             </div>
@@ -539,7 +539,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
             }
             action={
               parseFailed ? (
-                <LinkButton to="/biorepo/ingest" size="sm">
+                <LinkButton to="/intake/ingest" size="sm">
                   Open ingest board
                 </LinkButton>
               ) : (

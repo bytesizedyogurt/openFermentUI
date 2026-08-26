@@ -34,6 +34,7 @@ export type ComponentName =
   | 'BioRepo'
   | 'geneOS'
   | 'fermOS'
+  | 'pureOS'
   | 'Proforma'
   | 'Primer'
   | 'Audit'
@@ -42,6 +43,7 @@ export type ComponentName =
   | 'Claim Workbench'
   | 'Priority Engine'
   | 'Clearance'
+  | 'Dominion'
   | 'Enablement'
   | 'Notary'
   | 'Guild'
@@ -57,8 +59,9 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
   Postdoc: 'The agent — plans, retrieves, and answers with its working shown',
   Intake: 'Evidence in — ingest and extraction of parameters from sources',
   BioRepo: 'Evidence in — the corpus and everything retrieved from it',
-  geneOS: 'Computing — construct and strain design (not built)',
-  fermOS: 'Computing — fermentation and process modelling (not built)',
+  geneOS: 'Sequence, structure and function — nothing built yet',
+  fermOS: 'Hosts, metabolism and strain design — organisms are the part that exists',
+  pureOS: 'Everything downstream of the fermenter — recovery, formulation, storage',
   Proforma: 'Computing — cost models, sweeps and scenario economics',
   Primer: 'Keeping it honest — the introductory text: the platform taught through itself',
   Audit: 'Keeping it honest — provenance, and what is held out of aggregates',
@@ -66,6 +69,7 @@ export const COMPONENT_ROLE: Record<ComponentName, string> = {
   'Common Seal': 'Keeping it honest — timestamping and attestation (not built)',
   'Claim Workbench': 'Patents — claim drafting and analysis (not built)',
   'Priority Engine': 'Patents — priority and filing strategy (not built)',
+  Dominion: 'Patents and clearance — what is fenced and what is open',
   Clearance: 'Patents — freedom to operate, per jurisdiction',
   Enablement: 'Patents — enablement and written description (not built)',
   Notary: 'Patents — inventorship and conception records (not built)',

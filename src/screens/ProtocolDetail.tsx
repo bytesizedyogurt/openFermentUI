@@ -836,7 +836,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             title="No such protocol"
             body={`Nothing in this session has the id “${protocolId}”. It may have been renamed, or the link is from a different build.`}
             icon={<ClipboardList size={22} />}
-            action={<LinkButton to="/protocols">Back to all protocols</LinkButton>}
+            action={<LinkButton to="/runbooks/protocols">Back to all protocols</LinkButton>}
           />
         </Card>
       </>
@@ -920,7 +920,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
 
   const beginRun = () => {
     const runId = startRun(protocol.id, version.version, scale);
-    navigate(`/protocols/${protocol.id}/run/${runId}`);
+    navigate(`/runbooks/protocols/${protocol.id}/run/${runId}`);
   };
 
   const openCompare = () => {
@@ -975,7 +975,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             >
               <GitCompare size={14} /> Compare versions
             </Button>
-            <LinkButton to={`/protocols/${protocol.id}/edit`} size="sm">
+            <LinkButton to={`/runbooks/protocols/${protocol.id}/edit`} size="sm">
               <FileText size={13} /> Edit
             </LinkButton>
           </>
@@ -1011,7 +1011,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
                 return (
                   <a
                     key={o}
-                    href={href(`/organisms/${o}`)}
+                    href={href(`/fermos/organisms/${o}`)}
                     className="chip text-caption text-ink-soft hover:border-accent/40 hover:bg-accent-wash"
                     title={s.title}
                   >
@@ -1118,7 +1118,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
                 <EmptyState
                   title="This version has no steps"
                   body="Nothing to run yet. Open the editor to add the procedure."
-                  action={<LinkButton to={`/protocols/${protocol.id}/edit`}>Open editor</LinkButton>}
+                  action={<LinkButton to={`/runbooks/protocols/${protocol.id}/edit`}>Open editor</LinkButton>}
                 />
               </Card>
             ) : (
@@ -1305,7 +1305,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
                     <li key={r.id}>
                       <Tick p="user" className="py-0.5">
                         <a
-                          href={href(`/protocols/${protocol.id}/run/${r.id}`)}
+                          href={href(`/runbooks/protocols/${protocol.id}/run/${r.id}`)}
                           className="text-body hover:text-accent hover:underline font-num"
                         >
                           {r.id}

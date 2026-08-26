@@ -125,7 +125,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             icon={<Boxes size={22} aria-hidden />}
             title={`No molecule with the id “${productId}”`}
             body="The molecule index lists every product this catalogue covers. Open it to pick one."
-            action={<LinkButton to="/molecules">Back to molecules</LinkButton>}
+            action={<LinkButton to="/dominion/molecules">Back to molecules</LinkButton>}
           />
         </Card>
       </>
@@ -170,10 +170,10 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
         }
         actions={
           <>
-            <LinkButton to={`/molecules?category=${product.category}`}>
+            <LinkButton to={`/dominion/molecules?category=${product.category}`}>
               <Tag size={14} /> Same category
             </LinkButton>
-            <LinkButton to="/molecules">
+            <LinkButton to="/dominion/molecules">
               <ArrowRight size={14} className="rotate-180" /> All molecules
             </LinkButton>
           </>
@@ -307,7 +307,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             {strain ? (
               <>
                 <a
-                  href={href(`/organisms/${strain.id}`)}
+                  href={href(`/fermos/organisms/${strain.id}`)}
                   className="font-serif text-section-title font-semibold italic hover:text-accent hover:underline"
                 >
                   {strain.binomial}
@@ -323,7 +323,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
                 <p className="text-body text-ink-soft mt-2">{strain.description}</p>
                 <div className="mt-2">
                   <a
-                    href={href(`/molecules?host=${strain.id}`)}
+                    href={href(`/dominion/molecules?host=${strain.id}`)}
                     className="text-caption text-accent hover:underline"
                   >
                     Every molecule defaulting to this host
@@ -525,7 +525,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
                   {siblings.map((s) => (
                     <a
                       key={s.id}
-                      href={href(`/molecules/${s.id}`)}
+                      href={href(`/dominion/molecules/${s.id}`)}
                       className="chip hover:border-accent/45 hover:bg-accent-wash"
                       title={`${s.name} — ${PRODUCT_CATEGORY_LABEL[s.category]}`}
                     >
@@ -544,7 +544,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
         band describe a plausible way to make {product.name}, assembled from vocabulary rather than
         from experiments — {PROVENANCE_LABEL[product.provenance].toLowerCase()}. The corpus behind
         this platform covers one throughline in depth, and this molecule is not it.{' '}
-        <a className="text-accent hover:underline" href={href('/organisms')}>
+        <a className="text-accent hover:underline" href={href('/fermos/organisms')}>
           The organism pages
         </a>{' '}
         say exactly how much evidence stands behind each host.

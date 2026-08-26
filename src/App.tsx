@@ -22,6 +22,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { JobsPanel } from '@/components/JobsTray';
 import { GuidedTour } from '@/components/GuidedTour';
 import { SHORTCUTS } from '@/data/shortcuts';
+import { MODULES } from '@/data/learn';
 import { RAIL, redirectFor } from '@/data/nav';
 
 import Home from '@/screens/Home';
@@ -50,6 +51,11 @@ import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
 import Settings from '@/screens/Settings';
 import Architecture from '@/screens/Architecture';
+import GeneOS from '@/screens/GeneOS';
+import PureOS from '@/screens/PureOS';
+import FermOS from '@/screens/FermOS';
+import Dominion from '@/screens/Dominion';
+import Depositions from '@/screens/Depositions';
 
 function isActive(path: string, to: string) {
   if (to === '/') return path === '/';
@@ -60,7 +66,7 @@ function isActive(path: string, to: string) {
 
 function Screen() {
   const route = useRoute();
-  const [a, b, c, d] = route.segments;
+  const [a, b, c, d, e] = route.segments;
 
   // §8 — an old path lands on the new screen rather than the not-found page.
   // Replace rather than push, so Back does not bounce the reader between the
@@ -80,40 +86,60 @@ function Screen() {
     );
   }
 
+  // ── the eleven, and what each one owns (OF-BLD-008 §3) ──────────────
+  // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
+  // /fermos/organisms/cw15 rather than /organisms/cw15. Nothing was deleted —
+  // every screen below is the same file it was, mounted somewhere else.
   if (!a) return <Home />;
   switch (a) {
+    case 'intake':
+      if (b === 'ingest') return <IntakeIngest />;
+      return <Intake />;
+    case 'biorepo':
+      if (b === 'paper' && c)
+        return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
+      if (b === 'compare') return <Compare />;
+      if (b === 'witness') return <Witness />;
+      return <BioRepo />;
     case 'postdoc':
       return <Postdoc sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
-    case 'biorepo':
-      if (b === 'ingest') return <IntakeIngest />;
-      if (b === 'papers' && c) return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
-      return <BioRepo />;
-    case 'intake':
-      return <Intake />;
+    case 'geneos':
+      return <GeneOS />;
+    case 'fermos':
+      // The strain page fills the screen on its own; putting fermOS's header
+      // above it would push the organism it is about below the fold.
+      if (b === 'organisms' && c) return <StrainPage strainId={c} />;
+      return <FermOS />;
+    case 'pureos':
+      return <PureOS />;
+    case 'proforma':
+      if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;
+      return <Proforma />;
+    case 'runbooks':
+      // 'protocols' and 'depositions' are reserved second segments. Runbook ids
+      // are `rb-*`, so there is no collision to arbitrate.
+      if (b === 'protocols') {
+        if (c && d === 'run' && e) return <Deposition protocolId={c} runId={e} />;
+        if (c && d === 'edit') return <ProtocolEditor protocolId={c} />;
+        return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
+      }
+      if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
+    case 'dominion':
+      if (b === 'molecules' && c) return <MoleculeDetail productId={c} />;
+      return <Dominion />;
+    case 'primer':
+      // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
+      // its own. /primer/m0/l0-1 still resolves — an old deep link should not
+      // need a redirect when the id it carries is enough.
+      if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
+      if (b) {
+        const owner = MODULES.find((m) => m.lessons.some((l) => l.id === b));
+        if (owner) return <PrimerLesson moduleId={owner.id} lessonId={b} />;
+      }
+      return <Primer />;
     case 'guild':
       return <Guild />;
-    case 'witness':
-      return <Witness />;
-    case 'organisms':
-      return b ? <StrainPage strainId={b} /> : <Organisms />;
-    case 'molecules':
-      return b ? <MoleculeDetail productId={b} /> : <Molecules />;
-    case 'protocols':
-      if (b && c === 'run' && d) return <Deposition protocolId={b} runId={d} />;
-      if (b && c === 'edit') return <ProtocolEditor protocolId={b} />;
-      return b ? <ProtocolDetail protocolId={b} /> : <Protocols />;
-    case 'runbooks':
-      return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
-    case 'depositions':
-      // A deposition is reached from the runbook that predicted it or from the
-      // run that wrote it — it earns no rail slot of its own (§5 caps the rail
-      // at ten, and this is a record, not a destination).
-      return b ? <DepositionDetail depositionId={b} /> : <Runbooks />;
-    case 'proforma':
-      if (b === 'compare') return <Compare />;
-      return b ? <ProformaScenario scenarioId={b} /> : <Proforma />;
-    case 'primer':
-      return b && c ? <PrimerLesson moduleId={b} lessonId={c} /> : <Primer />;
     case 'settings':
       // Architecture is its own screen rather than a Settings pane: it is a
       // reference map, not a preference, and it needs the full width.
@@ -228,7 +254,10 @@ export default function App() {
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
 
-  const inDeposition = route.segments[0] === 'protocols' && route.segments[2] === 'run';
+  const inDeposition =
+    route.segments[0] === 'runbooks' &&
+    route.segments[1] === 'protocols' &&
+    route.segments[3] === 'run';
 
   // Restore the Durable tier before anything reads it (OF-BLD-006 §4.6).
   // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
@@ -339,7 +368,11 @@ export default function App() {
         <nav
           className={cx(
             'shrink-0 border-r border-line bg-surface-1 flex flex-col',
-            ui.railCollapsed ? 'w-[52px]' : 'w-[188px]',
+            // 208px, up from 188. OF-BLD-008 gave the eleven longer
+            // descriptors ("documents in, anchored to source") and at the old
+            // width every one of them truncated — a gloss that ends in an
+            // ellipsis is worse than no gloss, because it reads as a bug.
+            ui.railCollapsed ? 'w-[52px]' : 'w-[208px]',
             'hidden md:flex',
           )}
           aria-label="Primary"
@@ -391,9 +424,12 @@ export default function App() {
                       {/* §7 — the gloss. Eight invented words with no
                           explanation is friction the names have not earned
                           yet, and this is the cheapest possible fix. */}
+                      {/* Wraps to two lines rather than truncating. Twelve
+                          entries at two lines still fits the shortest rail
+                          this ships on. */}
                       <span
                         className={cx(
-                          'block truncate text-caption leading-tight',
+                          'block text-caption leading-tight',
                           active ? 'text-accent/70' : 'text-ink-soft/70',
                         )}
                       >

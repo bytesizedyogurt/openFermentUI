@@ -194,7 +194,7 @@ function StatePanel({ runbook }: { runbook: Runbook }) {
             Exclude the near-boundary candidates
           </Button>
           {product && (
-            <LinkButton to={`/molecules/${product.id}`}>
+            <LinkButton to={`/dominion/molecules/${product.id}`}>
               Read the clearance <ArrowRight size={14} />
             </LinkButton>
           )}
@@ -548,7 +548,7 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
           {mine.map((d) => (
             <li key={d.id}>
               <a
-                href={href(`/depositions/${d.id}`)}
+                href={href(`/runbooks/depositions/${d.id}`)}
                 className="text-body text-accent hover:underline"
               >
                 {d.state === 'closed' ? 'Closed' : d.state === 'running' ? 'Running' : 'Staged'} ·{' '}
@@ -585,7 +585,7 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
                 onClick={() => {
                   const started = openDeposition(runbook.id, p.id, scale);
                   setPick(false);
-                  if (started) navigate(`/protocols/${p.id}/run/${started.runId}`);
+                  if (started) navigate(`/runbooks/protocols/${p.id}/run/${started.runId}`);
                 }}
               >
                 <div className="font-medium">{p.title}</div>
@@ -671,7 +671,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         actions={
           <>
             {product && (
-              <LinkButton to={`/molecules/${product.id}`}>
+              <LinkButton to={`/dominion/molecules/${product.id}`}>
                 <Boxes size={14} /> {product.name}
               </LinkButton>
             )}
@@ -697,7 +697,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         </span>
         {product && <ClearanceChip state={product.clearanceState} compact />}
         {strain && (
-          <a href={href(`/organisms/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
+          <a href={href(`/fermos/organisms/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
             <FlaskConical size={12} aria-hidden />
             <span className="italic">{strain.binomial}</span>
           </a>
@@ -936,7 +936,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
                 )}
                 <div className="mt-3">
                   <a
-                    href={href(`/molecules/${product.id}`)}
+                    href={href(`/dominion/molecules/${product.id}`)}
                     className="text-caption text-accent hover:underline"
                   >
                     Full clearance on {product.name} ({PRODUCT_CATEGORY_LABEL[product.category]})
@@ -957,7 +957,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
               <EmptyState
                 title="No molecule attached"
                 body="Clearance attaches to a molecule, and this runbook asks a question that spans several. There is nothing here to clear until it is pointed at one."
-                action={<LinkButton to="/molecules">Open the catalogue</LinkButton>}
+                action={<LinkButton to="/dominion/molecules">Open the catalogue</LinkButton>}
               />
             </Card>
             <div className="mt-3">

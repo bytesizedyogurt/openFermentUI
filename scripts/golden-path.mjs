@@ -326,16 +326,25 @@ async function main() {
   const paletteOpen = (await page.locator('input[aria-label="Command palette"]').count()) > 0;
   check('Command palette opens', paletteOpen);
   if (paletteOpen) {
-    // Typed as the OLD word on purpose (OF-BLD-006 §6). People will reach for
-    // "validation" for months after the rename, and the palette has to take
-    // them to Witness rather than punish them for not having learned it yet.
+    // Typed as the OLD word on purpose. People reached for "validation" for
+    // months after the rename, and Witness has since moved again — under
+    // BioRepo — so the palette has to carry them across both moves.
     await page.locator('input[aria-label="Command palette"]').fill('validation');
-    await page.waitForTimeout(300);
-    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    const options = await page.locator('[role="option"]').allInnerTexts();
+    check(
+      'Palette resolves an old word to the surfaces that own it',
+      /BioRepo/.test(options[0] ?? '') && options.slice(0, 3).some((o) => /Witness/.test(o)),
+      (options[0] ?? '(nothing)').split('\n')[0],
+    );
+    // Clicked rather than Entered. Enter runs whichever row `sel` points at,
+    // and `sel` follows the mouse — a pointer left over the overlay by an
+    // earlier step silently changes what this asserts.
+    await page.locator('[role="option"]', { hasText: /^Witness/ }).first().click();
     await page.waitForTimeout(700);
     check(
-      'Palette resolves an old word to the renamed screen',
-      (page.url().split('#')[1] ?? '') === '/witness',
+      'Palette navigates to the moved screen',
+      (page.url().split('#')[1] ?? '') === '/biorepo/witness',
       page.url().split('#')[1] ?? '',
     );
   }

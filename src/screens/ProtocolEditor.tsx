@@ -1,4 +1,4 @@
-// Structured protocol editor (OF-DES-001 §5.3 `/protocols/:id/edit`, fidelity
+// Structured protocol editor (OF-DES-001 §5.3 `/runbooks/protocols/:id/edit`, fidelity
 // item 14). Edits, reorders, and quantity binding are real; a saved draft
 // becomes a live new version for the rest of the session.
 import { useMemo, useState } from 'react';
@@ -101,7 +101,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
       <EmptyState
         title="Protocol not found"
         body={`No protocol with id ${protocolId} exists in this session.`}
-        action={<Button onClick={() => navigate('/protocols')}>Back to protocols</Button>}
+        action={<Button onClick={() => navigate('/runbooks/protocols')}>Back to protocols</Button>}
       />
     );
   }
@@ -126,17 +126,17 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
       at: new Date().toISOString().slice(0, 16).replace('T', ' '),
       icon: 'file',
       text: `${protocol.title} — version ${draftVersion.version} published`,
-      href: `#/protocols/${protocolId}`,
+      href: `#/runbooks/protocols/${protocolId}`,
       provenance: 'user',
     });
     toast({
       text: `Version ${draftVersion.version} published for this session`,
       kind: 'success',
-      href: `#/protocols/${protocolId}`,
+      href: `#/runbooks/protocols/${protocolId}`,
       hrefLabel: 'Open',
     });
     setConfirmOpen(false);
-    navigate(`/protocols/${protocolId}`);
+    navigate(`/runbooks/protocols/${protocolId}`);
   };
 
   return (
@@ -158,7 +158,7 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
             <Button onClick={() => setPreview((p) => !p)}>
               <Eye size={14} /> {preview ? 'Hide preview' : 'Preview at scale'}
             </Button>
-            <Button onClick={() => navigate(`/protocols/${protocolId}`)}>Cancel</Button>
+            <Button onClick={() => navigate(`/runbooks/protocols/${protocolId}`)}>Cancel</Button>
             <Button variant="primary" disabled={blocking.length > 0} onClick={() => setConfirmOpen(true)}>
               <Save size={14} /> Save as v{draftVersion.version}
             </Button>

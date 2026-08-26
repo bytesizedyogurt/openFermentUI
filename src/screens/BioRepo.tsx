@@ -29,6 +29,8 @@ import {
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { BIOREPO_TABS } from '@/data/tabs';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -287,7 +289,7 @@ export default function BioRepo() {
       render: (r) => (
         <Tick p={r.prov} className="inline-block whitespace-nowrap">
           <a
-            href={href(`/biorepo/papers/${r.paper.id}`)}
+            href={href(`/biorepo/paper/${r.paper.id}`)}
             className="font-num text-accent hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
@@ -303,7 +305,7 @@ export default function BioRepo() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/biorepo/papers/${r.paper.id}`)}
+          href={href(`/biorepo/paper/${r.paper.id}`)}
           className="font-serif hover:text-accent hover:underline block truncate"
           style={{ maxWidth: 340 }}
           title={r.paper.title}
@@ -386,7 +388,7 @@ export default function BioRepo() {
         if (r.ingestKey === 'failed') {
           return (
             <a
-              href={href('/biorepo/ingest')}
+              href={href('/intake/ingest')}
               className="chip text-signal-error border-signal-error/40 hover:bg-signal-error/10"
               title="Ingest halted — open the board for the reason and a retry"
               onClick={(e) => e.stopPropagation()}
@@ -500,13 +502,14 @@ export default function BioRepo() {
           </div>
         </div>
       </Popover>
-      <LinkButton to="/biorepo/ingest" variant="primary" size="sm">
+      <LinkButton to="/intake/ingest" variant="primary" size="sm">
         Ingest papers
       </LinkButton>
     </>
   );
 
   const header = (
+    <>
     <PageHeader
       eyebrow="Papers and records"
       title="BioRepo"
@@ -519,6 +522,8 @@ export default function BioRepo() {
       }
       actions={headerActions}
     />
+    <OwnerTabs tabs={BIOREPO_TABS} />
+    </>
   );
 
   if (!ready) {
@@ -543,7 +548,7 @@ export default function BioRepo() {
           <EmptyState
             title="No papers in the corpus yet"
             body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
-            action={<LinkButton to="/biorepo/ingest">Open the ingest board</LinkButton>}
+            action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
       </>
@@ -559,7 +564,7 @@ export default function BioRepo() {
           <Callout kind="error" title={`${brokenRows.length} paper${brokenRows.length === 1 ? '' : 's'} failed to parse`}>
             {brokenRows.map((r) => r.paper.id).join(', ')} could not be segmented into sections. Retry the
             ingest or continue with abstract-only text on the{' '}
-            <a href={href('/biorepo/ingest')} className="text-accent hover:underline">
+            <a href={href('/intake/ingest')} className="text-accent hover:underline">
               ingest board
             </a>
             .
@@ -582,7 +587,7 @@ export default function BioRepo() {
                     {r.paper.id}
                   </span>
                   <a
-                    href={href(`/biorepo/papers/${r.paper.id}`)}
+                    href={href(`/biorepo/paper/${r.paper.id}`)}
                     className="font-serif truncate flex-1 min-w-0 hover:text-accent hover:underline"
                     title={r.paper.title}
                   >
@@ -611,7 +616,7 @@ export default function BioRepo() {
                       />
                     )}
                   </div>
-                  <LinkButton to="/biorepo/ingest" size="sm">
+                  <LinkButton to="/intake/ingest" size="sm">
                     Board
                   </LinkButton>
                 </div>
@@ -631,7 +636,7 @@ export default function BioRepo() {
         rowKey={(r) => r.paper.id}
         tickOf={(r) => r.prov}
         dense={density === 'dense'}
-        onOpen={(r) => navigate(`/biorepo/papers/${r.paper.id}`)}
+        onOpen={(r) => navigate(`/biorepo/paper/${r.paper.id}`)}
         facets={facets}
         searchOf={(r) =>
           `${r.paper.id} ${r.paper.title} ${r.paper.authors.join(' ')} ${r.paper.topics.join(' ')}`

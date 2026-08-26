@@ -19,6 +19,20 @@
 // different jobs, and `ComponentTag` still does the second one.
 import type { ComponentName } from '@/components/ComponentTag';
 
+/** The eleven destinations. Home is not one of them; it is the twelfth rail entry. */
+export type Eleven =
+  | 'Intake'
+  | 'BioRepo'
+  | 'Postdoc'
+  | 'geneOS'
+  | 'fermOS'
+  | 'pureOS'
+  | 'Proforma'
+  | 'Runbooks'
+  | 'Dominion'
+  | 'Primer'
+  | 'Guild';
+
 export type ComponentLayer =
   | 'The agent'
   | 'Evidence in'
@@ -31,6 +45,14 @@ export type ComponentLayer =
 export interface ComponentDef {
   name: ComponentName;
   layer: ComponentLayer;
+  /**
+   * Which of the eleven owns this (OF-BLD-008 §8). A destination owns itself.
+   * Internal machinery — Audit, Witness, Clearance, Deposition and the unbuilt
+   * patent pieces — is not a destination and names the one it lives inside, so
+   * that "where does this live" has an answer for every component rather than
+   * only for the ones with a rail entry.
+   */
+  owner: Eleven;
   /** Where the code is, or `[]` when the component is not built. */
   livesIn: string[];
   /** Where a user reads this name, or null when there is nothing to read. */
@@ -79,6 +101,7 @@ export const LAYERS: { id: ComponentLayer; blurb: string }[] = [
 export const COMPONENTS: ComponentDef[] = [
   {
     name: 'Postdoc',
+    owner: 'Postdoc',
     layer: 'The agent',
     livesIn: ['src/sim/chat.ts', 'src/screens/Postdoc.tsx'],
     surfacedAs: 'the rail, /postdoc',
@@ -86,6 +109,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Intake',
+    owner: 'Intake',
     layer: 'Evidence in',
     livesIn: ['src/screens/IntakeIngest.tsx', 'src/screens/Intake.tsx'],
     surfacedAs: 'the rail, /intake',
@@ -93,6 +117,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'BioRepo',
+    owner: 'BioRepo',
     layer: 'Evidence in',
     livesIn: ['src/data/', 'src/engine/retrieval.ts', 'src/screens/BioRepo.tsx'],
     surfacedAs: 'the rail, /biorepo',
@@ -100,22 +125,27 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'geneOS',
+    owner: 'geneOS',
     layer: 'Computing',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Construct and strain design',
+    // A placeholder screen only. Listed as built because the destination
+    // exists and is honest about being empty — not because there is tooling.
+    livesIn: ['src/screens/GeneOS.tsx'],
+    surfacedAs: 'the rail, /geneos',
+    role: 'Sequence, structure and function — a destination with no tooling behind it yet',
   },
   {
     name: 'fermOS',
+    owner: 'fermOS',
     layer: 'Computing',
-    livesIn: [],
-    surfacedAs: null,
-    role: 'Fermentation and process modelling',
+    livesIn: ['src/screens/FermOS.tsx', 'src/screens/Organisms.tsx', 'src/screens/StrainPage.tsx'],
+    surfacedAs: 'the rail, /fermos',
+    role: 'Hosts, metabolism and strain design — organisms is the built part',
   },
   {
     name: 'Proforma',
+    owner: 'Proforma',
     layer: 'Computing',
-    livesIn: ['src/screens/Proforma.tsx', 'src/engine/grids.ts', 'src/engine/interp.ts'],
+    livesIn: ['src/screens/Proforma.tsx', 'src/screens/ProformaScenario.tsx', 'src/engine/grids.ts', 'src/engine/interp.ts'],
     surfacedAs: 'the rail, /proforma',
     role: 'Cost models, sweeps and scenario economics',
   },
@@ -125,6 +155,7 @@ export const COMPONENTS: ComponentDef[] = [
     // The unit engine is unnamed until it gets a name of its own, which is
     // better than leaving it wearing one that belongs to something else.
     name: 'Primer',
+    owner: 'Primer',
     layer: 'Keeping it honest',
     livesIn: ['src/screens/Primer.tsx', 'src/screens/PrimerLesson.tsx'],
     surfacedAs: 'the rail, /primer',
@@ -132,6 +163,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Audit',
+    owner: 'BioRepo',
     layer: 'Keeping it honest',
     livesIn: ['src/components/Provenance.tsx', 'aggregateExclusion() in src/store.ts'],
     surfacedAs: 'provenance ticks and their labels',
@@ -139,13 +171,15 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Witness',
+    owner: 'BioRepo',
     layer: 'Keeping it honest',
     livesIn: ['src/screens/Witness.tsx', 'src/engine/metrics.ts'],
-    surfacedAs: '/witness',
+    surfacedAs: 'a BioRepo tab, /biorepo/witness',
     role: 'Extractor validation against the gold set',
   },
   {
     name: 'Common Seal',
+    owner: 'BioRepo',
     layer: 'Keeping it honest',
     livesIn: [],
     surfacedAs: null,
@@ -153,6 +187,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Claim Workbench',
+    owner: 'Dominion',
     layer: 'Patents',
     livesIn: [],
     surfacedAs: null,
@@ -160,6 +195,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Priority Engine',
+    owner: 'Dominion',
     layer: 'Patents',
     livesIn: [],
     surfacedAs: null,
@@ -167,13 +203,15 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Clearance',
+    owner: 'Dominion',
     layer: 'Patents',
-    livesIn: ['src/engine/clearance.ts', 'src/data/clearanceFindings.ts'],
-    surfacedAs: 'ambient on Molecules',
+    livesIn: ['src/engine/clearance.ts', 'src/data/clearanceFindings.ts', 'src/components/Clearance.tsx'],
+    surfacedAs: 'a Dominion tab, /dominion/clearance',
     role: 'Freedom to operate, per jurisdiction',
   },
   {
     name: 'Enablement',
+    owner: 'Dominion',
     layer: 'Patents',
     livesIn: [],
     surfacedAs: null,
@@ -181,6 +219,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Notary',
+    owner: 'Dominion',
     layer: 'Patents',
     livesIn: [],
     surfacedAs: null,
@@ -188,6 +227,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Guild',
+    owner: 'Guild',
     layer: 'People and permissions',
     livesIn: ['src/screens/Guild.tsx'],
     surfacedAs: '/guild',
@@ -195,6 +235,7 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Runbook',
+    owner: 'Runbooks',
     layer: 'Assay',
     livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts'],
     surfacedAs: 'the rail, /runbooks',
@@ -202,9 +243,10 @@ export const COMPONENTS: ComponentDef[] = [
   },
   {
     name: 'Deposition',
+    owner: 'Runbooks',
     layer: 'Assay',
-    livesIn: ['src/screens/Deposition.tsx', 'src/components/DepositionPanel.tsx'],
-    surfacedAs: 'launched from a Runbook',
+    livesIn: ['src/screens/Deposition.tsx', 'src/screens/Depositions.tsx', 'src/components/DepositionPanel.tsx'],
+    surfacedAs: 'a Runbooks tab, /runbooks/depositions',
     role: 'The inbound account of what actually happened',
   },
 ];
@@ -242,6 +284,11 @@ export const COMPONENTS_BY_NAME: Record<string, ComponentDef> = Object.fromEntri
 );
 
 export const isBuilt = (c: ComponentDef): boolean => c.livesIn.length > 0;
+
+/** Everything one of the eleven owns, including itself. */
+export function componentsOwnedBy(owner: Eleven): ComponentDef[] {
+  return COMPONENTS.filter((c) => c.owner === owner);
+}
 
 export function componentsInLayer(layer: ComponentLayer): ComponentDef[] {
   return COMPONENTS.filter((c) => c.layer === layer);

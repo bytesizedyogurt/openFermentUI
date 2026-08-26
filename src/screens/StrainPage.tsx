@@ -326,7 +326,7 @@ function StripPlot({
                   onFocus={() => setFocus(i)}
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
-                  onClick={() => navigate(`/biorepo/papers/${p.rec.paperId}?span=${p.rec.id}`)}
+                  onClick={() => navigate(`/biorepo/paper/${p.rec.paperId}?span=${p.rec.id}`)}
                   className={cx(
                     'absolute -translate-x-1/2 rounded-full leading-none p-0 border-0 bg-transparent',
                     'hover:scale-125 focus-visible:scale-125 transition-transform',
@@ -858,7 +858,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       priority: 1,
       render: ({ rec }) => (
         <a
-          href={href(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
+          href={href(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
           className="font-num text-accent hover:underline"
           onClick={(e) => e.stopPropagation()}
           title={`Open ${rec.id} anchored in ${rec.paperId}`}
@@ -997,7 +997,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             icon={<Microscope size={22} />}
             title={`No strain with the id “${strainId}”`}
             body="The organism index lists every strain this corpus covers. Open it to pick one."
-            action={<LinkButton to="/organisms">Back to organisms</LinkButton>}
+            action={<LinkButton to="/fermos/organisms">Back to organisms</LinkButton>}
           />
         </Card>
       </>
@@ -1109,7 +1109,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <Button onClick={exportSummary} title="CSV of the parameter summary below, one row per field">
               <Download size={14} /> Export summary
             </Button>
-            <LinkButton to="/organisms">
+            <LinkButton to="/fermos/organisms">
               <ArrowRight size={14} className="rotate-180" /> All organisms
             </LinkButton>
           </>
@@ -1205,7 +1205,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             dense={density === 'dense'}
             exportName={`openferment-${strainId}-records`}
             exportNote="Canonical values are converted from the stored published pair on every render, so the table and the plots can never disagree."
-            onOpen={({ rec }) => navigate(`/biorepo/papers/${rec.paperId}?span=${rec.id}`)}
+            onOpen={({ rec }) => navigate(`/biorepo/paper/${rec.paperId}?span=${rec.id}`)}
             searchOf={({ rec }) =>
               `${rec.id} ${rec.paperId} ${fieldName(rec.field)} ${rec.unit} ${rec.componentTag ?? ''} ${rec.quote}`
             }
@@ -1334,7 +1334,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               <div className="text-body text-ink-soft">
                 No protocol in the <span className="font-num">media</span> category lists this
                 organism.{' '}
-                <a className="text-accent hover:underline" href={href('/protocols')}>
+                <a className="text-accent hover:underline" href={href('/runbooks/protocols')}>
                   Browse all protocols
                 </a>
                 .
@@ -1344,7 +1344,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 {mediaProtocols.map(({ protocol, version, cited, materials }, i) => (
                   <li key={protocol.id}>
                     <a
-                      href={href(`/protocols/${protocol.id}`)}
+                      href={href(`/runbooks/protocols/${protocol.id}`)}
                       className="block rounded-card border border-line p-2.5 hover:border-accent hover:bg-accent-wash transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1403,7 +1403,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             {linkedProtocols.length === 0 ? (
               <div className="text-body text-ink-soft">
                 No protocol lists this organism yet.{' '}
-                <a className="text-accent hover:underline" href={href('/protocols')}>
+                <a className="text-accent hover:underline" href={href('/runbooks/protocols')}>
                   Open the protocol library
                 </a>
                 .
@@ -1416,7 +1416,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   return (
                     <li key={p.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
                       <a
-                        href={href(`/protocols/${p.id}`)}
+                        href={href(`/runbooks/protocols/${p.id}`)}
                         className="font-serif font-semibold hover:text-accent hover:underline"
                       >
                         {p.title}
@@ -1434,7 +1434,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                           {live && (
                             <a
                               className="btn btn-sm"
-                              href={href(`/protocols/${p.id}/run/${run.id}`)}
+                              href={href(`/runbooks/protocols/${p.id}/run/${run.id}`)}
                               title="Return to the active run"
                             >
                               <Play size={12} /> Resume
@@ -1471,7 +1471,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 {linkedScenarios.map(({ sc, via, recordId }) => (
                   <li key={sc.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
                     <a
-                      href={href(`/proforma/${sc.id}`)}
+                      href={href(`/proforma/scenario/${sc.id}`)}
                       className="font-serif font-semibold hover:text-accent hover:underline"
                     >
                       {sc.name}
@@ -1557,7 +1557,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           right={
             hostProducts.length > 0 ? (
               <a
-                href={href(`/molecules?host=${strainId}`)}
+                href={href(`/dominion/molecules?host=${strainId}`)}
                 className="text-caption text-accent hover:underline"
               >
                 Open in the catalogue
@@ -1586,7 +1586,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               icon={<Boxes size={22} aria-hidden />}
               title="No molecule in the catalogue defaults to this host"
               body="Nothing in the 117-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate."
-              action={<LinkButton to="/molecules">Browse the catalogue</LinkButton>}
+              action={<LinkButton to="/dominion/molecules">Browse the catalogue</LinkButton>}
             />
           </Card>
         ) : (
@@ -1633,7 +1633,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                     {items.map((p) => (
                       <li key={p.id} className="flex items-center justify-between gap-2">
                         <a
-                          href={href(`/molecules/${p.id}`)}
+                          href={href(`/dominion/molecules/${p.id}`)}
                           className="text-body hover:text-accent hover:underline truncate"
                           title={p.note ?? p.name}
                         >

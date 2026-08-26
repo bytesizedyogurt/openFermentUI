@@ -150,7 +150,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
       if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
       if (!scenario) return;
       if (e.key === 'p') togglePin(scenario.id);
-      else if (e.key === 'c') navigate('/proforma/compare');
+      else if (e.key === 'c') navigate('/biorepo/compare');
       else if (e.key === '[' || e.key === ']') {
         const d = scenario.dims[activeDim];
         if (!d) return;
@@ -271,7 +271,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
             <Button
               onClick={() => {
                 const id = duplicateScenario(scenario.id);
-                navigate(`/proforma/${id}`);
+                navigate(`/proforma/scenario/${id}`);
                 toast({ text: 'Scenario duplicated', kind: 'success' });
               }}
             >
@@ -280,7 +280,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
             <Button onClick={exportAll}>
               <Download size={14} /> Export CSV
             </Button>
-            <Button onClick={() => navigate('/proforma/compare')} title="Compare (c)">
+            <Button onClick={() => navigate('/biorepo/compare')} title="Compare (c)">
               <GitCompare size={14} /> Compare
             </Button>
           </>

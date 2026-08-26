@@ -30,6 +30,8 @@ import {
   cx,
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { RUNBOOK_TABS } from '@/data/tabs';
 
 function RunbookCard({ r }: { r: Runbook }) {
   const products = useStore((s) => s.products);
@@ -160,7 +162,7 @@ function HandoffPanel({ productId }: { productId: string }) {
             </Button>
             <Button onClick={() => navigate('/runbooks')}>Not now</Button>
             <a
-              href={href(`/molecules/${product.id}`)}
+              href={href(`/dominion/molecules/${product.id}`)}
               className="text-caption text-accent hover:underline ml-1"
             >
               Back to {product.name}
@@ -222,6 +224,7 @@ export default function Runbooks() {
     return (
       <>
         <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
+        <OwnerTabs tabs={RUNBOOK_TABS} />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
             <Card key={i}>
@@ -240,11 +243,12 @@ export default function Runbooks() {
         title="Runbooks"
         subtitle={subtitle}
         actions={
-          <a href={href('/molecules')} className="btn">
+          <a href={href('/dominion/molecules')} className="btn">
             <Boxes size={14} /> Molecules
           </a>
         }
       />
+      <OwnerTabs tabs={RUNBOOK_TABS} />
 
       {handoffId && <HandoffPanel productId={handoffId} />}
 
@@ -312,7 +316,7 @@ export default function Runbooks() {
             title="No runbooks in this session"
             body="Runbooks are synthesised against a molecule. Open the catalogue and start one — a blocked molecule is usually the most interesting place to begin."
             action={
-              <a href={href('/molecules')} className="btn btn-primary">
+              <a href={href('/dominion/molecules')} className="btn btn-primary">
                 Open the catalogue <ArrowRight size={14} />
               </a>
             }

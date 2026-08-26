@@ -24,7 +24,7 @@ import { useStore } from '@/store';
 import { navigate } from '@/router';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
-import { OFF_RAIL, RAIL } from '@/data/nav';
+import { RAIL, SUB_VIEWS } from '@/data/nav';
 import { cx } from './ui';
 
 interface Item {
@@ -103,7 +103,7 @@ export function CommandPalette() {
         icon: r.icon,
         run: () => navigate(r.to),
       })),
-      ...OFF_RAIL.filter((r) => r.to !== '/depositions').map((r) => ({
+      ...SUB_VIEWS.map((r) => ({
         id: `n-${r.label.toLowerCase()}`,
         group: 'Navigate' as const,
         label: r.label,
@@ -112,8 +112,8 @@ export function CommandPalette() {
         icon: r.icon,
         run: () => navigate(r.to),
       })),
-      { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest board', hint: 'what is queued, fetched, failed', aliases: ['ingest', 'library ingest', 'fetch'], icon: Library, run: () => navigate('/biorepo/ingest') },
-      { id: 'n-cmp', group: 'Navigate', label: 'Proforma — compare scenarios', aliases: ['compare', 'simulate compare'], icon: LineChart, run: () => navigate('/proforma/compare') },
+      { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest board', hint: 'what is queued, fetched, failed', aliases: ['ingest', 'library ingest', 'fetch'], icon: Library, run: () => navigate('/intake/ingest') },
+      { id: 'n-cmp', group: 'Navigate', label: 'Proforma — compare scenarios', aliases: ['compare', 'simulate compare'], icon: LineChart, run: () => navigate('/biorepo/compare') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
       { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', hint: 'what every name means', aliases: ['components', 'names', 'glossary', 'vocabulary', 'map'], icon: Boxes, run: () => navigate('/settings/architecture') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
@@ -125,7 +125,7 @@ export function CommandPalette() {
         label: `${p.id} — ${p.title}`,
         hint: `${p.year} · paper`,
         icon: Library,
-        run: () => navigate(`/biorepo/papers/${p.id}`),
+        run: () => navigate(`/biorepo/paper/${p.id}`),
       });
     }
     for (const s of strains) {
@@ -135,7 +135,7 @@ export function CommandPalette() {
         label: `${s.binomial} ${s.designation}`,
         hint: 'strain',
         icon: FlaskConical,
-        run: () => navigate(`/organisms/${s.id}`),
+        run: () => navigate(`/fermos/organisms/${s.id}`),
       });
     }
     for (const p of products) {
@@ -145,7 +145,7 @@ export function CommandPalette() {
         label: p.name,
         hint: `${PRODUCT_CATEGORY_LABEL[p.category]} · molecule`,
         icon: Boxes,
-        run: () => navigate(`/molecules/${p.id}`),
+        run: () => navigate(`/dominion/molecules/${p.id}`),
       });
     }
     for (const r of runbooks) {
@@ -165,7 +165,7 @@ export function CommandPalette() {
         label: p.title,
         hint: `${p.id} · protocol`,
         icon: ClipboardList,
-        run: () => navigate(`/protocols/${p.id}`),
+        run: () => navigate(`/runbooks/protocols/${p.id}`),
       });
     }
     for (const s of scenarios) {
@@ -175,7 +175,7 @@ export function CommandPalette() {
         label: s.name,
         hint: `${s.modelId} · scenario`,
         icon: LineChart,
-        run: () => navigate(`/proforma/${s.id}`),
+        run: () => navigate(`/proforma/scenario/${s.id}`),
       });
     }
 
@@ -191,7 +191,7 @@ export function CommandPalette() {
         id: 'a-newsc',
         group: 'Actions',
         label: 'New Proforma scenario from cw15 defaults',
-        run: () => navigate('/proforma/sc-s1'),
+        run: () => navigate('/proforma/scenario/sc-s1'),
       },
       {
         id: 'a-tour',
@@ -243,7 +243,7 @@ export function CommandPalette() {
         group: 'Actions',
         label: 'Show molecules with blocking patent claims',
         hint: `${products.filter((p) => p.clearanceState === 'blocked').length} blocked`,
-        run: () => navigate('/molecules?clearance=blocked'),
+        run: () => navigate('/dominion/molecules?clearance=blocked'),
       },
       { id: 'a-help', group: 'Actions', label: 'Keyboard shortcuts', run: () => useStore.getState().setUI({ helpOpen: true }) },
       { id: 'a-reset', group: 'Actions', label: 'Reset demo data', run: resetDemo },

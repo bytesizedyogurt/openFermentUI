@@ -42,6 +42,8 @@ import {
   cx,
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { RUNBOOK_TABS } from '@/data/tabs';
 
 // ── Category vocabulary (shared with ProtocolDetail) ───────────────────
 
@@ -335,7 +337,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           </span>
           <div className="min-w-0 flex-1">
             <a
-              href={href(`/protocols/${protocol.id}`)}
+              href={href(`/runbooks/protocols/${protocol.id}`)}
               className="font-serif text-section-title font-semibold leading-snug hover:text-accent hover:underline block"
             >
               {protocol.title}
@@ -363,7 +365,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
             return (
               <a
                 key={o}
-                href={href(`/organisms/${o}`)}
+                href={href(`/fermos/organisms/${o}`)}
                 className="chip text-caption text-ink-soft hover:border-accent/40 hover:bg-accent-wash"
                 title={s.title}
               >
@@ -386,14 +388,14 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           <div className="flex items-center gap-2 shrink-0">
             {row.runCount > 0 && (
               <a
-                href={href(`/protocols/${protocol.id}`)}
+                href={href(`/runbooks/protocols/${protocol.id}`)}
                 className="text-caption text-ink-soft hover:text-accent font-num"
                 title="Runs recorded in this session"
               >
                 {row.runCount} run{row.runCount === 1 ? '' : 's'}
               </a>
             )}
-            <LinkButton to={`/protocols/${protocol.id}`} variant="primary" size="sm">
+            <LinkButton to={`/runbooks/protocols/${protocol.id}`} variant="primary" size="sm">
               Open
             </LinkButton>
           </div>
@@ -552,7 +554,7 @@ export default function Protocols() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/protocols/${r.protocol.id}`)}
+          href={href(`/runbooks/protocols/${r.protocol.id}`)}
           className="font-num text-accent hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
@@ -567,7 +569,7 @@ export default function Protocols() {
       priority: 1,
       render: (r) => (
         <a
-          href={href(`/protocols/${r.protocol.id}`)}
+          href={href(`/runbooks/protocols/${r.protocol.id}`)}
           className="font-serif hover:text-accent hover:underline block truncate"
           style={{ maxWidth: 320 }}
           title={r.protocol.purpose}
@@ -682,6 +684,7 @@ export default function Protocols() {
   ];
 
   const header = (
+    <>
     <PageHeader
       title="Protocols"
       subtitle={
@@ -719,6 +722,8 @@ export default function Protocols() {
         </div>
       }
     />
+    <OwnerTabs tabs={RUNBOOK_TABS} />
+    </>
   );
 
   if (!ready) {
@@ -877,7 +882,7 @@ export default function Protocols() {
               rowKey={(r) => r.protocol.id}
               tickOf={(r) => r.prov}
               dense={density === 'dense'}
-              onOpen={(r) => navigate(`/protocols/${r.protocol.id}`)}
+              onOpen={(r) => navigate(`/runbooks/protocols/${r.protocol.id}`)}
               searchOf={undefined}
               exportName="openferment-protocols"
               exportNote="CSV exports carry the corpus disclosure header, which states what each provenance class means. Capability columns are computed from protocol content."

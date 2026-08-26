@@ -674,7 +674,7 @@ export const useStore = create<OFState>()((set, get) => ({
         { label: 'Embed', ms: 1100 },
         { label: 'Extract', ms: 1800 },
       ],
-      href: `#/biorepo/papers/${paperId}`,
+      href: `#/biorepo/paper/${paperId}`,
     });
     if (fails) {
       // Scripted failure path (§8.5): halts at Parse with a specific reason.
@@ -689,7 +689,7 @@ export const useStore = create<OFState>()((set, get) => ({
         get().toast({
           text: `Ingest ${paperId} halted at Fetch`,
           kind: 'error',
-          href: '#/biorepo/ingest',
+          href: '#/intake/ingest',
           // Not 'Review' — that word now names a screen this does not go to.
           hrefLabel: 'Open the board',
         });
@@ -699,7 +699,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'download',
       text: `Ingest started for ${paperId}`,
-      href: `#/biorepo/ingest`,
+      href: `#/intake/ingest`,
       provenance: 'demo',
     });
   },
@@ -876,7 +876,7 @@ export const useStore = create<OFState>()((set, get) => ({
         at: stamp(),
         icon: 'check',
         text: `Run completed — ${proto.title}`,
-        href: `#/protocols/${proto.id}`,
+        href: `#/runbooks/protocols/${proto.id}`,
         provenance: 'user',
       });
     }
@@ -1358,7 +1358,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'run',
       text: `Deposition staged — ${protocol.title}`,
-      href: `#/protocols/${protocolId}/run/${runId}`,
+      href: `#/runbooks/protocols/${protocolId}/run/${runId}`,
       provenance: 'user',
     });
     return { depositionId, runId };
@@ -1477,7 +1477,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'check',
       text: `Deposition closed — ${d?.entries.length ?? 0} measured, ${d?.observations.length ?? 0} observed`,
-      href: `#/depositions/${depositionId}`,
+      href: `#/runbooks/depositions/${depositionId}`,
       provenance: 'user',
     });
   },
@@ -1631,7 +1631,7 @@ export const useStore = create<OFState>()((set, get) => ({
       at: stamp(),
       icon: 'check',
       text: `Reconciled — ${outcome}, ${evidence.length} measured value${evidence.length === 1 ? '' : 's'} released as evidence`,
-      href: `#/depositions/${depositionId}`,
+      href: `#/runbooks/depositions/${depositionId}`,
       provenance: 'measured',
     });
     get().toast({

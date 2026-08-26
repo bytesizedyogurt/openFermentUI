@@ -731,7 +731,7 @@ function CorpusSection() {
                 ))}
               </ul>
               <div className="mt-3">
-                <LinkButton to="/witness" size="sm">
+                <LinkButton to="/biorepo/witness" size="sm">
                   <Beaker size={13} /> See the validation plan
                 </LinkButton>
               </div>

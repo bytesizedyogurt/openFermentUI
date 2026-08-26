@@ -217,7 +217,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
       </Tick>
 
       <div className="flex items-center gap-2 pt-1 border-t border-line">
-        <LinkButton to={`/organisms/${s.id}`} variant="primary">
+        <LinkButton to={`/fermos/organisms/${s.id}`} variant="primary">
           Open <ArrowRight size={14} />
         </LinkButton>
         <span className="font-num text-caption text-ink-soft">{s.id}</span>
@@ -231,7 +231,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
 
 type SortKey = 'coverage' | 'name';
 
-export default function Organisms() {
+export default function Organisms({ embedded = false }: { embedded?: boolean } = {}) {
   const strains = useStore((s) => s.strains);
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
@@ -329,7 +329,7 @@ export default function Organisms() {
   if (!ready) {
     return (
       <>
-        <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />
+        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => (
             <Card key={i}>
@@ -344,7 +344,7 @@ export default function Organisms() {
   if (strains.length === 0) {
     return (
       <>
-        <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />
+        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
         <Card>
           <EmptyState
             icon={<FlaskConical size={22} />}
@@ -359,10 +359,12 @@ export default function Organisms() {
 
   return (
     <>
+      {/* Suppressed when fermOS mounts this as its default view — the owner's
+          header is already on screen and two would read as two pages. */}
       <PageHeader
-        eyebrow="Module 1 · Organisms"
-        title="Organisms"
-        subtitle={subtitle}
+        eyebrow={embedded ? undefined : 'Module 1 · Organisms'}
+        title={embedded ? null : 'Organisms'}
+        subtitle={embedded ? undefined : subtitle}
         actions={
           <div
             className="flex rounded-input border border-line overflow-hidden"

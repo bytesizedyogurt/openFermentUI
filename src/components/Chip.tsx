@@ -46,8 +46,8 @@ export function CitationChip({
 
   const prov: ProvKind = record ? provenanceOf(record) : 'demo';
   const target = record
-    ? `/biorepo/papers/${paper.id}?span=${record.id}`
-    : `/biorepo/papers/${paper.id}`;
+    ? `/biorepo/paper/${paper.id}?span=${record.id}`
+    : `/biorepo/paper/${paper.id}`;
 
   const copyCitation = () => {
     const doi = paper.doi ? ` https://doi.org/${paper.doi}` : paper.pmcid ? ` PMC${paper.pmcid.replace(/^PMC/, '')}` : '';

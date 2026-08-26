@@ -23,7 +23,7 @@ export default function Proforma() {
         subtitle="Turn verified parameters into economics. Each scenario is a sweep over a techno-economic model; every assumption carries its provenance."
         actions={
           <>
-            <LinkButton to="/proforma/compare">
+            <LinkButton to="/biorepo/compare">
               <GitCompare size={14} /> Compare
               {pinnedCount > 0 && (
                 <span className="font-num text-caption ml-1">({pinnedCount} pinned)</span>
@@ -33,7 +33,7 @@ export default function Proforma() {
               variant="primary"
               onClick={() => {
                 const id = duplicateScenario(scenarios[0]?.id ?? '');
-                navigate(`/proforma/${id}`);
+                navigate(`/proforma/scenario/${id}`);
               }}
               disabled={scenarios.length === 0}
             >
@@ -70,7 +70,7 @@ export default function Proforma() {
                 </div>
 
                 <a
-                  href={`#/proforma/${sc.id}`}
+                  href={`#/proforma/scenario/${sc.id}`}
                   className="font-serif text-section-title font-semibold hover:text-accent leading-snug"
                 >
                   {sc.name}
@@ -100,7 +100,7 @@ export default function Proforma() {
                   </div>
                 </div>
 
-                <LinkButton to={`/proforma/${sc.id}`} variant="primary" className="justify-center">
+                <LinkButton to={`/proforma/scenario/${sc.id}`} variant="primary" className="justify-center">
                   Open scenario
                 </LinkButton>
               </Card>

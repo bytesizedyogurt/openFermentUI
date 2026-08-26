@@ -1,70 +1,208 @@
 # Components
 
-openFerment has a named architecture of eighteen components. This file is the
-canonical mapping between those names and the code, and it is the reference
-every future specification points at (OF-BLD-006 §2.3).
+**openFerment is Home plus eleven destinations, and the list is closed.**
+
+This file is the canonical map every future specification points at
+(OF-BLD-008 §8). `src/data/nav.ts` is the single source of truth the rail, the
+command palette, the Architecture screen and the smoke tests all read from;
+this document is the same content written for a person, and `check:seed` fails
+the build if the two disagree.
 
 ## The rule
 
-**The component names ARE the user-facing vocabulary.**
+| | Path | Chord | Descriptor |
+|---|---|---|---|
+| Home | `/` | `h` | where things stand |
+| Intake | `/intake` | `i` | documents in, anchored to source |
+| BioRepo | `/biorepo` | `b` | records, artifacts, provenance |
+| Postdoc | `/postdoc` | `o` | ask, plan, answer from records |
+| geneOS | `/geneos` | `e` | sequence, structure, function |
+| fermOS | `/fermos` | `f` | hosts, metabolism, strain design |
+| pureOS | `/pureos` | `u` | downstream, recovery, storage |
+| Proforma | `/proforma` | `c` | cost, scale, uncertainty |
+| Runbooks | `/runbooks` | `r` | claims to be tested |
+| Dominion | `/dominion` | `d` | what is fenced, what is open |
+| Primer | `/primer` | `n` | how the system works |
+| Guild | `/guild` | `g` | who may verify |
 
-This reverses §2.2, which held that these names were for building the system
-and that the rail should say "Ask" rather than "Postdoc". That was the wrong
-call for these users. Researchers acquire domain vocabulary constantly — it is
-most of what a first year of graduate work consists of — and they will use this
-daily. A precise name learned once beats a generic one re-read forever. "Ask"
-names the verb and tells you nothing about what you are talking to; "Postdoc"
-tells you it plans, retrieves, shows its working, and can be handed a
-half-formed question.
+Twelve rail entries. **It does not grow.** Everything that exists now, and
+everything built later, lives inside one of the eleven. When something new
+appears and does not obviously belong, the question is which of the eleven owns
+it — never whether to add a twelfth. If a thirteenth ever seems necessary the
+honest options are to find its owner, or to argue that the eleven are wrong.
+Adding one is not an option, and `check:seed` enforces that rather than
+trusting anybody to remember it.
 
-So a component name appears in four places:
+Five things used to be destinations and are now views inside their owner.
+**None of their screens were deleted** — each is the same file, mounted
+somewhere else:
 
-1. **Module organisation** — code for a component is identifiably that
-   component's code, and the file is named after it: Deposition's screen is
-   `Deposition.tsx`.
-2. **The product** — rail labels, page titles, routes, the command palette,
-   the guided tour. One vocabulary, in the code and on the screen.
-3. **Attribution in the UI** — when work is done, the component doing it is
-   named: `geneOS · homology sweep`, `Clearance · not searched`. Rendered by
-   `src/components/ComponentTag.tsx`. This survives the reversal unchanged:
-   naming the surface you are standing on and naming the component that did a
-   particular piece of work are different jobs.
-4. **This file** — the single canonical mapping.
+| Was | Is now |
+|---|---|
+| Organisms | fermOS's default view — `/fermos/organisms` |
+| Molecules | Dominion's default view — `/dominion/molecules` |
+| Protocols | a Runbooks tab — `/runbooks/protocols` |
+| Deposition | a Runbooks tab — `/runbooks/depositions` |
+| Witness | a BioRepo tab — `/biorepo/witness` |
 
-Three things keep an invented word learnable rather than hostile, and all three
-live in `src/data/nav.ts` rather than being left to each screen:
+Every retired path redirects, tail intact: `/organisms/cw15` lands on
+`/fermos/organisms/cw15`. Old words still resolve in the palette — typing
+"molecules" reaches Dominion.
 
-- a **descriptor** under every label, so nobody meets a bare coinage;
-- an **alias** in the command palette, so typing "library" still finds BioRepo;
-- a **redirect**, so `/library/papers/H4` lands on `/biorepo/papers/H4` rather
-  than a not-found page.
+## The eleven
 
-Organisms, Molecules and Protocols keep their plain names. They are catalogue
-views of domain objects a biologist already has words for, not components, and
-coining over them would be coining for its own sake.
+### Intake
 
-## The map
+**Documents in, anchored to source.** `/intake` · chord `g i`
+
+Ingest and extraction. A claim enters the system here or it does not enter at all.
+
+Views: [Ingest](#) `/intake/ingest`
+
+| Component | Implemented in |
+|---|---|
+| Intake | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx` |
+
+### BioRepo
+
+**Records, artifacts, provenance.** `/biorepo` · chord `g b`
+
+The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness asks whether the extractor reproduces.
+
+Views: [Witness](#) `/biorepo/witness` · [Compare](#) `/biorepo/compare`
+
+| Component | Implemented in |
+|---|---|
+| BioRepo | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx` |
+| Audit | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` |
+| Witness | `src/screens/Witness.tsx`, `src/engine/metrics.ts` |
+
+Not built: Common Seal.
+
+### Postdoc
+
+**Ask, plan, answer from records.** `/postdoc` · chord `g o`
+
+The thing you talk to. Runs on Claude Haiku through `openferment-core`; writes claims that carry no numbers of their own.
+
+| Component | Implemented in |
+|---|---|
+| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` |
+
+### geneOS
+
+**Sequence, structure, function.** `/geneos` · chord `g e`
+
+A destination with a screen and no tooling. Homology search, structure prediction, enzyme annotation and genus enumeration are named and unbuilt.
+
+| Component | Implemented in |
+|---|---|
+| geneOS | `src/screens/GeneOS.tsx` |
+
+### fermOS
+
+**Hosts, metabolism, strain design.** `/fermos` · chord `g f`
+
+The organism side. Organisms — the strain catalogue — is the built part; metabolic models, pathway design and strain design are not.
+
+Views: [Organisms](#) `/fermos/organisms`
+
+| Component | Implemented in |
+|---|---|
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx` |
+
+### pureOS
+
+**Downstream, recovery, storage.** `/pureos` · chord `g u`
+
+Everything after the fermenter. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it.
+
+### Proforma
+
+**Cost, scale, uncertainty.** `/proforma` · chord `g c`
+
+Techno-economics over authored response surfaces. Prices a process; does not choose one.
+
+| Component | Implemented in |
+|---|---|
+| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` |
+
+### Runbooks
+
+**Claims to be tested.** `/runbooks` · chord `g r`
+
+The outbound falsifiable claim, the protocols that execute it, and the Depositions that report back. This is where the arrow reverses.
+
+Views: [Protocols](#) `/runbooks/protocols` · [Depositions](#) `/runbooks/depositions`
+
+| Component | Implemented in |
+|---|---|
+| Runbook | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` |
+| Deposition | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` |
+
+### Dominion
+
+**What is fenced, what is open.** `/dominion` · chord `g d`
+
+The molecule catalogue and the patent layer. Clearance is built; Claim Workbench, Priority Engine, Enablement and Notary are not.
+
+Views: [Molecules](#) `/dominion/molecules` · [Clearance](#) `/dominion/clearance`
+
+| Component | Implemented in |
+|---|---|
+| Clearance | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` |
+
+Not built: Claim Workbench, Priority Engine, Enablement, Notary.
+
+### Primer
+
+**How the system works.** `/primer` · chord `g n`
+
+The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state.
+
+| Component | Implemented in |
+|---|---|
+| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` |
+
+### Guild
+
+**Who may verify.** `/guild` · chord `g g`
+
+The Guild of Applied Life: review, roles, and who decided what.
+
+| Component | Implemented in |
+|---|---|
+| Guild of Applied Life | `src/screens/Guild.tsx` |
+
+
+## The full component map
+
+Eighteen named components across seven layers, each owned by one of the eleven.
+Internal machinery — Audit, Witness, Clearance, Deposition and the unbuilt
+patent pieces — is not a destination and names the destination it lives inside,
+so "where does this live" has an answer for every component rather than only
+for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
 | Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx` | the rail, /biorepo |
-| geneOS | Computing | not built | — |
-| fermOS | Computing | not built | — |
-| Proforma | Computing | `src/screens/Proforma.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
+| geneOS | Computing | `src/screens/GeneOS.tsx` | the rail, /geneos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx` | the rail, /fermos |
+| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
-| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts` | /witness |
+| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts` | a BioRepo tab, /biorepo/witness |
 | Common Seal | Keeping it honest | not built | — |
 | Claim Workbench | Patents | not built | — |
 | Priority Engine | Patents | not built | — |
-| Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts` | ambient on Molecules |
+| Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` | a Dominion tab, /dominion/clearance |
 | Enablement | Patents | not built | — |
 | Notary | Patents | not built | — |
 | Guild of Applied Life | People and permissions | `src/screens/Guild.tsx` | /guild |
 | Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` | the rail, /runbooks |
-| Deposition | Assay | `src/screens/Deposition.tsx`, `src/components/DepositionPanel.tsx` | launched from a Runbook |
+| Deposition | Assay | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` | a Runbooks tab, /runbooks/depositions |
 
 ## Named nothing yet
 
@@ -76,30 +214,32 @@ Code that sits in a layer without a name of its own.
 
 ## Reading the map
 
-**"not built" is a real entry.** Seven of the eighteen have no code behind them.
-They are in the table because the table is the architecture, not an inventory
-of what happens to exist — and because a name with nothing under it is a
-smaller problem than a system with no name for the thing it is missing.
+**"not built" is a real entry.** Five of the components have no code behind
+them. They are in the table because the table is the architecture, not an
+inventory of what happens to exist — and because a name with nothing under it
+is a smaller problem than a system with no name for the thing it is missing.
 
-**Primer moved.** It used to name the unit engine; it now names the Learn
-section — an introductory text, and a bio pun that earns its place. The unit
-engine was not handed a replacement name on the spot. It sits in "Keeping it
-honest" unnamed until somebody chooses one deliberately, because an unnamed
-thing on the map is honest and a hastily renamed one is a name nobody picked.
+**A destination can be empty and still be in the rail.** geneOS has a screen
+and no tooling. That is deliberate: putting it in the navigation from day one
+means that when sequence work arrives the question is what geneOS does with it,
+not where in the navigation it should go. The screen says it is empty rather
+than implying otherwise, and Home says so too.
 
 **The Assay layer is where the arrow reverses.** Everything above Runbook is
 software reasoning about the world. Deposition is the world reporting back.
 Runbook is an outbound falsifiable claim; Deposition is the inbound account of
-what actually happened. It is the only ground truth the platform gets about its
-own predictions, and nothing in the literature can supply it.
+what actually happened, and it is the only ground truth the platform gets about
+its own predictions.
 
-**Two components share one screen.** Runbook and Deposition are separate
-components, and Deposition launches from a Runbook rather than living inside
-it. `Deposition.tsx` — formerly `RunMode.tsx` — is Deposition's screen: bench
-execution, glove-tolerant, a tablet held at arm's length. Its accessibility
-constraints are load-bearing rather than incidental, and the rename changed
-none of them. Extend it; do not rewrite it.
+**Proforma prices a train; pureOS decides it.** Asking what a centrifugation
+step costs at ten cubic metres is an economics question. Asking whether
+centrifugation or filtration suits a cell-wall-deficient alga is a process
+question. They were living in the same place, and now they are not.
+
+**Attribution survives the reorganisation.** `ComponentTag` names the component
+that did a piece of work, which is a different job from naming the surface you
+are standing on. A tag reading `Clearance · not searched` is still correct now
+that Clearance is a Dominion tab.
 
 **One name is a phrase.** "Guild of Applied Life" is the component; `Guild` is
-the short form used in the rail, in attribution, and in code identifiers. The
-full phrase appears on the screen itself, once, where there is room to learn it.
+the short form used in the rail, in attribution, and in code identifiers.

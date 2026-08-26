@@ -29,8 +29,17 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { href } from '@/router';
-import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
-import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle } from '@/components/ui';
+import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
+import { ELEVEN } from '@/data/nav';
+import { PAPERS } from '@/data/papers';
+import { RECORDS } from '@/data/records';
+import { STRAINS } from '@/data/strains';
+import { PRODUCTS } from '@/data/products';
+import { PROTOCOLS } from '@/data/protocols';
+import { UNIT_OPERATIONS } from '@/data/vocabulary';
+import { MODULES } from '@/data/learn';
+import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
+import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -188,6 +197,29 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 // surface names are the vocabulary now (§2.2 as revised) and Home is where a
 // first-time reader meets them. The verb is what they came to do; the name is
 // what they will type next time.
+/**
+ * What each of the eleven actually has, right now (§7).
+ *
+ * Counted from the seed where there is something to count, and stated as
+ * "nothing" where there is not. `built` drives the greying: a destination with
+ * no code renders dimmed rather than being quietly indistinguishable from one
+ * that works, because "I clicked geneOS and it was empty" should be something
+ * Home told you first.
+ */
+const STATE: Record<string, { now: string; built: boolean }> = {
+  Intake: { now: `${RECORDS.length} extraction records`, built: true },
+  BioRepo: { now: `${PAPERS.length} papers · gold set not yet annotated`, built: true },
+  Postdoc: { now: 'live on Claude Haiku, via openferment-core', built: true },
+  geneOS: { now: 'empty — no sequence tooling yet', built: false },
+  fermOS: { now: `${STRAINS.length} organisms · no metabolic model`, built: true },
+  pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
+  Proforma: { now: `${SCENARIOS.length} scenarios over ${COST_MODELS.length} cost models`, built: true },
+  Runbooks: { now: `${RUNBOOKS.length} runbooks · ${PROTOCOLS.length} protocols`, built: true },
+  Dominion: { now: `${PRODUCTS.length} molecules · clearance modelled, not searched`, built: true },
+  Primer: { now: `${MODULES.length} modules`, built: true },
+  Guild: { now: 'review queue and roles', built: true },
+};
+
 const ENTRY_CARDS: {
   to: string;
   title: string;
@@ -210,7 +242,7 @@ const ENTRY_CARDS: {
     Icon: Table2,
   },
   {
-    to: '/protocols',
+    to: '/runbooks/protocols',
     title: 'Run a protocol',
     where: 'Protocols → Deposition',
     desc: 'Scale a verified procedure to your batch size and execute it at the bench.',
@@ -224,7 +256,7 @@ const ENTRY_CARDS: {
     Icon: LineChart,
   },
   {
-    to: '/molecules',
+    to: '/dominion/molecules',
     title: 'Browse molecules',
     where: 'Molecules',
     desc: 'What could be made, in which host, on which train — and who already owns it.',
@@ -459,7 +491,7 @@ export default function Home() {
 
             <TileBoundary label="Gold set">
               <VitalTile
-                to="/witness"
+                to="/biorepo/witness"
                 label="Gold set"
                 prov="gold"
                 sub={
@@ -479,7 +511,7 @@ export default function Home() {
 
             <TileBoundary label="Protocols published">
               <VitalTile
-                to="/protocols"
+                to="/runbooks/protocols"
                 label="Protocols published"
                 prov={protocolProv}
                 sub={
@@ -518,7 +550,7 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TileBoundary label="Molecules catalogued">
               <VitalTile
-                to="/molecules"
+                to="/dominion/molecules"
                 label="Molecules catalogued"
                 prov="demo"
                 tickTitle="Modeled — a map of the option space, not a set of measurements"
@@ -618,7 +650,7 @@ export default function Home() {
 
               {activeRun && activeProtocol && (
                 <ResumeCard
-                  to={`/protocols/${activeRun.protocolId}/run/${activeRun.id}`}
+                  to={`/runbooks/protocols/${activeRun.protocolId}/run/${activeRun.id}`}
                   kicker="Run in progress"
                   title={activeProtocol.title}
                   prov="user"
@@ -663,7 +695,7 @@ export default function Home() {
 
               {pinnedScenarios.length > 0 && (
                 <ResumeCard
-                  to="/proforma/compare"
+                  to="/biorepo/compare"
                   kicker="Pinned scenarios"
                   title={pinnedScenarios.map((s) => s.name).join(' · ')}
                   prov="demo"
@@ -700,8 +732,74 @@ export default function Home() {
           )}
         </section>
 
-        {/* ── Band 3 · Start something ───────────────────────────────── */}
-        <section aria-labelledby="home-start">
+        {/* ── Band 3 · The eleven ────────────────────────────────────── */}
+        {/* OF-BLD-008 §7 — the whole navigation, laid out once with an honest
+            current state per entry. "Empty" is a legitimate state and is shown
+            as one: geneOS says it has nothing, and a reader who wants sequence
+            work learns that here rather than by clicking through to find out. */}
+        <section aria-labelledby="home-eleven">
+          <SectionTitle
+            right={
+              <span className="font-num text-caption text-ink-soft">
+                {ELEVEN.filter((d) => STATE[d.label]?.built).length}/{ELEVEN.length} with something behind them
+              </span>
+            }
+          >
+            <span id="home-eleven">The eleven</span>
+          </SectionTitle>
+          <p className="text-body text-ink-soft mb-3 max-w-3xl">
+            Everything this platform does lives inside one of these. The list is closed — when
+            something new is built the question is which of the eleven owns it, never whether to
+            add a twelfth.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {ELEVEN.map((d) => {
+              const state = STATE[d.label];
+              return (
+                <a
+                  key={d.to}
+                  href={href(d.to)}
+                  className={cx(
+                    'card p-4 flex items-start gap-3 transition-colors hover:border-accent/45 hover:bg-accent-wash/40',
+                    !state?.built && 'opacity-70',
+                  )}
+                >
+                  <span
+                    className={cx(
+                      'w-9 h-9 rounded-btn grid place-items-center shrink-0 border',
+                      state?.built
+                        ? 'bg-accent/10 border-accent/25'
+                        : 'bg-ink-soft/5 border-line',
+                    )}
+                  >
+                    <d.icon
+                      size={17}
+                      className={state?.built ? 'text-accent' : 'text-ink-soft'}
+                      aria-hidden
+                    />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-serif text-section-title font-semibold leading-snug">
+                      {d.label}
+                    </span>
+                    <span className="block text-body text-ink-soft">{d.descriptor}</span>
+                    <span
+                      className={cx(
+                        'block font-num text-caption mt-1',
+                        state?.built ? 'text-ink' : 'text-ink-soft/70',
+                      )}
+                    >
+                      {state?.now ?? '—'}
+                    </span>
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── Band 4 · Start something ───────────────────────────────── */}
+        <section aria-labelledby="home-start" className="mt-7">
           <SectionTitle>
             <span id="home-start">Start something</span>
           </SectionTitle>
@@ -736,15 +834,15 @@ export default function Home() {
               <Compass size={14} aria-hidden />
               What is this platform?
             </button>
-            {/* §7 — the full map, one click from Home. The rail teaches a name
-                at a time; this is where all eighteen are laid out at once,
+            {/* The full map, one click from Home. The grid above names the
+                eleven; this is where every component each one owns is laid out,
                 including the seven with nothing under them yet. */}
             <a
               href={href('/settings/architecture')}
               className="inline-flex items-center gap-1.5 text-body text-ink-soft hover:text-accent"
             >
               <Boxes size={14} aria-hidden />
-              What do these names mean?
+              The map behind these names
             </a>
           </div>
         </section>

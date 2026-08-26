@@ -430,7 +430,7 @@ export default function Guild() {
                 <LinkButton to="/intake" variant="primary">
                   Open Extract
                 </LinkButton>
-                <LinkButton to="/witness">Open Witness</LinkButton>
+                <LinkButton to="/biorepo/witness">Open Witness</LinkButton>
               </div>
             }
           />
@@ -588,7 +588,7 @@ export default function Guild() {
               <Button onClick={exportLog}>
                 <FileDown size={14} /> Export session log
               </Button>
-              <LinkButton to="/witness" variant="primary">
+              <LinkButton to="/biorepo/witness" variant="primary">
                 <Gauge size={14} /> Open Witness
               </LinkButton>
               <Button onClick={() => advanceReview(-1)} title="Step back into the last record">
@@ -838,7 +838,7 @@ export default function Guild() {
                 </span>
               </div>
               <a
-                href={href(`/biorepo/papers/${record.paperId}?span=${record.id}`)}
+                href={href(`/biorepo/paper/${record.paperId}?span=${record.id}`)}
                 className="text-caption text-accent hover:underline"
               >
                 Open in the reader
