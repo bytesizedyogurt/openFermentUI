@@ -19,6 +19,7 @@ import type { UnitOperationStage } from '@/data/types';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
 import { UnbuiltList } from '@/components/Unbuilt';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 const PLANNED = [
   {
@@ -160,6 +161,8 @@ export default function PureOS() {
           items={PLANNED}
         />
       </div>
+
+      <SubsystemShelf owner="pureOS" />
 
       <div className="mt-5">
         <ComponentTag component="pureOS" action={`${UNIT_OPERATIONS.length} operations, no process model`} />

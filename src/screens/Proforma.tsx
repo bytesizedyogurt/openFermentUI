@@ -6,6 +6,7 @@ import { evaluateGrid } from '@/engine/grids';
 import { fmt } from '@/engine/units';
 import { PageHeader, Card, Button, LinkButton, cx, EmptyState } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 export default function Proforma() {
   const scenarios = useStore((s) => s.scenarios);
@@ -108,6 +109,8 @@ export default function Proforma() {
           })}
         </div>
       )}
+
+      <SubsystemShelf owner="Proforma" />
     </div>
   );
 }

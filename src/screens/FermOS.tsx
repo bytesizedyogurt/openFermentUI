@@ -15,6 +15,7 @@ import { Callout, PageHeader } from '@/components/ui';
 import { OwnerTabs, type OwnerTab } from '@/components/OwnerTabs';
 import { ComponentTag } from '@/components/ComponentTag';
 import { UnbuiltList } from '@/components/Unbuilt';
+import { SubsystemShelf } from '@/components/ReferenceView';
 import Organisms from './Organisms';
 
 const PLANNED = [
@@ -65,6 +66,8 @@ export default function FermOS() {
           items={PLANNED}
         />
       </div>
+
+      <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
         <ComponentTag component="fermOS" action={`${STRAINS.length} organisms, no metabolic model`} />

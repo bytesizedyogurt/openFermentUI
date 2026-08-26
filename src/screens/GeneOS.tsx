@@ -14,6 +14,7 @@ import { Dna } from 'lucide-react';
 import { EmptyState, PageHeader } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
 import { UnbuiltList } from '@/components/Unbuilt';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 /**
  * What geneOS will hold. Stated as work not started rather than as a roadmap
@@ -60,6 +61,8 @@ export default function GeneOS() {
           items={PLANNED}
         />
       </div>
+
+      <SubsystemShelf owner="geneOS" />
 
       <div className="mt-5">
         <ComponentTag component="geneOS" action="no implementation" />

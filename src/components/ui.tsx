@@ -73,7 +73,14 @@ export function EmptyState({
   icon,
 }: {
   title: string;
-  body: string;
+  /**
+   * ReactNode rather than string since OF-BLD-010 §2, which asks an empty
+   * state to say three things — what this does, what would appear, what must
+   * exist first — and three statements crammed into one sentence is a
+   * paragraph nobody finishes. Every existing caller passes a string, which is
+   * still a ReactNode, so nothing else changes.
+   */
+  body: ReactNode;
   action?: ReactNode;
   icon?: ReactNode;
 }) {

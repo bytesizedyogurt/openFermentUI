@@ -31,6 +31,7 @@ import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ClearanceChip, CounselCallout } from '@/components/Clearance';
 import { ProvenanceLegend } from '@/components/Provenance';
 import { Card, Explain, PageHeader, Skeleton, cx } from '@/components/ui';
+import { referenceFor } from '@/data/reference';
 import { delayClass } from '@/sim/latency';
 
 // ── scoping by query string ────────────────────────────────────────────
@@ -65,6 +66,64 @@ function matchesScope(p: Product, key: ScopeKey, value: string): boolean {
 }
 
 // ── screen ─────────────────────────────────────────────────────────────
+
+/**
+ * The five limitation kinds, from `dominion.claims`.
+ *
+ * Collapsed behind a disclosure rather than laid out flat: the catalogue's job
+ * is the hundred and seventeen rows below it, and a five-row legend permanently
+ * open above them would be furniture. The trigger states the one sentence that
+ * matters; the table is for the reader who stops.
+ */
+function LimitationKinds() {
+  const content = referenceFor('dominion.claims');
+  const kinds = content?.tables.find((t) => t.title === 'Limitation kinds');
+  if (!kinds) return null;
+  const enumerable = kinds.rows.filter((r) => r[2] === 'Yes').length;
+
+  return (
+    <div className="text-caption text-ink-soft inline-flex items-center gap-1.5">
+      <span>
+        Clearance states describe what a claim <span className="text-ink">recites</span>, not what
+        a molecule is — {enumerable} of {kinds.rows.length} limitation kinds can be designed
+        around by enumeration.
+      </span>
+      <Explain label="The five limitation kinds">
+        <div className="text-body">
+          <p className="mb-2 text-ink">{content?.blurb}</p>
+          <table className="w-full border-collapse text-body">
+            <thead>
+              <tr className="border-b border-line">
+                {kinds.cols.map((c) => (
+                  <th key={c} className="text-caption font-medium text-ink-soft px-1.5 py-1 text-left">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {kinds.rows.map((r) => (
+                <tr key={r[0]} className="border-b border-line/60 last:border-0 align-top">
+                  <td className="font-num px-1.5 py-1 text-ink whitespace-nowrap">{r[0]}</td>
+                  <td className="px-1.5 py-1 text-ink-soft italic">{r[1]}</td>
+                  <td
+                    className={cx(
+                      'px-1.5 py-1 font-num whitespace-nowrap',
+                      r[2] === 'Yes' ? 'text-accent' : 'text-ink-soft',
+                    )}
+                  >
+                    {r[2]}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {content?.note && <p className="mt-2 text-ink-soft">{content.note}</p>}
+        </div>
+      </Explain>
+    </div>
+  );
+}
 
 export default function Molecules({ embedded = false }: { embedded?: boolean } = {}) {
   const products = useStore((s) => s.products);
@@ -422,6 +481,18 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
       <div className="mb-3">
         <ProvenanceLegend />
       </div>
+
+      {/* OF-BLD-010 §5 — the clearance vocabulary, beside the catalogue it
+          describes. Every molecule below carries a clearance state, and those
+          states are judgements about what a claim RECITES: a claim naming a
+          sequence can be designed around by enumeration, a claim naming a
+          function cannot. That distinction decides whether the column means
+          anything, and a reader should not have to go to Dominion's Claim
+          Workbench — which is not built — to find it.
+
+          Rows come from reference.ts so there is one source; nothing here is a
+          patent status, and none of it is about any particular molecule. */}
+      <LimitationKinds />
 
       <DataTable<Product>
         rows={rows}

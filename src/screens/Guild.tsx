@@ -37,6 +37,7 @@ import {
   cx,
 } from '@/components/ui';
 import { DISCLOSURE, exportText } from '@/lib/csv';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 // ── reject reasons (numbered so they are one keystroke away) ────────────
 
@@ -435,6 +436,13 @@ export default function Guild() {
             }
           />
         </Card>
+
+        {/* Mounted on the BETWEEN-TASKS returns only. Guild's own header sets
+            the target at twenty records mouse-free in under four minutes, and
+            putting reference tables between a reviewer and the record they are
+            judging works directly against that. Here the queue is empty and
+            there is nothing to get in the way of. */}
+        <SubsystemShelf owner="Guild" />
       </>
     );
   }
@@ -646,6 +654,10 @@ export default function Guild() {
             </div>
           </Card>
         </div>
+
+        {/* The other between-tasks return: the queue is finished, so the
+            reference shelf is not standing between anybody and a decision. */}
+        <SubsystemShelf owner="Guild" />
       </>
     );
   }

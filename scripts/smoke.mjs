@@ -195,12 +195,58 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-010 — the reference shelf renders, and a stub still reads as one
+  //
+  // Two things have to be true together on every owner with subsystems, and
+  // checking either alone would miss the failure that matters: the domain
+  // content is on screen, AND the screen still says the code is not built. A
+  // shelf that quietly replaced the "not built" statement would look like a
+  // working subsystem, which is the exact confusion the divider exists to stop.
+  const SHELVES = [
+    ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
+    ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
+    ['/fermos', 'fermOS subsystems', 'Analysis methods'],
+    ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
+    ['/intake', 'Intake subsystems', 'Parse status ladder'],
+    ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
+    ['/proforma', 'Proforma subsystems', 'Uncertain inputs'],
+  ];
+  let shelfFails = 0;
+  for (const [route, heading, table] of SHELVES) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(`http://localhost:${PORT}/#${route}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      const text = await page.locator('body').innerText();
+      const problems = [];
+      if (!text.includes(heading)) problems.push(`no "${heading}" section`);
+      if (!text.includes(table)) problems.push(`reference table "${table}" not rendered`);
+      if (!/not built/i.test(text)) problems.push('nothing on the page says "not built"');
+      if (!/has no implementation/i.test(text)) problems.push('no subsystem states it is unimplemented');
+      // The divider's label is the sentence that separates the two kinds of claim.
+      if (!/what the field looks like, not what your answer would be/i.test(text)) {
+        problems.push('the reference divider and its label are missing');
+      }
+      if (problems.length) {
+        shelfFails++;
+        console.log(`✗ shelf ${route.padEnd(12)} ${problems.join('; ')}`);
+      } else {
+        console.log(`✓ shelf ${route.padEnd(12)} content below the line, "not built" above it`);
+      }
+    } catch (e) {
+      shelfFails++;
+      console.log(`✗ shelf ${route.padEnd(12)} ${String(e).slice(0, 140)}`);
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
   console.log(`\n${ROUTES.length - failures.length}/${ROUTES.length} routes clean`);
+  console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
-  if (failures.length || redirectFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails) process.exit(1);
 }
 
 main();

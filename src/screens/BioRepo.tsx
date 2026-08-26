@@ -31,6 +31,7 @@ import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -710,6 +711,8 @@ export default function BioRepo() {
           </>
         )}
       />
+
+      <SubsystemShelf owner="BioRepo" />
     </>
   );
 }

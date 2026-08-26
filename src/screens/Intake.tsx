@@ -27,6 +27,7 @@ import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { INTAKE_TABS } from '@/data/tabs';
+import { SubsystemShelf } from '@/components/ReferenceView';
 
 // ── row model ──────────────────────────────────────────────────────────
 
@@ -640,6 +641,8 @@ export default function Intake() {
             : undefined
         }
       />
+
+      <SubsystemShelf owner="Intake" />
 
       <p className="text-caption text-ink-soft mt-3 max-w-3xl">
         Double-click a row (or press Enter) to open the quoted span inside the paper. “Export CSV”

@@ -12,6 +12,12 @@
 // claim-architecture judgements and are NOT resolved to any jurisdiction; the
 // per-jurisdiction matrix is almost entirely unassessed and says so. A reader
 // glancing at "21 blocked" must not come away thinking somebody searched.
+//
+// The four unbuilt pieces — Claim Workbench, Priority Engine, Enablement,
+// Notary — used to be an UnbuiltList inside the clearance view. They are the
+// four Dominion subsystems, so `SubsystemShelf` now names each of them AND
+// carries the reference content for it (OF-BLD-010). Keeping both would have
+// stated the same four absences twice on one screen, and the shelf says more.
 import { useMemo } from 'react';
 import { PRODUCTS } from '@/data/products';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
@@ -25,27 +31,9 @@ import { href, useRoute } from '@/router';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { OwnerTabs, activeTab, type OwnerTab } from '@/components/OwnerTabs';
 import { ComponentTag } from '@/components/ComponentTag';
-import { UnbuiltList } from '@/components/Unbuilt';
+import { SubsystemShelf } from '@/components/ReferenceView';
 import Molecules from './Molecules';
 
-const PLANNED = [
-  {
-    what: 'Claim Workbench',
-    why: 'Read a claim set and say what it actually recites, so designing around it is a decision rather than a hope.',
-  },
-  {
-    what: 'Priority Engine',
-    why: 'Where to file, in what order, and what the priority date has to beat.',
-  },
-  {
-    what: 'Enablement',
-    why: 'Whether a specification supports the breadth its claims ask for.',
-  },
-  {
-    what: 'Notary',
-    why: 'Who conceived what, and when, with a record that survives being questioned.',
-  },
-];
 
 const RISK_TONE: Record<string, string> = {
   low: 'text-accent',
@@ -134,13 +122,6 @@ function ClearanceView() {
         </Callout>
       </div>
 
-      <div className="mt-6">
-        <UnbuiltList
-          title="The rest of Dominion"
-          note="Clearance is the built part. These four are named in the architecture and have no code."
-          items={PLANNED}
-        />
-      </div>
     </>
   );
 }
@@ -168,6 +149,8 @@ export default function Dominion() {
       <OwnerTabs tabs={tabs} />
 
       {onClearance ? <ClearanceView /> : <Molecules embedded />}
+
+      <SubsystemShelf owner="Dominion" />
 
       <div className="mt-5">
         <ComponentTag
