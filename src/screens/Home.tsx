@@ -203,15 +203,15 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
  * Counted from the seed where there is something to count, and stated as
  * "nothing" where there is not. `built` drives the greying: a destination with
  * no code renders dimmed rather than being quietly indistinguishable from one
- * that works, because "I clicked geneOS and it was empty" should be something
+ * that works, because "I clicked fermOS and it was empty" should be something
  * Home told you first.
  */
 const STATE: Record<string, { now: string; built: boolean }> = {
   Intake: { now: `${RECORDS.length} extraction records`, built: true },
   BioRepo: { now: `${PAPERS.length} papers · gold set not yet annotated`, built: true },
   Postdoc: { now: 'live on Claude Haiku, via openferment-core', built: true },
-  geneOS: { now: 'empty — no sequence tooling yet', built: false },
-  fermOS: { now: `${STRAINS.length} organisms · no metabolic model`, built: true },
+  geneOS: { now: `${STRAINS.length} hosts · no sequence tooling`, built: true },
+  fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
   pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
   Proforma: { now: `${SCENARIOS.length} scenarios over ${COST_MODELS.length} cost models`, built: true },
   Runbooks: { now: `${RUNBOOKS.length} runbooks · ${PROTOCOLS.length} protocols`, built: true },

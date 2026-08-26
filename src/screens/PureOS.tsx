@@ -1,4 +1,12 @@
-// pureOS — everything downstream of the fermenter (OF-BLD-008 §4).
+// pureOS — everything downstream of the fermenter (OF-BLD-008 §4, OF-BLD-011 §4).
+//
+// THE THIRD OF THE THREE STAGES. geneOS asks what the cell CAN do; fermOS asks
+// what a vessel DOES achieve; pureOS asks how product becomes vial. The seam
+// arriving here is the harvest step, and it carries a decision made two
+// components upstream — SECRETED OR INTRACELLULAR — which dictates the entire
+// train. That is stated on the screen rather than left in COMPONENTS.md,
+// because a reader who does not know where the decision was made will look for
+// it in the wrong place.
 //
 // NOT EMPTY, BUT NEARLY. The unit-operation vocabulary and `ProcessTrain.tsx`
 // belong here rather than to Proforma, and the distinction is the point of the
@@ -16,6 +24,7 @@ import { Filter } from 'lucide-react';
 import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
 import type { UnitOperationStage } from '@/data/types';
+import { href } from '@/router';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
 import { UnbuiltList } from '@/components/Unbuilt';
@@ -73,12 +82,35 @@ export default function PureOS() {
   return (
     <>
       <PageHeader
-        eyebrow="Downstream, recovery, storage"
+        eyebrow="Harvest, capture, recovery"
         title="pureOS"
-        subtitle="Everything after the fermenter. Proforma prices a train; pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one, and the two were living in the same place."
+        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. Proforma prices a train; pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <Callout kind="warn" title="The train starts with a decision made in geneOS">
+        <p className="text-ink">
+          <strong>Secreted or intracellular</strong> is the single choice with the largest effect
+          on downstream cost, and it is a genetic design choice — made in{' '}
+          <a href={href('/geneos')} className="text-accent hover:underline">
+            geneOS
+          </a>{' '}
+          when the chassis and signal peptide are picked, long before anybody touches a column. A
+          secreted product starts at centrifuge and filter. An intracellular one starts at lysis
+          and inherits every problem after it. So the handoff from{' '}
+          <a href={href('/fermos')} className="text-accent hover:underline">
+            fermOS
+          </a>{' '}
+          has to carry product location, not just a titre.
+        </p>
+        <p className="text-ink mt-2">
+          Properties flow downstream and are stored once. Thermostability is predicted in geneOS
+          and consumed here, where it decides whether a heat step can replace most of the capture
+          chromatography — it is not a pureOS field, and duplicating it would create two answers
+          to one question.
+        </p>
+      </Callout>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-5">
         <Stat label="Unit operations" value={String(UNIT_OPERATIONS.length)} sub={`across ${byStage.length} stages`} />
         <Stat label="Storage formats" value={String(STORAGE_FORMATS.length)} sub="how a product is kept" />
         <Stat

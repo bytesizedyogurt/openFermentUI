@@ -74,10 +74,16 @@ export interface NavSurface {
  * THE TWELVE. Home, then the eleven destinations, in order.
  *
  * Five things that used to be here are now views inside their owner, and none
- * of their screens were deleted: Organisms is fermOS's default view, Molecules
- * is Dominion's, Protocols and Depositions are Runbooks tabs, and Witness is a
- * BioRepo tab. A catalogue of strains is not a destination — it is what one of
- * the eleven happens to hold.
+ * of their screens were deleted: the strain catalogue is geneOS's default view
+ * (as Hosts), Molecules is Dominion's, Protocols and Depositions are Runbooks
+ * tabs, and Witness is a BioRepo tab. A catalogue of strains is not a
+ * destination — it is what one of the eleven happens to hold.
+ *
+ * OF-BLD-011 §1 corrected which one. The catalogue sat under fermOS until the
+ * three OS components were re-cut along the three stages of making something —
+ * geneOS the organism, fermOS the reactor, pureOS downstream. Choosing a
+ * chassis is a genetic design decision, so Hosts moved to geneOS and
+ * `/fermos/organisms` redirects.
  */
 export const RAIL: (NavSurface & { key: string })[] = [
   {
@@ -118,8 +124,28 @@ export const RAIL: (NavSurface & { key: string })[] = [
   {
     label: 'geneOS',
     to: '/geneos',
-    descriptor: 'sequence, structure, function',
-    aliases: ['sequence', 'homology', 'structure', 'enzyme', 'genes'],
+    descriptor: 'host, construct, pathway, design',
+    aliases: [
+      'organisms',
+      'strains',
+      'hosts',
+      'chassis',
+      'sequence',
+      'homology',
+      'structure',
+      'enzyme',
+      'genes',
+      'parts',
+      'construct',
+      'pathway',
+      'pathways',
+      'metabolic',
+      'genome-scale',
+      'gem',
+      'fba',
+      'strain design',
+      'knockout',
+    ],
     icon: Dna,
     component: 'geneOS',
     key: 'e',
@@ -127,8 +153,22 @@ export const RAIL: (NavSurface & { key: string })[] = [
   {
     label: 'fermOS',
     to: '/fermos',
-    descriptor: 'hosts, metabolism, strain design',
-    aliases: ['organisms', 'strains', 'hosts', 'metabolic', 'pathways'],
+    descriptor: 'reactor, kinetics, scale',
+    aliases: [
+      'fermenter',
+      'fermentation',
+      'bioreactor',
+      'reactor',
+      'kinetics',
+      'monod',
+      'kla',
+      'oxygen transfer',
+      'transport',
+      'fed-batch',
+      'feeding',
+      'scale-up',
+      'control',
+    ],
     icon: FlaskConical,
     component: 'fermOS',
     key: 'f',
@@ -136,8 +176,20 @@ export const RAIL: (NavSurface & { key: string })[] = [
   {
     label: 'pureOS',
     to: '/pureos',
-    descriptor: 'downstream, recovery, storage',
-    aliases: ['downstream', 'purification', 'unit operations', 'process train', 'recovery'],
+    descriptor: 'harvest, capture, recovery',
+    aliases: [
+      'downstream',
+      'purification',
+      'harvest',
+      'lysis',
+      'capture',
+      'chromatography',
+      'polish',
+      'unit operations',
+      'process train',
+      'recovery',
+      'storage',
+    ],
     icon: Filter,
     component: 'pureOS',
     key: 'u',
@@ -201,12 +253,20 @@ export const ELEVEN = RAIL.filter((r) => r.to !== '/');
  */
 export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
   {
-    label: 'Organisms',
-    to: '/fermos/organisms',
-    descriptor: 'strains and hosts',
-    aliases: ['organisms', 'strains', 'hosts', 'cw15'],
-    icon: FlaskConical,
-    owner: 'fermOS',
+    label: 'Hosts',
+    to: '/geneos/hosts',
+    descriptor: 'the strain catalogue — chassis and lineage',
+    aliases: ['organisms', 'strains', 'hosts', 'chassis', 'cw15'],
+    icon: Dna,
+    owner: 'geneOS',
+  },
+  {
+    label: 'Pathway',
+    to: '/geneos/pathway',
+    descriptor: 'biosynthetic routes and their branch points',
+    aliases: ['pathway', 'pathways', 'route', 'precursor', 'mva', 'shikimate'],
+    icon: Dna,
+    owner: 'geneOS',
   },
   {
     label: 'Molecules',
@@ -291,8 +351,14 @@ export const DESCRIPTOR: Record<string, string> = Object.fromEntries(
  * itself redirected.
  */
 export const REDIRECTS: Record<string, string> = {
+  // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ────
+  // Re-aimed rather than chained: '/organisms' used to land on
+  // '/fermos/organisms', which is itself retired now, and a redirect whose
+  // target redirects bounces the reader through two interstitials.
+  '/fermos/organisms': '/geneos/hosts',
+
   // ── OF-BLD-008: five destinations became views ──────────────────────
-  '/organisms': '/fermos/organisms',
+  '/organisms': '/geneos/hosts',
   '/molecules': '/dominion/molecules',
   '/protocols': '/runbooks/protocols',
   '/depositions': '/runbooks/depositions',
@@ -351,7 +417,7 @@ const PATTERN_REDIRECTS: [RegExp, string][] = [
  * rule beat the general one without anybody having to order the map by hand.
  *
  * The tail is preserved, so a deep link keeps its target: `/organisms/cw15`
- * reaches `/fermos/organisms/cw15` rather than dumping the reader at the top
+ * reaches `/geneos/hosts/cw15` rather than dumping the reader at the top
  * of the catalogue to find their strain again.
  */
 export function redirectFor(path: string): string | null {

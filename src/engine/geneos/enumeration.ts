@@ -1,6 +1,13 @@
 // Enumeration funnel (OF-BLD-005 §7) — how a research runbook narrows a
 // candidate space, read back out of the stages it has already run.
 //
+// UNDER geneOS (OF-BLD-011 §7.4). Genus enumeration is a sequence-space search:
+// it asks which proteins occupy the space a claim fences, which is the same
+// question homology search and structure prediction ask with different tools.
+// It sat in a flat `engine/` directory that said nothing about who owned it;
+// the path now does. The file itself is unchanged — this is an ownership move,
+// not a rewrite.
+//
 // The funnel is derived rather than authored, so it cannot drift from the
 // stage list beside it. That makes the parsing rules load-bearing, and they
 // are deliberately strict: a number is a candidate count only when the stage's

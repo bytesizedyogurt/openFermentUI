@@ -124,22 +124,32 @@ export const COMPONENTS: ComponentDef[] = [
     role: 'The corpus, and everything retrieved from it',
   },
   {
+    // OF-BLD-011 §2 — the first of the three stages. The strain catalogue and
+    // its pages moved here from fermOS, because choosing a chassis is a
+    // genetic design decision; genus enumeration came with them, being a
+    // sequence-space search.
     name: 'geneOS',
     owner: 'geneOS',
     layer: 'Computing',
-    // A placeholder screen only. Listed as built because the destination
-    // exists and is honest about being empty — not because there is tooling.
-    livesIn: ['src/screens/GeneOS.tsx'],
+    livesIn: [
+      'src/screens/GeneOS.tsx',
+      'src/screens/Organisms.tsx',
+      'src/screens/StrainPage.tsx',
+      'src/engine/geneos/enumeration.ts',
+    ],
     surfacedAs: 'the rail, /geneos',
-    role: 'Sequence, structure and function — a destination with no tooling behind it yet',
+    role: 'The organism as an engineered system — host, parts, pathway, model, strain design',
   },
   {
+    // OF-BLD-011 §3 — the reactor, and now the emptiest of the eleven. It got
+    // emptier on purpose: the catalogue it used to hold was never its, and
+    // what it should have held — kinetics, transport, scale — was never built.
     name: 'fermOS',
     owner: 'fermOS',
     layer: 'Computing',
-    livesIn: ['src/screens/FermOS.tsx', 'src/screens/Organisms.tsx', 'src/screens/StrainPage.tsx'],
+    livesIn: ['src/screens/FermOS.tsx'],
     surfacedAs: 'the rail, /fermos',
-    role: 'Hosts, metabolism and strain design — organisms is the built part',
+    role: 'The reactor — kinetics, transport, operating mode, scale, control. None of it built',
   },
   {
     name: 'Proforma',

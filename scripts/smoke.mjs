@@ -52,12 +52,13 @@ const ROUTES = [
   ['/biorepo/compare', 'BioRepo — compare'],
   ['/biorepo/witness', 'BioRepo — Witness'],
   ['/postdoc', 'Postdoc'],
-  ['/geneos', 'geneOS (empty by design)'],
-  ['/fermos', 'fermOS'],
-  ['/fermos/organisms', 'fermOS — organisms'],
-  ['/fermos/organisms/cw15', 'fermOS — strain page (cw15)'],
-  ['/fermos/organisms/creinhardtii-wt', 'fermOS — strain (walled comparator)'],
-  ['/fermos/organisms/bovine', 'fermOS — strain (reference molecule)'],
+  ['/geneos', 'geneOS — Hosts is the default view'],
+  ['/geneos/hosts', 'geneOS — hosts (the strain catalogue)'],
+  ['/geneos/hosts/cw15', 'geneOS — strain page (cw15)'],
+  ['/geneos/hosts/creinhardtii-wt', 'geneOS — strain (walled comparator)'],
+  ['/geneos/hosts/bovine', 'geneOS — strain (reference molecule)'],
+  ['/geneos/pathway', 'geneOS — pathway vocabulary'],
+  ['/fermos', 'fermOS (the emptiest of the eleven)'],
   ['/pureos', 'pureOS'],
   ['/proforma', 'Proforma'],
   ['/proforma/scenario/sc-s1', 'Proforma — scenario S1'],
@@ -100,9 +101,13 @@ const ROUTES = [
  * silently becomes a bookmark to the top of the corpus.
  */
 const REDIRECTS = [
+  // ── OF-BLD-011: the strain catalogue moved from fermOS to geneOS ─────
+  ['/fermos/organisms', '/geneos/hosts'],
+  ['/fermos/organisms/cw15', '/geneos/hosts/cw15'],
   // ── OF-BLD-008: the five that stopped being destinations ─────────────
-  ['/organisms', '/fermos/organisms'],
-  ['/organisms/cw15', '/fermos/organisms/cw15'],
+  // Re-aimed at the current home rather than chained through the old one.
+  ['/organisms', '/geneos/hosts'],
+  ['/organisms/cw15', '/geneos/hosts/cw15'],
   ['/molecules', '/dominion/molecules'],
   ['/molecules/taq-dna-polymerase', '/dominion/molecules/taq-dna-polymerase'],
   ['/protocols', '/runbooks/protocols'],
@@ -205,7 +210,7 @@ async function main() {
   const SHELVES = [
     ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
     ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
-    ['/fermos', 'fermOS subsystems', 'Analysis methods'],
+    ['/fermos', 'fermOS subsystems', 'Kinetic models'],
     ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
     ['/intake', 'Intake subsystems', 'Parse status ladder'],
     ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
@@ -240,13 +245,51 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-011 §2 — a seeded subsystem carries its reference on its own
+  //    view, and must NOT appear on the shelf under a "no implementation"
+  //    heading.
+  //
+  // Both halves matter. Hosts showing its chassis table proves the reference
+  // survived the move to geneOS; Hosts being absent from the shelf proves the
+  // shelf did not start calling a live catalogue of strains unbuilt.
+  const SEEDED = [
+    ['/geneos/hosts', 'Chassis trade-offs', 'Hosts has no implementation'],
+    ['/geneos/pathway', 'Precursor pathways', 'Pathway has no implementation'],
+  ];
+  let seededFails = 0;
+  for (const [route, table, mustNotSay] of SEEDED) {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(`http://localhost:${PORT}/#${route}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(800);
+      const text = await page.locator('body').innerText();
+      const problems = [];
+      if (!text.includes(table)) problems.push(`reference table "${table}" not rendered`);
+      if (text.includes(mustNotSay)) problems.push(`shelf claims "${mustNotSay}" for a seeded subsystem`);
+      if (!/what the field looks like, not what your answer would be/i.test(text)) {
+        problems.push('the reference divider and its label are missing');
+      }
+      if (problems.length) {
+        seededFails++;
+        console.log(`✗ seeded ${route.padEnd(17)} ${problems.join('; ')}`);
+      } else {
+        console.log(`✓ seeded ${route.padEnd(17)} reference below the line, not on the shelf`);
+      }
+    } catch (e) {
+      seededFails++;
+      console.log(`✗ seeded ${route.padEnd(17)} ${String(e).slice(0, 140)}`);
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
   console.log(`\n${ROUTES.length - failures.length}/${ROUTES.length} routes clean`);
   console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
+  console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
-  if (failures.length || redirectFails || shelfFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails) process.exit(1);
 }
 
 main();

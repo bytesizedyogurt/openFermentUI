@@ -760,13 +760,23 @@ for (const f of CLEARANCE_FINDINGS) {
   // Retired words must still find their thing. Checked by resolution rather
   // than by reading the alias arrays, so a word that is present but attached
   // to the wrong surface still fails. Several words legitimately resolve to
-  // two places now — "organisms" reaches both fermOS and its Organisms view —
+  // two places now — "organisms" reaches both geneOS and its Hosts view —
   // so the assertion is that the RIGHT one is among them, and that the first
   // (rail before sub-view) is the destination.
   const REQUIRED_ALIASES: [string, string][] = [
-    // OF-BLD-008: the five that stopped being destinations.
-    ['organisms', 'fermOS'],
-    ['strains', 'fermOS'],
+    // OF-BLD-011: the strain catalogue moved from fermOS to geneOS, so the
+    // old words have to follow it. Somebody typing "organisms" must reach the
+    // catalogue wherever it now lives, not the reactor it used to live under.
+    ['organisms', 'geneOS'],
+    ['strains', 'geneOS'],
+    ['hosts', 'geneOS'],
+    // ... and fermOS has to be findable by what it now holds, or the emptiest
+    // of the eleven is also the least reachable.
+    ['kinetics', 'fermOS'],
+    ['fermenter', 'fermOS'],
+    ['harvest', 'pureOS'],
+    ['capture', 'pureOS'],
+    // OF-BLD-008: the rest of the five that stopped being destinations.
     ['molecules', 'Dominion'],
     ['products', 'Dominion'],
     ['protocols', 'Runbooks'],
@@ -824,8 +834,12 @@ for (const f of CLEARANCE_FINDINGS) {
   // pairs rather than as prose because "no 404 from an old link" is only true
   // if somebody checks each one, and two of these moved twice.
   const LANDINGS: [string, string | null][] = [
-    ['/organisms', '/fermos/organisms'],
-    ['/organisms/cw15', '/fermos/organisms/cw15'],
+    ['/organisms', '/geneos/hosts'],
+    ['/organisms/cw15', '/geneos/hosts/cw15'],
+    // Moved twice: /organisms → /fermos/organisms → /geneos/hosts. Neither
+    // hop may chain, so both old forms are asserted against the CURRENT home.
+    ['/fermos/organisms', '/geneos/hosts'],
+    ['/fermos/organisms/cw15', '/geneos/hosts/cw15'],
     ['/molecules', '/dominion/molecules'],
     ['/molecules/taq-dna-polymerase', '/dominion/molecules/taq-dna-polymerase'],
     ['/protocols', '/runbooks/protocols'],
@@ -849,13 +863,15 @@ for (const f of CLEARANCE_FINDINGS) {
     ['/learn/m0/l0-1', '/primer/l0-1'],
     // Current paths must NOT redirect, or the reader bounces on arrival.
     ['/postdoc', null],
-    ['/fermos/organisms/cw15', null],
+    ['/geneos/hosts/cw15', null],
     ['/dominion/molecules', null],
     ['/runbooks/protocols/PR-TAP-01', null],
     ['/biorepo/paper/H4', null],
     ['/proforma/scenario/sc-s1', null],
     ['/primer/l0-1', null],
     ['/geneos', null],
+    ['/geneos/pathway', null],
+    ['/fermos', null],
     ['/pureos', null],
   ];
   for (const [from, to] of LANDINGS) {

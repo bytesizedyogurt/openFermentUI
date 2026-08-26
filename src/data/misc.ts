@@ -53,14 +53,14 @@ export const ACTIVITY: ActivityEvent[] = [
     at: '2026-08-10 13:40',
     icon: 'flask',
     text: 'Open question recorded on cw15: does C. reinhardtii have a Fam20-family kinase?',
-    href: '#/fermos/organisms/cw15',
+    href: '#/geneos/hosts/cw15',
     provenance: 'curated',
   },
   {
     at: '2026-08-10 11:12',
     icon: 'check',
     text: 'Strain alias table built — cw15, cw15-302, CC-4350 and Elow47 now normalise on ingest',
-    href: '#/fermos/organisms/cw15',
+    href: '#/geneos/hosts/cw15',
     provenance: 'gold',
   },
   {
@@ -102,7 +102,7 @@ export const ACTIVITY: ActivityEvent[] = [
     at: '2026-08-06 09:20',
     icon: 'file',
     text: 'Numbering convention enforced on residue positions — β-casein mature 209 vs precursor 224',
-    href: '#/fermos/organisms/bovine',
+    href: '#/geneos/hosts/bovine',
     provenance: 'gold',
   },
 ];

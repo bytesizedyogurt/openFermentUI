@@ -135,7 +135,7 @@ export function CommandPalette() {
         label: `${s.binomial} ${s.designation}`,
         hint: 'strain',
         icon: FlaskConical,
-        run: () => navigate(`/fermos/organisms/${s.id}`),
+        run: () => navigate(`/geneos/hosts/${s.id}`),
       });
     }
     for (const p of products) {

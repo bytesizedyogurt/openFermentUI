@@ -34,7 +34,7 @@ import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/runbooks';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { STRAINS_BY_ID } from '@/data/strains';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
-import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/enumeration';
+import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/enumeration';
 import { lockIntact } from '@/engine/lock';
 import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
@@ -697,7 +697,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
         </span>
         {product && <ClearanceChip state={product.clearanceState} compact />}
         {strain && (
-          <a href={href(`/fermos/organisms/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
+          <a href={href(`/geneos/hosts/${strain.id}`)} className="chip text-ink-soft hover:border-accent/45">
             <FlaskConical size={12} aria-hidden />
             <span className="italic">{strain.binomial}</span>
           </a>

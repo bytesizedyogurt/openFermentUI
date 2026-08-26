@@ -41,6 +41,7 @@ import { REFERENCE, referenceFor, type ReferenceContent } from '../src/data/refe
 import { PROVENANCE_LABEL, aggregateExclusion } from '../src/store';
 import { RECORDS } from '../src/data/records';
 import { SUBSYSTEMS } from '../src/data/subsystems';
+import { SCALES } from '../src/data/vocabulary';
 import { ELEVEN } from '../src/data/nav';
 import type { Provenance } from '../src/data/types';
 
@@ -118,6 +119,26 @@ const JUSTIFIED: { why: string; re: RegExp }[] = [
   {
     why: 'a worked example of how NOT to state a prediction, inside a note that says so',
     re: /'Predicted Tm: \d+' is not evidence/,
+  },
+  {
+    // OF-BLD-011 §3. A vessel volume is the SIZE OF A CLASS OF EQUIPMENT, not a
+    // quantity measured from anything: "pilot means a hundred to a thousand
+    // litres" is a fact about how the industry names its tiers, in the same way
+    // that "EC 3 is the hydrolases" is a fact about how it names reactions.
+    //
+    // It is also checked rather than trusted — see the SCALES cross-check
+    // below, which fails the build if a tier here stops matching the vocabulary
+    // the rest of the codebase already ships.
+    why: 'a scale tier\'s working volume — the size of a vessel class, cross-checked against SCALES',
+    re: /^[\d,]+(?:-[\d,]+)? L$/,
+  },
+  {
+    // The same tiers named inside prose. This one is an argument about value
+    // density — a small plant making research enzymes against a large one
+    // making commodity protein — and the numbers in it are plant sizes, not
+    // results. Nothing here is a titre, a yield or a cost.
+    why: 'vessel sizes naming two classes of plant inside a comparison, never a measured quantity',
+    re: /\b[\d,]+ L (?:train|plant)\b/,
   },
 ];
 
@@ -322,6 +343,41 @@ for (const cell of unjustified) {
   }
 }
 
+// ── the scale tiers agree with the vocabulary (OF-BLD-011 §3) ──────────
+//
+// `fermos.scale` is the one table in this file that carries bare numbers, and
+// the justification above says they are allowed because they name vessel
+// CLASSES rather than measurements. That justification is only worth anything
+// if somebody checks it: a volume typed here by hand can drift from the SCALES
+// vocabulary the rest of the app renders, and then the shelf is quietly
+// asserting a different pilot scale from the one ProcessTrain draws.
+//
+// So every volume on the shelf must be a volume the code already ships. The
+// reverse is not required: the shelf names a microplate tier below anything
+// SCALES models, which is reference content about the field rather than a
+// scale the platform costs anything at.
+{
+  const table = REFERENCE['fermos.scale']?.tables.find((t) => t.title === 'Scale tiers');
+  if (!table) {
+    fail('fermos.scale: no "Scale tiers" table — §3 names it as the scale reference');
+  } else {
+    const known = new Set(SCALES.map((sc) => sc.volumeL));
+    for (const [tier, volume] of table.rows) {
+      // Non-numeric tiers (Millilitres) are prose and have nothing to compare.
+      if (!hasDigit.test(volume)) continue;
+      const bare = volume.replace(/\s*L$/, '');
+      if (!known.has(bare)) {
+        fail(
+          `fermos.scale: tier "${tier}" is ${JSON.stringify(volume)} on the shelf, which is not ` +
+            `a volume SCALES carries (${[...known].join(', ')}). Either the vocabulary moved and ` +
+            'the shelf did not, or a number was typed here by hand — and the shelf would then be ' +
+            'stating a different scale from the one the rest of the app draws.',
+        );
+      }
+    }
+  }
+}
+
 // ── the shelf is reachable (OF-BLD-010 §3) ─────────────────────────────
 //
 // `referenceFor(id)` is the wiring, so an id in reference.ts that no subsystem
@@ -352,6 +408,34 @@ for (const cell of unjustified) {
       );
     }
     if (!sub.state.trim()) fail(`${sub.id}: no state sentence — §2 needs something above the line`);
+
+    // OF-BLD-011 §2 — the status and the sentence must say the same thing.
+    // `SubsystemShelf` renders a stub under a heading that reads "no
+    // implementation"; a seeded subsystem is off the shelf and beside real
+    // data. A row whose status and sentence disagree ships one of those two
+    // claims under the other's layout, and the reader has no way to tell.
+    //
+    // ANCHORED TO THE START, not searched anywhere in the sentence. A first
+    // pass matched "not built" wherever it fell and rejected geneos.hosts for
+    // saying "…chassis comparison and host recommendation are not built" — a
+    // sentence that is both true and exactly the kind of precision a seeded
+    // subsystem needs. What the shelf's layout asserts is that the subsystem
+    // OPENS by declaring itself unbuilt, so that is what is checked.
+    const saysUnbuilt = /^not built\b/i.test(sub.state.trim());
+    if (sub.status === 'stub' && !saysUnbuilt) {
+      fail(
+        `${sub.id}: status is "stub" but its sentence does not say so — the shelf will render ` +
+          `it under "no implementation" while the sentence claims otherwise. Sentence: ` +
+          `${JSON.stringify(sub.state)}`,
+      );
+    }
+    if (sub.status === 'seeded' && saysUnbuilt) {
+      fail(
+        `${sub.id}: status is "seeded" but its sentence says it is not built. A seeded subsystem ` +
+          'is off the shelf and sits beside real data, so this sentence would contradict the ' +
+          `screen it appears on. Sentence: ${JSON.stringify(sub.state)}`,
+      );
+    }
   }
 
   const ids = SUBSYSTEMS.map((sub) => sub.id);
@@ -372,7 +456,8 @@ if (referenceFor('nothing.here') !== null) {
 
 console.log('\nopenFerment reference check');
 console.log('───────────────────────────');
-console.log(`  subsystems    ${SUBSYSTEMS.length} registered, ${Object.keys(REFERENCE).length} with reference content`);
+const seeded = SUBSYSTEMS.filter((sub) => sub.status === 'seeded').length;
+console.log(`  subsystems    ${SUBSYSTEMS.length} registered (${seeded} seeded, ${SUBSYSTEMS.length - seeded} stub), ${Object.keys(REFERENCE).length} with reference content`);
 console.log(`  tables        ${tables}`);
 console.log(`  entries       ${rows} rows, ${cells.length} strings scanned`);
 console.log(`  notes         ${notes} carry a load-bearing sentence`);

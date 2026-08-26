@@ -307,7 +307,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             {strain ? (
               <>
                 <a
-                  href={href(`/fermos/organisms/${strain.id}`)}
+                  href={href(`/geneos/hosts/${strain.id}`)}
                   className="font-serif text-section-title font-semibold italic hover:text-accent hover:underline"
                 >
                   {strain.binomial}
@@ -544,7 +544,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
         band describe a plausible way to make {product.name}, assembled from vocabulary rather than
         from experiments — {PROVENANCE_LABEL[product.provenance].toLowerCase()}. The corpus behind
         this platform covers one throughline in depth, and this molecule is not it.{' '}
-        <a className="text-accent hover:underline" href={href('/fermos/organisms')}>
+        <a className="text-accent hover:underline" href={href('/geneos/hosts')}>
           The organism pages
         </a>{' '}
         say exactly how much evidence stands behind each host.

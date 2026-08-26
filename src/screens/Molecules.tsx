@@ -229,7 +229,7 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
         const s = STRAINS_BY_ID[p.defaultStrainId];
         return s ? (
           <a
-            href={href(`/fermos/organisms/${s.id}`)}
+            href={href(`/geneos/hosts/${s.id}`)}
             className="hover:text-accent hover:underline block truncate"
             onClick={(e) => e.stopPropagation()}
             title={`${s.binomial} ${s.designation}`}

@@ -1,7 +1,9 @@
-// Organisms index (OF-DES-001 §8.9). Four strains, and an honest account of
-// how much of the corpus actually stands behind each one. cw15 is covered
-// across every asset class; the others are not, and the card says so rather
-// than padding the layout to look even.
+// The strain catalogue (OF-DES-001 §8.9) — geneOS's Hosts view since
+// OF-BLD-011 §7.3, because choosing a chassis is a genetic design decision
+// rather than a reactor one. An honest account of how much of the corpus
+// actually stands behind each strain: cw15 is covered across every asset
+// class; the others are not, and the card says so rather than padding the
+// layout to look even.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
 import type { ExtractionRecord, Paper, Strain } from '@/data/types';
@@ -217,7 +219,7 @@ function StrainCard({ c, maxes }: { c: Coverage; maxes: Record<string, number> }
       </Tick>
 
       <div className="flex items-center gap-2 pt-1 border-t border-line">
-        <LinkButton to={`/fermos/organisms/${s.id}`} variant="primary">
+        <LinkButton to={`/geneos/hosts/${s.id}`} variant="primary">
           Open <ArrowRight size={14} />
         </LinkButton>
         <span className="font-num text-caption text-ink-soft">{s.id}</span>
@@ -359,8 +361,10 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
 
   return (
     <>
-      {/* Suppressed when fermOS mounts this as its default view — the owner's
-          header is already on screen and two would read as two pages. */}
+      {/* Suppressed when geneOS mounts this as its Hosts view — the owner's
+          header is already on screen and two would read as two pages.
+          OF-BLD-011 §7.3 moved the mount from fermOS to geneOS; this file is
+          unchanged apart from where it is mounted and where its links point. */}
       <PageHeader
         eyebrow={embedded ? undefined : 'Module 1 · Organisms'}
         title={embedded ? null : 'Organisms'}

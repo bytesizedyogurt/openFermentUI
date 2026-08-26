@@ -166,7 +166,7 @@ The simulation holds itself to eight conditions (design §11):
 |---|---|---|---|
 | 0 | PhycoExtract | Extraction quality is measurable | `/intake`, `/biorepo`, `/guild`, `/biorepo/witness` |
 | 1 | Corpus & Postdoc | Agentic RAG with visible retrieval | `/postdoc`, `/biorepo` |
-| 2 | Organisms & Protocols | Verified parameters become executable | `/fermos/organisms`, `/runbooks/protocols` |
+| 2 | Hosts & Protocols | Verified parameters become executable | `/geneos/hosts`, `/runbooks/protocols` |
 | 3 | Proforma | Parameters feed techno-economics | `/proforma` |
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
@@ -194,25 +194,45 @@ screen was deleted** — each is the same file, mounted somewhere else:
 
 | Was | Is now |
 |---|---|
-| Organisms | fermOS's default view — `/fermos/organisms` |
+| Organisms | geneOS's default view, as **Hosts** — `/geneos/hosts` |
 | Molecules | Dominion's default view — `/dominion/molecules` |
 | Protocols | a Runbooks tab — `/runbooks/protocols` |
 | Deposition | a Runbooks tab — `/runbooks/depositions` |
 | Witness | a BioRepo tab — `/biorepo/witness` |
 
 Every retired path redirects with its tail intact, so `/organisms/cw15` lands
-on `/fermos/organisms/cw15` rather than a 404, and the palette still answers to
+on `/geneos/hosts/cw15` rather than a 404, and the palette still answers to
 the old words. `COMPONENTS.md` is the full map; `/settings/architecture` is the
 same map in the app.
 
-Two destinations are deliberately empty. **geneOS** has a screen and no
-tooling; **pureOS** has the unit-operation vocabulary and no process model.
-Both say so on the screen rather than implying otherwise, and Home shows the
-current state of each of the eleven beside its name. Putting them in the rail
-from day one means that when the work arrives the question is what they do with
-it, not where it goes.
+### The three OS components are three stages, not three toolkits
 
-Organisms, Molecules and Protocols keep their plain names as views. They are
+OF-BLD-011 corrected a boundary error. geneOS and fermOS had been split along
+software categories — sequence tools in one, metabolic modelling in the other —
+which is how a toolkit is organised, not how bioprocess work is.
+
+| | Owns | Question | Discipline |
+|---|---|---|---|
+| **geneOS** | The organism as an engineered system | What *can* this cell do? | Stoichiometry |
+| **fermOS** | The reactor | What *does* a real vessel achieve over time? | Dynamics |
+| **pureOS** | Downstream | How does product become vial? | Separation |
+
+Two seams carry a decision made in one component and paid for in another, and
+both are stated on the screens. **geneOS → fermOS** is stoichiometry to
+dynamics: a genome-scale model gives a yield ceiling with no time axis, and
+titre is fermOS's output rather than geneOS's. **fermOS → pureOS** is the
+harvest step, which pays for a choice made back in geneOS — secreted or
+intracellular — so the handoff carries product location, not just a titre.
+
+**fermOS is the emptiest of the eleven**: five named subsystems and no code. It
+is also the one that cannot be seeded from literature, because kinetic
+parameters are fitted to real runs and come from Deposition. **pureOS** has the
+unit-operation vocabulary and no process model. Both say so on the screen
+rather than implying otherwise, and Home shows the current state of each of the
+eleven beside its name. Putting them in the rail from day one means that when
+the work arrives the question is what they do with it, not where it goes.
+
+Hosts, Molecules and Protocols keep their plain names as views. They are
 catalogue views of domain objects, not components.
 
 ## Architecture
@@ -221,6 +241,7 @@ catalogue views of domain objects, not components.
 src/data/       seed content as typed TS modules — becomes API fixtures in production
 src/data/corpus/  the 15 literature threads, A–O, one file per thread group
 src/engine/     pure logic, unit-testable without UI, ships to production unchanged
+src/engine/geneos/  engine code a component owns outright (genus enumeration)
 src/sim/        latency model and chat flow player — two files, retired last
 src/components/ shared primitives (citation chip, data table, quantity field, …)
 src/screens/    one file per screen, named after the component it is

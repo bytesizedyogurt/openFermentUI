@@ -16,9 +16,9 @@ the build if the two disagree.
 | Intake | `/intake` | `i` | documents in, anchored to source |
 | BioRepo | `/biorepo` | `b` | records, artifacts, provenance |
 | Postdoc | `/postdoc` | `o` | ask, plan, answer from records |
-| geneOS | `/geneos` | `e` | sequence, structure, function |
-| fermOS | `/fermos` | `f` | hosts, metabolism, strain design |
-| pureOS | `/pureos` | `u` | downstream, recovery, storage |
+| geneOS | `/geneos` | `e` | host, construct, pathway, design |
+| fermOS | `/fermos` | `f` | reactor, kinetics, scale |
+| pureOS | `/pureos` | `u` | harvest, capture, recovery |
 | Proforma | `/proforma` | `c` | cost, scale, uncertainty |
 | Runbooks | `/runbooks` | `r` | claims to be tested |
 | Dominion | `/dominion` | `d` | what is fenced, what is open |
@@ -39,15 +39,61 @@ somewhere else:
 
 | Was | Is now |
 |---|---|
-| Organisms | fermOS's default view — `/fermos/organisms` |
+| Organisms | geneOS's default view, as **Hosts** — `/geneos/hosts` |
 | Molecules | Dominion's default view — `/dominion/molecules` |
 | Protocols | a Runbooks tab — `/runbooks/protocols` |
 | Deposition | a Runbooks tab — `/runbooks/depositions` |
 | Witness | a BioRepo tab — `/biorepo/witness` |
 
 Every retired path redirects, tail intact: `/organisms/cw15` lands on
-`/fermos/organisms/cw15`. Old words still resolve in the palette — typing
-"molecules" reaches Dominion.
+`/geneos/hosts/cw15`. Old words still resolve in the palette — typing
+"molecules" reaches Dominion, and "organisms" reaches geneOS.
+
+## The three OS components
+
+They are the three **stages of making something**, in order. OF-BLD-011 §1
+corrected an earlier split along software categories — sequence tools in one
+component, metabolic-modelling libraries in the other — which is how a toolkit
+is organised, not how bioprocess work is.
+
+| | Owns | Question | Discipline |
+|---|---|---|---|
+| **geneOS** | The organism as an engineered system | What *can* this cell do? | Stoichiometry |
+| **fermOS** | The reactor | What *does* a real vessel achieve over time? | Dynamics |
+| **pureOS** | Downstream | How does product become vial? | Separation |
+
+Two consequences of the old split were actively wrong, and both are fixed.
+**Strain design sat in fermOS** — deciding which genes to knock out is genetic
+design and belongs with the rest of it. And **fermOS had no kinetics at all**,
+which meant the component named after fermentation contained nothing about
+running a fermenter.
+
+### The seams
+
+Two boundaries carry a decision made in one component and paid for in another.
+Both are stated on the screens, not only here.
+
+**geneOS → fermOS is stoichiometry to dynamics.** A genome-scale model says the
+pathway can reach a yield; it has no time axis and no vessel. Kinetics says what
+happens in a 2,000 litre reactor over ninety hours. **Titre is fermOS's output,
+not geneOS's**, and the gap between the ceiling and the titre achieved is
+exactly what reconciliation measures against a Deposition.
+
+**fermOS → pureOS is the harvest step**, and it is where **secreted or
+intracellular** gets paid for — a decision made back in geneOS when the chassis
+and signal peptide were chosen. A secreted product starts at centrifuge and
+filter; an intracellular one starts at lysis and inherits every problem after
+it. The handoff must carry product location, not just a titre.
+
+**Properties flow downstream; operations do not flow back.** Thermostability is
+predicted in geneOS and consumed in pureOS, where it decides whether thermal
+clarification can replace most of the capture chromatography. Store it once in
+geneOS. Do not duplicate it.
+
+**fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
+real runs in a specific vessel, so they come from Deposition. fermOS is the
+component that most needs the Assay loop and the one that cannot be built out of
+papers.
 
 ## The eleven
 
@@ -91,31 +137,57 @@ The thing you talk to. Runs on Claude Haiku through `openferment-core`; writes c
 
 ### geneOS
 
-**Sequence, structure, function.** `/geneos` · chord `g e`
+**Host, construct, pathway, design.** `/geneos` · chord `g e`
 
-A destination with a screen and no tooling. Homology search, structure prediction, enzyme annotation and genus enumeration are named and unbuilt.
+The organism as an engineered system: host choice, genetic parts, pathway assembly, the genome-scale model, strain design. Stoichiometry — what a cell *can* do, before any vessel is involved. Hosts (the strain catalogue) and Pathway (the biosynthetic vocabulary) are seeded; the other six subsystems are named and unbuilt.
+
+Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
+
+| Subsystem | Key | State |
+|---|---|---|
+| Hosts | `geneos.hosts` | seeded |
+| Parts | `geneos.parts` | stub |
+| Pathway | `geneos.pathway` | seeded |
+| Sequence search | `geneos.search` | stub |
+| Structure | `geneos.structure` | stub |
+| Function | `geneos.function` | stub |
+| Model | `geneos.model` | stub |
+| Strain design | `geneos.design` | stub |
 
 | Component | Implemented in |
 |---|---|
-| geneOS | `src/screens/GeneOS.tsx` |
+| geneOS | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` |
 
 ### fermOS
 
-**Hosts, metabolism, strain design.** `/fermos` · chord `g f`
+**Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The organism side. Organisms — the strain catalogue — is the built part; metabolic models, pathway design and strain design are not.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **This is the emptiest of the eleven, and honestly so**: there is no kinetic model, no transport calculation and no scale-up logic anywhere in the codebase.
 
-Views: [Organisms](#) `/fermos/organisms`
+| Subsystem | Key | State |
+|---|---|---|
+| Kinetics | `fermos.kinetics` | stub |
+| Transport | `fermos.transport` | stub |
+| Operating mode | `fermos.mode` | stub |
+| Scale | `fermos.scale` | stub |
+| Control | `fermos.control` | stub |
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx` |
+| fermOS | `src/screens/FermOS.tsx` |
 
 ### pureOS
 
-**Downstream, recovery, storage.** `/pureos` · chord `g u`
+**Harvest, capture, recovery.** `/pureos` · chord `g u`
 
-Everything after the fermenter. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it.
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it.
+
+| Subsystem | Key | State |
+|---|---|---|
+| Harvest | `pureos.harvest` | stub |
+| Capture | `pureos.capture` | stub |
+| Polish | `pureos.polish` | stub |
+| Recovery | `pureos.recovery` | stub |
 
 ### Proforma
 
@@ -188,8 +260,8 @@ for the ones with a rail entry.
 | Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx` | the rail, /biorepo |
-| geneOS | Computing | `src/screens/GeneOS.tsx` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx` | the rail, /fermos |
+| geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
+| fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
@@ -219,11 +291,11 @@ them. They are in the table because the table is the architecture, not an
 inventory of what happens to exist — and because a name with nothing under it
 is a smaller problem than a system with no name for the thing it is missing.
 
-**A destination can be empty and still be in the rail.** geneOS has a screen
-and no tooling. That is deliberate: putting it in the navigation from day one
-means that when sequence work arrives the question is what geneOS does with it,
-not where in the navigation it should go. The screen says it is empty rather
-than implying otherwise, and Home says so too.
+**A destination can be empty and still be in the rail.** fermOS has a screen,
+five named subsystems and no code. That is deliberate: putting it in the
+navigation from day one means that when kinetics arrives the question is what
+fermOS does with it, not where in the navigation it should go. The screen says
+it is empty rather than implying otherwise, and Home says so too.
 
 **The Assay layer is where the arrow reverses.** Everything above Runbook is
 software reasoning about the world. Deposition is the world reporting back.
@@ -235,6 +307,13 @@ its own predictions.
 step costs at ten cubic metres is an economics question. Asking whether
 centrifugation or filtration suits a cell-wall-deficient alga is a process
 question. They were living in the same place, and now they are not.
+
+**One boundary is still open: mass balance.** It is listed under Proforma today,
+and a mass balance is a statement about a process train rather than about money.
+The cleaner split would be *pureOS specifies the train and its recovery;
+Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). Nothing in the code
+forces the question yet, and it is recorded here rather than settled quietly,
+because whoever builds it first will settle it by accident otherwise.
 
 **Attribution survives the reorganisation.** `ComponentTag` names the component
 that did a piece of work, which is a different job from naming the surface you

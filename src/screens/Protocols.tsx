@@ -365,7 +365,7 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
             return (
               <a
                 key={o}
-                href={href(`/fermos/organisms/${o}`)}
+                href={href(`/geneos/hosts/${o}`)}
                 className="chip text-caption text-ink-soft hover:border-accent/40 hover:bg-accent-wash"
                 title={s.title}
               >

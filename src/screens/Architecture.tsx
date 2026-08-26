@@ -122,9 +122,9 @@ export default function Architecture() {
       >
         That is on purpose, and it is why the empty rows are here rather than omitted. A name with
         no code behind it is a smaller problem than a system with no name for the thing it is
-        missing — <span className="font-num">geneOS</span> and{' '}
-        <span className="font-num">fermOS</span> are the two largest holes in the platform, and
-        leaving them off this page would make it look complete.
+        missing — <span className="font-num">fermOS</span> is now the largest hole in the platform
+        by some distance, holding five named subsystems and no line of code, and leaving it off
+        this page would make the map look complete.
       </Callout>
 
       <div className="mt-5 space-y-5">

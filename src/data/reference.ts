@@ -1,19 +1,34 @@
-// Reference content for subsystems that have no data yet (OF-BLD-010).
+// Reference content for subsystems that have no data yet (OF-BLD-010, revised OF-BLD-011).
 //
-// THE DISTINCTION THIS FILE RESTS ON. Reference content is domain knowledge:
-// the seven EC classes, the chromatography modes that exist, the published
-// genome-scale models, the rules for computing a priority date. None of it is
-// a measurement, a prediction, or a claim about any particular molecule. It is
-// the kind of thing a textbook contains, and putting it on screen is not
-// fabrication — it is the difference between an empty room and a reference
-// shelf.
+// THE DISTINCTION THIS FILE RESTS ON. Reference content is domain knowledge: the
+// seven EC classes, the chromatography modes that exist, the published
+// genome-scale models, what sets kLa in a stirred tank. None of it is a
+// measurement, a prediction, or a claim about any particular molecule. A
+// textbook contains these. Showing them is not fabrication.
 //
 // What is NOT in here, and must never be added: titres, yields, costs, patent
 // statuses, or any number presented as a result. A stub subsystem may show what
-// the field looks like. It may not show what your answer would be.
+// the FIELD looks like. It may never show what YOUR ANSWER would be.
 //
-// Rendered by ReferenceView beneath the EmptyState. The subsystem still reads
-// as unbuilt; it just is not blank while it waits.
+// COMPONENT BOUNDARIES (revised). The three OS components are the three stages
+// of making something, in order:
+//
+//   geneOS  - the organism as an engineered system. Host choice, genetic parts,
+//             pathway assembly, the genome-scale model, strain design.
+//             Stoichiometry. Answers: what CAN this cell do?
+//
+//   fermOS  - the reactor. Kinetics, oxygen and heat transport, operating mode
+//             and feeding, scale-up, instrumentation and control.
+//             Dynamics. Answers: what DOES a real vessel achieve over time?
+//
+//   pureOS  - downstream. Harvest, disruption, capture, polishing, recovery,
+//             formulation and storage. Answers: how does product become vial?
+//
+// The seam between geneOS and fermOS is stoichiometry versus dynamics: a GEM
+// gives a yield ceiling with no time axis; kinetics gives the curve in a
+// specific vessel. The seam between fermOS and pureOS is the harvest step, and
+// it carries one decision made far upstream - secreted or intracellular - which
+// dictates the entire downstream train.
 export interface ReferenceTable {
   title: string;
   cols: string[];
@@ -185,8 +200,104 @@ export const REFERENCE: Record<string, ReferenceContent> = {
       },
     ],
   },
+  'geneos.hosts': {
+    blurb: 'Choosing the chassis. The host decides what the construct can look like and what the downstream train will have to be.',
+    tables: [
+      {
+        title: 'Chassis trade-offs',
+        cols: ['Host', 'Secretion', 'Decides downstream'],
+        rows: [
+          ['E. coli', 'Poor - intracellular', 'Lysis, refolding if inclusion bodies, endotoxin clearance mandatory'],
+          ['B. subtilis', 'Excellent - true secretion', 'No lysis step; native proteases must be managed'],
+          ['K. phaffii (Pichia)', 'Excellent', 'Centrifuge and filter; low native secretome eases capture'],
+          ['S. cerevisiae', 'Moderate', 'GRAS status; hypermannosylation can complicate glycoproteins'],
+          ['Y. lipolytica', 'Good', 'Tolerates lipophilic products; fewer off-the-shelf parts'],
+          ['T. reesei', 'Exceptional', 'Highest titres; viscous broth and morphology control'],
+          ['A. oryzae / A. niger', 'Excellent', 'Long food-enzyme precedent; protease background'],
+          ['C. glutamicum', 'Good', 'No endotoxin - removes a whole clearance burden'],
+          ['C. reinhardtii', 'Moderate', 'Photoautotrophic option; cell-wall-deficient strains ease lysis'],
+        ],
+      },
+      {
+        title: 'What the host determines',
+        cols: ['Decision', 'Consequence'],
+        rows: [
+          ['Secreted or intracellular', 'Sets the entire downstream train'],
+          ['Glycosylation machinery', 'Whether the product carries the right post-translational modifications'],
+          ['Protease background', 'How much product survives to harvest'],
+          ['Endotoxin', 'Whether a clearance step is mandatory'],
+          ['Growth rate and media cost', 'Cycle time and operating cost'],
+          ['Regulatory precedent', 'How hard approval will be for the intended use'],
+        ],
+      },
+    ],
+    note: 'Host choice is made in geneOS and paid for in pureOS. Secreted versus intracellular is the single decision with the largest downstream consequence, and it is a genetic design choice, not a purification one.',
+  },
+  'geneos.parts': {
+    blurb: 'The genetic parts a construct is assembled from.',
+    tables: [
+      {
+        title: 'Part classes',
+        cols: ['Class', 'Chooses', 'Example decisions'],
+        rows: [
+          ['Promoter', 'When and how strongly the gene is read', 'Inducible or constitutive; strength; leakiness'],
+          ['Ribosome binding site / Kozak', 'Translation initiation rate', 'Tuning expression without changing the promoter'],
+          ['Signal peptide', 'Whether the product is secreted', 'Native, alpha-mating factor, or host-optimised'],
+          ['Fusion tag', 'Solubility and purification handle', 'His, MBP, SUMO, GST, intein'],
+          ['Linker and protease site', 'How the tag is removed', 'TEV, thrombin, or self-cleaving'],
+          ['Terminator', 'Transcript stability', 'Often overlooked, occasionally decisive'],
+          ['Selection marker', 'How transformants are kept', 'Antibiotic, auxotrophy, or marker-free'],
+          ['Origin or integration site', 'Copy number and stability', 'Episomal for speed, genomic for stability'],
+        ],
+      },
+      {
+        title: 'Sequence design operations',
+        cols: ['Operation', 'Why'],
+        rows: [
+          ['Codon optimisation', 'Match host codon usage and tRNA availability'],
+          ['Restriction site removal', 'Enable the intended assembly standard'],
+          ['Repeat and hairpin removal', 'Avoid synthesis failure and recombination'],
+          ['GC balancing', 'Improve synthesis success and expression'],
+          ['Domestication', 'Conform to an assembly standard such as MoClo or Golden Gate'],
+        ],
+      },
+    ],
+    note: 'A tagless product via self-cleaving intein removes a protease step and its cost from the downstream train. Construct decisions and purification decisions are the same decision viewed twice.',
+  },
+  'geneos.pathway': {
+    blurb: 'Assembling and balancing a metabolic pathway in the chosen host.',
+    tables: [
+      {
+        title: 'Precursor pathways',
+        cols: ['Pathway', 'From', 'Feeds'],
+        rows: [
+          ['Mevalonate (MVA)', 'Acetyl-CoA', 'IPP and DMAPP for terpenes and sterols'],
+          ['MEP / DXP', 'Pyruvate and G3P', 'IPP and DMAPP - the bacterial route'],
+          ['Shikimate', 'PEP and erythrose-4-phosphate', 'Aromatics and aromatic amino acids'],
+          ['Heme C4 (Shemin)', 'Glycine and succinyl-CoA', 'ALA, then heme'],
+          ['Heme C5', 'Glutamate via glutamyl-tRNA', 'ALA, then heme'],
+          ['GDP-fucose de novo', 'GDP-mannose', 'Fucosylated oligosaccharides'],
+          ['GDP-fucose salvage', 'Free L-fucose', 'Same, via a bifunctional kinase'],
+          ['CMP-sialic acid', 'GlcNAc to Neu5Ac', 'Sialylated oligosaccharides'],
+          ['Malonyl-CoA extension', 'Acetyl-CoA', 'Polyketides and fatty acids'],
+        ],
+      },
+      {
+        title: 'Balancing problems',
+        cols: ['Problem', 'Symptom', 'Typical handle'],
+        rows: [
+          ['Precursor limitation', 'Low titre despite high expression', 'Push flux into the precursor node'],
+          ['Cofactor imbalance', 'NADPH or ATP starvation', 'Swap cofactor specificity, or rebalance the network'],
+          ['Intermediate toxicity', 'Growth arrest mid-pathway', 'Tune relative enzyme levels; compartmentalise'],
+          ['Product export', 'Product accumulates intracellularly', 'Add or upregulate a transporter'],
+          ['Competing flux', 'Carbon lost to byproducts', 'Delete or attenuate the competing branch'],
+          ['Regulatory repression', 'Pathway silent under process conditions', 'Remove the regulator or decouple the promoter'],
+        ],
+      },
+    ],
+  },
   'geneos.search': {
-    blurb: 'Sequence databases and the tools that search them.',
+    blurb: 'Finding the protein you want to build, and its relatives. Sequence databases and the tools that search them.',
     tables: [
       {
         title: 'Databases',
@@ -222,13 +333,13 @@ export const REFERENCE: Record<string, ReferenceContent> = {
     tables: [
       {
         title: 'Methods',
-        cols: ['Method', 'Needs', 'Note'],
+        cols: ['Method', 'Needs', 'Licence note'],
         rows: [
           ['Boltz', 'Sequence', 'Fully open, no weights restriction'],
           ['ESMFold', 'Sequence only, no MSA', 'Fastest for single sequences'],
           ['ColabFold', 'Sequence, fast MSA via MMseqs2', 'Practical AlphaFold pipeline'],
           ['AlphaFold2', 'Sequence, deep MSA', 'Large database dependency'],
-          ['AlphaFold3', 'Sequence, complexes and ligands', 'Code CC BY-NC-SA; weights gated, non-commercial'],
+          ['AlphaFold3', 'Sequence, complexes and ligands', 'Code Apache; weights separately restricted'],
         ],
       },
       {
@@ -273,11 +384,11 @@ export const REFERENCE: Record<string, ReferenceContent> = {
     ],
     note: 'Analogous enzymes - proteins with no sequence similarity catalysing the same reaction - exist across a large share of EC classes. That space is the design-around space in its purest form.',
   },
-  'fermos.models': {
-    blurb: 'Published genome-scale models for the hosts in this catalogue.',
+  'geneos.model': {
+    blurb: 'The genome-scale model - a stoichiometric description of what the engineered cell can do. Steady state, no time axis.',
     tables: [
       {
-        title: 'Models',
+        title: 'Published models',
         cols: ['Model', 'Organism', 'Note'],
         rows: [
           ['iML1515', 'E. coli K-12 MG1655', 'The most used and best curated GEM'],
@@ -290,15 +401,17 @@ export const REFERENCE: Record<string, ReferenceContent> = {
         ],
       },
       {
-        title: 'Analysis methods',
+        title: 'Analyses',
         cols: ['Method', 'Answers', 'Cost'],
         rows: [
           ['FBA', 'Maximum theoretical flux to a product', 'Milliseconds'],
-          ['FVA', 'The range each reaction can carry', 'Seconds to minutes'],
           ['pFBA', 'Same optimum, minimal total flux', 'Milliseconds'],
+          ['FVA', 'The range each reaction can carry', 'Seconds to minutes'],
           ['Single deletion scan', 'Which genes are essential', 'Seconds'],
           ['Double deletion scan', 'Which pairs decouple growth from production', 'Millions of solves'],
-          ['MOMA / ROOM', 'Flux after a knockout, not re-optimised', 'Moderate'],
+          ['MOMA / ROOM', 'Flux immediately after a knockout, not re-optimised', 'Moderate'],
+          ['Thermodynamic FBA', 'Rules out directionally impossible routes', 'Moderate'],
+          ['Enzyme-constrained (GECKO)', 'Adds the finite protein budget', 'Moderate'],
         ],
       },
       {
@@ -308,16 +421,17 @@ export const REFERENCE: Record<string, ReferenceContent> = {
           ['GLPK', 'GPL', 'The common default; slow on strain-design MILPs'],
           ['HiGHS', 'MIT', 'The intended replacement - permissive and far faster'],
           ['CBC', 'EPL', 'COIN-OR alternative'],
-          ['Gurobi / CPLEX', 'Commercial', 'Fastest, not compatible with an open commons'],
+          ['Gurobi / CPLEX', 'Commercial', 'Fastest; incompatible with an open commons'],
         ],
       },
     ],
+    note: 'A GEM gives a yield ceiling, not a titre. It has no time axis and no vessel. What a real reactor achieves is fermOS\'s question, and the gap between the two is exactly what Deposition measures.',
   },
-  'fermos.design': {
-    blurb: 'Strain design search methods.',
+  'geneos.design': {
+    blurb: 'Searching for the genetic modifications that raise yield.',
     tables: [
       {
-        title: 'Methods',
+        title: 'Design methods',
         cols: ['Method', 'Searches for', 'Shape'],
         rows: [
           ['OptKnock', 'Knockouts coupling growth to production', 'Bilevel MILP'],
@@ -326,19 +440,348 @@ export const REFERENCE: Record<string, ReferenceContent> = {
           ['OptForce', 'Which fluxes must change, and by how much', 'MILP'],
           ['FSEOF', 'Overexpression targets', 'Flux scanning under enforced objective'],
           ['GDLS', 'Knockouts by local search', 'Iterative'],
+          ['cameo', 'Enumerate and rank designs', 'Wraps several of the above'],
         ],
       },
       {
-        title: 'Why this is the expensive stage',
+        title: 'Why the search is expensive',
         cols: ['Search', 'Approximate scale'],
         rows: [
           ['Single deletion', 'One solve per gene'],
           ['Double deletion', 'One solve per gene pair - millions on a mid-size model'],
-          ['Triple and deeper', 'Combinatorial; often does not converge'],
-          ['Bilevel MILP', 'Hard even at low depth; solver choice dominates runtime'],
+          ['Triple and deeper', 'Combinatorial; frequently fails to converge'],
+          ['Bilevel MILP', 'Hard even at shallow depth; solver choice dominates runtime'],
         ],
       },
     ],
+    note: 'This is the most compute-hungry thing in the platform, and the reason the solver choice is a real decision rather than a detail.',
+  },
+  'fermos.kinetics': {
+    blurb: 'What actually happens in the vessel over time. Where a genome-scale model gives a ceiling, kinetics gives the curve.',
+    tables: [
+      {
+        title: 'Rates and yields',
+        cols: ['Symbol', 'Name', 'What it tells you'],
+        rows: [
+          ['mu', 'Specific growth rate', 'How fast biomass accumulates, per hour'],
+          ['mu_max', 'Maximum specific growth rate', 'The ceiling under unlimited substrate'],
+          ['qs', 'Specific substrate uptake rate', 'How fast each gram of cells consumes feed'],
+          ['qp', 'Specific productivity', 'How fast each gram of cells makes product'],
+          ['Yxs', 'Biomass yield on substrate', 'Grams of cells per gram of feed'],
+          ['Yps', 'Product yield on substrate', 'Grams of product per gram of feed'],
+          ['Ks', 'Half-saturation constant', 'Substrate level at half of mu_max'],
+          ['ms', 'Maintenance coefficient', 'Feed consumed just to stay alive'],
+        ],
+      },
+      {
+        title: 'Kinetic models',
+        cols: ['Model', 'Describes', 'Use when'],
+        rows: [
+          ['Monod', 'Growth limited by one substrate', 'The default starting point'],
+          ['Contois', 'Growth inhibited by biomass density', 'High-cell-density culture'],
+          ['Haldane', 'Substrate inhibition at high concentration', 'Feeding a toxic or inhibitory substrate'],
+          ['Luedeking-Piret', 'Product formation growth- and non-growth-associated', 'Separating the two contributions'],
+          ['Logistic', 'Biomass approaching a carrying capacity', 'Fitting a curve without mechanism'],
+          ['Structured / dynamic FBA', 'Metabolism changing through the run', 'When a single set of rates will not fit'],
+        ],
+      },
+      {
+        title: 'Phases of a run',
+        cols: ['Phase', 'What dominates'],
+        rows: [
+          ['Lag', 'Adaptation; no net growth'],
+          ['Exponential', 'mu near mu_max; substrate in excess'],
+          ['Transition', 'Substrate or oxygen becomes limiting'],
+          ['Fed-batch production', 'Feed rate sets mu; product accumulates'],
+          ['Stationary', 'Growth stops; maintenance and product formation continue'],
+          ['Decline', 'Lysis, proteolysis, product degradation'],
+        ],
+      },
+    ],
+    note: 'Kinetic parameters are fitted to real runs, not derived from a genome. This is the component that most needs Deposition data, and the one that cannot be built from literature alone.',
+  },
+  'fermos.transport': {
+    blurb: 'Getting oxygen in and heat out. Transport is what usually limits a real fermentation, not biology.',
+    tables: [
+      {
+        title: 'Oxygen transfer',
+        cols: ['Term', 'Means', 'Why it bites'],
+        rows: [
+          ['OTR', 'Oxygen transfer rate', 'What the vessel can deliver'],
+          ['OUR', 'Oxygen uptake rate', 'What the cells demand'],
+          ['kLa', 'Volumetric mass transfer coefficient', 'The vessel\'s capacity to deliver oxygen'],
+          ['DO', 'Dissolved oxygen', 'The controlled variable, usually held above a setpoint'],
+          ['C*', 'Saturation concentration', 'Falls with temperature and rising salt'],
+          ['Oxygen limitation', 'OUR exceeds OTR', 'Growth and production stall; byproducts appear'],
+        ],
+      },
+      {
+        title: 'What sets kLa',
+        cols: ['Variable', 'Effect'],
+        rows: [
+          ['Agitation rate', 'Raises kLa and shear together'],
+          ['Aeration rate', 'More gas, more transfer, more foam'],
+          ['Impeller type and count', 'Rushton for gas dispersion, axial for bulk mixing'],
+          ['Back pressure', 'Raises saturation concentration'],
+          ['Broth viscosity', 'Filamentous cultures collapse kLa as they thicken'],
+          ['Antifoam', 'Suppresses foam and lowers kLa as a side effect'],
+        ],
+      },
+      {
+        title: 'Other transport limits',
+        cols: ['Limit', 'Symptom'],
+        rows: [
+          ['Heat removal', 'Temperature drifts up at scale; jacket area per volume falls'],
+          ['Mixing time', 'Gradients in pH, substrate and oxygen across a large vessel'],
+          ['Shear', 'Cell damage in shear-sensitive cultures'],
+          ['CO2 accumulation', 'Dissolved CO2 inhibits growth in tall vessels'],
+          ['Foaming', 'Carries cells into the exhaust; fouls filters'],
+        ],
+      },
+    ],
+    note: 'Oxygen transfer is the usual reason a strain that performed at bench scale disappoints at production scale. The biology did not change; the vessel did.',
+  },
+  'fermos.mode': {
+    blurb: 'How the vessel is operated, and the feeding strategy that follows.',
+    tables: [
+      {
+        title: 'Operating modes',
+        cols: ['Mode', 'How it runs', 'Suits'],
+        rows: [
+          ['Batch', 'Everything charged at the start', 'Simple products; screening'],
+          ['Fed-batch', 'Feed added over the run', 'Most industrial protein production'],
+          ['Continuous / chemostat', 'Feed in, broth out, steady state', 'Parameter estimation; some commodity products'],
+          ['Perfusion', 'Cells retained, medium exchanged', 'Very high cell density; sensitive products'],
+          ['Repeated batch', 'Partial harvest, refill', 'Reduces turnaround between runs'],
+        ],
+      },
+      {
+        title: 'Feeding strategies',
+        cols: ['Strategy', 'Basis', 'Trade-off'],
+        rows: [
+          ['Constant rate', 'Fixed feed', 'Simple; mu falls through the run'],
+          ['Exponential', 'Feed tracks a target mu', 'Holds growth rate; needs a good model'],
+          ['DO-stat', 'Feed on a dissolved-oxygen trigger', 'Self-correcting; noisy'],
+          ['pH-stat', 'Feed on a pH trigger', 'Works when substrate exhaustion shifts pH'],
+          ['Substrate-limited', 'Hold substrate near zero', 'Suppresses overflow metabolism'],
+        ],
+      },
+      {
+        title: 'Why overflow metabolism matters',
+        cols: ['Host', 'Byproduct', 'Cause'],
+        rows: [
+          ['E. coli', 'Acetate', 'Excess glucose uptake beyond respiratory capacity'],
+          ['S. cerevisiae', 'Ethanol', 'Crabtree effect at high glucose'],
+          ['K. phaffii', 'Methanol toxicity', 'Overfeeding the inducer'],
+          ['Many', 'Lactate, formate', 'Oxygen limitation'],
+        ],
+      },
+    ],
+    note: 'Feeding strategy is the main lever an operator has once the strain is fixed. Most of the difference between a good run and a poor one lives here.',
+  },
+  'fermos.scale': {
+    blurb: 'Moving from bench to production. What is held constant decides what breaks.',
+    tables: [
+      {
+        title: 'Scale-up criteria',
+        cols: ['Hold constant', 'Preserves', 'Sacrifices'],
+        rows: [
+          ['kLa', 'Oxygen supply', 'Mixing time and shear change'],
+          ['Power per volume', 'Energy input', 'kLa and tip speed drift'],
+          ['Impeller tip speed', 'Shear environment', 'kLa usually falls'],
+          ['Mixing time', 'Homogeneity', 'Impractical at large scale'],
+          ['Volumetric feed rate', 'Nominal feed profile', 'Gradients appear'],
+        ],
+      },
+      {
+        title: 'Scale tiers',
+        cols: ['Tier', 'Volume', 'Role'],
+        rows: [
+          ['Microplate / shake flask', 'Millilitres', 'Strain screening; no DO or pH control'],
+          ['Bench bioreactor', '1-10 L', 'Process definition; full instrumentation'],
+          ['Pilot', '100-1000 L', 'Confirms the process survives scale'],
+          ['Small production', '1000-10000 L', 'High-value proteins and enzymes'],
+          ['Production', '10000-50000 L', 'Food proteins'],
+          ['Large production', '50000-200000 L', 'Commodity; deliberately out of scope'],
+        ],
+      },
+      {
+        title: 'What breaks on the way up',
+        cols: ['Problem', 'Why it appears'],
+        rows: [
+          ['Oxygen limitation', 'kLa falls as volume rises'],
+          ['Mixing gradients', 'Blend time grows faster than volume'],
+          ['Heat removal', 'Jacket surface area per unit volume falls'],
+          ['CO2 accumulation', 'Taller column, longer gas residence'],
+          ['Hydrostatic pressure', 'Cells cycle through pressure and DO gradients'],
+          ['Feed distribution', 'A single feed point creates a local excess zone'],
+        ],
+      },
+    ],
+    note: 'Value density per litre of fermenter capacity is the metric that matters more than tonnage. A 2,000 L train making research enzymes can outperform a 200,000 L plant making commodity protein.',
+  },
+  'fermos.control': {
+    blurb: 'Instrumentation and control loops during a run.',
+    tables: [
+      {
+        title: 'Measured online',
+        cols: ['Variable', 'Sensor', 'Controlled by'],
+        rows: [
+          ['Temperature', 'RTD or thermocouple', 'Jacket heating and cooling'],
+          ['pH', 'Glass electrode', 'Acid and base addition'],
+          ['Dissolved oxygen', 'Optical or polarographic', 'Agitation, aeration, oxygen enrichment'],
+          ['Pressure', 'Transducer', 'Back-pressure valve'],
+          ['Weight', 'Load cells', 'Feed and harvest accounting'],
+          ['Off-gas O2 and CO2', 'Analyser', 'Nothing directly; used to infer OUR and RQ'],
+          ['Foam', 'Conductivity probe', 'Antifoam addition'],
+        ],
+      },
+      {
+        title: 'Inferred, not measured',
+        cols: ['Quantity', 'Derived from', 'Why it matters'],
+        rows: [
+          ['OUR and CER', 'Off-gas balance', 'The best real-time proxy for metabolic state'],
+          ['Respiratory quotient', 'CER over OUR', 'Signals a metabolic shift'],
+          ['Specific growth rate', 'Biomass over time', 'The variable a feed strategy targets'],
+          ['Biomass', 'OD, dry weight, or capacitance', 'Rarely available continuously'],
+        ],
+      },
+      {
+        title: 'Offline sampling',
+        cols: ['Measure', 'Method', 'Typical cadence'],
+        rows: [
+          ['Optical density', 'Spectrophotometer', 'Every few hours'],
+          ['Dry cell weight', 'Filter and dry', 'Once or twice per run'],
+          ['Substrate concentration', 'HPLC or enzymatic assay', 'Every few hours'],
+          ['Product titre', 'HPLC or ELISA', 'Key timepoints'],
+          ['Byproducts', 'HPLC', 'Alongside substrate'],
+          ['Contamination check', 'Microscopy or plating', 'Daily'],
+        ],
+      },
+    ],
+    note: 'Off-gas analysis is the most informative measurement on a fermenter and the most often omitted at small scale. It gives metabolic state continuously and without touching the broth.',
+  },
+  'pureos.harvest': {
+    blurb: 'The boundary. Separating cells from broth, and deciding which phase holds the product.',
+    tables: [
+      {
+        title: 'The decision that sets everything',
+        cols: ['Product location', 'First operation', 'Consequences'],
+        rows: [
+          ['Secreted into broth', 'Remove cells, keep supernatant', 'Shorter train; capture from a dilute stream'],
+          ['Intracellular, soluble', 'Keep cells, then lyse', 'Concentrated start; host protein burden is high'],
+          ['Intracellular, inclusion bodies', 'Keep cells, lyse, solubilise, refold', 'Longest train; refolding yield often dominates'],
+          ['Periplasmic', 'Osmotic shock or selective release', 'Middle ground; gentler than full lysis'],
+          ['Cell-associated / surface', 'Wash and elute', 'Uncommon; product-specific'],
+        ],
+      },
+      {
+        title: 'Solid-liquid separation',
+        cols: ['Operation', 'Suits', 'Watch'],
+        rows: [
+          ['Disc-stack centrifugation', 'Bacteria and yeast at scale', 'Shear; fines carried over'],
+          ['Tubular centrifugation', 'Small volumes, fine solids', 'Batch operation'],
+          ['Microfiltration (TFF)', 'Shear-sensitive cultures', 'Fouling; long processing time'],
+          ['Depth filtration', 'Polishing after centrifugation', 'Product adsorption to media'],
+          ['Rotary vacuum filtration', 'Filamentous fungal broth', 'Bulk operation, lower resolution'],
+          ['Flocculation then settling', 'Very large volumes', 'Adds a chemical to be removed later'],
+        ],
+      },
+      {
+        title: 'Cell disruption',
+        cols: ['Method', 'Scale', 'Note'],
+        rows: [
+          ['High-pressure homogenisation', 'Production', 'The industrial default; multiple passes, heat generated'],
+          ['Bead milling', 'Bench to pilot', 'Effective on tough-walled yeast and algae'],
+          ['Enzymatic lysis', 'Any', 'Gentle; adds an enzyme to be removed'],
+          ['Osmotic shock', 'Bench', 'Periplasmic release without full disruption'],
+          ['Freeze-thaw', 'Bench only', 'Does not scale'],
+        ],
+      },
+    ],
+    note: 'Secreted versus intracellular is decided in geneOS and paid for here. It is the single choice with the largest effect on downstream cost, and it is made before anyone touches a purification column.',
+  },
+  'pureos.capture': {
+    blurb: 'The first purification step. Highest volume, crudest feed, largest cost lever.',
+    tables: [
+      {
+        title: 'Chromatography modes',
+        cols: ['Mode', 'Separates by', 'Typical use'],
+        rows: [
+          ['Ion exchange (Q, SP, DEAE, CM)', 'Net surface charge', 'The workhorse capture step'],
+          ['Hydrophobic interaction', 'Surface hydrophobicity', 'Polishing after a high-salt step'],
+          ['Affinity - IMAC', 'His-tag binding immobilised metal', 'Tagged research proteins'],
+          ['Affinity - custom ligand', 'Specific molecular recognition', 'Highest resolution, highest cost'],
+          ['Mixed-mode', 'Charge and hydrophobicity together', 'Difficult separations; salt-tolerant loading'],
+          ['Hydroxyapatite', 'Calcium and phosphate interactions', 'Orthogonal to charge-based steps'],
+          ['Size exclusion', 'Hydrodynamic radius', 'Polishing and buffer exchange; low throughput'],
+        ],
+      },
+      {
+        title: 'Non-chromatographic capture',
+        cols: ['Method', 'When it wins'],
+        rows: [
+          ['Thermal clarification', 'Product is thermostable and the host proteome is not'],
+          ['Ammonium sulfate precipitation', 'Cheap bulk concentration; crude'],
+          ['PEG precipitation', 'Gentle; adds a component to remove'],
+          ['Aqueous two-phase extraction', 'Scalable, avoids resin cost'],
+          ['Expanded-bed adsorption', 'Capture directly from unclarified feed'],
+          ['Crystallisation', 'Product crystallises readily; very high purity in one step'],
+        ],
+      },
+      {
+        title: 'Capture economics',
+        cols: ['Driver', 'Effect'],
+        rows: [
+          ['Dynamic binding capacity', 'How much resin is needed per batch'],
+          ['Resin cost and lifetime', 'Amortised per cycle; often the largest consumable'],
+          ['Cycle time', 'Determines batches per year'],
+          ['Buffer volume', 'Water, storage, disposal - frequently underestimated'],
+          ['Feed dilution', 'A dilute secreted stream needs concentration before capture'],
+        ],
+      },
+    ],
+    note: 'For a thermostable product, a heat step can replace most of the capture chromatography. That single substitution is much of why molecular-biology enzymes are attractive to manufacture.',
+  },
+  'pureos.polish': {
+    blurb: 'Reaching final specification. Removing what capture left behind.',
+    tables: [
+      {
+        title: 'What has to be removed',
+        cols: ['Contaminant', 'Why', 'Typical step'],
+        rows: [
+          ['Host cell protein', 'Immunogenicity and assay interference', 'Orthogonal chromatography'],
+          ['Residual DNA', 'Regulatory limit', 'Anion exchange in flow-through; nuclease treatment'],
+          ['Endotoxin', 'Mandatory for anything from a Gram-negative host', 'Dedicated clearance step'],
+          ['Aggregates', 'Loss of activity; immunogenicity', 'Size exclusion or HIC'],
+          ['Product variants', 'Clipped, oxidised or misfolded forms', 'High-resolution polishing'],
+          ['Leached ligand', 'From affinity resin', 'Orthogonal step downstream of affinity'],
+          ['Process additives', 'Antifoam, flocculant, protease inhibitors', 'Diafiltration'],
+          ['Nucleases', 'For molecular-biology enzyme grade', 'Assay-driven; defines the grade'],
+        ],
+      },
+      {
+        title: 'Concentration and exchange',
+        cols: ['Operation', 'Does', 'Note'],
+        rows: [
+          ['Ultrafiltration', 'Concentrates by molecular weight cutoff', 'Choose cutoff well below product size'],
+          ['Diafiltration', 'Exchanges buffer at constant volume', 'Buffer consumption scales with diavolumes'],
+          ['Nanofiltration', 'Retains small molecules such as oligosaccharides', 'Used in sugar and HMO trains'],
+          ['Electrodialysis', 'Removes salts by charge', 'Desalting without dilution'],
+        ],
+      },
+      {
+        title: 'Orthogonality',
+        cols: ['Principle', 'Meaning'],
+        rows: [
+          ['Vary the separation basis', 'Charge, then hydrophobicity, then size'],
+          ['Avoid repeating a mechanism', 'Two ion exchanges remove nearly the same impurities'],
+          ['Sequence by volume', 'Highest-volume step first, most expensive resin last'],
+          ['Count the steps', 'Every added step multiplies yield loss'],
+        ],
+      },
+    ],
+    note: 'For a molecular-biology enzyme, nuclease and endotoxin clearance is what defines the grade rather than a purity percentage. That is the specification the customer actually buys.',
   },
   'pureos.recovery': {
     blurb: 'What drives yield loss at each stage of a downstream train.',
@@ -367,8 +810,48 @@ export const REFERENCE: Record<string, ReferenceContent> = {
           ['Step count', 'Every added step multiplies loss; fewer steps usually wins'],
         ],
       },
+      {
+        title: 'Where a train usually loses most',
+        cols: ['Stage', 'Typical dominant loss'],
+        rows: [
+          ['Refolding', 'Frequently the largest single loss in an inclusion-body route'],
+          ['Capture', 'Breakthrough on an overloaded column; incomplete elution'],
+          ['Polishing cuts', 'Product deliberately discarded to hit purity'],
+          ['Diafiltration', 'Membrane adsorption and system holdup'],
+          ['Drying', 'Thermal or shear inactivation'],
+        ],
+      },
     ],
     note: 'A train of many high-yielding steps still ends low. The strategic move for a thermostable product is a heat step that removes most host protein in one operation.',
+  },
+  'proforma.uncertainty': {
+    blurb: 'Why a point estimate is close to worthless, and what a range needs.',
+    tables: [
+      {
+        title: 'Uncertain inputs',
+        cols: ['Input', 'Why it moves'],
+        rows: [
+          ['Titre', 'Varies between runs and scales non-linearly'],
+          ['Recovery yield', 'Depends on decisions not yet made'],
+          ['Feedstock price', 'Commodity markets'],
+          ['Utilities', 'Regional and seasonal'],
+          ['Capital cost', 'Vendor quotes vary widely at small scale'],
+          ['Labour', 'Regional, and scale-dependent'],
+          ['Uptime', 'Rarely as assumed'],
+        ],
+      },
+      {
+        title: 'What a defensible TEA reports',
+        cols: ['Element', 'Note'],
+        rows: [
+          ['Distribution, not a number', 'A range with the driver named is usable'],
+          ['Sensitivity ranking', 'Which input dominates the spread'],
+          ['Mass balance closure', 'The error, stated rather than hidden'],
+          ['Assumption version', 'Which set produced this result'],
+          ['Benchmark comparison', 'Calibration against a published case'],
+        ],
+      },
+    ],
   },
   'dominion.claims': {
     blurb: 'The distinction the Claim Workbench exists to make.',
@@ -416,7 +899,7 @@ export const REFERENCE: Record<string, ReferenceContent> = {
         title: 'Term calculation',
         cols: ['Filing era', 'Term'],
         rows: [
-          ['Pre-GATT (filed before 8 June 1995)', 'The greater of 17 years from issue or 20 years from filing'],
+          ['Pre-GATT (filed before 8 June 1995)', '17 years from issue'],
           ['Post-GATT', '20 years from earliest non-provisional filing'],
           ['Adjustments', 'Office delay can extend; terminal disclaimers can shorten'],
         ],
@@ -499,35 +982,6 @@ export const REFERENCE: Record<string, ReferenceContent> = {
       },
     ],
     note: 'Until this exists, \'verified\' is an unsigned assertion. Provenance strength should eventually depend on who did the verifying, not just that someone did.',
-  },
-  'proforma.uncertainty': {
-    blurb: 'Why a point estimate is close to worthless, and what a range needs.',
-    tables: [
-      {
-        title: 'Uncertain inputs',
-        cols: ['Input', 'Why it moves'],
-        rows: [
-          ['Titre', 'Varies between runs and scales non-linearly'],
-          ['Recovery yield', 'Depends on decisions not yet made'],
-          ['Feedstock price', 'Commodity markets'],
-          ['Utilities', 'Regional and seasonal'],
-          ['Capital cost', 'Vendor quotes vary widely at small scale'],
-          ['Labour', 'Regional, and scale-dependent'],
-          ['Uptime', 'Rarely as assumed'],
-        ],
-      },
-      {
-        title: 'What a defensible TEA reports',
-        cols: ['Element', 'Note'],
-        rows: [
-          ['Distribution, not a number', 'A range with the driver named is usable'],
-          ['Sensitivity ranking', 'Which input dominates the spread'],
-          ['Mass balance closure', 'The error, stated rather than hidden'],
-          ['Assumption version', 'Which set produced this result'],
-          ['Benchmark comparison', 'Calibration against a published case'],
-        ],
-      },
-    ],
   },
 };
 

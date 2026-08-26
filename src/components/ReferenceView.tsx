@@ -19,7 +19,7 @@
 // result: no number in a result unit, no status attached to a patent.
 import { BookOpen, CircleDashed } from 'lucide-react';
 import { referenceFor, type ReferenceContent, type ReferenceTable } from '@/data/reference';
-import { subsystemsFor, type SubsystemOwner } from '@/data/subsystems';
+import { stubsFor, type SubsystemOwner } from '@/data/subsystems';
 import { Callout, Card, EmptyState, SectionTitle, cx } from './ui';
 
 /** One table. Plain, scrollable, no sorting and no interaction — this is a shelf. */
@@ -181,19 +181,38 @@ export function SubsystemBlock({
 }
 
 /**
- * Every subsystem one of the eleven owns, as a reference shelf.
+ * The reference content for ONE subsystem, by id.
+ *
+ * For a `seeded` subsystem, which has a live view and so is not on the shelf:
+ * the strain catalogue is Hosts, and the chassis trade-offs belong under it
+ * rather than filed with the parts of geneOS that do not exist. Renders
+ * nothing when the id has no entry, which is a normal outcome.
+ */
+export function SubsystemReference({ id }: { id: string }) {
+  const content = referenceFor(id);
+  if (!content) return null;
+  return <ReferenceView content={content} />;
+}
+
+/**
+ * Every UNBUILT subsystem one of the eleven owns, as a reference shelf.
  *
  * Mounted at the FOOT of its owner's screen, below whatever that owner actually
- * has. On geneOS there is nothing above it; on Dominion there are a hundred and
+ * has. On fermOS there is nothing above it; on Dominion there are a hundred and
  * seventeen molecules above it. Either way this section is the part that is not
  * built, and putting a "nothing is built here" panel above a live catalogue to
  * satisfy the letter of the layout would be a false statement on a screen whose
  * whole purpose is not making false statements.
+ *
+ * `stubsFor` rather than `subsystemsFor` for the same reason (OF-BLD-011 §2): a
+ * seeded subsystem carries its reference on its own view. Listing Hosts here,
+ * under a heading that says "no implementation", would contradict the catalogue
+ * of strains one tab away.
  */
 export function SubsystemShelf({ owner }: { owner: SubsystemOwner }) {
-  const subsystems = subsystemsFor(owner);
-  if (subsystems.length === 0) return null;
-  const withReference = subsystems.filter((s) => referenceFor(s.id) !== null).length;
+  const stubs = stubsFor(owner);
+  if (stubs.length === 0) return null;
+  const withReference = stubs.filter((s) => referenceFor(s.id) !== null).length;
 
   return (
     <section className="mt-10" aria-labelledby="subsystem-shelf">
@@ -202,7 +221,7 @@ export function SubsystemShelf({ owner }: { owner: SubsystemOwner }) {
           {owner} subsystems
         </h2>
         <span className="font-num text-caption text-ink-soft">
-          {subsystems.length} named, 0 built, {withReference} with reference content
+          {stubs.length} named, 0 built, {withReference} with reference content
         </span>
       </div>
       <p className="text-body text-ink-soft mt-2 max-w-3xl">
@@ -211,7 +230,7 @@ export function SubsystemShelf({ owner }: { owner: SubsystemOwner }) {
         Nothing below a line is a measurement, a prediction, or a claim about any particular
         molecule.
       </p>
-      {subsystems.map((s) => (
+      {stubs.map((s) => (
         <SubsystemBlock key={s.id} id={s.id} label={s.label} state={s.state} />
       ))}
     </section>

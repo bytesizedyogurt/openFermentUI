@@ -88,7 +88,7 @@ function Screen() {
 
   // ── the eleven, and what each one owns (OF-BLD-008 §3) ──────────────
   // Sub-views are paths UNDER their owner, so a URL says where a thing lives:
-  // /fermos/organisms/cw15 rather than /organisms/cw15. Nothing was deleted —
+  // /geneos/hosts/cw15 rather than /organisms/cw15. Nothing was deleted —
   // every screen below is the same file it was, mounted somewhere else.
   if (!a) return <Home />;
   switch (a) {
@@ -104,11 +104,13 @@ function Screen() {
     case 'postdoc':
       return <Postdoc sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;
     case 'geneos':
+      // The strain page fills the screen on its own; putting geneOS's header
+      // above it would push the organism it is about below the fold.
+      if (b === 'hosts' && c) return <StrainPage strainId={c} />;
       return <GeneOS />;
     case 'fermos':
-      // The strain page fills the screen on its own; putting fermOS's header
-      // above it would push the organism it is about below the fold.
-      if (b === 'organisms' && c) return <StrainPage strainId={c} />;
+      // Nothing under it. OF-BLD-011 §3 moved the strain catalogue to geneOS
+      // and left fermOS as the five reactor subsystems, none of which is built.
       return <FermOS />;
     case 'pureos':
       return <PureOS />;

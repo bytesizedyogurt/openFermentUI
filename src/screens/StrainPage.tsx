@@ -988,7 +988,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     return (
       <>
         <PageHeader
-          eyebrow="Organisms"
+          eyebrow="geneOS · Hosts"
           title="Strain not found"
           subtitle="Session state resets on refresh, so a deep link from an earlier session can point at nothing."
         />
@@ -997,7 +997,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             icon={<Microscope size={22} />}
             title={`No strain with the id “${strainId}”`}
             body="The organism index lists every strain this corpus covers. Open it to pick one."
-            action={<LinkButton to="/fermos/organisms">Back to organisms</LinkButton>}
+            action={<LinkButton to="/geneos/hosts">Back to hosts</LinkButton>}
           />
         </Card>
       </>
@@ -1008,7 +1008,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     return (
       <>
         <PageHeader
-          eyebrow="Organisms"
+          eyebrow="geneOS · Hosts"
           title={
             <span>
               <span className="italic">{strain.binomial}</span>{' '}
@@ -1083,7 +1083,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   return (
     <>
       <PageHeader
-        eyebrow={`Organisms · BSL-${strain.bsl}`}
+        eyebrow={`geneOS · Hosts · BSL-${strain.bsl}`}
         title={
           <span>
             <span className="italic">{strain.binomial}</span>{' '}
@@ -1109,8 +1109,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <Button onClick={exportSummary} title="CSV of the parameter summary below, one row per field">
               <Download size={14} /> Export summary
             </Button>
-            <LinkButton to="/fermos/organisms">
-              <ArrowRight size={14} className="rotate-180" /> All organisms
+            <LinkButton to="/geneos/hosts">
+              <ArrowRight size={14} className="rotate-180" /> All hosts
             </LinkButton>
           </>
         }

@@ -1011,7 +1011,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
                 return (
                   <a
                     key={o}
-                    href={href(`/fermos/organisms/${o}`)}
+                    href={href(`/geneos/hosts/${o}`)}
                     className="chip text-caption text-ink-soft hover:border-accent/40 hover:bg-accent-wash"
                     title={s.title}
                   >

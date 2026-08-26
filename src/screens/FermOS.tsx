@@ -1,76 +1,93 @@
-// fermOS — hosts, metabolism, strain design (OF-BLD-008 §4).
+// fermOS — the reactor (OF-BLD-011 §3).
 //
-// A SHELL, NOT A REWRITE. The organism catalogue already existed as a rail
-// destination; it is now fermOS's default view, and `Organisms.tsx` and
-// `StrainPage.tsx` are the same files they were. What changed is the URL and
-// what sits above it.
+// THIS SCREEN GOT EMPTIER ON PURPOSE. Until OF-BLD-011, fermOS held the strain
+// catalogue and named "metabolic models" and "strain design" as its unbuilt
+// parts. Both were wrong. Choosing a chassis and deciding which genes to knock
+// out are genetic design decisions, and they have gone to geneOS where they
+// belong. What was left behind was the discovery that THE COMPONENT NAMED AFTER
+// FERMENTATION CONTAINED NOTHING ABOUT RUNNING A FERMENTER — no kinetics, no
+// oxygen transfer, no feeding strategy, no scale-up.
 //
-// The header exists because "fermOS" over a list of strains would be a
-// coinage with no explanation attached — it says what fermOS covers and which
-// part of that is actually built, so a reader is not left guessing whether the
-// metabolic modelling is somewhere they have not found yet.
-import { useMemo } from 'react';
-import { STRAINS } from '@/data/strains';
-import { Callout, PageHeader } from '@/components/ui';
-import { OwnerTabs, type OwnerTab } from '@/components/OwnerTabs';
+//     fermOS answers: what DOES a real vessel achieve over time?
+//
+// So fermOS is now the five reactor subsystems and nothing else, which makes it
+// the emptiest of the eleven. That is the honest state: there is no kinetic
+// model, no transport calculation and no scale-up logic anywhere in this
+// codebase. Showing a chart here would be inventing the one thing the platform
+// exists to avoid inventing.
+//
+// AND IT MUST NOT BE SEEDED FROM LITERATURE (§3). Kinetic parameters are fitted
+// to real runs in a specific vessel; mu_max copied out of a paper about a
+// different strain in a different reactor is a number with no owner. fermOS is
+// the component that most needs the Assay loop, and the only honest route from
+// here to a kinetic model runs through Deposition.
+import { FlaskConical } from 'lucide-react';
+import { href } from '@/router';
+import { Callout, EmptyState, PageHeader } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
-import { UnbuiltList } from '@/components/Unbuilt';
 import { SubsystemShelf } from '@/components/ReferenceView';
-import Organisms from './Organisms';
-
-const PLANNED = [
-  {
-    what: 'Metabolic models',
-    why: 'Flux balance over a host, so a pathway can be checked against the carbon it would need.',
-  },
-  {
-    what: 'Pathway design',
-    why: 'What has to be added to a host to make a molecule, and what has to be removed.',
-  },
-  {
-    what: 'Strain design',
-    why: 'A construct plus a host plus the edits between them, as one designed object.',
-  },
-];
+import { stubsFor } from '@/data/subsystems';
 
 export default function FermOS() {
-  const tabs: OwnerTab[] = useMemo(
-    () => [{ label: 'Organisms', to: '/fermos/organisms', badge: STRAINS.length }],
-    [],
-  );
+  const stubs = stubsFor('fermOS');
 
   return (
     <>
       <PageHeader
-        eyebrow="Hosts, metabolism, strain design"
+        eyebrow="Reactor, kinetics, scale"
         title="fermOS"
-        subtitle="The organism side of making something. fermOS covers hosts, their metabolism, the pathways a molecule needs, and the strain design that gets from one to the other. Organisms — the catalogue below — is the part that exists."
+        subtitle="The vessel. Kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control — what a real reactor achieves over time, as opposed to what the cell could do in principle."
       />
 
-      <OwnerTabs tabs={tabs} />
+      <EmptyState
+        icon={<FlaskConical size={28} />}
+        title="Nothing is built here yet"
+        body="fermOS has no code behind it. No kinetic model, no oxygen-transfer calculation, no scale-up logic — and no sample curve standing in for one. It is the emptiest of the eleven, and the rail says so rather than implying the reactor is handled somewhere the reader has not found."
+      />
 
-      <Callout kind="info" title="Organisms is the built part of fermOS">
-        The catalogue and its strain pages are real: hosts, lineages, and the extraction records
-        anchored to each. Metabolic models, pathway design and strain design are not built, and are
-        named at the bottom of this page rather than implied by the rail entry.
-      </Callout>
+      <div className="mt-6 space-y-4">
+        <Callout kind="warn" title="Kinetic parameters come from runs, not from papers">
+          <p className="text-ink">
+            mu_max, Ks, qp and a maintenance coefficient are <em>fitted</em> to a real
+            fermentation in a specific vessel. Lifting them from a paper about a different strain
+            in a different reactor produces a number with no owner and no error bar, which is the
+            failure mode this whole platform is built against. So fermOS is deliberately not
+            seeded: the only honest route to a kinetic model here runs through{' '}
+            <a href={href('/runbooks/depositions')} className="text-accent hover:underline">
+              Deposition
+            </a>
+            . fermOS is the component that most needs the Assay loop, and the one that cannot be
+            built from literature alone.
+          </p>
+        </Callout>
 
-      <div className="mt-5">
-        <Organisms embedded />
-      </div>
-
-      <div className="mt-6">
-        <UnbuiltList
-          title="The rest of fermOS"
-          note="Not built. Listed so the gap between the name and the code is legible from the screen rather than only from COMPONENTS.md."
-          items={PLANNED}
-        />
+        <Callout kind="info" title="Titre is fermOS's output — and the seam on either side">
+          <p className="text-ink">
+            Upstream,{' '}
+            <a href={href('/geneos')} className="text-accent hover:underline">
+              geneOS
+            </a>{' '}
+            is stoichiometry: a genome-scale model gives a yield ceiling with no time axis. fermOS
+            is dynamics: the curve in a specific vessel. The gap between the ceiling and the titre
+            actually achieved is exactly what reconciliation measures.
+          </p>
+          <p className="text-ink mt-2">
+            Downstream, the seam to{' '}
+            <a href={href('/pureos')} className="text-accent hover:underline">
+              pureOS
+            </a>{' '}
+            is the harvest step, and it carries a decision made back in geneOS:{' '}
+            <strong>secreted or intracellular</strong>. A secreted product starts at centrifuge
+            and filter; an intracellular one starts at lysis and inherits every problem after it.
+            The handoff has to carry product location, not just a titre.
+          </p>
+        </Callout>
       </div>
 
       <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
-        <ComponentTag component="fermOS" action={`${STRAINS.length} organisms, no metabolic model`} />
+        <ComponentTag component="fermOS" action={`${stubs.length} subsystems named, none built`} />
       </div>
     </>
   );
