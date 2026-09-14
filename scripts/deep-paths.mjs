@@ -6,12 +6,18 @@
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 const DIST = join(process.cwd(), 'dist');
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff':'font/woff','.woff2':'font/woff2'};
 const server=createServer(async(rq,rs)=>{try{const u=decodeURIComponent((rq.url??'/').split('?')[0]);let f=join(DIST,u==='/'?'index.html':u);try{if((await stat(f)).isDirectory())f=join(f,'index.html');}catch{f=join(DIST,'index.html');}rs.writeHead(200,{'Content-Type':MIME[extname(f)]??'application/octet-stream'});rs.end(await readFile(f));}catch{rs.writeHead(404).end('nf');}});
 await new Promise(r=>server.listen(4324,r));
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+// The environment's pre-installed Chromium when present, Playwright's own
+// cache otherwise — the same fallback the other five browser scripts use.
+// This one hardcoded the path and was the single red stage on the first CI
+// run (OF-BLD-012 §4.3).
+const exe='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const b=await chromium.launch(existsSync(exe)?{executablePath:exe}:{});
 const p=await b.newPage({viewport:{width:1600,height:1000}});
 const errs=[];
 p.on('pageerror',e=>errs.push(String(e).slice(0,200)));
