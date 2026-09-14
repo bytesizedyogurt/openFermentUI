@@ -20,9 +20,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
-from . import intake
+from . import extract, intake
 from .corpus import load_corpus
-from .models import AnswerPlan, AskRequest, FetchResult, IntakeStatus, Overlay, Usage
+from .models import AnswerPlan, AskRequest, ExtractResponse, FetchResult, IntakeStatus, Overlay, Usage
 from .postdoc import MODEL, PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -163,6 +163,38 @@ def intake_fetch(paper_id: str, force: bool = False) -> FetchResult:
 def intake_status() -> dict[str, IntakeStatus]:
     """Every paper with a cached fetch, success or failure, summarised."""
     return intake.all_statuses()
+
+
+@app.post("/api/intake/{paper_id}/extract", response_model=ExtractResponse)
+def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
+    """One forced tool call over the paper's cached full text (§6.1, §6.3).
+
+    422 when the paper has no cached full text — there is nothing to anchor
+    to, and an extraction over a curation note would be an extraction over
+    the curator. 503 when there is no key or the API cannot be reached; the
+    detail says which.
+    """
+    try:
+        corpus = load_corpus()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    if corpus.paper(paper_id) is None:
+        raise HTTPException(status_code=404, detail=f"{paper_id} is not in the corpus")
+    fetched = intake.cached(paper_id)
+    if fetched is None or fetched.status != "complete":
+        raise HTTPException(
+            status_code=422,
+            detail=f"{paper_id} has no cached full text. POST /api/intake/{paper_id}/fetch first.",
+        )
+    try:
+        result = extract.extract_paper(paper_id, force=force)
+    except extract.ExtractUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    log.info(
+        "extract: %s → %d anchored, %d rejected, $%.4f",
+        paper_id, len(result.candidates), result.rejected, result.usage.costUsd,
+    )
+    return result
 
 
 # ── the overlay (OF-BLD-012 §2.1) ───────────────────────────────────────

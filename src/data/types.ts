@@ -1210,6 +1210,25 @@ export interface Candidate {
   negativeResult?: boolean;
 }
 
+/**
+ * What one extraction produced (OF-BLD-012 §6.1, §6.3). `candidates` are the
+ * survivors of anchoring; `audit` is the event they all share, kept beside
+ * them because a Candidate carries none; `rejectionReasons` is keyed by
+ * anchoring rule — field, section, quote, value, unit, range, method.
+ */
+export interface ExtractResponse {
+  paperId: string;
+  run: ExtractorRun;
+  extractedAt: string;
+  candidates: Candidate[];
+  audit: AuditEvent[];
+  rejected: number;
+  rejectionReasons: Record<string, number>;
+  rejectionDetails: string[];
+  usage: AnswerPlanUsage;
+  notes: string[];
+}
+
 type RecordMinusReview = Omit<ExtractionRecord, 'audit' | 'gold' | 'corrected' | 'reviewer'>;
 /**
  * `true` when A and B declare exactly the same keys, `never` otherwise.

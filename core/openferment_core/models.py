@@ -13,7 +13,7 @@ structurally incapable of originating a quantity (§5).
 """
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -212,6 +212,18 @@ ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "haiku-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
 
+class AuditEvent(BaseModel):
+    """One entry in a record's audit trail. Mirrors the browser's AuditEvent."""
+
+    at: str
+    who: str
+    action: str
+    from_: Any | None = Field(default=None, alias="from")
+    to: Any | None = None
+
+    model_config = {"populate_by_name": True}
+
+
 class Quantity(BaseModel):
     """A value and its unit. Categorical fields carry a string value."""
 
@@ -306,3 +318,25 @@ class ReviewDecision(BaseModel):
     at: str
     quote: str | None = None
     sectionId: str | None = None
+
+
+class ExtractResponse(BaseModel):
+    """What one extraction produced (§6.1, §6.3), and what
+    `candidates/{paperId}.json` holds.
+
+    `candidates` are the survivors of anchoring. `audit` is the event every
+    one of them shares — the Candidate model carries none (§2.5), so it lives
+    beside them here and is copied onto a record at promotion (§7).
+    `rejectionReasons` is keyed by anchoring rule; a rising count is the
+    signal that the prompt has drifted."""
+
+    paperId: str
+    run: ExtractorRun = "haiku-1"
+    extractedAt: str
+    candidates: list[Candidate] = Field(default_factory=list)
+    audit: list[AuditEvent] = Field(default_factory=list)
+    rejected: int = 0
+    rejectionReasons: dict[str, int] = Field(default_factory=dict)
+    rejectionDetails: list[str] = Field(default_factory=list)
+    usage: Usage = Field(default_factory=Usage)
+    notes: list[str] = Field(default_factory=list)

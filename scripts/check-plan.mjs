@@ -24,7 +24,12 @@ const fail = (m) => errors.push(m);
 const py = readFileSync('core/openferment_core/models.py', 'utf8');
 const ts = readFileSync('src/data/types.ts', 'utf8');
 
-/** Field names declared in a Pydantic model body. */
+/**
+ * Field names declared in a Pydantic model body — the wire names. A field that
+ * declares `alias="x"` is serialised as `x`, which is what the browser reads,
+ * so that is the name compared (Python needs the alias when the wire name is
+ * a keyword: `from_: ... = Field(alias="from")`).
+ */
 function pydanticFields(source, className) {
   const body = source.split(`class ${className}(BaseModel):`)[1]?.split('\nclass ')[0];
   if (body === undefined) {
@@ -32,7 +37,9 @@ function pydanticFields(source, className) {
     return null;
   }
   return new Set(
-    [...body.matchAll(/^ {4}([a-zA-Z_][a-zA-Z0-9_]*)\s*:/gm)].map((m) => m[1]),
+    [...body.matchAll(/^ {4}([a-zA-Z_][a-zA-Z0-9_]*)\s*:(.*)$/gm)].map(
+      (m) => m[2].match(/\balias="([^"]+)"/)?.[1] ?? m[1],
+    ),
   );
 }
 
@@ -69,6 +76,8 @@ const PAIRS = [
   ['ExtractRunFalsePositive', 'RunFalsePositive'],
   ['ExtractRun', 'RunOutput'],
   ['ReviewDecision', 'ReviewDecision'],
+  ['AuditEvent', 'AuditEvent'],
+  ['ExtractResponse', 'ExtractResponse'],
 ];
 
 let compared = 0;
