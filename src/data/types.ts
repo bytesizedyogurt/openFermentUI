@@ -1217,6 +1217,19 @@ export interface Candidate {
  * anchoring rule — field, section, quote, value, unit, range, method.
  */
 /**
+ * core/data/biorepo.json (OF-BLD-012 §2.2, §7.1) — the one data file the
+ * increment commits: human decisions keyed by record id, and the candidates
+ * those decisions were about (accepted ones are new records; rejected ones
+ * are Witness's false positives), copied here because candidates/ is not
+ * committed. Written by `biorepo.write` alone.
+ */
+export interface BioRepo {
+  version: 1;
+  decisions: Record<string, ReviewDecision>;
+  records: Candidate[];
+}
+
+/**
  * A candidate anchoring refused (OF-BLD-012 §2.4), kept beside the survivors
  * so the run can be scored honestly (§6.2): one whose value agreed with the
  * seed and whose quote failed is a span_error in Witness. Never a record.

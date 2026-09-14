@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import extract, intake
+from openferment_core import biorepo, extract, intake
 from openferment_core.api import app
 from openferment_core.models import Overlay
 
@@ -24,6 +24,7 @@ def _offline(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
+    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 @pytest.fixture
@@ -42,6 +43,7 @@ def test_status_and_overlay_are_empty_before_any_fetch(client):
     body = client.get("/api/biorepo/overlay").json()
     overlay = Overlay.model_validate(body)
     assert overlay.papers == {} and overlay.runs == [] and overlay.candidates == []
+    assert overlay.records == {}
 
 
 def test_fetching_an_unknown_paper_is_a_404(client):

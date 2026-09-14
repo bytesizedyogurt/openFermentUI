@@ -14,7 +14,7 @@ import {
   Send,
   ArrowUpDown,
 } from 'lucide-react';
-import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, RunOutput } from '@/data/types';
+import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
@@ -61,6 +61,7 @@ const PROVISIONAL_LABEL =
   'Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild.';
 
 const NO_CANDIDATES: Candidate[] = [];
+const NO_DECISIONS: Record<string, ReviewDecision> = {};
 const RUN_BLURB: Record<ExtractorRun, string> = {
   'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
   'v0.4': 'Adds unit normalisation against the ontology before scoring.',
@@ -224,6 +225,13 @@ export default function Witness() {
   const papers = useStore((s) => s.papers);
   // §6.2 — candidates the seed has no record for: the corpus growing, unscored.
   const overlayCandidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
+  const overlayRecords = useStore((s) => s.overlay?.records ?? NO_DECISIONS);
+  // A candidate a reviewer has decided is a record or a false positive now,
+  // not an unscored one (§7.3).
+  const unscored = useMemo(
+    () => overlayCandidates.filter((c) => !overlayRecords[c.id]),
+    [overlayCandidates, overlayRecords],
+  );
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
@@ -844,11 +852,11 @@ export default function Witness() {
         promote a record in the review queue.
       </p>
 
-      {run.run === 'haiku-1' && overlayCandidates.length > 0 && (
+      {run.run === 'haiku-1' && unscored.length > 0 && (
         <div className="mb-6 max-w-4xl">
           <Callout
             kind="info"
-            title={`${overlayCandidates.length} candidate${overlayCandidates.length === 1 ? '' : 's'} new to the corpus — unscored`}
+            title={`${unscored.length} candidate${unscored.length === 1 ? '' : 's'} new to the corpus — unscored`}
           >
             The extractor read values for fields the curated set has no record of on these papers.
             They are the corpus growing, not false positives: nothing here can say whether they are

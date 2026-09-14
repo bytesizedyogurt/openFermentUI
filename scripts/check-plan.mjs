@@ -78,6 +78,7 @@ const PAIRS = [
   ['ReviewDecision', 'ReviewDecision'],
   ['AuditEvent', 'AuditEvent'],
   ['DroppedCandidate', 'DroppedCandidate'],
+  ['BioRepo', 'BioRepo'],
   ['ExtractResponse', 'ExtractResponse'],
 ];
 

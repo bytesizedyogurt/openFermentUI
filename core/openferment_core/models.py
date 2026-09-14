@@ -337,6 +337,24 @@ class ReviewDecision(BaseModel):
     sectionId: str | None = None
 
 
+class BioRepo(BaseModel):
+    """core/data/biorepo.json (§2.2, §7.1) — the one data file that is
+    committed, because it holds human decisions and the short quotes that
+    anchor them. This file IS the corpus growing.
+
+    `decisions` is keyed by recordId. `records` holds the candidates those
+    decisions were made about — accepted ones, which are new records, and
+    rejected ones, which Witness lists as false positives — copied here
+    because candidates/ is gitignored and a decision about a candidate nobody
+    can see any more would be a decision about nothing. The copy keeps the
+    candidate's own status; the decision is the authority.
+    """
+
+    version: Literal[1] = 1
+    decisions: dict[str, ReviewDecision] = Field(default_factory=dict)
+    records: list[Candidate] = Field(default_factory=list)
+
+
 class ExtractResponse(BaseModel):
     """What one extraction produced (§6.1, §6.3), and what
     `candidates/{paperId}.json` holds.

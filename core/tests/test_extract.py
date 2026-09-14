@@ -15,7 +15,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import extract, intake
+from openferment_core import biorepo, extract, intake
 from openferment_core.api import app
 from openferment_core.models import ExtractResponse, Usage
 from openferment_core.units import tables
@@ -29,6 +29,7 @@ def _offline(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
+    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 def fetch_structural_as(paper_id: str):

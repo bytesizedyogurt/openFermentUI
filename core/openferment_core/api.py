@@ -20,9 +20,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
-from . import extract, intake, witness
+from . import biorepo, extract, intake, witness
 from .corpus import load_corpus
-from .models import AnswerPlan, AskRequest, ExtractResponse, ExtractRun, FetchResult, IntakeStatus, Overlay, Usage
+from .models import (
+    AnswerPlan,
+    AskRequest,
+    ExtractResponse,
+    ExtractRun,
+    FetchResult,
+    IntakeStatus,
+    Overlay,
+    ReviewDecision,
+    Usage,
+)
 from .postdoc import MODEL, PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -205,18 +215,38 @@ def biorepo_overlay() -> Overlay:
     """What the service knows that the seed does not.
 
     Papers from fulltext/ (§5); the run and the new candidates recomputed
-    from candidates/ against the seed (§6.2). §7.2 adds review decisions.
-    The store applies whatever is here in one action at load, and nothing
-    here changes a record's status — that path goes through `biorepo.write`
-    alone. A missing corpus.json costs the run, not the overlay.
+    from candidates/ against the seed (§6.2); the reviewers' decisions from
+    biorepo.json (§7.2). The store applies whatever is here in one action at
+    load, and nothing here changes a record's status — that path goes
+    through `biorepo.write` alone. A missing corpus.json costs the run, not
+    the overlay.
     """
     try:
         runs = witness.runs()
         candidates = witness.new_candidates()
     except FileNotFoundError as e:
         log.warning("overlay without runs — %s", e)
-        runs, candidates = [], []
-    return Overlay(papers=intake.overlay_papers(), candidates=candidates, runs=runs)
+        runs, candidates = [], biorepo.records()
+    return Overlay(
+        papers=intake.overlay_papers(),
+        records=biorepo.decisions(),
+        candidates=candidates,
+        runs=runs,
+    )
+
+
+@app.post("/api/biorepo/decisions", response_model=ReviewDecision)
+def biorepo_decisions(decision: ReviewDecision) -> ReviewDecision:
+    """The one way a decision reaches biorepo.json (§2.3, §7.2): through
+    `biorepo.write`, which stores it or refuses it with the rule that failed.
+    422 carries the rule and the reason; nothing is repaired on the way."""
+    try:
+        return biorepo.write(decision)
+    except biorepo.WriteRefused as e:
+        log.warning("biorepo refused %s — %s", decision.recordId, e)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────

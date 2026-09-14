@@ -164,8 +164,13 @@ def load_corpus(path: str | None = None) -> Corpus:
     papers_by_id = {p["id"]: p for p in papers}
     records_by_id = {r["id"]: r for r in records}
 
-    order = [r["id"] for r in records]
-    docs = [tokenize(_document(r, papers_by_id)) for r in records]
+    # A record a reviewer rejected stays resolvable — a later decision may
+    # name it, and a citation of it must be checkable — but it is never
+    # retrieved: Postdoc citing evidence a person threw out would be the
+    # exact wrongness the review boundary exists to stop (OF-BLD-012 §7.4).
+    retrievable = [r for r in records if r.get("status") != "rejected"]
+    order = [r["id"] for r in retrievable]
+    docs = [tokenize(_document(r, papers_by_id)) for r in retrievable]
     return Corpus(
         papers=papers,
         records=records,

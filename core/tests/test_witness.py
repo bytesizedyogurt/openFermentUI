@@ -12,9 +12,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import extract, intake, witness
+from openferment_core import biorepo, extract, intake, witness
 from openferment_core.api import app
-from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity
+from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, ReviewDecision
 from openferment_core.units import to_si
 
 # ── a seed nobody curated ──────────────────────────────────────────────
@@ -155,6 +155,20 @@ def test_new_records_are_unscored_and_not_false_positives(run):
     assert all(c.status == "unverified" for c in new)
 
 
+def test_false_positives_are_only_what_a_reviewer_rejected():
+    def d(rid, status, reason=None):
+        return ReviewDecision(status=status, provenance="unverified", reviewer="sean",
+                              recordId=rid, at="2026-09-14T00:00:00Z", rejectReason=reason)
+    decisions = {
+        "hk1-P1-5": d("hk1-P1-5", "rejected", "not a titre — a loading control"),
+        "hk1-P1-1": d("hk1-P1-1", "verified"),
+    }
+    fps = witness.false_positives(CANDIDATES, decisions)
+    assert [fp.id for fp in fps] == ["hk1-P1-5"]
+    assert fps[0].field == "titer_intracellular" and fps[0].note == "not a titre — a loading control"
+    assert witness.false_positives(CANDIDATES, {}) == []
+
+
 def test_the_run_is_the_browsers_shape(run):
     assert run.run == "haiku-1"
     body = run.model_dump()
@@ -184,6 +198,7 @@ def _offline(monkeypatch, tmp_path):
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(extract, "FIXTURE_DIR", tmp_path / "no-saved-responses")
+    monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
 
 
 @pytest.fixture

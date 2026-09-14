@@ -17,16 +17,49 @@
  * condition string attached to a real measurement is worse than no condition
  * string, because downstream it reads as something somebody established.
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
-import { ALIASES, REFUSALS, SI_UNIT, U } from '../src/engine/units';
+import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
-import type { ExtractionRecord } from '../src/data/types';
+import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 const OUT = 'core/openferment_core/data/corpus.json';
+
+/**
+ * The reviewers' decisions (OF-BLD-012 §7.4). corpus.json reflects
+ * biorepo.json: a promoted record carries its promoted status and provenance
+ * and the quote a reviewer re-anchored it to; an accepted new record is
+ * appended. The seed modules stay untouched — this is the one place the two
+ * are combined, and `check:biorepo` checks that the combination happened.
+ */
+const BIOREPO = 'core/data/biorepo.json';
+const biorepo: BioRepo = existsSync(BIOREPO)
+  ? (JSON.parse(readFileSync(BIOREPO, 'utf8')) as BioRepo)
+  : { version: 1, decisions: {}, records: [] };
+
+/** A record as the reviewer left it. Nothing is invented: every field comes off the decision. */
+function decided(r: ExtractionRecord, d: ReviewDecision | undefined): ExtractionRecord {
+  if (!d) return r;
+  const value = d.corrected?.value ?? r.value;
+  const unit = d.corrected?.unit ?? r.unit;
+  return {
+    ...r,
+    status: d.status,
+    provenance: d.provenance,
+    gold: d.gold,
+    corrected: d.corrected,
+    rejectReason: d.rejectReason,
+    reviewer: d.reviewer,
+    quote: d.quote ?? r.quote,
+    sectionId: d.sectionId ?? r.sectionId,
+    value,
+    unit,
+    si: d.corrected && typeof value === 'number' ? toSI(value, unit) : r.si,
+  };
+}
 
 /**
  * What was actually recorded about how this measurement was taken.
@@ -75,35 +108,54 @@ const papers = PAPERS.map((p) => ({
   tranche: p.tranche,
 }));
 
-const records = RECORDS.map((r) => ({
-  id: r.id,
-  paperId: r.paperId,
-  sectionId: r.sectionId,
-  field: r.field,
-  /** The ontology's human name for the field — 'Titre', not 'titre_g_per_l'. */
-  fieldLabel: fieldName(r.field),
-  value: r.value,
-  unit: r.unit,
-  /** Normalised value, so retrieval and the UI agree on magnitude. */
-  si: r.si,
-  quote: r.quote,
-  /**
-   * The EFFECTIVE provenance, via the same `provenanceOf` the UI renders from.
-   * Exporting the raw field instead would let the service and the screen
-   * disagree about what a record is worth, which is the one disagreement that
-   * must not exist.
-   */
-  provenance: provenanceOf(r),
-  /**
-   * False means this paper is quoting somebody else's measurement. The model is
-   * told, so it can avoid presenting a citation-of-a-citation as corroboration
-   * (OF-COR-001 §19, fifth trap).
-   */
-  primary: r.isPrimary,
-  citesRecordId: r.citesRecordId ?? null,
-  strainId: r.organism ?? null,
-  conditions: conditionsOf(r),
-}));
+function exportRecord(r: ExtractionRecord, source: 'seed' | 'biorepo') {
+  return {
+    id: r.id,
+    paperId: r.paperId,
+    sectionId: r.sectionId,
+    field: r.field,
+    /** The ontology's human name for the field — 'Titre', not 'titre_g_per_l'. */
+    fieldLabel: fieldName(r.field),
+    value: r.value,
+    unit: r.unit,
+    /** Normalised value, so retrieval and the UI agree on magnitude. */
+    si: r.si,
+    quote: r.quote,
+    /**
+     * The EFFECTIVE provenance, via the same `provenanceOf` the UI renders from.
+     * Exporting the raw field instead would let the service and the screen
+     * disagree about what a record is worth, which is the one disagreement that
+     * must not exist.
+     */
+    provenance: provenanceOf(r),
+    /**
+     * The review status as biorepo.json has it (OF-BLD-012 §7.4). Retrieval
+     * skips 'rejected'; `check:biorepo` checks this column against the file.
+     */
+    status: r.status,
+    /** For anchoring a promotion (§2.4 rule 6): the ontology may require one. */
+    method: r.method ?? null,
+    /**
+     * False means this paper is quoting somebody else's measurement. The model is
+     * told, so it can avoid presenting a citation-of-a-citation as corroboration
+     * (OF-COR-001 §19, fifth trap).
+     */
+    primary: r.isPrimary,
+    citesRecordId: r.citesRecordId ?? null,
+    strainId: r.organism ?? null,
+    conditions: conditionsOf(r),
+    /** 'seed' from src/data; 'biorepo' for a new record a reviewer accepted. */
+    source,
+  };
+}
+
+const seedRecords = RECORDS.map((r) => exportRecord(decided(r, biorepo.decisions[r.id]), 'seed'));
+// Accepted new records: the corpus growing (§7.4). A rejected candidate is
+// not a record and an undecided one is not in biorepo.json at all.
+const newRecords = biorepo.records
+  .filter((c) => biorepo.decisions[c.id]?.status === 'verified')
+  .map((c) => exportRecord(decided({ ...c, audit: [] }, biorepo.decisions[c.id]), 'biorepo'));
+const records = [...seedRecords, ...newRecords];
 
 /**
  * The ontology, for the extractor and the anchoring validator (OF-BLD-012 §5.3).
@@ -147,7 +199,9 @@ const sections = papers.reduce((n, p) => n + p.sections.length, 0);
 console.log('\nopenFerment corpus export');
 console.log('─────────────────────────');
 console.log(`  papers      ${papers.length} (${sections} sections; ${papers.filter((p) => p.pmcid).length} with a PMCID, ${papers.filter((p) => !p.pmcid && p.doi).length} DOI-only, ${papers.filter((p) => !p.pmcid && !p.doi && p.pmid).length} PMID-only)`);
-console.log(`  records     ${records.length}`);
+const decisionList = Object.values(biorepo.decisions);
+console.log(`  records     ${records.length} (${seedRecords.length} seed, ${newRecords.length} accepted new records from biorepo.json)`);
+console.log(`  decisions   ${decisionList.length} (${decisionList.filter((d) => d.status === 'verified').length} verified, ${decisionList.filter((d) => d.status === 'rejected').length} rejected, ${decisionList.filter((d) => d.provenance === 'gold' || d.gold).length} gold)`);
 console.log(`  conditions  ${withConditions} carry recorded conditions, ${records.length - withConditions} carry none and say so`);
 console.log(`  primary     ${records.length - nonPrimary} first-hand, ${nonPrimary} quoting another record`);
 console.log(`  ontology    ${ontology.length} fields, ${ontology.filter((d) => d.categorical).length} categorical, ${ontology.filter((d) => d.requiresMethod).length} require a method`);
