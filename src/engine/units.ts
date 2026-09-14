@@ -1,5 +1,15 @@
 // Purpose-built unit engine for the openFerment ontology (OF-DES-001 §7.5).
 // Linear families use factor-to-base; temperature is affine.
+//
+// THE TABLES ARE DATA THAT CROSSES THE BOUNDARY (OF-BLD-012 §5.3). `U`,
+// `ALIASES`, `SI_UNIT` and `REFUSALS` are exported so `scripts/export-corpus.ts`
+// can ship them to the Python service verbatim, and `core/openferment_core/
+// units.py` normalises and converts from the same table rather than from a
+// second one somebody typed in by hand. The FUNCTIONS stay here and are the
+// reference implementation: `scripts/export-unit-fixtures.ts` records what
+// they answer for a fixed set of inputs, and the Python test asserts the same
+// answers on every pair. If the two sides ever disagree, this side is right and
+// the test says so.
 
 export interface UnitDef {
   family: string;
@@ -11,7 +21,7 @@ export interface UnitDef {
 // Family base units: rate=h⁻¹, time=h, massConc=g L⁻¹, mass=g, volume=L,
 // percent=%, yield=g g⁻¹, volProd=g L⁻¹ h⁻¹, specProd=mg g⁻¹ h⁻¹,
 // odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹
-const U: Record<string, UnitDef> = {
+export const U: Record<string, UnitDef> = {
   'h⁻¹': { family: 'rate', factor: 1, label: 'h⁻¹' },
   'd⁻¹': { family: 'rate', factor: 1 / 24, label: 'd⁻¹' },
   'min⁻¹': { family: 'rate', factor: 60, label: 'min⁻¹' },
@@ -96,7 +106,7 @@ const U: Record<string, UnitDef> = {
  * these; the point of this table is that the UI can say why, turning the unit
  * engine from a convenience into an epistemic guardrail.
  */
-const REFUSALS: { a: string; b: string; because: string }[] = [
+export const REFUSALS: { a: string; b: string; because: string }[] = [
   {
     a: 'proteinShare',
     b: 'massConc',
@@ -139,7 +149,7 @@ export function explainRefusal(fromUnit: string, toUnit: string): string | null 
 }
 
 // The SI/canonical display unit chosen per family for the "SI twin".
-const SI_UNIT: Record<string, string> = {
+export const SI_UNIT: Record<string, string> = {
   proteinShare: '% TSP',
   stoichiometry: 'mol mol⁻¹',
   fold: '×',
@@ -168,7 +178,7 @@ const SI_UNIT: Record<string, string> = {
 };
 
 // Alias normalization: accept human/ASCII notations.
-const ALIASES: Record<string, string> = {
+export const ALIASES: Record<string, string> = {
   '1/h': 'h⁻¹',
   'h-1': 'h⁻¹',
   '/h': 'h⁻¹',
@@ -222,6 +232,11 @@ const ALIASES: Record<string, string> = {
   '%v/v': '% v/v',
   '% vv': '% v/v',
   '%w/v': '% w/v',
+  // No-space forms of the expression-share units. Papers write "15%TSP" at
+  // least as often as "15 % TSP", and the superscript-insensitive fallback
+  // below cannot bridge a missing space.
+  '%tsp': '% TSP',
+  '%tcp': '% TCP',
   m: 'mol L⁻¹',
   mm: 'mmol L⁻¹',
   um: 'µmol L⁻¹',
@@ -242,8 +257,11 @@ export function normalizeUnit(raw: string): string | null {
   if (ALIASES[t]) return ALIASES[t];
   if (ALIASES[lower]) return ALIASES[lower];
   // Try unicode-superscript-insensitive match
+  // The middot separators (mg·L⁻¹, mg⋅L⁻¹) are read as the space the table
+  // uses — Python mirrors this exact sequence of replacements, so change it
+  // in both places or the fixture test will say which one you forgot.
   const strip = (s: string) =>
-    s.replace(/⁻¹/g, '-1').replace(/⁻²/g, '-2').replace(/⁻³/g, '-3').replace(/³/g, '3').replace(/²/g, '2').replace(/\s+/g, ' ').toLowerCase();
+    s.replace(/[·⋅]/g, ' ').replace(/⁻¹/g, '-1').replace(/⁻²/g, '-2').replace(/⁻³/g, '-3').replace(/³/g, '3').replace(/²/g, '2').replace(/\s+/g, ' ').toLowerCase();
   const target = strip(t);
   for (const key of Object.keys(U)) {
     if (strip(key) === target) return key;

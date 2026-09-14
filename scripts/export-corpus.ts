@@ -21,7 +21,8 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
-import { fieldName } from '../src/data/ontology';
+import { ONTOLOGY, fieldName } from '../src/data/ontology';
+import { ALIASES, REFUSALS, SI_UNIT, U } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
 import type { ExtractionRecord } from '../src/data/types';
 
@@ -91,8 +92,40 @@ const records = RECORDS.map((r) => ({
   conditions: conditionsOf(r),
 }));
 
+/**
+ * The ontology, for the extractor and the anchoring validator (OF-BLD-012 §5.3).
+ *
+ * Every field the spec names, and NOT `notes`. The notes carry example values
+ * — "P. pastoris β-casein 15–18", "industry fermentation averages run 24–42" —
+ * which are exactly what must never sit in front of a model being asked to
+ * find numbers in a paper. The definition says what a field means; the notes
+ * say what values people have seen, and the second is a prime.
+ *
+ * Optional fields are filled with their defaults so the Python side reads a
+ * fixed shape rather than probing for keys.
+ */
+const ontology = ONTOLOGY.map((d) => ({
+  id: d.id,
+  family: d.family,
+  name: d.name,
+  definition: d.definition,
+  canonicalUnit: d.canonicalUnit,
+  range: d.range,
+  categorical: d.categorical ?? false,
+  requiresMethod: d.requiresMethod ?? false,
+  refuseConversionTo: d.refuseConversionTo ?? [],
+}));
+
+/**
+ * The unit engine's tables, verbatim. This is the split OF-BLD-002 §0 asked
+ * for: on the Python side `units.ts` becomes a generated table; on this side
+ * it stays the reference implementation, proven by the fixture that
+ * `export-unit-fixtures.ts` records from it.
+ */
+const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
+
 mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify({ papers, records }, null, 2) + '\n');
+writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2) + '\n');
 
 const withConditions = records.filter((r) => r.conditions !== null).length;
 const nonPrimary = records.filter((r) => !r.primary).length;
@@ -104,4 +137,6 @@ console.log(`  papers      ${papers.length} (${sections} sections)`);
 console.log(`  records     ${records.length}`);
 console.log(`  conditions  ${withConditions} carry recorded conditions, ${records.length - withConditions} carry none and say so`);
 console.log(`  primary     ${records.length - nonPrimary} first-hand, ${nonPrimary} quoting another record`);
+console.log(`  ontology    ${ontology.length} fields, ${ontology.filter((d) => d.categorical).length} categorical, ${ontology.filter((d) => d.requiresMethod).length} require a method`);
+console.log(`  units       ${Object.keys(U).length} units in ${new Set(Object.values(U).map((u) => u.family)).size} families, ${Object.keys(ALIASES).length} aliases, ${REFUSALS.length} explained refusals`);
 console.log(`\n✓ ${OUT}`);
