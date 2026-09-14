@@ -49,8 +49,16 @@ export interface DurableReviewDecision {
   reviewer?: string;
 }
 
-/** Compile-time proof that a ReviewDecision carries every DurableReviewDecision field. */
-export const DecisionMirror: (d: ReviewDecision) => DurableReviewDecision = (d) => d;
+/**
+ * Compile-time proof that a ReviewDecision carries every DurableReviewDecision
+ * field: every key here is a key there (a field added here alone fails the
+ * build), and a ReviewDecision is assignable to this shape (the types agree).
+ */
+type KeysSubset<A, B> = [keyof A] extends [keyof B] ? true : never;
+export const DecisionMirror: [KeysSubset<DurableReviewDecision, ReviewDecision>, (d: ReviewDecision) => DurableReviewDecision] = [
+  true,
+  (d) => d,
+];
 
 export interface DurableSnapshot {
   /** Bumped when the shape changes; an older snapshot is dropped, not guessed at. */

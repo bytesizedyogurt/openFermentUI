@@ -1211,11 +1211,20 @@ export interface Candidate {
 }
 
 type RecordMinusReview = Omit<ExtractionRecord, 'audit' | 'gold' | 'corrected' | 'reviewer'>;
-/** Compile-time proof that Candidate is ExtractionRecord minus review, in both directions. */
-export const CandidateMirror: [(c: Candidate) => RecordMinusReview, (r: RecordMinusReview) => Candidate] = [
-  (c) => c,
-  (r) => r,
-];
+/**
+ * `true` when A and B declare exactly the same keys, `never` otherwise.
+ * Assignability alone is not enough here: an extra OPTIONAL property is
+ * assignable in both directions, so a mirror built on assignability lets a
+ * field added to one side slip past — which is what the first version of this
+ * did, and what a negative test caught.
+ */
+type SameKeys<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never;
+/** Compile-time proof that Candidate is ExtractionRecord minus review: same keys, assignable both ways. */
+export const CandidateMirror: [
+  SameKeys<Candidate, RecordMinusReview>,
+  (c: Candidate) => RecordMinusReview,
+  (r: RecordMinusReview) => Candidate,
+] = [true, (c) => c, (r) => r];
 
 /**
  * What a reviewer decided about one record (OF-BLD-012 §7.1). The first six
