@@ -252,6 +252,7 @@ export default function App() {
   const tickJobs = useStore((s) => s.tickJobs);
   const tickTimers = useStore((s) => s.tickTimers);
   const hydrateDurable = useStore((s) => s.hydrateDurable);
+  const hydrateOverlay = useStore((s) => s.hydrateOverlay);
   const route = useRoute();
   const [gPressed, setGPressed] = useState(false);
   const lastFrame = useRef(performance.now());
@@ -266,7 +267,10 @@ export default function App() {
   // memory and Settings says so, rather than blocking the screen on storage.
   useEffect(() => {
     void hydrateDurable();
-  }, [hydrateDurable]);
+    // OF-BLD-012 §2.1 — the service's overlay, applied over the seed when the
+    // service answers. Silent when it does not: the app is then the seed.
+    void hydrateOverlay();
+  }, [hydrateDurable, hydrateOverlay]);
 
   // Theme / density / motion applied at the document root.
   useEffect(() => {

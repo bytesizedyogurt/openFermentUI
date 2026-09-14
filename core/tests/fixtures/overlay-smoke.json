@@ -1,0 +1,52 @@
+{
+  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes.",
+  "papers": {
+    "B5": {
+      "ingest": "complete",
+      "textSource": "full-text",
+      "sections": [
+        {
+          "id": "abstract",
+          "heading": "Abstract",
+          "text": "The abstract comes first, whatever order the elements appear in."
+        },
+        {
+          "id": "s1",
+          "heading": "Introduction",
+          "text": "An imaginary organism was grown in an imaginary vessel. Its rate is written per litre, as in mg L-1, and its gas as CO2."
+        },
+        {
+          "id": "s2",
+          "heading": "Results",
+          "text": "Results have a preamble of their own."
+        },
+        {
+          "id": "s3",
+          "heading": "Results › Growth",
+          "text": "The nested section flattens with the parent heading in front of it."
+        },
+        {
+          "id": "s4",
+          "heading": "Results › Empty › Deeper",
+          "text": "Three levels down, still prefixed all the way up."
+        },
+        {
+          "id": "t1",
+          "heading": "Table 1 Placeholder rows, kept as rows.",
+          "text": "Condition | Value | Unit\nPlaceholder A | 7 | mg L-1\nPlaceholder B | 9 | mg L-1"
+        },
+        {
+          "id": "f1",
+          "heading": "Figure 1",
+          "text": "Figure 1 A placeholder figure caption."
+        }
+      ],
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "fetchedAt": "2026-09-14T00:00:00+00:00",
+      "reason": null
+    }
+  },
+  "records": {},
+  "candidates": [],
+  "runs": []
+}

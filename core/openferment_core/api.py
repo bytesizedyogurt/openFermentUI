@@ -18,10 +18,11 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
+from . import intake
 from .corpus import load_corpus
-from .models import AnswerPlan, AskRequest, Usage
+from .models import AnswerPlan, AskRequest, FetchResult, IntakeStatus, Overlay, Usage
 from .postdoc import MODEL, PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -132,3 +133,47 @@ def ask(request: AskRequest) -> AnswerPlan:
         rejected=result.rejected,
         rejectionReasons=result.reasons,
     )
+
+
+# ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────
+
+
+@app.post("/api/intake/{paper_id}/fetch", response_model=FetchResult)
+def intake_fetch(paper_id: str, force: bool = False) -> FetchResult:
+    """Fetch one paper's full text from Europe PMC, split it, cache it.
+
+    A fetch that fails returns HTTP 200 with `status: failed:fetch` or
+    `failed:parse` and a reason — the ingest board renders both, and a 5xx
+    would render as nothing. The only errors here are a paper the corpus has
+    never heard of, and a corpus that has not been generated.
+    """
+    try:
+        corpus = load_corpus()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    paper = corpus.paper(paper_id)
+    if paper is None:
+        raise HTTPException(status_code=404, detail=f"{paper_id} is not in the corpus")
+    result = intake.fetch_paper(paper, force=force)
+    log.info("intake: %s → %s%s", paper_id, result.status, f" ({result.reason})" if result.reason else "")
+    return result
+
+
+@app.get("/api/intake/status")
+def intake_status() -> dict[str, IntakeStatus]:
+    """Every paper with a cached fetch, success or failure, summarised."""
+    return intake.all_statuses()
+
+
+# ── the overlay (OF-BLD-012 §2.1) ───────────────────────────────────────
+
+
+@app.get("/api/biorepo/overlay", response_model=Overlay)
+def biorepo_overlay() -> Overlay:
+    """What the service knows that the seed does not.
+
+    Papers only, for now: §7.2 adds review decisions, candidates and runs. The
+    store applies whatever is here in one action at load, and nothing here
+    changes a record's status — that path goes through `biorepo.write` alone.
+    """
+    return Overlay(papers=intake.overlay_papers())

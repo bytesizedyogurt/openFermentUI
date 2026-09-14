@@ -27,6 +27,8 @@ import type {
   Scenario,
   Strain,
   TimerState,
+  Overlay,
+  FetchResult,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -51,6 +53,8 @@ import {
   saveDurable,
   type DurableSnapshot,
 } from '@/lib/durable';
+import { IntakeDown, fetchPaper, loadOverlay } from '@/lib/intake';
+import { postdocHealth } from '@/lib/postdoc';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -282,6 +286,23 @@ export interface OFState {
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
   durableReady: boolean;
 
+  // service overlay (OF-BLD-012 §2.1)
+  /** Whether openferment-core answered /api/health this session. null = not asked yet. */
+  serviceUp: boolean | null;
+  /** The overlay as last received, merged. Later views (runs, candidates) read it here. */
+  overlay: Overlay | null;
+  /** Apply an overlay over the seed. Idempotent; merges into any overlay already applied. */
+  applyOverlay: (overlay: Overlay) => void;
+  /** Ask the service for its overlay and apply it. Silent when there is no service. */
+  hydrateOverlay: () => Promise<void>;
+  /** Live fetch through the service. Called by `ingestPaper` when the service is up. */
+  ingestPaperLive: (paperId: string) => Promise<void>;
+  /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
+  ingestPaperScripted: (paperId: string) => void;
+  completeJob: (id: string) => void;
+  /** Put one record's card in front of the reviewer — the reader's rail links here. */
+  focusReview: (recordId: string) => void;
+
   // misc
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
@@ -414,6 +435,8 @@ const seedState = () => ({
   runs: {} as Record<string, RunState>,
   activeRunId: null,
   jobs: [] as Job[],
+  serviceUp: null as boolean | null,
+  overlay: null as Overlay | null,
   reviewQueue: [] as string[],
   reviewIndex: 0,
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
@@ -610,7 +633,10 @@ export const useStore = create<OFState>()((set, get) => ({
     const finishedJobs: Job[] = [];
     set((s) => ({
       jobs: s.jobs.map((j) => {
-        if (j.status !== 'running') return j;
+        // A real job's progress is set by the fetch that owns it, never by
+        // the clock — at simSpeed ∞ a timed job completes on the next tick,
+        // which would mark a paper 'complete' while its fetch was still out.
+        if (j.status !== 'running' || j.real) return j;
         let { stageIndex, stageProgress } = j;
         let budget = dt;
         while (budget > 0 && stageIndex < j.stages.length) {
@@ -652,16 +678,134 @@ export const useStore = create<OFState>()((set, get) => ({
       jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: 'failed', failReason: reason } : j)),
     })),
 
+  completeJob: (id) =>
+    set((s) => ({
+      jobs: s.jobs.map((j) =>
+        j.id === id ? { ...j, stageIndex: j.stages.length, stageProgress: 1, status: 'done' } : j,
+      ),
+    })),
+
   clearJobs: () => set((s) => ({ jobs: s.jobs.filter((j) => j.status === 'running') })),
 
   // ── ingest ───────────────────────────────────────────────────────────
+  //
+  // TWO PATHS, AND THE STORE SAYS WHICH ONE RAN (OF-BLD-012 §5.4). When
+  // openferment-core answers /api/health the paper is fetched for real from
+  // Europe PMC and its own text replaces the curation note. When it does not,
+  // the five-stage timer simulation runs as it always has and halts at Fetch
+  // with a reason that names the missing service. The offline path is kept as
+  // a fallback for the board, not for the corpus: nothing it does changes a
+  // paper's text, and the board labels it as a simulation.
   ingestPaper: (paperId) => {
+    if (!get().papers.some((p) => p.id === paperId)) return;
+    void (async () => {
+      let up = get().serviceUp;
+      if (up === null) {
+        try {
+          up = (await postdocHealth()).ok;
+        } catch {
+          up = false;
+        }
+        set({ serviceUp: up });
+      }
+      if (up) await get().ingestPaperLive(paperId);
+      else get().ingestPaperScripted(paperId);
+    })();
+  },
+
+  ingestPaperLive: async (paperId) => {
+    get().setPaperIngest(paperId, 'stage:fetch');
+    // Two real stages. Chunk, Embed and Extract are not run by a fetch — the
+    // board shows them as not built rather than ticking them off.
+    const id = get().startJob({
+      title: `Fetch ${paperId}`,
+      kind: 'ingest',
+      real: true,
+      stages: [
+        { label: 'Fetch', ms: 20000 },
+        { label: 'Parse', ms: 2000 },
+      ],
+      href: `#/biorepo/paper/${paperId}`,
+    });
+    get().logActivity({
+      at: stamp(),
+      icon: 'download',
+      text: `Fetching ${paperId} from Europe PMC`,
+      href: `#/intake/ingest`,
+      provenance: 'user',
+    });
+
+    let result: FetchResult;
+    try {
+      result = await fetchPaper(paperId);
+    } catch (e) {
+      const message =
+        e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+      get().failJob(id, message);
+      get().setPaperIngest(paperId, 'failed:fetch');
+      if (e instanceof IntakeDown) set({ serviceUp: false });
+      get().toast({ text: `Fetch ${paperId} failed — ${message}`, kind: 'error' });
+      return;
+    }
+
+    if (result.status === 'complete') {
+      get().applyOverlay({
+        papers: {
+          [paperId]: {
+            ingest: 'complete',
+            textSource: 'full-text',
+            sections: result.sections,
+            license: result.license?.href ?? result.license?.text ?? null,
+            fetchedAt: result.fetchedAt,
+            reason: null,
+          },
+        },
+        records: {},
+        candidates: [],
+        runs: [],
+      });
+      get().completeJob(id);
+      get().toast({
+        text: `${paperId} fetched — ${result.sections.length} sections, the paper's own words`,
+        kind: 'success',
+        href: `#/biorepo/paper/${paperId}`,
+        hrefLabel: 'Open',
+      });
+      return;
+    }
+
+    // A real failure, with the service's reason. Persisted server-side, so
+    // the same paper is not asked again until somebody forces it.
+    get().applyOverlay({
+      papers: {
+        [paperId]: {
+          ingest: result.status,
+          textSource: 'curation-note',
+          sections: [],
+          license: null,
+          fetchedAt: result.fetchedAt,
+          reason: result.reason,
+        },
+      },
+      records: {},
+      candidates: [],
+      runs: [],
+    });
+    get().failJob(id, result.reason ?? 'The service reported a failure without a reason.');
+    get().toast({
+      text: `${paperId} halted at ${result.status === 'failed:parse' ? 'Parse' : 'Fetch'}`,
+      kind: 'error',
+      href: '#/intake/ingest',
+      hrefLabel: 'Open the board',
+    });
+  },
+
+  ingestPaperScripted: (paperId) => {
     const paper = get().papers.find((p) => p.id === paperId);
     if (!paper) return;
-    // With a real corpus, ingestion needs the source document — and this build
-    // has none. Open-access entries would be fetchable with network access;
-    // paywalled ones need institutional credentials. Either way the pipeline
-    // halts at Fetch rather than pretending to parse something it never got.
+    // The timer path halts at Fetch every time: with no service there is
+    // nothing to fetch with, and the pipeline says so rather than pretending
+    // to parse something it never got.
     const fails = true;
     get().setPaperIngest(paperId, 'stage:fetch');
     const id = get().startJob({
@@ -681,8 +825,8 @@ export const useStore = create<OFState>()((set, get) => ({
       const speed = get().ui.simSpeed;
       const wait = speed === Infinity ? 50 : 900 / speed;
       const reason = paper.openAccess
-        ? `Source not retrieved — ${paper.doi ? `DOI ${paper.doi}` : paper.pmcid ?? 'the record'} is open access, but this build makes no network requests.`
-        : 'Source not retrieved — publisher requires institutional access. Fetch this one manually and re-run.';
+        ? `Source not retrieved — ${paper.doi ? `DOI ${paper.doi}` : paper.pmcid ?? 'the record'} is open access, but the Intake service is not running, so no request was made. Start it with \`uv run uvicorn openferment_core.api:app --reload\` from \`core/\` and retry.`
+        : 'Source not retrieved — publisher requires institutional access, and the Intake service is not running. Fetch this one manually and re-run.';
       setTimeout(() => {
         get().failJob(id, reason);
         get().setPaperIngest(paperId, 'failed:fetch');
@@ -1676,12 +1820,73 @@ export const useStore = create<OFState>()((set, get) => ({
     });
   },
 
+  // ── service overlay (OF-BLD-012 §2.1) ─────────────────────────────────
+
+  applyOverlay: (overlay) =>
+    set((s) => {
+      const merged: Overlay = {
+        papers: { ...(s.overlay?.papers ?? {}), ...overlay.papers },
+        records: { ...(s.overlay?.records ?? {}), ...overlay.records },
+        candidates: overlay.candidates.length ? overlay.candidates : (s.overlay?.candidates ?? []),
+        runs: overlay.runs.length ? overlay.runs : (s.overlay?.runs ?? []),
+      };
+      // Papers only, for now. §7 applies review decisions and §6 applies runs;
+      // nothing in an overlay ever changes a record's status from here.
+      const papers = s.papers.map((p) => {
+        const o = overlay.papers[p.id];
+        if (!o) return p;
+        const fetched = o.textSource === 'full-text' && o.sections.length > 0;
+        return {
+          ...p,
+          ingest: o.ingest,
+          textSource: fetched ? 'full-text' : p.textSource,
+          // A failed fetch keeps the curation note: the reader must show
+          // SOMETHING, and the curator's words labelled as such beat nothing.
+          sections: fetched ? o.sections : p.sections,
+          license: fetched ? (o.license ?? undefined) : p.license,
+          ingestReason: o.reason ?? undefined,
+        } as Paper;
+      });
+      return { overlay: merged, papers };
+    }),
+
+  hydrateOverlay: async () => {
+    const overlay = await loadOverlay();
+    if (!overlay) {
+      set({ serviceUp: false });
+      return;
+    }
+    set({ serviceUp: true });
+    get().applyOverlay(overlay);
+  },
+
+  focusReview: (recordId) => {
+    const s = get();
+    const at = s.reviewQueue.indexOf(recordId);
+    if (at >= 0) {
+      set({ reviewIndex: at });
+      return;
+    }
+    if (!s.records.some((r) => r.id === recordId)) return;
+    // Not in the current queue — already decided, or no queue yet. Put it in
+    // front and the rest of the unverified records behind it.
+    const rest = s.records
+      .filter((r) => r.status === 'unverified' && r.id !== recordId)
+      .map((r) => r.id);
+    get().startReview([recordId, ...rest]);
+  },
+
   resetDemo: () => {
     // Clear persistence as well as memory. A reset that leaves a durable
     // snapshot behind would restore itself on the next reload, which is the
     // opposite of what the button says.
     void clearDurable();
-    set({ ...seedState(), grids: seedGrids(), toasts: [] });
+    // The overlay is the service's state, not the session's: it survives a
+    // reset the way it survives a reload.
+    const overlay = get().overlay;
+    const serviceUp = get().serviceUp;
+    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp });
+    if (overlay) get().applyOverlay(overlay);
     get().toast({
       text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
       kind: 'info',

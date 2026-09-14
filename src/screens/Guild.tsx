@@ -20,7 +20,7 @@ import {
 import type { ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
-import { href } from '@/router';
+import { useRoute, href } from '@/router';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
@@ -150,7 +150,11 @@ export default function Guild() {
   const editRecord = useStore((s) => s.editRecord);
   const undoReview = useStore((s) => s.undoReview);
   const advanceReview = useStore((s) => s.advanceReview);
+  const focusReview = useStore((s) => s.focusReview);
   const toast = useStore((s) => s.toast);
+  // OF-BLD-012 §5.4 — the reader's "pending verification" rail links here
+  // with ?record=<id>, and the card it names must be the one on screen.
+  const focusId = useRoute().query.get('record');
 
   const [origin, setOrigin] = useState<'extract' | 'session'>('extract');
   const [usedKeyboard, setUsedKeyboard] = useState(false);
@@ -182,6 +186,12 @@ export default function Guild() {
       }
     }
   }, [queue.length, startReview]);
+
+  // Declared after the seeding effect above so it runs after it in the same
+  // flush: the queue exists by the time this looks for the record in it.
+  useEffect(() => {
+    if (focusId) focusReview(focusId);
+  }, [focusId, focusReview, queue.length]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);

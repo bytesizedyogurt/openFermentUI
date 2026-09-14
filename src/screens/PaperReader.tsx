@@ -1,10 +1,21 @@
 // Paper reader (OF-DES-001 §8.4). The left pane renders the paper with every
 // extraction anchored to the exact quoted substring; the right rail lists the
 // same records. Selection is synchronised in both directions.
+//
+// SILENT DROPPING ENDS HERE (OF-BLD-012 §5.4). `locateSpans` finds each
+// record's quote with indexOf and, until this increment, a quote that failed
+// to anchor simply vanished from the text and sank to the bottom of the rail.
+// That was tolerable while every section was a curation note the quotes were
+// transcribed from. It is not tolerable once a section is the paper's own
+// text: a curated quote that is not in the paper is exactly the record a
+// reviewer needs to look at. So on a fetched paper the rail lists those
+// records under their own heading — pending verification — with a link to
+// the review card, and the count is in the heading where nobody can miss it.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   FolderPlus,
   Loader2,
   MessageSquare,
@@ -247,6 +258,9 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
   const parseFailed = paper.ingest === 'failed:parse';
   const ingesting = paper.ingest.startsWith('stage:');
   const onShelf = paper.ingest === 'shelf';
+  const fullText = paper.textSource === 'full-text';
+  /** On a fetched paper: the records whose curated quote the text does not contain. */
+  const pending = fullText ? railRecords.filter((x) => !x.located) : [];
 
   const totalChars = paper.sections.reduce((n, s) => n + s.text.length, 0) || 1;
 
@@ -374,6 +388,17 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         </div>
       )}
 
+      {paper.textSource === 'full-text' && (
+        <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
+          <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
+          <span>
+            Full text from Europe PMC{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            The sections below are the paper&rsquo;s own words; a record whose curated quote is not
+            found in them is listed in the rail as pending verification, not hidden.
+          </span>
+        </div>
+      )}
+
       {onShelf && (
         <div className="mt-4">
           <Callout kind="info" title="Not ingested yet">
@@ -452,12 +477,14 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         </Card>
       ) : (
         <>
-          <section className="mt-6">
-            <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
-            <div className="prose-reading">
-              <p>{paper.abstract}</p>
-            </div>
-          </section>
+          {paper.textSource !== 'full-text' && (
+            <section className="mt-6">
+              <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
+              <div className="prose-reading">
+                <p>{paper.abstract}</p>
+              </div>
+            </section>
+          )}
 
           {parseFailed ? (
             <section className="mt-4">
@@ -551,7 +578,7 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
           />
         ) : (
           <div className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
-            {railRecords.map(({ record: r, located }) => {
+            {(fullText ? railRecords.filter((x) => x.located) : railRecords).map(({ record: r, located }) => {
               const p = provOf(r);
               const isActive = activeId === r.id;
               return (
@@ -609,6 +636,65 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
                 </button>
               );
             })}
+
+            {/* §5.4 — the records the paper's own text does not contain. */}
+            {fullText && pending.length > 0 && (
+              <section className="mt-3 pt-3 border-t border-line" aria-labelledby="pending-verification">
+                <h3
+                  id="pending-verification"
+                  className="text-caption font-medium text-signal-warn flex items-center gap-1.5 mb-1"
+                >
+                  <AlertTriangle size={12} aria-hidden />
+                  Quote not found in source text — pending verification
+                  <span className="font-num ml-auto">{pending.length}</span>
+                </h3>
+                <p className="text-caption text-ink-soft mb-2">
+                  These quotes were transcribed from the curation document and do not appear verbatim in
+                  the fetched text. Each stays unverified until a reviewer anchors it to the paper&rsquo;s
+                  words or rejects it.
+                </p>
+                {pending.map(({ record: r }) => {
+                  const p = provOf(r);
+                  const isActive = activeId === r.id;
+                  return (
+                    <div
+                      key={r.id}
+                      className={cx(
+                        'rounded-input pr-1.5 py-1.5 mb-0.5 border',
+                        tickClass(p),
+                        isActive ? 'border-accent/50 bg-accent-wash' : 'border-transparent',
+                      )}
+                    >
+                      <button
+                        className="w-full text-left"
+                        onClick={() => setActiveId(r.id)}
+                        aria-pressed={isActive}
+                        title={`${r.id}: the quoted text was not found in this paper's sections`}
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate">{fieldName(r.field)}</span>
+                          <span className="font-num text-caption text-ink-soft shrink-0">{r.id}</span>
+                        </span>
+                        <span className="flex items-baseline justify-between gap-2 mt-0.5">
+                          <Quantity value={r.value} unit={r.unit} si={r.si} mode={unitMode} />
+                        </span>
+                        {r.quote && (
+                          <span className="block mt-1 text-caption text-ink-soft italic line-clamp-2">
+                            &ldquo;{r.quote}&rdquo;
+                          </span>
+                        )}
+                      </button>
+                      <a
+                        href={href(`/guild?record=${encodeURIComponent(r.id)}`)}
+                        className="mt-1 inline-flex items-center gap-1 text-caption text-accent hover:underline"
+                      >
+                        Open review card <ArrowRight size={11} aria-hidden />
+                      </a>
+                    </div>
+                  );
+                })}
+              </section>
+            )}
           </div>
         )}
 

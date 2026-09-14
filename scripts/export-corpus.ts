@@ -60,6 +60,19 @@ const papers = PAPERS.map((p) => ({
    */
   textSource: p.textSource,
   sections: p.sections.map((s) => ({ id: s.id, heading: s.heading, text: s.text })),
+  /**
+   * The identifiers Intake resolves and fetches by (OF-BLD-012 §5.1), and the
+   * state the ingest board reads. Absent until §10.4's API test asked the
+   * service to fetch B5 and it answered "no identifier" — the seed had a PMCID
+   * the projection never carried. Null rather than missing, so the Python
+   * side reads a fixed shape.
+   */
+  doi: p.doi ?? null,
+  pmcid: p.pmcid ?? null,
+  pmid: p.pmid ?? null,
+  openAccess: p.openAccess,
+  ingest: p.ingest,
+  tranche: p.tranche,
 }));
 
 const records = RECORDS.map((r) => ({
@@ -133,7 +146,7 @@ const sections = papers.reduce((n, p) => n + p.sections.length, 0);
 
 console.log('\nopenFerment corpus export');
 console.log('─────────────────────────');
-console.log(`  papers      ${papers.length} (${sections} sections)`);
+console.log(`  papers      ${papers.length} (${sections} sections; ${papers.filter((p) => p.pmcid).length} with a PMCID, ${papers.filter((p) => !p.pmcid && p.doi).length} DOI-only, ${papers.filter((p) => !p.pmcid && !p.doi && p.pmid).length} PMID-only)`);
 console.log(`  records     ${records.length}`);
 console.log(`  conditions  ${withConditions} carry recorded conditions, ${records.length - withConditions} carry none and say so`);
 console.log(`  primary     ${records.length - nonPrimary} first-hand, ${nonPrimary} quoting another record`);

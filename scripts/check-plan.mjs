@@ -59,6 +59,8 @@ const PAIRS = [
   ['FetchLicense', 'FetchLicense'],
   ['FetchResult', 'FetchResult'],
   ['IntakeStatus', 'IntakeStatus'],
+  ['OverlayPaper', 'OverlayPaper'],
+  ['Overlay', 'Overlay'],
 ];
 
 let compared = 0;

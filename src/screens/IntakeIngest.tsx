@@ -1,6 +1,15 @@
-// Ingest (OF-DES-001 §8.5). The demo shelf is the one live input method; the
-// pipeline board on the right shows the same five stages a real ingest runs,
-// including the scripted parse failure and its two recovery paths.
+// Ingest (OF-DES-001 §8.5, OF-BLD-012 §5.4). The queue on the left is the
+// one live input method; the pipeline board on the right shows what happened
+// to each paper that entered it.
+//
+// TWO PATHS, LABELLED. When openferment-core is running, "Fetch" makes the
+// first real network request this pipeline has ever made: the service asks
+// Europe PMC for the JATS, splits it, and the paper's own text replaces the
+// curation note. When the service is not running, the five-stage timer
+// simulation runs instead and halts at Fetch with a reason naming the missing
+// service. The board says which of the two it is showing, because a timed
+// animation that looked like a fetch would be the exact fake this project
+// exists to avoid.
 import { useMemo } from 'react';
 import {
   AlertTriangle,
@@ -15,6 +24,7 @@ import {
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
+import { START_COMMAND } from '@/lib/postdoc';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { INTAKE_TABS } from '@/data/tabs';
 import {
@@ -37,9 +47,11 @@ const DEFAULT_MS = [900, 1400, 700, 1100, 1800];
  * to the Parse cell. The job's stageIndex can drift a cell past it (the failure
  * is scheduled on a timer, not on the stage boundary), so it is clamped here.
  */
-// Nothing gets past Fetch in this build: no network requests are made, so the
-// pipeline halts at the first stage rather than at Parse.
+// The scripted path halts at Fetch: with no service there is nothing to fetch
+// with. The live path halts wherever the service says it did.
 const FAIL_STAGE_INDEX = STAGE_KEYS.indexOf('fetch');
+/** The stages a real fetch actually runs. Chunk, Embed and Extract are not built. */
+const REAL_STAGES = 2;
 
 type RowState = 'running' | 'complete' | 'failed' | 'degraded' | 'stalled';
 type CellState = 'done' | 'active' | 'pending' | 'failed' | 'skipped' | 'notrun';
@@ -50,6 +62,8 @@ interface BoardRow {
   state: RowState;
   stageIndex: number;
   extractions: number;
+  /** A real fetch (live, or applied from the overlay) rather than the timer simulation. */
+  real: boolean;
 }
 
 interface Cell {
@@ -87,6 +101,22 @@ function cellsFor(row: BoardRow): Cell[] {
 
   return STAGE_LABELS.map((label, i) => {
     const ms = msOf(i);
+    // A real fetch runs two stages and ticks off nothing it did not do.
+    if (row.real && i >= REAL_STAGES) {
+      return { label, state: 'notrun' as CellState, fill: 0, timing: 'not built' };
+    }
+    if (row.real) {
+      if (row.state === 'complete') return { label, state: 'done' as CellState, fill: 1, timing: 'done' };
+      if (row.state === 'failed') {
+        if (i < row.stageIndex) return { label, state: 'done' as CellState, fill: 1, timing: 'done' };
+        if (i === row.stageIndex) return { label, state: 'failed' as CellState, fill: 1, timing: 'halted' };
+        return { label, state: 'notrun' as CellState, fill: 0, timing: 'not run' };
+      }
+      // running: the fetch owns both cells until the service answers
+      return i === 0
+        ? { label, state: 'active' as CellState, fill: 0.5, timing: 'in flight' }
+        : { label, state: 'pending' as CellState, fill: 0, timing: 'after fetch' };
+    }
     if (row.state === 'complete') {
       return { label, state: 'done' as CellState, fill: 1, timing: secs(ms) };
     }
@@ -138,6 +168,8 @@ export default function IntakeIngest() {
   const setPaperIngest = useStore((s) => s.setPaperIngest);
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
+  const serviceUp = useStore((s) => s.serviceUp);
+  const live = serviceUp === true;
 
   // The demo shelf is gone with the synthetic corpus. What sits here now is
   // the real ingest queue: tranche-1 entries whose full text has not been
@@ -156,7 +188,12 @@ export default function IntakeIngest() {
       const job = ingestJobFor(jobs, paper.id);
       const ingesting = paper.ingest.startsWith('stage:');
       const failed = paper.ingest.startsWith('failed:');
-      if (!job && !ingesting && !failed) continue;
+      const fetched = paper.textSource === 'full-text';
+      // Papers the overlay brought in are on the board as well as papers
+      // with a job — a fetch that happened before this page load is still a
+      // thing that happened.
+      if (!job && !ingesting && !failed && !fetched) continue;
+      const real = fetched || Boolean(job?.real) || (!job && failed && Boolean(paper.ingestReason));
 
       const seededIndex = Math.max(
         0,
@@ -167,7 +204,11 @@ export default function IntakeIngest() {
       let stageIndex: number;
       if (failed) {
         state = 'failed';
-        stageIndex = Math.min(job?.stageIndex ?? FAIL_STAGE_INDEX, FAIL_STAGE_INDEX);
+        stageIndex = real
+          ? paper.ingest === 'failed:parse'
+            ? STAGE_KEYS.indexOf('parse')
+            : STAGE_KEYS.indexOf('fetch')
+          : Math.min(job?.stageIndex ?? FAIL_STAGE_INDEX, FAIL_STAGE_INDEX);
       } else if (job?.status === 'running') {
         state = 'running';
         stageIndex = Math.min(job.stageIndex, STAGE_LABELS.length - 1);
@@ -182,7 +223,7 @@ export default function IntakeIngest() {
         stageIndex = seededIndex;
       }
 
-      out.push({ paper, job, state, stageIndex, extractions: counts.get(paper.id) ?? 0 });
+      out.push({ paper, job, state, stageIndex, extractions: counts.get(paper.id) ?? 0, real });
     }
     return out.sort(
       (a, b) => ROW_ORDER[a.state] - ROW_ORDER[b.state] || a.paper.id.localeCompare(b.paper.id),
@@ -192,7 +233,9 @@ export default function IntakeIngest() {
   const addFromShelf = (paper: Paper) => {
     ingestPaper(paper.id);
     toast({
-      text: `${paper.id} entered the pipeline — Fetch → Parse → Chunk → Embed → Extract`,
+      text: live
+        ? `${paper.id} — asking Europe PMC for the full text`
+        : `${paper.id} entered the simulated pipeline — Fetch → Parse → Chunk → Embed → Extract`,
       kind: 'info',
     });
   };
@@ -214,16 +257,37 @@ export default function IntakeIngest() {
         title="Ingest papers"
         subtitle={
           <>
-            Papers move through five stages before their spans anchor to the source rather than to a
-            curation note. Nothing in the corpus has been through them yet: this build makes no
-            network requests, so every run halts at Fetch with the reason it could not get the
-            document. Roughly 55% of the corpus is openly retrievable; the rest needs institutional
-            access.
+            A paper enters the corpus here or not at all. Fetch asks Europe PMC for the open-access
+            full text and splits it into sections, so a record&rsquo;s quote can anchor to the
+            paper&rsquo;s own words rather than to a curation note. Twenty-seven of the 132 entries
+            carry a PMCID and are fetchable; the DOI-only ones are looked up once; the rest need
+            manual retrieval.
           </>
         }
         actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
       />
       <OwnerTabs tabs={INTAKE_TABS} />
+
+      {/* Which of the two paths this board is showing. Stated, not inferred. */}
+      {serviceUp === false && (
+        <div className="mb-4">
+          <Callout kind="warn" title="Offline — the pipeline below is a timed simulation">
+            The Intake service is not running, so nothing here makes a network request: every run
+            halts at Fetch with a reason that says so, and no paper&rsquo;s text changes. Start it
+            with <span className="font-num">{START_COMMAND}</span> from <span className="font-num">core/</span>{' '}
+            and reload to fetch for real.
+          </Callout>
+        </div>
+      )}
+      {live && (
+        <div className="mb-4">
+          <Callout kind="info" title="Live — fetching through openferment-core">
+            Fetch makes a real request to Europe PMC and the paper&rsquo;s own sections replace the
+            curation note. Chunk, Embed and Extract are not built and the board says so rather than
+            ticking them off.
+          </Callout>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-5 items-start">
         {/* ── LEFT: input methods ───────────────────────────────────── */}
@@ -237,8 +301,9 @@ export default function IntakeIngest() {
               Tranche 1 — ingest queue
             </SectionTitle>
             <p className="text-caption text-ink-soft mb-2">
-              Papers held out of the seeded corpus. Adding one runs the full pipeline and genuinely joins
-              it to the corpus for the rest of this session.
+              Tranche-1 entries whose full text has not been fetched. {live
+                ? 'Fetch asks Europe PMC for the paper and, when it is open access, replaces the curation note with its own text.'
+                : 'With the service down, Add runs the timed simulation and halts at Fetch.'}
             </p>
 
             {shelf.length === 0 ? (
@@ -276,7 +341,7 @@ export default function IntakeIngest() {
                       onClick={() => addFromShelf(p)}
                       aria-label={`Add ${p.id} to the ingest pipeline`}
                     >
-                      <Plus size={13} /> Add
+                      <Plus size={13} /> {live ? 'Fetch' : 'Add'}
                     </Button>
                   </div>
                 ))}
@@ -303,7 +368,7 @@ export default function IntakeIngest() {
               </Button>
             </fieldset>
             <p className="text-caption text-ink-soft mt-2">
-              Not active in this build — no network requests are made.
+              Not active in this build. Fetch by identifier runs from the queue above.
             </p>
           </Card>
 
@@ -322,7 +387,7 @@ export default function IntakeIngest() {
               <Button size="sm">Choose files</Button>
             </fieldset>
             <p className="text-caption text-ink-soft mt-2">
-              Not active in this build — no network requests are made.
+              Not active in this build. Fetch by identifier runs from the queue above.
             </p>
           </Card>
         </div>
@@ -352,7 +417,11 @@ export default function IntakeIngest() {
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block w-3 h-1.5 rounded-full bg-signal-error" /> halted
             </span>
-            <span>Stage times are scripted demo budgets, not measured throughput.</span>
+            <span>
+              {live
+                ? 'Chunk, Embed and Extract are not built; a fetched paper shows them as not run.'
+                : 'Stage times are scripted demo budgets, not measured throughput.'}
+            </span>
           </div>
 
           {rows.length === 0 ? (
@@ -375,7 +444,9 @@ export default function IntakeIngest() {
                         ? 'In corpus — abstract-only text'
                         : row.state === 'stalled'
                           ? `Waiting at ${STAGE_LABELS[row.stageIndex]} — resume to run the remaining stages`
-                          : 'In corpus';
+                          : row.real
+                            ? `${row.paper.sections.length} sections from Europe PMC${row.paper.license ? ` · ${row.paper.license}` : ''}`
+                            : 'In corpus';
                 return (
                   <Card key={row.paper.id} className="p-3">
                     <div className="flex items-start gap-3 mb-2">
@@ -389,7 +460,7 @@ export default function IntakeIngest() {
                           )}
                           {row.state === 'complete' && (
                             <span className="chip text-accent border-accent/40">
-                              <CheckCircle2 size={11} /> In corpus
+                              <CheckCircle2 size={11} /> {row.real ? 'Full text' : 'In corpus'}
                             </span>
                           )}
                           {row.state === 'failed' && (
@@ -466,14 +537,16 @@ export default function IntakeIngest() {
 
                     {row.state === 'failed' && (
                       <div className="mt-3">
-                        <Callout kind="error" title="Parse failed">
+                        <Callout kind="error" title={`Halted at ${STAGE_LABELS[row.stageIndex]}`}>
                           <p className="mb-2">
-                            {row.job?.failReason ?? 'Source document could not be retrieved.'}
+                            {row.job?.failReason ??
+                              row.paper.ingestReason ??
+                              'Source document could not be retrieved.'}
                           </p>
                           <p className="mb-2 text-ink-soft">
-                            Retry re-runs the same parser. Continuing without full text admits the paper on
-                            its abstract alone — extractions will be limited to that text and spans cannot
-                            be anchored to sections.
+                            {row.real
+                              ? 'The service records a miss so the same paper is not asked again; Retry forces a fresh request.'
+                              : 'Retry re-runs the same parser. Continuing without full text admits the paper on its abstract alone — extractions will be limited to that text and spans cannot be anchored to sections.'}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             <Button size="sm" onClick={() => ingestPaper(row.paper.id)}>

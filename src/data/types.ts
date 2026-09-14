@@ -194,6 +194,12 @@ export interface Paper {
   verifyNeeded?: boolean;
   /** Why this entry earns its place, from the corpus document. */
   corpusRole?: string;
+
+  // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
+  /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
+  license?: string;
+  /** Why the last fetch halted, when `ingest` is a failure state. */
+  ingestReason?: string;
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';
@@ -581,6 +587,12 @@ export interface Job {
   failReason?: string;
   href?: string;
   startedAt: number;
+  /**
+   * A job whose progress is set by a real request rather than by the clock
+   * (OF-BLD-012 §5.4). `tickJobs` leaves these alone; the fetch that started
+   * one completes or fails it.
+   */
+  real?: boolean;
 }
 
 // ── OF-BLD-005 · molecules, vocabulary and runbooks ────────────────────
@@ -1119,4 +1131,31 @@ export interface IntakeStatus {
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
+}
+
+/**
+ * What the overlay says about one paper (§2.1). A failed fetch is here too,
+ * with its reason and no sections — the store keeps the seed's curation note
+ * for it and the ingest board says why it halted.
+ */
+export interface OverlayPaper {
+  ingest: IngestStatus;
+  textSource: 'full-text' | 'curation-note';
+  sections: PaperSection[];
+  license: string | null;
+  fetchedAt: string | null;
+  reason: string | null;
+}
+
+/**
+ * GET /api/biorepo/overlay. Applied over the seed in one action at load when
+ * the service answers; with the service down the app is exactly the seed.
+ * `records`, `candidates` and `runs` are typed loosely until §7 and §6 define
+ * their shapes — the field names are fixed now so the shape does not move.
+ */
+export interface Overlay {
+  papers: Record<string, OverlayPaper>;
+  records: Record<string, Record<string, unknown>>;
+  candidates: unknown[];
+  runs: unknown[];
 }

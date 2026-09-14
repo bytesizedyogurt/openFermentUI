@@ -173,3 +173,32 @@ class IntakeStatus(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
+
+
+class OverlayPaper(BaseModel):
+    """What the overlay says about one paper (§2.1): its fetch state and, when
+    the fetch succeeded, the paper's own sections in place of the seed's
+    curation note. A failed fetch is here too, with its reason — the ingest
+    board renders it, and a board that only showed successes would be lying by
+    omission about the twenty-six DOI-only papers."""
+
+    ingest: str
+    textSource: Literal["full-text", "curation-note"]
+    sections: list[FetchedSection] = Field(default_factory=list)
+    license: str | None = None
+    fetchedAt: str | None = None
+    reason: str | None = None
+
+
+class Overlay(BaseModel):
+    """GET /api/biorepo/overlay (§2.1). The store applies it in one action on
+    top of the seed; with the service down the app is exactly the seed.
+
+    `records`, `candidates` and `runs` are typed loosely here and in
+    types.ts until §7 and §6 define ReviewDecision, Candidate and ExtractRun;
+    the field names are fixed now so the shape does not move under the UI."""
+
+    papers: dict[str, OverlayPaper] = Field(default_factory=dict)
+    records: dict[str, dict] = Field(default_factory=dict)
+    candidates: list[dict] = Field(default_factory=list)
+    runs: list[dict] = Field(default_factory=list)

@@ -13,6 +13,24 @@ import { join, extname } from 'node:path';
 const DIST = join(process.cwd(), 'dist');
 const PORT = 4319;
 
+/**
+ * A stand-in for openferment-core (OF-BLD-012 §5.5). The built app asks
+ * /api/health at load and, when it answers, applies /api/biorepo/overlay over
+ * the seed. Serving both here exercises the real hydration path on every
+ * route, with an overlay fixture whose B5 text is the structural JATS
+ * document the Python parser is tested against — a made-up article shape, not
+ * a paper, labelled as such in the file. Nothing else under /api exists.
+ */
+const OVERLAY_FIXTURE = join(process.cwd(), 'core/tests/fixtures/overlay-smoke.json');
+const HEALTH = JSON.stringify({
+  ok: true,
+  service: 'openferment-core (smoke double)',
+  model: 'none',
+  hasKey: false,
+  records: 134,
+  corpusError: null,
+});
+
 const MIME = {
   '.html': 'text/html',
   '.js': 'text/javascript',
@@ -26,6 +44,18 @@ const MIME = {
 const server = createServer(async (req, res) => {
   try {
     const url = decodeURIComponent((req.url ?? '/').split('?')[0]);
+    if (url === '/api/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(HEALTH);
+    }
+    if (url === '/api/biorepo/overlay') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(await readFile(OVERLAY_FIXTURE));
+    }
+    if (url.startsWith('/api/')) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ detail: 'not part of the smoke double' }));
+    }
     let file = join(DIST, url === '/' ? 'index.html' : url);
     try {
       if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
@@ -49,6 +79,7 @@ const ROUTES = [
   ['/biorepo/paper/H4', 'BioRepo — paper (P. pastoris precedent)'],
   ['/biorepo/paper/D5', 'BioRepo — paper (the open question, no records)'],
   ['/biorepo/paper/O8m', 'BioRepo — paper (industry estimates)'],
+  ['/biorepo/paper/B5', 'BioRepo — paper (full text from the overlay)'],
   ['/biorepo/compare', 'BioRepo — compare'],
   ['/biorepo/witness', 'BioRepo — Witness'],
   ['/postdoc', 'Postdoc'],
@@ -282,6 +313,53 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
+  //    quotes are listed rather than dropped.
+  //
+  // The fixture replaces B5's curation note with the structural document, so
+  // its three curated quotes cannot anchor. Every one of them has to be on
+  // screen under the pending-verification heading with a link to its review
+  // card, and the curator's-note banner has to be gone.
+  let overlayFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(`http://localhost:${PORT}/#/biorepo/paper/B5`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(1200);
+      const text = await page.locator('body').innerText();
+      const problems = [];
+      if (!/Full text from Europe PMC/.test(text)) problems.push('no full-text banner');
+      if (!/The abstract comes first/.test(text)) problems.push('the overlay sections did not render');
+      if (/Catalogued from OF-COR-001/.test(text)) problems.push('the curation-note banner is still showing');
+      // Sentence case on purpose: the heading is the spec's own phrase, and a
+      // CSS text-transform would turn it into a different sentence on screen.
+      if (!/Quote not found in source text — pending verification/.test(text)) {
+        problems.push('unanchored quotes are not listed as pending verification');
+      }
+      for (const id of ['r-B5-1', 'r-B5-2', 'r-B5-3']) {
+        if (!text.includes(id)) problems.push(`${id} is not on the page`);
+      }
+      const links = await page.locator('a[href="#/guild?record=r-B5-1"]').count();
+      if (links === 0) problems.push('no link from the pending record to its review card');
+      // The board shows the fetched paper as a real fetch, not a simulation.
+      await page.goto(`http://localhost:${PORT}/#/intake/ingest`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(900);
+      const board = await page.locator('body').innerText();
+      if (!/Live — fetching through openferment-core/.test(board)) problems.push('board does not say it is live');
+      if (!/sections from Europe PMC/.test(board)) problems.push('B5 is not on the board as a real fetch');
+      if (problems.length) {
+        overlayFails++;
+        console.log(`✗ overlay      ${problems.join('; ')}`);
+      } else {
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review');
+      }
+    } catch (e) {
+      overlayFails++;
+      console.log(`✗ overlay      ${String(e).slice(0, 160)}`);
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
@@ -289,7 +367,8 @@ async function main() {
   console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
-  if (failures.length || redirectFails || shelfFails || seededFails) process.exit(1);
+  console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed`);
+  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails) process.exit(1);
 }
 
 main();

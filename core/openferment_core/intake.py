@@ -44,7 +44,7 @@ from typing import Any
 
 import httpx
 
-from .models import FetchedSection, FetchLicense, FetchResult, IntakeStatus
+from .models import FetchedSection, FetchLicense, FetchResult, IntakeStatus, OverlayPaper
 
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -393,6 +393,32 @@ def all_statuses() -> dict[str, IntakeStatus]:
         status = status_of(path.stem)
         if status is not None:
             out[path.stem] = status
+    return out
+
+
+def overlay_papers() -> dict[str, OverlayPaper]:
+    """Every cached fetch as the overlay's `papers` map (§2.1).
+
+    A success carries the paper's own sections and the licence string; a
+    failure carries its status and reason and no sections, so the store keeps
+    the seed's curation note for it and the board can say why it halted.
+    """
+    out: dict[str, OverlayPaper] = {}
+    if not FULLTEXT_DIR.exists():
+        return out
+    for path in sorted(FULLTEXT_DIR.glob("*.json")):
+        result = cached(path.stem)
+        if result is None:
+            continue
+        ok = result.status == "complete"
+        out[path.stem] = OverlayPaper(
+            ingest=result.status,
+            textSource="full-text" if ok else "curation-note",
+            sections=result.sections if ok else [],
+            license=(result.license.href or result.license.text) if result.license else None,
+            fetchedAt=result.fetchedAt,
+            reason=result.reason,
+        )
     return out
 
 
