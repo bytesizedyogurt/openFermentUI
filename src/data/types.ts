@@ -1076,3 +1076,47 @@ export interface AnswerPlan {
   /** Why each was dropped. A rising rate is the signal that the prompt has drifted. */
   rejectionReasons: string[];
 }
+
+// ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
+//
+// Mirrors of the Pydantic models in core/openferment_core/models.py; `pnpm
+// check:plan` fails the build if a field exists on one side only. The service's
+// `FetchedSection` is the same shape as `PaperSection` above and is compared
+// against it.
+
+/** What the JATS <license> element said, stored beside every fetched text. */
+export interface FetchLicense {
+  href: string | null;
+  text: string | null;
+}
+
+export type FetchStatus = Extract<IngestStatus, 'complete' | 'failed:fetch' | 'failed:parse'>;
+
+/**
+ * What one fetch produced. A failure is a result with a reason rather than an
+ * error — the ingest board already renders both failure states.
+ */
+export interface FetchResult {
+  paperId: string;
+  pmcid: string | null;
+  status: FetchStatus;
+  reason: string | null;
+  fetchedAt: string;
+  license: FetchLicense | null;
+  sections: PaperSection[];
+  /** Size of the XML as received. */
+  bytes: number;
+}
+
+/** One row of GET /api/intake/status. */
+export interface IntakeStatus {
+  paperId: string;
+  pmcid: string | null;
+  ingest: IngestStatus;
+  textSource: 'full-text' | 'curation-note';
+  sections: number;
+  tables: number;
+  license: string | null;
+  fetchedAt: string | null;
+  reason: string | null;
+}

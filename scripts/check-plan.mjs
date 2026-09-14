@@ -53,6 +53,12 @@ const PAIRS = [
   ['Claim', 'Claim'],
   ['Usage', 'AnswerPlanUsage'],
   ['AnswerPlan', 'AnswerPlan'],
+  // OF-BLD-012 §2.5 — Intake. The service's FetchedSection is the browser's
+  // PaperSection; the rest keep their names on both sides.
+  ['FetchedSection', 'PaperSection'],
+  ['FetchLicense', 'FetchLicense'],
+  ['FetchResult', 'FetchResult'],
+  ['IntakeStatus', 'IntakeStatus'],
 ];
 
 let compared = 0;

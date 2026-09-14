@@ -10,10 +10,13 @@ dependencies = [
     "pydantic>=2.9",
     "rank-bm25>=0.2.2",
     "python-dotenv>=1.0",
+    # OF-BLD-012 §5.1 — Intake fetches from Europe PMC. Was a dev-only
+    # dependency for FastAPI's test client; the service itself needs it now.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "httpx>=0.27"]
+dev = ["pytest>=8.3"]
 
 [build-system]
 requires = ["hatchling"]

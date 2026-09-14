@@ -27,7 +27,8 @@
     "export:unit-fixtures": "tsx scripts/export-unit-fixtures.ts",
     "test:core": "pnpm export:corpus && pnpm export:unit-fixtures && cd core && uv run --extra dev pytest tests/ -q -m \"not live\"",
     "test:live": "cd core && uv run --extra dev pytest tests/ -q -m live -s",
-    "check:reference": "tsx scripts/check-reference.ts"
+    "check:reference": "tsx scripts/check-reference.ts",
+    "intake:fetch": "cd core && uv run python -m openferment_core.intake"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

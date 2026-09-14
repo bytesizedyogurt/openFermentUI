@@ -114,3 +114,62 @@ class AskRequest(BaseModel):
     # §6 caps evidence at 30 records. A caller asking for more is clamped rather
     # than refused — the cap is a token-budget contract, not a permission.
     maxEvidence: int = 30
+
+
+# ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
+#
+# Mirrored in src/data/types.ts and named in scripts/check-plan.mjs PAIRS, like
+# everything else in this file. `FetchedSection` mirrors the browser's
+# `PaperSection` under a different name because that interface already exists
+# and this is the service's word for the same shape.
+
+
+class FetchedSection(BaseModel):
+    """One section of a paper's own text. Same shape as PaperSection."""
+
+    id: str
+    heading: str
+    text: str
+
+
+class FetchLicense(BaseModel):
+    """What the JATS <license> element said. Stored beside every fetched text,
+    because Europe PMC's open-access subset spans several licences and the
+    text is kept local partly on that account (§2.2)."""
+
+    href: str | None = None
+    text: str | None = None
+
+
+FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
+
+
+class FetchResult(BaseModel):
+    """What `intake.fetch_paper` produced, and what `fulltext/{paperId}.json`
+    holds. A failure is a result with a reason, not an exception — the UI
+    already renders `failed:fetch` and `failed:parse` (§5.2)."""
+
+    paperId: str
+    pmcid: str | None = None
+    status: FetchStatus
+    reason: str | None = None
+    fetchedAt: str
+    license: FetchLicense | None = None
+    sections: list[FetchedSection] = Field(default_factory=list)
+    # Size of the XML as received. A sanity figure for the batch table and the
+    # quickest tell that a "success" was actually an error page.
+    bytes: int = 0
+
+
+class IntakeStatus(BaseModel):
+    """One row of `GET /api/intake/status` — a paper's fetch state, summarised."""
+
+    paperId: str
+    pmcid: str | None = None
+    ingest: str
+    textSource: Literal["full-text", "curation-note"]
+    sections: int = 0
+    tables: int = 0
+    license: str | None = None
+    fetchedAt: str | None = None
+    reason: str | None = None
