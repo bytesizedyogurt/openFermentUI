@@ -347,11 +347,24 @@ async function main() {
       const board = await page.locator('body').innerText();
       if (!/Live — fetching through openferment-core/.test(board)) problems.push('board does not say it is live');
       if (!/sections from Europe PMC/.test(board)) problems.push('B5 is not on the board as a real fetch');
+      // §6.4 — Witness scores the overlay's run. No record carries real gold,
+      // so provisional mode is on by default and labelled with the spec's
+      // sentence; the fixture run is one match, one mismatch, one miss over
+      // B5's three curated records, so the counts are fixed.
+      await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(900);
+      const witness = await page.locator('body').innerText();
+      if (!/haiku-1/.test(witness)) problems.push('Witness does not show the overlay run');
+      if (!/Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild\./.test(witness)) {
+        problems.push('Witness is not labelled provisional');
+      }
+      if (!/tp 1 · fp 1 · fn 2/.test(witness)) problems.push('Witness did not score the fixture run as tp 1, fp 1, fn 2');
+      if (/No extractor has been run against this corpus yet/.test(witness)) problems.push('Witness still shows the empty state');
       if (problems.length) {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally');
       }
     } catch (e) {
       overlayFails++;
@@ -367,7 +380,7 @@ async function main() {
   console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
-  console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed`);
+  console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails) process.exit(1);
 }
 

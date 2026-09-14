@@ -14,7 +14,7 @@ import {
   Send,
   ArrowUpDown,
 } from 'lucide-react';
-import type { ExtractionRecord, ExtractorRun, FieldId, RunOutput } from '@/data/types';
+import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
@@ -46,16 +46,21 @@ import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
 
-const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r'];
+// haiku-1 last: it is the only run that actually ran (OF-BLD-012 §6), and it
+// arrives through the service overlay rather than the seed.
+const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r', 'haiku-1'];
 const RUN_LABEL: Record<ExtractorRun, string> = {
   'v0.3': 'v0.3',
   'v0.4': 'v0.4',
   'v0.4r': 'v0.4 + rules',
-  // OF-BLD-012 §6 — the first run that actually ran. Not in RUN_ORDER until
-  // §6.4 wires the overlay's runs into this screen; the label exists now so
-  // the union is complete.
   'haiku-1': 'haiku-1',
 };
+
+/** The spec's own sentence (OF-BLD-012 §6.4); the smoke test looks for it. */
+const PROVISIONAL_LABEL =
+  'Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild.';
+
+const NO_CANDIDATES: Candidate[] = [];
 const RUN_BLURB: Record<ExtractorRun, string> = {
   'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
   'v0.4': 'Adds unit normalisation against the ontology before scoring.',
@@ -217,6 +222,8 @@ export default function Witness() {
   const runOutputs = useStore((s) => s.runOutputs);
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
+  // §6.2 — candidates the seed has no record for: the corpus growing, unscored.
+  const overlayCandidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
@@ -228,6 +235,8 @@ export default function Witness() {
   const [open, setOpen] = useState<MismatchRow | null>(null);
   const [noteText, setNoteText] = useState('');
   const [filed, setFiled] = useState<Set<string>>(new Set());
+  // null until the reader touches the toggle; the default depends on the data.
+  const [provisionalPick, setProvisionalPick] = useState<boolean | null>(null);
 
   const upColor = palette[0];
   const downColor = palette[1];
@@ -250,16 +259,42 @@ export default function Witness() {
     [runOutputs],
   );
 
+  // ── provisional mode (OF-BLD-012 §6.4) ───────────────────────────────
+  // computeRunMetrics counts only records with `gold` set, and none has it
+  // yet. Until a reviewer flags some, the curated values on FETCHED papers
+  // can stand in — clearly labelled — so the run that ran gets a number.
+  // Once real gold exists the toggle defaults off and both numbers show.
+  const fetchedPapers = useMemo(
+    () => new Set(papers.filter((p) => p.textSource === 'full-text').map((p) => p.id)),
+    [papers],
+  );
+  const hasRealGold = useMemo(() => records.some((r) => r.gold), [records]);
+  const provisional = provisionalPick ?? !hasRealGold;
+  const provisionalRecords = useMemo<ExtractionRecord[]>(
+    () =>
+      records.map((r) =>
+        r.gold || !fetchedPapers.has(r.paperId) ? r : { ...r, gold: { value: r.value, unit: r.unit } },
+      ),
+    [records, fetchedPapers],
+  );
+  const scoringRecords = provisional ? provisionalRecords : records;
+
   // Every run is scored, every render, from the live records array — editing
   // the gold set during a review session moves these numbers immediately.
-  const allMetrics = useMemo<RunMetrics[]>(
+  // Both bases are computed so the other can sit beside the headline.
+  const measuredMetrics = useMemo<RunMetrics[]>(
     () => orderedRuns.map((r) => computeRunMetrics(r, records)),
     [orderedRuns, records],
   );
+  const provisionalMetrics = useMemo<RunMetrics[]>(
+    () => orderedRuns.map((r) => computeRunMetrics(r, provisionalRecords)),
+    [orderedRuns, provisionalRecords],
+  );
+  const allMetrics = provisional ? provisionalMetrics : measuredMetrics;
 
   const recordById = useMemo(
-    () => new Map<string, ExtractionRecord>(records.map((r) => [r.id, r])),
-    [records],
+    () => new Map<string, ExtractionRecord>(scoringRecords.map((r) => [r.id, r])),
+    [scoringRecords],
   );
 
   const activeIdx = useMemo(() => {
@@ -357,10 +392,12 @@ export default function Witness() {
 
   const exportMetrics = () => {
     const rows: unknown[][] = [];
+    const basis = provisional ? 'provisional — curated values as gold' : 'gold';
     for (const m of allMetrics) {
       rows.push([
         m.run,
         RUN_LABEL[m.run as ExtractorRun] ?? m.run,
+        basis,
         'micro (all fields)',
         '',
         m.goldSize,
@@ -378,6 +415,7 @@ export default function Witness() {
         rows.push([
           m.run,
           RUN_LABEL[m.run as ExtractorRun] ?? m.run,
+          basis,
           'field',
           fieldName(f.field),
           f.nGold,
@@ -397,6 +435,7 @@ export default function Witness() {
       [
         'Run',
         'Run label',
+        'Gold basis',
         'Scope',
         'Field',
         'n (gold)',
@@ -574,6 +613,27 @@ export default function Witness() {
   const partial = run.results.length < metrics.goldSize;
   const isBaseline = activeIdx === 0;
 
+  // The other basis, beside the headline, once both exist (§6.4).
+  const beside = hasRealGold ? (provisional ? measuredMetrics : provisionalMetrics)[activeIdx] : null;
+  const besideLabel = provisional ? 'Measured' : 'Provisional';
+  const besideLine = (value: number, defined: boolean) =>
+    beside ? (
+      <div className="text-caption text-ink-soft">
+        {besideLabel}{' '}
+        <span className="font-num">{defined ? `${pct(value)} %` : '—'}</span>
+      </div>
+    ) : null;
+  // The seeded runs are demo data; haiku-1's numbers rest on whichever gold
+  // basis is in force, and the tick says which.
+  const headlineTick: 'demo' | 'curated' | 'gold' =
+    run.run === 'haiku-1' ? (provisional ? 'curated' : 'gold') : 'demo';
+  const headlineTitle =
+    run.run === 'haiku-1'
+      ? provisional
+        ? 'Micro-averaged over this run against curated values standing in as gold'
+        : 'Micro-averaged over this run against reviewer-flagged gold records'
+      : "Micro-averaged over this run's matched records against the gold-set annotations";
+
   const headerActions = (
     <>
       <Button onClick={exportMetrics} title="Headline and per-field metrics for every run">
@@ -629,8 +689,31 @@ export default function Witness() {
           </Explain>
         </div>
 
+        <label className="flex items-center gap-2 text-body cursor-pointer">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--accent)]"
+            checked={provisional}
+            onChange={(e) => setProvisionalPick(e.target.checked)}
+          />
+          Score against curated records as provisional gold
+        </label>
+
         <div className="text-caption text-ink-soft">{RUN_BLURB[run.run]}</div>
       </div>
+
+      {provisional && (
+        <div className="mb-4">
+          <Callout kind="warn" title={PROVISIONAL_LABEL}>
+            Every curated record on a fetched paper (
+            <span className="font-num">{fetchedPapers.size}</span>
+            {fetchedPapers.size === 1 ? ' paper' : ' papers'}) is scored as if its value were
+            gold. That measures whether the extractor reproduces the curator, not whether either
+            is right. Flag records for gold in the review queue and the measured number appears
+            beside this one.
+          </Callout>
+        </div>
+      )}
 
       {partial && (
         <div className="mb-4">
@@ -661,13 +744,10 @@ export default function Witness() {
 
       {/* ── band 1: headline ─────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 mb-2">
-        <Tick
-          p="demo"
-          className="card py-3 pr-3"
-          title="Micro-averaged over this run's matched records against the gold-set annotations"
-        >
+        <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Precision</div>
           <MetricValue value={metrics.micro.precision} defined={precisionDefined} />
+          {besideLine(beside?.micro.precision ?? 0, !!beside && beside.micro.tp + beside.micro.fp > 0)}
           <div className="mt-0.5">
             <Delta
               now={precisionDefined ? metrics.micro.precision : null}
@@ -680,13 +760,10 @@ export default function Witness() {
           </div>
         </Tick>
 
-        <Tick
-          p="demo"
-          className="card py-3 pr-3"
-          title="Micro-averaged over this run's matched records against the gold-set annotations"
-        >
+        <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">Recall</div>
           <MetricValue value={metrics.micro.recall} defined={recallDefined} />
+          {besideLine(beside?.micro.recall ?? 0, !!beside && beside.micro.tp + beside.micro.fn > 0)}
           <div className="mt-0.5">
             <Delta
               now={recallDefined ? metrics.micro.recall : null}
@@ -699,13 +776,13 @@ export default function Witness() {
           </div>
         </Tick>
 
-        <Tick
-          p="demo"
-          className="card py-3 pr-3"
-          title="Micro-averaged over this run's matched records against the gold-set annotations"
-        >
+        <Tick p={headlineTick} className="card py-3 pr-3" title={headlineTitle}>
           <div className="text-caption uppercase tracking-wide text-ink-soft">F1 (micro)</div>
           <MetricValue value={metrics.micro.f1} defined={f1Defined} />
+          {besideLine(
+            beside?.micro.f1 ?? 0,
+            !!beside && beside.micro.tp + beside.micro.fp > 0 && beside.micro.tp + beside.micro.fn > 0,
+          )}
           <div className="mt-0.5">
             <Delta
               now={f1Defined ? metrics.micro.f1 : null}
@@ -720,8 +797,14 @@ export default function Witness() {
           </div>
         </Tick>
 
-        <Tick p="gold" className="card py-3 pr-3" title="Curated gold-set annotations">
-          <div className="text-caption uppercase tracking-wide text-ink-soft">Gold-set size</div>
+        <Tick
+          p={provisional ? 'curated' : 'gold'}
+          className="card py-3 pr-3"
+          title={provisional ? 'Curated records on fetched papers, standing in as gold' : 'Curated gold-set annotations'}
+        >
+          <div className="text-caption uppercase tracking-wide text-ink-soft">
+            {provisional ? 'Gold-set size (provisional)' : 'Gold-set size'}
+          </div>
           <div className="font-num text-display leading-tight">{metrics.goldSize}</div>
           <div className="mt-0.5">
             <Delta
@@ -760,6 +843,20 @@ export default function Witness() {
         same gold set is used for every run, so its size and paper coverage only move when you
         promote a record in the review queue.
       </p>
+
+      {run.run === 'haiku-1' && overlayCandidates.length > 0 && (
+        <div className="mb-6 max-w-4xl">
+          <Callout
+            kind="info"
+            title={`${overlayCandidates.length} candidate${overlayCandidates.length === 1 ? '' : 's'} new to the corpus — unscored`}
+          >
+            The extractor read values for fields the curated set has no record of on these papers.
+            They are the corpus growing, not false positives: nothing here can say whether they are
+            right until a reviewer decides in Guild. A rejection adds one to this run&rsquo;s false
+            positives; an acceptance makes it a record.
+          </Callout>
+        </div>
+      )}
 
       {/* ── band 2: per-field ────────────────────────────────────────── */}
       <SectionTitle

@@ -77,6 +77,7 @@ const PAIRS = [
   ['ExtractRun', 'RunOutput'],
   ['ReviewDecision', 'ReviewDecision'],
   ['AuditEvent', 'AuditEvent'],
+  ['DroppedCandidate', 'DroppedCandidate'],
   ['ExtractResponse', 'ExtractResponse'],
 ];
 

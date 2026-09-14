@@ -1216,6 +1216,21 @@ export interface Candidate {
  * them because a Candidate carries none; `rejectionReasons` is keyed by
  * anchoring rule — field, section, quote, value, unit, range, method.
  */
+/**
+ * A candidate anchoring refused (OF-BLD-012 §2.4), kept beside the survivors
+ * so the run can be scored honestly (§6.2): one whose value agreed with the
+ * seed and whose quote failed is a span_error in Witness. Never a record.
+ */
+export interface DroppedCandidate {
+  paperId: string;
+  sectionId: string;
+  field: string;
+  value: number | string | null;
+  unit: string;
+  rule: string;
+  detail: string;
+}
+
 export interface ExtractResponse {
   paperId: string;
   run: ExtractorRun;
@@ -1225,6 +1240,7 @@ export interface ExtractResponse {
   rejected: number;
   rejectionReasons: Record<string, number>;
   rejectionDetails: string[];
+  dropped: DroppedCandidate[];
   usage: AnswerPlanUsage;
   notes: string[];
 }

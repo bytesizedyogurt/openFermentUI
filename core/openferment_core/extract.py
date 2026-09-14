@@ -354,6 +354,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         rejected=anchored.rejected,
         rejectionReasons=anchored.reasons,
         rejectionDetails=anchored.details,
+        dropped=anchored.dropped,
         usage=usage,
         notes=notes,
     )

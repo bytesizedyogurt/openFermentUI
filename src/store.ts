@@ -1830,8 +1830,8 @@ export const useStore = create<OFState>()((set, get) => ({
         candidates: overlay.candidates.length ? overlay.candidates : (s.overlay?.candidates ?? []),
         runs: overlay.runs.length ? overlay.runs : (s.overlay?.runs ?? []),
       };
-      // Papers only, for now. §7 applies review decisions and §6 applies runs;
-      // nothing in an overlay ever changes a record's status from here.
+      // Papers and runs. §7 applies review decisions; nothing in an overlay
+      // ever changes a record's status from here.
       const papers = s.papers.map((p) => {
         const o = overlay.papers[p.id];
         if (!o) return p;
@@ -1847,7 +1847,13 @@ export const useStore = create<OFState>()((set, get) => ({
           ingestReason: o.reason ?? undefined,
         } as Paper;
       });
-      return { overlay: merged, papers };
+      // §6.4 — Witness reads runs from the store: the overlay's when present,
+      // the seed's RUN_OUTPUTS otherwise. An overlay run replaces a seed run
+      // of the same id; the seed keeps any run the overlay does not carry.
+      const runOutputs = merged.runs.length
+        ? [...s.runOutputs.filter((r) => !merged.runs.some((o) => o.run === r.run)), ...merged.runs]
+        : s.runOutputs;
+      return { overlay: merged, papers, runOutputs };
     }),
 
   hydrateOverlay: async () => {

@@ -19,6 +19,13 @@
 //   2. the 60-record gold set of OF-COR-001 §18 has been annotated against
 //      those source spans by a human, and
 //   3. an extractor has actually been run.
+//
+// OF-BLD-012 §6.4: the first run that actually ran, haiku-1, does not land in
+// this file. It arrives through the service overlay — `overlay.runs`,
+// recomputed from core/data/candidates/ against the seed on every request —
+// and the store merges it into `runOutputs`; Witness scores it live, in
+// provisional mode until a reviewer flags real gold. With the service down
+// this array is what the app has, and it is empty for the reasons above.
 import type { RunOutput } from './types';
 
 export const RUN_OUTPUTS: RunOutput[] = [];

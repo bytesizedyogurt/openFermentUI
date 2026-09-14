@@ -20,9 +20,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 
-from . import extract, intake
+from . import extract, intake, witness
 from .corpus import load_corpus
-from .models import AnswerPlan, AskRequest, ExtractResponse, FetchResult, IntakeStatus, Overlay, Usage
+from .models import AnswerPlan, AskRequest, ExtractResponse, ExtractRun, FetchResult, IntakeStatus, Overlay, Usage
 from .postdoc import MODEL, PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -204,8 +204,30 @@ def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
 def biorepo_overlay() -> Overlay:
     """What the service knows that the seed does not.
 
-    Papers only, for now: §7.2 adds review decisions, candidates and runs. The
-    store applies whatever is here in one action at load, and nothing here
-    changes a record's status — that path goes through `biorepo.write` alone.
+    Papers from fulltext/ (§5); the run and the new candidates recomputed
+    from candidates/ against the seed (§6.2). §7.2 adds review decisions.
+    The store applies whatever is here in one action at load, and nothing
+    here changes a record's status — that path goes through `biorepo.write`
+    alone. A missing corpus.json costs the run, not the overlay.
     """
-    return Overlay(papers=intake.overlay_papers())
+    try:
+        runs = witness.runs()
+        candidates = witness.new_candidates()
+    except FileNotFoundError as e:
+        log.warning("overlay without runs — %s", e)
+        runs, candidates = [], []
+    return Overlay(papers=intake.overlay_papers(), candidates=candidates, runs=runs)
+
+
+# ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────
+
+
+@app.get("/api/witness/runs", response_model=list[ExtractRun])
+def witness_runs() -> list[ExtractRun]:
+    """RunOutput[] recomputed from every candidates/*.json against the seed.
+    Empty until something has been extracted. 503 when the corpus has not
+    been generated, because there is nothing to score against."""
+    try:
+        return witness.runs()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e

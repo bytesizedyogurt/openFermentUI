@@ -194,14 +194,15 @@ class Overlay(BaseModel):
     """GET /api/biorepo/overlay (§2.1). The store applies it in one action on
     top of the seed; with the service down the app is exactly the seed.
 
-    `records`, `candidates` and `runs` are typed loosely here and in
-    types.ts until §7 and §6 define ReviewDecision, Candidate and ExtractRun;
-    the field names are fixed now so the shape does not move under the UI."""
+    `papers` from fulltext/ (§5); `runs` and `candidates` recomputed from
+    candidates/ against the seed by `witness.py` (§6.2) — the candidates here
+    are the NEW records, the ones no seed record covers; `records` from
+    biorepo.json (§7)."""
 
     papers: dict[str, OverlayPaper] = Field(default_factory=dict)
-    records: dict[str, dict] = Field(default_factory=dict)
-    candidates: list[dict] = Field(default_factory=list)
-    runs: list[dict] = Field(default_factory=list)
+    records: dict[str, "ReviewDecision"] = Field(default_factory=dict)
+    candidates: list["Candidate"] = Field(default_factory=list)
+    runs: list["ExtractRun"] = Field(default_factory=list)
 
 
 # ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────
@@ -272,6 +273,22 @@ class Candidate(BaseModel):
     negativeResult: bool | None = None
 
 
+class DroppedCandidate(BaseModel):
+    """A candidate anchoring refused (§2.4), kept beside the survivors so the
+    run can be scored honestly (§6.2): a candidate whose value agreed with the
+    seed and whose quote failed is a `span_error` in Witness — the extractor
+    produced it, and dropping it from BioRepo does not undo that. Never enters
+    BioRepo; never repaired."""
+
+    paperId: str
+    sectionId: str
+    field: str
+    value: float | str | None = None
+    unit: str = ""
+    rule: str
+    detail: str = ""
+
+
 class ExtractRunResult(BaseModel):
     """One seed record scored against a run (§6.2)."""
 
@@ -338,5 +355,6 @@ class ExtractResponse(BaseModel):
     rejected: int = 0
     rejectionReasons: dict[str, int] = Field(default_factory=dict)
     rejectionDetails: list[str] = Field(default_factory=list)
+    dropped: list[DroppedCandidate] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)
     notes: list[str] = Field(default_factory=list)

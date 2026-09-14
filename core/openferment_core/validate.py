@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .models import Candidate, Claim, Quantity, weakest_provenance
+from .models import Candidate, Claim, DroppedCandidate, Quantity, weakest_provenance
 from .units import UnitError, field as ontology_field, in_range, normalize as normalize_unit, to_canonical, to_si
 
 # Digits in any form a model might reach for: 4, 4.2, 4,200, 1e6, ½, ٤ (Arabic
@@ -293,6 +293,8 @@ class AnchorResult:
     rejected: int = 0
     reasons: dict[str, int] = field(default_factory=lambda: {r: 0 for r in ANCHOR_RULES})
     details: list[str] = field(default_factory=list)
+    # What was refused, with the rule — for `match_run` (§6.2), never BioRepo.
+    dropped: list[DroppedCandidate] = field(default_factory=list)
 
 
 def anchor_candidate(
@@ -430,4 +432,16 @@ def anchor_all(
             out.rejected += 1
             out.reasons[rule or "quote"] += 1
             out.details.append(f"{rule}: {detail}")
+            value = raw.get("value")
+            out.dropped.append(
+                DroppedCandidate(
+                    paperId=paper_id,
+                    sectionId=str(raw.get("sectionId") or ""),
+                    field=str(raw.get("field") or ""),
+                    value=value if isinstance(value, (int, float, str)) and not isinstance(value, bool) else None,
+                    unit=str(raw.get("unit") or ""),
+                    rule=rule or "quote",
+                    detail=detail or "",
+                )
+            )
     return out

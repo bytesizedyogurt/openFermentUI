@@ -1,5 +1,5 @@
 {
-  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes.",
+  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes. The `runs` entry is hand-written in the shape witness.match_run produces (OF-BLD-012 §6.2) — one match, one value mismatch, one miss over B5's three seed records — so Witness's provisional mode can be exercised offline; it is not a measurement.",
   "papers": {
     "B5": {
       "ingest": "complete",
@@ -48,5 +48,32 @@
   },
   "records": {},
   "candidates": [],
-  "runs": []
+  "runs": [
+    {
+      "run": "haiku-1",
+      "results": [
+        {
+          "goldRecordId": "r-B5-1",
+          "outcome": "match",
+          "extracted": {
+            "value": 8.5,
+            "unit": "d"
+          }
+        },
+        {
+          "goldRecordId": "r-B5-2",
+          "outcome": "value_mismatch",
+          "extracted": {
+            "value": 12,
+            "unit": "d"
+          }
+        },
+        {
+          "goldRecordId": "r-B5-3",
+          "outcome": "miss"
+        }
+      ],
+      "falsePositives": []
+    }
+  ]
 }

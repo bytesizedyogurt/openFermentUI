@@ -130,6 +130,11 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     assert r.rejectionReasons["unit"] == 1
     assert r.rejectionReasons["section"] == 1
     assert len(r.rejectionDetails) == 4
+    # §6.2 — what was refused travels with the response, for match_run's
+    # span_error, and never as a candidate.
+    assert [d.rule for d in r.dropped] == ["quote", "value", "unit", "section"]
+    assert all(d.paperId == "X1" and d.field == "titer_secreted" for d in r.dropped)
+    assert r.dropped[0].value == 7 and r.dropped[0].unit == "mg L-1"
     assert r.usage.costUsd == 0.002 and r.usage.inputTokens == 1000
     assert r.audit and r.audit[0].who == "haiku-1" and r.audit[0].action == "extracted"
 
@@ -144,7 +149,7 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     path = extract.CANDIDATES_DIR / "X1.json"
     assert path.exists()
     stored = json.loads(path.read_text())
-    assert stored["run"] == "haiku-1" and len(stored["candidates"]) == 2
+    assert stored["run"] == "haiku-1" and len(stored["candidates"]) == 2 and len(stored["dropped"]) == 4
     again = extract.extract_paper("X1")
     assert again.extractedAt == r.extractedAt and len(call.calls) == 1
     forced = extract.extract_paper("X1", force=True)

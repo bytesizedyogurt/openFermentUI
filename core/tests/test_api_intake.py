@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import intake
+from openferment_core import extract, intake
 from openferment_core.api import app
 from openferment_core.models import Overlay
 
@@ -23,6 +23,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def _offline(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
+    monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
 
 
 @pytest.fixture
@@ -39,7 +40,8 @@ def test_health_still_answers(client):
 def test_status_and_overlay_are_empty_before_any_fetch(client):
     assert client.get("/api/intake/status").json() == {}
     body = client.get("/api/biorepo/overlay").json()
-    assert Overlay.model_validate(body).papers == {}
+    overlay = Overlay.model_validate(body)
+    assert overlay.papers == {} and overlay.runs == [] and overlay.candidates == []
 
 
 def test_fetching_an_unknown_paper_is_a_404(client):
@@ -100,3 +102,8 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     assert overlay.papers["B5"].textSource == "full-text"
     assert overlay.papers["B5"].sections[0].id == "abstract"
     assert "not the paper" in raw["_note"]
+    # §6.4 — the hand-written run Witness scores in the smoke test, in the
+    # shape match_run produces, over B5's three curated records.
+    assert [r.run for r in overlay.runs] == ["haiku-1"]
+    assert [r.outcome for r in overlay.runs[0].results] == ["match", "value_mismatch", "miss"]
+    assert overlay.runs[0].falsePositives == []
