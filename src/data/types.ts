@@ -203,7 +203,9 @@ export interface Paper {
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';
-export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r';
+// 'haiku-1' is the first run that actually ran (OF-BLD-012 §6). The three
+// before it are the seed's names for runs that never happened.
+export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r' | 'haiku-1';
 
 export interface AuditEvent {
   at: string;
@@ -271,20 +273,34 @@ export interface ExtractionRecord {
   negativeResult?: boolean;
 }
 
+/** A value and its unit. Categorical fields carry a string value. */
+export interface Quantity {
+  value: number | string;
+  unit: string;
+}
+
+/** One gold record scored against a run. */
+export interface RunResult {
+  goldRecordId: string;
+  outcome: 'match' | 'value_mismatch' | 'unit_error' | 'span_error' | 'miss';
+  extracted?: { value: number; unit: string };
+}
+
+/** A candidate a reviewer rejected — the only way one gets here (OF-BLD-012 §6.2). */
+export interface RunFalsePositive {
+  id: string;
+  paperId: string;
+  field: FieldId;
+  extracted: { value: number; unit: string };
+  note: string;
+}
+
+// Named rather than inline so the service's ExtractRun mirrors them field for
+// field (OF-BLD-012 §2.5). Same shape as before; nothing here changed.
 export interface RunOutput {
   run: ExtractorRun;
-  results: {
-    goldRecordId: string;
-    outcome: 'match' | 'value_mismatch' | 'unit_error' | 'span_error' | 'miss';
-    extracted?: { value: number; unit: string };
-  }[];
-  falsePositives: {
-    id: string;
-    paperId: string;
-    field: FieldId;
-    extracted: { value: number; unit: string };
-    note: string;
-  }[];
+  results: RunResult[];
+  falsePositives: RunFalsePositive[];
 }
 
 export interface CuratorNote {
@@ -1155,7 +1171,69 @@ export interface OverlayPaper {
  */
 export interface Overlay {
   papers: Record<string, OverlayPaper>;
-  records: Record<string, Record<string, unknown>>;
-  candidates: unknown[];
-  runs: unknown[];
+  records: Record<string, ReviewDecision>;
+  candidates: Candidate[];
+  runs: RunOutput[];
+}
+
+/**
+ * An extraction the anchoring rules accepted (OF-BLD-012 §2.4), before any
+ * human has looked at it. ExtractionRecord minus the four fields review owns
+ * — audit, gold, corrected, reviewer — listed out because `check:plan` reads
+ * field names as text. `CandidateMirror` below makes the compiler hold this to
+ * ExtractionRecord: add a field to one and not the other and the build fails.
+ */
+export interface Candidate {
+  id: string;
+  paperId: string;
+  sectionId: string;
+  quote: string;
+  field: FieldId;
+  value: number | string;
+  unit: string;
+  si: { value: number; unit: string };
+  confidence: number;
+  status: RecordStatus;
+  provenance: Provenance;
+  organism?: string;
+  componentTag?: string;
+  goldOnly?: boolean;
+  extractorRun?: ExtractorRun;
+  rejectReason?: string;
+  isPrimary: boolean;
+  citesRecordId?: string;
+  method?: AnalysisMethod;
+  numbering?: NumberingConvention;
+  curationRef?: string;
+  range?: { low: number; high: number };
+  comparativeBaseline?: string;
+  negativeResult?: boolean;
+}
+
+type RecordMinusReview = Omit<ExtractionRecord, 'audit' | 'gold' | 'corrected' | 'reviewer'>;
+/** Compile-time proof that Candidate is ExtractionRecord minus review, in both directions. */
+export const CandidateMirror: [(c: Candidate) => RecordMinusReview, (r: RecordMinusReview) => Candidate] = [
+  (c) => c,
+  (r) => r,
+];
+
+/**
+ * What a reviewer decided about one record (OF-BLD-012 §7.1). The first six
+ * fields are exactly DurableReviewDecision in src/lib/durable.ts — the shape
+ * the Durable tier already persists — so a decision made offline and one
+ * posted to the service are the same object. The rest say which record, when,
+ * and, for a promotion that re-anchors a curated quote to the paper's own
+ * words, the replacement span.
+ */
+export interface ReviewDecision {
+  status: RecordStatus;
+  provenance: Provenance;
+  gold?: { value: number | string; unit: string };
+  corrected?: { value: number; unit: string };
+  rejectReason?: string;
+  reviewer?: string;
+  recordId: string;
+  at: string;
+  quote?: string;
+  sectionId?: string;
 }

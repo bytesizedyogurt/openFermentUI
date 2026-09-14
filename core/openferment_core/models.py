@@ -202,3 +202,107 @@ class Overlay(BaseModel):
     records: dict[str, dict] = Field(default_factory=dict)
     candidates: list[dict] = Field(default_factory=list)
     runs: list[dict] = Field(default_factory=list)
+
+
+# ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────
+
+RecordStatus = Literal["unverified", "verified", "rejected"]
+# Mirrors ExtractorRun in types.ts. 'haiku-1' is the first run that actually ran.
+ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "haiku-1"]
+Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
+
+
+class Quantity(BaseModel):
+    """A value and its unit. Categorical fields carry a string value."""
+
+    value: float | str
+    unit: str
+
+
+class Range(BaseModel):
+    low: float
+    high: float
+
+
+class Candidate(BaseModel):
+    """An extraction the anchoring rules accepted (§2.4), before any human has
+    looked at it. Mirrors the browser's ExtractionRecord minus the four fields
+    review owns — audit, gold, corrected, reviewer — because a candidate has
+    no review history yet and must not be able to claim one.
+
+    Provenance and status are fixed at 'unverified' by construction. The model
+    does not get a slot to set either.
+    """
+
+    id: str
+    paperId: str
+    sectionId: str
+    quote: str
+    field: str
+    value: float | str
+    unit: str
+    si: Quantity
+    confidence: float = 0.0
+    status: RecordStatus = "unverified"
+    provenance: Provenance = "unverified"
+    organism: str | None = None
+    componentTag: str | None = None
+    goldOnly: bool | None = None
+    extractorRun: ExtractorRun = "haiku-1"
+    rejectReason: str | None = None
+    isPrimary: bool = True
+    citesRecordId: str | None = None
+    method: str | None = None
+    numbering: str | None = None
+    curationRef: str | None = None
+    range: Range | None = None
+    comparativeBaseline: str | None = None
+    negativeResult: bool | None = None
+
+
+class ExtractRunResult(BaseModel):
+    """One seed record scored against a run (§6.2)."""
+
+    goldRecordId: str
+    outcome: Outcome
+    extracted: Quantity | None = None
+
+
+class ExtractRunFalsePositive(BaseModel):
+    """A candidate a reviewer rejected — the only way one gets here (§6.2)."""
+
+    id: str
+    paperId: str
+    field: str
+    extracted: Quantity
+    note: str
+
+
+class ExtractRun(BaseModel):
+    """Mirrors the browser's RunOutput: what Witness computes metrics from."""
+
+    run: ExtractorRun
+    results: list[ExtractRunResult] = Field(default_factory=list)
+    falsePositives: list[ExtractRunFalsePositive] = Field(default_factory=list)
+
+
+class ReviewDecision(BaseModel):
+    """What a reviewer decided about one record (§7.1).
+
+    The first six fields are exactly the browser's DurableReviewDecision — the
+    shape the Durable tier already persists — so a decision made offline and a
+    decision posted to the service are the same object. The rest say which
+    record, when, and, for a promotion that re-anchors a curated quote to the
+    paper's own words, the replacement span.
+    """
+
+    status: RecordStatus
+    provenance: Provenance
+    gold: Quantity | None = None
+    corrected: Quantity | None = None
+    rejectReason: str | None = None
+    reviewer: str | None = None
+    recordId: str
+    at: str
+    quote: str | None = None
+    sectionId: str | None = None

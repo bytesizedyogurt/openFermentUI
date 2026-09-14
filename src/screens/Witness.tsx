@@ -51,11 +51,16 @@ const RUN_LABEL: Record<ExtractorRun, string> = {
   'v0.3': 'v0.3',
   'v0.4': 'v0.4',
   'v0.4r': 'v0.4 + rules',
+  // OF-BLD-012 §6 — the first run that actually ran. Not in RUN_ORDER until
+  // §6.4 wires the overlay's runs into this screen; the label exists now so
+  // the union is complete.
+  'haiku-1': 'haiku-1',
 };
 const RUN_BLURB: Record<ExtractorRun, string> = {
   'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
   'v0.4': 'Adds unit normalisation against the ontology before scoring.',
   'v0.4r': 'v0.4 with hand-written guard rules for the fields that failed most.',
+  'haiku-1': 'Claude Haiku, one forced tool call per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
 };
 
 const INSUFFICIENT_N = 5;

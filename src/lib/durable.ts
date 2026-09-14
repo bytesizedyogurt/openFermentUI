@@ -25,15 +25,22 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, MeasuredEvidence, Provenance, RecordStatus } from '@/data/types';
+import type { Deposition, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
 const STORE = 'durable';
 const KEY = 'snapshot';
 
-/** A review decision, reduced to the fields review actually changes. */
-export interface ReviewDecision {
+/**
+ * A review decision, reduced to the fields review actually changes.
+ *
+ * Named DurableReviewDecision (OF-BLD-012 §2.1) because the service's
+ * ReviewDecision in `src/data/types.ts` is this plus recordId, at, and an
+ * optional replacement span. `DecisionMirror` below has the compiler hold the
+ * two together: every field here must exist there with the same type.
+ */
+export interface DurableReviewDecision {
   status: RecordStatus;
   provenance: Provenance;
   gold?: { value: number | string; unit: string };
@@ -41,6 +48,9 @@ export interface ReviewDecision {
   rejectReason?: string;
   reviewer?: string;
 }
+
+/** Compile-time proof that a ReviewDecision carries every DurableReviewDecision field. */
+export const DecisionMirror: (d: ReviewDecision) => DurableReviewDecision = (d) => d;
 
 export interface DurableSnapshot {
   /** Bumped when the shape changes; an older snapshot is dropped, not guessed at. */
@@ -50,7 +60,7 @@ export interface DurableSnapshot {
   /** First-party measurements released by reconciliation. */
   measuredEvidence: MeasuredEvidence[];
   /** Keyed by record id. Re-applied over the seeded records at hydrate. */
-  reviewDecisions: Record<string, ReviewDecision>;
+  reviewDecisions: Record<string, DurableReviewDecision>;
   /** Keyed by runbook id. Locks only — the runbook itself comes from seed. */
   runbookLocks: Record<string, { lockedAt: string; lockHash: string }>;
 }

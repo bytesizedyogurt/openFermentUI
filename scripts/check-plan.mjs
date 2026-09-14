@@ -61,6 +61,14 @@ const PAIRS = [
   ['IntakeStatus', 'IntakeStatus'],
   ['OverlayPaper', 'OverlayPaper'],
   ['Overlay', 'Overlay'],
+  // OF-BLD-012 §2.5 — extraction and review. The service's names differ
+  // from the browser's where the browser already had one.
+  ['Quantity', 'Quantity'],
+  ['Candidate', 'Candidate'],
+  ['ExtractRunResult', 'RunResult'],
+  ['ExtractRunFalsePositive', 'RunFalsePositive'],
+  ['ExtractRun', 'RunOutput'],
+  ['ReviewDecision', 'ReviewDecision'],
 ];
 
 let compared = 0;
