@@ -1,0 +1,50 @@
+# The whole of `pnpm verify`, on every push and pull request (OF-BLD-012 §4.3).
+#
+# No secrets. Verify is designed to run with no key, no service and no network
+# beyond package registries, and this workflow holds it to that: a stage that
+# starts needing a key would fail here first.
+#
+# Two things the local machine has that a runner does not, both installed
+# explicitly rather than assumed:
+#   - a Chromium for Playwright. The six browser scripts look for the
+#     pre-installed one at CHROMIUM_PATH and otherwise fall back to Playwright's
+#     own cache, which is empty on a fresh runner.
+#   - the Python dev extra. `uv run` without `--extra dev` falls through to
+#     whatever `pytest` happens to be on PATH, outside the project venv;
+#     `test:core` asks for the extra so the locked one is used.
+name: verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Playwright's own postinstall would fetch every browser; the explicit
+      # step below fetches the one the scripts use.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version comes from `packageManager` in package.json.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: core/uv.lock
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm verify

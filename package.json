@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -23,8 +24,8 @@
     "export:corpus": "tsx scripts/export-corpus.ts",
     "check:plan": "node scripts/check-plan.mjs",
     "export:fixtures": "tsx scripts/export-flow-fixtures.ts",
-    "test:core": "pnpm export:corpus && cd core && uv run pytest tests/ -q -m \"not live\"",
-    "test:live": "cd core && uv run pytest tests/ -q -m live -s",
+    "test:core": "pnpm export:corpus && cd core && uv run --extra dev pytest tests/ -q -m \"not live\"",
+    "test:live": "cd core && uv run --extra dev pytest tests/ -q -m live -s",
     "check:reference": "tsx scripts/check-reference.ts"
   },
   "dependencies": {
