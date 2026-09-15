@@ -313,7 +313,16 @@ ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
 
 
 def content_id(
-    prefix: str, paper_id: str, section_id: str, field_id: str, value: Any, unit: str, quote: str
+    prefix: str,
+    paper_id: str,
+    section_id: str,
+    field_id: str,
+    value: Any,
+    unit: str,
+    quote: str,
+    *,
+    method: str | None = None,
+    is_primary: bool = True,
 ) -> str:
     """The id of an anchored candidate: '<run>-<paperId>-<8 hex of its content>'.
 
@@ -321,11 +330,20 @@ def content_id(
     sentence and a number; keyed by position it would follow the id onto
     whatever a re-extraction put there next. Keyed by content, a re-run that
     produces the same candidate produces the same id and the decision holds,
-    and a different candidate gets a different id and starts undecided. The
-    content is the ANCHORED form — the canonical unit spelling, the parsed
-    number — so 'mg/L' and 'mg L⁻¹' are the same candidate.
+    and a different candidate gets a different id and starts undecided.
+
+    The content is the NORMALISED form, so spelling the model varies does
+    not split one candidate into two: the quote after §2.4 rule 2's
+    normalisation (a superscript or a double space is the same sentence),
+    the number to nine significant digits (a string '1.1 × 10⁻⁵' and a JSON
+    1.1e-5 differ by an ulp after parsing), the canonical unit, a categorical
+    value lower-cased. Method and primacy are in, because on a field that
+    requires a method they are what the record is.
     """
-    material = "\x1f".join((paper_id, section_id, field_id, repr(value), unit, quote))
+    number = f"{value:.9g}" if isinstance(value, (int, float)) and not isinstance(value, bool) else str(value).strip().lower()
+    material = "\x1f".join(
+        (paper_id, section_id, field_id, number, unit, normalize_text(quote), method or "", "1" if is_primary else "0")
+    )
     return f"{prefix}-{paper_id}-{hashlib.sha1(material.encode('utf-8')).hexdigest()[:8]}"
 
 
@@ -337,6 +355,8 @@ class AnchorResult:
     details: list[str] = field(default_factory=list)
     # What was refused, with the rule — for `match_run` (§6.2), never BioRepo.
     dropped: list[DroppedCandidate] = field(default_factory=list)
+    # Emissions that collapsed onto an earlier one under the same content id.
+    duplicates: int = 0
 
 
 def anchor_candidate(
@@ -445,10 +465,14 @@ def anchor_candidate(
         confidence = 0.0
 
     anchored_value = value.strip() if categorical else number  # type: ignore[union-attr]
+    is_primary = bool(raw.get("isPrimary", True))
     return (
         Candidate(
             id=candidate_id
-            or content_id(id_prefix, paper_id, section_id, field_id, anchored_value, unit, quote),
+            or content_id(
+                id_prefix, paper_id, section_id, field_id, anchored_value, unit, quote,
+                method=method or None, is_primary=is_primary,
+            ),
             paperId=paper_id,
             sectionId=section_id,
             quote=quote,
@@ -458,7 +482,7 @@ def anchor_candidate(
             si=si,
             confidence=confidence,
             organism=(str(raw["organism"]).strip() or None) if raw.get("organism") else None,
-            isPrimary=bool(raw.get("isPrimary", True)),
+            isPrimary=is_primary,
             method=method or None,
         ),
         None,
@@ -478,15 +502,20 @@ def anchor_all(
     collapse, rejections are counted per rule. The counts are the response's
     rejection report and the log line."""
     out = AnchorResult()
-    seen: set[str] = set()
+    by_id: dict[str, int] = {}
     for raw in raws:
         candidate, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, id_prefix=id_prefix)
         if candidate is not None:
             # Content-addressed ids: the same sentence, field and number
-            # emitted twice is one candidate, not two.
-            if candidate.id in seen:
+            # emitted twice is one candidate, not two. The more confident
+            # emission is the one kept, and the collapse is counted.
+            at = by_id.get(candidate.id)
+            if at is not None:
+                out.duplicates += 1
+                if candidate.confidence > out.accepted[at].confidence:
+                    out.accepted[at] = candidate
                 continue
-            seen.add(candidate.id)
+            by_id[candidate.id] = len(out.accepted)
             out.accepted.append(candidate)
         else:
             out.rejected += 1

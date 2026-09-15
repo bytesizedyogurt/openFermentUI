@@ -313,6 +313,7 @@ def test_anchor_all_counts_rejections_per_rule():
     # unit was spelled; a duplicate collapses.
     again = anchor_all([good(), good(unit="g L⁻¹"), good()], SECTIONS, paper_id="X1")
     assert [c.id for c in again.accepted] == [ids[0]] and again.rejected == 0
+    assert again.duplicates == 2
     assert result.rejected == 4
     assert result.reasons["section"] == 1
     assert result.reasons["value"] == 1
@@ -320,3 +321,15 @@ def test_anchor_all_counts_rejections_per_rule():
     assert result.reasons["quote"] == 1
     assert set(result.reasons) == set(ANCHOR_RULES)
     assert len(result.details) == 4
+
+
+def test_a_duplicate_keeps_the_more_confident_emission():
+    # The same sentence, field and number emitted twice is one candidate;
+    # the copy kept is the one the model was surer of, whichever came first,
+    # and the collapse is counted rather than silently absorbed.
+    low_first = anchor_all([good(confidence=0.4), good(confidence=0.9)], SECTIONS, paper_id="X1")
+    high_first = anchor_all([good(confidence=0.9), good(confidence=0.4)], SECTIONS, paper_id="X1")
+    assert [c.confidence for c in low_first.accepted] == [0.9]
+    assert [c.confidence for c in high_first.accepted] == [0.9]
+    assert low_first.duplicates == high_first.duplicates == 1
+    assert low_first.accepted[0].id == high_first.accepted[0].id

@@ -407,17 +407,17 @@ async function main() {
       await coldPage.close();
       if (!/\/ 135\b/.test(cold)) problems.push(`the new candidate did not join the open queue (progress reads ${(cold.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
 
-      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-eaf0fd9a`, { waitUntil: 'networkidle' });
+      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
       // A hash navigation on the same document returns at once; wait for the
       // card itself, not a clock.
-      await page.locator('text=hk1-B5-eaf0fd9a').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('text=hk1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(150);
       const newCard = await page.locator('body').innerText();
       if (!/Extracted by haiku-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
       if (!/Placeholder A \| 7 \| mg L-1/.test(newCard)) problems.push('the new candidate\'s quote is not on its card');
       await page.keyboard.press('a');
       await page.waitForTimeout(700);
-      const posted = decisions.find((d) => d.recordId === 'hk1-B5-eaf0fd9a');
+      const posted = decisions.find((d) => d.recordId === 'hk1-B5-a07dd73c');
       if (!posted) problems.push('accepting the new candidate posted no decision to the service');
       else if (posted.status !== 'verified' || !posted.reviewer || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
 

@@ -244,7 +244,7 @@ NESTED = """<?xml version="1.0" encoding="UTF-8"?>
         <table-wrap id="t1"><label>Table 1</label><caption><p>Rows.</p></caption>
           <table><tr><th>Condition</th><th>Value</th></tr><tr><td>A</td><td>7</td></tr></table>
         </table-wrap>
-        After the table, 10<sup>-3</sup> M.</p>
+        After the table, 10<sup>-3</sup> M. The 2<sup>nd</sup> run<sup>a</sup> and Fig. 3<sup>†</sup> agree.</p>
     </sec>
   </body>
 </article>
@@ -257,7 +257,7 @@ def test_a_table_nested_in_a_paragraph_stays_out_of_the_prose():
     by_id = {s.id: s for s in r.sections}
     assert "Condition" not in by_id["s1"].text and "| 7" not in by_id["s1"].text
     assert by_id["t1"].text.splitlines() == ["Condition | Value", "A | 7"]
-    assert by_id["s1"].text.startswith("Cultures reached") and by_id["s1"].text.endswith("M.")
+    assert by_id["s1"].text.startswith("Cultures reached") and by_id["s1"].text.endswith("agree.")
 
 
 def test_a_superscript_on_a_number_reads_as_a_power_of_ten():
@@ -266,3 +266,13 @@ def test_a_superscript_on_a_number_reads_as_a_power_of_ten():
     assert "2 × 10^6 cells mL-1" in s1, s1
     assert "CO2 rose" in s1
     assert "10^-3 M" in s1
+
+
+def test_a_superscript_that_is_not_a_number_is_not_a_power():
+    # An ordinal, a footnote letter or a dagger after a digit is read inline,
+    # not as an exponent: '2nd', '3†' — a caret would invent a power of ten
+    # the paper never wrote, and normalize_text would then fold it as one.
+    r = split_jats(NESTED, paper_id="X1")
+    s1 = next(s for s in r.sections if s.id == "s1").text
+    assert "The 2nd runa and Fig. 3† agree." in s1, s1
+    assert "2^nd" not in s1 and "3^†" not in s1

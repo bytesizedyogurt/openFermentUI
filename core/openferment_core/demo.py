@@ -164,7 +164,8 @@ def rebuild_smoke_overlay() -> None:
                 "textSource": "full-text",
                 "sections": sections,
                 "license": fetched.license.href if fetched.license else None,
-                "fetchedAt": fetched.fetchedAt,
+                # Fixed, so regenerating an unchanged set leaves the tree clean.
+                "fetchedAt": AT,
                 "reason": None,
             }
         },

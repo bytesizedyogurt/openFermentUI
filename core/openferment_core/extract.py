@@ -345,7 +345,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     user_text, notes = build_prompt(sections)
     tool = build_tool([s["id"] for s in sections], list(tables()["ontology"].keys()))
     raw, usage = call_model(paper_id, user_text, tool)
-    if SAVE_RESPONSES and not intake.fixtures_only():
+    if SAVE_RESPONSES and not intake.fixtures_only() and not raw.get("truncated"):
         FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
         (FIXTURE_DIR / f"{paper_id}.json").write_text(
             json.dumps(

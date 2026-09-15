@@ -148,19 +148,26 @@ def write(decision: ReviewDecision) -> ReviewDecision:
         raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
 
     # What a reviewer typed is held to §2.4 rule 5 like what the model
-    # emitted — whatever the record's status: the value, in canonical units,
-    # inside the field's range. A correction saved on an unverified record
-    # still reaches corpus.json.
-    typed = decision.gold or decision.corrected
+    # emitted — whatever the record's status, and BOTH typed values when a
+    # decision carries a gold value and a correction: the value, in
+    # canonical units, inside the field's range. A correction on an
+    # unverified seed record still reaches corpus.json (an unverified
+    # candidate is not a record, and is not appended).
     field_id = _field(rec, "field")
-    if typed is not None and not (ontology_field(field_id) or {}).get("categorical"):
+    categorical = bool((ontology_field(field_id) or {}).get("categorical"))
+    for what, typed in (("gold", decision.gold), ("corrected", decision.corrected)):
+        if typed is None or categorical:
+            continue
+        if isinstance(typed.value, str) or isinstance(typed.value, bool):
+            raise WriteRefused("range", f"the {what} value {typed.value!r} for {field_id} is not a number")
         try:
             canonical = to_canonical(float(typed.value), typed.unit, field_id)
         except (TypeError, ValueError, UnitError) as e:
-            raise WriteRefused("range", f"{typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
+            raise WriteRefused("range", f"the {what} value {typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
         if not in_range(canonical, field_id):
             raise WriteRefused(
-                "range", f"{typed.value!r} {typed.unit!r} is outside the range of {field_id} in canonical units"
+                "range",
+                f"the {what} value {typed.value!r} {typed.unit!r} is outside the range of {field_id} in canonical units",
             )
 
     stored = decision.model_copy()
@@ -181,27 +188,30 @@ def write(decision: ReviewDecision) -> ReviewDecision:
         if quote is None and _is_gold(decision):
             quote = _field(rec, "quote")
         if quote is not None:
-            value_unit: Quantity = (
-                decision.gold
-                or decision.corrected
-                or Quantity(value=_field(rec, "value"), unit=_field(rec, "unit"))
-            )
-            raw = {
-                "sectionId": section_id,
-                "field": _field(rec, "field"),
-                "value": value_unit.value,
-                "unit": value_unit.unit,
-                "quote": quote,
-                "method": _field(rec, "method"),
-            }
-            _, rule, detail = anchor_candidate(
-                raw, sections, paper_id=paper_id, candidate_id=decision.recordId
-            )
-            if rule is not None:
-                raise WriteRefused(
-                    "quote",
-                    f"the quote for {decision.recordId} fails anchoring on rule '{rule}': {detail}",
+            # Every value the promoted record will carry has to sit in the
+            # quote: the correction (which becomes the record's value) and
+            # the gold value, or the record's own when neither was typed.
+            typed_values = [q for q in (decision.corrected, decision.gold) if q is not None]
+            to_anchor: list[Quantity] = typed_values or [
+                Quantity(value=_field(rec, "value"), unit=_field(rec, "unit"))
+            ]
+            for value_unit in to_anchor:
+                raw = {
+                    "sectionId": section_id,
+                    "field": _field(rec, "field"),
+                    "value": value_unit.value,
+                    "unit": value_unit.unit,
+                    "quote": quote,
+                    "method": _field(rec, "method"),
+                }
+                _, rule, detail = anchor_candidate(
+                    raw, sections, paper_id=paper_id, candidate_id=decision.recordId
                 )
+                if rule is not None:
+                    raise WriteRefused(
+                        "quote",
+                        f"the quote for {decision.recordId} fails anchoring on rule '{rule}': {detail}",
+                    )
             stored.quote = quote
             stored.sectionId = section_id
 

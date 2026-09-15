@@ -48,7 +48,10 @@ def test_the_loop_replays_from_the_fixtures():
     assert fetched.status == "complete" and [s.id for s in fetched.sections][:2] == ["abstract", "s1"]
 
     result = extract.extract_paper("B5")
-    assert [c.id for c in result.candidates] == ["hk1-B5-eaf0fd9a", "hk1-B5-d235ba19"], result.rejectionDetails
+    # The ids are content-addressed; the fixture set is consistent when the
+    # replayed candidates are exactly the ones the saved decisions name.
+    saved = BioRepo.model_validate(json.loads((DEMO / "biorepo.json").read_text(encoding="utf-8")))
+    assert [c.id for c in result.candidates] == [c.id for c in saved.records], result.rejectionDetails
     assert result.rejected == 0
     assert result.usage.costUsd == 0, "nothing was spent — no call was made"
 
@@ -62,8 +65,8 @@ def test_the_saved_decisions_are_ones_the_write_function_stores():
     # write function accepts exactly those decisions over these fixtures —
     # rewriting each one and comparing.
     saved = BioRepo.model_validate(json.loads((DEMO / "biorepo.json").read_text(encoding="utf-8")))
-    assert set(saved.decisions) == {"hk1-B5-eaf0fd9a", "hk1-B5-d235ba19", "r-B5-3"}
-    assert [c.id for c in saved.records] == ["hk1-B5-eaf0fd9a", "hk1-B5-d235ba19"]
+    assert set(saved.decisions) == {c.id for c in saved.records} | {"r-B5-3"}
+    assert len(saved.records) == 2
 
     intake.fetch_paper({"id": "B5", "pmcid": "PMC8471596"})
     extract.extract_paper("B5")
@@ -74,5 +77,5 @@ def test_the_saved_decisions_are_ones_the_write_function_stores():
 
     # And the two rejections are the run's false positives, with their reasons.
     fps = witness.runs()[0].falsePositives
-    assert [fp.id for fp in fps] == ["hk1-B5-eaf0fd9a", "hk1-B5-d235ba19"]
+    assert [fp.id for fp in fps] == [c.id for c in saved.records]
     assert all(fp.note for fp in fps)

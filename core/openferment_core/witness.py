@@ -223,6 +223,11 @@ class Gathered:
     """Everything the cache and biorepo.json say about candidates, read once."""
 
     candidates: list[Candidate] = field(default_factory=list)
+    # The candidates the extractor produces NOW — what the run is scored on.
+    # A copy biorepo.json keeps of a candidate a re-extraction no longer
+    # produces is still a record (if accepted) and still a false positive (if
+    # rejected), but it is not something the current run got right.
+    current: list[Candidate] = field(default_factory=list)
     dropped: list[DroppedCandidate] = field(default_factory=list)
     papers: set[str] = field(default_factory=set)
     decisions: dict[str, ReviewDecision] = field(default_factory=dict)
@@ -244,13 +249,14 @@ def _gather() -> Gathered:
         for c in r.candidates:
             seen.add(c.id)
             out.candidates.append(copies.get(c.id, c))
+            out.current.append(copies.get(c.id, c))
         out.dropped.extend(r.dropped)
     out.candidates += [c for cid, c in copies.items() if cid not in seen]
     return out
 
 
 def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
-    run = match_run(g.candidates, seed, papers=g.papers, dropped=g.dropped)
+    run = match_run(g.current, seed, papers=g.papers, dropped=g.dropped)
     run.falsePositives = false_positives([c for c in g.candidates if c.paperId in g.papers], g.decisions)
     outcomes: dict[str, int] = defaultdict(int)
     for r in run.results:

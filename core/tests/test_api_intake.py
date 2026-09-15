@@ -122,7 +122,7 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     # (a new record, so Guild queues it) and the same row read as a colony
     # time (matching r-B5-*'s field, so it sits beside those cards).
     assert [(c.id, c.field) for c in overlay.candidates] == [
-        ("hk1-B5-eaf0fd9a", "titer_secreted"),
-        ("hk1-B5-d235ba19", "time_to_colony"),
+        ("hk1-B5-a07dd73c", "titer_secreted"),
+        ("hk1-B5-95f64ef4", "time_to_colony"),
     ]
     assert all(c.extractorRun == "haiku-1" and c.status == "unverified" for c in overlay.candidates)

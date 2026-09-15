@@ -217,7 +217,9 @@ def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
             inner: list[str] = []
             _collect(child, inner, prose=prose)
             exponent = "".join(inner).strip()
-            if before and before[-1].isdigit() and exponent and not exponent.startswith("^"):
+            # Only a numeric superscript on a digit is a power: '10⁶' yes,
+            # '2<sup>nd</sup>' and a footnote mark '7.2<sup>a</sup>' no.
+            if before and before[-1].isdigit() and re.fullmatch(r"[-\u2212\u207b]?\d+", exponent):
                 # Close up '10 ⁶' as well as '10⁶': the space is typography.
                 if parts and parts[-1].rstrip() != parts[-1]:
                     parts[-1] = parts[-1].rstrip()

@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 STRUCTURAL = "structural"
 
 # The extractor found a titre in B5's table — a field the seed has no B5
-# record for, so it is a new candidate, hk1-B5-eaf0fd9a.
+# record for, so it is a new candidate, hk1-B5-a07dd73c.
 NEW_TITRE = {
     "candidates": [
         {
@@ -168,6 +168,22 @@ def test_refuses_a_typed_value_outside_the_fields_range():
     assert stored.corrected == Quantity(value=9, unit="d")
 
 
+def test_both_typed_values_are_range_checked_not_just_the_first():
+    # A decision may carry a gold value AND a correction. Rule 5 applies to
+    # each: an in-range correction does not launder an out-of-range gold, and
+    # the other way round. The message names which one failed.
+    fetch_b5()
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-B5-1", "verified", provenance="gold",
+                               gold=Quantity(value=8500, unit="d"), corrected=Quantity(value=9, unit="d")))
+    assert caught.value.rule == "range" and "gold" in caught.value.why
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-B5-1", "verified", provenance="gold",
+                               gold=Quantity(value=9, unit="d"), corrected=Quantity(value=8500, unit="d")))
+    assert caught.value.rule == "range" and "corrected" in caught.value.why
+    assert not biorepo.PATH.exists()
+
+
 def test_refuses_gold_that_is_not_verified():
     fetch_b5()
     with pytest.raises(biorepo.WriteRefused) as caught:
@@ -189,42 +205,42 @@ def test_accept_without_a_quote_proceeds_on_a_fetched_paper():
 def test_gold_on_a_candidate_anchors_on_its_quote_and_keeps_both(monkeypatch):
     extract_b5(monkeypatch)
     stored = biorepo.write(
-        decision("hk1-B5-eaf0fd9a", "verified", provenance="gold", gold=Quantity(value=7, unit="mg L⁻¹"))
+        decision("hk1-B5-a07dd73c", "verified", provenance="gold", gold=Quantity(value=7, unit="mg L⁻¹"))
     )
     # The candidate's own quote and section were copied onto the decision,
     # so `check:biorepo`'s "every gold decision has a quote" holds by
     # construction.
     assert stored.quote == "Placeholder A | 7 | mg L-1" and stored.sectionId == "t1"
     repo = biorepo.read()
-    assert [c.id for c in repo.records] == ["hk1-B5-eaf0fd9a"]
+    assert [c.id for c in repo.records] == ["hk1-B5-a07dd73c"]
     assert repo.records[0].status == "unverified", "the copy is the candidate; the decision is the authority"
 
 
 def test_a_rejected_candidate_is_a_false_positive_in_the_run(monkeypatch):
     extract_b5(monkeypatch)
-    biorepo.write(decision("hk1-B5-eaf0fd9a", "rejected", rejectReason="a placeholder row, not a measurement"))
+    biorepo.write(decision("hk1-B5-a07dd73c", "rejected", rejectReason="a placeholder row, not a measurement"))
     runs = witness.runs()
-    assert [fp.id for fp in runs[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
+    assert [fp.id for fp in runs[0].falsePositives] == ["hk1-B5-a07dd73c"]
     fp = runs[0].falsePositives[0]
     assert fp.field == "titer_secreted" and fp.extracted == Quantity(value=7, unit="mg L⁻¹")
     assert fp.note == "a placeholder row, not a measurement"
     # Still in the overlay's candidates, with its decision beside it, so the
     # browser can show what was decided rather than a hole.
     overlay = Overlay.model_validate(TestClient(app).get("/api/biorepo/overlay").json())
-    assert [c.id for c in overlay.candidates] == ["hk1-B5-eaf0fd9a"]
-    assert overlay.records["hk1-B5-eaf0fd9a"].status == "rejected"
+    assert [c.id for c in overlay.candidates] == ["hk1-B5-a07dd73c"]
+    assert overlay.records["hk1-B5-a07dd73c"].status == "rejected"
 
 
 def test_a_decided_candidate_outlives_the_cache(monkeypatch):
     extract_b5(monkeypatch)
-    biorepo.write(decision("hk1-B5-eaf0fd9a", "verified"))
+    biorepo.write(decision("hk1-B5-a07dd73c", "verified"))
     for path in extract.CANDIDATES_DIR.glob("*.json"):
         path.unlink()
     # No run — nothing was extracted in this checkout — but the record is
     # still a record, and a later decision about it still resolves.
     assert witness.runs() == []
-    assert [c.id for c in witness.new_candidates()] == ["hk1-B5-eaf0fd9a"]
-    again = biorepo.write(decision("hk1-B5-eaf0fd9a", "rejected", rejectReason="on reflection, a placeholder"))
+    assert [c.id for c in witness.new_candidates()] == ["hk1-B5-a07dd73c"]
+    again = biorepo.write(decision("hk1-B5-a07dd73c", "rejected", rejectReason="on reflection, a placeholder"))
     assert again.status == "rejected" and len(biorepo.read().records) == 1
 
 

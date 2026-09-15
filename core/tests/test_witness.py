@@ -276,7 +276,7 @@ def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
     # The titre is new to B5 — the corpus growing — and it is in the overlay
     # for Guild, not in the score.
     assert [c.field for c in overlay.candidates] == ["titer_secreted"]
-    assert overlay.candidates[0].id == "hk1-B5-eaf0fd9a"
+    assert overlay.candidates[0].id == "hk1-B5-a07dd73c"
     assert runs[0].falsePositives == []
 
 
@@ -291,9 +291,9 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
     client.post("/api/intake/B5/extract")
     biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
-                                 recordId="hk1-B5-eaf0fd9a", at="2026-09-15T00:00:00Z",
+                                 recordId="hk1-B5-a07dd73c", at="2026-09-15T00:00:00Z",
                                  rejectReason="a placeholder row"))
-    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
+    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["hk1-B5-a07dd73c"]
 
     other = {"candidates": [{
         "sectionId": "t1", "field": "titer_secreted", "value": 9, "unit": "mg L-1",
@@ -303,12 +303,12 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     assert client.post("/api/intake/B5/extract?force=true").status_code == 200
 
     runs_, candidates, decisions = witness.overlay_bundle()
-    assert [(c.id, c.value) for c in candidates] == [("hk1-B5-f5cdb84c", 9), ("hk1-B5-eaf0fd9a", 7)]
-    assert "hk1-B5-eaf0fd9a" in decisions and "hk1-B5-f5cdb84c" not in decisions
+    assert [(c.id, c.value) for c in candidates] == [("hk1-B5-93a4e8a2", 9), ("hk1-B5-a07dd73c", 7)]
+    assert "hk1-B5-a07dd73c" in decisions and "hk1-B5-93a4e8a2" not in decisions
     # The rejected 7 is still a false positive of the run: the file keeps it
     # and Witness measures what the extractor produced, then and now.
-    assert [fp.id for fp in runs_[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
+    assert [fp.id for fp in runs_[0].falsePositives] == ["hk1-B5-a07dd73c"]
     stored = biorepo.write(ReviewDecision(status="verified", provenance="unverified", reviewer="sean",
-                                          recordId="hk1-B5-f5cdb84c", at="2026-09-15T01:00:00Z"))
+                                          recordId="hk1-B5-93a4e8a2", at="2026-09-15T01:00:00Z"))
     assert stored.status == "verified"
     assert sorted(c.value for c in biorepo.records()) == [7, 9]

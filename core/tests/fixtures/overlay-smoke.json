@@ -42,14 +42,14 @@
         }
       ],
       "license": "https://creativecommons.org/licenses/by/4.0/",
-      "fetchedAt": "2026-09-15T05:35:49.674480+00:00",
+      "fetchedAt": "2026-09-15T09:00:00Z",
       "reason": null
     }
   },
   "records": {},
   "candidates": [
     {
-      "id": "hk1-B5-eaf0fd9a",
+      "id": "hk1-B5-a07dd73c",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -67,7 +67,7 @@
       "isPrimary": true
     },
     {
-      "id": "hk1-B5-d235ba19",
+      "id": "hk1-B5-95f64ef4",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
