@@ -229,10 +229,14 @@ export default function Witness() {
   const overlayRecords = useStore((s) => s.overlay?.records ?? NO_DECISIONS);
   // A candidate a reviewer has decided is a record or a false positive now,
   // not an unscored one (§7.3).
-  const unscored = useMemo(
-    () => overlayCandidates.filter((c) => !overlayRecords[c.id] && isNewCandidate(c, records)),
-    [overlayCandidates, overlayRecords, records],
-  );
+  const unscored = useMemo(() => {
+    const local = new Map(records.map((r) => [r.id, r]));
+    return overlayCandidates.filter((c) => {
+      if (overlayRecords[c.id] || !isNewCandidate(c, records)) return false;
+      const mine = local.get(c.id);
+      return !mine || (mine.status === 'unverified' && !mine.gold);
+    });
+  }, [overlayCandidates, overlayRecords, records]);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();

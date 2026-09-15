@@ -39,6 +39,7 @@ import {
   cx,
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
+import { locateQuote } from '@/lib/review';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -54,9 +55,11 @@ function locateSpans(text: string, recs: ExtractionRecord[]): Span[] {
   const found: Span[] = [];
   for (const r of recs) {
     if (!r.quote) continue;
-    const start = text.indexOf(r.quote);
-    if (start < 0) continue;
-    found.push({ record: r, start, end: start + r.quote.length });
+    // The way the service anchors (OF-BLD-012 §2.4 rule 2): normalised on
+    // both sides, then mapped back onto the paper's own characters.
+    const hit = locateQuote(text, r.quote);
+    if (!hit) continue;
+    found.push({ record: r, start: hit.start, end: hit.end });
   }
   found.sort((a, b) => a.start - b.start || b.end - a.end);
   const kept: Span[] = [];

@@ -57,7 +57,7 @@ import {
   type DurableSnapshot,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
-import { carryOverSpan, goldRefusal, isNewCandidate } from '@/lib/review';
+import { carryOverSpan, isNewCandidate, writeRefusal, type ReviewAction } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
 
 export type Theme = 'bench' | 'night';
@@ -74,6 +74,8 @@ export interface Toast {
 
 interface UndoFrame {
   records: ExtractionRecord[];
+  /** The records this action changed. Undo restores these and only these (§7.3). */
+  recordIds: string[];
   queueIndex: number;
   label: string;
 }
@@ -110,6 +112,39 @@ function decisionOf(
     at,
     ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
+}
+
+/** The review action a record's current state amounts to, for the refusal predicate. */
+function actionOf(r: ExtractionRecord): ReviewAction {
+  if (r.gold) return 'gold';
+  if (r.status === 'verified') return 'accept';
+  return 'reject';
+}
+
+/**
+ * A decision applied to a record — the service's or the Durable tier's. The
+ * six review fields, the span a promotion re-anchored to, and the corrected
+ * value AS the value: a record whose correction is shown beside a stale
+ * number is two records.
+ */
+function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDecision): ExtractionRecord {
+  const next: ExtractionRecord = {
+    ...r,
+    status: d.status,
+    provenance: d.provenance,
+    gold: d.gold,
+    corrected: d.corrected,
+    rejectReason: d.rejectReason,
+    reviewer: d.reviewer,
+  };
+  if ('quote' in d && d.quote) next.quote = d.quote;
+  if ('sectionId' in d && d.sectionId) next.sectionId = d.sectionId;
+  if (d.corrected) {
+    next.value = d.corrected.value;
+    next.unit = d.corrected.unit;
+    next.si = toSI(d.corrected.value, d.corrected.unit);
+  }
+  return next;
 }
 
 function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
@@ -328,8 +363,10 @@ export interface OFState {
    * against them: the later of the two wins (OF-BLD-012 §7.3).
    */
   durableReview: { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null;
-  /** ISO time of the last decision this browser made on each record; persisted as the Durable decision's `at`. */
+  /** ISO time of the decision currently applied to each record, whoever made it; persisted as the Durable decision's `at`. */
   decisionAt: Record<string, string>;
+  /** Decisions the service refused this session, by record id, with the rule — not posted again until the record changes. */
+  refusedDecisions: Record<string, string>;
 
   // service overlay (OF-BLD-012 §2.1)
   /** Whether openferment-core answered /api/health this session. null = not asked yet. */
@@ -518,6 +555,7 @@ export const useStore = create<OFState>()((set, get) => ({
   durableReady: false,
   durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
   decisionAt: {} as Record<string, string>,
+  refusedDecisions: {} as Record<string, string>,
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
@@ -560,16 +598,17 @@ export const useStore = create<OFState>()((set, get) => ({
     // OF-BLD-012 §7.3 — what the service would say, said here first.
     const paper = s.papers.find((p) => p.id === before.paperId);
     const candidates = s.overlay?.candidates ?? [];
-    if (action === 'gold') {
-      const refusal = goldRefusal(before, paper, candidates, s.serviceUp);
+    if (action !== 'skip') {
+      const refusal = writeRefusal(action, before, paper, candidates, s.serviceUp);
       if (refusal) {
         get().toast({ text: refusal, kind: 'error' });
         return;
       }
     }
     // A promotion on a curated record whose quote is not in the fetched text
-    // carries the extractor's agreeing span, so the promoted record anchors
-    // in the paper's own words.
+    // carries the extractor's agreeing span — and the paper's own number, as
+    // the correction — so the promoted record anchors in the paper's words
+    // and the service finds that number inside them (§2.4 rule 3).
     const span = action === 'accept' || action === 'gold' ? carryOverSpan(before, paper, candidates) : null;
     const reanchor = (r: ExtractionRecord, audit: AuditEvent[]): ExtractionRecord => {
       if (!span) return r;
@@ -580,10 +619,29 @@ export const useStore = create<OFState>()((set, get) => ({
         from: r.quote,
         to: span.quote,
       });
-      return { ...r, quote: span.quote, sectionId: span.sectionId };
+      const sameNumber = r.value === span.value && r.unit === span.unit;
+      if (sameNumber) return { ...r, quote: span.quote, sectionId: span.sectionId };
+      audit.push({
+        at: stamp(),
+        who: 'you',
+        action: 'value taken as the paper writes it',
+        from: `${r.value} ${r.unit}`,
+        to: `${span.value} ${span.unit}`,
+      });
+      const corrected = { value: span.value as number, unit: span.unit };
+      return {
+        ...r,
+        quote: span.quote,
+        sectionId: span.sectionId,
+        corrected,
+        value: span.value,
+        unit: span.unit,
+        si: typeof span.value === 'number' ? toSI(span.value, span.unit) : r.si,
+      };
     };
     const frame: UndoFrame = {
       records: structuredClone(s.records),
+      recordIds: [id],
       queueIndex: s.reviewIndex,
       label: action,
     };
@@ -599,8 +657,10 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'reject') {
         audit.push({ at: stamp(), who: 'you', action: `rejected — ${payload?.reason ?? 'unspecified'}` });
         stats.rejected++;
+        // A rejected record is not in the gold set, whatever it was before.
+        const { gold: _gold, ...rest } = r;
         return {
-          ...r,
+          ...rest,
           status: 'rejected' as RecordStatus,
           reviewer: 'you',
           rejectReason: payload?.reason,
@@ -622,12 +682,14 @@ export const useStore = create<OFState>()((set, get) => ({
       return r;
     });
     const now = new Date().toISOString();
+    const { [id]: _refused, ...refusedDecisions } = s.refusedDecisions;
     set({
       records,
       undoStack: [...s.undoStack.slice(-25), frame],
       reviewStats: stats,
       reviewIndex: Math.min(s.reviewIndex + 1, s.reviewQueue.length),
       decisionAt: action === 'skip' ? s.decisionAt : { ...s.decisionAt, [id]: now },
+      refusedDecisions: action === 'skip' ? s.refusedDecisions : refusedDecisions,
     });
     // §7.3 — the Durable tier keeps the decision offline; when the service is
     // up it is posted too, and `biorepo.write` is what stores it there.
@@ -641,6 +703,7 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const frame: UndoFrame = {
       records: structuredClone(s.records),
+      recordIds: [id],
       queueIndex: s.reviewIndex,
       label: 'edit',
     };
@@ -665,11 +728,22 @@ export const useStore = create<OFState>()((set, get) => ({
         ],
       };
     });
+    const now = new Date().toISOString();
     set({
       records,
       undoStack: [...s.undoStack.slice(-25), frame],
       reviewStats: { ...s.reviewStats, edited: s.reviewStats.edited + 1 },
+      decisionAt: { ...s.decisionAt, [id]: now },
     });
+    // §7.3 — a correction is part of the decision about a record, and the
+    // service holds it to §2.4 rule 5 (the range) like anything typed.
+    if (s.serviceUp) {
+      const after = get().records.find((r) => r.id === id);
+      const paper = s.papers.find((p) => p.id === after?.paperId);
+      if (after && !writeRefusal(actionOf(after), after, paper, s.overlay?.candidates ?? [], true)) {
+        void get().postReviewDecision(decisionOf(after, null, now));
+      }
+    }
   },
 
   setRecordStatus: (id, status, reason) =>
@@ -691,11 +765,14 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const frame = s.undoStack[s.undoStack.length - 1];
     if (!frame) return;
-    // Restore what the frame holds, by id; a record that arrived since (a
-    // candidate the overlay appended) is not the frame's to take away.
-    const restored = new Map(frame.records.map((r) => [r.id, r]));
+    // Restore only the records the undone action touched. The frame holds
+    // every record, but a record another reviewer changed since — applied
+    // here by a mid-session overlay — is not this browser's to take back,
+    // and a candidate that arrived since is not the frame's to take away.
+    const touched = new Set(frame.recordIds);
+    const restored = new Map(frame.records.filter((r) => touched.has(r.id)).map((r) => [r.id, r]));
     const now = new Date().toISOString();
-    const changed = frame.records.filter((r) => {
+    const changed = [...restored.values()].filter((r) => {
       const current = s.records.find((c) => c.id === r.id);
       return current && !sameDecision(current, r);
     });
@@ -1954,11 +2031,10 @@ export const useStore = create<OFState>()((set, get) => ({
         // record; the later of the two wins. The decision's own `at` when the
         // snapshot carries one, the snapshot's savedAt for older snapshots.
         const madeAt = d.at ?? snap.savedAt;
-        decisionAt[r.id] = madeAt;
         const server = s.overlay?.records[r.id];
         if (server && server.at > madeAt) return r;
-        const { at: _at, ...fields } = d;
-        return { ...r, ...fields };
+        decisionAt[r.id] = madeAt;
+        return applyDecision(r, d);
       });
       // Locks re-apply only to runbooks that still exist. A lock whose runbook
       // was created in a previous session and is not in this one is dropped —
@@ -2018,25 +2094,20 @@ export const useStore = create<OFState>()((set, get) => ({
         : s.runOutputs;
 
       // §7.3 — the service's decisions, over seed records and candidates
-      // alike. When the Durable tier restored a decision for the same record,
-      // the later of the two wins.
-      const local = s.durableReview;
+      // alike. The later of the two wins, judged against the time of the
+      // decision currently on the record — the live one, not the snapshot
+      // this session loaded with, so a decision made a minute ago is not
+      // overwritten by an older server one a fetch or an extraction brings
+      // back. A server decision applied here takes its own `at`, so the
+      // Durable tier persists it as the server's and never re-posts it.
+      const decisionAt = { ...s.decisionAt };
       const decide = (r: ExtractionRecord): ExtractionRecord => {
         const d = merged.records[r.id];
         if (!d) return r;
-        const mine = local?.decisions[r.id];
-        if (mine && (mine.at ?? local!.savedAt) > d.at) return r;
-        return {
-          ...r,
-          status: d.status,
-          provenance: d.provenance,
-          gold: d.gold,
-          corrected: d.corrected,
-          rejectReason: d.rejectReason,
-          reviewer: d.reviewer,
-          quote: d.quote ?? r.quote,
-          sectionId: d.sectionId ?? r.sectionId,
-        };
+        const mine = decisionAt[r.id];
+        if (mine && mine > d.at) return r;
+        decisionAt[r.id] = d.at;
+        return applyDecision(r, d);
       };
       // §7.3 — candidates for a field the seed has no record of join the
       // records, after the seed, as unverified records extracted by haiku-1.
@@ -2044,25 +2115,31 @@ export const useStore = create<OFState>()((set, get) => ({
       // beside that record on its review card. Idempotent: a candidate
       // already here is not added twice, and a Durable decision on one that
       // just arrived is applied to it.
+      const local = s.durableReview;
       const seed = s.records.filter((r) => r.extractorRun !== 'haiku-1');
       const present = new Set(s.records.map((r) => r.id));
+      const arrivingIds: string[] = [];
       const arriving: ExtractionRecord[] = merged.candidates
         .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
         .map((c) => {
-          const mine = local?.decisions[c.id];
+          arrivingIds.push(c.id);
           const record: ExtractionRecord = { ...c, audit: [] };
+          const mine = local?.decisions[c.id];
           if (!mine) return record;
-          const { at: _at, ...fields } = mine;
-          return { ...record, ...fields };
+          decisionAt[c.id] = mine.at ?? local!.savedAt;
+          return applyDecision(record, mine);
         });
       const records = [...s.records, ...arriving].map(decide);
-      // New records join an open review queue after everything already in it
-      // (§7.3). A queue seeded before the overlay arrived would otherwise
-      // never see them.
+      // New records still undecided join an open review queue after
+      // everything already in it (§7.3). A queue seeded before the overlay
+      // arrived would otherwise never see them.
       const queued = new Set(s.reviewQueue);
-      const joining = arriving.filter((r) => r.status === 'unverified' && !queued.has(r.id)).map((r) => r.id);
+      const arrived = new Set(arrivingIds);
+      const joining = records
+        .filter((r) => arrived.has(r.id) && r.status === 'unverified' && !r.gold && !queued.has(r.id))
+        .map((r) => r.id);
       const reviewQueue = s.reviewQueue.length && joining.length ? [...s.reviewQueue, ...joining] : s.reviewQueue;
-      return { overlay: merged, papers, runOutputs, records, reviewQueue };
+      return { overlay: merged, papers, runOutputs, records, reviewQueue, decisionAt };
     }),
 
   hydrateOverlay: async () => {
@@ -2101,20 +2178,31 @@ export const useStore = create<OFState>()((set, get) => ({
     const local = s.durableReview;
     if (!local || !s.overlay || !s.serviceUp) return;
     const pending: ReviewDecision[] = [];
+    let kept = 0;
     for (const [id, mine] of Object.entries(local.decisions)) {
-      const madeAt = mine.at ?? local.savedAt;
+      const madeAt = s.decisionAt[id] ?? mine.at ?? local.savedAt;
       const server = s.overlay.records[id];
-      if (server && server.at >= madeAt) continue;
+      if (server && server.at >= madeAt) continue; // the service has this one, or a newer one
+      if (s.refusedDecisions[id]) continue; // refused this session; the record has not changed since
       const record = s.records.find((r) => r.id === id);
       if (!record) continue; // a candidate not in this overlay; nothing to post it about
+      // What the service would refuse is not posted, and not posted again on
+      // every load: an accept on an unfetched paper stays this browser's.
+      const paper = s.papers.find((p) => p.id === record.paperId);
+      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates, true)) {
+        kept++;
+        continue;
+      }
       pending.push(decisionOf(record, null, madeAt));
     }
     for (const d of pending) await get().postReviewDecision(d);
-    if (pending.length) {
+    if (pending.length || kept) {
       get().logActivity({
         at: stamp(),
         icon: 'upload',
-        text: `${pending.length} review decision${pending.length === 1 ? '' : 's'} made offline sent to the service`,
+        text:
+          `${pending.length} review decision${pending.length === 1 ? '' : 's'} made offline sent to the service` +
+          (kept ? `; ${kept} kept in this browser only (the service would refuse them — unfetched or unidentified papers)` : ''),
         href: '#/guild',
         provenance: 'user',
       });
@@ -2133,7 +2221,9 @@ export const useStore = create<OFState>()((set, get) => ({
       if (e instanceof DecisionRefused) {
         // The service said no and said why. The browser's decision stands in
         // the Durable tier; the reviewer hears the rule, and nothing is
-        // repaired on either side.
+        // repaired on either side. Remembered, so it is not posted again
+        // until the record changes.
+        set((s) => ({ refusedDecisions: { ...s.refusedDecisions, [decision.recordId]: e.rule } }));
         get().toast({ text: `${decision.recordId} — the service refused this decision (${e.rule}): ${e.why}`, kind: 'error' });
         get().logActivity({
           at: stamp(),
@@ -2162,7 +2252,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {} });
+    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
     if (overlay) get().applyOverlay(overlay);
     get().toast({
       text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',

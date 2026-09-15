@@ -20,7 +20,7 @@ import {
 import type { Candidate, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
-import { bestCandidate, carryOverSpan, goldRefusal, paperFetched } from '@/lib/review';
+import { bestCandidate, carryOverSpan, locateQuote, paperFetched, writeRefusal } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
@@ -67,9 +67,12 @@ interface SpanContext {
  */
 function spanContext(text: string, quote: string, radius = 440): SpanContext | null {
   if (!quote) return null;
-  const at = text.indexOf(quote);
-  if (at < 0) return null;
-  const qEnd = at + quote.length;
+  // Located the way the service locates it (OF-BLD-012 §2.4 rule 2): a
+  // quote the model wrote with 'L-1' still sits in a section that says 'L⁻¹'.
+  const hit = locateQuote(text, quote);
+  if (!hit) return null;
+  const at = hit.start;
+  const qEnd = hit.end;
 
   const paraStart = (() => {
     const i = text.lastIndexOf('\n', at);
@@ -173,26 +176,21 @@ export default function Guild() {
   const [now, setNow] = useState(() => Date.now());
   const [frozenEnd, setFrozenEnd] = useState<number | null>(null);
 
-  const seeded = useRef(false);
   const lastAt = useRef(Date.now());
   const timings = useRef<number[]>([]);
 
   // Arriving without a queue (deep link, refresh) fills it with everything
-  // still unverified, so the screen is never a dead end.
+  // still unverified, so the screen is never a dead end. Re-run whenever the
+  // queue is empty and records change: an overlay that lands after this
+  // mounted can bring new candidates to review (OF-BLD-012 §7.3).
   useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    if (queue.length === 0) {
-      const ids = useStore
-        .getState()
-        .records.filter((r) => r.status === 'unverified')
-        .map((r) => r.id);
-      if (ids.length > 0) {
-        startReview(ids);
-        setOrigin('session');
-      }
+    if (queue.length > 0) return;
+    const ids = records.filter((r) => r.status === 'unverified').map((r) => r.id);
+    if (ids.length > 0) {
+      startReview(ids);
+      setOrigin('session');
     }
-  }, [queue.length, startReview]);
+  }, [queue.length, records, startReview]);
 
   // Declared after the seeding effect above so it runs after it in the same
   // flush: the queue exists by the time this looks for the record in it.
@@ -719,7 +717,10 @@ export default function Guild() {
   const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
   const bestCtx = best && bestSection ? spanContext(bestSection.text, best.candidate.quote) : null;
   const carry = fetched && !fromExtractor ? carryOverSpan(record, paper, candidates) : null;
-  const goldBlocked = goldRefusal(record, paper, candidates, serviceUp);
+  // §2.3 — what the service would refuse, said here first, per action.
+  const acceptBlocked = writeRefusal('accept', record, paper, candidates, serviceUp);
+  const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp);
+  const goldBlocked = writeRefusal('gold', record, paper, candidates, serviceUp);
 
   return (
     <>
@@ -1121,14 +1122,16 @@ export default function Guild() {
               <Button
                 variant="primary"
                 onClick={() => decide('accept')}
-                title="Accept this extraction as verified — shortcut a"
+                disabled={!!acceptBlocked}
+                title={acceptBlocked ?? 'Accept this extraction as verified — shortcut a'}
               >
                 <Check size={14} /> Accept
                 <Hint k="a" faded={usedKeyboard} />
               </Button>
               <Button
                 onClick={() => setRejecting(true)}
-                title="Reject and pick a reason — shortcut r"
+                disabled={!!rejectBlocked}
+                title={rejectBlocked ?? 'Reject and pick a reason — shortcut r'}
               >
                 <Ban size={14} /> Reject
                 <Hint k="r" faded={usedKeyboard} />
@@ -1161,9 +1164,13 @@ export default function Guild() {
               </span>
             </div>
           )}
-          {goldBlocked && !rejecting && (
+          {!rejecting && (rejectBlocked || acceptBlocked || goldBlocked) && (
             <p className="text-caption text-ink-soft mt-2" data-testid="gold-blocked">
-              Gold is unavailable here: {goldBlocked}
+              {rejectBlocked
+                ? `The service will keep no decision here: ${rejectBlocked}`
+                : acceptBlocked
+                  ? `Accept and gold are unavailable here: ${acceptBlocked}`
+                  : `Gold is unavailable here: ${goldBlocked}`}
             </p>
           )}
         </Card>
