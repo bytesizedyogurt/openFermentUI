@@ -1,0 +1,30 @@
+{
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): what fixture-mode extract.py returns for B5 instead of calling claude-haiku-4-5-20251001. HAND-WRITTEN, not a model output — the sandbox this was written in had no key — in the exact shape of the emit_candidates tool input, over the structural stand-in text. Both candidates anchor (§2.4): the value is in the quote, the unit is in the field's family, the converted value is in range. Regenerate with a key: OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture",
+  "raw": {
+    "candidates": [
+      {
+        "sectionId": "t1",
+        "field": "titer_secreted",
+        "value": 7,
+        "unit": "mg L-1",
+        "quote": "Placeholder A | 7 | mg L-1",
+        "isPrimary": true,
+        "confidence": 0.8
+      },
+      {
+        "sectionId": "t1",
+        "field": "time_to_colony",
+        "value": 7,
+        "unit": "d",
+        "quote": "Placeholder A | 7 | mg L-1",
+        "isPrimary": true,
+        "confidence": 0.55
+      }
+    ]
+  },
+  "usage": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": 0.0
+  }
+}

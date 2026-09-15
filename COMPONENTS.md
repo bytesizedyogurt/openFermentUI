@@ -101,27 +101,27 @@ papers.
 
 **Documents in, anchored to source.** `/intake` · chord `g i`
 
-Ingest and extraction. A claim enters the system here or it does not enter at all.
+Ingest and extraction. A claim enters the system here or it does not enter at all. With openferment-core running, Fetch asks Europe PMC for a paper's open-access full text and Extract runs Claude Haiku once over it, every candidate anchored to a verbatim quote (OF-BLD-012 §5–6); the seed's curator notes stand in for the papers nobody has fetched, and the reader says which is which.
 
 Views: [Ingest](#) `/intake/ingest`
 
 | Component | Implemented in |
 |---|---|
-| Intake | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx` |
+| Intake | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` |
 
 ### BioRepo
 
 **Records, artifacts, provenance.** `/biorepo` · chord `g b`
 
-The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness asks whether the extractor reproduces.
+The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `haiku-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7).
 
 Views: [Witness](#) `/biorepo/witness` · [Compare](#) `/biorepo/compare`
 
 | Component | Implemented in |
 |---|---|
-| BioRepo | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx` |
+| BioRepo | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py` |
 | Audit | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` |
-| Witness | `src/screens/Witness.tsx`, `src/engine/metrics.ts` |
+| Witness | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` |
 
 Not built: Common Seal.
 
@@ -258,14 +258,14 @@ for the ones with a rail entry.
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
 | Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` | the rail, /postdoc |
-| Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx` | the rail, /intake |
-| BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx` | the rail, /biorepo |
+| Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
+| BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
 | fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
-| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts` | a BioRepo tab, /biorepo/witness |
+| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` | a BioRepo tab, /biorepo/witness |
 | Common Seal | Keeping it honest | not built | — |
 | Claim Workbench | Patents | not built | — |
 | Priority Engine | Patents | not built | — |

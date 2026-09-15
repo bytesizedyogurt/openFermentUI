@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pnpm demo:offline (OF-BLD-012 §8.1): the JATS the fixture-mode service
+  returns for B5 (PMC8471596). THIS IS NOT THE PAPER. It is the structural
+  document tests/fixtures/jats/structural.xml — a made-up article SHAPE for
+  testing the parser — standing in until the real one is saved here. The
+  sandbox this was written in could not reach Europe PMC. To replace it:
+
+    curl -sS -A 'openferment-core/0.1' \
+      https://www.ebi.ac.uk/europepmc/webservices/rest/PMC8471596/fullTextXML \
+      > core/tests/fixtures/demo/jats/PMC8471596.xml
+
+  then regenerate extract/B5.json with a key (see README, 'The offline demo').
+-->
+<!--
+  STRUCTURAL FIXTURE. THIS IS NOT A PAPER.
+
+  A minimal JATS document whose only purpose is to pin what `split_jats` does
+  with each element the real corpus uses: an abstract, nested sections, a
+  table kept as rows, a figure caption, inline sup/sub, a licence, and the
+  three back-matter elements that must be dropped. Every sentence is
+  placeholder prose about an imaginary organism and an imaginary run; nothing
+  here is a measurement of anything, and nothing here may be quoted as one.
+
+  The real fixture is tests/fixtures/jats/PMC8471596.xml (B5, MDPI Life, CC
+  BY), checked in once from Europe PMC. test_intake.py tests that file when
+  it is present and this one always.
+-->
+<article xmlns:xlink="http://www.w3.org/1999/xlink" article-type="research-article">
+  <front>
+    <article-meta>
+      <title-group>
+        <article-title>A structural fixture for the Intake parser</article-title>
+      </title-group>
+      <permissions>
+        <license license-type="open-access" xlink:href="https://creativecommons.org/licenses/by/4.0/">
+          <license-p>This is an open access article distributed under a placeholder licence.</license-p>
+        </license>
+      </permissions>
+      <abstract abstract-type="graphical">
+        <p>A picture of nothing.</p>
+      </abstract>
+      <abstract>
+        <p>The   abstract  comes first,   whatever order the   elements appear in.</p>
+      </abstract>
+    </article-meta>
+  </front>
+  <body>
+    <sec id="sec1">
+      <title>Introduction</title>
+      <p>An imaginary organism was grown in an imaginary vessel.</p>
+      <p>Its rate is written per litre, as in mg L<sup>-1</sup>, and its gas as CO<sub>2</sub>.</p>
+    </sec>
+    <sec id="sec2">
+      <title>Results</title>
+      <p>Results have a preamble of their own.</p>
+      <sec id="sec2.1">
+        <title>Growth</title>
+        <p>The nested section flattens with the parent heading in front of it.</p>
+        <table-wrap id="tab1">
+          <label>Table 1</label>
+          <caption><p>Placeholder rows, kept as rows.</p></caption>
+          <table>
+            <thead>
+              <tr><th>Condition</th><th>Value</th><th>Unit</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Placeholder A</td><td>7</td><td>mg L<sup>-1</sup></td></tr>
+              <tr><td>Placeholder B</td><td>9</td><td>mg L<sup>-1</sup></td></tr>
+            </tbody>
+          </table>
+        </table-wrap>
+        <fig id="fig1">
+          <label>Figure 1</label>
+          <caption><p>A placeholder figure caption.</p></caption>
+          <graphic xlink:href="nothing.png"/>
+        </fig>
+      </sec>
+      <sec id="sec2.2">
+        <title>Empty</title>
+        <sec id="sec2.2.1">
+          <title>Deeper</title>
+          <p>Three levels down, still prefixed all the way up.</p>
+        </sec>
+      </sec>
+    </sec>
+  </body>
+  <back>
+    <ack><p>Acknowledgements must not become a section.</p></ack>
+    <fn-group><fn><p>A footnote must not become a section.</p></fn></fn-group>
+    <ref-list>
+      <title>References</title>
+      <ref id="r1"><mixed-citation>A reference must not become a section.</mixed-citation></ref>
+    </ref-list>
+  </back>
+</article>

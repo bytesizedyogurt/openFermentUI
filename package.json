@@ -30,7 +30,8 @@
     "test:live": "cd core && uv run --extra dev pytest tests/ -q -m live -s",
     "check:reference": "tsx scripts/check-reference.ts",
     "intake:fetch": "cd core && uv run python -m openferment_core.intake",
-    "intake:extract": "cd core && uv run python -m openferment_core.extract"
+    "intake:extract": "cd core && uv run python -m openferment_core.extract",
+    "demo:offline": "node scripts/demo-offline.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

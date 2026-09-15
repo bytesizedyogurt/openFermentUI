@@ -31,3 +31,6 @@ core/tests/fixtures/units.json
 # decisions, is the one data file that IS committed.
 core/data/fulltext/
 core/data/candidates/
+# §8.1 — `pnpm demo:offline` runs the service against a scratch copy of the
+# data directory so the demo never writes into the committed biorepo.json.
+core/data/demo/

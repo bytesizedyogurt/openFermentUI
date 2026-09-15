@@ -56,7 +56,7 @@ import {
   saveDurable,
   type DurableSnapshot,
 } from '@/lib/durable';
-import { DecisionRefused, IntakeDown, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
+import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { carryOverSpan, goldRefusal, isNewCandidate } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
 
@@ -341,6 +341,8 @@ export interface OFState {
   ingestPaperLive: (paperId: string) => Promise<void>;
   /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
   ingestPaperScripted: (paperId: string) => void;
+  /** One forced tool call over a fetched paper, through the service (§6.3); then the overlay again. */
+  extractPaperLive: (paperId: string) => Promise<void>;
   completeJob: (id: string) => void;
   /** Put one record's card in front of the reviewer — the reader's rail links here. */
   focusReview: (recordId: string) => void;
@@ -798,6 +800,47 @@ export const useStore = create<OFState>()((set, get) => ({
       if (up) await get().ingestPaperLive(paperId);
       else get().ingestPaperScripted(paperId);
     })();
+  },
+
+  extractPaperLive: async (paperId) => {
+    const id = get().startJob({
+      title: `Extract ${paperId}`,
+      kind: 'ingest',
+      real: true,
+      stages: [{ label: 'Extract', ms: 30000 }],
+      href: `#/biorepo/witness`,
+    });
+    get().logActivity({
+      at: stamp(),
+      icon: 'sparkles',
+      text: `Extracting ${paperId} — one forced tool call over its full text`,
+      href: '#/intake/ingest',
+      provenance: 'user',
+    });
+    try {
+      const result = await extractPaper(paperId);
+      get().completeJob(id);
+      const dropped = Object.entries(result.rejectionReasons)
+        .filter(([, n]) => n > 0)
+        .map(([rule, n]) => `${rule} ${n}`)
+        .join(', ');
+      get().toast({
+        text: `${paperId} extracted — ${result.candidates.length} candidate${result.candidates.length === 1 ? '' : 's'} anchored, ${result.rejected} refused${dropped ? ` (${dropped})` : ''}, $${result.usage.costUsd.toFixed(4)}`,
+        kind: 'success',
+        href: '#/biorepo/witness',
+        hrefLabel: 'Open Witness',
+      });
+    } catch (e) {
+      const message =
+        e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
+      get().failJob(id, message);
+      if (e instanceof IntakeDown && /not running/.test(e.message)) set({ serviceUp: false });
+      get().toast({ text: `Extract ${paperId} failed — ${message}`, kind: 'error' });
+      return;
+    }
+    // The run, the candidates and the decisions are recomputed server-side;
+    // ask for them again so Witness and Guild move.
+    await get().hydrateOverlay();
   },
 
   ingestPaperLive: async (paperId) => {

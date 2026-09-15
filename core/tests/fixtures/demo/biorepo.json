@@ -1,0 +1,67 @@
+{
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written through biorepo.write against the demo fixtures — two rejections of the stand-in text's two candidates (Witness's false positives) and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
+  "version": 1,
+  "decisions": {
+    "hk1-B5-1": {
+      "status": "rejected",
+      "provenance": "unverified",
+      "rejectReason": "not this field — a placeholder table row, not a titre",
+      "reviewer": "sean",
+      "recordId": "hk1-B5-1",
+      "at": "2026-09-15T09:00:00Z"
+    },
+    "hk1-B5-2": {
+      "status": "rejected",
+      "provenance": "unverified",
+      "rejectReason": "wrong span — a row of titres read as a colony time",
+      "reviewer": "sean",
+      "recordId": "hk1-B5-2",
+      "at": "2026-09-15T09:00:00Z"
+    },
+    "r-B5-3": {
+      "status": "verified",
+      "provenance": "curated",
+      "reviewer": "sean",
+      "recordId": "r-B5-3",
+      "at": "2026-09-15T09:00:00Z"
+    }
+  },
+  "records": [
+    {
+      "id": "hk1-B5-1",
+      "paperId": "B5",
+      "sectionId": "t1",
+      "quote": "Placeholder A | 7 | mg L-1",
+      "field": "titer_secreted",
+      "value": 7.0,
+      "unit": "mg L⁻¹",
+      "si": {
+        "value": 0.007,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "extractorRun": "haiku-1",
+      "isPrimary": true
+    },
+    {
+      "id": "hk1-B5-2",
+      "paperId": "B5",
+      "sectionId": "t1",
+      "quote": "Placeholder A | 7 | mg L-1",
+      "field": "time_to_colony",
+      "value": 7.0,
+      "unit": "d",
+      "si": {
+        "value": 168.0,
+        "unit": "h"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "extractorRun": "haiku-1",
+      "isPrimary": true
+    }
+  ]
+}

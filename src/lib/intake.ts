@@ -9,7 +9,7 @@
 // simulation for a real fetch — the ingest board keeps that path, labelled as
 // the offline one, and the choice between them is made in the store where the
 // reader can see which one ran.
-import type { FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
+import type { ExtractResponse, FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
 
 export class IntakeDown extends Error {
@@ -123,6 +123,30 @@ export async function fetchPaper(
   }
   if (!response.ok) await explain(response, opts.signal);
   return (await response.json()) as FetchResult;
+}
+
+/**
+ * Extract one fetched paper through the service (OF-BLD-012 §6.3): one
+ * forced tool call, every candidate anchored, the refusals counted. 422 when
+ * the paper has no full text and 503 when there is no key both surface as
+ * IntakeDown with the service's own reason; nothing is invented to fill in.
+ */
+export async function extractPaper(
+  paperId: string,
+  opts: { force?: boolean; signal?: AbortSignal } = {},
+): Promise<ExtractResponse> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/intake/${encodeURIComponent(paperId)}/extract${opts.force ? '?force=true' : ''}`,
+      { method: 'POST', signal: opts.signal },
+    );
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    throw new IntakeDown('Intake service not running.');
+  }
+  if (!response.ok) await explain(response, opts.signal);
+  return (await response.json()) as ExtractResponse;
 }
 
 /** Every paper the service has a cached fetch for, success or failure. */

@@ -38,10 +38,13 @@ question the app labels as open** rather than answering.
 | Layer | Status |
 |---|---|
 | Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none |
+| Full text | **Real, when fetched** — as of 2026-09-15, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
+| Extractor run | **Real, when run** — `haiku-1`, one forced tool call per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-15, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
+| Verified records | **0** as of 2026-09-15 — a verified record is one a named reviewer promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
-| Agent answer prose | **Authored** — 13 scripted flows, deterministic and offline. No language model is called |
+| Agent answer prose | **Real model call** — Postdoc on Claude Haiku through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
 The corpus is real literature. That is the whole point of OF-COR-001, and it is why the
 demo-labelling policy is narrow rather than blanket: only the two genuinely synthetic
@@ -52,12 +55,18 @@ carries its actual provenance.
 carry a DOI, 59 carry some persistent identifier, 50 record no authors, and 18 sit at
 `year: 0` because OF-COR-001 states no year. `curated` — the provenance on 132 of the 134
 records — means *transcribed from the curation document and not yet checked against the source
-PDF*. It does not mean verified. Nothing in the corpus is currently `verified`.
+PDF*. It does not mean verified. A record becomes `verified` only through a review decision in
+Guild, which `biorepo.write` stores in `core/data/biorepo.json` and `pnpm export:corpus` merges;
+the counts in the table above are what that file held when this README was written.
 
 ### Seed inventory
 
+The seed is what the app is with the service down. With it up, an overlay adds what has been
+fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not change.
+
 ```
-132 papers          all ingest: 'catalogued'   (metadata + curator note; no full text retrieved)
+132 papers          ingest: 'catalogued' in the seed (metadata + curator note); 27 carry a PMCID
+                    and fetch as full text through the service — the reader says which it shows
 134 records         132 curated · 2 industry-estimate · 127 flagged is_primary
  24 ontology fields  5 families: expression, ptm, functional, cultivation, downstream
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
@@ -122,17 +131,66 @@ from a bill into a bug report.
 
 ```bash
 pnpm install
-pnpm dev            # http://localhost:5173
+pnpm dev            # http://localhost:5173 — /api proxies to the service on :8000
 pnpm build          # typecheck + production bundle
 pnpm bundle:single  # one self-contained .html (inlined CSS/JS/fonts), openable from file://
+```
 
-pnpm verify         # the full gate, in order:
-  pnpm typecheck    #   tsc --noEmit
-  pnpm check:seed   #   every seed invariant, incl. unit dimensional analysis
+The service, for Postdoc's live mode and for Intake's real fetch and extraction
+(OF-BLD-012). Everything below needs `uv`; only the last two lines spend money.
+
+```bash
+cp core/.env.example core/.env        # ANTHROPIC_API_KEY — gitignored, guarded by check:secrets;
+                                      # set a spend cap in the console first
+pnpm export:corpus                    # project the TS seed (+ biorepo.json) to core/.../corpus.json
+cd core && uv run uvicorn openferment_core.api:app --reload
+
+pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for the 27 papers with a PMCID
+                                      # (no key needed; ≤ 2 requests/s, a project User-Agent)
+pnpm intake:extract --all             # Claude Haiku, one forced tool call per fetched paper
+                                      # → core/data/candidates/; prints anchored, rejected by rule, cost
+```
+
+Both batch commands are idempotent — a paper already fetched or extracted is skipped unless
+`--force`. Review decisions made in Guild while the service is up go to `core/data/biorepo.json`
+through one write function; that file is committed, `fulltext/` and `candidates/` are not.
+
+### The offline demo
+
+```bash
+pnpm demo:offline   # no key, no network: the service in fixture mode + the built app on :4173
+```
+
+Replays the loop from saved responses: open Intake, fetch B5, Extract, open Witness, open Guild,
+decide a record, watch Witness move. The fixtures live in `core/tests/fixtures/demo/` and say
+what they are: B5's text is a structural stand-in document until the real JATS is saved beside
+it (the fixture's own comment gives the `curl`), and the "model response" is hand-written in the
+tool's shape — regenerate it with a key via
+`OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture`.
+The anchoring, matching, scoring and the write function are the real code paths, and the demo
+writes into a scratch copy of the data directory, never into the committed `biorepo.json`.
+
+### The gate
+
+```bash
+pnpm verify              # offline — no key, no service, no network — in order:
+  pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
+  pnpm typecheck         #   tsc --noEmit
+  pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
+  pnpm check:reference   #   reference content is domain knowledge, never a result
+  pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write
+  pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
+  pnpm check:biorepo     #   biorepo.json is sound and corpus.json reflects every decision
+  pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
+  pnpm check:capture     #   captured screens
   pnpm build
-  pnpm test:smoke   #   32 routes, headless: console errors, uncaught throws, empty renders
-  pnpm test:golden  #   the ten-minute demo script, driven end to end
-  pnpm test:deep    #   ingest failure, protocol version diff, scenario compare
+  pnpm test:durable      #   the Durable tier survives a reload
+  pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
+  pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
+  pnpm test:smoke        #   48 routes headless, the overlay applied, Witness scored, Guild posting
+  pnpm test:golden       #   the ten-minute demo script, driven end to end
+  pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
+pnpm test:live           # the thirteen flows against the real pipeline — needs a key, never in verify
 ```
 
 The test suite is not decoration. `test:golden` is what caught a markdown-renderer infinite
@@ -318,8 +376,9 @@ One working mode. **Scripted** is offline and deterministic: it plays seeded con
 flows — the plan ticks, tool calls appear, retrieval sets render, the answer streams. Because
 every message comes from the flow object, the inspector's "trace" is the literal data that
 produced the answer, honest by construction rather than reconstructed afterward. The composer
-offers a "Live (needs network)" toggle, which is inert: selecting it shows a banner and the
-turn still runs scripted. No language model is called anywhere in this build.
+offers a **Live** toggle, which is not inert: with `openferment-core` running it is a real
+model call (see *Postdoc runs on Claude Haiku* above), and with the service down it says so
+and the turn runs scripted. In scripted mode no language model is called.
 
 When no flow matches, a fallback ladder takes over: first an **entity-lookup flow** that
 genuinely queries the seeded store and answers from live data with real chips, subject to the
@@ -357,10 +416,13 @@ Real corpus, modeled economics — so the labelling is targeted rather than blan
 
 Recorded here because the app records them rather than papering over them:
 
-- **Papers are catalogued, not ingested.** Metadata and a curator note only; no full text was
-  retrieved, so extraction spans anchor to curator prose and the reader says so. `RUN_OUTPUTS`
-  is deliberately empty — no extractor has run against un-ingested papers, so Witness shows
-  the 66-record gold-set *plan* and 6 difficulty cases rather than fabricated P/R/F1.
+- **The seed is catalogued; full text arrives through the service.** The seed holds metadata
+  and a curator note per paper, so with the service down extraction spans anchor to curator
+  prose and the reader says so. With it up, the 27 papers with a PMCID fetch as full text, the
+  extractor runs over them, and Witness scores that run (`haiku-1`) provisionally against the
+  curated values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
+  arrives through the overlay, not the seed. The 66-record gold-set *plan* and 6 difficulty
+  cases are still shown until the run exists in a checkout.
 - **49 entries are flagged `[verify]`, and they are thinner than that flag suggests.** Only 7 of
   the 49 hold title, a named journal, a real year and a DOI together. 28 carry no `doi`, `pmcid`
   or `pmid` at all, 18 record a placeholder venue rather than a journal, and 12 sit at `year: 0`.

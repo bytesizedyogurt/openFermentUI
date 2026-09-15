@@ -45,8 +45,12 @@ from .validate import anchor_all
 log = logging.getLogger("openferment.extract")
 
 CANDIDATES_DIR = intake.DATA_DIR / "candidates"
-FIXTURE_DIR = Path(__file__).parent.parent / "tests" / "fixtures" / "extract"
+FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
 RUN = "haiku-1"
+# `--save-fixture`: after a real call, write {raw, usage} to FIXTURE_DIR so a
+# fixture-mode service can replay it (§8.1). Off by default; never in
+# fixture mode, where there is no call to save.
+SAVE_RESPONSES = False
 
 # A paper can yield dozens of candidates at roughly eighty tokens each, and
 # Postdoc's 2000 would truncate the tool call mid-list — a truncated tool
@@ -333,6 +337,21 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     user_text, notes = build_prompt(sections)
     tool = build_tool([s["id"] for s in sections], list(tables()["ontology"].keys()))
     raw, usage = call_model(paper_id, user_text, tool)
+    if SAVE_RESPONSES and not intake.fixtures_only():
+        FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
+        (FIXTURE_DIR / f"{paper_id}.json").write_text(
+            json.dumps(
+                {
+                    "_note": f"Saved response of {MODEL} for {paper_id}, for OPENFERMENT_FIXTURES=1 replay.",
+                    "raw": raw,
+                    "usage": usage.model_dump(),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     if raw.get("truncated"):
         notes.append("the model's response hit the token limit; no candidates were kept from it")
 
@@ -408,13 +427,15 @@ def main(argv: list[str]) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+    global SAVE_RESPONSES
     force = "--force" in argv
+    SAVE_RESPONSES = "--save-fixture" in argv
     if "--all" in argv:
         _print_table(extract_all(force=force))
         return 0
     ids = [a for a in argv if not a.startswith("--")]
     if not ids:
-        print("usage: python -m openferment_core.extract --all [--force] | <paperId> [...]")
+        print("usage: python -m openferment_core.extract --all [--force] [--save-fixture] | <paperId> [...]")
         return 2
     results = []
     for paper_id in ids:

@@ -1,31 +1,25 @@
-// Extractor runs against the gold set (OF-DES-001 §8.8).
+// Extractor runs in the SEED (OF-DES-001 §8.8, OF-BLD-012 §6.4).
 //
-// EMPTY, AND THAT IS THE POINT.
+// EMPTY, AND IT STAYS EMPTY.
 //
-// The synthetic corpus shipped three seeded extractor runs with authored
-// confusion data. The real corpus cannot: no extractor has been run against
-// these papers, because their full texts have not been ingested (every entry is
-// `catalogued`, with the curator's notes standing in for the source). Scoring
-// precision and recall now would mean scoring an extractor that never ran,
-// against a gold set that was never annotated from source spans.
+// The synthetic corpus once shipped three seeded extractor runs with authored
+// confusion data. The real corpus never did: no extractor had read these
+// papers, so there was nothing to score, and the validation screen showed an
+// honest empty state instead of a fabricated F1.
 //
-// So the validation dashboard shows an honest empty state instead of a number.
-// That is a better artifact than a fabricated F1: it tells a faculty reader
-// exactly where the project is, which is *catalogued and planned, not yet
-// measured* (OF-COR-001 §22, actions 6 and 7).
+// Now one has. OF-BLD-012 §6 fetches the open-access papers' full text, runs
+// Claude Haiku once per paper with a forced tool call, anchors every candidate
+// to a verbatim quote, and scores the run against the curated records
+// (`match_run`, core/openferment_core/witness.py). That run — `haiku-1` — does
+// NOT land in this file. It arrives through the service's overlay,
+// `GET /api/biorepo/overlay` → `overlay.runs`, recomputed from
+// core/data/candidates/ on every request, and the store merges it into
+// `runOutputs` at load. Witness scores it live, in provisional mode until a
+// reviewer flags real gold in Guild.
 //
-// This file is populated after tranche-1 ingest, when:
-//   1. the 40 open-access core papers have real parsed text,
-//   2. the 60-record gold set of OF-COR-001 §18 has been annotated against
-//      those source spans by a human, and
-//   3. an extractor has actually been run.
-//
-// OF-BLD-012 §6.4: the first run that actually ran, haiku-1, does not land in
-// this file. It arrives through the service overlay — `overlay.runs`,
-// recomputed from core/data/candidates/ against the seed on every request —
-// and the store merges it into `runOutputs`; Witness scores it live, in
-// provisional mode until a reviewer flags real gold. With the service down
-// this array is what the app has, and it is empty for the reasons above.
+// So this array is what the app has with the service down, and it is empty
+// because a run is a measurement and a measurement is not seed data. With the
+// service up, Witness shows the run that ran.
 import type { RunOutput } from './types';
 
 export const RUN_OUTPUTS: RunOutput[] = [];

@@ -47,9 +47,17 @@ import httpx
 from .models import FetchedSection, FetchLicense, FetchResult, IntakeStatus, OverlayPaper
 
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
-DATA_DIR = Path(__file__).parent.parent / "data"
+# Where the service keeps what it fetched, extracted and decided (§2.2), and
+# where fixture mode reads from. Both overridable by environment, read once
+# at import, so `pnpm demo:offline` can point a whole service at
+# tests/fixtures/demo/ and a scratch data directory without touching
+# core/data/biorepo.json — the committed file — or anything anyone fetched
+# for real (§8.1).
+_CORE = Path(__file__).parent.parent
+DATA_DIR = Path(os.environ.get("OPENFERMENT_DATA_DIR") or _CORE / "data")
 FULLTEXT_DIR = DATA_DIR / "fulltext"
-FIXTURE_DIR = Path(__file__).parent.parent / "tests" / "fixtures" / "jats"
+FIXTURE_ROOT = Path(os.environ.get("OPENFERMENT_FIXTURE_DIR") or _CORE / "tests" / "fixtures")
+FIXTURE_DIR = FIXTURE_ROOT / "jats"
 TIMEOUT_S = 20.0
 # §11: at most two requests per second. Enforced here rather than remembered by
 # every caller, so the batch and a burst of UI clicks are held to the same rate.

@@ -111,7 +111,13 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Intake',
     owner: 'Intake',
     layer: 'Evidence in',
-    livesIn: ['src/screens/IntakeIngest.tsx', 'src/screens/Intake.tsx'],
+    // OF-BLD-012 — fetch and extract are the service's; the board drives them.
+    livesIn: [
+      'src/screens/IntakeIngest.tsx',
+      'src/screens/Intake.tsx',
+      'core/openferment_core/intake.py',
+      'core/openferment_core/extract.py',
+    ],
     surfacedAs: 'the rail, /intake',
     role: 'Ingest and extraction of parameters from sources',
   },
@@ -119,7 +125,8 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'BioRepo',
     owner: 'BioRepo',
     layer: 'Evidence in',
-    livesIn: ['src/data/', 'src/engine/retrieval.ts', 'src/screens/BioRepo.tsx'],
+    // OF-BLD-012 §2.3 — one write function for the corpus's decisions.
+    livesIn: ['src/data/', 'src/engine/retrieval.ts', 'src/screens/BioRepo.tsx', 'core/openferment_core/biorepo.py'],
     surfacedAs: 'the rail, /biorepo',
     role: 'The corpus, and everything retrieved from it',
   },
@@ -183,7 +190,8 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Witness',
     owner: 'BioRepo',
     layer: 'Keeping it honest',
-    livesIn: ['src/screens/Witness.tsx', 'src/engine/metrics.ts'],
+    // OF-BLD-012 §6.2 — match_run scores the run that ran; the screen renders it.
+    livesIn: ['src/screens/Witness.tsx', 'src/engine/metrics.ts', 'core/openferment_core/witness.py'],
     surfacedAs: 'a BioRepo tab, /biorepo/witness',
     role: 'Extractor validation against the gold set',
   },

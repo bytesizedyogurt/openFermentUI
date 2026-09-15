@@ -1029,14 +1029,15 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Agent chat — live mode',
-    fidelity: 'Visual in this build',
-    notes: 'The mode switch exists and is labelled as inactive. No language model is called.',
+    fidelity: 'Real model call, through openferment-core',
+    notes:
+      'Postdoc on Claude Haiku when the service is running: one retrieval, one forced tool call, and the browser renders every value from the cited record — the prose carries no numbers of its own. With the service down the switch says so and the turn runs scripted.',
   },
   {
     feature: 'Retrieval inspector and tool traces',
     fidelity: 'Scripted, mirroring the flow’s actual data',
     notes:
-      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — which, every entry being catalogued, is the curator’s note rather than the paper.',
+      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — the curator’s note for an entry the service has not fetched, the paper’s own words for one it has.',
   },
   {
     feature: 'Ingest pipeline',
@@ -1173,10 +1174,10 @@ function AboutSection() {
               plan against.
             </li>
             <li>
-              <span className="font-medium">The agent&rsquo;s answers are written, not generated.</span>{' '}
-              Plans, tool calls and answer prose come from authored flows matched to the question,
-              so the same question always returns the same answer. No language model is called from
-              this build.
+              <span className="font-medium">Scripted answers are written, not generated.</span>{' '}
+              In scripted mode, plans, tool calls and answer prose come from authored flows matched
+              to the question, so the same question always returns the same answer. Live mode is a
+              real model call through openferment-core and is labelled as such.
             </li>
           </ul>
         </Callout>
@@ -1282,13 +1283,16 @@ function AboutSection() {
             fill it.
           </Row>
           <Row label="Agent">
-            Scripted flow player. Plans, tool calls and answers are matched from authored flows; no
-            language model is called from this build, and the live mode is labelled inactive.
+            Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
+            flows and no model is called. Live: Postdoc on Claude Haiku through openferment-core,
+            values rendered from the cited records.
           </Row>
           <Row label="Retrieval">
-            Local lexical scorer over the section text held in the build, which for every entry is
-            the curator&rsquo;s note. No embedding model, no vector store, no network request — the
-            &ldquo;Embed&rdquo; stage in ingest is a timed animation.
+            Local lexical scorer over the section text held in the build — the curator&rsquo;s note
+            for an entry the service has not fetched, the paper&rsquo;s own words for one it has. No
+            embedding model, no vector store; the &ldquo;Embed&rdquo; stage in ingest is a timed
+            animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
+            one forced tool call for the candidates.
           </Row>
           <Row label="Storage">
             Split by lifetime. Reference data — papers, protocols, molecules, vocabulary — is never

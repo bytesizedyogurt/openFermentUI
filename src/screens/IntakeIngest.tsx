@@ -2,14 +2,17 @@
 // one live input method; the pipeline board on the right shows what happened
 // to each paper that entered it.
 //
-// TWO PATHS, LABELLED. When openferment-core is running, "Fetch" makes the
-// first real network request this pipeline has ever made: the service asks
-// Europe PMC for the JATS, splits it, and the paper's own text replaces the
-// curation note. When the service is not running, the five-stage timer
-// simulation runs instead and halts at Fetch with a reason naming the missing
-// service. The board says which of the two it is showing, because a timed
-// animation that looked like a fetch would be the exact fake this project
-// exists to avoid.
+// TWO PATHS, LABELLED. When openferment-core is running, "Fetch" is a real
+// network request: the service asks Europe PMC for the JATS, splits it, and
+// the paper's own text replaces the curation note; "Extract" is then one
+// forced tool call over that text, every candidate anchored to a verbatim
+// quote, and the run, the candidates and the decisions come back through the
+// overlay for Witness and Guild (OF-BLD-012 §6). Chunk and Embed are not
+// built and are shown as not run. When the service is not running, the
+// five-stage timer simulation runs instead and halts at Fetch with a reason
+// naming the missing service. The board says which of the two it is showing,
+// because a timed animation that looked like a fetch would be the exact fake
+// this project exists to avoid.
 import { useMemo } from 'react';
 import {
   AlertTriangle,
@@ -20,6 +23,7 @@ import {
   Plus,
   RefreshCw,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
@@ -50,7 +54,7 @@ const DEFAULT_MS = [900, 1400, 700, 1100, 1800];
 // The scripted path halts at Fetch: with no service there is nothing to fetch
 // with. The live path halts wherever the service says it did.
 const FAIL_STAGE_INDEX = STAGE_KEYS.indexOf('fetch');
-/** The stages a real fetch actually runs. Chunk, Embed and Extract are not built. */
+/** The stages a real fetch actually runs. Chunk and Embed are not built; Extract is its own action. */
 const REAL_STAGES = 2;
 
 type RowState = 'running' | 'complete' | 'failed' | 'degraded' | 'stalled';
@@ -165,6 +169,7 @@ export default function IntakeIngest() {
   const records = useStore((s) => s.records);
   const jobs = useStore((s) => s.jobs);
   const ingestPaper = useStore((s) => s.ingestPaper);
+  const extractPaperLive = useStore((s) => s.extractPaperLive);
   const setPaperIngest = useStore((s) => s.setPaperIngest);
   const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
@@ -497,6 +502,16 @@ export default function IntakeIngest() {
                           <LinkButton to={`/biorepo/paper/${row.paper.id}`} size="sm">
                             View paper
                           </LinkButton>
+                        )}
+                        {row.state === 'complete' && row.real && live && (
+                          <Button
+                            size="sm"
+                            onClick={() => void extractPaperLive(row.paper.id)}
+                            disabled={jobs.some((j) => j.status === 'running' && j.title === `Extract ${row.paper.id}`)}
+                            title="One forced tool call over the fetched text; every candidate anchored to a verbatim quote (OF-BLD-012 §6)"
+                          >
+                            <Sparkles size={12} /> Extract
+                          </Button>
                         )}
                         {row.state === 'stalled' && (
                           <Button size="sm" onClick={() => ingestPaper(row.paper.id)}>
