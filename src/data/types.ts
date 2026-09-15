@@ -266,12 +266,38 @@ export interface ExtractionRecord {
   /** Where in OF-COR-001 a 'curated' value was transcribed from, e.g. '§9 H4'. */
   curationRef?: string;
   /** A value the source states as a range rather than a point. */
-  range?: { low: number; high: number };
+  range?: Range;
   /** For comparative claims ("12-fold higher than X"), the baseline. */
   comparativeBaseline?: string;
   /** Value is a reported negative/absent result, not a missing measurement. */
   negativeResult?: boolean;
+  /**
+   * How §2.4 rule 3 found this value in its sentence (OF-BLD-012.1 F1.2).
+   * Computed by the service's anchoring and by nothing else — no model output
+   * and no reviewer sets it — so the review card can say "midpoint of 7-10 d"
+   * or "zero read from a negative result" beside the number.
+   */
+  valueBasis?: ValueBasis;
 }
+
+/**
+ * A value the source states as an interval. The curators record it; §2.4
+ * rule 3 anchors a midpoint or an endpoint against the sentence that states
+ * it. Mirrors `Range` in models.py.
+ */
+export interface Range {
+  low: number;
+  high: number;
+}
+
+/** How rule 3 found a value in its sentence. Mirrors `ValueBasis` in models.py. */
+export type ValueBasis =
+  | 'exact'
+  | 'converted'
+  | 'range-midpoint'
+  | 'range-low'
+  | 'range-high'
+  | 'negation';
 
 /** A value and its unit. Categorical fields carry a string value. */
 export interface Quantity {
@@ -1205,9 +1231,10 @@ export interface Candidate {
   method?: AnalysisMethod;
   numbering?: NumberingConvention;
   curationRef?: string;
-  range?: { low: number; high: number };
+  range?: Range;
   comparativeBaseline?: string;
   negativeResult?: boolean;
+  valueBasis?: ValueBasis;
 }
 
 /**

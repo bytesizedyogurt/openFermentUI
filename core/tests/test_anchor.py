@@ -24,6 +24,7 @@ from openferment_core.validate import (
     anchor_candidate,
     normalize_text,
     parse_numbers,
+    parse_quantities,
 )
 
 # A paper nobody wrote. Two prose sections and one table, with the spellings a
@@ -44,6 +45,20 @@ SECTIONS = [
             "12% of total soluble protein. The specific growth rate was 0.12 h-1. "
             "Phosphorylation at Ser15 was confirmed by LC-ESI-MS. The kinase responsible "
             "was Fam20C. Colonies appeared in 7–10 days. A soft­hyphenated word."
+        ),
+    },
+    {
+        "id": "s4",
+        "heading": "Results \u203a Structure the curators recorded",
+        "text": (
+            "Secretion in the flask line ran 12-15 mg L-1 across the series. "
+            "Across the survey, yields ran 0.6 mg L-1 to 1 g L-1 in five yeast studies. "
+            "The recombinant protein was not phosphorylated. "
+            "All eight phosphoserine sites were substituted with aspartate. "
+            "Secretion improved roughly three-fold over the parent strain. "
+            "The analogue sold at about USD 12 thousand/kg in 2025. "
+            "The particle was approximately spherical, radius ~70 nm. "
+            "It carried the same degree of phosphorylation as the animal-derived protein."
         ),
     },
     {
@@ -276,11 +291,29 @@ def test_rule_4_unit_must_be_in_the_fields_family_with_the_reason():
 
 
 def test_rule_5_value_must_be_in_range_in_canonical_units():
-    # titer_secreted's range tops out well below this.
+    # expression_pct_tsp tops out at 40. The quote states 4200 and the
+    # candidate's unit does not convert into the quote's, so rule 3 compares
+    # the bare number and passes it — and rule 5 is what refuses it.
+    _, rule, detail = anchor(
+        good(
+            sectionId="t1",
+            field="expression_pct_tsp",
+            value=4200,
+            unit="% TSP",
+            quote="Fed-batch | 4200 | mg L-1",
+            method="undetermined",
+        )
+    )
+    assert rule == "range", detail
+
+
+def test_a_candidate_whose_unit_disagrees_with_the_quotes_refuses_on_the_value():
+    # The row says 4200 mg L-1. A candidate calling that 4200 g/L is claiming
+    # a number the sentence does not state, and rule 3 now sees it.
     _, rule, detail = anchor(
         good(sectionId="t1", value=4200, unit="g/L", quote="Fed-batch | 4200 | mg L-1")
     )
-    assert rule == "range", detail
+    assert rule == "value", detail
 
 
 def test_rule_6_a_method_is_required_where_the_ontology_says_so():
@@ -333,3 +366,229 @@ def test_a_duplicate_keeps_the_more_confident_emission():
     assert [c.confidence for c in high_first.accepted] == [0.9]
     assert low_first.duplicates == high_first.duplicates == 1
     assert low_first.accepted[0].id == high_first.accepted[0].id
+
+
+# ── §2.4 rule 3, as OF-BLD-012.1 F1.2 rewrites it ──────────────────────
+#
+# The curators recorded that "7-10 days" is a range and that "not
+# phosphorylated" is an absence. Until F1.2 the exporter dropped that
+# structure and the rule met a midpoint it could not find in the sentence.
+# These cases are the structure, read back.
+
+
+def test_the_quote_is_parsed_into_quantities_not_bare_numbers():
+    q = parse_quantities("The secreted titre reached 4.20 g L-1 after 72 h")
+    assert [(x.value, x.unit) for x in q] == [(4.2, "g L\u207b\u00b9"), (72.0, "h")]
+    # A number with nothing that normalises after it is a bare quantity.
+    assert [(x.value, x.unit) for x in parse_quantities("released 45-50%")] == [
+        (45.0, None),
+        (50.0, "%"),
+    ]
+
+
+def test_word_numbers_and_scale_words_are_quantities():
+    assert [x.value for x in parse_quantities("all eight phosphoserine sites")] == [8.0]
+    assert [x.value for x in parse_quantities("roughly three-fold")] == [3.0]
+    assert [x.value for x in parse_quantities("about USD 1 million/kg")] == [1e6]
+    assert [x.value for x in parse_quantities("roughly three times larger")] == [3.0]
+    # An ordinal is not a cardinal: 'the second impeller' is not the number two.
+    assert [x.value for x in parse_quantities("the second impeller")] == []
+
+
+def test_a_recorded_range_anchors_on_its_midpoint():
+    c, rule, detail = anchor(
+        good(
+            field="time_to_colony",
+            value=8.5,
+            unit="d",
+            quote="Colonies appeared in 7\u201310 days",
+            range={"low": 7, "high": 10},
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "range-midpoint"
+
+
+@pytest.mark.parametrize(
+    "value,basis", [(7, "range-low"), (10, "range-high"), (8.5, "range-midpoint")]
+)
+def test_a_recorded_range_anchors_on_either_endpoint_too(value, basis):
+    c, rule, detail = anchor(
+        good(
+            field="time_to_colony",
+            value=value,
+            unit="d",
+            quote="Colonies appeared in 7\u201310 days",
+            range={"low": 7, "high": 10},
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == basis
+
+
+def test_a_range_is_converted_from_the_units_the_quote_writes():
+    # The curators recorded 0.012-0.015 g/L; the paper wrote 12-15 mg/L.
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            value=0.0135,
+            unit="g/L",
+            quote="Secretion in the flask line ran 12-15 mg L-1 across the series",
+            range={"low": 0.012, "high": 0.015},
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "range-midpoint"
+
+
+def test_a_range_written_as_a_to_b_with_a_unit_on_each_end():
+    # 0.6 mg/L to 1 g/L is the range 0.6-1000 mg/L; the midpoint is 500.3.
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            value=500.3,
+            unit="mg/L",
+            quote="yields ran 0.6 mg L-1 to 1 g L-1 in five yeast studies",
+            range={"low": 0.6, "high": 1000},
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "range-midpoint"
+
+
+def test_a_range_the_quote_does_not_state_refuses():
+    _, rule, detail = anchor(
+        good(
+            field="time_to_colony",
+            value=8.5,
+            unit="d",
+            quote="Colonies appeared in 7\u201310 days",
+            range={"low": 2, "high": 5},
+        )
+    )
+    assert rule == "value", detail
+
+
+def test_a_negative_result_reads_zero_from_the_sentence_that_states_the_absence():
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="phosphorylation_degree",
+            value=0,
+            unit="% of native sites",
+            quote="The recombinant protein was not phosphorylated",
+            method="undetermined",
+            negativeResult=True,
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "negation"
+
+
+def test_a_negative_result_needs_a_marker_in_the_quote():
+    _, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="phosphorylation_degree",
+            value=0,
+            unit="% of native sites",
+            quote="All eight phosphoserine sites were substituted with aspartate",
+            negativeResult=True,
+        )
+    )
+    assert rule == "value", detail
+
+
+def test_a_negative_result_flag_does_not_license_a_number():
+    # negativeResult is about zero. A non-zero value is held to the ordinary rule.
+    _, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="phosphorylation_degree",
+            value=40,
+            unit="% of native sites",
+            quote="The recombinant protein was not phosphorylated",
+            negativeResult=True,
+        )
+    )
+    assert rule == "value", detail
+
+
+def test_a_number_the_paper_wrote_in_words_anchors():
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="phosphate_count",
+            value=8,
+            unit="mol mol-1",
+            quote="All eight phosphoserine sites were substituted with aspartate",
+            method="undetermined",
+        )
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "exact"
+
+
+def test_a_fold_written_in_words_anchors():
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="fold_improvement",
+            value=3,
+            unit="\u00d7",
+            quote="Secretion improved roughly three-fold over the parent strain",
+        )
+    )
+    assert rule is None, detail
+
+
+def test_a_scale_word_multiplies_the_number_beside_it():
+    c, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="minimum_selling_price",
+            value=12000,
+            unit="USD kg-1",
+            quote="The analogue sold at about USD 12 thousand/kg in 2025",
+            method="undetermined",
+        )
+    )
+    assert rule is None, detail
+
+
+def test_a_unit_the_quote_spells_differently_anchors_as_converted():
+    # The table says 4200 mg L-1; the candidate says 4.2 g/L. One measurement.
+    c, rule, detail = anchor(
+        good(sectionId="t1", value=4.2, unit="g/L", quote="Fed-batch | 4200 | mg L-1")
+    )
+    assert rule is None, detail
+    assert c.valueBasis == "converted"
+
+
+def test_a_value_derived_from_the_quotes_numbers_still_refuses():
+    # r-E2-1: a diameter of 140 nm read off "radius ~70 nm". Doubling is
+    # arithmetic the sentence did not do, and no flag licenses it.
+    _, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="micelle_diameter",
+            value=140,
+            unit="nm",
+            quote="The particle was approximately spherical, radius ~70 nm",
+        )
+    )
+    assert rule == "value", detail
+
+
+def test_a_value_read_from_a_comparison_still_refuses():
+    # r-H4-4: "the same degree of phosphorylation as" is not the number 100.
+    _, rule, detail = anchor(
+        good(
+            sectionId="s4",
+            field="phosphorylation_degree",
+            value=100,
+            unit="% of native sites",
+            quote="It carried the same degree of phosphorylation as the animal-derived protein",
+        )
+    )
+    assert rule == "value", detail

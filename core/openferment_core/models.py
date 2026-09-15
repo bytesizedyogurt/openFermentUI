@@ -237,6 +237,13 @@ class Range(BaseModel):
     high: float
 
 
+# How §2.4 rule 3 found the value in the sentence (OF-BLD-012.1 F1.2).
+# Computed by the anchoring rules; never set by a model or a reviewer.
+ValueBasis = Literal[
+    "exact", "converted", "range-midpoint", "range-low", "range-high", "negation"
+]
+
+
 class Candidate(BaseModel):
     """An extraction the anchoring rules accepted (§2.4), before any human has
     looked at it. Mirrors the browser's ExtractionRecord minus the four fields
@@ -271,6 +278,7 @@ class Candidate(BaseModel):
     range: Range | None = None
     comparativeBaseline: str | None = None
     negativeResult: bool | None = None
+    valueBasis: ValueBasis | None = None
 
 
 class DroppedCandidate(BaseModel):

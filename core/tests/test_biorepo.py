@@ -19,7 +19,14 @@ from fastapi.testclient import TestClient
 from openferment_core import biorepo, extract, intake, witness
 from openferment_core.api import app
 from openferment_core.corpus import load_corpus
-from openferment_core.models import BioRepo, Overlay, Quantity, ReviewDecision
+from openferment_core.models import (
+    BioRepo,
+    FetchedSection,
+    FetchResult,
+    Overlay,
+    Quantity,
+    ReviewDecision,
+)
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 STRUCTURAL = "structural"
@@ -65,6 +72,25 @@ def decision(record_id: str, status: str = "verified", **overrides) -> ReviewDec
     )
     base.update(overrides)
     return ReviewDecision(**base)
+
+
+def fetch_saying(paper_id: str, record_id: str, sentence: str) -> None:
+    """A fetched paper whose section says this, under the section id the
+    record cites — written where a real fetch would leave it, so `cached`
+    reads it the way it reads any other. Used where the test is about the
+    anchoring rules and not about the fetch."""
+    rec = load_corpus().record(record_id)
+    assert rec is not None, record_id
+    result = FetchResult(
+        paperId=paper_id,
+        status="complete",
+        fetchedAt="2026-09-15T00:00:00Z",
+        sections=[FetchedSection(id=rec["sectionId"], heading="Results", text=sentence)],
+    )
+    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(
+        result.model_dump_json(), encoding="utf-8"
+    )
 
 
 def identified(paper_id: str) -> bool:
@@ -289,3 +315,56 @@ def test_a_rejected_record_is_resolvable_but_never_retrieved(tmp_path):
     edited = load_corpus(str(path))
     assert edited.record(target["id"]) is not None, "still resolvable — a decision may name it"
     assert target["id"] not in [h["id"] for h in edited.search(query)]
+
+
+# ── the structure the curators recorded (OF-BLD-012.1 F1.3) ────────────
+#
+# `write` builds the raw dict anchoring reads. Until F1.3 it passed the
+# value, the unit and the quote and nothing else, so a promotion on a record
+# whose source states a range met a midpoint that is not in the sentence.
+
+
+def test_gold_on_a_record_whose_source_states_a_range_anchors_on_that_range():
+    # r-B5-1: the curators recorded 7-10 days and wrote the midpoint down.
+    rec = load_corpus().record("r-B5-1")
+    assert rec["range"] == {"low": 7, "high": 10} and rec["value"] == 8.5
+    fetch_saying("B5", "r-B5-1", f"In our hands, {rec['quote']}.")
+    stored = biorepo.write(
+        decision("r-B5-1", "verified", provenance="gold", gold=Quantity(value=8.5, unit="d"))
+    )
+    assert stored.status == "verified"
+    assert biorepo.decisions()["r-B5-1"].quote == rec["quote"]
+
+
+def test_gold_on_a_record_the_paper_wrote_in_another_unit_anchors():
+    # r-C2-1: curated 0.015 g/L; the paper wrote "a maximum of 15 mg/L".
+    rec = load_corpus().record("r-C2-1")
+    assert rec["value"] == 0.015 and rec["range"] is None
+    fetch_saying("C2", "r-C2-1", f"Secretion improved, {rec['quote']}.")
+    stored = biorepo.write(
+        decision("r-C2-1", "verified", provenance="gold", gold=Quantity(value=0.015, unit="g L\u207b\u00b9"))
+    )
+    assert stored.status == "verified"
+
+
+def test_gold_on_a_recorded_absence_reads_its_zero_from_the_sentence():
+    # r-I1-3: value 0, negativeResult, and a quote with no digit anywhere in
+    # it — the negation rule is the only thing that can anchor it.
+    rec = load_corpus().record("r-I1-3")
+    assert rec["value"] == 0 and rec["negativeResult"] is True
+    assert not any(ch.isdigit() for ch in rec["quote"])
+    fetch_saying("I1", "r-I1-3", f"Even after prolonged incubation, {rec['quote']}.")
+    stored = biorepo.write(decision("r-I1-3", "verified", provenance="gold"))
+    assert stored.status == "verified"
+
+
+def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
+    # r-E2-1: a diameter of 140 nm read off "radius ~70 nm". Doubling is
+    # arithmetic the sentence did not do, and no recorded structure licenses
+    # it — the reviewer is told to edit the value or record the derivation.
+    rec = load_corpus().record("r-E2-1")
+    fetch_saying("E2", "r-E2-1", f"The particle was {rec['quote']}.")
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-E2-1", "verified", provenance="gold"))
+    assert caught.value.rule == "quote"
+    assert "derived from the quote" in caught.value.why

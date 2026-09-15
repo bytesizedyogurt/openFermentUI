@@ -31,8 +31,16 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .models import Candidate, Claim, DroppedCandidate, Quantity, weakest_provenance
-from .units import UnitError, field as ontology_field, in_range, normalize as normalize_unit, to_canonical, to_si
+from .models import Candidate, Claim, DroppedCandidate, Quantity, Range, weakest_provenance
+from .units import (
+    UnitError,
+    convert,
+    field as ontology_field,
+    in_range,
+    normalize as normalize_unit,
+    to_canonical,
+    to_si,
+)
 
 # Digits in any form a model might reach for: 4, 4.2, 4,200, 1e6, ½, ٤ (Arabic
 # -Indic), Ⅳ (Roman numeral forms), ² (superscript). `\d` in Python is already
@@ -297,6 +305,244 @@ def parse_numbers(text: str) -> list[float]:
     return [v for _, v in sorted(found, key=lambda t: t[0])]
 
 
+# ── the quantities a sentence states (OF-BLD-012.1 F1.2) ───────────────
+#
+# Rule 3 asks whether the sentence says this number. Read as bare numbers it
+# cannot see three things the curators recorded and the papers write plainly:
+# a number in another unit ("15 mg/L" for 0.015 g/L), a range ("7-10 days",
+# whose midpoint the curator recorded), and a number written in words ("all
+# eight sites"). So the quote is parsed into QUANTITIES — a number, and the
+# unit token the sentence attached to it — and into the RANGES those
+# quantities form. Both lists below are closed: adding to either is a commit
+# with a test (OF-BLD-012.1 §7).
+
+# Cardinals only. Ordinals ('second', 'third'), fractions ('half', 'quarter')
+# and 'once/twice' are deliberately absent: 'the second impeller' is not the
+# number two, and a validator that reads it as one gets switched off.
+_CARDINAL_VALUE = {
+    "zero": 0.0, "one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0, "five": 5.0,
+    "six": 6.0, "seven": 7.0, "eight": 8.0, "nine": 9.0, "ten": 10.0,
+    "eleven": 11.0, "twelve": 12.0, "thirteen": 13.0, "fourteen": 14.0,
+    "fifteen": 15.0, "sixteen": 16.0, "seventeen": 17.0, "eighteen": 18.0,
+    "nineteen": 19.0, "twenty": 20.0, "thirty": 30.0, "forty": 40.0,
+    "fifty": 50.0, "sixty": 60.0, "seventy": 70.0, "eighty": 80.0,
+    "ninety": 90.0, "hundred": 100.0,
+}
+# A scale word multiplies the number beside it: 'USD 1 million/kg' is 1e6.
+_SCALE_VALUE = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12}
+_WORD_VALUE = {**_CARDINAL_VALUE, **_SCALE_VALUE}
+_WORD_QUANTITY = re.compile(
+    r"(?<![A-Za-z])(" + "|".join(sorted(_WORD_VALUE, key=len, reverse=True)) + r")(?![A-Za-z])",
+    re.IGNORECASE,
+)
+
+# An absence is a measurement the paper made. A curator who recorded
+# negativeResult recorded that this sentence states one; these are the
+# spellings the corpus uses for it. Closed, and matched case-insensitively.
+NEGATION_MARKERS = (
+    "no detectable", "not detected", "not phosphorylated", "non-phosphorylated",
+    "unphosphorylated", "dephosphorylated", "did not", "no ", "none", "absent",
+    "unsuccessful", "hardly", "failed to",
+)
+
+# How far past a number a unit may sit, and how many whitespace-separated
+# tokens it may span: 'g L-1' is two, '% of total protein' is four.
+# Whitespace, an approximation mark, and the pipe a fetched table row puts
+# between its cells ('Fed-batch | 4200 | mg L-1'). No wider: a wider gap
+# would swallow the unit it is looking for, because in '45-50%' the '%' IS
+# the unit.
+_UNIT_GAP = re.compile(r"[\s~\u2248|]{0,3}")
+_UNIT_TOKENS = 4
+_RANGE_CONNECTOR = re.compile(r"\s*(?:-|to|through)\s*", re.IGNORECASE)
+_BETWEEN = re.compile(r"between\s*$", re.IGNORECASE)
+_AND_CONNECTOR = re.compile(r"\s*and\s*", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class QuoteQuantity:
+    """One number the sentence states, with the unit token it wrote beside it.
+
+    `unit` is None when the sentence gave none — then it compares as a bare
+    number, which is what rule 3 did for every number before F1.2."""
+
+    value: float
+    unit: str | None
+    start: int
+    end: int
+    """Where the number ends; `unitEnd` is where its unit token ends."""
+    unitEnd: int
+
+
+@dataclass(frozen=True)
+class QuoteRange:
+    """Two quantities the sentence joined: '7-10 days', '0.6 mg/L to 1 g/L'."""
+
+    low: QuoteQuantity
+    high: QuoteQuantity
+
+
+def _numbers_with_spans(text: str) -> list[tuple[int, int, float]]:
+    """Every number in a normalised text, with the span it occupies."""
+    found: list[tuple[int, int, float]] = []
+    taken: list[tuple[int, int]] = []
+    for m in _SCI.finditer(text):
+        mantissa = float(m.group(1).replace(",", "")) if m.group(1) else 1.0
+        found.append((m.start(), m.end(), mantissa * 10.0 ** int(m.group(2))))
+        taken.append(m.span())
+    for m in _NUMBER.finditer(text):
+        if any(a <= m.start() < b for a, b in taken):
+            continue
+        try:
+            found.append((m.start(), m.end(), float(m.group(0).replace(",", ""))))
+        except ValueError:
+            continue
+    return sorted(found, key=lambda t: t[0])
+
+
+def _unit_after(text: str, end: int) -> tuple[str | None, int]:
+    """The unit token a sentence attached to the number ending at `end`.
+
+    Longest first, so 'g L-1' wins over 'g'. Nothing is read as a unit when
+    the next thing is another number — in '12-15 mg/L' the 12 is bare, and
+    reading '-15' as its unit would be reading the range as a unit."""
+    gap = _UNIT_GAP.match(text, end)
+    at = gap.end() if gap else end
+    rest = text[at:]
+    if not rest or _NUMBER.match(rest) or _SCI.match(rest):
+        return None, end
+    tokens = rest.split()
+    for n in range(min(_UNIT_TOKENS, len(tokens)), 0, -1):
+        spelled = " ".join(tokens[:n]).rstrip(".,;:)]")
+        if not spelled:
+            continue
+        normalised = normalize_unit(spelled)
+        if normalised:
+            return normalised, at + len(spelled)
+    return None, end
+
+
+def parse_quantities(text: str) -> list[QuoteQuantity]:
+    """Every quantity a (normalised) sentence states, in order.
+
+    Numbers as digits, numbers written in words, and a number multiplied by
+    the scale word beside it. The unit is the token the sentence wrote after
+    the number, when that token is one the unit engine knows."""
+    norm = normalize_text(text)
+    atoms: list[tuple[int, int, float, bool]] = [
+        (a, b, v, False) for a, b, v in _numbers_with_spans(norm)
+    ]
+    for m in _WORD_QUANTITY.finditer(norm):
+        word = m.group(1).lower()
+        atoms.append((m.start(), m.end(), _WORD_VALUE[word], word in _SCALE_VALUE))
+    atoms.sort(key=lambda t: t[0])
+
+    out: list[QuoteQuantity] = []
+    i = 0
+    while i < len(atoms):
+        start, end, value, is_scale = atoms[i]
+        # A number followed by a scale word is one quantity: '1 million'.
+        if not is_scale and i + 1 < len(atoms) and atoms[i + 1][3]:
+            nxt = atoms[i + 1]
+            if norm[end : nxt[0]].strip() == "":
+                value, end = value * nxt[2], nxt[1]
+                i += 1
+        unit, unit_end = _unit_after(norm, end)
+        out.append(QuoteQuantity(value=value, unit=unit, start=start, end=end, unitEnd=unit_end))
+        i += 1
+    return out
+
+
+def parse_ranges(text: str) -> list[QuoteRange]:
+    """The ranges a (normalised) sentence states: adjacent quantities joined
+    by a dash, by 'to', or by 'and' after 'between'."""
+    norm = normalize_text(text)
+    quantities = parse_quantities(norm)
+    out: list[QuoteRange] = []
+    for a, b in zip(quantities, quantities[1:]):
+        gap = norm[a.unitEnd : b.start]
+        joined = bool(_RANGE_CONNECTOR.fullmatch(gap)) or (
+            bool(_AND_CONNECTOR.fullmatch(gap)) and bool(_BETWEEN.search(norm[: a.start]))
+        )
+        if joined:
+            out.append(QuoteRange(low=a, high=b))
+    return out
+
+
+def _as_candidate_unit(value: float, unit: str | None, candidate_unit: str) -> float:
+    """A quote's number in the candidate's unit. Bare when either side has no
+    unit, and bare when the two do not convert — which is what rule 3 did for
+    every number before F1.2, so conversion only ever lets more through."""
+    if not unit or not candidate_unit:
+        return value
+    try:
+        return convert(value, unit, candidate_unit)
+    except (UnitError, ValueError, TypeError):
+        return value
+
+
+def _close(a: float, b: float) -> bool:
+    if b == 0:
+        return a == 0
+    return abs(a - b) / abs(b) <= VALUE_TOLERANCE
+
+
+def _recorded_range(raw: Any) -> tuple[float, float] | None:
+    """The range the curators recorded, from a dict or a Range."""
+    r = raw.get("range") if isinstance(raw, dict) else getattr(raw, "range", None)
+    if r is None:
+        return None
+    low = r.get("low") if isinstance(r, dict) else getattr(r, "low", None)
+    high = r.get("high") if isinstance(r, dict) else getattr(r, "high", None)
+    try:
+        return float(low), float(high)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def value_basis(
+    number: float,
+    quote: str,
+    candidate_unit: str,
+    *,
+    recorded_range: tuple[float, float] | None = None,
+    negative_result: bool = False,
+) -> str | None:
+    """How this sentence says this number, or None when it does not (§2.4
+    rule 3 as F1.2 rewrites it). Computed here and nowhere else: no model
+    output and no reviewer sets it."""
+    norm = normalize_text(quote)
+
+    # A range the curators recorded, stated by the sentence in whatever units
+    # the paper used. The value is then the midpoint or an endpoint of it.
+    if recorded_range is not None:
+        low, high = recorded_range
+        for r in parse_ranges(norm):
+            a = _as_candidate_unit(r.low.value, r.low.unit or r.high.unit, candidate_unit)
+            b = _as_candidate_unit(r.high.value, r.high.unit or r.low.unit, candidate_unit)
+            if not (_close(a, low) and _close(b, high)):
+                continue
+            if _close(number, (a + b) / 2):
+                return "range-midpoint"
+            if _close(number, a):
+                return "range-low"
+            if _close(number, b):
+                return "range-high"
+
+    # An absence the curators recorded. Zero is the reading; the sentence has
+    # to say the absence in one of the words the corpus uses for it.
+    if negative_result and number == 0:
+        lowered = norm.lower()
+        if any(marker in lowered for marker in NEGATION_MARKERS):
+            return "negation"
+
+    for q in parse_quantities(norm):
+        if not _close(_as_candidate_unit(q.value, q.unit, candidate_unit), number):
+            continue
+        converted = bool(q.unit) and bool(candidate_unit) and q.unit != normalize_unit(candidate_unit)
+        return "converted" if converted else "exact"
+    return None
+
+
 def _value_in_quote(value: float, quote: str) -> bool:
     for n in parse_numbers(quote):
         if value == 0:
@@ -359,6 +605,30 @@ class AnchorResult:
     duplicates: int = 0
 
 
+def _why_not_in_quote(
+    number: float,
+    norm_quote: str,
+    recorded: tuple[float, float] | None,
+    negative: bool,
+) -> str:
+    """Why rule 3 refused, said so a reviewer knows what to do about it."""
+    head = f"no number in the quote equals {number} within {VALUE_TOLERANCE:.1%}"
+    if recorded is not None:
+        low, high = recorded
+        return f"{head}; the quote does not state the recorded range {low:g}-{high:g} either"
+    if negative and number == 0:
+        return (
+            f"{head}; the record is marked a negative result, and the quote does not "
+            "state an absence in any of the words the corpus uses for one"
+        )
+    if parse_quantities(norm_quote):
+        return (
+            f"{head}; the value is derived from the quote's numbers; edit it to the "
+            "paper's spelling or record the derivation"
+        )
+    return f"{head}; the quote states no quantity at all"
+
+
 def anchor_candidate(
     raw: dict[str, Any],
     sections: list[dict[str, Any]],
@@ -396,9 +666,19 @@ def anchor_candidate(
     if norm_quote not in normalize_text(str(section.get("text") or "")):
         return None, "quote", f"quote is not in section {section_id} after normalisation"
 
-    # 3. The value is inside the quote.
+    # 3. The value is inside the quote — as the sentence states it (F1.2):
+    #    in the units the paper used, as the range the curators recorded, as
+    #    the absence it reports, or written in words.
     value = raw.get("value")
     categorical = bool(spec.get("categorical"))
+    # The unit is normalised HERE, before the value is checked, because rule 3
+    # reads the quote in the units the paper wrote and converts them into the
+    # candidate's. The unit REFUSALS stay where they were, in rule 4 below, so
+    # a candidate with both a bad unit and a bad value still refuses on the
+    # value, exactly as it did before.
+    unit_raw = str(raw.get("unit") or "")
+    unit_normalised = normalize_unit(unit_raw) or ""
+    basis: str | None = "exact"
     if categorical:
         if not isinstance(value, str) or not value.strip():
             return None, "value", "categorical field needs a string value"
@@ -425,12 +705,16 @@ def anchor_candidate(
                 return None, "value", f"value {value!r} is not a number"
         if number != number:  # NaN
             return None, "value", "value is NaN"
-        if not _value_in_quote(number, norm_quote):
-            return None, "value", f"no number in the quote equals {number} within {VALUE_TOLERANCE:.1%}"
+        recorded = _recorded_range(raw)
+        negative = bool(raw.get("negativeResult"))
+        basis = value_basis(
+            number, norm_quote, unit_normalised, recorded_range=recorded, negative_result=negative
+        )
+        if basis is None:
+            return None, "value", _why_not_in_quote(number, norm_quote, recorded, negative)
 
         # 4. The unit normalises, into the field's family.
-        unit_raw = str(raw.get("unit") or "")
-        unit = normalize_unit(unit_raw) or ""
+        unit = unit_normalised
         if not unit and unit_raw.strip():
             return None, "unit", f"unit {unit_raw!r} does not normalise"
         if not unit and spec["canonicalUnit"]:
@@ -465,7 +749,11 @@ def anchor_candidate(
         confidence = 0.0
 
     anchored_value = value.strip() if categorical else number  # type: ignore[union-attr]
+    # §2.4 rule 3's answer, computed here and nowhere else (OF-BLD-012.1 §7):
+    # no model output and no reviewer sets it.
     is_primary = bool(raw.get("isPrimary", True))
+    recorded_span = _recorded_range(raw)
+    recorded_low, recorded_high = recorded_span or (0.0, 0.0)
     return (
         Candidate(
             id=candidate_id
@@ -484,6 +772,9 @@ def anchor_candidate(
             organism=(str(raw["organism"]).strip() or None) if raw.get("organism") else None,
             isPrimary=is_primary,
             method=method or None,
+            valueBasis=basis,
+            range=Range(low=recorded_low, high=recorded_high) if recorded_span else None,
+            negativeResult=bool(raw.get("negativeResult")) or None,
         ),
         None,
         None,

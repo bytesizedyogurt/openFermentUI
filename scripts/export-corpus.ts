@@ -146,6 +146,17 @@ function exportRecord(r: ExtractionRecord, source: 'seed' | 'biorepo') {
     primary: r.isPrimary,
     citesRecordId: r.citesRecordId ?? null,
     strainId: r.organism ?? null,
+    /**
+     * What the curators recorded ABOUT the value, as data rather than prose
+     * (OF-BLD-012.1 F1.1). `conditions` below still says both in words for
+     * the model to read; these two are for §2.4 rule 3, which anchors a
+     * midpoint against the range the sentence states and reads a zero out of
+     * the absence it reports. Folded only into the prose, as they were, the
+     * service could not see either — and 27 of the 34 curated records whose
+     * value is not literally in their own quote are one of these two.
+     */
+    range: r.range ?? null,
+    negativeResult: r.negativeResult ?? false,
     conditions: conditionsOf(r),
     /** 'seed' from src/data; 'biorepo' for a new record a reviewer accepted. */
     source,

@@ -203,6 +203,12 @@ def write(decision: ReviewDecision) -> ReviewDecision:
                     "unit": value_unit.unit,
                     "quote": quote,
                     "method": _field(rec, "method"),
+                    # What the curators recorded about the value (F1.3). A
+                    # gold decision on a record whose source states a range
+                    # anchors on that range, with no reviewer edit; one on a
+                    # recorded absence reads its zero out of the sentence.
+                    "range": _field(rec, "range"),
+                    "negativeResult": _field(rec, "negativeResult"),
                 }
                 _, rule, detail = anchor_candidate(
                     raw, sections, paper_id=paper_id, candidate_id=decision.recordId
