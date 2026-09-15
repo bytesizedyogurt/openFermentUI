@@ -9,7 +9,7 @@
 // simulation for a real fetch — the ingest board keeps that path, labelled as
 // the offline one, and the choice between them is made in the store where the
 // reader can see which one ran.
-import type { ExtractResponse, FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
+import type { DecisionCheck, ExtractResponse, FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
 
 export class IntakeDown extends Error {
@@ -98,6 +98,31 @@ export async function postDecision(decision: ReviewDecision, signal?: AbortSigna
   }
   if (!response.ok) await explain(response, signal);
   return (await response.json()) as ReviewDecision;
+}
+
+/**
+ * Would the service keep this decision? (OF-BLD-012.1 F1.5)
+ *
+ * `biorepo.write` runs every one of its rules with nothing written and
+ * answers 200 either way — a refusal is an answer here, not an error, so
+ * only an outage throws. The screen asks before the reviewer presses the
+ * key, which is why the rules live in one place and are not mirrored.
+ */
+export async function checkDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<DecisionCheck> {
+  let response: Response;
+  try {
+    response = await fetch('/api/biorepo/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(decision),
+      signal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    throw new IntakeDown('Intake service not running.');
+  }
+  if (!response.ok) await explain(response, signal);
+  return (await response.json()) as DecisionCheck;
 }
 
 /**

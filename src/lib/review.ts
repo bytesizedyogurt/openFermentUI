@@ -7,7 +7,7 @@
 // the service is the authority (§2.3); these exist so the screen says the
 // same thing the service would, one keystroke earlier, and so the store and
 // the card cannot disagree about which candidate is "the extractor's best".
-import type { Candidate, ExtractionRecord, Paper } from '@/data/types';
+import type { Candidate, DecisionCheck, ExtractionRecord, Paper, ReviewDecision } from '@/data/types';
 import { convert, normalizeUnit, quantityEquals, sameFamily } from '@/engine/units';
 
 /** The extractor's run, the only one that ever ran (§6). */
@@ -285,22 +285,31 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * keeps the decision, the service is simply never asked — where the other
  * two mean the action cannot be taken at all until something changes.
  */
+/** The rules `biorepo.write` refuses under (§2.3). The service names one; the fallback below can only see three of them. */
+export type RefusalRule = 'record' | 'reviewer' | 'fulltext' | 'quote' | 'paper' | 'range' | 'status';
+
 export interface Refusal {
-  rule: 'paper' | 'fulltext' | 'quote';
+  rule: RefusalRule;
   why: string;
   browserOnly: boolean;
 }
 
 /**
- * Why `biorepo.write` would refuse this decision (§2.3), in words the
- * reviewer can act on — or null when it would be stored. Applies only while
- * the service is up: offline, the Durable tier keeps behaving as it always
- * has, and `syncDecisions` asks this again before posting.
+ * THE OFFLINE FALLBACK (OF-BLD-012.1 F1.5). While the service is up, Guild
+ * asks `POST /api/biorepo/check` and gates on THAT answer: the rules live in
+ * `biorepo.write` and are not mirrored here, because a mirror of a rule is a
+ * second rule that drifts. This function is what the screen falls back to
+ * when the check has not answered yet, and what `syncDecisions` asks before
+ * posting a decision made while the service was away. It can only see the
+ * three conditions the browser has the facts for:
  *
  *   paper     no PMCID, DOI or PMID — the committed file may not name it;
  *             decided in this browser only
  *   fulltext  a promotion (accept, gold) needs the paper's fetched text
  *   quote     gold needs a sentence in that text that says this number
+ *
+ * It cannot see `range`, `status`, `record` or `reviewer`, and it does not
+ * try: those come back from the check.
  */
 export function writeRefusal(
   action: ReviewAction,
@@ -334,6 +343,56 @@ export function writeRefusal(
     rule: 'quote',
     browserOnly: false,
     why: 'Gold needs a sentence in the fetched text that says this number. The curated quote is not in it, and the extractor found no span that agrees.',
+  };
+}
+
+/**
+ * The service's answer as a refusal the card can render. The rule is the
+ * service's; the WORDS are this file's when it names the same rule, because
+ * `biorepo.write`'s reasons are written for a log and these are written for
+ * a reviewer holding a pipette.
+ */
+export function refusalOf(check: DecisionCheck, fallback: Refusal | null): Refusal | null {
+  if (check.ok) return null;
+  const rule = (check.rule ?? 'fulltext') as RefusalRule;
+  return {
+    rule,
+    why:
+      fallback && fallback.rule === rule
+        ? fallback.why
+        : (check.why ?? 'The service would not keep this decision.'),
+    // A paper with no identifier is still reviewable here; everything else stops the action.
+    browserOnly: rule === 'paper',
+  };
+}
+
+/**
+ * The decision an action would post, built the way the store builds it, so
+ * the question the screen asks is the decision it would send (F1.5).
+ */
+export function decisionToCheck(
+  action: 'accept' | 'gold',
+  record: ExtractionRecord,
+  paper: Paper | undefined,
+  candidates: Candidate[],
+  reviewer: string,
+): ReviewDecision {
+  const span = carryOverSpan(record, paper, candidates);
+  const carried = span && spanChangesNumber(record, span);
+  const corrected = carried && span ? { value: span.value as number, unit: span.unit } : record.corrected;
+  return {
+    status: 'verified',
+    provenance: record.provenance,
+    corrected,
+    gold:
+      action === 'gold'
+        ? (record.gold ?? { value: corrected?.value ?? record.value, unit: corrected?.unit ?? record.unit })
+        : undefined,
+    rejectReason: undefined,
+    reviewer,
+    recordId: record.id,
+    at: new Date().toISOString(),
+    ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
 }
 

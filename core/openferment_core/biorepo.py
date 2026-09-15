@@ -126,8 +126,14 @@ def _is_gold(d: ReviewDecision) -> bool:
 # ── the write ──────────────────────────────────────────────────────────
 
 
-def write(decision: ReviewDecision) -> ReviewDecision:
-    """Store one decision, or refuse it with the rule that failed (§2.3)."""
+def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
+    """Store one decision, or refuse it with the rule that failed (§2.3).
+
+    `dry_run` runs every rule and writes nothing — the question the browser
+    asks through `POST /api/biorepo/check` before the reviewer presses the
+    key (OF-BLD-012.1 F1.5). There is still only one place the rules live;
+    asking and deciding cannot drift apart because they are the same code.
+    """
     if not (decision.reviewer or "").strip():
         raise WriteRefused("reviewer", "a decision needs a reviewer; an empty name is nobody deciding")
 
@@ -226,6 +232,8 @@ def write(decision: ReviewDecision) -> ReviewDecision:
     if isinstance(rec, Candidate):
         # The candidate the decision is about, kept where the decision is.
         repo.records = [c for c in repo.records if c.id != rec.id] + [rec]
+    if dry_run:
+        return stored
     _persist(repo)
     log.info(
         "biorepo: %s → %s%s by %s",

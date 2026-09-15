@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from openferment_core import biorepo, extract, intake, witness
 from openferment_core.api import app
-from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, ReviewDecision
+from openferment_core.models import Candidate, DroppedCandidate, ExtractRun, Overlay, Quantity, Range, ReviewDecision
 from openferment_core.units import to_si
 
 # ── a seed nobody curated ──────────────────────────────────────────────
@@ -312,3 +312,14 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
                                           recordId="hk1-B5-93a4e8a2", at="2026-09-15T01:00:00Z"))
     assert stored.status == "verified"
     assert sorted(c.value for c in biorepo.records()) == [7, 9]
+
+
+def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
+    # r-P1-3 is 8.5 d, the midpoint of the 7-10 the source states. A model
+    # that emitted the same range but wrote the low end as its value is
+    # reporting the same measurement, and the run must score it as a match.
+    low_end = cand("P1", "time_to_colony", 7, "d", 9)
+    low_end = low_end.model_copy(update={"range": Range(low=7, high=10)})
+    seed = [{**r, "range": {"low": 7, "high": 10}} if r["id"] == "r-P1-3" else r for r in SEED]
+    run = witness.match_run([low_end], seed, papers={"P1"})
+    assert outcomes(run)["r-P1-3"] == "match"

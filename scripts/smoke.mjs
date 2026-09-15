@@ -43,6 +43,8 @@ const MIME = {
 
 /** Decisions the double received on POST /api/biorepo/decisions (§7.3). */
 const decisions = [];
+/** Questions the double received on POST /api/biorepo/check (OF-BLD-012.1 F1.5). */
+const checks = [];
 
 const server = createServer(async (req, res) => {
   try {
@@ -61,6 +63,23 @@ const server = createServer(async (req, res) => {
       decisions.push(decision);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(decision));
+    }
+    if (url === '/api/biorepo/check' && req.method === 'POST') {
+      // What `biorepo.write` would answer for the smoke fixture, in its
+      // shape: B5's curated record is on a fetched paper, so an accept is
+      // storable, and its quote is not in that text and no extractor span
+      // agrees with it, so a gold decision refuses on rule 'quote'. The card
+      // renders its own words for a rule it also recognises; the GATE is
+      // this answer, which is the point of the endpoint.
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const asked = JSON.parse(body);
+      checks.push(asked);
+      const refused = asked.gold
+        ? { ok: false, rule: 'quote', why: `the quote for ${asked.recordId} fails anchoring on rule 'quote'` }
+        : { ok: true, rule: null, why: null };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(refused));
     }
     if (url === '/api/biorepo/overlay') {
       // Answered late on purpose: a screen mounted before the overlay arrives
@@ -423,13 +442,18 @@ async function main() {
 
       await page.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="extractor-span"]').first().waitFor({ timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(150);
+      // Long enough for the 300 ms debounce on POST /api/biorepo/check to
+      // have asked and answered (OF-BLD-012.1 F1.5).
+      await page.waitForTimeout(700);
       const curatedCard = await page.locator('body').innerText();
       if (!/what the extractor read/i.test(curatedCard)) problems.push('the curated record on a fetched paper shows no extractor block');
       if (!/Disagrees — extractor 7 d vs curated 8\.5 d \(-18 %\)/.test(curatedCard)) problems.push('the extractor\'s disagreeing span is not labelled with its delta');
       const goldDisabled = await page.locator('button:has-text("Flag for gold")').isDisabled();
       if (!goldDisabled) problems.push('gold is enabled on a record biorepo.write would refuse');
       if (!/Gold is unavailable here: Gold needs a sentence in the fetched text/.test(curatedCard)) problems.push('the gold refusal is not explained on the card');
+      const askedAbout = checks.filter((c) => c.recordId === 'r-B5-1');
+      if (!askedAbout.some((c) => c.gold)) problems.push('the card never asked the service whether gold would be kept');
+      if (!askedAbout.some((c) => !c.gold)) problems.push('the card never asked the service whether accept would be kept');
       const reader = await page.locator('a[href="#/biorepo/paper/B5?section=t1"]').count();
       if (reader === 0) problems.push('no link from the extractor span to the reader at its section');
       if (problems.length) {

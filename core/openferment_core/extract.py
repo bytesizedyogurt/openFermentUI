@@ -86,7 +86,17 @@ Name it as the paper does; if the paper reports the value without saying how \
 it was measured, write "undetermined".
 
 Give the unit as the paper wrote it. Give confidence as your own estimate \
-that the quote really reports this field, from 0 to 1."""
+that the quote really reports this field, from 0 to 1.
+
+When the sentence states a RANGE rather than a point — "7-10 days", "0.6 to \
+1 g/L", "$4-6/kg" — emit `range` with the low and high as the paper wrote \
+them, and set `value` to the midpoint. Do not pick one end and present it as \
+the measurement, and do not invent a point the paper did not state.
+
+When the sentence reports an ABSENCE that was measured — "no detectable \
+product", "not phosphorylated", "micelles did not form" — emit `value` 0 \
+with `negativeResult` true. An absence somebody looked for is a result. A \
+field the paper simply never mentions is not, and gets no candidate at all."""
 
 
 class ExtractTruncated(RuntimeError):
@@ -171,6 +181,31 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                                 "type": "number",
                                 "minimum": 0,
                                 "maximum": 1,
+                            },
+                            # What the curators can record, the model can say
+                            # too (OF-BLD-012.1 F1.4). Without these it has to
+                            # invent a point for "7-10 days" and something
+                            # arbitrary for "not phosphorylated", and then
+                            # disagrees with the seed on exactly the records
+                            # the curators handled most carefully.
+                            "range": {
+                                "type": "object",
+                                "description": (
+                                    "Present only when the sentence states a range rather than "
+                                    "a point. The endpoints as the paper wrote them, in `unit`."
+                                ),
+                                "properties": {
+                                    "low": {"type": "number"},
+                                    "high": {"type": "number"},
+                                },
+                                "required": ["low", "high"],
+                            },
+                            "negativeResult": {
+                                "type": "boolean",
+                                "description": (
+                                    "True when the sentence reports an absence that was measured "
+                                    "rather than a quantity. Emit value 0 with it."
+                                ),
                             },
                         },
                         "required": ["sectionId", "field", "value", "unit", "quote", "isPrimary", "confidence"],

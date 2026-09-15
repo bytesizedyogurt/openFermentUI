@@ -17,11 +17,23 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { Candidate, ExtractionRecord } from '@/data/types';
+import type { Candidate, DecisionCheck, ExtractionRecord, Paper } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
-import { bestCandidate, blocks, carryOverSpan, locateQuote, paperFetched, spanChangesNumber, writeRefusal } from '@/lib/review';
+import {
+  bestCandidate,
+  blocks,
+  carryOverSpan,
+  decisionToCheck,
+  locateQuote,
+  paperFetched,
+  refusalOf,
+  spanChangesNumber,
+  writeRefusal,
+  type Refusal,
+} from '@/lib/review';
 import { useRoute, href } from '@/router';
+import { checkDecision } from '@/lib/intake';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
@@ -225,6 +237,47 @@ export default function Guild() {
 
   const elapsed = (frozenEnd ?? now) - stats.startedAt;
 
+  // ── what the service would say (OF-BLD-012.1 F1.5) ───────────────────
+  //
+  // `biorepo.write` owns the rules; the card asks it rather than mirroring
+  // them. Keyed on what a decision about this record would carry, so the
+  // question is re-asked when the reviewer edits the value and not when some
+  // unrelated part of the store moves. Debounced 300 ms: a reviewer on the
+  // home row passes through cards faster than a round trip.
+  const gateKey = record
+    ? [record.id, record.status, record.value, record.unit, record.quote, record.gold ? 'gold' : ''].join('|')
+    : '';
+  const [checked, setChecked] = useState<{ key: string; accept: DecisionCheck; gold: DecisionCheck }>({
+    key: '',
+    accept: { ok: true },
+    gold: { ok: true },
+  });
+  // Read inside the effect rather than depended on: these change identity on
+  // every store update, and the question only changes when gateKey does.
+  const asking = useRef({ record, paper: undefined as Paper | undefined, candidates });
+  asking.current = { record, paper: papers.find((p) => p.id === record?.paperId), candidates };
+  useEffect(() => {
+    if (!serviceUp || !gateKey) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      const { record: r, paper: pp, candidates: cs } = asking.current;
+      if (!r) return;
+      void Promise.all([
+        checkDecision(decisionToCheck('accept', r, pp, cs, 'you'), controller.signal),
+        checkDecision(decisionToCheck('gold', r, pp, cs, 'you'), controller.signal),
+      ])
+        .then(([accept, gold]) => setChecked({ key: gateKey, accept, gold }))
+        // The service went away mid-question. The predicate in review.ts is
+        // the fallback and already says something sensible; a reviewer who
+        // has decided nothing does not need an error about it.
+        .catch(() => undefined);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [serviceUp, gateKey]);
+
   // ── decisions ────────────────────────────────────────────────────────
 
   const recordTiming = useCallback(() => {
@@ -232,17 +285,25 @@ export default function Guild() {
     lastAt.current = Date.now();
   }, []);
 
+  // The gate the shortcuts obey. The buttons are `disabled`; a keystroke is
+  // not, and it reaches `decide` directly.
+  const blocked = useRef<Partial<Record<'accept' | 'reject' | 'gold', Refusal | null>>>({});
+
   const decide = useCallback(
     (action: 'accept' | 'reject' | 'skip' | 'gold', reason?: string) => {
       const target = useStore.getState();
       const id = target.reviewQueue[target.reviewIndex];
       if (!id) return;
+      if (action !== 'skip' && blocks(blocked.current[action] ?? null)) {
+        toast({ text: blocked.current[action]!.why, kind: 'error' });
+        return;
+      }
       recordTiming();
       reviewDecide(id, action, reason ? { reason } : undefined);
       setRejecting(false);
       setEditing(false);
     },
-    [recordTiming, reviewDecide],
+    [recordTiming, reviewDecide, toast],
   );
 
   const openEdit = useCallback(() => {
@@ -717,10 +778,16 @@ export default function Guild() {
   const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
   const bestCtx = best && bestSection ? spanContext(bestSection.text, best.candidate.quote) : null;
   const carry = fetched && !fromExtractor ? carryOverSpan(record, paper, candidates) : null;
-  // §2.3 — what the service would refuse, said here first, per action.
-  const acceptBlocked = writeRefusal('accept', record, paper, candidates, serviceUp);
+  // §2.3 — what the service would refuse. The predicate in review.ts is the
+  // fallback; while the service is up the card asks it directly (F1.5), so
+  // the screen is gated on the rules themselves rather than on a copy.
+  const localAccept = writeRefusal('accept', record, paper, candidates, serviceUp);
   const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp);
-  const goldBlocked = writeRefusal('gold', record, paper, candidates, serviceUp);
+  const localGold = writeRefusal('gold', record, paper, candidates, serviceUp);
+  const asked = checked.key === gateKey ? checked : null;
+  const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
+  const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;
+  blocked.current = { accept: acceptBlocked, reject: rejectBlocked, gold: goldBlocked };
 
   return (
     <>

@@ -281,6 +281,17 @@ class Candidate(BaseModel):
     valueBasis: ValueBasis | None = None
 
 
+class DecisionCheck(BaseModel):
+    """What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether
+    `biorepo.write` would store this decision, and the rule it would refuse
+    it under. The browser asks before the reviewer presses the key, so the
+    screen says what the service would say rather than a mirror of it."""
+
+    ok: bool
+    rule: str | None = None
+    why: str | None = None
+
+
 class DroppedCandidate(BaseModel):
     """A candidate anchoring refused (§2.4), kept beside the survivors so the
     run can be scored honestly (§6.2): a candidate whose value agreed with the

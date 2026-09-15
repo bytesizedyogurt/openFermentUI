@@ -13,3 +13,12 @@ transcript; this file is the index a later session reads first.
   refused gold records now anchor, not the 32 the spec predicted: `r-A2-1` and
   `r-O8-1` refuse on rule 5, the field's own range, which no rule-3 fix
   reaches. `pnpm verify` green, all sixteen stages.
+- **2026-09-15 · OF-BLD-012.1 §6.2 (F1.4–F1.5)** — `emit_candidates` gains
+  `range` and `negativeResult` and the prompt says what each is for, so the
+  extractor can say what the curators recorded; `match_run` scores a range
+  candidate against a range record on its endpoints. `biorepo.write` grows a
+  `dry_run`, `POST /api/biorepo/check` asks it, and Guild gates Accept and
+  Gold on that answer with `writeRefusal` demoted to the offline fallback —
+  the rules are not mirrored. New verify stage `check:anchors` holds the
+  anchoring floor at **93 of 104**; seventeen stages now. Both new guards
+  negative-tested. `pnpm verify` green.

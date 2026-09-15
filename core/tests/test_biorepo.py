@@ -368,3 +368,34 @@ def test_gold_on_a_value_derived_from_the_quote_still_refuses_with_a_reason():
         biorepo.write(decision("r-E2-1", "verified", provenance="gold"))
     assert caught.value.rule == "quote"
     assert "derived from the quote" in caught.value.why
+
+
+# ── the check the browser asks before the keystroke (F1.5) ─────────────
+
+
+def test_a_dry_run_answers_the_same_and_writes_nothing():
+    fetch_b5()
+    good = decision("r-B5-3", "verified")
+    assert biorepo.write(good, dry_run=True).status == "verified"
+    assert not biorepo.PATH.exists(), "a dry run is a question, not a decision"
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision(unfetched_seed_record(), "verified"), dry_run=True)
+    assert caught.value.rule == "fulltext"
+    assert not biorepo.PATH.exists()
+    # And the real write still stores it.
+    biorepo.write(good)
+    assert "r-B5-3" in biorepo.decisions()
+
+
+def test_the_check_endpoint_answers_ok_or_the_rule(client):
+    fetch_b5()
+    ok = client.post("/api/biorepo/check", json=decision("r-B5-3", "verified").model_dump()).json()
+    assert ok == {"ok": True, "rule": None, "why": None}
+    bad = client.post(
+        "/api/biorepo/check",
+        json=decision(unfetched_seed_record(), "verified").model_dump(),
+    )
+    assert bad.status_code == 200, "a refusal is an answer, not an error"
+    assert bad.json()["ok"] is False and bad.json()["rule"] == "fulltext"
+    assert "full text" in bad.json()["why"]
+    assert biorepo.decisions() == {}, "asking must never write"

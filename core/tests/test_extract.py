@@ -239,3 +239,79 @@ def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):
     r = client.post("/api/intake/B5/extract")
     assert r.status_code == 503
     assert "saved response" in r.json()["detail"]
+
+
+# ── what the curators can say, the extractor can say too (F1.4) ────────
+
+
+def test_the_tool_lets_the_model_state_a_range_and_an_absence():
+    tool = extract.build_tool(["s1"], ["titer_secreted"])
+    props = tool["input_schema"]["properties"]["candidates"]["items"]["properties"]
+    assert props["range"]["properties"]["low"]["type"] == "number"
+    assert props["range"]["properties"]["high"]["type"] == "number"
+    assert props["negativeResult"]["type"] == "boolean"
+    # Optional: most sentences state neither.
+    required = tool["input_schema"]["properties"]["candidates"]["items"]["required"]
+    assert "range" not in required and "negativeResult" not in required
+
+
+def test_the_system_prompt_says_what_a_range_and_an_absence_are_for():
+    assert "range" in extract.SYSTEM and "midpoint" in extract.SYSTEM
+    assert "negativeResult" in extract.SYSTEM
+
+
+def fetch_saying(paper_id: str, section_id: str, text: str) -> None:
+    """A fetched paper whose one section says this, written where a real
+    fetch would leave it."""
+    from openferment_core.models import FetchedSection, FetchResult
+
+    result = FetchResult(
+        paperId=paper_id,
+        status="complete",
+        fetchedAt="2026-09-15T00:00:00Z",
+        sections=[FetchedSection(id=section_id, heading="Results", text=text)],
+    )
+    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+
+
+def test_a_range_the_model_states_reaches_the_anchored_candidate(monkeypatch):
+    # The sentence states 7-10 days; the model emits the range and the
+    # midpoint, as the prompt asks. The candidate keeps both.
+    fetch_saying("R1", "s1", "Colonies appeared in 7-10 days on selection.")
+    emitted = {
+        "candidates": [
+            {
+                "sectionId": "s1", "field": "time_to_colony", "value": 8.5, "unit": "d",
+                "quote": "Colonies appeared in 7-10 days on selection",
+                "range": {"low": 7, "high": 10},
+                "isPrimary": True, "confidence": 0.9,
+            }
+        ]
+    }
+    monkeypatch.setattr(extract, "call_model", lambda *_: (emitted, extract.Usage()))
+    result = extract.extract_paper("R1")
+    assert result.rejected == 0, result.rejectionDetails
+    [c] = result.candidates
+    assert c.value == 8.5 and c.valueBasis == "range-midpoint"
+    assert c.range is not None and (c.range.low, c.range.high) == (7.0, 10.0)
+
+
+def test_an_absence_the_model_states_reaches_the_anchored_candidate(monkeypatch):
+    fetch_saying("R2", "s1", "The recombinant protein was not phosphorylated.")
+    emitted = {
+        "candidates": [
+            {
+                "sectionId": "s1", "field": "phosphorylation_degree", "value": 0,
+                "unit": "% of native sites",
+                "quote": "The recombinant protein was not phosphorylated",
+                "negativeResult": True, "method": "undetermined",
+                "isPrimary": True, "confidence": 0.9,
+            }
+        ]
+    }
+    monkeypatch.setattr(extract, "call_model", lambda *_: (emitted, extract.Usage()))
+    result = extract.extract_paper("R2")
+    assert result.rejected == 0, result.rejectionDetails
+    [c] = result.candidates
+    assert c.value == 0 and c.valueBasis == "negation" and c.negativeResult is True

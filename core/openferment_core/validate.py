@@ -486,7 +486,7 @@ def _close(a: float, b: float) -> bool:
     return abs(a - b) / abs(b) <= VALUE_TOLERANCE
 
 
-def _recorded_range(raw: Any) -> tuple[float, float] | None:
+def recorded_range(raw: Any) -> tuple[float, float] | None:
     """The range the curators recorded, from a dict or a Range."""
     r = raw.get("range") if isinstance(raw, dict) else getattr(raw, "range", None)
     if r is None:
@@ -705,7 +705,7 @@ def anchor_candidate(
                 return None, "value", f"value {value!r} is not a number"
         if number != number:  # NaN
             return None, "value", "value is NaN"
-        recorded = _recorded_range(raw)
+        recorded = recorded_range(raw)
         negative = bool(raw.get("negativeResult"))
         basis = value_basis(
             number, norm_quote, unit_normalised, recorded_range=recorded, negative_result=negative
@@ -752,7 +752,7 @@ def anchor_candidate(
     # §2.4 rule 3's answer, computed here and nowhere else (OF-BLD-012.1 §7):
     # no model output and no reviewer sets it.
     is_primary = bool(raw.get("isPrimary", True))
-    recorded_span = _recorded_range(raw)
+    recorded_span = recorded_range(raw)
     recorded_low, recorded_high = recorded_span or (0.0, 0.0)
     return (
         Candidate(

@@ -290,6 +290,19 @@ export interface Range {
   high: number;
 }
 
+/**
+ * What `POST /api/biorepo/check` answers (OF-BLD-012.1 F1.5): whether the
+ * service would keep this decision, and the rule it would refuse it under.
+ * The screen asks before the reviewer presses the key, so what it says is
+ * what `biorepo.write` would say rather than a browser copy of the rules.
+ * Mirrors `DecisionCheck` in models.py.
+ */
+export interface DecisionCheck {
+  ok: boolean;
+  rule?: string | null;
+  why?: string | null;
+}
+
 /** How rule 3 found a value in its sentence. Mirrors `ValueBasis` in models.py. */
 export type ValueBasis =
   | 'exact'

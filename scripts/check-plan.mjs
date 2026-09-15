@@ -77,6 +77,7 @@ const PAIRS = [
   ['ExtractRunFalsePositive', 'RunFalsePositive'],
   ['ExtractRun', 'RunOutput'],
   ['ReviewDecision', 'ReviewDecision'],
+  ['DecisionCheck', 'DecisionCheck'],
   ['AuditEvent', 'AuditEvent'],
   ['DroppedCandidate', 'DroppedCandidate'],
   ['BioRepo', 'BioRepo'],

@@ -50,6 +50,7 @@ from .models import (
     ReviewDecision,
 )
 from .units import quantity_equals, same_family
+from .validate import recorded_range
 
 log = logging.getLogger("openferment.witness")
 
@@ -61,9 +62,34 @@ def _is_categorical(value: Any) -> bool:
     return isinstance(value, str)
 
 
-def _agrees(cv: Any, cu: str, rv: Any, ru: str) -> bool:
+def _ranges_agree(cr: tuple[float, float], rr: tuple[float, float], cu: str, ru: str) -> bool:
+    """Two ranges are the same interval, endpoint for endpoint, after
+    conversion (OF-BLD-012.1 F1.4)."""
+    try:
+        return quantity_equals((cr[0], cu), (rr[0], ru), TOLERANCE_PCT) and quantity_equals(
+            (cr[1], cu), (rr[1], ru), TOLERANCE_PCT
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _agrees(
+    cv: Any,
+    cu: str,
+    rv: Any,
+    ru: str,
+    *,
+    c_range: tuple[float, float] | None = None,
+    r_range: tuple[float, float] | None = None,
+) -> bool:
     """Candidate against seed: strings case-insensitively, numbers within
-    tolerance after conversion. A candidate with no value agrees with nothing."""
+    tolerance after conversion. A candidate with no value agrees with nothing.
+
+    When both sides record the same range, they are reporting the same
+    measurement even if one wrote an endpoint where the other wrote the
+    midpoint — so the range is asked first."""
+    if c_range is not None and r_range is not None and _ranges_agree(c_range, r_range, cu, ru):
+        return True
     if cv is None:
         return False
     if _is_categorical(cv) or _is_categorical(rv):
@@ -125,7 +151,15 @@ def match_run(
         key = (rec["paperId"], rec["field"])
         rv, ru = rec["value"], rec["unit"]
         hit = next(
-            (c for c in by_key.get(key, []) if id(c) not in consumed and _agrees(c.value, c.unit, rv, ru)),
+            (
+                c
+                for c in by_key.get(key, [])
+                if id(c) not in consumed
+                and _agrees(
+                    c.value, c.unit, rv, ru,
+                    c_range=recorded_range(c), r_range=recorded_range(rec),
+                )
+            ),
             None,
         )
         if hit is not None:

@@ -25,6 +25,7 @@ from .corpus import load_corpus
 from .models import (
     AnswerPlan,
     AskRequest,
+    DecisionCheck,
     ExtractResponse,
     ExtractRun,
     FetchResult,
@@ -239,6 +240,24 @@ def biorepo_decisions(decision: ReviewDecision) -> ReviewDecision:
     except biorepo.WriteRefused as e:
         log.warning("biorepo refused %s — %s", decision.recordId, e)
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/biorepo/check", response_model=DecisionCheck)
+def biorepo_check(decision: ReviewDecision) -> DecisionCheck:
+    """Would `biorepo.write` keep this decision? (OF-BLD-012.1 F1.5)
+
+    Every rule of §2.3 runs; nothing is written. A refusal is an ANSWER, not
+    an error, so it comes back 200 with the rule and the reason — the browser
+    is asking a question, and a 422 here would read as a failed decision in
+    the console of a reviewer who has not decided anything yet.
+    """
+    try:
+        biorepo.write(decision, dry_run=True)
+        return DecisionCheck(ok=True)
+    except biorepo.WriteRefused as e:
+        return DecisionCheck(ok=False, rule=e.rule, why=e.why)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
