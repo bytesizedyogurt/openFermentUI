@@ -198,6 +198,10 @@ def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
         )
     try:
         result = extract.extract_paper(paper_id, force=force)
+    except extract.ExtractTruncated as e:
+        # Not cached, so the next attempt is a real one; 502 because the
+        # upstream answered and the answer was unusable.
+        raise HTTPException(status_code=502, detail=str(e)) from e
     except extract.ExtractUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     log.info(
@@ -221,18 +225,8 @@ def biorepo_overlay() -> Overlay:
     through `biorepo.write` alone. A missing corpus.json costs the run, not
     the overlay.
     """
-    candidates = witness.overlay_candidates()
-    try:
-        runs = witness.runs()
-    except FileNotFoundError as e:
-        log.warning("overlay without runs — %s", e)
-        runs = []
-    return Overlay(
-        papers=intake.overlay_papers(),
-        records=biorepo.decisions(),
-        candidates=candidates,
-        runs=runs,
-    )
+    runs, candidates, decisions = witness.overlay_bundle()
+    return Overlay(papers=intake.overlay_papers(), records=decisions, candidates=candidates, runs=runs)
 
 
 @app.post("/api/biorepo/decisions", response_model=ReviewDecision)

@@ -173,11 +173,28 @@ def test_a_failed_fetch_is_not_extractable(monkeypatch):
         extract.extract_paper("X2")
 
 
-def test_a_truncated_response_keeps_nothing_and_says_so(monkeypatch):
+def test_a_truncated_response_is_refused_and_not_cached(monkeypatch):
+    # Cached as an empty extraction it would score as every record missed and
+    # could never be re-run without --force; so it is neither.
     fetch_structural_as("X1")
     monkeypatch.setattr(extract, "call_model", stub_call({"candidates": [], "truncated": True}))
-    r = extract.extract_paper("X1")
-    assert r.candidates == [] and any("token limit" in n for n in r.notes)
+    with pytest.raises(extract.ExtractTruncated) as caught:
+        extract.extract_paper("X1")
+    assert "nothing cached" in str(caught.value)
+    assert extract.cached("X1") is None
+    # The next attempt is a real call, not a cache hit.
+    call = stub_call(GOOD_AND_BAD)
+    monkeypatch.setattr(extract, "call_model", call)
+    assert len(extract.extract_paper("X1").candidates) == 2 and len(call.calls) == 1
+
+
+def test_extract_endpoint_answers_502_on_a_truncated_response(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: STRUCTURAL_PMCID)
+    client.post("/api/intake/B5/fetch")
+    monkeypatch.setattr(extract, "call_model", stub_call({"candidates": [], "truncated": True}))
+    r = client.post("/api/intake/B5/extract")
+    assert r.status_code == 502 and "token limit" in r.json()["detail"]
 
 
 def test_fixture_mode_refuses_the_api_without_a_saved_response(monkeypatch):

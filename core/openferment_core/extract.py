@@ -89,6 +89,14 @@ Give the unit as the paper wrote it. Give confidence as your own estimate \
 that the quote really reports this field, from 0 to 1."""
 
 
+class ExtractTruncated(RuntimeError):
+    """The model's response was cut off at the token limit, or carried no tool
+    call at all. Nothing is kept and NOTHING IS CACHED: an empty extraction
+    written to disk would be scored as every record missed and could never
+    be re-run without --force. Raised as its own type so the batch can say
+    which papers need a second look."""
+
+
 class ExtractUnavailable(RuntimeError):
     """No key, no cached text, or the API could not be reached."""
 
@@ -277,13 +285,13 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
         # A tool input cut off mid-list does not parse into candidates the
         # validator can trust; better no candidates and a loud log line.
         log.warning("%s: response hit max_tokens (%d); candidates dropped", paper_id, MAX_TOKENS)
-        return {"candidates": [], "truncated": True}, usage
+        return {"candidates": [], "truncated": True, "usage": usage.model_dump()}, usage
     for block in response.content:
         if block.type == "tool_use" and block.name == "emit_candidates":
             raw = block.input if isinstance(block.input, dict) else json.loads(block.input)
             return raw, usage
     log.warning("%s: no tool_use block; stop_reason=%s", paper_id, response.stop_reason)
-    return {"candidates": []}, usage
+    return {"candidates": [], "truncated": True, "usage": usage.model_dump()}, usage
 
 
 # ── persistence ────────────────────────────────────────────────────────
@@ -353,7 +361,12 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
             encoding="utf-8",
         )
     if raw.get("truncated"):
-        notes.append("the model's response hit the token limit; no candidates were kept from it")
+        # Not an extraction, and not cached as one (see ExtractTruncated).
+        spent = Usage.model_validate(raw.get("usage") or usage.model_dump())
+        raise ExtractTruncated(
+            f"{paper_id}: the model's response hit the token limit or carried no tool call; "
+            f"nothing kept, nothing cached (${spent.costUsd:.4f} spent). Split the paper or raise MAX_TOKENS."
+        )
 
     raws = raw.get("candidates") or []
     if not isinstance(raws, list):
@@ -402,6 +415,8 @@ def extract_all(*, force: bool = False) -> list[ExtractResponse]:
             continue
         try:
             out.append(extract_paper(paper_id, force=force))
+        except ExtractTruncated as e:
+            print(f"{paper_id:<6} NOT extracted — {e}")
         except ExtractUnavailable as e:
             print(f"{paper_id:<6} skipped — {e}")
     return out
@@ -441,7 +456,7 @@ def main(argv: list[str]) -> int:
     for paper_id in ids:
         try:
             results.append(extract_paper(paper_id, force=force))
-        except ExtractUnavailable as e:
+        except (ExtractTruncated, ExtractUnavailable) as e:
             print(f"{paper_id}: {e}")
             return 1
     _print_table(results)

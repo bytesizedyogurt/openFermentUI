@@ -83,18 +83,20 @@ def records() -> list[Candidate]:
 
 
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
-    """The seed record (a dict from corpus.json) or the candidate (a Candidate
-    from candidates/ or from biorepo.json's own copy) this id names."""
-    seed = load_corpus().record(record_id)
-    if seed is not None:
-        return seed
-    for c in records():
-        if c.id == record_id:
-            return c
+    """What this id names: the extractor's current candidate under it first —
+    a decision is about what the extractor says NOW, and the copy kept here is
+    refreshed on write — then the copy biorepo.json keeps (the only one on a
+    checkout that never ran the extractor), then the seed record."""
     for response in extract.all_cached():
         for c in response.candidates:
             if c.id == record_id:
                 return c
+    for c in records():
+        if c.id == record_id:
+            return c
+    seed = load_corpus().record(record_id)
+    if seed is not None and seed.get("source", "seed") == "seed":
+        return seed
     return None
 
 

@@ -231,3 +231,38 @@ def test_b5_splits_into_many_sections_with_tables_and_a_licence():
     assert any(s.id.startswith("t") for s in r.sections), "B5 has tables; none survived"
     assert r.license is not None
     assert "creativecommons" in ((r.license.href or "") + (r.license.text or "")).lower()
+
+
+# ── what JATS nests, and what a superscript means ──────────────────────
+
+NESTED = """<?xml version="1.0" encoding="UTF-8"?>
+<article xmlns:xlink="http://www.w3.org/1999/xlink">
+  <front><article-meta><title-group><article-title>Nested</article-title></title-group></article-meta></front>
+  <body>
+    <sec><title>Results</title>
+      <p>Cultures reached 2 × 10<sup>6</sup> cells mL<sup>-1</sup> and CO<sub>2</sub> rose.
+        <table-wrap id="t1"><label>Table 1</label><caption><p>Rows.</p></caption>
+          <table><tr><th>Condition</th><th>Value</th></tr><tr><td>A</td><td>7</td></tr></table>
+        </table-wrap>
+        After the table, 10<sup>-3</sup> M.</p>
+    </sec>
+  </body>
+</article>
+"""
+
+
+def test_a_table_nested_in_a_paragraph_stays_out_of_the_prose():
+    r = split_jats(NESTED, paper_id="X1")
+    assert r.status == "complete", r.reason
+    by_id = {s.id: s for s in r.sections}
+    assert "Condition" not in by_id["s1"].text and "| 7" not in by_id["s1"].text
+    assert by_id["t1"].text.splitlines() == ["Condition | Value", "A | 7"]
+    assert by_id["s1"].text.startswith("Cultures reached") and by_id["s1"].text.endswith("M.")
+
+
+def test_a_superscript_on_a_number_reads_as_a_power_of_ten():
+    r = split_jats(NESTED, paper_id="X1")
+    s1 = next(s for s in r.sections if s.id == "s1").text
+    assert "2 × 10^6 cells mL-1" in s1, s1
+    assert "CO2 rose" in s1
+    assert "10^-3 M" in s1

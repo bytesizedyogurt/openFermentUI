@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from dataclasses import dataclass, field
 from collections.abc import Iterable
 from typing import Any
 
@@ -200,47 +201,101 @@ def new_records(
 # ── from the cache ─────────────────────────────────────────────────────
 
 
-def _gather() -> tuple[list[Candidate], list[DroppedCandidate], set[str]]:
+def seed_records() -> list[dict[str, Any]]:
+    """The curated records, and only those. `pnpm export:corpus` appends
+    accepted candidates to corpus.json (§7.4) with `source: 'biorepo'`; a run
+    scored against them would match the extractor against itself, and a
+    field they cover would stop looking new. The seed is what is scored."""
+    return [r for r in load_corpus().records if r.get("source", "seed") == "seed"]
+
+
+_CONTENT = ("sectionId", "field", "value", "unit", "quote")
+
+
+def _same_content(a: Candidate, b: Candidate) -> bool:
+    return all(getattr(a, k) == getattr(b, k) for k in _CONTENT)
+
+
+@dataclass
+class Gathered:
+    """Everything the cache and biorepo.json say about candidates, read once."""
+
+    candidates: list[Candidate] = field(default_factory=list)
+    dropped: list[DroppedCandidate] = field(default_factory=list)
+    papers: set[str] = field(default_factory=set)
+    decisions: dict[str, ReviewDecision] = field(default_factory=dict)
+    # Candidate ids whose biorepo.json copy no longer matches what the cache
+    # holds under that id: the paper was re-extracted and the numbering moved.
+    stale: set[str] = field(default_factory=set)
+
+
+def _gather() -> Gathered:
     """Every candidate the extractor produced, plus the copies biorepo.json
-    keeps of the ones a reviewer decided — the same candidate when both exist
-    (biorepo's copy wins: it is the one the decision was made about), and the
-    only copy on a fresh clone where candidates/ is empty. The scored papers
-    are the extracted ones alone: a decided candidate does not make its paper
-    a paper the extractor ran over in this checkout."""
+    keeps of the ones a reviewer decided — the same candidate when both exist,
+    and the only copy on a fresh clone where candidates/ is empty. The scored
+    papers are the extracted ones alone: a decided candidate does not make
+    its paper a paper the extractor ran over in this checkout.
+
+    Ids are positional (§6.2: hk1-<paperId>-<n>), so a re-extraction can put
+    different content under an id a reviewer already decided. When the copy
+    and the cache disagree on content, the cache wins — it is what the
+    extractor says now — and the decision is STALE: not applied, not a false
+    positive, logged with the ids so someone re-decides. A decision about a
+    sentence must not follow the id to a different sentence."""
+    repo = biorepo.read()
     responses = extract.all_cached()
-    decided = {c.id: c for c in biorepo.records()}
-    candidates = [decided.get(c.id, c) for r in responses for c in r.candidates]
-    seen = {c.id for c in candidates}
-    candidates += [c for c in decided.values() if c.id not in seen]
-    dropped = [d for r in responses for d in r.dropped]
-    return candidates, dropped, {r.paperId for r in responses}
+    copies = {c.id: c for c in repo.records}
+    out = Gathered(decisions=dict(repo.decisions), papers={r.paperId for r in responses})
+    seen: set[str] = set()
+    for r in responses:
+        for c in r.candidates:
+            seen.add(c.id)
+            copy = copies.get(c.id)
+            if copy is not None and not _same_content(copy, c):
+                out.stale.add(c.id)
+                out.candidates.append(c)
+            else:
+                out.candidates.append(copy or c)
+        out.dropped.extend(r.dropped)
+    out.candidates += [c for cid, c in copies.items() if cid not in seen]
+    for cid in out.stale:
+        out.decisions.pop(cid, None)
+    if out.stale:
+        log.warning(
+            "witness: %d decision(s) are stale — the paper was re-extracted and the candidate under "
+            "the same id changed: %s. Not applied; decide again in Guild.",
+            len(out.stale),
+            ", ".join(sorted(out.stale)),
+        )
+    return out
 
 
-def runs() -> list[ExtractRun]:
-    """GET /api/witness/runs — recomputed from every candidates/*.json against
-    the seed, with the reviewers' rejections from biorepo.json as the false
-    positives. Empty when nothing has been extracted: no run, no number."""
-    candidates, dropped, papers = _gather()
-    if not papers:
-        return []
-    seed = load_corpus().records
-    run = match_run(candidates, seed, papers=papers, dropped=dropped)
-    run.falsePositives = false_positives(
-        [c for c in candidates if c.paperId in papers], biorepo.decisions()
-    )
+def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
+    run = match_run(g.candidates, seed, papers=g.papers, dropped=g.dropped)
+    run.falsePositives = false_positives([c for c in g.candidates if c.paperId in g.papers], g.decisions)
     outcomes: dict[str, int] = defaultdict(int)
     for r in run.results:
         outcomes[r.outcome] += 1
     log.info(
         "witness: %s over %d papers → %d scored (%s), %d new, %d rejected",
         RUN,
-        len(papers),
+        len(g.papers),
         len(run.results),
         ", ".join(f"{k}={v}" for k, v in sorted(outcomes.items())) or "nothing",
-        len(new_records(candidates, seed, papers=papers)),
+        len(new_records(g.candidates, seed, papers=g.papers)),
         len(run.falsePositives),
     )
-    return [run]
+    return run
+
+
+def runs() -> list[ExtractRun]:
+    """GET /api/witness/runs — recomputed from every candidates/*.json against
+    the seed, with the reviewers' rejections from biorepo.json as the false
+    positives. Empty when nothing has been extracted: no run, no number."""
+    g = _gather()
+    if not g.papers:
+        return []
+    return [_run(g, seed_records())]
 
 
 def new_candidates() -> list[Candidate]:
@@ -248,11 +303,11 @@ def new_candidates() -> list[Candidate]:
     from the cache, and every one a reviewer has decided, from biorepo.json,
     so an accepted record is still a record on a checkout that never ran the
     extractor."""
-    candidates, _, papers = _gather()
-    decided = {c.id for c in biorepo.records()}
-    fresh = new_records(candidates, load_corpus().records, papers=papers) if papers else []
+    g = _gather()
+    decided = {c.id for c in biorepo.records()} - g.stale
+    fresh = new_records(g.candidates, seed_records(), papers=g.papers) if g.papers else []
     out = [c for c in fresh if c.id not in decided]
-    return out + biorepo.records()
+    return out + [c for c in biorepo.records() if c.id not in g.stale]
 
 
 def overlay_candidates() -> list[Candidate]:
@@ -263,5 +318,17 @@ def overlay_candidates() -> list[Candidate]:
     promotion carries when the curated quote is not in the fetched text. The
     browser sorts new from matching with the seed in hand; the decisions
     travel in `overlay.records`."""
-    candidates, _, _ = _gather()
-    return candidates
+    return _gather().candidates
+
+
+def overlay_bundle() -> tuple[list[ExtractRun], list[Candidate], dict[str, ReviewDecision]]:
+    """Runs, candidates and decisions for the overlay, from ONE read of the
+    cache and biorepo.json — the store asks on every page load and after
+    every extraction. A missing corpus.json costs the run, not the rest."""
+    g = _gather()
+    try:
+        runs_ = [_run(g, seed_records())] if g.papers else []
+    except FileNotFoundError as e:
+        log.warning("overlay without runs — %s", e)
+        runs_ = []
+    return runs_, g.candidates, g.decisions

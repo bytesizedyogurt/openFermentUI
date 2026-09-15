@@ -169,6 +169,21 @@ def test_false_positives_are_only_what_a_reviewer_rejected():
     assert witness.false_positives(CANDIDATES, {}) == []
 
 
+def test_an_accepted_candidate_appended_to_the_corpus_is_not_scored_against_itself(monkeypatch):
+    # export-corpus appends accepted candidates with source='biorepo'. They
+    # must be neither gold to match against nor cover a field so it stops
+    # being new: the seed is what is scored.
+    appended = {**SEED[0], "id": "hk1-P1-9", "field": "titer_intracellular", "value": 1.1,
+                "unit": "g L⁻¹", "source": "biorepo"}
+    corpus = type("C", (), {"records": SEED + [appended]})()
+    monkeypatch.setattr(witness, "load_corpus", lambda: corpus)
+    seed = witness.seed_records()
+    assert [r["id"] for r in seed] == [r["id"] for r in SEED]
+    run = witness.match_run(CANDIDATES, seed, papers={"P1"})
+    assert "hk1-P1-9" not in outcomes(run)
+    assert [c.id for c in witness.new_records(CANDIDATES, seed, papers={"P1"})] == ["hk1-P1-5"]
+
+
 def test_the_run_is_the_browsers_shape(run):
     assert run.run == "haiku-1"
     body = run.model_dump()
@@ -232,3 +247,34 @@ def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
     assert [c.field for c in overlay.candidates] == ["titer_secreted"]
     assert overlay.candidates[0].id == "hk1-B5-1"
     assert runs[0].falsePositives == []
+
+
+def test_a_decision_does_not_follow_an_id_to_different_content(client, monkeypatch):
+    # Ids are positional. A reviewer rejects hk1-B5-1; the paper is
+    # re-extracted with --force and a different candidate lands under that
+    # id. The decision is stale: not applied, not a false positive, the new
+    # candidate undecided — and a new decision resolves to the NEW content.
+    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
+    client.post("/api/intake/B5/fetch")
+    monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
+    client.post("/api/intake/B5/extract")
+    biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
+                                 recordId="hk1-B5-1", at="2026-09-15T00:00:00Z",
+                                 rejectReason="a placeholder row"))
+    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["hk1-B5-1"]
+
+    other = {"candidates": [{
+        "sectionId": "t1", "field": "titer_secreted", "value": 9, "unit": "mg L-1",
+        "quote": "Placeholder B | 9 | mg L-1", "isPrimary": True, "confidence": 0.7,
+    }]}
+    monkeypatch.setattr(extract, "call_model", lambda *_: (other, extract.Usage()))
+    assert client.post("/api/intake/B5/extract?force=true").status_code == 200
+
+    runs_, candidates, decisions = witness.overlay_bundle()
+    assert runs_[0].falsePositives == [], "the rejection was about the 7, not the 9"
+    assert "hk1-B5-1" not in decisions
+    assert [(c.id, c.value) for c in candidates] == [("hk1-B5-1", 9)]
+    stored = biorepo.write(ReviewDecision(status="verified", provenance="unverified", reviewer="sean",
+                                          recordId="hk1-B5-1", at="2026-09-15T01:00:00Z"))
+    assert stored.status == "verified"
+    assert [c.value for c in biorepo.records()] == [9], "the copy is refreshed to the new content"

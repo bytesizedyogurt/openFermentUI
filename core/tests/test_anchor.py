@@ -81,6 +81,57 @@ def test_normalisation_folds_dashes_superscripts_soft_hyphens_and_whitespace():
     assert normalize_text("−17 °C") == "-17 °C"
 
 
+def test_a_superscript_on_a_number_is_a_power_of_ten_not_a_digit():
+    # '10⁶' is a million, not a hundred and six; 'L⁻¹' is still a unit exponent.
+    assert normalize_text("2 × 10⁶ cells mL⁻¹") == "2 × 10^6 cells mL-1"
+    assert normalize_text("10⁻⁶ M") == "10^-6 M"
+    assert normalize_text("m² and CO₂") == "m2 and CO₂"
+
+
+@pytest.mark.parametrize(
+    ("text", "numbers"),
+    [
+        ("2 × 10^6 cells mL-1", [2e6]),
+        ("2 x 10^6 cells", [2e6]),
+        ("2.5·10^-3 M", [2.5e-3]),
+        ("about 10^6 cells and 12 h", [1e6, 12.0]),
+        ("1e6 cells", [1e6]),
+    ],
+)
+def test_scientific_notation_is_one_number(text, numbers):
+    assert parse_numbers(text) == numbers
+
+
+@pytest.mark.parametrize("written", ["4200", "4,200", "4200 mg L-1", " 4,200 "])
+def test_a_value_written_as_a_string_is_read_like_a_quote(written):
+    c, rule, detail = anchor(
+        good(sectionId="t1", value=written, unit="mg/L", quote="Fed-batch | 4200 | mg L-1")
+    )
+    assert rule is None, detail
+    assert c.value == 4200 and c.si.value == 4.2
+
+
+def test_a_string_value_must_hold_exactly_one_number():
+    _, rule, detail = anchor(good(sectionId="t1", value="7-10", unit="mg/L", quote="Fed-batch | 4200 | mg L-1"))
+    assert rule == "value" and "single number" in detail
+    _, rule, _ = anchor(good(value="four point two"))
+    assert rule == "value"
+
+
+def test_a_power_of_ten_in_the_quote_is_read_as_a_number():
+    # A titre written as 4.2 × 10³ mg L⁻¹ is 4.2 g/L; it must not be read as 4.2, 10 and 3.
+    sections = SECTIONS + [
+        {"id": "s8", "heading": "Titre", "text": "The titre reached 4.2 × 10³ mg L⁻¹ by day 4."}
+    ]
+    raw = good(sectionId="s8", value=4200, unit="mg/L", quote="reached 4.2 × 10³ mg L⁻¹")
+    c, rule, detail = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    assert rule is None, detail
+    assert c.si.value == 4.2
+    raw = good(sectionId="s8", value=4.2, unit="mg/L", quote="reached 4.2 × 10³ mg L⁻¹")
+    _, rule, _ = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    assert rule == "value", "4.2 is the mantissa, not a number the sentence states"
+
+
 @pytest.mark.parametrize(
     ("text", "numbers"),
     [

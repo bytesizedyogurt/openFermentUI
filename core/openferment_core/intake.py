@@ -36,6 +36,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -81,12 +82,19 @@ def _user_agent() -> str:
     return f"{ua} {contact}" if contact else ua
 
 
+_throttle_lock = threading.Lock()
+
+
 def _throttle() -> None:
+    """Held under a lock: FastAPI runs the sync endpoints in a thread pool, and
+    two clicks arriving together must queue behind one another, not both read
+    the same timestamp and fire at once."""
     global _last_request_at
-    wait = MIN_INTERVAL_S - (time.monotonic() - _last_request_at)
-    if wait > 0:
-        time.sleep(wait)
-    _last_request_at = time.monotonic()
+    with _throttle_lock:
+        wait = MIN_INTERVAL_S - (time.monotonic() - _last_request_at)
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at = time.monotonic()
 
 
 def _get(url: str, params: dict[str, str] | None = None) -> httpx.Response:
@@ -168,33 +176,64 @@ def fetch_fulltext(pmcid: str) -> str:
 _WS = re.compile(r"\s+")
 
 
-def _text(el: ET.Element | None) -> str:
-    """All text under an element, inline markup dropped, whitespace collapsed.
-
-    <sup> and <sub> contribute their characters inline, so L<sup>-1</sup>
-    reads 'L-1' and CO<sub>2</sub> reads 'CO2' — the spelling §2.4's
-    normalisation expects to find.
-    """
-    if el is None:
-        return ""
-    return _WS.sub(" ", "".join(el.itertext())).strip()
-
-
+# Elements that are not the paper's prose. They never leak into a section's
+# paragraphs, wherever JATS nests them — a <table-wrap> inside a <p> is common
+# — and tables and figures become their own sections instead.
+_NOT_PROSE = {"table-wrap", "fig", "ref-list", "ack", "fn-group"}
 # Elements whose text is not the paper's argument and must not become a section
 # or leak into a parent's paragraphs.
-_DROP = {"ref-list", "ack", "fn-group", "table-wrap", "fig", "sec", "title", "label"}
+_DROP = _NOT_PROSE | {"sec", "title", "label"}
+
+
+def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
+    """Text in document order. <sup> and <sub> contribute their characters
+    inline, so L<sup>-1</sup> reads 'L-1' and CO<sub>2</sub> reads 'CO2', the
+    spellings §2.4's normalisation expects — except a superscript on a NUMBER,
+    which is a power of ten and reads 10<sup>6</sup> as '10^6', because '106'
+    is a different number. In prose mode, tables and figures nested anywhere
+    below are skipped: they are sections of their own, not this paragraph."""
+    if el.text:
+        parts.append(el.text)
+    for child in el:
+        if prose and child.tag in _NOT_PROSE:
+            if child.tail:
+                parts.append(child.tail)
+            continue
+        if child.tag == "sup":
+            before = "".join(parts).rstrip()
+            inner: list[str] = []
+            _collect(child, inner, prose=prose)
+            exponent = "".join(inner).strip()
+            if before and before[-1].isdigit() and exponent and not exponent.startswith("^"):
+                parts.append("^" + exponent)
+            else:
+                parts.append(exponent)
+        else:
+            _collect(child, parts, prose=prose)
+        if child.tail:
+            parts.append(child.tail)
+
+
+def _text(el: ET.Element | None, *, prose: bool = False) -> str:
+    """All text under an element, inline markup dropped, whitespace collapsed."""
+    if el is None:
+        return ""
+    parts: list[str] = []
+    _collect(el, parts, prose=prose)
+    return _WS.sub(" ", "".join(parts)).strip()
 
 
 def _own_paragraphs(sec: ET.Element) -> str:
     """The text of a <sec> that belongs to it directly: paragraphs and lists,
     but not its nested <sec>s, its tables, or its figures — those become their
-    own sections. Its <title> is the heading and is left out here."""
+    own sections, wherever they are nested. Its <title> is the heading and is
+    left out here."""
     parts: list[str] = []
     for child in sec:
         tag = child.tag
         if tag in _DROP:
             continue
-        text = _text(child)
+        text = _text(child, prose=True)
         if text:
             parts.append(text)
     return " ".join(parts).strip()

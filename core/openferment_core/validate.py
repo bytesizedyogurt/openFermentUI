@@ -233,10 +233,17 @@ def decline_reason(result: ValidationResult, model_declined: str | None) -> str 
 # looked for in the section. Quotes arrive with a dozen dashes, superscript
 # digits, soft hyphens from PDF-derived text and runs of whitespace; none of
 # those is a difference in what the paper said.
-# U+207B, superscript minus, is folded with the superscript digits it sits in
-# front of: 'L⁻¹' has to become 'L-1', the spelling the JATS split writes.
+# Superscripts are two different things and are folded two different ways.
+# On a unit they are an exponent spelled with a minus: 'L⁻¹' becomes 'L-1',
+# the spelling the JATS split writes. On a NUMBER they are a power of ten:
+# '10⁶' must become '10^6', not '106' — the first version folded both the
+# same way and a titre of 2 × 10⁶ could never anchor, while a value of 106
+# anchored falsely. `parse_numbers` reads the caret form below.
+_SUP_DIGITS = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"
+_SUPERSCRIPTS = str.maketrans(_SUP_DIGITS, "0123456789")
+_POWER = re.compile(rf"(?<=\d)(\u207b?)([{_SUP_DIGITS}]+)")  # after a digit: an exponent
+_UNIT_EXP = re.compile(rf"\u207b([{_SUP_DIGITS}]+)")  # superscript minus: a unit exponent
 _DASHES = dict.fromkeys(map(ord, "\u2212\u2010\u2011\u2012\u2013\u2014\u2015\u207b"), "-")
-_SUPERSCRIPTS = str.maketrans("\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079", "0123456789")
 _SOFT_HYPHEN = "\u00ad"
 _SPACES = re.compile(r"\s+")
 
@@ -247,7 +254,10 @@ VALUE_TOLERANCE = 0.005
 
 def normalize_text(text: str) -> str:
     """§2.4 rule 2's normalisation, applied to quotes and sections alike."""
-    out = text.replace(_SOFT_HYPHEN, "").translate(_DASHES).translate(_SUPERSCRIPTS)
+    out = text.replace(_SOFT_HYPHEN, "")
+    out = _POWER.sub(lambda m: "^" + ("-" if m.group(1) else "") + m.group(2).translate(_SUPERSCRIPTS), out)
+    out = _UNIT_EXP.sub(lambda m: "-" + m.group(1).translate(_SUPERSCRIPTS), out)
+    out = out.translate(_DASHES).translate(_SUPERSCRIPTS)
     return _SPACES.sub(" ", out).strip()
 
 
@@ -258,18 +268,32 @@ def normalize_text(text: str) -> str:
 # a hyphen ('L-1', 'h-1', 'm-2') is a unit exponent — neither is a value, and
 # the first version of this read every 'g L-1' as containing the number one.
 _NUMBER = re.compile(r"(?<![\w.])(?<![A-Za-z]-)-?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?")
+# Scientific notation as a paper writes it after normalisation: '2 × 10^6',
+# '2 x 10^6', '2·10^-3', or a bare '10^6'. The caret comes from
+# normalize_text folding a superscript on a number. Matched first, and the
+# span it covers is not re-read as the plain numbers 2, 10 and 6.
+_SCI = re.compile(
+    r"(?<![\w.])(?:(-?\d[\d,]*(?:\.\d+)?)\s*[×x*·]\s*)?10\^(-?\d+)(?![\w.])"
+)
 
 
 def parse_numbers(text: str) -> list[float]:
-    """Every number in a (normalised) quote, as floats."""
-    out: list[float] = []
+    """Every number in a (normalised) quote, as floats, in order."""
+    found: list[tuple[int, float]] = []
+    taken: list[tuple[int, int]] = []
+    for m in _SCI.finditer(text):
+        mantissa = float(m.group(1).replace(",", "")) if m.group(1) else 1.0
+        found.append((m.start(), mantissa * 10.0 ** int(m.group(2))))
+        taken.append(m.span())
     for m in _NUMBER.finditer(text):
+        if any(a <= m.start() < b for a, b in taken):
+            continue
         raw = m.group(0).replace(",", "")
         try:
-            out.append(float(raw))
+            found.append((m.start(), float(raw)))
         except ValueError:
             continue
-    return out
+    return [v for _, v in sorted(found, key=lambda t: t[0])]
 
 
 def _value_in_quote(value: float, quote: str) -> bool:
@@ -345,10 +369,21 @@ def anchor_candidate(
         canonical: float | None = None
         si = Quantity(value=value.strip(), unit="")
     else:
-        try:
-            number = float(value)  # type: ignore[arg-type]
-        except (TypeError, ValueError):
+        # The tool asks for the number as the paper wrote it, and a paper
+        # writes '4,200', '12.5%' or '1.5 × 10⁶'. A string is read the way a
+        # quote is; it has to hold exactly one number.
+        if isinstance(value, bool):
             return None, "value", f"value {value!r} is not a number"
+        if isinstance(value, str):
+            numbers = parse_numbers(normalize_text(value))
+            if len(numbers) != 1:
+                return None, "value", f"value {value!r} is not a single number"
+            number = numbers[0]
+        else:
+            try:
+                number = float(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None, "value", f"value {value!r} is not a number"
         if number != number:  # NaN
             return None, "value", "value is NaN"
         if not _value_in_quote(number, norm_quote):
@@ -397,7 +432,7 @@ def anchor_candidate(
             sectionId=section_id,
             quote=quote,
             field=field_id,
-            value=value.strip() if categorical else float(value),  # type: ignore[union-attr]
+            value=value.strip() if categorical else number,  # type: ignore[union-attr]
             unit=unit,
             si=si,
             confidence=confidence,
