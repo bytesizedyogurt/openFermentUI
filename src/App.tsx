@@ -97,7 +97,13 @@ function Screen() {
       return <Intake />;
     case 'biorepo':
       if (b === 'paper' && c)
-        return <PaperReader paperId={c} spanId={route.query.get('span') ?? undefined} />;
+        return (
+          <PaperReader
+            paperId={c}
+            spanId={route.query.get('span') ?? undefined}
+            sectionId={route.query.get('section') ?? undefined}
+          />
+        );
       if (b === 'compare') return <Compare />;
       if (b === 'witness') return <Witness />;
       return <BioRepo />;

@@ -1,5 +1,5 @@
 {
-  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes. The `runs` entry is hand-written in the shape witness.match_run produces (OF-BLD-012 §6.2) — one match, one value mismatch, one miss over B5's three seed records — so Witness's provisional mode can be exercised offline; it is not a measurement.",
+  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes. The two `candidates` are hand-written raw candidates put through the real validate.anchor_all against that text (OF-BLD-012 §2.4) — one a titre the seed has no B5 record for, one the same table row read as a colony time — and `runs` is the real witness.match_run over B5's three seed records (§6.2). Neither is a measurement of anything.",
   "papers": {
     "B5": {
       "ingest": "complete",
@@ -47,16 +47,53 @@
     }
   },
   "records": {},
-  "candidates": [],
+  "candidates": [
+    {
+      "id": "hk1-B5-1",
+      "paperId": "B5",
+      "sectionId": "t1",
+      "quote": "Placeholder A | 7 | mg L-1",
+      "field": "titer_secreted",
+      "value": 7.0,
+      "unit": "mg L⁻¹",
+      "si": {
+        "value": 0.007,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "extractorRun": "haiku-1",
+      "isPrimary": true
+    },
+    {
+      "id": "hk1-B5-2",
+      "paperId": "B5",
+      "sectionId": "t1",
+      "quote": "Placeholder A | 7 | mg L-1",
+      "field": "time_to_colony",
+      "value": 7.0,
+      "unit": "d",
+      "si": {
+        "value": 168.0,
+        "unit": "h"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "extractorRun": "haiku-1",
+      "isPrimary": true
+    }
+  ],
   "runs": [
     {
       "run": "haiku-1",
       "results": [
         {
           "goldRecordId": "r-B5-1",
-          "outcome": "match",
+          "outcome": "value_mismatch",
           "extracted": {
-            "value": 8.5,
+            "value": 7.0,
             "unit": "d"
           }
         },
@@ -64,13 +101,17 @@
           "goldRecordId": "r-B5-2",
           "outcome": "value_mismatch",
           "extracted": {
-            "value": 12,
+            "value": 7.0,
             "unit": "d"
           }
         },
         {
           "goldRecordId": "r-B5-3",
-          "outcome": "miss"
+          "outcome": "value_mismatch",
+          "extracted": {
+            "value": 7.0,
+            "unit": "d"
+          }
         }
       ],
       "falsePositives": []

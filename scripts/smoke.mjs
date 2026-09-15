@@ -41,12 +41,26 @@ const MIME = {
   '.json': 'application/json',
 };
 
+/** Decisions the double received on POST /api/biorepo/decisions (§7.3). */
+const decisions = [];
+
 const server = createServer(async (req, res) => {
   try {
     const url = decodeURIComponent((req.url ?? '/').split('?')[0]);
     if (url === '/api/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(HEALTH);
+    }
+    if (url === '/api/biorepo/decisions' && req.method === 'POST') {
+      // The double stores nothing and refuses nothing: it records what the
+      // browser sent and echoes it back, so the test can read what
+      // `biorepo.write` would have been asked to store.
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const decision = JSON.parse(body);
+      decisions.push(decision);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(decision));
     }
     if (url === '/api/biorepo/overlay') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -358,13 +372,42 @@ async function main() {
       if (!/Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild\./.test(witness)) {
         problems.push('Witness is not labelled provisional');
       }
-      if (!/tp 1 · fp 1 · fn 2/.test(witness)) problems.push('Witness did not score the fixture run as tp 1, fp 1, fn 2');
+      // match_run over the fixture's two candidates: three value mismatches.
+      if (!/tp 0 · fp 3 · fn 3/.test(witness)) problems.push('Witness did not score the fixture run as tp 0, fp 3, fn 3');
       if (/No extractor has been run against this corpus yet/.test(witness)) problems.push('Witness still shows the empty state');
+      if (!/1 candidate new to the corpus — unscored/.test(witness)) problems.push('Witness does not count the one new candidate as unscored');
+
+      // §7.3 — the review card. The new candidate is in the queue, labelled;
+      // accepting it posts a decision to the service. The curated record on
+      // the same fetched paper shows the extractor's disagreeing span, and
+      // gold is unavailable with the reason, because biorepo.write would
+      // refuse it.
+      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-1`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(900);
+      const newCard = await page.locator('body').innerText();
+      if (!/Extracted by haiku-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
+      if (!/Placeholder A \| 7 \| mg L-1/.test(newCard)) problems.push('the new candidate\'s quote is not on its card');
+      await page.keyboard.press('a');
+      await page.waitForTimeout(700);
+      const posted = decisions.find((d) => d.recordId === 'hk1-B5-1');
+      if (!posted) problems.push('accepting the new candidate posted no decision to the service');
+      else if (posted.status !== 'verified' || !posted.reviewer || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
+
+      await page.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(900);
+      const curatedCard = await page.locator('body').innerText();
+      if (!/what the extractor read/i.test(curatedCard)) problems.push('the curated record on a fetched paper shows no extractor block');
+      if (!/Disagrees — extractor 7 d vs curated 8\.5 d \(-18 %\)/.test(curatedCard)) problems.push('the extractor\'s disagreeing span is not labelled with its delta');
+      const goldDisabled = await page.locator('button:has-text("Flag for gold")').isDisabled();
+      if (!goldDisabled) problems.push('gold is enabled on a record biorepo.write would refuse');
+      if (!/Gold is unavailable here: Gold needs a sentence in the fetched text/.test(curatedCard)) problems.push('the gold refusal is not explained on the card');
+      const reader = await page.locator('a[href="#/biorepo/paper/B5?section=t1"]').count();
+      if (reader === 0) problems.push('no link from the extractor span to the reader at its section');
       if (problems.length) {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision');
       }
     } catch (e) {
       overlayFails++;

@@ -244,13 +244,24 @@ def runs() -> list[ExtractRun]:
 
 
 def new_candidates() -> list[Candidate]:
-    """The candidates the seed has no record for, for `overlay.candidates`
-    (§2.1, §7.3): the undecided ones from the cache, and every one a reviewer
-    has decided, from biorepo.json, so an accepted record is still a record
-    on a checkout that never ran the extractor. The decisions themselves
-    travel in `overlay.records`."""
+    """The candidates the seed has no record for (§6.2): the undecided ones
+    from the cache, and every one a reviewer has decided, from biorepo.json,
+    so an accepted record is still a record on a checkout that never ran the
+    extractor."""
     candidates, _, papers = _gather()
     decided = {c.id for c in biorepo.records()}
     fresh = new_records(candidates, load_corpus().records, papers=papers) if papers else []
     out = [c for c in fresh if c.id not in decided]
     return out + biorepo.records()
+
+
+def overlay_candidates() -> list[Candidate]:
+    """`overlay.candidates` (§2.1, §7.3): EVERY candidate, not only the new
+    ones. A candidate that matches a seed record's field is not a record —
+    the seed has one — but it is what the review card shows beside that
+    record: the extractor's reading of the same paper, and the span a
+    promotion carries when the curated quote is not in the fetched text. The
+    browser sorts new from matching with the seed in hand; the decisions
+    travel in `overlay.records`."""
+    candidates, _, _ = _gather()
+    return candidates

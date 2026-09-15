@@ -221,12 +221,12 @@ def biorepo_overlay() -> Overlay:
     through `biorepo.write` alone. A missing corpus.json costs the run, not
     the overlay.
     """
+    candidates = witness.overlay_candidates()
     try:
         runs = witness.runs()
-        candidates = witness.new_candidates()
     except FileNotFoundError as e:
         log.warning("overlay without runs — %s", e)
-        runs, candidates = [], biorepo.records()
+        runs = []
     return Overlay(
         papers=intake.overlay_papers(),
         records=biorepo.decisions(),

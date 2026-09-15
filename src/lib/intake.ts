@@ -9,7 +9,7 @@
 // simulation for a real fetch — the ingest board keeps that path, labelled as
 // the offline one, and the choice between them is made in the store where the
 // reader can see which one ran.
-import type { FetchResult, IntakeStatus, Overlay } from '@/data/types';
+import type { FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
 
 export class IntakeDown extends Error {
@@ -49,6 +49,55 @@ async function explain(response: Response, signal?: AbortSignal): Promise<never>
     `Intake service answered ${response.status}${detail ? ` — ${detail}` : ''}.`,
     'The service is running, so check its log — it will name what went wrong.',
   );
+}
+
+/**
+ * The service stored nothing: `biorepo.write` refused the decision (OF-BLD-012
+ * §2.3). `rule` is which of its conditions held — record, reviewer,
+ * fulltext, quote — and the message is the reason in words. Not an outage:
+ * the service is up and said no.
+ */
+export class DecisionRefused extends Error {
+  constructor(
+    readonly rule: string,
+    readonly why: string,
+  ) {
+    super(why);
+    this.name = 'DecisionRefused';
+  }
+}
+
+/**
+ * Post one review decision (§7.2, §7.3). The service's `biorepo.write` is the
+ * only thing that stores it; this returns what was stored — the decision as
+ * sent, plus the quote and section a gold decision anchored on — or throws
+ * DecisionRefused with the rule, or IntakeDown when there is no service.
+ */
+export async function postDecision(decision: ReviewDecision, signal?: AbortSignal): Promise<ReviewDecision> {
+  let response: Response;
+  try {
+    response = await fetch('/api/biorepo/decisions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(decision),
+      signal,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw e;
+    throw new IntakeDown('Intake service not running.');
+  }
+  if (response.status === 422) {
+    let detail = '';
+    try {
+      detail = String(((await response.json()) as { detail?: string }).detail ?? '');
+    } catch {
+      /* the status is the message */
+    }
+    const m = /^([a-z]+): (.*)$/s.exec(detail);
+    throw new DecisionRefused(m ? m[1] : 'unknown', m ? m[2] : detail || 'refused without a reason');
+  }
+  if (!response.ok) await explain(response, signal);
+  return (await response.json()) as ReviewDecision;
 }
 
 /**

@@ -17,9 +17,10 @@ import {
   Undo2,
   AlertTriangle,
 } from 'lucide-react';
-import type { ExtractionRecord } from '@/data/types';
+import type { Candidate, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
+import { bestCandidate, carryOverSpan, goldRefusal, paperFetched } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
@@ -136,6 +137,8 @@ function Hint({ k, faded }: { k: string; faded: boolean }) {
   );
 }
 
+const NO_CANDIDATES: Candidate[] = [];
+
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function Guild() {
@@ -152,6 +155,10 @@ export default function Guild() {
   const advanceReview = useStore((s) => s.advanceReview);
   const focusReview = useStore((s) => s.focusReview);
   const toast = useStore((s) => s.toast);
+  // OF-BLD-012 §7.3 — the extractor's candidates and whether the service is
+  // up, for the block beside a curated record on a fetched paper.
+  const serviceUp = useStore((s) => s.serviceUp);
+  const candidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   // OF-BLD-012 §5.4 — the reader's "pending verification" rail links here
   // with ?record=<id>, and the card it names must be the one on screen.
   const focusId = useRoute().query.get('record');
@@ -704,6 +711,16 @@ export default function Guild() {
   const prov = provOf(record);
   const draftSI = draft ? toSI(draft.value, draft.unit) : null;
 
+  // §7.3 — beside a curated record on a fetched paper: what the extractor
+  // read for the same field, whether it agrees, and what a promotion carries.
+  const fromExtractor = record.extractorRun === 'haiku-1';
+  const fetched = paperFetched(paper);
+  const best = fetched && !fromExtractor ? bestCandidate(record, candidates) : null;
+  const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
+  const bestCtx = best && bestSection ? spanContext(bestSection.text, best.candidate.quote) : null;
+  const carry = fetched && !fromExtractor ? carryOverSpan(record, paper, candidates) : null;
+  const goldBlocked = goldRefusal(record, paper, candidates, serviceUp);
+
   return (
     <>
       <PageHeader
@@ -896,6 +913,95 @@ export default function Guild() {
               </Callout>
             )}
           </div>
+
+          {/* §7.3 — what the extractor read, beside a curated record on a fetched paper */}
+          {fetched && !fromExtractor && (
+            <div className="mt-5 pt-4 border-t border-line" data-testid="extractor-span">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="text-caption uppercase tracking-wide text-ink-soft">
+                  What the extractor read
+                </div>
+                {best && (
+                  <a
+                    href={href(`/biorepo/paper/${record.paperId}?section=${best.candidate.sectionId}`)}
+                    className="text-caption text-accent hover:underline"
+                  >
+                    Open in the reader at {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`}
+                  </a>
+                )}
+              </div>
+              {best ? (
+                <>
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="font-num text-section-title">
+                      {fmt(best.candidate.value)}
+                      {best.candidate.unit && (
+                        <span className="text-body text-ink-soft ml-1">{best.candidate.unit}</span>
+                      )}
+                    </span>
+                    <span className="text-caption text-ink-soft">
+                      haiku-1 · {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`} ·
+                      confidence <span className="font-num">{best.candidate.confidence.toFixed(2)}</span>
+                    </span>
+                    {best.agrees ? (
+                      <span className="text-caption text-accent inline-flex items-center gap-1">
+                        <Check size={12} aria-hidden /> Agrees with the curated value within 2 %
+                      </span>
+                    ) : (
+                      <span className="text-caption text-signal-warn">
+                        Disagrees — extractor{' '}
+                        <span className="font-num">
+                          {fmt(best.candidate.value)} {best.candidate.unit}
+                        </span>{' '}
+                        vs curated{' '}
+                        <span className="font-num">
+                          {fmt(record.value)} {record.unit}
+                        </span>
+                        {best.deltaPct !== null && (
+                          <span className="font-num">
+                            {' '}
+                            ({best.deltaPct > 0 ? '+' : ''}
+                            {best.deltaPct.toFixed(0)} %)
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="prose-reading mt-2">
+                    {bestCtx ? (
+                      <p style={{ whiteSpace: 'pre-line' }}>
+                        {bestCtx.clippedStart && <span className="text-ink-soft">… </span>}
+                        {bestCtx.before}
+                        <mark className="span-unverified">{bestCtx.quote}</mark>
+                        {bestCtx.after}
+                        {bestCtx.clippedEnd && <span className="text-ink-soft"> …</span>}
+                      </p>
+                    ) : (
+                      <p className="font-serif italic">“{best.candidate.quote}”</p>
+                    )}
+                  </div>
+                  {carry ? (
+                    <p className="text-caption text-ink-soft mt-2">
+                      The curated quote is not in the fetched text. Accept or gold carries this span
+                      onto the record, so it anchors in the paper&rsquo;s own words.
+                    </p>
+                  ) : (
+                    ctx === null && (
+                      <p className="text-caption text-ink-soft mt-2">
+                        The curated quote is not in the fetched text and this span disagrees, so a
+                        promotion carries nothing: accept proceeds without a span; gold needs one.
+                      </p>
+                    )
+                  )}
+                </>
+              ) : (
+                <p className="text-body text-ink-soft">
+                  No extractor candidate for {fieldName(record.field)} on this paper. Accept proceeds
+                  without a span; gold needs one.
+                </p>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* ── right rail: audit + origin ─────────────────────────────── */}
@@ -935,21 +1041,42 @@ export default function Guild() {
             <div className="text-caption uppercase tracking-wide text-ink-soft mb-1.5">
               Where this record came from
             </div>
-            <Tick
-              p={provOf(record)}
-              title="Transcribed from the curation document — no extractor produced it"
-            >
-              <div className="text-body">Hand-transcribed from the corpus document</div>
-              <div className="font-num text-caption text-ink-soft">
-                {record.curationRef ? `${record.curationRef} · ` : ''}field {record.field}
-              </div>
-            </Tick>
-            <p className="text-caption text-ink-soft mt-2">
-              No extractor has been run against this corpus, so what you are reviewing is a
-              transcription, not an extraction: the value was typed in from the curation document
-              and has not yet been checked against the source PDF. Confidence is authored, not
-              inferred.
-            </p>
+            {fromExtractor ? (
+              <>
+                <Tick
+                  p={provOf(record)}
+                  title="Extracted by haiku-1 from the fetched full text (OF-BLD-012 §6)"
+                >
+                  <div className="text-body">Extracted by haiku-1 — new to the corpus</div>
+                  <div className="font-num text-caption text-ink-soft">
+                    field {record.field} · confidence {record.confidence.toFixed(2)}
+                  </div>
+                </Tick>
+                <p className="text-caption text-ink-soft mt-2">
+                  One forced tool call over the paper&rsquo;s own text produced this candidate, and
+                  anchoring checked that its quote is verbatim in the section and holds the value.
+                  No curated record covers this field on this paper: accepting makes it a record,
+                  rejecting makes it a false positive in Witness.
+                </p>
+              </>
+            ) : (
+              <>
+                <Tick
+                  p={provOf(record)}
+                  title="Transcribed from the curation document — no extractor produced it"
+                >
+                  <div className="text-body">Hand-transcribed from the corpus document</div>
+                  <div className="font-num text-caption text-ink-soft">
+                    {record.curationRef ? `${record.curationRef} · ` : ''}field {record.field}
+                  </div>
+                </Tick>
+                <p className="text-caption text-ink-soft mt-2">
+                  {fetched
+                    ? 'The value was typed in from the curation document; the extractor\u2019s reading of the same paper is shown beside the span. Confidence is authored, not inferred.'
+                    : 'No extractor has read this paper, so what you are reviewing is a transcription, not an extraction: the value was typed in from the curation document and has not yet been checked against the source PDF. Confidence is authored, not inferred.'}
+                </p>
+              </>
+            )}
           </div>
 
           {record.organism && (
@@ -1019,7 +1146,8 @@ export default function Guild() {
               </Button>
               <Button
                 onClick={() => decide('gold')}
-                title="Verify and promote this record into the curated gold set — shortcut g"
+                disabled={!!goldBlocked}
+                title={goldBlocked ?? 'Verify and promote this record into the curated gold set — shortcut g'}
               >
                 <Award size={14} /> Flag for gold
                 <Hint k="g" faded={usedKeyboard} />
@@ -1032,6 +1160,11 @@ export default function Guild() {
                 <span className="kbd">u</span> undo
               </span>
             </div>
+          )}
+          {goldBlocked && !rejecting && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="gold-blocked">
+              Gold is unavailable here: {goldBlocked}
+            </p>
           )}
         </Card>
       </div>

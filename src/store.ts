@@ -3,6 +3,8 @@
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5).
 import { create } from 'zustand';
 import type {
+  AuditEvent,
+  ReviewDecision,
   ActivityEvent,
   ChatMessage,
   ClearanceStateId,
@@ -45,6 +47,7 @@ import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
 import {
+  type DurableReviewDecision,
   EMPTY_SNAPSHOT,
   clearDurable,
   durableAvailable,
@@ -53,7 +56,8 @@ import {
   saveDurable,
   type DurableSnapshot,
 } from '@/lib/durable';
-import { IntakeDown, fetchPaper, loadOverlay } from '@/lib/intake';
+import { DecisionRefused, IntakeDown, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
+import { carryOverSpan, goldRefusal, isNewCandidate } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
 
 export type Theme = 'bench' | 'night';
@@ -82,6 +86,38 @@ function stamp(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * The decision a record's current state amounts to (OF-BLD-012 §7.3): the
+ * Durable tier's six fields, the record id, an ISO stamp the service can
+ * order against a snapshot's savedAt, and — when a promotion re-anchored the
+ * record — the span it now stands on.
+ */
+function decisionOf(
+  r: ExtractionRecord,
+  span: { quote: string; sectionId: string } | null,
+): ReviewDecision {
+  return {
+    status: r.status,
+    provenance: r.provenance,
+    gold: r.gold,
+    corrected: r.corrected,
+    rejectReason: r.rejectReason,
+    reviewer: r.reviewer ?? 'you',
+    recordId: r.id,
+    at: new Date().toISOString(),
+    ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
+  };
+}
+
+function sameDecision(a: ExtractionRecord, b: ExtractionRecord): boolean {
+  return (
+    a.status === b.status &&
+    a.rejectReason === b.rejectReason &&
+    JSON.stringify(a.gold ?? null) === JSON.stringify(b.gold ?? null) &&
+    JSON.stringify(a.corrected ?? null) === JSON.stringify(b.corrected ?? null)
+  );
 }
 
 export interface OFState {
@@ -285,6 +321,12 @@ export interface OFState {
   hydrateDurable: () => Promise<void>;
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
   durableReady: boolean;
+  /**
+   * The review decisions the Durable tier restored, with the snapshot's
+   * savedAt — kept so a server decision for the same record can be compared
+   * against them: the later of the two wins (OF-BLD-012 §7.3).
+   */
+  durableReview: { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null;
 
   // service overlay (OF-BLD-012 §2.1)
   /** Whether openferment-core answered /api/health this session. null = not asked yet. */
@@ -302,6 +344,8 @@ export interface OFState {
   completeJob: (id: string) => void;
   /** Put one record's card in front of the reviewer — the reader's rail links here. */
   focusReview: (recordId: string) => void;
+  /** Post one decision to the service; `biorepo.write` stores it or refuses it (§7.2–7.3). */
+  postReviewDecision: (decision: ReviewDecision) => Promise<void>;
 
   // misc
   logActivity: (e: ActivityEvent) => void;
@@ -465,6 +509,7 @@ export const useStore = create<OFState>()((set, get) => ({
   grids: seedGrids(),
   toasts: [],
   durableReady: false,
+  durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
@@ -502,6 +547,33 @@ export const useStore = create<OFState>()((set, get) => ({
 
   reviewDecide: (id, action, payload) => {
     const s = get();
+    const before = s.records.find((r) => r.id === id);
+    if (!before) return;
+    // OF-BLD-012 §7.3 — what the service would say, said here first.
+    const paper = s.papers.find((p) => p.id === before.paperId);
+    const candidates = s.overlay?.candidates ?? [];
+    if (action === 'gold') {
+      const refusal = goldRefusal(before, paper, candidates, s.serviceUp);
+      if (refusal) {
+        get().toast({ text: refusal, kind: 'error' });
+        return;
+      }
+    }
+    // A promotion on a curated record whose quote is not in the fetched text
+    // carries the extractor's agreeing span, so the promoted record anchors
+    // in the paper's own words.
+    const span = action === 'accept' || action === 'gold' ? carryOverSpan(before, paper, candidates) : null;
+    const reanchor = (r: ExtractionRecord, audit: AuditEvent[]): ExtractionRecord => {
+      if (!span) return r;
+      audit.push({
+        at: stamp(),
+        who: 'you',
+        action: `span re-anchored to the extractor's quote (${span.candidateId})`,
+        from: r.quote,
+        to: span.quote,
+      });
+      return { ...r, quote: span.quote, sectionId: span.sectionId };
+    };
     const frame: UndoFrame = {
       records: structuredClone(s.records),
       queueIndex: s.reviewIndex,
@@ -514,7 +586,7 @@ export const useStore = create<OFState>()((set, get) => ({
       if (action === 'accept') {
         audit.push({ at: stamp(), who: 'you', action: 'verified' });
         stats.accepted++;
-        return { ...r, status: 'verified' as RecordStatus, reviewer: 'you', audit };
+        return { ...reanchor(r, audit), status: 'verified' as RecordStatus, reviewer: 'you', audit };
       }
       if (action === 'reject') {
         audit.push({ at: stamp(), who: 'you', action: `rejected — ${payload?.reason ?? 'unspecified'}` });
@@ -531,7 +603,7 @@ export const useStore = create<OFState>()((set, get) => ({
         audit.push({ at: stamp(), who: 'you', action: 'flagged for gold set' });
         stats.gold++;
         return {
-          ...r,
+          ...reanchor(r, audit),
           status: 'verified' as RecordStatus,
           reviewer: 'you',
           gold: r.gold ?? { value: r.corrected?.value ?? r.value, unit: r.corrected?.unit ?? r.unit },
@@ -547,6 +619,12 @@ export const useStore = create<OFState>()((set, get) => ({
       reviewStats: stats,
       reviewIndex: Math.min(s.reviewIndex + 1, s.reviewQueue.length),
     });
+    // §7.3 — the Durable tier keeps the decision offline; when the service is
+    // up it is posted too, and `biorepo.write` is what stores it there.
+    if (action !== 'skip' && s.serviceUp) {
+      const after = get().records.find((r) => r.id === id);
+      if (after) void get().postReviewDecision(decisionOf(after, span));
+    }
   },
 
   editRecord: (id, value, unit) => {
@@ -608,6 +686,15 @@ export const useStore = create<OFState>()((set, get) => ({
       reviewIndex: frame.queueIndex,
       undoStack: s.undoStack.slice(0, -1),
     });
+    // §7.3 — an undo is a decision as well: the service must not keep a
+    // status this browser has taken back.
+    if (s.serviceUp) {
+      for (const restored of frame.records) {
+        const current = s.records.find((r) => r.id === restored.id);
+        if (!current || sameDecision(current, restored)) continue;
+        void get().postReviewDecision(decisionOf(restored, null));
+      }
+    }
   },
 
   advanceReview: (delta) =>
@@ -1801,7 +1888,13 @@ export const useStore = create<OFState>()((set, get) => ({
       // discarding what a reviewer already decided.
       const records = s.records.map((r) => {
         const d = snap.reviewDecisions[r.id];
-        return d ? { ...r, ...d } : r;
+        if (!d) return r;
+        // §7.3 — the service may already have applied its decision for this
+        // record; the later of the two wins, and its `at` is an ISO stamp
+        // like our savedAt.
+        const server = s.overlay?.records[r.id];
+        if (server && server.at > snap.savedAt) return r;
+        return { ...r, ...d };
       });
       // Locks re-apply only to runbooks that still exist. A lock whose runbook
       // was created in a previous session and is not in this one is dropped —
@@ -1816,6 +1909,7 @@ export const useStore = create<OFState>()((set, get) => ({
         depositions: snap.depositions,
         measuredEvidence: snap.measuredEvidence ?? [],
         durableReady: durableAvailable(),
+        durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
       };
     });
   },
@@ -1830,8 +1924,9 @@ export const useStore = create<OFState>()((set, get) => ({
         candidates: overlay.candidates.length ? overlay.candidates : (s.overlay?.candidates ?? []),
         runs: overlay.runs.length ? overlay.runs : (s.overlay?.runs ?? []),
       };
-      // Papers and runs. §7 applies review decisions; nothing in an overlay
-      // ever changes a record's status from here.
+      // Papers, runs, decisions and new records. A decision here came through
+      // `biorepo.write` on the service (§2.3); this is the only other place a
+      // record's status moves, and only to what the service already stored.
       const papers = s.papers.map((p) => {
         const o = overlay.papers[p.id];
         if (!o) return p;
@@ -1853,7 +1948,44 @@ export const useStore = create<OFState>()((set, get) => ({
       const runOutputs = merged.runs.length
         ? [...s.runOutputs.filter((r) => !merged.runs.some((o) => o.run === r.run)), ...merged.runs]
         : s.runOutputs;
-      return { overlay: merged, papers, runOutputs };
+
+      // §7.3 — the service's decisions, over seed records and candidates
+      // alike. When the Durable tier restored a decision for the same record,
+      // the later of the two wins.
+      const local = s.durableReview;
+      const decide = (r: ExtractionRecord): ExtractionRecord => {
+        const d = merged.records[r.id];
+        if (!d) return r;
+        if (local?.decisions[r.id] && local.savedAt > d.at) return r;
+        return {
+          ...r,
+          status: d.status,
+          provenance: d.provenance,
+          gold: d.gold,
+          corrected: d.corrected,
+          rejectReason: d.rejectReason,
+          reviewer: d.reviewer,
+          quote: d.quote ?? r.quote,
+          sectionId: d.sectionId ?? r.sectionId,
+        };
+      };
+      // §7.3 — candidates for a field the seed has no record of join the
+      // records, after the seed, as unverified records extracted by haiku-1.
+      // A candidate that matches a seed record's field stays in the overlay,
+      // beside that record on its review card. Idempotent: a candidate
+      // already here is not added twice, and a Durable decision on one that
+      // just arrived is applied to it.
+      const seed = s.records.filter((r) => r.extractorRun !== 'haiku-1');
+      const present = new Set(s.records.map((r) => r.id));
+      const arriving: ExtractionRecord[] = merged.candidates
+        .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
+        .map((c) => {
+          const mine = local?.decisions[c.id];
+          const record: ExtractionRecord = { ...c, audit: [] };
+          return mine ? { ...record, ...mine } : record;
+        });
+      const records = [...s.records, ...arriving].map(decide);
+      return { overlay: merged, papers, runOutputs, records };
     }),
 
   hydrateOverlay: async () => {
@@ -1880,6 +2012,38 @@ export const useStore = create<OFState>()((set, get) => ({
       .filter((r) => r.status === 'unverified' && r.id !== recordId)
       .map((r) => r.id);
     get().startReview([recordId, ...rest]);
+  },
+
+  postReviewDecision: async (decision) => {
+    try {
+      const stored = await postDecision(decision);
+      set((s) => ({
+        overlay: s.overlay
+          ? { ...s.overlay, records: { ...s.overlay.records, [stored.recordId]: stored } }
+          : s.overlay,
+      }));
+    } catch (e) {
+      if (e instanceof DecisionRefused) {
+        // The service said no and said why. The browser's decision stands in
+        // the Durable tier; the reviewer hears the rule, and nothing is
+        // repaired on either side.
+        get().toast({ text: `${decision.recordId} — the service refused this decision (${e.rule}): ${e.why}`, kind: 'error' });
+        get().logActivity({
+          at: stamp(),
+          icon: 'flag',
+          text: `biorepo.write refused ${decision.recordId} on rule ‘${e.rule}’ — ${e.why}`,
+          href: '#/guild',
+          provenance: 'user',
+        });
+        return;
+      }
+      if (e instanceof IntakeDown) {
+        set({ serviceUp: false });
+        get().toast({ text: `${e.message} The decision on ${decision.recordId} is kept in this browser only.`, kind: 'error' });
+        return;
+      }
+      throw e;
+    }
   },
 
   resetDemo: () => {

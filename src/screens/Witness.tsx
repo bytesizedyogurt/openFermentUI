@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
+import { isNewCandidate } from '@/lib/review';
 import { useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
 import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
@@ -229,8 +230,8 @@ export default function Witness() {
   // A candidate a reviewer has decided is a record or a false positive now,
   // not an unscored one (§7.3).
   const unscored = useMemo(
-    () => overlayCandidates.filter((c) => !overlayRecords[c.id]),
-    [overlayCandidates, overlayRecords],
+    () => overlayCandidates.filter((c) => !overlayRecords[c.id] && isNewCandidate(c, records)),
+    [overlayCandidates, overlayRecords, records],
   );
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);

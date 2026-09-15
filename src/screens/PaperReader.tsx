@@ -98,7 +98,17 @@ function stageLabelOf(paper: Paper, job: Job | undefined): string {
   return STAGE_LABELS[idx];
 }
 
-export default function PaperReader({ paperId, spanId }: { paperId: string; spanId?: string }) {
+export default function PaperReader({
+  paperId,
+  spanId,
+  sectionId,
+}: {
+  paperId: string;
+  /** A record to select and scroll to. */
+  spanId?: string;
+  /** A section to scroll to — the review card's link to where the extractor read (OF-BLD-012 §7.3). */
+  sectionId?: string;
+}) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
   const collections = useStore((s) => s.collections);
@@ -173,6 +183,15 @@ export default function PaperReader({ paperId, spanId }: { paperId: string; span
         return offsetOf(a.record) - offsetOf(b.record);
       });
   }, [paper, recs, sectionSpans]);
+
+  // Deep link to a section: scroll to its heading, nothing selected.
+  useEffect(() => {
+    if (!sectionId || spanId || !ready) return;
+    const t = window.setTimeout(() => {
+      sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [sectionId, spanId, ready, behavior]);
 
   // Deep link: select, scroll into view, pulse once.
   useEffect(() => {
