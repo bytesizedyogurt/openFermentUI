@@ -54,6 +54,15 @@ export interface DurableReviewDecision {
    * the fallback for snapshots written before this field existed.
    */
   at?: string;
+  /**
+   * The sentence and section a promotion re-anchored the record to
+   * (OF-BLD-012 §7.3), when it carried the extractor's span. Absent for a
+   * record decided on its own quote. Kept so a carry-over made offline is
+   * still standing on the paper's words after a reload, and is posted with
+   * them when the service is back.
+   */
+  quote?: string;
+  sectionId?: string;
 }
 
 /**

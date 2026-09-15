@@ -20,7 +20,7 @@ import {
 import type { Candidate, ExtractionRecord } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { useStore, provenanceOf } from '@/store';
-import { bestCandidate, carryOverSpan, locateQuote, paperFetched, writeRefusal } from '@/lib/review';
+import { bestCandidate, blocks, carryOverSpan, locateQuote, paperFetched, spanChangesNumber, writeRefusal } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
@@ -984,7 +984,18 @@ export default function Guild() {
                   {carry ? (
                     <p className="text-caption text-ink-soft mt-2">
                       The curated quote is not in the fetched text. Accept or gold carries this span
-                      onto the record, so it anchors in the paper&rsquo;s own words.
+                      onto the record, so it anchors in the paper&rsquo;s own words
+                      {spanChangesNumber(record, carry) ? (
+                        <>
+                          , and takes the paper&rsquo;s own number,{' '}
+                          <span className="font-mono">
+                            {fmt(carry.value)} {carry.unit}
+                          </span>
+                          , as the correction.
+                        </>
+                      ) : (
+                        '.'
+                      )}
                     </p>
                   ) : (
                     ctx === null && (
@@ -1122,16 +1133,16 @@ export default function Guild() {
               <Button
                 variant="primary"
                 onClick={() => decide('accept')}
-                disabled={!!acceptBlocked}
-                title={acceptBlocked ?? 'Accept this extraction as verified — shortcut a'}
+                disabled={blocks(acceptBlocked)}
+                title={acceptBlocked?.why ?? 'Accept this extraction as verified — shortcut a'}
               >
                 <Check size={14} /> Accept
                 <Hint k="a" faded={usedKeyboard} />
               </Button>
               <Button
                 onClick={() => setRejecting(true)}
-                disabled={!!rejectBlocked}
-                title={rejectBlocked ?? 'Reject and pick a reason — shortcut r'}
+                disabled={blocks(rejectBlocked)}
+                title={rejectBlocked?.why ?? 'Reject and pick a reason — shortcut r'}
               >
                 <Ban size={14} /> Reject
                 <Hint k="r" faded={usedKeyboard} />
@@ -1149,8 +1160,8 @@ export default function Guild() {
               </Button>
               <Button
                 onClick={() => decide('gold')}
-                disabled={!!goldBlocked}
-                title={goldBlocked ?? 'Verify and promote this record into the curated gold set — shortcut g'}
+                disabled={blocks(goldBlocked)}
+                title={goldBlocked?.why ?? 'Verify and promote this record into the curated gold set — shortcut g'}
               >
                 <Award size={14} /> Flag for gold
                 <Hint k="g" faded={usedKeyboard} />
@@ -1167,10 +1178,10 @@ export default function Guild() {
           {!rejecting && (rejectBlocked || acceptBlocked || goldBlocked) && (
             <p className="text-caption text-ink-soft mt-2" data-testid="gold-blocked">
               {rejectBlocked
-                ? `The service will keep no decision here: ${rejectBlocked}`
+                ? `The service will keep no decision here: ${rejectBlocked.why}`
                 : acceptBlocked
-                  ? `Accept and gold are unavailable here: ${acceptBlocked}`
-                  : `Gold is unavailable here: ${goldBlocked}`}
+                  ? `Accept and gold are unavailable here: ${acceptBlocked.why}`
+                  : `Gold is unavailable here: ${goldBlocked?.why}`}
             </p>
           )}
         </Card>

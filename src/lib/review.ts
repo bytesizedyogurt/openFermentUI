@@ -8,7 +8,7 @@
 // same thing the service would, one keystroke earlier, and so the store and
 // the card cannot disagree about which candidate is "the extractor's best".
 import type { Candidate, ExtractionRecord, Paper } from '@/data/types';
-import { convert, quantityEquals, sameFamily } from '@/engine/units';
+import { convert, normalizeUnit, quantityEquals, sameFamily } from '@/engine/units';
 
 /** The extractor's run, the only one that ever ran (§6). */
 export const EXTRACTOR_RUN = 'haiku-1';
@@ -62,10 +62,15 @@ export function locateQuote(text: string, quote: string): { start: number; end: 
   const needle = normalizeText(quote);
   if (!needle) return null;
   // Normalise the text one character at a time, remembering where each
-  // output character came from. Soft hyphens vanish; dashes and superscript
-  // digits map one to one; a superscript on a number gains a caret that maps
-  // to the same source position; whitespace runs collapse to their first
-  // character.
+  // output character came from, with the same decisions validate.py's
+  // regexes make on the RAW text — which is why every look-back below reads
+  // `text`, never `out`. Soft hyphens vanish. A superscript run is a power
+  // ('10⁶' → '10^6', '10⁻⁶' → '10^-6') when the raw character before it is a
+  // digit, or exactly one ASCII space after a digit (the space is dropped);
+  // a superscript digit after another superscript digit or a superscript
+  // minus continues that run; anywhere else a superscript minus is a unit
+  // exponent ('L⁻¹' → 'L-1') and a superscript digit is just its digit.
+  // Dashes map one to one; whitespace runs collapse to their first character.
   const out: string[] = [];
   const from: number[] = [];
   const push = (s: string, i: number) => {
@@ -74,10 +79,42 @@ export function locateQuote(text: string, quote: string): { start: number; end: 
       from.push(i);
     }
   };
+  const isDigit = (ch: string | undefined) => !!ch && ch >= '0' && ch <= '9';
+  const isSupDigit = (ch: string | undefined) => !!ch && SUP_TO_DIGIT[ch] !== undefined;
+  // The raw character n places before i, skipping soft hyphens, as the
+  // service sees it after its first replace.
+  const rawBefore = (i: number, n: number): string | undefined => {
+    let j = i;
+    for (let k = 0; k < n; k++) {
+      j--;
+      while (j >= 0 && text[j] === '\u00ad') j--;
+      if (j < 0) return undefined;
+    }
+    return text[j];
+  };
+  const rawAfter = (i: number): string | undefined => {
+    let j = i + 1;
+    while (j < text.length && text[j] === '\u00ad') j++;
+    return text[j];
+  };
+  // Whether a superscript at i starts a power: `(?<=\d) ?` in validate.py.
+  const startsPower = (i: number): 'digit' | 'space' | null => {
+    const p1 = rawBefore(i, 1);
+    if (isDigit(p1)) return 'digit';
+    if (p1 === ' ' && isDigit(rawBefore(i, 2))) return 'space';
+    return null;
+  };
+  const dropSpace = () => {
+    // The single space the power swallows is the last output character.
+    if (out[out.length - 1] === ' ') {
+      out.pop();
+      from.pop();
+    }
+  };
   let prevSpace = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '­') continue;
+    if (ch === '\u00ad') continue;
     if (/\s/.test(ch)) {
       if (!prevSpace) push(' ', i);
       prevSpace = true;
@@ -85,25 +122,17 @@ export function locateQuote(text: string, quote: string): { start: number; end: 
     }
     prevSpace = false;
     if (ch === '⁻') {
-      // Superscript minus: a power on a preceding digit ('10⁻⁶' → '10^-6'),
-      // a unit exponent otherwise ('L⁻¹' → 'L-1').
-      const lastDigit = out.length > 0 && /\d/.test(out[out.length - 1]);
-      push(lastDigit ? '^-' : '-', i);
+      const power = isSupDigit(rawAfter(i)) ? startsPower(i) : null;
+      if (power === 'space') dropSpace();
+      push(power ? '^-' : '-', i);
       continue;
     }
-    if (SUP_TO_DIGIT[ch] !== undefined) {
-      const prev = out[out.length - 1];
-      const prevPrev = out[out.length - 2];
-      const afterDigit = /\d/.test(prev ?? '') || (prev === ' ' && /\d/.test(prevPrev ?? ''));
-      const afterCaret = prev === '-' && prevPrev === '^';
-      const inPower = afterCaret || (SUP_TO_DIGIT[text[i - 1] ?? ''] !== undefined && out.includes('^'));
-      if (afterDigit && !inPower) {
-        if (prev === ' ') {
-          out.pop();
-          from.pop();
-        }
-        push('^', i);
-      }
+    if (isSupDigit(ch)) {
+      const before = rawBefore(i, 1);
+      const continues = isSupDigit(before) || before === '⁻';
+      const power = continues ? null : startsPower(i);
+      if (power === 'space') dropSpace();
+      if (power) push('^', i);
       push(SUP_TO_DIGIT[ch], i);
       continue;
     }
@@ -232,7 +261,35 @@ export function carryOverSpan(
   return { quote: c.quote, sectionId: c.sectionId, candidateId: c.id, value: c.value, unit: c.unit };
 }
 
+/**
+ * Whether a carried span changes the record's number: the candidate wrote a
+ * different value, or the same value in a unit that does not normalise to
+ * the record's. A categorical value never does — it agreed case-insensitively
+ * to be carried at all, and a string is not a correction. 'g/L' against
+ * 'g L⁻¹' is the same unit spelled twice, not a correction either.
+ */
+export function spanChangesNumber(record: Valued, span: Pick<CarriedSpan, 'value' | 'unit'>): boolean {
+  if (typeof record.value !== 'number' || typeof span.value !== 'number') return false;
+  if (record.value !== span.value) return true;
+  const a = normalizeUnit(record.unit);
+  const b = normalizeUnit(span.unit);
+  return a === null || b === null ? record.unit !== span.unit : a !== b;
+}
+
 export type ReviewAction = 'accept' | 'reject' | 'gold';
+
+/**
+ * Why `biorepo.write` would refuse a decision, by the rule it would name
+ * (§2.3). `browserOnly` marks the one refusal that does not stop the review:
+ * a paper with no identifier can still be decided here — the Durable tier
+ * keeps the decision, the service is simply never asked — where the other
+ * two mean the action cannot be taken at all until something changes.
+ */
+export interface Refusal {
+  rule: 'paper' | 'fulltext' | 'quote';
+  why: string;
+  browserOnly: boolean;
+}
 
 /**
  * Why `biorepo.write` would refuse this decision (§2.3), in words the
@@ -240,7 +297,8 @@ export type ReviewAction = 'accept' | 'reject' | 'gold';
  * the service is up: offline, the Durable tier keeps behaving as it always
  * has, and `syncDecisions` asks this again before posting.
  *
- *   paper     no PMCID, DOI or PMID — the committed file may not name it
+ *   paper     no PMCID, DOI or PMID — the committed file may not name it;
+ *             decided in this browser only
  *   fulltext  a promotion (accept, gold) needs the paper's fetched text
  *   quote     gold needs a sentence in that text that says this number
  */
@@ -250,21 +308,38 @@ export function writeRefusal(
   paper: Paper | undefined,
   candidates: Candidate[],
   serviceUp: boolean | null,
-): string | null {
+): Refusal | null {
   if (!serviceUp) return null;
   if (!paperIdentified(paper)) {
-    return `${record.paperId} carries no PMCID, DOI or PMID, so the service keeps no decision about it. It can still be reviewed in this browser.`;
+    return {
+      rule: 'paper',
+      browserOnly: true,
+      why: `${record.paperId} carries no PMCID, DOI or PMID, so the service keeps no decision about it. It is reviewed in this browser only.`,
+    };
   }
   if (action === 'reject') return null;
   if (!paperFetched(paper)) {
-    return `${action === 'gold' ? 'Gold' : 'Accept'} needs the paper's full text, and ${record.paperId} has not been fetched. Fetch it from Intake first.`;
+    return {
+      rule: 'fulltext',
+      browserOnly: false,
+      why: `${action === 'gold' ? 'Gold' : 'Accept'} needs the paper's full text, and ${record.paperId} has not been fetched. Fetch it from Intake first.`,
+    };
   }
   if (action !== 'gold') return null;
   // A candidate's quote anchored when it was extracted; the service will find it.
   if (record.extractorRun === EXTRACTOR_RUN) return null;
   if (quoteAnchors(record, paper)) return null;
   if (carryOverSpan(record, paper, candidates)) return null;
-  return 'Gold needs a sentence in the fetched text that says this number. The curated quote is not in it, and the extractor found no span that agrees.';
+  return {
+    rule: 'quote',
+    browserOnly: false,
+    why: 'Gold needs a sentence in the fetched text that says this number. The curated quote is not in it, and the extractor found no span that agrees.',
+  };
+}
+
+/** A refusal that stops the action, as opposed to one that only keeps it out of the service. */
+export function blocks(refusal: Refusal | null): boolean {
+  return !!refusal && !refusal.browserOnly;
 }
 
 /** Kept for callers that only ask about gold. */
@@ -273,6 +348,6 @@ export function goldRefusal(
   paper: Paper | undefined,
   candidates: Candidate[],
   serviceUp: boolean | null,
-): string | null {
+): Refusal | null {
   return writeRefusal('gold', record, paper, candidates, serviceUp);
 }
