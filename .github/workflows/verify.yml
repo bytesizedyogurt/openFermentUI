@@ -6,8 +6,8 @@
 #
 # Two things the local machine has that a runner does not, both installed
 # explicitly rather than assumed:
-#   - a Chromium for Playwright. The six browser scripts look for the
-#     pre-installed one at CHROMIUM_PATH and otherwise fall back to Playwright's
+#   - a Chromium for Playwright. The browser scripts try the pre-installed
+#     one first (smoke.mjs also honours CHROMIUM_PATH) and fall back to Playwright's
 #     own cache, which is empty on a fresh runner.
 #   - the Python dev extra. `uv run` without `--extra dev` falls through to
 #     whatever `pytest` happens to be on PATH, outside the project venv;

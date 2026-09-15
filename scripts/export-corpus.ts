@@ -18,7 +18,7 @@
  * string, because downstream it reads as something somebody established.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
@@ -35,7 +35,9 @@ const OUT = 'core/openferment_core/data/corpus.json';
  * appended. The seed modules stay untouched — this is the one place the two
  * are combined, and `check:biorepo` checks that the combination happened.
  */
-const BIOREPO = 'core/data/biorepo.json';
+// The same override the service reads (OPENFERMENT_DATA_DIR), so the demo's
+// scratch decisions reach the corpus the demo's service retrieves over.
+const BIOREPO = join(process.env.OPENFERMENT_DATA_DIR ?? 'core/data', 'biorepo.json');
 const biorepo: BioRepo = existsSync(BIOREPO)
   ? (JSON.parse(readFileSync(BIOREPO, 'utf8')) as BioRepo)
   : { version: 1, decisions: {}, records: [] };

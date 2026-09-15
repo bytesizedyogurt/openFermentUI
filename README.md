@@ -145,8 +145,9 @@ cp core/.env.example core/.env        # ANTHROPIC_API_KEY — gitignored, guarde
 pnpm export:corpus                    # project the TS seed (+ biorepo.json) to core/.../corpus.json
 cd core && uv run uvicorn openferment_core.api:app --reload
 
-pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for the 27 papers with a PMCID
-                                      # (no key needed; ≤ 2 requests/s, a project User-Agent)
+pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for the 59 papers with an identifier:
+                                      # the 27 with a PMCID fetch directly, the rest are looked up by DOI or
+                                      # PMID and most are not open access (no key; ≤ 2 requests/s, a User-Agent)
 pnpm intake:extract --all             # Claude Haiku, one forced tool call per fetched paper
                                       # → core/data/candidates/; prints anchored, rejected by rule, cost
 ```
@@ -163,12 +164,20 @@ pnpm demo:offline   # no key, no network: the service in fixture mode + the buil
 
 Replays the loop from saved responses: open Intake, fetch B5, Extract, open Witness, open Guild,
 decide a record, watch Witness move. The fixtures live in `core/tests/fixtures/demo/` and say
-what they are: B5's text is a structural stand-in document until the real JATS is saved beside
-it (the fixture's own comment gives the `curl`), and the "model response" is hand-written in the
-tool's shape — regenerate it with a key via
-`OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture`.
-The anchoring, matching, scoring and the write function are the real code paths, and the demo
-writes into a scratch copy of the data directory, never into the committed `biorepo.json`.
+what they are: B5's text is a structural stand-in document, and the "model response" is
+hand-written in the tool's shape. The anchoring, matching, scoring and the write function are
+the real code paths, and the demo writes into a scratch copy of the data directory, never into
+the committed `biorepo.json`. The first run needs PyPI once, to build `core/.venv`.
+
+To make the demo real, regenerate all three fixtures together — they only make sense as a set,
+and `test_demo` checks that they still fit the code:
+
+```bash
+pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one Haiku call);
+                              # writes jats/PMC8471596.xml, extract/B5.json and biorepo.json
+pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and the smoke overlay
+                              # fixture from whatever JATS and response are saved
+```
 
 ### The gate
 
@@ -182,7 +191,7 @@ pnpm verify              # offline — no key, no service, no network — in ord
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and corpus.json reflects every decision
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
-  pnpm check:capture     #   captured screens
+  pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm build
   pnpm test:durable      #   the Durable tier survives a reload
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant

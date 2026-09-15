@@ -83,6 +83,9 @@ for (const [id, d] of Object.entries(decisions)) {
     fail(`corpus.json has ${id} as ${out.status}; biorepo.json says ${d.status} — the export did not merge`);
   }
   if (out && d.quote && out.quote !== d.quote) fail(`corpus.json did not take the re-anchored quote for ${id}`);
+  if (out && d.corrected && (out.value !== d.corrected.value || out.unit !== d.corrected.unit)) {
+    fail(`corpus.json has ${id} as ${out.value} ${out.unit}; the decision corrected it to ${d.corrected.value} ${d.corrected.unit}`);
+  }
 }
 
 // ── every copied candidate ─────────────────────────────────────────────
