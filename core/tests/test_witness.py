@@ -184,6 +184,37 @@ def test_an_accepted_candidate_appended_to_the_corpus_is_not_scored_against_itse
     assert [c.id for c in witness.new_records(CANDIDATES, seed, papers={"P1"})] == ["hk1-P1-5"]
 
 
+SIBLINGS = [
+    {"id": "r-F4-1", "paperId": "F4", "field": "expression_pct_tsp", "value": 38, "unit": "% TSP"},
+    {"id": "r-F4-2", "paperId": "F4", "field": "expression_pct_tsp", "value": 36, "unit": "% TSP"},
+    {"id": "r-F4-3", "paperId": "F4", "field": "expression_pct_tsp", "value": 13, "unit": "% TSP"},
+]
+
+
+def test_one_candidate_scores_one_record():
+    # Three curated figures for one field; the extractor found the first.
+    # That is one match and two misses — not one match and two mismatches
+    # "extracted 38" against records it never addressed.
+    one = [cand("F4", "expression_pct_tsp", 38, "% TSP", 1)]
+    assert outcomes(witness.match_run(one, SIBLINGS, papers={"F4"})) == {
+        "r-F4-1": "match", "r-F4-2": "miss", "r-F4-3": "miss"}
+    two = one + [cand("F4", "expression_pct_tsp", 36, "% TSP", 2)]
+    assert outcomes(witness.match_run(two, SIBLINGS, papers={"F4"})) == {
+        "r-F4-1": "match", "r-F4-2": "match", "r-F4-3": "miss"}
+    # Matches are taken first, so a candidate is not spent on a mismatch with
+    # an earlier record when it matches a later one.
+    late = [cand("F4", "expression_pct_tsp", 13, "% TSP", 1)]
+    assert outcomes(witness.match_run(late, SIBLINGS, papers={"F4"})) == {
+        "r-F4-1": "miss", "r-F4-2": "miss", "r-F4-3": "match"}
+    # Two curated records with the same value and one extraction: one match.
+    twins = [dict(SIBLINGS[0]), {**SIBLINGS[0], "id": "r-F4-9"}]
+    assert outcomes(witness.match_run(one, twins, papers={"F4"})) == {"r-F4-1": "match", "r-F4-9": "miss"}
+    # A wrong candidate is spent on one sibling as a mismatch; the rest miss.
+    wrong = [cand("F4", "expression_pct_tsp", 99, "% TSP", 1)]
+    assert outcomes(witness.match_run(wrong, SIBLINGS, papers={"F4"})) == {
+        "r-F4-1": "value_mismatch", "r-F4-2": "miss", "r-F4-3": "miss"}
+
+
 def test_the_run_is_the_browsers_shape(run):
     assert run.run == "haiku-1"
     body = run.model_dump()
@@ -245,23 +276,24 @@ def test_runs_recompute_from_the_cache_against_the_seed(client, monkeypatch):
     # The titre is new to B5 — the corpus growing — and it is in the overlay
     # for Guild, not in the score.
     assert [c.field for c in overlay.candidates] == ["titer_secreted"]
-    assert overlay.candidates[0].id == "hk1-B5-1"
+    assert overlay.candidates[0].id == "hk1-B5-eaf0fd9a"
     assert runs[0].falsePositives == []
 
 
-def test_a_decision_does_not_follow_an_id_to_different_content(client, monkeypatch):
-    # Ids are positional. A reviewer rejects hk1-B5-1; the paper is
-    # re-extracted with --force and a different candidate lands under that
-    # id. The decision is stale: not applied, not a false positive, the new
-    # candidate undecided — and a new decision resolves to the NEW content.
+def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkeypatch):
+    # Ids are content-addressed. A reviewer rejects the titre; the paper is
+    # re-extracted with --force and the extractor now says something else.
+    # The rejection stays with the sentence it was about (kept as the file's
+    # copy, no longer a false positive the extractor produces), and the new
+    # candidate arrives undecided under its own id.
     monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
     client.post("/api/intake/B5/fetch")
     monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
     client.post("/api/intake/B5/extract")
     biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
-                                 recordId="hk1-B5-1", at="2026-09-15T00:00:00Z",
+                                 recordId="hk1-B5-eaf0fd9a", at="2026-09-15T00:00:00Z",
                                  rejectReason="a placeholder row"))
-    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["hk1-B5-1"]
+    assert [fp.id for fp in witness.runs()[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
 
     other = {"candidates": [{
         "sectionId": "t1", "field": "titer_secreted", "value": 9, "unit": "mg L-1",
@@ -271,10 +303,12 @@ def test_a_decision_does_not_follow_an_id_to_different_content(client, monkeypat
     assert client.post("/api/intake/B5/extract?force=true").status_code == 200
 
     runs_, candidates, decisions = witness.overlay_bundle()
-    assert runs_[0].falsePositives == [], "the rejection was about the 7, not the 9"
-    assert "hk1-B5-1" not in decisions
-    assert [(c.id, c.value) for c in candidates] == [("hk1-B5-1", 9)]
+    assert [(c.id, c.value) for c in candidates] == [("hk1-B5-f5cdb84c", 9), ("hk1-B5-eaf0fd9a", 7)]
+    assert "hk1-B5-eaf0fd9a" in decisions and "hk1-B5-f5cdb84c" not in decisions
+    # The rejected 7 is still a false positive of the run: the file keeps it
+    # and Witness measures what the extractor produced, then and now.
+    assert [fp.id for fp in runs_[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
     stored = biorepo.write(ReviewDecision(status="verified", provenance="unverified", reviewer="sean",
-                                          recordId="hk1-B5-1", at="2026-09-15T01:00:00Z"))
+                                          recordId="hk1-B5-f5cdb84c", at="2026-09-15T01:00:00Z"))
     assert stored.status == "verified"
-    assert [c.value for c in biorepo.records()] == [9], "the copy is refreshed to the new content"
+    assert sorted(c.value for c in biorepo.records()) == [7, 9]

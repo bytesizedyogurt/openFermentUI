@@ -370,14 +370,18 @@ async function main() {
       // sentence; the fixture run is one match, one mismatch, one miss over
       // B5's three curated records, so the counts are fixed.
       await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(900);
+      // Witness renders a skeleton for a simulated 200–450 ms before its
+      // numbers; wait for the run's own label rather than a guessed sleep.
+      await page.locator('text=haiku-1').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(150);
       const witness = await page.locator('body').innerText();
       if (!/haiku-1/.test(witness)) problems.push('Witness does not show the overlay run');
       if (!/Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild\./.test(witness)) {
         problems.push('Witness is not labelled provisional');
       }
-      // match_run over the fixture's two candidates: three value mismatches.
-      if (!/tp 0 · fp 3 · fn 3/.test(witness)) problems.push('Witness did not score the fixture run as tp 0, fp 3, fn 3');
+      // match_run over the fixture's two candidates: one candidate scores one
+      // record, so one mismatch and two misses.
+      if (!/tp 0 · fp 1 · fn 3/.test(witness)) problems.push('Witness did not score the fixture run as tp 0, fp 1, fn 3');
       if (/No extractor has been run against this corpus yet/.test(witness)) problems.push('Witness still shows the empty state');
       if (!/1 candidate new to the corpus — unscored/.test(witness)) problems.push('Witness does not count the one new candidate as unscored');
       // The extractor's own candidate is a record on a fetched paper, but it
@@ -396,24 +400,30 @@ async function main() {
       // queue when it arrives.
       const coldPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
       await coldPage.goto(`http://localhost:${PORT}/#/guild`, { waitUntil: 'networkidle' });
-      await coldPage.waitForTimeout(1200);
+      // networkidle already covers the double's 700 ms overlay; give the
+      // store one tick to apply it.
+      await coldPage.waitForTimeout(300);
       const cold = await coldPage.locator('body').innerText();
       await coldPage.close();
       if (!/\/ 135\b/.test(cold)) problems.push(`the new candidate did not join the open queue (progress reads ${(cold.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
 
-      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-1`, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(900);
+      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-eaf0fd9a`, { waitUntil: 'networkidle' });
+      // A hash navigation on the same document returns at once; wait for the
+      // card itself, not a clock.
+      await page.locator('text=hk1-B5-eaf0fd9a').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(150);
       const newCard = await page.locator('body').innerText();
       if (!/Extracted by haiku-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
       if (!/Placeholder A \| 7 \| mg L-1/.test(newCard)) problems.push('the new candidate\'s quote is not on its card');
       await page.keyboard.press('a');
       await page.waitForTimeout(700);
-      const posted = decisions.find((d) => d.recordId === 'hk1-B5-1');
+      const posted = decisions.find((d) => d.recordId === 'hk1-B5-eaf0fd9a');
       if (!posted) problems.push('accepting the new candidate posted no decision to the service');
       else if (posted.status !== 'verified' || !posted.reviewer || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
 
       await page.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(900);
+      await page.locator('[data-testid="extractor-span"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(150);
       const curatedCard = await page.locator('body').innerText();
       if (!/what the extractor read/i.test(curatedCard)) problems.push('the curated record on a fetched paper shows no extractor block');
       if (!/Disagrees — extractor 7 d vs curated 8\.5 d \(-18 %\)/.test(curatedCard)) problems.push('the extractor\'s disagreeing span is not labelled with its delta');

@@ -17,6 +17,16 @@ write is a file whose history nobody can explain.
              its own or the record's, because gold means "this sentence in
              this paper says this number" and a gold record without a
              sentence is a curated record wearing a badge
+  paper      the record's paper carries no PMCID, DOI or PMID — the rule
+             `check:biorepo` enforces on the committed file (§7.4), enforced
+             here first so a decision the build would reject is never stored
+  range      a promotion's value — corrected or gold — is outside the field's
+             range in canonical units, or its unit does not normalise: §2.4
+             rule 5, applied to what a reviewer typed as well as to what the
+             model emitted
+  status     a gold decision that is not a verified one: gold is a promotion,
+             and a promotion with another status would be stored and never
+             merged
 
 Refusals reach the API as 422 with the rule and the reason. Nothing repairs a
 bad decision: a quote that fails is not trimmed, a missing reviewer is not
@@ -35,13 +45,14 @@ from typing import Any
 from . import extract, intake
 from .corpus import load_corpus
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
+from .units import UnitError, field as ontology_field, in_range, to_canonical
 from .validate import anchor_candidate
 
 log = logging.getLogger("openferment.biorepo")
 
 PATH = intake.DATA_DIR / "biorepo.json"
 
-RULES = ("record", "reviewer", "fulltext", "quote")
+RULES = ("record", "reviewer", "fulltext", "quote", "paper", "range", "status")
 
 
 class WriteRefused(ValueError):
@@ -126,6 +137,31 @@ def write(decision: ReviewDecision) -> ReviewDecision:
             "record", f"{decision.recordId} is not a seed record and not a candidate anyone extracted"
         )
     paper_id = _field(rec, "paperId")
+    paper = load_corpus().paper(paper_id) or {}
+    if not (paper.get("pmcid") or paper.get("doi") or paper.get("pmid")):
+        raise WriteRefused(
+            "paper",
+            f"{decision.recordId} is on {paper_id}, which carries no PMCID, DOI or PMID; "
+            "a decision on it could not be committed (check:biorepo, §7.4)",
+        )
+    if _is_gold(decision) and decision.status != "verified":
+        raise WriteRefused("status", f"a gold decision is a verified one; this one says {decision.status!r}")
+
+    # What a reviewer typed is held to §2.4 rule 5 like what the model
+    # emitted — whatever the record's status: the value, in canonical units,
+    # inside the field's range. A correction saved on an unverified record
+    # still reaches corpus.json.
+    typed = decision.gold or decision.corrected
+    field_id = _field(rec, "field")
+    if typed is not None and not (ontology_field(field_id) or {}).get("categorical"):
+        try:
+            canonical = to_canonical(float(typed.value), typed.unit, field_id)
+        except (TypeError, ValueError, UnitError) as e:
+            raise WriteRefused("range", f"{typed.value!r} {typed.unit!r} for {field_id}: {e}") from e
+        if not in_range(canonical, field_id):
+            raise WriteRefused(
+                "range", f"{typed.value!r} {typed.unit!r} is outside the range of {field_id} in canonical units"
+            )
 
     stored = decision.model_copy()
     if _is_promotion(decision):

@@ -26,6 +26,7 @@ call, so it is trusted before any model output reaches it.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -241,7 +242,7 @@ def decline_reason(result: ValidationResult, model_declined: str | None) -> str 
 # anchored falsely. `parse_numbers` reads the caret form below.
 _SUP_DIGITS = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"
 _SUPERSCRIPTS = str.maketrans(_SUP_DIGITS, "0123456789")
-_POWER = re.compile(rf"(?<=\d)(\u207b?)([{_SUP_DIGITS}]+)")  # after a digit: an exponent
+_POWER = re.compile(rf"(?<=\d) ?(\u207b?)([{_SUP_DIGITS}]+)")  # after a digit: an exponent
 _UNIT_EXP = re.compile(rf"\u207b([{_SUP_DIGITS}]+)")  # superscript minus: a unit exponent
 _DASHES = dict.fromkeys(map(ord, "\u2212\u2010\u2011\u2012\u2013\u2014\u2015\u207b"), "-")
 _SOFT_HYPHEN = "\u00ad"
@@ -311,6 +312,23 @@ def _value_in_quote(value: float, quote: str) -> bool:
 ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
 
 
+def content_id(
+    prefix: str, paper_id: str, section_id: str, field_id: str, value: Any, unit: str, quote: str
+) -> str:
+    """The id of an anchored candidate: '<run>-<paperId>-<8 hex of its content>'.
+
+    Content-addressed, not positional. A reviewer's decision is about a
+    sentence and a number; keyed by position it would follow the id onto
+    whatever a re-extraction put there next. Keyed by content, a re-run that
+    produces the same candidate produces the same id and the decision holds,
+    and a different candidate gets a different id and starts undecided. The
+    content is the ANCHORED form — the canonical unit spelling, the parsed
+    number — so 'mg/L' and 'mg L⁻¹' are the same candidate.
+    """
+    material = "\x1f".join((paper_id, section_id, field_id, repr(value), unit, quote))
+    return f"{prefix}-{paper_id}-{hashlib.sha1(material.encode('utf-8')).hexdigest()[:8]}"
+
+
 @dataclass
 class AnchorResult:
     accepted: list[Candidate] = field(default_factory=list)
@@ -326,7 +344,8 @@ def anchor_candidate(
     sections: list[dict[str, Any]],
     *,
     paper_id: str,
-    candidate_id: str,
+    candidate_id: str | None = None,
+    id_prefix: str = "hk1",
 ) -> tuple[Candidate | None, str | None, str | None]:
     """One candidate against §2.4. Returns (candidate, None, None) when it
     anchors, or (None, rule, detail) naming the rule that refused it.
@@ -363,7 +382,7 @@ def anchor_candidate(
     if categorical:
         if not isinstance(value, str) or not value.strip():
             return None, "value", "categorical field needs a string value"
-        if value.strip().lower() not in norm_quote.lower():
+        if normalize_text(value).lower() not in norm_quote.lower():
             return None, "value", f"value {value!r} does not appear in the quote"
         unit = ""
         canonical: float | None = None
@@ -425,14 +444,16 @@ def anchor_candidate(
     except (TypeError, ValueError):
         confidence = 0.0
 
+    anchored_value = value.strip() if categorical else number  # type: ignore[union-attr]
     return (
         Candidate(
-            id=candidate_id,
+            id=candidate_id
+            or content_id(id_prefix, paper_id, section_id, field_id, anchored_value, unit, quote),
             paperId=paper_id,
             sectionId=section_id,
             quote=quote,
             field=field_id,
-            value=value.strip() if categorical else number,  # type: ignore[union-attr]
+            value=anchored_value,
             unit=unit,
             si=si,
             confidence=confidence,
@@ -452,16 +473,20 @@ def anchor_all(
     paper_id: str,
     id_prefix: str = "hk1",
 ) -> AnchorResult:
-    """Every candidate through `anchor_candidate`; survivors numbered in order,
-    rejections counted per rule. The counts are the response's rejection
-    report and the log line."""
+    """Every candidate through `anchor_candidate`; survivors keep document
+    order under content-addressed ids (`content_id`), exact duplicates
+    collapse, rejections are counted per rule. The counts are the response's
+    rejection report and the log line."""
     out = AnchorResult()
+    seen: set[str] = set()
     for raw in raws:
-        n = len(out.accepted) + 1
-        candidate, rule, detail = anchor_candidate(
-            raw, sections, paper_id=paper_id, candidate_id=f"{id_prefix}-{paper_id}-{n}"
-        )
+        candidate, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, id_prefix=id_prefix)
         if candidate is not None:
+            # Content-addressed ids: the same sentence, field and number
+            # emitted twice is one candidate, not two.
+            if candidate.id in seen:
+                continue
+            seen.add(candidate.id)
             out.accepted.append(candidate)
         else:
             out.rejected += 1

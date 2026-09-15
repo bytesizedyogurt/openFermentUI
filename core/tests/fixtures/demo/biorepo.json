@@ -1,21 +1,21 @@
 {
-  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written through biorepo.write against the demo fixtures — two rejections of the stand-in text's two candidates (Witness's false positives) and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written by `pnpm demo:fixtures` through biorepo.write against the demo fixtures — two rejections of the first two candidates (Witness's false positives) and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
   "version": 1,
   "decisions": {
-    "hk1-B5-1": {
+    "hk1-B5-eaf0fd9a": {
       "status": "rejected",
       "provenance": "unverified",
       "rejectReason": "not this field — a placeholder table row, not a titre",
       "reviewer": "sean",
-      "recordId": "hk1-B5-1",
+      "recordId": "hk1-B5-eaf0fd9a",
       "at": "2026-09-15T09:00:00Z"
     },
-    "hk1-B5-2": {
+    "hk1-B5-d235ba19": {
       "status": "rejected",
       "provenance": "unverified",
       "rejectReason": "wrong span — a row of titres read as a colony time",
       "reviewer": "sean",
-      "recordId": "hk1-B5-2",
+      "recordId": "hk1-B5-d235ba19",
       "at": "2026-09-15T09:00:00Z"
     },
     "r-B5-3": {
@@ -28,7 +28,7 @@
   },
   "records": [
     {
-      "id": "hk1-B5-1",
+      "id": "hk1-B5-eaf0fd9a",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -46,7 +46,7 @@
       "isPrimary": true
     },
     {
-      "id": "hk1-B5-2",
+      "id": "hk1-B5-d235ba19",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",

@@ -55,9 +55,22 @@ EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 # core/data/biorepo.json — the committed file — or anything anyone fetched
 # for real (§8.1).
 _CORE = Path(__file__).parent.parent
-DATA_DIR = Path(os.environ.get("OPENFERMENT_DATA_DIR") or _CORE / "data")
+
+
+def _env_path(name: str, default: Path) -> Path:
+    """An override from the environment. A relative one is taken from the
+    repository root — the `pnpm intake:*` aliases run from core/, and a path
+    typed at the root must not quietly land in core/core/."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    path = Path(raw)
+    return path if path.is_absolute() else (_CORE.parent / path).resolve()
+
+
+DATA_DIR = _env_path("OPENFERMENT_DATA_DIR", _CORE / "data")
 FULLTEXT_DIR = DATA_DIR / "fulltext"
-FIXTURE_ROOT = Path(os.environ.get("OPENFERMENT_FIXTURE_DIR") or _CORE / "tests" / "fixtures")
+FIXTURE_ROOT = _env_path("OPENFERMENT_FIXTURE_DIR", _CORE / "tests" / "fixtures")
 FIXTURE_DIR = FIXTURE_ROOT / "jats"
 TIMEOUT_S = 20.0
 # §11: at most two requests per second. Enforced here rather than remembered by
@@ -205,6 +218,9 @@ def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
             _collect(child, inner, prose=prose)
             exponent = "".join(inner).strip()
             if before and before[-1].isdigit() and exponent and not exponent.startswith("^"):
+                # Close up '10 ⁶' as well as '10⁶': the space is typography.
+                if parts and parts[-1].rstrip() != parts[-1]:
+                    parts[-1] = parts[-1].rstrip()
                 parts.append("^" + exponent)
             else:
                 parts.append(exponent)

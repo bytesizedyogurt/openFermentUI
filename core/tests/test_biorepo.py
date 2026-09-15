@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 STRUCTURAL = "structural"
 
 # The extractor found a titre in B5's table — a field the seed has no B5
-# record for, so it is a new candidate, hk1-B5-1.
+# record for, so it is a new candidate, hk1-B5-eaf0fd9a.
 NEW_TITRE = {
     "candidates": [
         {
@@ -67,9 +67,19 @@ def decision(record_id: str, status: str = "verified", **overrides) -> ReviewDec
     return ReviewDecision(**base)
 
 
+def identified(paper_id: str) -> bool:
+    p = load_corpus().paper(paper_id) or {}
+    return bool(p.get("pmcid") or p.get("doi") or p.get("pmid"))
+
+
 def unfetched_seed_record() -> str:
-    """A seed record whose paper nobody has fetched in this test."""
-    return next(r["id"] for r in load_corpus().records if r["paperId"] != "B5")
+    """A seed record on an identified paper nobody has fetched in this test."""
+    return next(r["id"] for r in load_corpus().records if r["paperId"] != "B5" and identified(r["paperId"]))
+
+
+def unidentified_seed_record() -> str:
+    """A seed record on a paper with no PMCID, DOI or PMID — 73 of the 132."""
+    return next(r["id"] for r in load_corpus().records if not identified(r["paperId"]))
 
 
 # ── the file ───────────────────────────────────────────────────────────
@@ -130,6 +140,41 @@ def test_gold_needs_a_quote_that_anchors_its_own_will_not_do_here():
     assert caught.value.rule == "quote"
 
 
+def test_refuses_any_decision_on_a_paper_with_no_identifier():
+    # check:biorepo fails the build on such a decision (§7.4); the write
+    # function says so first, for a rejection as much as a promotion.
+    rid = unidentified_seed_record()
+    for status in ("rejected", "verified"):
+        with pytest.raises(biorepo.WriteRefused) as caught:
+            biorepo.write(decision(rid, status, rejectReason="x"))
+        assert caught.value.rule == "paper"
+    assert not biorepo.PATH.exists()
+
+
+def test_refuses_a_typed_value_outside_the_fields_range():
+    # §2.4 rule 5 for what a reviewer typed: 8500 days to a colony is not a
+    # colony time, whatever the reviewer meant; and a unit that does not
+    # normalise is refused the same way. Status does not matter.
+    fetch_b5()
+    for status in ("verified", "unverified"):
+        with pytest.raises(biorepo.WriteRefused) as caught:
+            biorepo.write(decision("r-B5-1", status, corrected=Quantity(value=8500, unit="d")))
+        assert caught.value.rule == "range", status
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=8.5, unit="furlongs")))
+    assert caught.value.rule == "range"
+    # In range, it is stored — with the correction.
+    stored = biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=9, unit="d")))
+    assert stored.corrected == Quantity(value=9, unit="d")
+
+
+def test_refuses_gold_that_is_not_verified():
+    fetch_b5()
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-B5-1", "unverified", provenance="gold", gold=Quantity(value=8.5, unit="d")))
+    assert caught.value.rule == "status"
+
+
 # ── what a good decision does ──────────────────────────────────────────
 
 
@@ -144,42 +189,42 @@ def test_accept_without_a_quote_proceeds_on_a_fetched_paper():
 def test_gold_on_a_candidate_anchors_on_its_quote_and_keeps_both(monkeypatch):
     extract_b5(monkeypatch)
     stored = biorepo.write(
-        decision("hk1-B5-1", "verified", provenance="gold", gold=Quantity(value=7, unit="mg L⁻¹"))
+        decision("hk1-B5-eaf0fd9a", "verified", provenance="gold", gold=Quantity(value=7, unit="mg L⁻¹"))
     )
     # The candidate's own quote and section were copied onto the decision,
     # so `check:biorepo`'s "every gold decision has a quote" holds by
     # construction.
     assert stored.quote == "Placeholder A | 7 | mg L-1" and stored.sectionId == "t1"
     repo = biorepo.read()
-    assert [c.id for c in repo.records] == ["hk1-B5-1"]
+    assert [c.id for c in repo.records] == ["hk1-B5-eaf0fd9a"]
     assert repo.records[0].status == "unverified", "the copy is the candidate; the decision is the authority"
 
 
 def test_a_rejected_candidate_is_a_false_positive_in_the_run(monkeypatch):
     extract_b5(monkeypatch)
-    biorepo.write(decision("hk1-B5-1", "rejected", rejectReason="a placeholder row, not a measurement"))
+    biorepo.write(decision("hk1-B5-eaf0fd9a", "rejected", rejectReason="a placeholder row, not a measurement"))
     runs = witness.runs()
-    assert [fp.id for fp in runs[0].falsePositives] == ["hk1-B5-1"]
+    assert [fp.id for fp in runs[0].falsePositives] == ["hk1-B5-eaf0fd9a"]
     fp = runs[0].falsePositives[0]
     assert fp.field == "titer_secreted" and fp.extracted == Quantity(value=7, unit="mg L⁻¹")
     assert fp.note == "a placeholder row, not a measurement"
     # Still in the overlay's candidates, with its decision beside it, so the
     # browser can show what was decided rather than a hole.
     overlay = Overlay.model_validate(TestClient(app).get("/api/biorepo/overlay").json())
-    assert [c.id for c in overlay.candidates] == ["hk1-B5-1"]
-    assert overlay.records["hk1-B5-1"].status == "rejected"
+    assert [c.id for c in overlay.candidates] == ["hk1-B5-eaf0fd9a"]
+    assert overlay.records["hk1-B5-eaf0fd9a"].status == "rejected"
 
 
 def test_a_decided_candidate_outlives_the_cache(monkeypatch):
     extract_b5(monkeypatch)
-    biorepo.write(decision("hk1-B5-1", "verified"))
+    biorepo.write(decision("hk1-B5-eaf0fd9a", "verified"))
     for path in extract.CANDIDATES_DIR.glob("*.json"):
         path.unlink()
     # No run — nothing was extracted in this checkout — but the record is
     # still a record, and a later decision about it still resolves.
     assert witness.runs() == []
-    assert [c.id for c in witness.new_candidates()] == ["hk1-B5-1"]
-    again = biorepo.write(decision("hk1-B5-1", "rejected", rejectReason="on reflection, a placeholder"))
+    assert [c.id for c in witness.new_candidates()] == ["hk1-B5-eaf0fd9a"]
+    again = biorepo.write(decision("hk1-B5-eaf0fd9a", "rejected", rejectReason="on reflection, a placeholder"))
     assert again.status == "rejected" and len(biorepo.read().records) == 1
 
 

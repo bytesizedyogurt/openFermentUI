@@ -31,7 +31,8 @@
     "check:reference": "tsx scripts/check-reference.ts",
     "intake:fetch": "cd core && uv run python -m openferment_core.intake",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
-    "demo:offline": "node scripts/demo-offline.mjs"
+    "demo:offline": "node scripts/demo-offline.mjs",
+    "demo:fixtures": "cd core && uv run python -m openferment_core.demo"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

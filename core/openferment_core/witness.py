@@ -110,51 +110,60 @@ def match_run(
         if d.rule == "quote":
             dropped_by_key[(d.paperId, d.field)].append(d)
 
-    results: list[ExtractRunResult] = []
-    for rec in seed_records:
-        if rec["paperId"] not in scored:
+    # One candidate scores one record. Several curated records can share a
+    # (paper, field) — three expression figures from one paper, or one
+    # sentence curated per strain — and scoring each against every candidate
+    # would let one extraction match twice, or count the siblings it never
+    # addressed as value mismatches. Matches are taken first, consuming the
+    # candidate; what remains is judged against what remains.
+    scored_records = [rec for rec in seed_records if rec["paperId"] in scored]
+    consumed: set[int] = set()
+    consumed_dropped: set[int] = set()
+    outcome_for: dict[str, ExtractRunResult] = {}
+
+    for rec in scored_records:
+        key = (rec["paperId"], rec["field"])
+        rv, ru = rec["value"], rec["unit"]
+        hit = next(
+            (c for c in by_key.get(key, []) if id(c) not in consumed and _agrees(c.value, c.unit, rv, ru)),
+            None,
+        )
+        if hit is not None:
+            consumed.add(id(hit))
+            outcome_for[rec["id"]] = ExtractRunResult(
+                goldRecordId=rec["id"], outcome="match", extracted=_quantity(hit.value, hit.unit)
+            )
+
+    for rec in scored_records:
+        if rec["id"] in outcome_for:
             continue
         key = (rec["paperId"], rec["field"])
         rv, ru = rec["value"], rec["unit"]
-        cands = by_key.get(key, [])
-
-        hit = next((c for c in cands if _agrees(c.value, c.unit, rv, ru)), None)
-        if hit is not None:
-            results.append(
-                ExtractRunResult(goldRecordId=rec["id"], outcome="match", extracted=_quantity(hit.value, hit.unit))
-            )
-            continue
-
         span = next(
-            (d for d in dropped_by_key.get(key, []) if _agrees(d.value, d.unit, rv, ru)),
+            (d for d in dropped_by_key.get(key, [])
+             if id(d) not in consumed_dropped and _agrees(d.value, d.unit, rv, ru)),
             None,
         )
         if span is not None:
-            results.append(
-                ExtractRunResult(
-                    goldRecordId=rec["id"], outcome="span_error", extracted=_quantity(span.value, span.unit)
-                )
+            consumed_dropped.add(id(span))
+            outcome_for[rec["id"]] = ExtractRunResult(
+                goldRecordId=rec["id"], outcome="span_error", extracted=_quantity(span.value, span.unit)
             )
             continue
-
+        cands = [c for c in by_key.get(key, []) if id(c) not in consumed]
         if not cands:
-            results.append(ExtractRunResult(goldRecordId=rec["id"], outcome="miss"))
+            outcome_for[rec["id"]] = ExtractRunResult(goldRecordId=rec["id"], outcome="miss")
             continue
-
         same = next((c for c in cands if _same_family(c.unit, ru)), None)
-        if same is not None:
-            results.append(
-                ExtractRunResult(
-                    goldRecordId=rec["id"], outcome="value_mismatch", extracted=_quantity(same.value, same.unit)
-                )
-            )
-        else:
-            first = cands[0]
-            results.append(
-                ExtractRunResult(
-                    goldRecordId=rec["id"], outcome="unit_error", extracted=_quantity(first.value, first.unit)
-                )
-            )
+        chosen = same if same is not None else cands[0]
+        consumed.add(id(chosen))
+        outcome_for[rec["id"]] = ExtractRunResult(
+            goldRecordId=rec["id"],
+            outcome="value_mismatch" if same is not None else "unit_error",
+            extracted=_quantity(chosen.value, chosen.unit),
+        )
+
+    results = [outcome_for[rec["id"]] for rec in scored_records]
 
     # falsePositives stays empty here on purpose: a candidate the seed does
     # not cover is unscored until a reviewer rejects it (§6.2, §7.3) —
@@ -209,13 +218,6 @@ def seed_records() -> list[dict[str, Any]]:
     return [r for r in load_corpus().records if r.get("source", "seed") == "seed"]
 
 
-_CONTENT = ("sectionId", "field", "value", "unit", "quote")
-
-
-def _same_content(a: Candidate, b: Candidate) -> bool:
-    return all(getattr(a, k) == getattr(b, k) for k in _CONTENT)
-
-
 @dataclass
 class Gathered:
     """Everything the cache and biorepo.json say about candidates, read once."""
@@ -224,24 +226,15 @@ class Gathered:
     dropped: list[DroppedCandidate] = field(default_factory=list)
     papers: set[str] = field(default_factory=set)
     decisions: dict[str, ReviewDecision] = field(default_factory=dict)
-    # Candidate ids whose biorepo.json copy no longer matches what the cache
-    # holds under that id: the paper was re-extracted and the numbering moved.
-    stale: set[str] = field(default_factory=set)
 
 
 def _gather() -> Gathered:
     """Every candidate the extractor produced, plus the copies biorepo.json
-    keeps of the ones a reviewer decided — the same candidate when both exist,
-    and the only copy on a fresh clone where candidates/ is empty. The scored
-    papers are the extracted ones alone: a decided candidate does not make
-    its paper a paper the extractor ran over in this checkout.
-
-    Ids are positional (§6.2: hk1-<paperId>-<n>), so a re-extraction can put
-    different content under an id a reviewer already decided. When the copy
-    and the cache disagree on content, the cache wins — it is what the
-    extractor says now — and the decision is STALE: not applied, not a false
-    positive, logged with the ids so someone re-decides. A decision about a
-    sentence must not follow the id to a different sentence."""
+    keeps of the ones a reviewer decided — the same candidate when both exist
+    (ids are content-addressed, so the same id IS the same content), and the
+    only copy on a fresh clone where candidates/ is empty. The scored papers
+    are the extracted ones alone: a decided candidate does not make its paper
+    a paper the extractor ran over in this checkout."""
     repo = biorepo.read()
     responses = extract.all_cached()
     copies = {c.id: c for c in repo.records}
@@ -250,23 +243,9 @@ def _gather() -> Gathered:
     for r in responses:
         for c in r.candidates:
             seen.add(c.id)
-            copy = copies.get(c.id)
-            if copy is not None and not _same_content(copy, c):
-                out.stale.add(c.id)
-                out.candidates.append(c)
-            else:
-                out.candidates.append(copy or c)
+            out.candidates.append(copies.get(c.id, c))
         out.dropped.extend(r.dropped)
     out.candidates += [c for cid, c in copies.items() if cid not in seen]
-    for cid in out.stale:
-        out.decisions.pop(cid, None)
-    if out.stale:
-        log.warning(
-            "witness: %d decision(s) are stale — the paper was re-extracted and the candidate under "
-            "the same id changed: %s. Not applied; decide again in Guild.",
-            len(out.stale),
-            ", ".join(sorted(out.stale)),
-        )
     return out
 
 
@@ -304,10 +283,9 @@ def new_candidates() -> list[Candidate]:
     so an accepted record is still a record on a checkout that never ran the
     extractor."""
     g = _gather()
-    decided = {c.id for c in biorepo.records()} - g.stale
+    decided = {c.id for c in biorepo.records()}
     fresh = new_records(g.candidates, seed_records(), papers=g.papers) if g.papers else []
-    out = [c for c in fresh if c.id not in decided]
-    return out + [c for c in biorepo.records() if c.id not in g.stale]
+    return [c for c in fresh if c.id not in decided] + biorepo.records()
 
 
 def overlay_candidates() -> list[Candidate]:

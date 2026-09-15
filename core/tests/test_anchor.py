@@ -12,6 +12,8 @@ the service reads them. Offline and free.
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from openferment_core.units import tables
@@ -305,7 +307,12 @@ def test_anchor_all_counts_rejections_per_rule():
         SECTIONS,
         paper_id="X1",
     )
-    assert [c.id for c in result.accepted] == ["hk1-X1-1", "hk1-X1-2"]
+    ids = [c.id for c in result.accepted]
+    assert len(ids) == 2 and all(re.fullmatch(r"hk1-X1-[0-9a-f]{8}", i) for i in ids) and ids[0] != ids[1]
+    # Stable: the same content gets the same id on a second run, however the
+    # unit was spelled; a duplicate collapses.
+    again = anchor_all([good(), good(unit="g L⁻¹"), good()], SECTIONS, paper_id="X1")
+    assert [c.id for c in again.accepted] == [ids[0]] and again.rejected == 0
     assert result.rejected == 4
     assert result.reasons["section"] == 1
     assert result.reasons["value"] == 1

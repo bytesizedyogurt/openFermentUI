@@ -1,5 +1,5 @@
 {
-  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with the snippet in tests/test_api_intake.py if the parser's output changes. The two `candidates` are hand-written raw candidates put through the real validate.anchor_all against that text (OF-BLD-012 §2.4) — one a titre the seed has no B5 record for, one the same table row read as a colony time — and `runs` is the real witness.match_run over B5's three seed records (§6.2). Neither is a measurement of anything.",
+  "_note": "Served by scripts/smoke.mjs as GET /api/biorepo/overlay. B5's text here is tests/fixtures/jats/structural.xml — a made-up article SHAPE for testing the parser, not the paper. It stands in so the reader's overlay path can be exercised offline; the real B5 text arrives through intake.py. Regenerate with `pnpm demo:fixtures` (core/openferment_core/demo.py) if the parser's output changes. The two `candidates` are hand-written raw candidates put through the real validate.anchor_all against that text (OF-BLD-012 §2.4) — one a titre the seed has no B5 record for, one the same table row read as a colony time — and `runs` is the real witness.match_run over B5's three seed records (§6.2). Neither is a measurement of anything.",
   "papers": {
     "B5": {
       "ingest": "complete",
@@ -42,14 +42,14 @@
         }
       ],
       "license": "https://creativecommons.org/licenses/by/4.0/",
-      "fetchedAt": "2026-09-14T00:00:00+00:00",
+      "fetchedAt": "2026-09-15T05:35:49.674480+00:00",
       "reason": null
     }
   },
   "records": {},
   "candidates": [
     {
-      "id": "hk1-B5-1",
+      "id": "hk1-B5-eaf0fd9a",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -67,7 +67,7 @@
       "isPrimary": true
     },
     {
-      "id": "hk1-B5-2",
+      "id": "hk1-B5-d235ba19",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -99,19 +99,11 @@
         },
         {
           "goldRecordId": "r-B5-2",
-          "outcome": "value_mismatch",
-          "extracted": {
-            "value": 7.0,
-            "unit": "d"
-          }
+          "outcome": "miss"
         },
         {
           "goldRecordId": "r-B5-3",
-          "outcome": "value_mismatch",
-          "extracted": {
-            "value": 7.0,
-            "unit": "d"
-          }
+          "outcome": "miss"
         }
       ],
       "falsePositives": []

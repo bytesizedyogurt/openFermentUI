@@ -120,7 +120,7 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     monkeypatch.setattr(extract, "call_model", call)
 
     r = extract.extract_paper("X1")
-    assert [c.id for c in r.candidates] == ["hk1-X1-1", "hk1-X1-2"]
+    assert [c.id for c in r.candidates] == ["hk1-X1-9c0e8df1", "hk1-X1-106ec772"], "content-addressed, stable across runs"
     assert r.candidates[0].value == 7 and r.candidates[0].unit == "mg L⁻¹"
     assert r.candidates[1].organism == "imaginary yeast"
     assert all(c.status == "unverified" and c.provenance == "unverified" for c in r.candidates)
@@ -228,7 +228,7 @@ def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
     assert r.status_code == 200, r.text
     body = ExtractResponse.model_validate(r.json())
     assert body.paperId == "B5" and len(body.candidates) == 2 and body.rejected == 4
-    assert body.candidates[0].id == "hk1-B5-1"
+    assert body.candidates[0].id == "hk1-B5-eaf0fd9a"
 
 
 def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):

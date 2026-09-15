@@ -7,6 +7,7 @@ real fetch is exercised by the `live` test in test_intake_live.py.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,14 @@ FIXTURES = Path(__file__).parent / "fixtures"
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    # Only the structural document is a fixture here. A real PMC8471596.xml
+    # saved beside it (test_intake's skip message asks for one) must not turn
+    # B5's fixture-mode fetch from the failure these tests expect into a
+    # success.
+    jats = tmp_path / "jats"
+    jats.mkdir()
+    shutil.copy(FIXTURES / "jats" / "structural.xml", jats / "structural.xml")
+    monkeypatch.setattr(intake, "FIXTURE_DIR", jats)
     monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
     monkeypatch.setattr(extract, "CANDIDATES_DIR", tmp_path / "candidates")
     monkeypatch.setattr(biorepo, "PATH", tmp_path / "biorepo.json")
@@ -95,9 +104,7 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     """scripts/smoke.mjs serves this file as the overlay. It is committed, so
     it can drift from the model; this ties it to the shape the browser reads.
 
-    Regenerate with:
-        uv run --extra dev python -c "from openferment_core.intake import split_jats; ..."
-    (the snippet that produced it is in the file's own _note)."""
+    Regenerate with `pnpm demo:fixtures` (core/openferment_core/demo.py)."""
     raw = json.loads((FIXTURES / "overlay-smoke.json").read_text(encoding="utf-8"))
     overlay = Overlay.model_validate(raw)
     assert "B5" in overlay.papers
@@ -107,13 +114,15 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     # §6.4 — the run Witness scores in the smoke test: match_run's own output
     # over B5's three curated records and the two candidates below.
     assert [r.run for r in overlay.runs] == ["haiku-1"]
-    assert [r.outcome for r in overlay.runs[0].results] == ["value_mismatch"] * 3
+    # One candidate scores one record: the colony-time candidate is spent
+    # on r-B5-1 as a mismatch; its siblings are misses, not mismatches.
+    assert [r.outcome for r in overlay.runs[0].results] == ["value_mismatch", "miss", "miss"]
     assert overlay.runs[0].falsePositives == []
     # §7.3 — two anchored candidates: a titre the seed has no B5 record for
     # (a new record, so Guild queues it) and the same row read as a colony
     # time (matching r-B5-*'s field, so it sits beside those cards).
     assert [(c.id, c.field) for c in overlay.candidates] == [
-        ("hk1-B5-1", "titer_secreted"),
-        ("hk1-B5-2", "time_to_colony"),
+        ("hk1-B5-eaf0fd9a", "titer_secreted"),
+        ("hk1-B5-d235ba19", "time_to_colony"),
     ]
     assert all(c.extractorRun == "haiku-1" and c.status == "unverified" for c in overlay.candidates)
