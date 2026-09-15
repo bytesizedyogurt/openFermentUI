@@ -564,7 +564,7 @@ export default function IntakeIngest() {
                               : 'Retry re-runs the same parser. Continuing without full text admits the paper on its abstract alone — extractions will be limited to that text and spans cannot be anchored to sections.'}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            <Button size="sm" onClick={() => ingestPaper(row.paper.id)}>
+                            <Button size="sm" onClick={() => ingestPaper(row.paper.id, { force: row.real })}>
                               <RefreshCw size={12} /> Retry
                             </Button>
                             <Button size="sm" onClick={() => continueDegraded(row)}>

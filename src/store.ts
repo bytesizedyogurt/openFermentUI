@@ -97,6 +97,7 @@ function stamp(): string {
 function decisionOf(
   r: ExtractionRecord,
   span: { quote: string; sectionId: string } | null,
+  at: string,
 ): ReviewDecision {
   return {
     status: r.status,
@@ -106,7 +107,7 @@ function decisionOf(
     rejectReason: r.rejectReason,
     reviewer: r.reviewer ?? 'you',
     recordId: r.id,
-    at: new Date().toISOString(),
+    at,
     ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
   };
 }
@@ -207,7 +208,7 @@ export interface OFState {
   clearJobs: () => void;
 
   // ingest
-  ingestPaper: (paperId: string) => void;
+  ingestPaper: (paperId: string, opts?: { force?: boolean }) => void;
   setPaperIngest: (paperId: string, status: Paper['ingest']) => void;
 
   // protocols / runs
@@ -327,6 +328,8 @@ export interface OFState {
    * against them: the later of the two wins (OF-BLD-012 §7.3).
    */
   durableReview: { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null;
+  /** ISO time of the last decision this browser made on each record; persisted as the Durable decision's `at`. */
+  decisionAt: Record<string, string>;
 
   // service overlay (OF-BLD-012 §2.1)
   /** Whether openferment-core answered /api/health this session. null = not asked yet. */
@@ -338,7 +341,7 @@ export interface OFState {
   /** Ask the service for its overlay and apply it. Silent when there is no service. */
   hydrateOverlay: () => Promise<void>;
   /** Live fetch through the service. Called by `ingestPaper` when the service is up. */
-  ingestPaperLive: (paperId: string) => Promise<void>;
+  ingestPaperLive: (paperId: string, force?: boolean) => Promise<void>;
   /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
   ingestPaperScripted: (paperId: string) => void;
   /** One forced tool call over a fetched paper, through the service (§6.3); then the overlay again. */
@@ -348,6 +351,8 @@ export interface OFState {
   focusReview: (recordId: string) => void;
   /** Post one decision to the service; `biorepo.write` stores it or refuses it (§7.2–7.3). */
   postReviewDecision: (decision: ReviewDecision) => Promise<void>;
+  /** Post every decision this browser made that the service lacks or has an older one of (§7.3). */
+  syncDecisions: () => Promise<void>;
 
   // misc
   logActivity: (e: ActivityEvent) => void;
@@ -512,6 +517,7 @@ export const useStore = create<OFState>()((set, get) => ({
   toasts: [],
   durableReady: false,
   durableReview: null as { savedAt: string; decisions: Record<string, DurableReviewDecision> } | null,
+  decisionAt: {} as Record<string, string>,
   ui: {
     theme: initialTheme(),
     density: 'comfortable',
@@ -615,17 +621,19 @@ export const useStore = create<OFState>()((set, get) => ({
       stats.skipped++;
       return r;
     });
+    const now = new Date().toISOString();
     set({
       records,
       undoStack: [...s.undoStack.slice(-25), frame],
       reviewStats: stats,
       reviewIndex: Math.min(s.reviewIndex + 1, s.reviewQueue.length),
+      decisionAt: action === 'skip' ? s.decisionAt : { ...s.decisionAt, [id]: now },
     });
     // §7.3 — the Durable tier keeps the decision offline; when the service is
     // up it is posted too, and `biorepo.write` is what stores it there.
     if (action !== 'skip' && s.serviceUp) {
       const after = get().records.find((r) => r.id === id);
-      if (after) void get().postReviewDecision(decisionOf(after, span));
+      if (after) void get().postReviewDecision(decisionOf(after, span, now));
     }
   },
 
@@ -683,19 +691,26 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const frame = s.undoStack[s.undoStack.length - 1];
     if (!frame) return;
+    // Restore what the frame holds, by id; a record that arrived since (a
+    // candidate the overlay appended) is not the frame's to take away.
+    const restored = new Map(frame.records.map((r) => [r.id, r]));
+    const now = new Date().toISOString();
+    const changed = frame.records.filter((r) => {
+      const current = s.records.find((c) => c.id === r.id);
+      return current && !sameDecision(current, r);
+    });
+    const decisionAt = { ...s.decisionAt };
+    for (const r of changed) decisionAt[r.id] = now;
     set({
-      records: frame.records,
+      records: s.records.map((r) => restored.get(r.id) ?? r),
       reviewIndex: frame.queueIndex,
       undoStack: s.undoStack.slice(0, -1),
+      decisionAt,
     });
     // §7.3 — an undo is a decision as well: the service must not keep a
     // status this browser has taken back.
     if (s.serviceUp) {
-      for (const restored of frame.records) {
-        const current = s.records.find((r) => r.id === restored.id);
-        if (!current || sameDecision(current, restored)) continue;
-        void get().postReviewDecision(decisionOf(restored, null));
-      }
+      for (const r of changed) void get().postReviewDecision(decisionOf(r, null, now));
     }
   },
 
@@ -785,7 +800,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // with a reason that names the missing service. The offline path is kept as
   // a fallback for the board, not for the corpus: nothing it does changes a
   // paper's text, and the board labels it as a simulation.
-  ingestPaper: (paperId) => {
+  ingestPaper: (paperId, opts) => {
     if (!get().papers.some((p) => p.id === paperId)) return;
     void (async () => {
       let up = get().serviceUp;
@@ -797,7 +812,7 @@ export const useStore = create<OFState>()((set, get) => ({
         }
         set({ serviceUp: up });
       }
-      if (up) await get().ingestPaperLive(paperId);
+      if (up) await get().ingestPaperLive(paperId, opts?.force);
       else get().ingestPaperScripted(paperId);
     })();
   },
@@ -843,7 +858,7 @@ export const useStore = create<OFState>()((set, get) => ({
     await get().hydrateOverlay();
   },
 
-  ingestPaperLive: async (paperId) => {
+  ingestPaperLive: async (paperId, force = false) => {
     get().setPaperIngest(paperId, 'stage:fetch');
     // Two real stages. Chunk, Embed and Extract are not run by a fetch — the
     // board shows them as not built rather than ticking them off.
@@ -867,7 +882,9 @@ export const useStore = create<OFState>()((set, get) => ({
 
     let result: FetchResult;
     try {
-      result = await fetchPaper(paperId);
+      // Retry forces: the service caches a miss so the same paper is not
+      // asked twice by accident, and a retry is on purpose.
+      result = await fetchPaper(paperId, { force });
     } catch (e) {
       const message =
         e instanceof IntakeDown ? `${e.message} ${e.remedy}` : e instanceof Error ? e.message : String(e);
@@ -1929,15 +1946,19 @@ export const useStore = create<OFState>()((set, get) => ({
       // Review decisions are re-applied over the seeded records rather than
       // replacing them, so a corpus update ships new records without
       // discarding what a reviewer already decided.
+      const decisionAt = { ...s.decisionAt };
       const records = s.records.map((r) => {
         const d = snap.reviewDecisions[r.id];
         if (!d) return r;
         // §7.3 — the service may already have applied its decision for this
-        // record; the later of the two wins, and its `at` is an ISO stamp
-        // like our savedAt.
+        // record; the later of the two wins. The decision's own `at` when the
+        // snapshot carries one, the snapshot's savedAt for older snapshots.
+        const madeAt = d.at ?? snap.savedAt;
+        decisionAt[r.id] = madeAt;
         const server = s.overlay?.records[r.id];
-        if (server && server.at > snap.savedAt) return r;
-        return { ...r, ...d };
+        if (server && server.at > madeAt) return r;
+        const { at: _at, ...fields } = d;
+        return { ...r, ...fields };
       });
       // Locks re-apply only to runbooks that still exist. A lock whose runbook
       // was created in a previous session and is not in this one is dropped —
@@ -1953,8 +1974,12 @@ export const useStore = create<OFState>()((set, get) => ({
         measuredEvidence: snap.measuredEvidence ?? [],
         durableReady: durableAvailable(),
         durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
+        decisionAt,
       };
     });
+    // Both sides are known once the overlay is in too; whichever hydrate
+    // finishes second pushes the browser's later decisions to the service.
+    if (get().serviceUp && get().overlay) void get().syncDecisions();
   },
 
   // ── service overlay (OF-BLD-012 §2.1) ─────────────────────────────────
@@ -1999,7 +2024,8 @@ export const useStore = create<OFState>()((set, get) => ({
       const decide = (r: ExtractionRecord): ExtractionRecord => {
         const d = merged.records[r.id];
         if (!d) return r;
-        if (local?.decisions[r.id] && local.savedAt > d.at) return r;
+        const mine = local?.decisions[r.id];
+        if (mine && (mine.at ?? local!.savedAt) > d.at) return r;
         return {
           ...r,
           status: d.status,
@@ -2025,10 +2051,18 @@ export const useStore = create<OFState>()((set, get) => ({
         .map((c) => {
           const mine = local?.decisions[c.id];
           const record: ExtractionRecord = { ...c, audit: [] };
-          return mine ? { ...record, ...mine } : record;
+          if (!mine) return record;
+          const { at: _at, ...fields } = mine;
+          return { ...record, ...fields };
         });
       const records = [...s.records, ...arriving].map(decide);
-      return { overlay: merged, papers, runOutputs, records };
+      // New records join an open review queue after everything already in it
+      // (§7.3). A queue seeded before the overlay arrived would otherwise
+      // never see them.
+      const queued = new Set(s.reviewQueue);
+      const joining = arriving.filter((r) => r.status === 'unverified' && !queued.has(r.id)).map((r) => r.id);
+      const reviewQueue = s.reviewQueue.length && joining.length ? [...s.reviewQueue, ...joining] : s.reviewQueue;
+      return { overlay: merged, papers, runOutputs, records, reviewQueue };
     }),
 
   hydrateOverlay: async () => {
@@ -2039,6 +2073,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
     set({ serviceUp: true });
     get().applyOverlay(overlay);
+    if (get().durableReview) void get().syncDecisions();
   },
 
   focusReview: (recordId) => {
@@ -2055,6 +2090,35 @@ export const useStore = create<OFState>()((set, get) => ({
       .filter((r) => r.status === 'unverified' && r.id !== recordId)
       .map((r) => r.id);
     get().startReview([recordId, ...rest]);
+  },
+
+  syncDecisions: async () => {
+    // The Durable tier is the offline cache (§7.3): a decision made with the
+    // service down reaches it here, the next time both are known. Later
+    // wins in both directions — a server decision newer than the browser's
+    // was already applied over it, and is left alone.
+    const s = get();
+    const local = s.durableReview;
+    if (!local || !s.overlay || !s.serviceUp) return;
+    const pending: ReviewDecision[] = [];
+    for (const [id, mine] of Object.entries(local.decisions)) {
+      const madeAt = mine.at ?? local.savedAt;
+      const server = s.overlay.records[id];
+      if (server && server.at >= madeAt) continue;
+      const record = s.records.find((r) => r.id === id);
+      if (!record) continue; // a candidate not in this overlay; nothing to post it about
+      pending.push(decisionOf(record, null, madeAt));
+    }
+    for (const d of pending) await get().postReviewDecision(d);
+    if (pending.length) {
+      get().logActivity({
+        at: stamp(),
+        icon: 'upload',
+        text: `${pending.length} review decision${pending.length === 1 ? '' : 's'} made offline sent to the service`,
+        href: '#/guild',
+        provenance: 'user',
+      });
+    }
   },
 
   postReviewDecision: async (decision) => {
@@ -2098,7 +2162,7 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp });
+    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {} });
     if (overlay) get().applyOverlay(overlay);
     get().toast({
       text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
@@ -2127,6 +2191,7 @@ function snapshotOf(s: OFState): DurableSnapshot {
       corrected: r.corrected,
       rejectReason: r.rejectReason,
       reviewer: r.reviewer,
+      at: s.decisionAt[r.id],
     };
   }
   const runbookLocks: DurableSnapshot['runbookLocks'] = {};

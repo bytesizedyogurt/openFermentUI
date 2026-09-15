@@ -282,7 +282,7 @@ export default function Witness() {
   const provisionalRecords = useMemo<ExtractionRecord[]>(
     () =>
       records.map((r) =>
-        r.gold || r.status === 'rejected' || !fetchedPapers.has(r.paperId)
+        r.gold || r.status === 'rejected' || r.extractorRun === 'haiku-1' || !fetchedPapers.has(r.paperId)
           ? r
           : { ...r, gold: { value: r.value, unit: r.unit } },
       ),

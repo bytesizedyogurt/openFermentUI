@@ -47,6 +47,13 @@ export interface DurableReviewDecision {
   corrected?: { value: number; unit: string };
   rejectReason?: string;
   reviewer?: string;
+  /**
+   * When THIS decision was made, ISO. Compared against the service's
+   * decision for the same record — the later wins (OF-BLD-012 §7.3). The
+   * snapshot's savedAt moves on every deposition and lock save, so it is only
+   * the fallback for snapshots written before this field existed.
+   */
+  at?: string;
 }
 
 /**

@@ -63,6 +63,10 @@ const server = createServer(async (req, res) => {
       return res.end(JSON.stringify(decision));
     }
     if (url === '/api/biorepo/overlay') {
+      // Answered late on purpose: a screen mounted before the overlay arrives
+      // has to cope with it arriving — Guild's queue in particular (§7.3) —
+      // and a double that answered instantly would let that path go untested.
+      await new Promise((r) => setTimeout(r, 700));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(await readFile(OVERLAY_FIXTURE));
     }
@@ -376,12 +380,27 @@ async function main() {
       if (!/tp 0 · fp 3 · fn 3/.test(witness)) problems.push('Witness did not score the fixture run as tp 0, fp 3, fn 3');
       if (/No extractor has been run against this corpus yet/.test(witness)) problems.push('Witness still shows the empty state');
       if (!/1 candidate new to the corpus — unscored/.test(witness)) problems.push('Witness does not count the one new candidate as unscored');
+      // The extractor's own candidate is a record on a fetched paper, but it
+      // is not gold to score the extractor against: three curated records
+      // stand in, not four, and the run is not "partial".
+      if (/Partial results/.test(witness)) problems.push('Witness counts the new candidate as provisional gold and calls the run partial');
 
       // §7.3 — the review card. The new candidate is in the queue, labelled;
       // accepting it posts a decision to the service. The curated record on
       // the same fetched paper shows the extractor's disagreeing span, and
       // gold is unavailable with the reason, because biorepo.write would
       // refuse it.
+      // Opening Guild COLD — a fresh document, not this page, whose store
+      // already holds the overlay — seeds the queue from the seed before the
+      // double's delayed overlay answers; the new candidate has to join that
+      // queue when it arrives.
+      const coldPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      await coldPage.goto(`http://localhost:${PORT}/#/guild`, { waitUntil: 'networkidle' });
+      await coldPage.waitForTimeout(1200);
+      const cold = await coldPage.locator('body').innerText();
+      await coldPage.close();
+      if (!/\/ 135\b/.test(cold)) problems.push(`the new candidate did not join the open queue (progress reads ${(cold.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
+
       await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-1`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(900);
       const newCard = await page.locator('body').innerText();
