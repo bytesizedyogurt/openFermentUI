@@ -130,14 +130,23 @@ const SEED_BY_ID = new Map(RECORDS.map((r) => [r.id, r]));
  * without it would be anchored on the seed quote, which is not in the paper.
  */
 function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string } | null {
-  const seed = SEED_BY_ID.get(r.id);
-  if (!seed || (r.quote === seed.quote && r.sectionId === seed.sectionId)) return null;
+  const was = r.original ?? SEED_BY_ID.get(r.id);
+  if (!was || (r.quote === was.quote && r.sectionId === was.sectionId)) return null;
   return { quote: r.quote, sectionId: r.sectionId };
 }
 
-/** The number a record was published with — the seed's, or the candidate's as extracted — for a decision that withdraws a correction. */
-function originalOf(id: string, candidates: Candidate[]): { value: number | string; unit: string } | undefined {
-  return SEED_BY_ID.get(id) ?? candidates.find((c) => c.id === id);
+/**
+ * What a record was published as, stamped once as it ENTERS the store
+ * (OF-BLD-012.1 F7) and never touched by a decision. Answering "has this been
+ * re-anchored?" by diffing against the seed module was right until a corpus
+ * update moved the seed underneath a decided record: the record then looked
+ * re-anchored and the sync posted the seed's new sentence as though a
+ * reviewer had chosen it.
+ */
+function stampOriginal(r: ExtractionRecord): ExtractionRecord {
+  return r.original
+    ? r
+    : { ...r, original: { value: r.value, unit: r.unit, quote: r.quote, sectionId: r.sectionId } };
 }
 
 /**
@@ -173,11 +182,7 @@ function actionOf(r: ExtractionRecord): ReviewAction {
  * value AS the value: a record whose correction is shown beside a stale
  * number is two records.
  */
-function applyDecision(
-  r: ExtractionRecord,
-  d: DurableReviewDecision | ReviewDecision,
-  original?: { value: number | string; unit: string },
-): ExtractionRecord {
+function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDecision): ExtractionRecord {
   const next: ExtractionRecord = {
     ...r,
     status: d.status,
@@ -193,13 +198,13 @@ function applyDecision(
     next.value = d.corrected.value;
     next.unit = d.corrected.unit;
     next.si = toSI(d.corrected.value, d.corrected.unit);
-  } else if (r.corrected && original) {
+  } else if (r.corrected && r.original) {
     // A newer decision with no correction withdraws the one this record
-    // carried: the published number comes back as the value, not the edit.
+    // carried: the PUBLISHED number comes back as the value, not the edit.
     next.corrected = undefined;
-    next.value = original.value;
-    next.unit = original.unit;
-    if (typeof original.value === 'number') next.si = toSI(original.value, original.unit);
+    next.value = r.original.value;
+    next.unit = r.original.unit;
+    if (typeof r.original.value === 'number') next.si = toSI(r.original.value, r.original.unit);
   }
   return next;
 }
@@ -571,7 +576,7 @@ function freezeLocked(runbooks: Runbook[]): Runbook[] {
 
 const seedState = () => ({
   papers: structuredClone(PAPERS),
-  records: structuredClone(RECORDS),
+  records: structuredClone(RECORDS).map(stampOriginal),
   runOutputs: structuredClone(RUN_OUTPUTS),
   strains: structuredClone(STRAINS),
   products: structuredClone(PRODUCTS),
@@ -2119,7 +2124,7 @@ export const useStore = create<OFState>()((set, get) => ({
         const server = s.overlay?.records[r.id];
         if (server && server.at > madeAt) return r;
         decisionAt[r.id] = madeAt;
-        return applyDecision(r, d, originalOf(r.id, s.overlay?.candidates ?? []));
+        return applyDecision(r, d);
       });
       // Locks re-apply only to runbooks that still exist. A lock whose runbook
       // was created in a previous session and is not in this one is dropped —
@@ -2202,7 +2207,7 @@ export const useStore = create<OFState>()((set, get) => ({
         const mine = decisionAt[r.id];
         if (mine && mine > d.at) return r;
         decisionAt[r.id] = d.at;
-        return applyDecision(r, d, originalOf(r.id, currentCandidates));
+        return applyDecision(r, d);
       };
       // §7.3 — candidates for a field the seed has no record of join the
       // records, after the seed, as unverified records extracted by haiku-1.
@@ -2218,7 +2223,7 @@ export const useStore = create<OFState>()((set, get) => ({
         .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
         .map((c) => {
           arrivingIds.push(c.id);
-          const record: ExtractionRecord = { ...c, audit: [] };
+          const record: ExtractionRecord = stampOriginal({ ...c, audit: [] });
           const mine = local?.decisions[c.id];
           if (!mine) return record;
           decisionAt[c.id] = mine.at ?? local!.savedAt;

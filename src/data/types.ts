@@ -272,6 +272,16 @@ export interface ExtractionRecord {
   /** Value is a reported negative/absent result, not a missing measurement. */
   negativeResult?: boolean;
   /**
+   * What this record was PUBLISHED as, stamped once as it enters the store
+   * and never touched by a decision (OF-BLD-012.1 F7). A promotion may move a
+   * record onto the paper's own sentence and take the paper's own number;
+   * this is what it was before that, so "has this been re-anchored?" and
+   * "what do I restore when a correction is withdrawn?" are answered by the
+   * record itself rather than by diffing it against the seed it was loaded
+   * from — which a corpus update would silently change under it.
+   */
+  original?: { value: number | string; unit: string; quote: string; sectionId: string };
+  /**
    * A candidate a reviewer decided on that the extractor's CURRENT run no
    * longer produces (OF-BLD-012.1 F3). The decision stays — it is a decision,
    * not an opinion — and the card says the sentence behind it is gone, so a
@@ -1318,7 +1328,7 @@ export interface ExtractResponse {
 // overlay, and a Candidate the service just sent is by definition in it.
 type RecordMinusReview = Omit<
   ExtractionRecord,
-  'audit' | 'gold' | 'corrected' | 'reviewer' | 'absentFromRun'
+  'audit' | 'gold' | 'corrected' | 'reviewer' | 'absentFromRun' | 'original'
 >;
 /**
  * `true` when A and B declare exactly the same keys, `never` otherwise.

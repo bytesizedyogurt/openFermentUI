@@ -49,7 +49,7 @@ from .models import (
     Quantity,
     ReviewDecision,
 )
-from .units import quantity_equals, same_family
+from .units import UnitError, quantity_equals, same_family, to_si
 from .validate import recorded_range
 
 log = logging.getLogger("openferment.witness")
@@ -100,6 +100,34 @@ def _agrees(
         return False
 
 
+def _distance(
+    cv: Any,
+    cu: str,
+    rv: Any,
+    ru: str,
+    *,
+    c_range: tuple[float, float] | None = None,
+    r_range: tuple[float, float] | None = None,
+) -> float | None:
+    """How far a candidate is from a seed record, or None when they do not
+    agree at all (OF-BLD-012.1 F6).
+
+    Agreement is `_agrees`, which already converts and applies the tolerance;
+    this only ORDERS the pairs that agree, so a crude magnitude comparison
+    through SI is enough. A categorical match and a matching range are both
+    distance zero: there is nothing to be closer or further about."""
+    if not _agrees(cv, cu, rv, ru, c_range=c_range, r_range=r_range):
+        return None
+    if _is_categorical(cv) or _is_categorical(rv) or (c_range and r_range):
+        return 0.0
+    try:
+        cs, _ = to_si(float(cv), cu)
+        rs, _ = to_si(float(rv), ru)
+    except (TypeError, ValueError, UnitError):
+        return 0.0
+    return abs(cs - rs) / abs(rs) if rs else abs(cs)
+
+
 def _same_family(cu: str, ru: str) -> bool:
     """Categorical records carry no unit on either side; that is the same family."""
     if not cu and not ru:
@@ -126,6 +154,27 @@ def match_run(
     `papers` is the set of paper ids the extractor has actually run over;
     seed records on any other paper are left out rather than counted as
     misses. `dropped` supplies the span_error cases.
+
+    THE ALGORITHM (OF-BLD-012.1 F6). One candidate scores one record, and the
+    pairing is by distance, not by arrival:
+
+      1. Every (record, candidate) pair of the same paper and field that
+         AGREES — `_agrees`, which converts units, honours a recorded range,
+         and applies TOLERANCE_PCT — is scored with `_distance`.
+      2. The pairs are sorted by distance, ties broken on record order then
+         candidate order, and consumed greedily: each record takes its
+         closest unclaimed candidate, each candidate scores at most once.
+      3. The dropped candidates whose quote failed anchoring are paired the
+         same way against whatever records are still unmatched: those are the
+         span_errors.
+      4. What is left over is judged record by record — a candidate of the
+         right family is a value_mismatch, of the wrong family a unit_error,
+         nothing at all a miss.
+
+    Greedy-by-distance is not globally optimal, but it is stable, it is
+    explainable to a reviewer looking at one row, and it cannot do what
+    first-fit did: hand a record the candidate its sibling was closer to and
+    then score the sibling a mismatch the extractor never earned.
     """
     scored = set(papers)
     by_key: dict[tuple[str, str], list[Candidate]] = defaultdict(list)
@@ -147,43 +196,55 @@ def match_run(
     consumed_dropped: set[int] = set()
     outcome_for: dict[str, ExtractRunResult] = {}
 
-    for rec in scored_records:
+    # F6 — the CLOSEST pair is the match. Every agreeing (record, candidate)
+    # pair is scored, sorted by distance, and consumed greedily. Taken in
+    # record order instead, the first record could consume the candidate the
+    # second one is closer to and leave it a value mismatch the extractor did
+    # not earn. Ties break on record order then candidate order, so the result
+    # does not depend on what order the candidates arrived in.
+    pairs: list[tuple[float, int, int, dict[str, Any], Candidate]] = []
+    for ri, rec in enumerate(scored_records):
         key = (rec["paperId"], rec["field"])
-        rv, ru = rec["value"], rec["unit"]
-        hit = next(
-            (
-                c
-                for c in by_key.get(key, [])
-                if id(c) not in consumed
-                and _agrees(
-                    c.value, c.unit, rv, ru,
-                    c_range=recorded_range(c), r_range=recorded_range(rec),
-                )
-            ),
-            None,
-        )
-        if hit is not None:
-            consumed.add(id(hit))
-            outcome_for[rec["id"]] = ExtractRunResult(
-                goldRecordId=rec["id"], outcome="match", extracted=_quantity(hit.value, hit.unit)
+        for ci, c in enumerate(by_key.get(key, [])):
+            d = _distance(
+                c.value, c.unit, rec["value"], rec["unit"],
+                c_range=recorded_range(c), r_range=recorded_range(rec),
             )
+            if d is not None:
+                pairs.append((d, ri, ci, rec, c))
+    for _, _, _, rec, hit in sorted(pairs, key=lambda t: (t[0], t[1], t[2])):
+        if rec["id"] in outcome_for or id(hit) in consumed:
+            continue
+        consumed.add(id(hit))
+        outcome_for[rec["id"]] = ExtractRunResult(
+            goldRecordId=rec["id"], outcome="match", extracted=_quantity(hit.value, hit.unit)
+        )
+
+    # The dropped-span pass, paired the same way: a candidate whose value
+    # agreed and whose quote failed anchoring is a span_error against the
+    # record it is closest to, not against whichever came first.
+    span_pairs: list[tuple[float, int, int, dict[str, Any], DroppedCandidate]] = []
+    for ri, rec in enumerate(scored_records):
+        if rec["id"] in outcome_for:
+            continue
+        key = (rec["paperId"], rec["field"])
+        for di, d in enumerate(dropped_by_key.get(key, [])):
+            distance = _distance(d.value, d.unit, rec["value"], rec["unit"])
+            if distance is not None:
+                span_pairs.append((distance, ri, di, rec, d))
+    for _, _, _, rec, span in sorted(span_pairs, key=lambda t: (t[0], t[1], t[2])):
+        if rec["id"] in outcome_for or id(span) in consumed_dropped:
+            continue
+        consumed_dropped.add(id(span))
+        outcome_for[rec["id"]] = ExtractRunResult(
+            goldRecordId=rec["id"], outcome="span_error", extracted=_quantity(span.value, span.unit)
+        )
 
     for rec in scored_records:
         if rec["id"] in outcome_for:
             continue
         key = (rec["paperId"], rec["field"])
         rv, ru = rec["value"], rec["unit"]
-        span = next(
-            (d for d in dropped_by_key.get(key, [])
-             if id(d) not in consumed_dropped and _agrees(d.value, d.unit, rv, ru)),
-            None,
-        )
-        if span is not None:
-            consumed_dropped.add(id(span))
-            outcome_for[rec["id"]] = ExtractRunResult(
-                goldRecordId=rec["id"], outcome="span_error", extracted=_quantity(span.value, span.unit)
-            )
-            continue
         cands = [c for c in by_key.get(key, []) if id(c) not in consumed]
         if not cands:
             outcome_for[rec["id"]] = ExtractRunResult(goldRecordId=rec["id"], outcome="miss")

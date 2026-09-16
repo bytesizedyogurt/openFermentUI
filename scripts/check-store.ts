@@ -1,7 +1,13 @@
 /**
- * The overlay is authoritative (OF-BLD-012.1 F3).
+ * What the store does to records when the world changes (OF-BLD-012.1 F3, F7).
  *
- *   pnpm check:overlay
+ *   pnpm check:store
+ *
+ * Two contracts, both about record identity:
+ *
+ *   F3  the overlay is authoritative — an empty candidate list means empty
+ *   F7  a record remembers what it was, in a stored field, not by diffing
+ *       against the seed it was loaded from
  *
  * `applyOverlay` is the one action that puts the service's view on top of the
  * seed. It used to KEEP the previous candidate list whenever the new one was
@@ -102,5 +108,59 @@ check(
 );
 check('and its decision is still there', s().records.find((r) => r.id === THREE[0].id)?.status === 'rejected');
 
-console.log(fails === 0 ? '\nTHE OVERLAY IS AUTHORITATIVE' : `\n${fails} failures`);
+// ── F7 — a record remembers what it was ──────────────────────────────
+//
+// `reanchoredSpan` used to decide whether a promotion had moved a record's
+// quote by comparing it against the SEED the store was built from. A corpus
+// update that rewrote a decided record's quote would then make that record
+// look re-anchored, and the sync would post the seed's new sentence as if
+// the reviewer had chosen it. The original is a stored field now.
+
+const posted: { quote?: string; sectionId?: string; recordId: string }[] = [];
+(globalThis as any).fetch = async (url: string, init?: { body: string }) => {
+  if (String(url).includes('/api/biorepo/')) {
+    const body = JSON.parse(init!.body);
+    if (String(url).endsWith('/decisions')) posted.push(body);
+    return { status: 200, ok: true, json: async () => (String(url).endsWith('/check') ? { ok: true } : body) };
+  }
+  throw new Error('no service');
+};
+
+const seeded = s().records.find((r) => r.extractorRun !== 'haiku-1')!;
+check('a seeded record carries what it was published as', !!seeded.original, seeded.original);
+check(
+  'and it is the record as the seed wrote it',
+  seeded.original?.quote === seeded.quote && seeded.original?.value === seeded.value,
+);
+const arrived = s().records.find((r) => r.id === THREE[0].id)!;
+check('an arriving candidate carries it too', arrived.original?.quote === THREE[0].quote, arrived.original);
+
+// A record still standing on its own sentence posts no span, even when the
+// sentence the SEED now holds has moved on.
+const identified = s().papers.find((p) => p.pmcid || p.doi || p.pmid)!;
+const onIts = { ...seeded, paperId: identified.id, quote: 'the sentence this record has always stood on', sectionId: 's1' };
+useStore.setState({
+  serviceUp: true,
+  reviewer: 'Sam Okonkwo',
+  records: s().records.map((r) => (r.id === seeded.id ? { ...onIts, original: { value: onIts.value, unit: onIts.unit, quote: onIts.quote, sectionId: 's1' } } : r)),
+});
+posted.length = 0;
+useStore.getState().editRecord(seeded.id, 42, 'g L⁻¹');
+await new Promise((r) => setTimeout(r, 20));
+check('an unmoved record posts no span, whatever the seed now says', posted[0] === undefined || posted[0].quote === undefined, posted[0]);
+
+// A record a promotion re-anchored posts the sentence it was moved to.
+useStore.setState({
+  records: s().records.map((r) =>
+    r.id === seeded.id
+      ? { ...r, quote: 'the sentence a promotion moved it to', sectionId: 's2' }
+      : r,
+  ),
+});
+posted.length = 0;
+useStore.getState().editRecord(seeded.id, 43, 'g L⁻¹');
+await new Promise((r) => setTimeout(r, 20));
+check('a re-anchored record posts the sentence it was moved to', posted[0]?.quote === 'the sentence a promotion moved it to', posted[0]?.quote);
+
+console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

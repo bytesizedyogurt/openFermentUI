@@ -43,3 +43,14 @@ transcript; this file is the index a later session reads first.
   Correction to the spec: the eight store scenarios it says live in `scripts/`
   were scratchpad probes — this stage is the first one in the tree.
   `pnpm verify` green.
+- **2026-09-16 · OF-BLD-012.1 §6.5 (F6–F7)** — `match_run` pairs by distance:
+  every agreeing (record, candidate) pair is scored, sorted, and consumed
+  greedily, ties breaking on record then candidate order, so the result no
+  longer depends on arrival order and a record cannot take the candidate its
+  sibling was closer to. The dropped-span pass is paired the same way and the
+  docstring states the algorithm. `ExtractionRecord.original` is stamped once
+  as a record enters the store and never touched by a decision;
+  `reanchoredSpan` and the withdrawal of a correction read it instead of
+  diffing against `RECORDS`, which a corpus update would move underneath a
+  decided record. The overlay guard grew the F7 scenarios and is renamed
+  `pnpm check:store`. Both fixes negative-tested. `pnpm verify` green.

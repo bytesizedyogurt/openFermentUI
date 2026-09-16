@@ -323,3 +323,36 @@ def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
     seed = [{**r, "range": {"low": 7, "high": 10}} if r["id"] == "r-P1-3" else r for r in SEED]
     run = witness.match_run([low_end], seed, papers={"P1"})
     assert outcomes(run)["r-P1-3"] == "match"
+
+
+def test_the_closest_pair_is_the_match_not_the_first_one_tried():
+    # Two curated records of one field, and two candidates. Taken in record
+    # order, the first record consumes the candidate the SECOND one is closer
+    # to, and the second is left with one 2.9 % away — a value mismatch the
+    # extractor did not earn. Both pairings agree; only one is right.
+    seed = [
+        {"id": "r-Q1-1", "paperId": "Q1", "field": "titer_secreted", "value": 100, "unit": "g L\u207b\u00b9"},
+        {"id": "r-Q1-2", "paperId": "Q1", "field": "titer_secreted", "value": 103, "unit": "g L\u207b\u00b9"},
+    ]
+    near = cand("Q1", "titer_secreted", 101.5, "g L\u207b\u00b9", 1)
+    exact = cand("Q1", "titer_secreted", 100, "g L\u207b\u00b9", 2)
+    run = witness.match_run([near, exact], seed, papers={"Q1"})
+    assert outcomes(run) == {"r-Q1-1": "match", "r-Q1-2": "match"}
+    # And the closest candidate went to the record it is closest to.
+    by_record = {r.goldRecordId: r.extracted.value for r in run.results if r.extracted}
+    assert by_record == {"r-Q1-1": 100, "r-Q1-2": 101.5}
+
+
+def test_the_pairing_does_not_depend_on_the_order_the_candidates_arrive():
+    seed = [
+        {"id": "r-Q1-1", "paperId": "Q1", "field": "titer_secreted", "value": 100, "unit": "g L\u207b\u00b9"},
+        {"id": "r-Q1-2", "paperId": "Q1", "field": "titer_secreted", "value": 103, "unit": "g L\u207b\u00b9"},
+    ]
+    near = cand("Q1", "titer_secreted", 101.5, "g L\u207b\u00b9", 1)
+    exact = cand("Q1", "titer_secreted", 100, "g L\u207b\u00b9", 2)
+    one = witness.match_run([near, exact], seed, papers={"Q1"})
+    other = witness.match_run([exact, near], seed, papers={"Q1"})
+    assert outcomes(one) == outcomes(other)
+    assert [r.extracted.value for r in one.results if r.extracted] == [
+        r.extracted.value for r in other.results if r.extracted
+    ]
