@@ -272,6 +272,14 @@ export interface ExtractionRecord {
   /** Value is a reported negative/absent result, not a missing measurement. */
   negativeResult?: boolean;
   /**
+   * A candidate a reviewer decided on that the extractor's CURRENT run no
+   * longer produces (OF-BLD-012.1 F3). The decision stays — it is a decision,
+   * not an opinion — and the card says the sentence behind it is gone, so a
+   * reviewer is not left wondering. Browser-side only: the service recomputes
+   * this every time it assembles an overlay.
+   */
+  absentFromRun?: boolean;
+  /**
    * How §2.4 rule 3 found this value in its sentence (OF-BLD-012.1 F1.2).
    * Computed by the service's anchoring and by nothing else — no model output
    * and no reviewer sets it — so the review card can say "midpoint of 7-10 d"
@@ -1211,8 +1219,15 @@ export interface OverlayPaper {
 export interface Overlay {
   papers: Record<string, OverlayPaper>;
   records: Record<string, ReviewDecision>;
-  candidates: Candidate[];
-  runs: RunOutput[];
+  /**
+   * The extractor's current candidates, or null for "not supplied"
+   * (OF-BLD-012.1 F3). The service always sends the full list, so an EMPTY
+   * list means it produced nothing and the store drops what it had. Only
+   * null keeps it. Before F3 the two were the same value, and a cleared
+   * cache on the service left stale candidates on screen until a reload.
+   */
+  candidates: Candidate[] | null;
+  runs: RunOutput[] | null;
 }
 
 /**
@@ -1298,7 +1313,13 @@ export interface ExtractResponse {
   notes: string[];
 }
 
-type RecordMinusReview = Omit<ExtractionRecord, 'audit' | 'gold' | 'corrected' | 'reviewer'>;
+// `absentFromRun` joins the four review fields here: it is the browser's note
+// about the extractor's current run (OF-BLD-012.1 F3), recomputed on every
+// overlay, and a Candidate the service just sent is by definition in it.
+type RecordMinusReview = Omit<
+  ExtractionRecord,
+  'audit' | 'gold' | 'corrected' | 'reviewer' | 'absentFromRun'
+>;
 /**
  * `true` when A and B declare exactly the same keys, `never` otherwise.
  * Assignability alone is not enough here: an extra OPTIONAL property is

@@ -2153,9 +2153,16 @@ export const useStore = create<OFState>()((set, get) => ({
       const merged: Overlay = {
         papers: { ...(s.overlay?.papers ?? {}), ...overlay.papers },
         records: { ...(s.overlay?.records ?? {}), ...overlay.records },
-        candidates: overlay.candidates.length ? overlay.candidates : (s.overlay?.candidates ?? []),
-        runs: overlay.runs.length ? overlay.runs : (s.overlay?.runs ?? []),
+        // F3 — a list REPLACES, whatever its length. The service always
+        // sends the full list, so an empty one means the extractor produced
+        // nothing; only null means "not supplied". Before F3 the two were
+        // indistinguishable and a cleared cache left stale candidates on
+        // screen until a reload.
+        candidates: overlay.candidates ?? s.overlay?.candidates ?? [],
+        runs: overlay.runs ?? s.overlay?.runs ?? [],
       };
+      const currentCandidates = merged.candidates ?? [];
+      const currentRuns = merged.runs ?? [];
       // Papers, runs, decisions and new records. A decision here came through
       // `biorepo.write` on the service (§2.3); this is the only other place a
       // record's status moves, and only to what the service already stored.
@@ -2177,8 +2184,8 @@ export const useStore = create<OFState>()((set, get) => ({
       // §6.4 — Witness reads runs from the store: the overlay's when present,
       // the seed's RUN_OUTPUTS otherwise. An overlay run replaces a seed run
       // of the same id; the seed keeps any run the overlay does not carry.
-      const runOutputs = merged.runs.length
-        ? [...s.runOutputs.filter((r) => !merged.runs.some((o) => o.run === r.run)), ...merged.runs]
+      const runOutputs = currentRuns.length
+        ? [...s.runOutputs.filter((r) => !currentRuns.some((o) => o.run === r.run)), ...currentRuns]
         : s.runOutputs;
 
       // §7.3 — the service's decisions, over seed records and candidates
@@ -2195,7 +2202,7 @@ export const useStore = create<OFState>()((set, get) => ({
         const mine = decisionAt[r.id];
         if (mine && mine > d.at) return r;
         decisionAt[r.id] = d.at;
-        return applyDecision(r, d, originalOf(r.id, merged.candidates));
+        return applyDecision(r, d, originalOf(r.id, currentCandidates));
       };
       // §7.3 — candidates for a field the seed has no record of join the
       // records, after the seed, as unverified records extracted by haiku-1.
@@ -2207,7 +2214,7 @@ export const useStore = create<OFState>()((set, get) => ({
       const seed = s.records.filter((r) => r.extractorRun !== 'haiku-1');
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
-      const arriving: ExtractionRecord[] = merged.candidates
+      const arriving: ExtractionRecord[] = currentCandidates
         .filter((c) => !present.has(c.id) && isNewCandidate(c, seed))
         .map((c) => {
           arrivingIds.push(c.id);
@@ -2217,7 +2224,26 @@ export const useStore = create<OFState>()((set, get) => ({
           decisionAt[c.id] = mine.at ?? local!.savedAt;
           return applyDecision(record, mine);
         });
-      const records = [...s.records, ...arriving].map(decide);
+      // F3 — what happens to the records earlier candidates became. A
+      // candidate nobody decided on is the extractor's current opinion, and
+      // goes when the opinion does. One a reviewer decided is a DECISION, and
+      // a decision does not evaporate because a re-extraction stopped
+      // producing the sentence: it stays, marked, so the card can say so.
+      // Only meaningful when a list actually arrived.
+      const stillExtracted = new Set(currentCandidates.map((c) => c.id));
+      const wasDecided = (id: string) =>
+        !!decisionAt[id] || !!merged.records[id] || !!local?.decisions[id];
+      const surviving =
+        overlay.candidates === null || overlay.candidates === undefined
+          ? s.records
+          : s.records.filter((r) => r.extractorRun !== 'haiku-1' || stillExtracted.has(r.id) || wasDecided(r.id));
+      const records = [...surviving, ...arriving]
+        .map(decide)
+        .map((r) =>
+          r.extractorRun !== 'haiku-1' || overlay.candidates == null
+            ? r
+            : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true },
+        );
       // New records still undecided join an open review queue after
       // everything already in it (§7.3). A queue seeded before the overlay
       // arrived would otherwise never see them.
@@ -2226,7 +2252,11 @@ export const useStore = create<OFState>()((set, get) => ({
       const joining = records
         .filter((r) => arrived.has(r.id) && r.status === 'unverified' && !r.gold && !queued.has(r.id))
         .map((r) => r.id);
-      const reviewQueue = s.reviewQueue.length && joining.length ? [...s.reviewQueue, ...joining] : s.reviewQueue;
+      // A record that is gone is gone from the queue too; a reviewer should
+      // not be shown a card for a sentence the extractor no longer reads.
+      const alive = new Set(records.map((r) => r.id));
+      const kept = s.reviewQueue.filter((id) => alive.has(id));
+      const reviewQueue = kept.length && joining.length ? [...kept, ...joining] : kept;
       return { overlay: merged, papers, runOutputs, records, reviewQueue, decisionAt };
     }),
 
@@ -2277,7 +2307,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates, true, reviewerName())) {
+      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates ?? [], true, reviewerName())) {
         kept++;
         continue;
       }

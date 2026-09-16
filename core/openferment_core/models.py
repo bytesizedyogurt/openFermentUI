@@ -195,14 +195,19 @@ class Overlay(BaseModel):
     top of the seed; with the service down the app is exactly the seed.
 
     `papers` from fulltext/ (§5); `runs` and `candidates` recomputed from
-    candidates/ against the seed by `witness.py` (§6.2) — the candidates here
-    are the NEW records, the ones no seed record covers; `records` from
-    biorepo.json (§7)."""
+    candidates/ against the seed by `witness.py` (§6.2); `records` from
+    biorepo.json (§7).
+
+    `candidates` and `runs` are a LIST OR NULL (OF-BLD-012.1 F3). The service
+    always sends the full list, so an empty list means the extractor produced
+    nothing and the store drops what it had. `None` means "not supplied" and
+    the store keeps what it had — nothing here sends it, and it exists so that
+    "empty" and "unknown" can never be the same value again."""
 
     papers: dict[str, OverlayPaper] = Field(default_factory=dict)
     records: dict[str, "ReviewDecision"] = Field(default_factory=dict)
-    candidates: list["Candidate"] = Field(default_factory=list)
-    runs: list["ExtractRun"] = Field(default_factory=list)
+    candidates: list["Candidate"] | None = Field(default_factory=list)
+    runs: list["ExtractRun"] | None = Field(default_factory=list)
 
 
 # ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────

@@ -33,3 +33,13 @@ transcript; this file is the index a later session reads first.
   reviews as a named person and checks the posted decision carries that name;
   the durable check reloads the page and finds the name still there. Both new
   assertions negative-tested. `pnpm verify` green.
+- **2026-09-16 · OF-BLD-012.1 §6.4 (F3)** — the overlay is authoritative.
+  `Overlay.candidates` and `runs` are a list or `null` in both languages; a
+  list replaces whatever its length, and only `null` keeps what was there. An
+  undecided `haiku-1` record absent from an incoming list is removed from the
+  store and the review queue; a decided one stays and carries `absentFromRun`,
+  which the review card explains. New verify stage `check:overlay` drives the
+  real store through five scenarios; eighteen stages now. Negative-tested.
+  Correction to the spec: the eight store scenarios it says live in `scripts/`
+  were scratchpad probes — this stage is the first one in the tree.
+  `pnpm verify` green.

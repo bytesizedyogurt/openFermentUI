@@ -18,7 +18,7 @@
     "test:reconcile": "node scripts/check-reconcile.mjs",
     "test:smoke": "node scripts/smoke.mjs",
     "test:golden": "node scripts/golden-path.mjs",
-    "verify": "pnpm check:secrets && pnpm typecheck && pnpm check:plan && pnpm check:reference && pnpm test:core && pnpm check:seed && pnpm check:biorepo && pnpm check:anchors && pnpm check:lock && pnpm check:capture && pnpm build && pnpm test:durable && pnpm test:deposition && pnpm test:reconcile && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
+    "verify": "pnpm check:secrets && pnpm typecheck && pnpm check:plan && pnpm check:reference && pnpm test:core && pnpm check:seed && pnpm check:biorepo && pnpm check:anchors && pnpm check:overlay && pnpm check:lock && pnpm check:capture && pnpm build && pnpm test:durable && pnpm test:deposition && pnpm test:reconcile && pnpm test:smoke && pnpm test:golden && pnpm test:deep",
     "test:deep": "node scripts/deep-paths.mjs",
     "bundle:single": "pnpm build && node scripts/bundle-single.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
@@ -33,7 +33,8 @@
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "demo:offline": "node scripts/demo-offline.mjs",
     "demo:fixtures": "cd core && uv run python -m openferment_core.demo",
-    "check:anchors": "node scripts/check-anchors.mjs"
+    "check:anchors": "node scripts/check-anchors.mjs",
+    "check:overlay": "tsx scripts/check-overlay.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

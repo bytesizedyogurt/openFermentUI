@@ -1135,6 +1135,13 @@ export default function Guild() {
                     field {record.field} · confidence {record.confidence.toFixed(2)}
                   </div>
                 </Tick>
+                {record.absentFromRun && (
+                  <p className="text-caption text-ink-soft mt-2" data-testid="absent-from-run">
+                    The extractor&rsquo;s current run no longer produces this candidate — a later
+                    extraction read the paper differently, or the paper was fetched again. Your
+                    decision is kept: it is a decision, not the extractor&rsquo;s opinion.
+                  </p>
+                )}
                 <p className="text-caption text-ink-soft mt-2">
                   One forced tool call over the paper&rsquo;s own text produced this candidate, and
                   anchoring checked that its quote is verbatim in the section and holds the value.

@@ -227,6 +227,10 @@ def biorepo_overlay() -> Overlay:
     the overlay.
     """
     runs, candidates, decisions = witness.overlay_bundle()
+    # Always the FULL lists, never None (OF-BLD-012.1 F3): an empty list here
+    # means the extractor has produced nothing, and the store drops what it
+    # was holding. None is reserved for a caller that supplies neither, and
+    # nothing in this service is such a caller.
     return Overlay(papers=intake.overlay_papers(), records=decisions, candidates=candidates, runs=runs)
 
 
