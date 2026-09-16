@@ -87,6 +87,13 @@ export interface DurableSnapshot {
   reviewDecisions: Record<string, DurableReviewDecision>;
   /** Keyed by runbook id. Locks only — the runbook itself comes from seed. */
   runbookLocks: Record<string, { lockedAt: string; lockHash: string }>;
+  /**
+   * The person deciding, as they typed it in Settings (OF-BLD-012.1 F2).
+   * Durable because a reviewer should not have to re-introduce themselves
+   * after a refresh. Empty until set; `biorepo.write` refuses a decision
+   * that carries no name, so nothing reaches the committed file unsigned.
+   */
+  reviewerName: string;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {
@@ -96,6 +103,7 @@ export const EMPTY_SNAPSHOT: DurableSnapshot = {
   measuredEvidence: [],
   reviewDecisions: {},
   runbookLocks: {},
+  reviewerName: '',
 };
 
 /**

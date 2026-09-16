@@ -399,3 +399,25 @@ def test_the_check_endpoint_answers_ok_or_the_rule(client):
     assert bad.json()["ok"] is False and bad.json()["rule"] == "fulltext"
     assert "full text" in bad.json()["why"]
     assert biorepo.decisions() == {}, "asking must never write"
+
+
+# ── a decision is signed by a person (OF-BLD-012.1 F2) ─────────────────
+
+
+@pytest.mark.parametrize("name", ["you", "me", "Reviewer", "USER", "test", "x", " "])
+def test_refuses_a_reviewer_who_is_not_a_person(name):
+    # README: "a verified record is one a named reviewer promoted against a
+    # quote in the paper's own text". A corpus signed 'you' is signed by
+    # nobody, and the file is the record of who decided what.
+    fetch_b5()
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("r-B5-3", "verified", reviewer=name))
+    assert caught.value.rule == "reviewer"
+    assert not biorepo.PATH.exists()
+
+
+def test_a_named_reviewer_is_stored():
+    fetch_b5()
+    stored = biorepo.write(decision("r-B5-3", "verified", reviewer="Sean Creighton"))
+    assert stored.reviewer == "Sean Creighton"
+    assert biorepo.decisions()["r-B5-3"].reviewer == "Sean Creighton"

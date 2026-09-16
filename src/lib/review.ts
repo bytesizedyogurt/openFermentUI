@@ -301,15 +301,16 @@ export interface Refusal {
  * second rule that drifts. This function is what the screen falls back to
  * when the check has not answered yet, and what `syncDecisions` asks before
  * posting a decision made while the service was away. It can only see the
- * three conditions the browser has the facts for:
+ * four conditions the browser has the facts for:
  *
+ *   reviewer  nobody has set a name in Settings (F2)
  *   paper     no PMCID, DOI or PMID — the committed file may not name it;
  *             decided in this browser only
  *   fulltext  a promotion (accept, gold) needs the paper's fetched text
  *   quote     gold needs a sentence in that text that says this number
  *
- * It cannot see `range`, `status`, `record` or `reviewer`, and it does not
- * try: those come back from the check.
+ * It cannot see `range`, `status` or `record`, and it does not try: those
+ * come back from the check.
  */
 export function writeRefusal(
   action: ReviewAction,
@@ -317,8 +318,19 @@ export function writeRefusal(
   paper: Paper | undefined,
   candidates: Candidate[],
   serviceUp: boolean | null,
+  reviewer: string | null,
 ): Refusal | null {
   if (!serviceUp) return null;
+  // A decision the committed file cannot attribute is not a decision it can
+  // keep (OF-BLD-012.1 F2). Asked first, because it is the one refusal the
+  // reviewer can clear in five seconds.
+  if (!reviewer || !reviewer.trim()) {
+    return {
+      rule: 'reviewer',
+      browserOnly: false,
+      why: 'Set your reviewer name in Settings before deciding — the committed file records who decided what.',
+    };
+  }
   if (!paperIdentified(paper)) {
     return {
       rule: 'paper',
@@ -407,6 +419,7 @@ export function goldRefusal(
   paper: Paper | undefined,
   candidates: Candidate[],
   serviceUp: boolean | null,
+  reviewer: string | null,
 ): Refusal | null {
-  return writeRefusal('gold', record, paper, candidates, serviceUp);
+  return writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
 }

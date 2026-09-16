@@ -591,6 +591,8 @@ function CorpusSection() {
   const resetDemo = useStore((s) => s.resetDemo);
   const depositions = useStore((s) => s.depositions);
   const [confirm, setConfirm] = useState(false);
+  const reviewer = useStore((s) => s.reviewer);
+  const setReviewerName = useStore((s) => s.setReviewerName);
 
   const gold = useMemo(() => records.filter((r) => r.gold), [records]);
   const goldPapers = useMemo(() => new Set(gold.map((r) => r.paperId)).size, [gold]);
@@ -607,6 +609,32 @@ function CorpusSection() {
         You are signed in as the demo curator, who owns this deployment. Everything on this panel
         edits the corpus for the whole session; there is no second reviewer to undo it for you.
       </Callout>
+
+      <section>
+        <SectionTitle>Reviewer</SectionTitle>
+        <Card className="p-3">
+          <Row label="Your name">
+            <input
+              id="reviewer-name"
+              type="text"
+              value={reviewer}
+              onChange={(e) => setReviewerName(e.target.value)}
+              placeholder="e.g. Sean Creighton"
+              aria-label="Reviewer name"
+              autoComplete="name"
+              className="w-full max-w-sm rounded border border-line bg-surface px-2 py-1 text-body"
+            />
+          </Row>
+          <p className="text-body text-ink-soft mt-3 max-w-3xl">
+            Every decision you make in the review queue is stored against this name, in{' '}
+            <code className="font-mono text-caption">core/data/biorepo.json</code>, which is
+            committed. A record is only verified when a named person promoted it against a sentence
+            in the paper&rsquo;s own text — so the service refuses a decision signed by nobody, or
+            by a placeholder like &ldquo;you&rdquo;. The name is kept in this browser and is not
+            sent anywhere except with a decision.
+          </p>
+        </Card>
+      </section>
 
       <section>
         <SectionTitle

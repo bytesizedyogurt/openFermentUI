@@ -9,7 +9,9 @@ write is a file whose history nobody can explain.
 `write` refuses a decision when any of these hold, and says which:
 
   record     recordId resolves to nothing in the seed or the candidates
-  reviewer   reviewer is empty
+  reviewer   reviewer is empty, shorter than two characters, or one of the
+             placeholders nobody is called ('you', 'me', 'reviewer', 'user',
+             'test') — the committed file records who decided what
   fulltext   a verified or gold decision names a record whose paper has no
              fetched full text — there is nothing for a promotion to anchor to
   quote      a verified or gold decision carries a quote that fails §2.4
@@ -53,6 +55,14 @@ log = logging.getLogger("openferment.biorepo")
 PATH = intake.DATA_DIR / "biorepo.json"
 
 RULES = ("record", "reviewer", "fulltext", "quote", "paper", "range", "status")
+
+# Names that are not a person (OF-BLD-012.1 F2). The README says a verified
+# record is one a NAMED reviewer promoted; a file signed 'you' is signed by
+# nobody, and this file is the record of who decided what. Closed list,
+# matched case-insensitively after trimming; adding to it is a commit with a
+# test.
+PLACEHOLDER_REVIEWERS = frozenset({"you", "me", "reviewer", "user", "test"})
+MIN_REVIEWER_CHARS = 2
 
 
 class WriteRefused(ValueError):
@@ -134,8 +144,15 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
     key (OF-BLD-012.1 F1.5). There is still only one place the rules live;
     asking and deciding cannot drift apart because they are the same code.
     """
-    if not (decision.reviewer or "").strip():
+    reviewer = (decision.reviewer or "").strip()
+    if not reviewer:
         raise WriteRefused("reviewer", "a decision needs a reviewer; an empty name is nobody deciding")
+    if len(reviewer) < MIN_REVIEWER_CHARS or reviewer.lower() in PLACEHOLDER_REVIEWERS:
+        raise WriteRefused(
+            "reviewer",
+            f"{reviewer!r} is a placeholder, not a person. Set a reviewer name in Settings — "
+            "the committed file is the record of who decided what",
+        )
 
     rec = _resolve(decision.recordId)
     if rec is None:

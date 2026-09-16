@@ -108,7 +108,10 @@ function decisionOf(
     gold: r.gold,
     corrected: r.corrected,
     rejectReason: r.rejectReason,
-    reviewer: r.reviewer ?? 'you',
+    // The CURRENT name, not the one the record was stamped with: a decision
+    // made before a name was set is posted under the name once there is one,
+    // and an undo is signed by whoever undid it.
+    reviewer: reviewerName() ?? r.reviewer ?? '',
     recordId: r.id,
     at,
     ...(span ? { quote: span.quote, sectionId: span.sectionId } : {}),
@@ -135,6 +138,26 @@ function reanchoredSpan(r: ExtractionRecord): { quote: string; sectionId: string
 /** The number a record was published with — the seed's, or the candidate's as extracted — for a decision that withdraws a correction. */
 function originalOf(id: string, candidates: Candidate[]): { value: number | string; unit: string } | undefined {
   return SEED_BY_ID.get(id) ?? candidates.find((c) => c.id === id);
+}
+
+/**
+ * Who is deciding (OF-BLD-012.1 F2), or null when nobody has said. The one
+ * place the name is read: `biorepo.write` refuses a decision signed by a
+ * placeholder, and a corpus whose decisions are all signed the same
+ * non-name is a corpus nobody can be asked about.
+ */
+export function reviewerName(): string | null {
+  return useStore.getState().reviewer.trim() || null;
+}
+
+/**
+ * What an audit line is signed with. A decision made before a name is set is
+ * still a real decision in this browser — it simply cannot be posted, because
+ * `writeRefusal` blocks it — so the trail says where it was made rather than
+ * inventing a person.
+ */
+function decidedBy(): string {
+  return reviewerName() ?? 'this browser';
 }
 
 /** The review action a record's current state amounts to, for the refusal predicate. */
@@ -392,6 +415,13 @@ export interface OFState {
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
   durableReady: boolean;
   /**
+   * The person deciding, as typed in Settings (OF-BLD-012.1 F2). Read through
+   * `reviewerName()` rather than directly, so every decision and every audit
+   * line is signed the same way. Empty until set.
+   */
+  reviewer: string;
+  setReviewerName: (name: string) => void;
+  /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
    * against them: the later of the two wins (OF-BLD-012 §7.3).
@@ -609,6 +639,9 @@ export const useStore = create<OFState>()((set, get) => ({
 
   setUI: (patch) => set((s) => ({ ui: { ...s.ui, ...patch } })),
 
+  reviewer: '',
+  setReviewerName: (name) => set({ reviewer: name }),
+
   toast: (t) => {
     const id = nextId('toast');
     set((s) => ({ toasts: [...s.toasts.slice(-2), { ...t, id }] }));
@@ -635,7 +668,8 @@ export const useStore = create<OFState>()((set, get) => ({
     // A refusal that blocks (no full text, no anchoring sentence) stops here.
     // The one that does not — the paper has no identifier — lets the review
     // go on in this browser and keeps the decision from the service.
-    const refusal = action === 'skip' ? null : writeRefusal(action, before, paper, candidates, s.serviceUp);
+    const refusal =
+      action === 'skip' ? null : writeRefusal(action, before, paper, candidates, s.serviceUp, reviewerName());
     if (blocks(refusal)) {
       get().toast({ text: refusal!.why, kind: 'error' });
       return;
@@ -649,7 +683,7 @@ export const useStore = create<OFState>()((set, get) => ({
       if (!span) return r;
       audit.push({
         at: stamp(),
-        who: 'you',
+        who: decidedBy(),
         action: `span re-anchored to the extractor's quote (${span.candidateId})`,
         from: r.quote,
         to: span.quote,
@@ -657,7 +691,7 @@ export const useStore = create<OFState>()((set, get) => ({
       if (!spanChangesNumber(r, span)) return { ...r, quote: span.quote, sectionId: span.sectionId };
       audit.push({
         at: stamp(),
-        who: 'you',
+        who: decidedBy(),
         action: 'value taken as the paper writes it',
         from: `${r.value} ${r.unit}`,
         to: `${span.value} ${span.unit}`,
@@ -685,25 +719,25 @@ export const useStore = create<OFState>()((set, get) => ({
       if (r.id !== id) return r;
       const audit = [...r.audit];
       if (action === 'accept') {
-        audit.push({ at: stamp(), who: 'you', action: 'verified' });
+        audit.push({ at: stamp(), who: decidedBy(), action: 'verified' });
         stats.accepted++;
-        return { ...reanchor(r, audit), status: 'verified' as RecordStatus, reviewer: 'you', audit };
+        return { ...reanchor(r, audit), status: 'verified' as RecordStatus, reviewer: decidedBy(), audit };
       }
       if (action === 'reject') {
-        audit.push({ at: stamp(), who: 'you', action: `rejected — ${payload?.reason ?? 'unspecified'}` });
+        audit.push({ at: stamp(), who: decidedBy(), action: `rejected — ${payload?.reason ?? 'unspecified'}` });
         stats.rejected++;
         // A rejected record is not in the gold set, whatever it was before.
         const { gold: _gold, ...rest } = r;
         return {
           ...rest,
           status: 'rejected' as RecordStatus,
-          reviewer: 'you',
+          reviewer: decidedBy(),
           rejectReason: payload?.reason,
           audit,
         };
       }
       if (action === 'gold') {
-        audit.push({ at: stamp(), who: 'you', action: 'flagged for gold set' });
+        audit.push({ at: stamp(), who: decidedBy(), action: 'flagged for gold set' });
         stats.gold++;
         // The gold value is the number the record carries AFTER re-anchoring:
         // the paper's own, inside the sentence the service will anchor it in.
@@ -711,7 +745,7 @@ export const useStore = create<OFState>()((set, get) => ({
         return {
           ...re,
           status: 'verified' as RecordStatus,
-          reviewer: 'you',
+          reviewer: decidedBy(),
           gold: re.gold ?? { value: re.corrected?.value ?? re.value, unit: re.corrected?.unit ?? re.unit },
           audit,
         };
@@ -758,7 +792,7 @@ export const useStore = create<OFState>()((set, get) => ({
           ...r.audit,
           {
             at: stamp(),
-            who: 'you',
+            who: decidedBy(),
             action: 'edited value',
             from: `${r.value} ${r.unit}`,
             to: `${value} ${unit}`,
@@ -781,7 +815,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       const after = get().records.find((r) => r.id === id);
       const paper = s.papers.find((p) => p.id === after?.paperId);
-      if (after && !writeRefusal(actionOf(after), after, paper, s.overlay?.candidates ?? [], true)) {
+      if (after && !writeRefusal(actionOf(after), after, paper, s.overlay?.candidates ?? [], true, reviewerName())) {
         void get().postReviewDecision(decisionOf(after, reanchoredSpan(after), now));
       }
     }
@@ -794,9 +828,9 @@ export const useStore = create<OFState>()((set, get) => ({
           ? {
               ...r,
               status,
-              reviewer: 'you',
+              reviewer: decidedBy(),
               rejectReason: reason ?? r.rejectReason,
-              audit: [...r.audit, { at: stamp(), who: 'you', action: `set ${status}` }],
+              audit: [...r.audit, { at: stamp(), who: decidedBy(), action: `set ${status}` }],
             }
           : r,
       ),
@@ -836,7 +870,7 @@ export const useStore = create<OFState>()((set, get) => ({
     if (s.serviceUp) {
       for (const r of changed) {
         const paper = s.papers.find((p) => p.id === r.paperId);
-        if (writeRefusal(actionOf(r), r, paper, s.overlay?.candidates ?? [], true)) continue;
+        if (writeRefusal(actionOf(r), r, paper, s.overlay?.candidates ?? [], true, reviewerName())) continue;
         void get().postReviewDecision(decisionOf(r, reanchoredSpan(r), now));
       }
     }
@@ -2102,6 +2136,9 @@ export const useStore = create<OFState>()((set, get) => ({
         durableReady: durableAvailable(),
         durableReview: { savedAt: snap.savedAt, decisions: snap.reviewDecisions },
         decisionAt,
+        // Older snapshots predate the field; an unnamed reviewer is the
+        // same as one who has not said yet (OF-BLD-012.1 F2).
+        reviewer: snap.reviewerName ?? '',
       };
     });
     // Both sides are known once the overlay is in too; whichever hydrate
@@ -2240,7 +2277,7 @@ export const useStore = create<OFState>()((set, get) => ({
       // What the service would refuse is not posted, and not posted again on
       // every load: an accept on an unfetched paper stays this browser's.
       const paper = s.papers.find((p) => p.id === record.paperId);
-      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates, true)) {
+      if (writeRefusal(actionOf(record), record, paper, s.overlay.candidates, true, reviewerName())) {
         kept++;
         continue;
       }
@@ -2352,6 +2389,7 @@ function snapshotOf(s: OFState): DurableSnapshot {
     measuredEvidence: s.measuredEvidence,
     reviewDecisions,
     runbookLocks,
+    reviewerName: s.reviewer,
   };
 }
 
@@ -2361,7 +2399,8 @@ if (durableAvailable()) {
       s.depositions === prev.depositions &&
       s.records === prev.records &&
       s.runbooks === prev.runbooks &&
-      s.measuredEvidence === prev.measuredEvidence
+      s.measuredEvidence === prev.measuredEvidence &&
+      s.reviewer === prev.reviewer
     )
       return;
     saveDurable(snapshotOf(s));

@@ -22,3 +22,14 @@ transcript; this file is the index a later session reads first.
   the rules are not mirrored. New verify stage `check:anchors` holds the
   anchoring floor at **93 of 104**; seventeen stages now. Both new guards
   negative-tested. `pnpm verify` green.
+- **2026-09-16 · OF-BLD-012.1 §6.3 (F2)** — decisions are signed by a person.
+  Settings gains a Reviewer name field, kept in the Durable tier under
+  `reviewerName`; `reviewerName()` in the store is the one place it is read and
+  replaces all **12** hard-coded `'you'` sites (the spec said 10); an audit line
+  made before a name is set says `this browser`, which can never be posted.
+  `writeRefusal` gains a blocking `reviewer` rule while the service is up, and
+  `biorepo.write` refuses a name under two characters or in the closed
+  placeholder list (`you`, `me`, `reviewer`, `user`, `test`). The smoke now
+  reviews as a named person and checks the posted decision carries that name;
+  the durable check reloads the page and finds the name still there. Both new
+  assertions negative-tested. `pnpm verify` green.

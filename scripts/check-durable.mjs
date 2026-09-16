@@ -61,6 +61,20 @@ check('same hash survived', after.includes(hashBefore ?? '@@'), hashBefore);
 check('no editable inputs after reload',
   await page.locator('section[aria-labelledby="band-predictions"] input[type="number"]').count() === 0);
 
+// The reviewer's name is Durable too (OF-BLD-012.1 F2): nobody should have
+// to re-introduce themselves after a refresh, and an unnamed reviewer cannot
+// decide anything the committed file would keep.
+await go('/settings/corpus');
+await page.locator('input[aria-label="Reviewer name"]').fill('Sean Creighton');
+await page.waitForTimeout(1200);           // let the debounced write flush
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1600);
+check(
+  'reviewer name SURVIVED a page reload',
+  (await page.locator('input[aria-label="Reviewer name"]').inputValue()) === 'Sean Creighton',
+);
+await go('/runbooks/rb-lyo-ambient');
+
 // Ephemeral state must NOT survive.
 await page.evaluate(() => document.documentElement.dataset.density);
 const dens1 = await page.evaluate(() => document.documentElement.dataset.density);

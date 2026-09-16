@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { Candidate, DecisionCheck, ExtractionRecord, Paper } from '@/data/types';
 import { ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf, reviewerName } from '@/store';
 import {
   bestCandidate,
   blocks,
@@ -244,8 +244,9 @@ export default function Guild() {
   // question is re-asked when the reviewer edits the value and not when some
   // unrelated part of the store moves. Debounced 300 ms: a reviewer on the
   // home row passes through cards faster than a round trip.
+  const reviewer = useStore((s) => s.reviewer);
   const gateKey = record
-    ? [record.id, record.status, record.value, record.unit, record.quote, record.gold ? 'gold' : ''].join('|')
+    ? [record.id, record.status, record.value, record.unit, record.quote, record.gold ? 'gold' : '', reviewer].join('|')
     : '';
   const [checked, setChecked] = useState<{ key: string; accept: DecisionCheck; gold: DecisionCheck }>({
     key: '',
@@ -261,10 +262,13 @@ export default function Guild() {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       const { record: r, paper: pp, candidates: cs } = asking.current;
-      if (!r) return;
+      const who = reviewerName();
+      // Nothing to ask while nobody has said who is deciding: the fallback
+      // already says so, and the service would refuse on 'reviewer' anyway.
+      if (!r || !who) return;
       void Promise.all([
-        checkDecision(decisionToCheck('accept', r, pp, cs, 'you'), controller.signal),
-        checkDecision(decisionToCheck('gold', r, pp, cs, 'you'), controller.signal),
+        checkDecision(decisionToCheck('accept', r, pp, cs, who), controller.signal),
+        checkDecision(decisionToCheck('gold', r, pp, cs, who), controller.signal),
       ])
         .then(([accept, gold]) => setChecked({ key: gateKey, accept, gold }))
         // The service went away mid-question. The predicate in review.ts is
@@ -781,9 +785,9 @@ export default function Guild() {
   // §2.3 — what the service would refuse. The predicate in review.ts is the
   // fallback; while the service is up the card asks it directly (F1.5), so
   // the screen is gated on the rules themselves rather than on a copy.
-  const localAccept = writeRefusal('accept', record, paper, candidates, serviceUp);
-  const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp);
-  const localGold = writeRefusal('gold', record, paper, candidates, serviceUp);
+  const localAccept = writeRefusal('accept', record, paper, candidates, serviceUp, reviewer);
+  const rejectBlocked = writeRefusal('reject', record, paper, candidates, serviceUp, reviewer);
+  const localGold = writeRefusal('gold', record, paper, candidates, serviceUp, reviewer);
   const asked = checked.key === gateKey ? checked : null;
   const acceptBlocked = asked ? refusalOf(asked.accept, localAccept) : localAccept;
   const goldBlocked = asked ? refusalOf(asked.gold, localGold) : localGold;

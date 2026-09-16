@@ -41,6 +41,9 @@ const MIME = {
   '.json': 'application/json',
 };
 
+/** The person the smoke reviews as. `biorepo.write` refuses a placeholder (F2). */
+const REVIEWER = 'Sam Okonkwo';
+
 /** Decisions the double received on POST /api/biorepo/decisions (§7.3). */
 const decisions = [];
 /** Questions the double received on POST /api/biorepo/check (OF-BLD-012.1 F1.5). */
@@ -434,11 +437,28 @@ async function main() {
       const newCard = await page.locator('body').innerText();
       if (!/Extracted by haiku-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
       if (!/Placeholder A \| 7 \| mg L-1/.test(newCard)) problems.push('the new candidate\'s quote is not on its card');
+      // Nobody can decide anything the committed file would keep until they
+      // have said who they are (OF-BLD-012.1 F2) — so the card refuses first,
+      // and the name set in Settings is what the decision is signed with.
+      const beforeNaming = await page.locator('body').innerText();
+      if (!/Set your reviewer name in Settings/.test(beforeNaming)) {
+        problems.push('an unnamed reviewer is not told to set a name before deciding');
+      }
+      if (!(await page.locator('button:has-text("Accept")').isDisabled())) {
+        problems.push('accept is enabled for a reviewer with no name');
+      }
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
+      await page.locator('text=hk1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(700);
       await page.keyboard.press('a');
       await page.waitForTimeout(700);
       const posted = decisions.find((d) => d.recordId === 'hk1-B5-a07dd73c');
       if (!posted) problems.push('accepting the new candidate posted no decision to the service');
-      else if (posted.status !== 'verified' || !posted.reviewer || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
+      else if (posted.status !== 'verified' || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
+      else if (posted.reviewer !== REVIEWER) problems.push(`the decision is signed ${JSON.stringify(posted.reviewer)}, not the name set in Settings`);
 
       await page.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="extractor-span"]').first().waitFor({ timeout: 8000 }).catch(() => {});
