@@ -1321,6 +1321,18 @@ export interface ExtractResponse {
   dropped: DroppedCandidate[];
   usage: AnswerPlanUsage;
   notes: string[];
+  /**
+   * How many model calls this extraction took (OF-BLD-012.1 F8). One is the
+   * ordinary case; more means the response hit the token limit and the paper
+   * was halved and asked again rather than discarded.
+   */
+  calls: number;
+  /**
+   * The sections that still would not fit after splitting, and so were not
+   * extracted. The honest gap in this paper's extraction, rather than the
+   * silent zero Witness used to score.
+   */
+  truncatedSections: string[];
 }
 
 // `absentFromRun` joins the four review fields here: it is the browser's note

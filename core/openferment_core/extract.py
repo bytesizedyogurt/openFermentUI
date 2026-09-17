@@ -32,6 +32,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
 import anthropic
@@ -56,7 +57,19 @@ SAVE_RESPONSES = False
 # Postdoc's 2000 would truncate the tool call mid-list — a truncated tool
 # input is a malformed response, not a shorter one. Four times Postdoc's
 # budget, and still one call.
-MAX_TOKENS = POSTDOC_MAX_TOKENS * 4
+# The response has to hold EVERY candidate for a paper, and a review with
+# many tables carries more than a hundred. No longer derived from Postdoc's
+# (OF-BLD-012.1 F8): the two calls answer different questions — one writes a
+# handful of claims, this one lists every measurement in a paper — and tying
+# them together meant a limit chosen for the first silently capped the
+# second. 16 000 covers the corpus; the split below covers what it does not.
+MAX_TOKENS = 16_000
+
+# How many times a paper may be halved before the remainder is REPORTED as
+# truncated rather than split again (F8). Two is a quarter of a paper per
+# call; below that the ontology re-sent with every call costs more than the
+# candidates left in the remainder are worth.
+MAX_SPLIT_DEPTH = 2
 
 # §6.1: any single section over this is cut at a sentence boundary and the
 # response says so in `notes`. Methods sections in long papers exceed it;
@@ -363,6 +376,84 @@ def _persist(result: ExtractResponse) -> ExtractResponse:
 # ── one paper ──────────────────────────────────────────────────────────
 
 
+@dataclass
+class _Extracted:
+    """What one extraction produced, across however many calls it took."""
+
+    raws: list[dict[str, Any]] = field(default_factory=list)
+    usage: Usage = field(default_factory=Usage)
+    truncatedSections: list[str] = field(default_factory=list)
+    calls: int = 0
+
+
+def _spent(a: Usage, b: Usage) -> Usage:
+    """Every call is paid for, including one that produced nothing."""
+    return Usage(
+        inputTokens=a.inputTokens + b.inputTokens,
+        outputTokens=a.outputTokens + b.outputTokens,
+        costUsd=a.costUsd + b.costUsd,
+    )
+
+
+def _halve(sections: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split by cumulative CHARACTER count, not by section count, so the two
+    halves cost about the same. A paper whose one table is most of its text
+    is exactly the paper that truncates."""
+    lengths = [len(str(s.get("text") or "")) for s in sections]
+    total = sum(lengths)
+    cut, seen = 1, 0
+    for i, n in enumerate(lengths):
+        seen += n
+        if total == 0 or seen * 2 >= total:
+            cut = i + 1
+            break
+    cut = min(max(cut, 1), len(sections) - 1)
+    return sections[:cut], sections[cut:]
+
+
+def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: int = 0) -> _Extracted:
+    """One call over these sections; on truncation, two calls over halves.
+
+    A response cut off at the token limit is not an extraction — the tool
+    call is incomplete and nothing in it can be trusted — but it is also not
+    evidence that the paper holds no measurements, which is how Witness read
+    it before F8. So the paper is halved and asked again, twice, and only the
+    remainder that still will not fit is reported as truncated. Candidates
+    are content-addressed, so a sentence that lands in both halves collapses
+    to one.
+    """
+    user_text, _ = build_prompt(sections)
+    tool = build_tool([s["id"] for s in sections], list(tables()["ontology"].keys()))
+    raw, usage = call_model(paper_id, user_text, tool)
+    if not raw.get("truncated"):
+        raws = raw.get("candidates") or []
+        return _Extracted(
+            raws=[r for r in raws if isinstance(r, dict)] if isinstance(raws, list) else [],
+            usage=usage,
+            calls=1,
+        )
+
+    spent = Usage.model_validate(raw.get("usage") or usage.model_dump())
+    ids = [str(s["id"]) for s in sections]
+    if len(sections) < 2 or depth >= MAX_SPLIT_DEPTH:
+        log.warning(
+            "%s: sections %s still truncate at depth %d; reported, not discarded",
+            paper_id, ", ".join(ids), depth,
+        )
+        return _Extracted(usage=spent, truncatedSections=ids, calls=1)
+
+    log.info("%s: response hit max_tokens over %d sections; splitting", paper_id, len(sections))
+    left, right = _halve(sections)
+    out = _Extracted(usage=spent, calls=1)
+    for half in (left, right):
+        part = _extract_sections(paper_id, half, depth=depth + 1)
+        out.raws.extend(part.raws)
+        out.usage = _spent(out.usage, part.usage)
+        out.truncatedSections.extend(part.truncatedSections)
+        out.calls += part.calls
+    return out
+
+
 def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
     """Fetch → prompt → one call → anchor → persist. Cached unless `force`."""
     if not force:
@@ -377,17 +468,35 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         )
     sections = [s.model_dump() for s in fetched.sections]
 
-    user_text, notes = build_prompt(sections)
-    tool = build_tool([s["id"] for s in sections], list(tables()["ontology"].keys()))
-    raw, usage = call_model(paper_id, user_text, tool)
-    if SAVE_RESPONSES and not intake.fixtures_only() and not raw.get("truncated"):
+    # What the prompt had to cut to fit a section in; the same for every call
+    # below, because the sections are the same.
+    _, notes = build_prompt(sections)
+    got = _extract_sections(paper_id, sections)
+    if got.truncatedSections and not got.raws:
+        # Nothing was extracted at all, so nothing is cached (see
+        # ExtractTruncated): an empty extraction on disk would be scored as
+        # every record missed and could never be re-run without --force.
+        raise ExtractTruncated(
+            f"{paper_id}: the model's response hit the token limit over every section, "
+            f"even split {MAX_SPLIT_DEPTH} deep, or carried no tool call; nothing kept, "
+            f"nothing cached (${got.usage.costUsd:.4f} spent over {got.calls} calls)."
+        )
+    if got.truncatedSections:
+        notes.append(
+            "sections " + ", ".join(got.truncatedSections) + " still hit the token limit after "
+            f"splitting and were not extracted; the rest of the paper was"
+        )
+    if SAVE_RESPONSES and not intake.fixtures_only():
+        # The candidates from every call, as one response: a fixture replays
+        # the RESULT, and a split is how it was obtained rather than what it
+        # was. A run that produced nothing is not saved at all.
         FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
         (FIXTURE_DIR / f"{paper_id}.json").write_text(
             json.dumps(
                 {
                     "_note": f"Saved response of {MODEL} for {paper_id}, for OPENFERMENT_FIXTURES=1 replay.",
-                    "raw": raw,
-                    "usage": usage.model_dump(),
+                    "raw": {"candidates": got.raws},
+                    "usage": got.usage.model_dump(),
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -395,18 +504,9 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
             + "\n",
             encoding="utf-8",
         )
-    if raw.get("truncated"):
-        # Not an extraction, and not cached as one (see ExtractTruncated).
-        spent = Usage.model_validate(raw.get("usage") or usage.model_dump())
-        raise ExtractTruncated(
-            f"{paper_id}: the model's response hit the token limit or carried no tool call; "
-            f"nothing kept, nothing cached (${spent.costUsd:.4f} spent). Split the paper or raise MAX_TOKENS."
-        )
 
-    raws = raw.get("candidates") or []
-    if not isinstance(raws, list):
-        raws = []
-    anchored = anchor_all([r for r in raws if isinstance(r, dict)], sections, paper_id=paper_id)
+    usage = got.usage
+    anchored = anchor_all(got.raws, sections, paper_id=paper_id)
 
     # §6.2 — the audit trail starts here. The Candidate model carries no audit
     # (§2.5); the persisted file does, and `ExtractResponse` keeps it beside
@@ -424,6 +524,8 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         dropped=anchored.dropped,
         usage=usage,
         notes=notes,
+        calls=got.calls,
+        truncatedSections=got.truncatedSections,
     )
     if anchored.rejected:
         # §2.4 — a rising rejection rate is the signal that the prompt has

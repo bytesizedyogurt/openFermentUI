@@ -260,6 +260,21 @@ def test_the_system_prompt_says_what_a_range_and_an_absence_are_for():
     assert "negativeResult" in extract.SYSTEM
 
 
+def fetch_sections(paper_id: str, sections: list[tuple[str, str]]) -> None:
+    """A fetched paper whose sections say these things, written where a real
+    fetch would leave it."""
+    from openferment_core.models import FetchedSection, FetchResult
+
+    result = FetchResult(
+        paperId=paper_id,
+        status="complete",
+        fetchedAt="2026-09-15T00:00:00Z",
+        sections=[FetchedSection(id=i, heading="Results", text=t) for i, t in sections],
+    )
+    intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    (intake.FULLTEXT_DIR / f"{paper_id}.json").write_text(result.model_dump_json(), encoding="utf-8")
+
+
 def fetch_saying(paper_id: str, section_id: str, text: str) -> None:
     """A fetched paper whose one section says this, written where a real
     fetch would leave it."""
@@ -315,3 +330,101 @@ def test_an_absence_the_model_states_reaches_the_anchored_candidate(monkeypatch)
     assert result.rejected == 0, result.rejectionDetails
     [c] = result.candidates
     assert c.value == 0 and c.valueBasis == "negation" and c.negativeResult is True
+
+
+# ── a long paper does not lose its candidates (OF-BLD-012.1 F8) ────────
+#
+# A review with many tables can emit more than the token limit of candidates.
+# The old handling logged a warning and returned nothing, and Witness then
+# scored that paper as if the extractor had found nothing in it.
+
+FOUR = [(f"s{n}", f"The titre reached {n}.0 g L-1 in run {n}.") for n in (1, 2, 3, 4)]
+
+
+def one_per_section(section_ids: list[str]) -> dict:
+    return {
+        "candidates": [
+            {
+                "sectionId": sid, "field": "titer_secreted", "value": float(sid[1:]),
+                "unit": "g L-1", "quote": f"The titre reached {sid[1:]}.0 g L-1 in run {sid[1:]}",
+                "isPrimary": True, "confidence": 0.9,
+            }
+            for sid in section_ids
+        ]
+    }
+
+
+def sections_asked(tool: dict) -> list[str]:
+    return tool["input_schema"]["properties"]["candidates"]["items"]["properties"]["sectionId"]["enum"]
+
+
+def truncated(usage_in: int = 100) -> tuple[dict, extract.Usage]:
+    u = extract.Usage(inputTokens=usage_in, outputTokens=extract.MAX_TOKENS, costUsd=0.01)
+    return {"candidates": [], "truncated": True, "usage": u.model_dump()}, u
+
+
+def test_the_token_limit_is_high_enough_for_a_paper_full_of_tables():
+    assert extract.MAX_TOKENS >= 16_000
+
+
+def test_a_paper_that_truncates_whole_is_split_and_nothing_is_lost(monkeypatch):
+    fetch_sections("S1", FOUR)
+    asked: list[list[str]] = []
+
+    def fake(paper_id, user_text, tool):
+        ids = sections_asked(tool)
+        asked.append(ids)
+        if len(ids) == 4:
+            return truncated()
+        return one_per_section(ids), extract.Usage(inputTokens=10, outputTokens=20, costUsd=0.002)
+
+    monkeypatch.setattr(extract, "call_model", fake)
+    result = extract.extract_paper("S1")
+    assert result.calls == 3, asked
+    assert asked == [["s1", "s2", "s3", "s4"], ["s1", "s2"], ["s3", "s4"]]
+    assert sorted(c.sectionId for c in result.candidates) == ["s1", "s2", "s3", "s4"]
+    assert result.truncatedSections == []
+    # Every call is paid for, including the one that produced nothing.
+    assert result.usage.costUsd == pytest.approx(0.01 + 0.002 + 0.002)
+
+
+def test_a_half_that_still_truncates_splits_once_more_then_reports_it(monkeypatch):
+    fetch_sections("S2", FOUR)
+    asked: list[list[str]] = []
+
+    def fake(paper_id, user_text, tool):
+        ids = sections_asked(tool)
+        asked.append(ids)
+        # Everything on the left keeps truncating; the right half answers.
+        if ids[0] == "s1":
+            return truncated()
+        return one_per_section(ids), extract.Usage(costUsd=0.002)
+
+    monkeypatch.setattr(extract, "call_model", fake)
+    result = extract.extract_paper("S2")
+    # whole → [s1 s2] → [s1] → [s2]; and [s3 s4] answered whole.
+    assert sorted(c.sectionId for c in result.candidates) == ["s2", "s3", "s4"]
+    assert result.truncatedSections == ["s1"], asked
+    assert result.calls == len(asked)
+
+
+def test_a_paper_that_truncates_all_the_way_down_is_still_refused(monkeypatch):
+    # Nothing was extracted, so nothing is cached and the endpoint says 502:
+    # an empty extraction written to disk would be scored as every record
+    # missed and could never be re-run without --force.
+    fetch_sections("S3", FOUR)
+    monkeypatch.setattr(extract, "call_model", lambda *_: truncated())
+    with pytest.raises(extract.ExtractTruncated):
+        extract.extract_paper("S3")
+    assert extract.cached("S3") is None
+
+
+def test_a_paper_that_does_not_truncate_is_one_call(monkeypatch):
+    fetch_sections("S4", FOUR)
+    monkeypatch.setattr(
+        extract, "call_model",
+        lambda p, u, t: (one_per_section(sections_asked(t)), extract.Usage(costUsd=0.002)),
+    )
+    result = extract.extract_paper("S4")
+    assert result.calls == 1 and result.truncatedSections == []
+    assert len(result.candidates) == 4

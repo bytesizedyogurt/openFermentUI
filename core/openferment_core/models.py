@@ -400,3 +400,10 @@ class ExtractResponse(BaseModel):
     dropped: list[DroppedCandidate] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)
     notes: list[str] = Field(default_factory=list)
+    # How many model calls this took, and which sections still would not fit
+    # (OF-BLD-012.1 F8). One call is the ordinary case; more means the paper
+    # was halved because the response hit the token limit. `truncatedSections`
+    # is what even splitting could not reach — the honest gap in this paper's
+    # extraction, rather than a silent zero.
+    calls: int = 1
+    truncatedSections: list[str] = Field(default_factory=list)

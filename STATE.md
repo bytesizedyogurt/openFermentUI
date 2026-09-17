@@ -54,3 +54,12 @@ transcript; this file is the index a later session reads first.
   diffing against `RECORDS`, which a corpus update would move underneath a
   decided record. The overlay guard grew the F7 scenarios and is renamed
   `pnpm check:store`. Both fixes negative-tested. `pnpm verify` green.
+- **2026-09-17 · OF-BLD-012.1 §6.6 (F8)** — a truncated paper is split, never
+  discarded. `MAX_TOKENS` is 16 000 and no longer derived from Postdoc's; a
+  response that hits the limit halves the paper by character count and asks
+  again, twice deep, and only the remainder that still will not fit is
+  reported. `ExtractResponse` gains `calls` and `truncatedSections` (the spec
+  said `ExtractRun`; that model is Witness's per-run aggregate, and these are
+  per-extraction facts that belong beside `usage`). Every call is paid for in
+  `usage`. A paper that truncates all the way down is still refused and still
+  cached as nothing. Negative-tested. `pnpm verify` green.
