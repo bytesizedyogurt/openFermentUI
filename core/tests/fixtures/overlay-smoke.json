@@ -64,7 +64,8 @@
       "status": "unverified",
       "provenance": "unverified",
       "extractorRun": "haiku-1",
-      "isPrimary": true
+      "isPrimary": true,
+      "valueBasis": "exact"
     },
     {
       "id": "hk1-B5-95f64ef4",
@@ -82,7 +83,8 @@
       "status": "unverified",
       "provenance": "unverified",
       "extractorRun": "haiku-1",
-      "isPrimary": true
+      "isPrimary": true,
+      "valueBasis": "converted"
     }
   ],
   "runs": [

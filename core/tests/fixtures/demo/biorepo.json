@@ -1,14 +1,23 @@
 {
-  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written by `pnpm demo:fixtures` through biorepo.write against the demo fixtures — two rejections of the first two candidates (Witness's false positives) and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written by `pnpm demo:fixtures` through biorepo.write against the demo fixtures — the titre row promoted to gold and corrected into canonical units, the same row rejected where it was read as a colony time (Witness's false positive), and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
   "version": 1,
   "decisions": {
     "hk1-B5-a07dd73c": {
-      "status": "rejected",
-      "provenance": "unverified",
-      "rejectReason": "not this field — a placeholder table row, not a titre",
+      "status": "verified",
+      "provenance": "gold",
+      "gold": {
+        "value": 7.0,
+        "unit": "mg L⁻¹"
+      },
+      "corrected": {
+        "value": 0.007,
+        "unit": "g L⁻¹"
+      },
       "reviewer": "sean",
       "recordId": "hk1-B5-a07dd73c",
-      "at": "2026-09-15T09:00:00Z"
+      "at": "2026-09-15T09:00:00Z",
+      "quote": "Placeholder A | 7 | mg L-1",
+      "sectionId": "t1"
     },
     "hk1-B5-95f64ef4": {
       "status": "rejected",
@@ -43,7 +52,8 @@
       "status": "unverified",
       "provenance": "unverified",
       "extractorRun": "haiku-1",
-      "isPrimary": true
+      "isPrimary": true,
+      "valueBasis": "exact"
     },
     {
       "id": "hk1-B5-95f64ef4",
@@ -61,7 +71,8 @@
       "status": "unverified",
       "provenance": "unverified",
       "extractorRun": "haiku-1",
-      "isPrimary": true
+      "isPrimary": true,
+      "valueBasis": "converted"
     }
   ]
 }

@@ -75,7 +75,21 @@ def test_the_saved_decisions_are_ones_the_write_function_stores():
     assert biorepo.read().decisions == saved.decisions
     assert [c.id for c in biorepo.read().records] == [c.id for c in saved.records]
 
-    # And the two rejections are the run's false positives, with their reasons.
+    # A REJECTED candidate is the run's false positive, with its reason; the
+    # one promoted to gold is not — the extractor got that row right.
+    rejected = [rid for rid, d in saved.decisions.items() if d.status == "rejected"]
+    assert rejected, "the fixture set needs a rejection to score as a false positive"
     fps = witness.runs()[0].falsePositives
-    assert [fp.id for fp in fps] == [c.id for c in saved.records]
+    assert [fp.id for fp in fps] == rejected
     assert all(fp.note for fp in fps)
+
+
+def test_the_fixture_set_covers_every_way_a_decision_can_land():
+    """`pnpm test:export` reads this set to prove the merge reaches the
+    corpus (OF-BLD-012.1 F4), so the set has to hold one of each."""
+    saved = BioRepo.model_validate_json((DEMO / "biorepo.json").read_text(encoding="utf-8"))
+    kinds = saved.decisions.values()
+    assert any(d.corrected for d in kinds), "a correction, so the exported value is the reviewer's"
+    assert any(d.provenance == "gold" or d.gold for d in kinds), "a gold promotion"
+    assert any(d.status == "rejected" for d in kinds), "a rejection, which must stay out of the corpus"
+    assert any(d.status == "verified" and not d.gold for d in kinds), "a plain accept"

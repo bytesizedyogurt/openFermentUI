@@ -8,18 +8,34 @@
  * wrong, or a decision about a record that no longer exists fails the build
  * here, in words.
  *
- * Checked against the corpus projection the exporter just wrote, which is
- * where the seed's record ids and paper identifiers are readable without a
- * TypeScript toolchain (pure Node, like check-plan). `pnpm verify` runs the
- * export two stages earlier; run `pnpm export:corpus` first when invoking
- * this alone. Because the export MERGES biorepo.json (§7.4), the last block
- * checks that the merge happened: a decision the corpus does not reflect is
- * a decision Postdoc will not honour.
+ * Checked against the corpus projection, which is where the seed's record ids
+ * and paper identifiers are readable. THE GUARD BRINGS ITS OWN EXPORT
+ * (OF-BLD-012.1 F5): it runs `export-corpus.ts` into a temp directory and
+ * compares against that, so it says the same thing on a fresh clone with no
+ * corpus.json as it does mid-verify, and can never report a decision as
+ * unmerged when the truth is that the projection on disk is older than the
+ * file. Because the export MERGES biorepo.json (§7.4), the last block checks
+ * that the merge happened: a decision the corpus does not reflect is a
+ * decision Postdoc will not honour.
+ *
+ * `OPENFERMENT_DATA_DIR` selects which biorepo.json is checked, the same
+ * override the service and the exporter read, so `test:export` can point this
+ * at a fixture whose merge has been broken on purpose.
+ *
+ * `OPENFERMENT_CORPUS_IN` names a projection to check AGAINST instead of
+ * making one. Nothing in `verify` sets it; `test:export` does, because rule 4
+ * asks whether a corpus reflects a decision, and a guard that always builds
+ * the corpus it is about to check can only ever answer yes to that. Pointed
+ * at a corpus built before the decision changed, rule 4 has something to
+ * catch — which is the only way to know it still would.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join } from 'node:path';
 
-const BIOREPO = 'core/data/biorepo.json';
-const CORPUS = 'core/openferment_core/data/corpus.json';
+const DATA_DIR = process.env.OPENFERMENT_DATA_DIR?.trim() || 'core/data';
+const BIOREPO = join(isAbsolute(DATA_DIR) ? DATA_DIR : join(process.cwd(), DATA_DIR), 'biorepo.json');
 
 const errors = [];
 const fail = (m) => errors.push(m);
@@ -28,8 +44,25 @@ if (!existsSync(BIOREPO)) {
   console.error(`✗ ${BIOREPO} is missing — it is committed, so this checkout is broken`);
   process.exit(1);
 }
-if (!existsSync(CORPUS)) {
-  console.error(`✗ ${CORPUS} is missing — run \`pnpm export:corpus\` first; verify does`);
+
+// The projection this file is checked against: one named for us, or one
+// made now from this file.
+const given = process.env.OPENFERMENT_CORPUS_IN?.trim();
+let CORPUS = given || '';
+if (!given) {
+  CORPUS = join(mkdtempSync(join(tmpdir(), 'of-biorepo-')), 'corpus.json');
+  const ran = spawnSync('pnpm', ['export:corpus'], {
+    encoding: 'utf-8',
+    shell: process.platform === 'win32',
+    env: { ...process.env, OPENFERMENT_DATA_DIR: DATA_DIR, OPENFERMENT_CORPUS_OUT: CORPUS },
+  });
+  if (ran.status !== 0 || !existsSync(CORPUS)) {
+    console.error(ran.stderr || ran.stdout);
+    console.error('✗ the corpus export did not run — this guard cannot check a merge it cannot make');
+    process.exit(1);
+  }
+} else if (!existsSync(CORPUS)) {
+  console.error(`✗ OPENFERMENT_CORPUS_IN points at ${CORPUS}, which does not exist`);
   process.exit(1);
 }
 

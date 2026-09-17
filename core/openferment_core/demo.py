@@ -100,7 +100,7 @@ def rebuild_decisions(scratch: Path) -> list[str]:
     the saved JATS and response: reject the first two candidates, accept
     the curated r-B5-3."""
     from . import biorepo, extract, intake
-    from .models import ReviewDecision
+    from .models import Quantity, ReviewDecision
 
     os.environ["OPENFERMENT_FIXTURES"] = "1"
     fetched = intake.fetch_paper(B5, force=True)
@@ -110,13 +110,26 @@ def rebuild_decisions(scratch: Path) -> list[str]:
         sys.exit("the saved response anchors no candidate against the saved JATS; nothing to decide on")
     if biorepo.PATH.exists():
         biorepo.PATH.unlink()
-    reasons = [
-        "not this field — a placeholder table row, not a titre",
-        "wrong span — a row of titres read as a colony time",
-    ]
-    for c, why in zip(result.candidates[:2], reasons):
-        biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="sean",
-                                     recordId=c.id, at=AT, rejectReason=why))
+    # One of each kind of decision, so `pnpm test:export` has all three merge
+    # paths to check (OF-BLD-012.1 F4) and the demo opens on a corpus that has
+    # actually been reviewed rather than only rejected:
+    #
+    #   1. the titre row promoted to gold AND corrected into canonical units —
+    #      the paper wrote mg/L, the corpus records g/L, and both the gold
+    #      value and the correction have to anchor in that same sentence
+    #   2. the same row read as a colony time, rejected — Witness's false
+    #      positive
+    #   3. a curated B5 record accepted as it stands
+    first, second = result.candidates[0], result.candidates[1]
+    biorepo.write(ReviewDecision(
+        status="verified", provenance="gold", reviewer="sean", recordId=first.id, at=AT,
+        gold=Quantity(value=first.value, unit=first.unit),
+        corrected=Quantity(value=float(first.value) / 1000.0, unit="g L\u207b\u00b9"),
+    ))
+    biorepo.write(ReviewDecision(
+        status="rejected", provenance="unverified", reviewer="sean", recordId=second.id, at=AT,
+        rejectReason="wrong span — a row of titres read as a colony time",
+    ))
     biorepo.write(ReviewDecision(status="verified", provenance="curated", reviewer="sean",
                                  recordId="r-B5-3", at=AT))
     raw = json.loads(biorepo.PATH.read_text(encoding="utf-8"))
@@ -125,8 +138,9 @@ def rebuild_decisions(scratch: Path) -> list[str]:
             "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied "
             "into the demo's scratch data directory at start so Guild and Witness open with "
             "something decided. Written by `pnpm demo:fixtures` through biorepo.write against "
-            "the demo fixtures — two rejections of the first two candidates (Witness's false "
-            "positives) and one accept of a curated B5 record. Not the committed "
+            "the demo fixtures — the titre row promoted to gold and corrected into canonical "
+            "units, the same row rejected where it was read as a colony time (Witness's false "
+            "positive), and one accept of a curated B5 record. Not the committed "
             "core/data/biorepo.json, which the demo never touches."
         ),
         **raw,

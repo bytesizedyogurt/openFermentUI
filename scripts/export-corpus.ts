@@ -26,7 +26,13 @@ import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
-const OUT = 'core/openferment_core/data/corpus.json';
+/**
+ * Where the projection lands. Overridable (OF-BLD-012.1 F4–F5) so a guard can
+ * export into a temp directory and read it back without touching the one the
+ * service uses — `check:biorepo` brings its own export, and `test:export`
+ * exports the demo's decisions to prove the merge happens.
+ */
+const OUT = process.env.OPENFERMENT_CORPUS_OUT?.trim() || 'core/openferment_core/data/corpus.json';
 
 /**
  * The reviewers' decisions (OF-BLD-012 §7.4). corpus.json reflects

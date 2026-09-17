@@ -63,3 +63,15 @@ transcript; this file is the index a later session reads first.
   per-extraction facts that belong beside `usage`). Every call is paid for in
   `usage`. A paper that truncates all the way down is still refused and still
   cached as nothing. Negative-tested. `pnpm verify` green.
+- **2026-09-17 · OF-BLD-012.1 §6.7 (F4–F5)** — the merge is tested and the
+  guard brings its own export. `export-corpus.ts` takes
+  `OPENFERMENT_CORPUS_OUT`; `check:biorepo` takes `OPENFERMENT_DATA_DIR` and
+  exports into a temp directory itself, so it passes on a fresh clone with no
+  `corpus.json`. New stage `pnpm test:export` exports the demo's decisions and
+  checks the corrected value, the SI twin, the re-anchored quote, the appended
+  record, gold provenance and the excluded rejection. The demo fixture now
+  carries one of each kind of decision. **Tension resolved:** F4 asks the
+  guard to fail on a bent value, but after F5 the guard builds the corpus it
+  checks, so bending the decision bends both sides — rule 4 is testable
+  through `OPENFERMENT_CORPUS_IN`, which nothing in verify sets. Nineteen
+  stages. Both negative-tested. `pnpm verify` green.
