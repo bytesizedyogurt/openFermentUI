@@ -417,17 +417,31 @@ async function main() {
       // gold is unavailable with the reason, because biorepo.write would
       // refuse it.
       // Opening Guild COLD — a fresh document, not this page, whose store
-      // already holds the overlay — seeds the queue from the seed before the
-      // double's delayed overlay answers; the new candidate has to join that
-      // queue when it arrives.
+      // already holds the overlay. F9: the queue waits for /api/health and
+      // then seeds with the records the service can KEEP, so it is the 82
+      // seeded records on identified papers plus the new candidate on B5 —
+      // 83, not all 135. The other 52 sit on papers with no PMCID, DOI or
+      // PMID, and `biorepo.write` refuses every decision about them.
+      // (That a candidate arriving joins an ALREADY OPEN queue is
+      // `pnpm check:store`, which tests it without a clock.)
       const coldPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
       await coldPage.goto(`http://localhost:${PORT}/#/guild`, { waitUntil: 'networkidle' });
       // networkidle already covers the double's 700 ms overlay; give the
       // store one tick to apply it.
       await coldPage.waitForTimeout(300);
-      const cold = await coldPage.locator('body').innerText();
+      const cold = (await coldPage.locator('body').innerText()).replace(/\s+/g, ' ');
+      if (!/\/ 83\b/.test(cold))
+        problems.push(`the queue is not the 83 records the service would keep (progress reads ${(cold.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
+      if (!/hiding 52 records on papers with no PMCID, DOI or PMID/.test(cold))
+        problems.push(`the filter does not say what it is hiding (${(cold.match(/hiding[^,]*/) ?? ['—'])[0]})`);
+      // And it is a filter, not a wall: the refused records are still
+      // reviewable in this browser, and unticking gives them back.
+      await coldPage.locator('#keepable-only').uncheck();
+      await coldPage.waitForTimeout(200);
+      const unfiltered = (await coldPage.locator('body').innerText()).replace(/\s+/g, ' ');
       await coldPage.close();
-      if (!/\/ 135\b/.test(cold)) problems.push(`the new candidate did not join the open queue (progress reads ${(cold.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
+      if (!/\/ 135\b/.test(unfiltered))
+        problems.push(`unticking the filter did not give the refused records back (progress reads ${(unfiltered.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
 
       await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
       // A hash navigation on the same document returns at once; wait for the

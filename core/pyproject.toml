@@ -28,7 +28,9 @@ packages = ["openferment_core"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    # §9 — the live tests spend money and need a key. They are excluded from
-    # `pnpm verify`, which must stay runnable offline with no key present.
-    "live: requires ANTHROPIC_API_KEY and makes real API calls",
+    # §9 — the live tests leave this machine. Most spend money and need a key;
+    # the Crossref one (F9) needs neither, only a network that will reach
+    # api.crossref.org. All are excluded from `pnpm verify`, which must stay
+    # runnable offline with no key present.
+    "live: makes a real network call (Anthropic, needing ANTHROPIC_API_KEY, or Crossref, needing none)",
 ]

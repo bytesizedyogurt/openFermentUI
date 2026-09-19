@@ -35,7 +35,9 @@
     "demo:fixtures": "cd core && uv run python -m openferment_core.demo",
     "check:anchors": "node scripts/check-anchors.mjs",
     "check:store": "tsx scripts/check-store.ts",
-    "test:export": "node scripts/test-export.mjs"
+    "test:export": "node scripts/test-export.mjs",
+    "ids:propose": "cd core && uv run python ../scripts/resolve-identifiers.py",
+    "ids:apply": "cd core && uv run python ../scripts/resolve-identifiers.py --apply"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

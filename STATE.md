@@ -75,3 +75,25 @@ transcript; this file is the index a later session reads first.
   checks, so bending the decision bends both sides — rule 4 is testable
   through `OPENFERMENT_CORPUS_IN`, which nothing in verify sets. Nineteen
   stages. Both negative-tested. `pnpm verify` green.
+- **2026-09-19 · OF-BLD-012.1 §6.8 (F9)** — identifiers proposed by machine,
+  approved by a person. `pnpm ids:propose` asks Crossref about each of the
+  **73** seed papers carrying no PMCID, DOI or PMID and writes a gitignored
+  TSV; `pnpm ids:apply` writes back the rows a person changed to `APPROVED`
+  and only those — under the entry's `venue:` line, never onto a paper that
+  already has one, one line and nothing else — then prints the diff to commit,
+  and raises rather than guess at an id the seed does not hold. Crossref lives
+  in one function, so the matching, the verdict and the patcher are pinned
+  offline: **19** tests in verify, plus one `live` test that is the only place
+  an unreachable Crossref shows up as a refusal instead of 73 silent REVIEW
+  rows. Guild gains the **Papers the service can keep** filter over the **52**
+  unverified records `biorepo.write` refuses for want of an identifier.
+  **Two findings.** The filter as first written was decoration: Guild seeded
+  its queue at mount, before `/api/health` had answered, so the box read
+  "hiding 52" above a queue still holding all 135 — the smoke's old `/ 135`
+  assertion passing is what proved it. The queue waits for the answer now,
+  which cost the smoke its cold-open race for §7.3's "an arriving candidate
+  joins an open queue"; that contract moved into `check:store`, where it needs
+  no clock. And **Crossref is unreachable from this environment** — the agent
+  proxy answers 403 to CONNECT for `api.crossref.org` — so `ids:propose` is
+  Sean's to run; from here every lookup degrades to a REVIEW row, as designed.
+  Four guards negative-tested. `pnpm verify` green, nineteen stages.

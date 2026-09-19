@@ -73,7 +73,16 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 ## The seed, the overlay, and offline verify
 
 - `src/data/*.ts` is the source of truth for the 132 papers and 134 records.
-  Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`.
+  Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. The ONE sanctioned
+  exception is a DOI a person approved (OF-BLD-012.1 F9): `pnpm ids:propose`
+  asks Crossref about every paper carrying no PMCID, DOI or PMID and writes
+  `core/data/identifiers-proposed.tsv`, which is gitignored and is not the
+  seed; `pnpm ids:apply <file>` writes back the rows — and only the rows —
+  whose verdict a person changed to `APPROVED`, then prints the diff to
+  commit. The script's own `PROPOSE` is an opinion, never an approval, and no
+  amount of Crossref score substitutes for one. Guild's **Papers the service
+  can keep** filter, on by default when the service is up, hides the records
+  `biorepo.write` refuses for want of an identifier.
 - The service supplies an **overlay** the store applies at load when
   `/api/health` answers (OF-BLD-012 §2.1). With the service down the app is
   exactly the seed. The overlay is AUTHORITATIVE: `candidates` and `runs` are

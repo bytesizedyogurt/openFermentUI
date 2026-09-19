@@ -76,7 +76,7 @@ useStore.setState({ serviceUp: false, decisionAt: {}, durableReview: null });
 // 1. Three candidates arrive and become records.
 useStore.getState().applyOverlay(overlay({ candidates: THREE }));
 check('three candidates joined the records', ours().length === 3, ours().map((r) => r.id));
-check('and the queue knows about them', THREE.every((c) => s().reviewQueue.includes(c.id)) || s().reviewQueue.length === 0);
+check('with no queue open, an arriving candidate does not force one', s().reviewQueue.length === 0, s().reviewQueue.length);
 
 // 2. An empty list means the extractor produced nothing. Undecided
 //    candidates are the extractor's current opinion, and go with it.
@@ -107,6 +107,24 @@ check(
   s().records.find((r) => r.id === THREE[0].id)?.absentFromRun !== true,
 );
 check('and its decision is still there', s().records.find((r) => r.id === THREE[0].id)?.status === 'rejected');
+
+// 6. §7.3 — a candidate that arrives while a queue is OPEN joins it. The
+//    smoke was the only place this was checked, by opening Guild cold and
+//    racing the double's delayed overlay against the queue's own seeding.
+//    F9 made that seeding wait for /api/health, so the race is gone and the
+//    contract needs a home that is not a clock.
+useStore.getState().applyOverlay(overlay({ candidates: [] }));
+const open = s().records.filter((r) => r.status === 'unverified').slice(0, 5).map((r) => r.id);
+useStore.getState().startReview(open);
+check('a queue is open', s().reviewQueue.length === open.length, s().reviewQueue.length);
+useStore.getState().applyOverlay(overlay({ candidates: THREE }));
+check(
+  'an undecided candidate arriving joins the open queue',
+  [THREE[1], THREE[2]].every((c) => s().reviewQueue.includes(c.id)),
+  s().reviewQueue.slice(-3),
+);
+check('a decided one does not queue itself for review again', !s().reviewQueue.includes(THREE[0].id));
+check('and the records already queued are still queued', open.every((id) => s().reviewQueue.includes(id)));
 
 // ── F7 — a record remembers what it was ──────────────────────────────
 //

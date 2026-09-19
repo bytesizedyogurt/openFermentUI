@@ -34,3 +34,6 @@ core/data/candidates/
 # §8.1 — `pnpm demo:offline` runs the service against a scratch copy of the
 # data directory so the demo never writes into the committed biorepo.json.
 core/data/demo/
+# Crossref's proposals (OF-BLD-012.1 F9). A proposal is not a fact: what is
+# approved lands in src/data/corpus/ as a seed change, with a commit.
+core/data/identifiers-proposed.tsv

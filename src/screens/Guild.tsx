@@ -27,6 +27,7 @@ import {
   decisionToCheck,
   locateQuote,
   paperFetched,
+  paperIdentified,
   refusalOf,
   spanChangesNumber,
   writeRefusal,
@@ -191,18 +192,63 @@ export default function Guild() {
   const lastAt = useRef(Date.now());
   const timings = useRef<number[]>([]);
 
+  // OF-BLD-012.1 F9 — 73 of the 132 seed papers carry no PMCID, DOI or PMID,
+  // and `biorepo.write` refuses every decision about them, so 52 unverified
+  // records can be reviewed here and never reach the committed file. A
+  // reviewer working towards that file should not be shown them: with the
+  // service up this filter is ON, and the strip says how many it is hiding
+  // and why. Off, the queue is everything, and those records are still
+  // reviewable in this browser — the Durable tier keeps them.
+  //
+  // `null` until the reviewer touches the box: the default FOLLOWS the
+  // service rather than being copied out of it once, because `serviceUp` is
+  // `null` until /api/health answers and an effect that copied it then would
+  // land a render too late — after the queue had already been seeded with the
+  // records the service will refuse.
+  const [filterChoice, setFilterChoice] = useState<boolean | null>(null);
+  const keepableOnly = filterChoice ?? serviceUp === true;
+
+  const keepable = useCallback(
+    (r: ExtractionRecord) => paperIdentified(papers.find((p) => p.id === r.paperId)),
+    [papers],
+  );
+  const waiting = useMemo(() => records.filter((r) => r.status === 'unverified'), [records]);
+  const hiddenByFilter = useMemo(
+    () => (keepableOnly ? waiting.filter((r) => !keepable(r)).length : 0),
+    [keepableOnly, waiting, keepable],
+  );
+
   // Arriving without a queue (deep link, refresh) fills it with everything
   // still unverified, so the screen is never a dead end. Re-run whenever the
   // queue is empty and records change: an overlay that lands after this
   // mounted can bring new candidates to review (OF-BLD-012 §7.3).
   useEffect(() => {
     if (queue.length > 0) return;
-    const ids = records.filter((r) => r.status === 'unverified').map((r) => r.id);
+    // Hold until /api/health has answered: what the queue is FOR depends on
+    // the answer, and a queue seeded before it arrives is the wrong queue
+    // with the filter above it claiming otherwise.
+    if (serviceUp === null) return;
+    const ids = waiting.filter((r) => !keepableOnly || keepable(r)).map((r) => r.id);
     if (ids.length > 0) {
       startReview(ids);
       setOrigin('session');
     }
-  }, [queue.length, records, startReview]);
+  }, [queue.length, waiting, keepable, keepableOnly, serviceUp, startReview]);
+
+  /** Changing what the queue is FOR rebuilds it; the session counters restart with it. */
+  const setFilter = useCallback(
+    (only: boolean) => {
+      setFilterChoice(only);
+      const ids = useStore
+        .getState()
+        .records.filter((r) => r.status === 'unverified')
+        .filter((r) => !only || keepable(r))
+        .map((r) => r.id);
+      startReview(ids);
+      setOrigin('session');
+    },
+    [keepable, startReview],
+  );
 
   // Declared after the seeding effect above so it runs after it in the same
   // flush: the queue exists by the time this looks for the record in it.
@@ -557,6 +603,26 @@ export default function Guild() {
               ? 'Queued from the Extract table as it was filtered.'
               : 'Auto-filled with every unverified record in this session.'}
           </div>
+          <label className="mt-1.5 flex items-start gap-2 text-caption">
+            <input
+              type="checkbox"
+              id="keepable-only"
+              checked={keepableOnly}
+              onChange={(e) => setFilter(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-ink-soft">
+              Papers the service can keep
+              {hiddenByFilter > 0 && (
+                <>
+                  {' '}
+                  — hiding <span className="font-num">{hiddenByFilter}</span> record
+                  {hiddenByFilter === 1 ? '' : 's'} on papers with no PMCID, DOI or PMID, which{' '}
+                  <code className="font-mono">biorepo.write</code> refuses
+                </>
+              )}
+            </span>
+          </label>
         </div>
 
         <div>
