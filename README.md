@@ -37,11 +37,11 @@ question the app labels as open** rather than answering.
 
 | Layer | Status |
 |---|---|
-| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none |
-| Full text | **Real, when fetched** — as of 2026-09-15, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
+| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
+| Full text | **Real, when fetched** — as of 2026-09-21, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `haiku-1`, one forced tool call per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-15, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
-| Verified records | **0** as of 2026-09-15 — a verified record is one a named reviewer promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
+| Extractor run | **Real, when run** — `haiku-1`, one forced tool call per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
+| Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model call** — Postdoc on Claude Haiku through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
@@ -70,7 +70,9 @@ fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not chan
 134 records         132 curated · 2 industry-estimate · 127 flagged is_primary
  24 ontology fields  5 families: expression, ptm, functional, cultivation, downstream
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
-  7 strains         cw15, UVM4, C. reinhardtii wild type, GS115, T. reesei, E. coli, bovine
+ 15 strains         cw15, UVM4 and C. reinhardtii wild type; the bovine reference; and eleven comparator
+                    hosts — P. pastoris GS115, T. reesei, E. coli, S. cerevisiae, Y. lipolytica, A. niger,
+                    A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila
   9 protocols       TAP media → transformation → PEF disruption → Phos-tag → CIP
  13 chat flows       3 scenarios · 6 learn modules / 9 lessons
 ```
@@ -137,7 +139,7 @@ pnpm bundle:single  # one self-contained .html (inlined CSS/JS/fonts), openable 
 ```
 
 The service, for Postdoc's live mode and for Intake's real fetch and extraction
-(OF-BLD-012). Everything below needs `uv`; only the last two lines spend money.
+(OF-BLD-012). Everything below needs `uv`; only `intake:extract` spends money.
 
 ```bash
 cp core/.env.example core/.env        # ANTHROPIC_API_KEY — gitignored, guarded by check:secrets;
@@ -150,11 +152,19 @@ pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for t
                                       # PMID and most are not open access (no key; ≤ 2 requests/s, a User-Agent)
 pnpm intake:extract --all             # Claude Haiku, one forced tool call per fetched paper
                                       # → core/data/candidates/; prints anchored, rejected by rule, cost
+
+pnpm ids:propose                      # Crossref, one request a second, for the 73 papers with no identifier
+                                      # → core/data/identifiers-proposed.tsv (gitignored). Writes NOTHING to the seed
+pnpm ids:apply <file.tsv>             # writes the rows a person changed to APPROVED into src/data/corpus/ and
+                                      # prints the diff to commit. PROPOSE is the script's opinion, not an approval
 ```
 
 Both batch commands are idempotent — a paper already fetched or extracted is skipped unless
-`--force`. Review decisions made in Guild while the service is up go to `core/data/biorepo.json`
-through one write function; that file is committed, `fulltext/` and `candidates/` are not.
+`--force`; an outage (a timeout, a 5xx) is not cached, so the next run asks again. Review
+decisions made in Guild while the service is up go to `core/data/biorepo.json` through one write
+function, signed with the reviewer name from Settings; that file is committed, `fulltext/` and
+`candidates/` are not. A typed value — a correction, a gold value — has to sit in a sentence of
+the fetched paper like any other number, or the write is refused and Guild says which rule.
 
 ### The offline demo
 
@@ -182,14 +192,17 @@ pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and th
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — in order:
+pnpm verify              # offline — no key, no service, no network — nineteen stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
-  pnpm check:biorepo     #   biorepo.json is sound and corpus.json reflects every decision
+  pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
+  pnpm test:export       #   the decision merge, exercised on a fixture that has decisions; a bent one fails
+  pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
+  pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm build

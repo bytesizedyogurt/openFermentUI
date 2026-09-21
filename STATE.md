@@ -97,3 +97,23 @@ transcript; this file is the index a later session reads first.
   proxy answers 403 to CONNECT for `api.crossref.org` — so `ids:propose` is
   Sean's to run; from here every lookup degrades to a REVIEW row, as designed.
   Four guards negative-tested. `pnpm verify` green, nineteen stages.
+- **2026-09-21 · OF-BLD-012.1 §6.9 (review pass, truth pass, PR)** — the
+  thirty commits since `main` were read adversarially before the PR, with the
+  store and the service driven by probes. **Fifteen findings, all confirmed,
+  all fixed, each with a test that failed first** (`a264368`). The ones that
+  mattered: a live fetch applied its result with `candidates: []`, which under
+  F3 wiped the extractor's candidates on every fetch; a reviewer-typed
+  correction with no quote skipped rule 3 and reached `corpus.json` inside no
+  sentence; an undo was stored as a decision and counted by Witness; rule 3
+  read "one of the highest titres" as a titre of 1 and matched negation
+  markers as substrings; a numeric superscript on any digit was a power of
+  ten; `applyOverlay` moved the reviewer to a different card when the queue
+  was pruned; the deep-link effect re-fired on every queue change and, opened
+  early, defeated F9's filter. `check:anchors` still **93 of 104**; **318**
+  Python tests. Truth pass over README: three stages missing from the gate
+  (`test:export`, `check:anchors`, `check:store`), **15** strains not 7, the
+  F9 commands and the reviewer name in "Running it", dates re-measured (still
+  0 fetched, 0 extracted, 0 verified in this checkout). `CLAUDE.md` already
+  carried F1's `valueBasis` list and the `/check` rule from §6.1–6.2; it
+  gains the typed-value and withdrawal rules. `pnpm verify` green, nineteen
+  stages. PR opened to `main`.

@@ -49,6 +49,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   says so in its header; do not grow it into a second copy of the rules.
   `normalizeText` is the one thing mirrored, and it is fuzzed against
   `normalize_text`.
+- **A typed value is held to the sentence like any other.** A correction or
+  a gold value, whatever the decision's status, anchors on the decision's
+  quote or the record's own, and needs the paper fetched (OF-BLD-012.1 §6.9).
+  A decision that decides nothing — `unverified`, nothing typed, nothing
+  rejected — is what an undo posts, and `biorepo.write` treats it as a
+  withdrawal: the stored decision goes, and the candidate copy with it.
 - Reference content (`src/data/reference.ts`) is domain knowledge, never a
   result: no titre, yield, cost or patent status. `pnpm check:reference`
   enforces it and every numeric cell needs a written justification.
