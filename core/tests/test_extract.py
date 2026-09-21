@@ -428,3 +428,21 @@ def test_a_paper_that_does_not_truncate_is_one_call(monkeypatch):
     result = extract.extract_paper("S4")
     assert result.calls == 1 and result.truncatedSections == []
     assert len(result.candidates) == 4
+
+
+def test_the_prompt_is_built_once_per_call(monkeypatch):
+    # `extract_paper` built the whole prompt — the ontology and every section
+    # serialised — once for its notes and then again for the call. Twice the
+    # work on every paper, and three or four times on one that splits.
+    fetch_structural_as("X1")
+    monkeypatch.setattr(extract, "call_model", stub_call(GOOD_AND_BAD))
+    real = extract.build_prompt
+    calls: list[int] = []
+
+    def counting(sections):
+        calls.append(len(sections))
+        return real(sections)
+
+    monkeypatch.setattr(extract, "build_prompt", counting)
+    extract.extract_paper("X1")
+    assert calls == [len(intake.cached("X1").sections)], calls

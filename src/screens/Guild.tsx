@@ -252,8 +252,14 @@ export default function Guild() {
 
   // Declared after the seeding effect above so it runs after it in the same
   // flush: the queue exists by the time this looks for the record in it.
+  // Once per deep link, not once per queue change: the hash keeps carrying
+  // `?record=` after the reviewer has decided that card and moved on, and an
+  // overlay landing then (a fetch, an extraction) would snap them back to it.
+  const focused = useRef<string | null>(null);
   useEffect(() => {
-    if (focusId) focusReview(focusId);
+    if (!focusId || queue.length === 0 || focused.current === focusId) return;
+    focused.current = focusId;
+    focusReview(focusId);
   }, [focusId, focusReview, queue.length]);
 
   useEffect(() => {

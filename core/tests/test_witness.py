@@ -356,3 +356,14 @@ def test_the_pairing_does_not_depend_on_the_order_the_candidates_arrive():
     assert [r.extracted.value for r in one.results if r.extracted] == [
         r.extracted.value for r in other.results if r.extracted
     ]
+
+
+def test_a_dropped_candidate_whose_value_is_a_numeric_string_is_still_a_span_error():
+    # The tool asks for "the number as the paper wrote it", and a model
+    # that writes "4,200" has agreed with 4.2 g/L. Compared as a category,
+    # the string could never score a span_error, so exactly the emissions
+    # the prompt invites were scored as misses (OF-BLD-012.1 §6.9).
+    run = witness.match_run([], SEED, papers={"P1"}, dropped=[dropped("P1", "titer_secreted", "4,200", "mg/L")])
+    assert outcomes(run)["r-P1-1"] == "span_error"
+    extracted = next(r.extracted for r in run.results if r.goldRecordId == "r-P1-1")
+    assert extracted == Quantity(value="4,200", unit="mg/L"), "what the model wrote is what Witness shows"

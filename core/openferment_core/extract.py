@@ -39,7 +39,7 @@ import anthropic
 
 from . import intake
 from .models import Candidate, ExtractResponse, Usage
-from .postdoc import MAX_TOKENS as POSTDOC_MAX_TOKENS, MODEL, cost_usd
+from .postdoc import MODEL, cost_usd
 from .units import tables
 from .validate import anchor_all
 
@@ -384,6 +384,9 @@ class _Extracted:
     usage: Usage = field(default_factory=Usage)
     truncatedSections: list[str] = field(default_factory=list)
     calls: int = 0
+    # What the prompt had to cut to fit a section in. Per section, so the
+    # same for every call over the same sections; taken from the first.
+    notes: list[str] = field(default_factory=list)
 
 
 def _spent(a: Usage, b: Usage) -> Usage:
@@ -422,7 +425,7 @@ def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: i
     are content-addressed, so a sentence that lands in both halves collapses
     to one.
     """
-    user_text, _ = build_prompt(sections)
+    user_text, notes = build_prompt(sections)
     tool = build_tool([s["id"] for s in sections], list(tables()["ontology"].keys()))
     raw, usage = call_model(paper_id, user_text, tool)
     if not raw.get("truncated"):
@@ -431,6 +434,7 @@ def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: i
             raws=[r for r in raws if isinstance(r, dict)] if isinstance(raws, list) else [],
             usage=usage,
             calls=1,
+            notes=notes,
         )
 
     spent = Usage.model_validate(raw.get("usage") or usage.model_dump())
@@ -440,11 +444,11 @@ def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: i
             "%s: sections %s still truncate at depth %d; reported, not discarded",
             paper_id, ", ".join(ids), depth,
         )
-        return _Extracted(usage=spent, truncatedSections=ids, calls=1)
+        return _Extracted(usage=spent, truncatedSections=ids, calls=1, notes=notes)
 
     log.info("%s: response hit max_tokens over %d sections; splitting", paper_id, len(sections))
     left, right = _halve(sections)
-    out = _Extracted(usage=spent, calls=1)
+    out = _Extracted(usage=spent, calls=1, notes=notes)
     for half in (left, right):
         part = _extract_sections(paper_id, half, depth=depth + 1)
         out.raws.extend(part.raws)
@@ -468,10 +472,10 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         )
     sections = [s.model_dump() for s in fetched.sections]
 
-    # What the prompt had to cut to fit a section in; the same for every call
-    # below, because the sections are the same.
-    _, notes = build_prompt(sections)
     got = _extract_sections(paper_id, sections)
+    # What the prompt had to cut to fit a section in — from the call that
+    # built it, not from building it a second time.
+    notes = list(got.notes)
     if got.truncatedSections and not got.raws:
         # Nothing was extracted at all, so nothing is cached (see
         # ExtractTruncated): an empty extraction on disk would be scored as

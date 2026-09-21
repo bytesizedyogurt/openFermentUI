@@ -592,3 +592,36 @@ def test_a_value_read_from_a_comparison_still_refuses():
         )
     )
     assert rule == "value", detail
+
+
+# ── §6.9 — what a review of rule 3 found ────────────────────────────────
+#
+# Two ways a sentence that states no number was read as stating one.
+
+
+def test_a_cardinal_in_a_partitive_or_a_compound_is_not_a_quantity():
+    # "one of the highest titres" states no titre of 1, and "a two-step
+    # purification" states no 2. Read as numbers, they let a candidate
+    # valued 1 or 2 anchor on ordinary prose as basis 'exact'.
+    from openferment_core.validate import value_basis
+
+    assert value_basis(1.0, "one of the highest titres reported for this host", "g L-1") is None
+    assert value_basis(2.0, "a two-step purification gave pure protein", "") is None
+    assert value_basis(1.0, "one of the two strains grew", "") is None
+    # What the closed list is FOR still reads as it did:
+    assert value_basis(3.0, "Secretion improved roughly three-fold", "×") == "exact"
+    assert value_basis(3.0, "roughly three times larger than normal", "×") == "exact"
+    assert value_basis(8.0, "All eight phosphoserine sites were substituted", "mol mol-1") == "exact"
+
+
+def test_a_negation_marker_is_a_word_not_a_substring():
+    # 'none' is not in 'nonetheless' and 'absent' is not in 'absentee'; a
+    # marker matched as a substring let a zero anchor on a sentence that
+    # reports no absence at all.
+    from openferment_core.validate import value_basis
+
+    assert value_basis(0.0, "nonetheless, the yield rose to 4.2 g/L", "g L-1", negative_result=True) is None
+    assert value_basis(0.0, "the absentee samples were discarded", "", negative_result=True) is None
+    assert value_basis(0.0, "phosphoserine was not detected in any fraction", "", negative_result=True) == "negation"
+    assert value_basis(0.0, "there was no detectable kinase activity", "", negative_result=True) == "negation"
+    assert value_basis(0.0, "the sites were absent from the mature protein", "", negative_result=True) == "negation"

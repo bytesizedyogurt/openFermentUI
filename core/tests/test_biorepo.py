@@ -189,9 +189,12 @@ def test_refuses_a_typed_value_outside_the_fields_range():
     with pytest.raises(biorepo.WriteRefused) as caught:
         biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=8.5, unit="furlongs")))
     assert caught.value.rule == "range"
-    # In range, it is stored — with the correction.
-    stored = biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=9, unit="d")))
-    assert stored.corrected == Quantity(value=9, unit="d")
+    # In range AND in the record's sentence (§6.9: a typed number anchors
+    # like any other), it is stored — with the correction.
+    rec = load_corpus().record("r-B5-1")
+    fetch_saying("B5", "r-B5-1", f"In our hands, {rec['quote']}.")
+    stored = biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=7, unit="d")))
+    assert stored.corrected == Quantity(value=7, unit="d")
 
 
 def test_both_typed_values_are_range_checked_not_just_the_first():
@@ -421,3 +424,69 @@ def test_a_named_reviewer_is_stored():
     stored = biorepo.write(decision("r-B5-3", "verified", reviewer="Sean Creighton"))
     assert stored.reviewer == "Sean Creighton"
     assert biorepo.decisions()["r-B5-3"].reviewer == "Sean Creighton"
+
+
+# ── §6.9 — a typed number is held to the sentence like any other ────────
+
+
+def test_a_correction_with_no_quote_anchors_on_the_records_own_sentence():
+    # A decision that carried a corrected value and no quote skipped
+    # anchoring altogether, so a reviewer-typed number reached biorepo.json
+    # — and corpus.json, through the export's merge — without appearing in
+    # any sentence the paper wrote. The record's own sentence is the one it
+    # has to sit in, whatever the decision's status.
+    rec = load_corpus().record("r-B5-1")
+    fetch_saying("B5", "r-B5-1", f"In our hands, {rec['quote']}.")
+    assert "9.9" not in rec["quote"]
+    for status in ("verified", "unverified"):
+        with pytest.raises(biorepo.WriteRefused) as caught:
+            biorepo.write(decision("r-B5-1", status, corrected=Quantity(value=9.9, unit="d")))
+        assert caught.value.rule == "quote", status
+    # An endpoint of the range the sentence states is in the sentence.
+    stored = biorepo.write(decision("r-B5-1", "verified", corrected=Quantity(value=7, unit="d")))
+    assert stored.corrected == Quantity(value=7, unit="d")
+    assert stored.quote == rec["quote"], "the sentence the correction stands on is stored with it"
+
+
+def test_a_correction_on_an_unfetched_paper_is_refused_for_want_of_words():
+    rid = next(
+        r["id"] for r in load_corpus().records
+        if r["paperId"] != "B5" and identified(r["paperId"]) and isinstance(r["value"], (int, float))
+    )
+    rec = load_corpus().record(rid)
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision(rid, "unverified", corrected=Quantity(value=rec["value"], unit=rec["unit"])))
+    assert caught.value.rule == "fulltext"
+
+
+def test_an_undecided_decision_withdraws_the_one_it_replaces(monkeypatch):
+    # An undo posts the record as it was before the decision: status
+    # 'unverified', nothing typed. That is a withdrawal, not a decision to
+    # keep — the file stored it as one, and the candidate copy beside it, so
+    # Witness counted an undone rejection as decided on every checkout.
+    extract_b5(monkeypatch)
+    biorepo.write(decision("hk1-B5-a07dd73c", "rejected", rejectReason="a placeholder row"))
+    assert "hk1-B5-a07dd73c" in biorepo.decisions() and len(biorepo.records()) == 1
+    echoed = biorepo.write(decision("hk1-B5-a07dd73c", "unverified", provenance="unverified"))
+    assert echoed.status == "unverified"
+    assert "hk1-B5-a07dd73c" not in biorepo.decisions()
+    assert biorepo.records() == [], "the copy goes with the decision it sat beside"
+    # Withdrawing what was never decided is nothing, not an error; and
+    # dry_run answers without touching the file.
+    biorepo.write(decision("hk1-B5-a07dd73c", "unverified", provenance="unverified"))
+    before = biorepo.PATH.read_text(encoding="utf-8")
+    biorepo.write(decision("hk1-B5-a07dd73c", "unverified", provenance="unverified"), dry_run=True)
+    assert biorepo.PATH.read_text(encoding="utf-8") == before
+
+
+def test_resolving_a_candidate_opens_its_own_papers_file_and_no_other(monkeypatch):
+    # The id names the paper — 'hk1-B5-a07dd73c' — so there is one file to
+    # read. `_resolve` read and validated EVERY candidates/*.json on every
+    # call, and Guild asks /check twice per card.
+    extract_b5(monkeypatch)
+    monkeypatch.setattr(extract, "all_cached", lambda: pytest.fail("scanned the whole cache"))
+    stored = biorepo.write(decision("hk1-B5-a07dd73c", "rejected", rejectReason="a placeholder row"))
+    assert stored.recordId == "hk1-B5-a07dd73c"
+    # A seed record never touches the extractor's cache at all.
+    fetch_saying("B5", "r-B5-3", "Selection used paromomycin.")
+    assert biorepo.write(decision("r-B5-3", "verified")).status == "verified"

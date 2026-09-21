@@ -200,11 +200,19 @@ function applyDecision(r: ExtractionRecord, d: DurableReviewDecision | ReviewDec
     next.si = toSI(d.corrected.value, d.corrected.unit);
   } else if (r.corrected && r.original) {
     // A newer decision with no correction withdraws the one this record
-    // carried: the PUBLISHED number comes back as the value, not the edit.
+    // carried: the PUBLISHED number comes back as the value, not the edit —
+    // and the published SENTENCE with it, unless the decision brought its
+    // own. A promotion carried the extractor's span together with the
+    // paper's number; putting the number back beside the carried sentence
+    // leaves a record whose quote no longer states its value.
     next.corrected = undefined;
     next.value = r.original.value;
     next.unit = r.original.unit;
     if (typeof r.original.value === 'number') next.si = toSI(r.original.value, r.original.unit);
+    if (!('quote' in d && d.quote)) {
+      next.quote = r.original.quote;
+      next.sectionId = r.original.sectionId;
+    }
   }
   return next;
 }
@@ -1075,8 +1083,11 @@ export const useStore = create<OFState>()((set, get) => ({
           },
         },
         records: {},
-        candidates: [],
-        runs: [],
+        // A fetch brings a paper, not an extractor run. `[]` here would say
+        // "the extractor produced nothing" (F3) and drop every undecided
+        // candidate in the store; `null` says nothing about them.
+        candidates: null,
+        runs: null,
       });
       get().completeJob(id);
       get().toast({
@@ -1102,8 +1113,8 @@ export const useStore = create<OFState>()((set, get) => ({
         },
       },
       records: {},
-      candidates: [],
-      runs: [],
+      candidates: null,
+      runs: null,
     });
     get().failJob(id, result.reason ?? 'The service reported a failure without a reason.');
     get().toast({
@@ -2262,7 +2273,16 @@ export const useStore = create<OFState>()((set, get) => ({
       const alive = new Set(records.map((r) => r.id));
       const kept = s.reviewQueue.filter((id) => alive.has(id));
       const reviewQueue = kept.length && joining.length ? [...kept, ...joining] : kept;
-      return { overlay: merged, papers, runOutputs, records, reviewQueue, decisionAt };
+      // The index follows the RECORD, not the position: a reviewer on card
+      // four of six whose first three cards just went is on card one of
+      // three, and one whose own card went lands on the next survivor —
+      // never on a different card at the same number, never past the end.
+      const under = s.reviewQueue[s.reviewIndex];
+      const reviewIndex =
+        under !== undefined && alive.has(under)
+          ? reviewQueue.indexOf(under)
+          : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter((id) => alive.has(id)).length, reviewQueue.length);
+      return { overlay: merged, papers, runOutputs, records, reviewQueue, reviewIndex, decisionAt };
     }),
 
   hydrateOverlay: async () => {

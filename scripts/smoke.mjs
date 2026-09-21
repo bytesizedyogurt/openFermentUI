@@ -424,8 +424,10 @@ async function main() {
       // PMID, and `biorepo.write` refuses every decision about them.
       // (That a candidate arriving joins an ALREADY OPEN queue is
       // `pnpm check:store`, which tests it without a clock.)
+      // Opened on a deep link, `?record=r-B5-1`, which the queue focuses
+      // ONCE when it seeds — see the unfiltered check below.
       const coldPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-      await coldPage.goto(`http://localhost:${PORT}/#/guild`, { waitUntil: 'networkidle' });
+      await coldPage.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
       // networkidle already covers the double's 700 ms overlay; give the
       // store one tick to apply it.
       await coldPage.waitForTimeout(300);
@@ -435,13 +437,19 @@ async function main() {
       if (!/hiding 52 records on papers with no PMCID, DOI or PMID/.test(cold))
         problems.push(`the filter does not say what it is hiding (${(cold.match(/hiding[^,]*/) ?? ['—'])[0]})`);
       // And it is a filter, not a wall: the refused records are still
-      // reviewable in this browser, and unticking gives them back.
+      // reviewable in this browser, and unticking gives them back. The
+      // rebuilt queue starts at its first card: the deep link above was
+      // honoured once, when the queue seeded, and a queue that changes
+      // length afterwards must not snap the reviewer back to `?record=` —
+      // which is what an effect keyed on the queue's length did.
       await coldPage.locator('#keepable-only').uncheck();
       await coldPage.waitForTimeout(200);
       const unfiltered = (await coldPage.locator('body').innerText()).replace(/\s+/g, ' ');
       await coldPage.close();
       if (!/\/ 135\b/.test(unfiltered))
         problems.push(`unticking the filter did not give the refused records back (progress reads ${(unfiltered.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
+      else if (!/\b1 \/ 135\b/.test(unfiltered))
+        problems.push(`the rebuilt queue snapped back to the deep-linked record instead of starting at its first card (progress reads ${(unfiltered.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
 
       await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
       // A hash navigation on the same document returns at once; wait for the

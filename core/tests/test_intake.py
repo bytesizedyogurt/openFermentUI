@@ -276,3 +276,73 @@ def test_a_superscript_that_is_not_a_number_is_not_a_power():
     s1 = next(s for s in r.sections if s.id == "s1").text
     assert "The 2nd runa and Fig. 3† agree." in s1, s1
     assert "2^nd" not in s1 and "3^†" not in s1
+
+
+def test_a_numeric_superscript_that_is_not_on_a_ten_is_a_reference_mark():
+    # Nature-style markup puts the citation number in a superscript, and it
+    # lands after a number as often as after a word: '4.2<sup>12</sup> g/L'
+    # is 4.2 g/L citing reference 12. Read as a power it became '4.2^12';
+    # read inline it became '4.212' — a number the paper never wrote, and
+    # one that took the unit. Only a superscript on a ten is a power.
+    xml = NESTED.replace(
+        "After the table, 10<sup>-3</sup> M.",
+        "Titres reached 4.2<sup>12</sup> g/L as reported previously<sup>13,14</sup>. "
+        "After the table, 10<sup>-3</sup> M.",
+    )
+    r = split_jats(xml, paper_id="X1")
+    s1 = next(s for s in r.sections if s.id == "s1").text
+    assert "Titres reached 4.2 g/L as reported previously. After the table, 10^-3 M." in s1, s1
+    assert "2 × 10^6 cells mL-1" in s1, "a superscript on a ten is still a power"
+
+
+# ── §6.9 — an outage is not a miss ──────────────────────────────────────
+
+
+def test_a_transient_failure_is_not_cached_as_a_miss(monkeypatch):
+    # A timeout or a 5xx is the network's condition, not the paper's. Cached
+    # as failed:fetch it read exactly like "no open-access text", and the
+    # batch never asked again without --force; the board showed every paper
+    # a brief outage touched as halted.
+    import httpx
+
+    request = httpx.Request("GET", "https://www.ebi.ac.uk/europepmc/x")
+
+    def slow(pmcid):
+        raise httpx.ReadTimeout("slow", request=request)
+
+    monkeypatch.setattr(intake, "fetch_fulltext", slow)
+    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
+    assert r.status == "failed:fetch" and "slow" in (r.reason or "")
+    assert cached("X3") is None, "not persisted: the next run asks again"
+
+    def down(pmcid):
+        raise intake.Transient("Europe PMC returned 503 for PMC1")
+
+    monkeypatch.setattr(intake, "fetch_fulltext", down)
+    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
+    assert r.status == "failed:fetch" and "503" in (r.reason or "")
+    assert cached("X3") is None
+
+    # A definitive answer — a 404, a document with nothing in it — IS cached.
+    def gone(pmcid):
+        raise httpx.HTTPStatusError(
+            "Europe PMC returned 404 for PMC1", request=request, response=httpx.Response(404, request=request)
+        )
+
+    monkeypatch.setattr(intake, "fetch_fulltext", gone)
+    r = fetch_paper({"id": "X3", "pmcid": "PMC1"})
+    assert r.status == "failed:fetch" and cached("X3") is not None
+
+
+def test_a_5xx_from_the_lookup_is_transient_too(monkeypatch):
+    # A DOI-only paper resolves through a search; a 503 there is not "no
+    # open-access full text", which is what a None answer means.
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "0")
+    import httpx
+
+    request = httpx.Request("GET", "https://www.ebi.ac.uk/europepmc/search")
+    monkeypatch.setattr(intake, "_get", lambda *a, **k: httpx.Response(503, request=request))
+    with pytest.raises(intake.Transient):
+        intake.resolve_pmcid({"id": "X4", "doi": "10.1/x"})
+    r = fetch_paper({"id": "X4", "doi": "10.1/x"})
+    assert r.status == "failed:fetch" and cached("X4") is None

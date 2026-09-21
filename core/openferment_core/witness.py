@@ -58,8 +58,24 @@ RUN = extract.RUN
 TOLERANCE_PCT = 2  # the browser's quantityEquals default, and §6.2's number
 
 
+def _number(value: Any) -> float | None:
+    """The number a value is, when it is one. The tool asks for 'the number
+    as the paper wrote it', so a dropped candidate can carry '4,200' as a
+    string; that is 4200, not a category."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.replace(",", "").replace(" ", ""))
+        except ValueError:
+            return None
+    return None
+
+
 def _is_categorical(value: Any) -> bool:
-    return isinstance(value, str)
+    return isinstance(value, str) and _number(value) is None
 
 
 def _ranges_agree(cr: tuple[float, float], rr: tuple[float, float], cu: str, ru: str) -> bool:
@@ -94,8 +110,11 @@ def _agrees(
         return False
     if _is_categorical(cv) or _is_categorical(rv):
         return str(cv).strip().lower() == str(rv).strip().lower()
+    cn, rn = _number(cv), _number(rv)
+    if cn is None or rn is None:
+        return False
     try:
-        return quantity_equals((float(cv), cu), (float(rv), ru), TOLERANCE_PCT)
+        return quantity_equals((cn, cu), (rn, ru), TOLERANCE_PCT)
     except (TypeError, ValueError):
         return False
 
@@ -121,8 +140,8 @@ def _distance(
     if _is_categorical(cv) or _is_categorical(rv) or (c_range and r_range):
         return 0.0
     try:
-        cs, _ = to_si(float(cv), cu)
-        rs, _ = to_si(float(rv), ru)
+        cs, _ = to_si(_number(cv) or 0.0, cu)
+        rs, _ = to_si(_number(rv) or 0.0, ru)
     except (TypeError, ValueError, UnitError):
         return 0.0
     return abs(cs - rs) / abs(rs) if rs else abs(cs)

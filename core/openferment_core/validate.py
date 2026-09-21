@@ -335,6 +335,11 @@ _WORD_QUANTITY = re.compile(
     r"(?<![A-Za-z])(" + "|".join(sorted(_WORD_VALUE, key=len, reverse=True)) + r")(?![A-Za-z])",
     re.IGNORECASE,
 )
+# A cardinal that is not counting anything: 'one of the highest titres' states
+# no titre of 1, and 'a two-step purification' states no 2. A partitive ('of'
+# straight after) and a hyphenated compound ('two-step', 'three-dimensional')
+# are left alone; '-fold' is the one compound that IS a number (r-J10-3).
+_NOT_COUNTING = re.compile(r"\s+of(?![A-Za-z])|-(?!fold(?![A-Za-z]))[A-Za-z]", re.IGNORECASE)
 
 # An absence is a measurement the paper made. A curator who recorded
 # negativeResult recorded that this sentence states one; these are the
@@ -343,6 +348,12 @@ NEGATION_MARKERS = (
     "no detectable", "not detected", "not phosphorylated", "non-phosphorylated",
     "unphosphorylated", "dephosphorylated", "did not", "no ", "none", "absent",
     "unsuccessful", "hardly", "failed to",
+)
+# Matched as WORDS: 'none' is not in 'nonetheless' and 'absent' is not in
+# 'absentee'. The list above is the closed list; this is only how it is read.
+_NEGATION = re.compile(
+    "|".join(r"(?<![a-z])" + re.escape(m.strip()) + r"(?![a-z])" for m in NEGATION_MARKERS),
+    re.IGNORECASE,
 )
 
 # How far past a number a unit may sit, and how many whitespace-separated
@@ -433,6 +444,8 @@ def parse_quantities(text: str) -> list[QuoteQuantity]:
     ]
     for m in _WORD_QUANTITY.finditer(norm):
         word = m.group(1).lower()
+        if word not in _SCALE_VALUE and _NOT_COUNTING.match(norm, m.end()):
+            continue
         atoms.append((m.start(), m.end(), _WORD_VALUE[word], word in _SCALE_VALUE))
     atoms.sort(key=lambda t: t[0])
 
@@ -530,10 +543,8 @@ def value_basis(
 
     # An absence the curators recorded. Zero is the reading; the sentence has
     # to say the absence in one of the words the corpus uses for it.
-    if negative_result and number == 0:
-        lowered = norm.lower()
-        if any(marker in lowered for marker in NEGATION_MARKERS):
-            return "negation"
+    if negative_result and number == 0 and _NEGATION.search(norm):
+        return "negation"
 
     for q in parse_quantities(norm):
         if not _close(_as_candidate_unit(q.value, q.unit, candidate_unit), number):
@@ -541,17 +552,6 @@ def value_basis(
         converted = bool(q.unit) and bool(candidate_unit) and q.unit != normalize_unit(candidate_unit)
         return "converted" if converted else "exact"
     return None
-
-
-def _value_in_quote(value: float, quote: str) -> bool:
-    for n in parse_numbers(quote):
-        if value == 0:
-            if n == 0:
-                return True
-            continue
-        if abs(n - value) / abs(value) <= VALUE_TOLERANCE:
-            return True
-    return False
 
 
 # Rule codes, in rule order. The counts are keyed by these.

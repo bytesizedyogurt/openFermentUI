@@ -41,6 +41,8 @@ has a quote holds by construction and not by convention.
 """
 from __future__ import annotations
 
+import re
+
 import logging
 from typing import Any
 
@@ -103,15 +105,24 @@ def records() -> list[Candidate]:
 # ── resolving a record ─────────────────────────────────────────────────
 
 
+_CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>.+)-[0-9a-f]{8}$")
+
+
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     """What this id names: the extractor's current candidate under it first —
     a decision is about what the extractor says NOW, and the copy kept here is
     refreshed on write — then the copy biorepo.json keeps (the only one on a
-    checkout that never ran the extractor), then the seed record."""
-    for response in extract.all_cached():
-        for c in response.candidates:
-            if c.id == record_id:
-                return c
+    checkout that never ran the extractor), then the seed record.
+
+    A candidate id names its paper ('hk1-B5-a07dd73c'), so there is one file
+    to open; a seed id ('r-B5-1') names none, and the cache is not read at
+    all. Guild asks `/check` twice per card, and each ask used to read and
+    validate every candidates/*.json on disk."""
+    m = _CANDIDATE_ID.match(record_id)
+    response = extract.cached(m.group("paper")) if m else None
+    for c in response.candidates if response else []:
+        if c.id == record_id:
+            return c
     for c in records():
         if c.id == record_id:
             return c
@@ -131,6 +142,18 @@ def _is_promotion(d: ReviewDecision) -> bool:
 
 def _is_gold(d: ReviewDecision) -> bool:
     return d.provenance == "gold" or d.gold is not None
+
+
+def _is_withdrawal(d: ReviewDecision) -> bool:
+    """A decision that decides nothing — 'unverified' with nothing typed,
+    nothing rejected — is what an undo posts: the record as it was."""
+    return (
+        d.status == "unverified"
+        and d.gold is None
+        and d.corrected is None
+        and not d.rejectReason
+        and d.provenance != "gold"
+    )
 
 
 # ── the write ──────────────────────────────────────────────────────────
@@ -194,21 +217,38 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             )
 
     stored = decision.model_copy()
-    if _is_promotion(decision):
+    typed = decision.corrected is not None or decision.gold is not None
+    if _is_withdrawal(decision):
+        # An undo: the record as it was before anyone decided. Nothing to
+        # keep, and nothing to keep beside it — the candidate copy went with
+        # the decision it sat next to. Idempotent when there was none.
+        repo = read()
+        if decision.recordId in repo.decisions:
+            del repo.decisions[decision.recordId]
+            repo.records = [c for c in repo.records if c.id != decision.recordId]
+            if not dry_run:
+                _persist(repo)
+                log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
+        return stored
+    if _is_promotion(decision) or typed:
         fetched = intake.cached(paper_id)
         if fetched is None or fetched.status != "complete" or not fetched.sections:
             raise WriteRefused(
                 "fulltext",
                 f"{decision.recordId} is on {paper_id}, which has no fetched full text — "
-                "a promotion has to anchor in the paper's own words, and there are none here",
+                + ("a promotion" if _is_promotion(decision) else "a typed value")
+                + " has to anchor in the paper's own words, and there are none here",
             )
         sections = [s.model_dump() for s in fetched.sections]
 
-        # The quote a promotion stands on: the decision's if it brought one,
-        # the record's own for gold. Accept without a quote proceeds (§7.3).
+        # The quote a decision stands on: the decision's if it brought one,
+        # else the record's own whenever there is a NUMBER to place — gold,
+        # or a correction, which becomes the record's value in corpus.json
+        # and has to sit in a sentence the paper wrote like any other (§6.9).
+        # Accept without a quote and without a typed value proceeds (§7.3).
         quote = decision.quote
         section_id = decision.sectionId or _field(rec, "sectionId")
-        if quote is None and _is_gold(decision):
+        if quote is None and (_is_gold(decision) or typed):
             quote = _field(rec, "quote")
         if quote is not None:
             # Every value the promoted record will carry has to sit in the

@@ -85,6 +85,11 @@ class NetworkRefused(RuntimeError):
     """Raised in fixture mode when something tries to reach the network."""
 
 
+class Transient(RuntimeError):
+    """The network's condition, not the paper's: a 5xx that survived the one
+    retry. Never cached — the next run asks again (OF-BLD-012.1 §6.9)."""
+
+
 def fixtures_only() -> bool:
     return os.environ.get("OPENFERMENT_FIXTURES", "") not in ("", "0", "false")
 
@@ -152,6 +157,8 @@ def resolve_pmcid(paper: dict[str, Any]) -> str | None:
         f"{EUROPE_PMC}/search",
         {"query": query, "format": "json", "resultType": "lite", "pageSize": "5"},
     )
+    if response.status_code >= 500:
+        raise Transient(f"Europe PMC returned {response.status_code} looking up {query}")
     if response.status_code != 200:
         return None
     for hit in response.json().get("resultList", {}).get("result", []):
@@ -175,6 +182,8 @@ def fetch_fulltext(pmcid: str) -> str:
             raise NetworkRefused(f"fixture mode and no fixture at {path}")
         return path.read_text(encoding="utf-8")
     response = _get(f"{EUROPE_PMC}/{pmcid}/fullTextXML")
+    if response.status_code >= 500:
+        raise Transient(f"Europe PMC returned {response.status_code} for {pmcid}")
     if response.status_code != 200:
         raise httpx.HTTPStatusError(
             f"Europe PMC returned {response.status_code} for {pmcid}",
@@ -198,6 +207,11 @@ _NOT_PROSE = {"table-wrap", "fig", "ref-list", "ack", "fn-group"}
 _DROP = _NOT_PROSE | {"sec", "title", "label"}
 
 
+# The base a numeric superscript is a power of: a ten that is a number of its
+# own, not the tail of '110' or '2.10'.
+_TEN = re.compile(r"(?<![\d.,])10$")
+
+
 def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
     """Text in document order. <sup> and <sub> contribute their characters
     inline, so L<sup>-1</sup> reads 'L-1' and CO<sub>2</sub> reads 'CO2', the
@@ -217,13 +231,24 @@ def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
             inner: list[str] = []
             _collect(child, inner, prose=prose)
             exponent = "".join(inner).strip()
-            # Only a numeric superscript on a digit is a power: '10⁶' yes,
-            # '2<sup>nd</sup>' and a footnote mark '7.2<sup>a</sup>' no.
-            if before and before[-1].isdigit() and re.fullmatch(r"[-\u2212\u207b]?\d+", exponent):
+            # A numeric superscript on a TEN is a power: '10⁶' yes. On any
+            # other NUMBER it is a reference mark — Nature-style
+            # '4.2<sup>12</sup> g/L' cites reference 12 — and is dropped:
+            # read as a power it invented 4.2^12, read inline it invented
+            # 4.212 and handed it the unit. On a letter it is a unit's
+            # exponent, 'L<sup>-1</sup>', and reads inline as before; so do
+            # '2<sup>nd</sup>' and a footnote letter '7.2<sup>a</sup>'. A
+            # run of marks, '13,14' or '3-5', is never anything but citations.
+            numeric = bool(re.fullmatch(r"[-\u2212\u207b]?\d+", exponent))
+            if numeric and _TEN.search(before):
                 # Close up '10 ⁶' as well as '10⁶': the space is typography.
                 if parts and parts[-1].rstrip() != parts[-1]:
                     parts[-1] = parts[-1].rstrip()
                 parts.append("^" + exponent)
+            elif numeric and before and before[-1].isdigit():
+                pass  # a reference mark on a number that is not a ten
+            elif re.fullmatch(r"\d+[\d,\s\u2013-]*[,\u2013-][\d,\s\u2013-]*", exponent):
+                pass  # a run of reference marks
             else:
                 parts.append(exponent)
         else:
@@ -403,7 +428,13 @@ def _persist(result: FetchResult) -> FetchResult:
 def fetch_paper(paper: dict[str, Any], *, force: bool = False) -> FetchResult:
     """Resolve, fetch, split, persist. Returns the cached result when one
     exists unless `force`, so the batch is idempotent and a miss is not
-    re-asked."""
+    re-asked.
+
+    A MISS is cached: no open-access text, a 404, a document with nothing in
+    it. An OUTAGE is not — a timeout, a connection that dropped, a 5xx that
+    survived the retry — because that is the network's condition and not the
+    paper's, and a batch that cached it would show every paper a brief outage
+    touched as halted until somebody forced each one by hand."""
     paper_id = str(paper["id"])
     if not force:
         hit = cached(paper_id)
@@ -413,6 +444,11 @@ def fetch_paper(paper: dict[str, Any], *, force: bool = False) -> FetchResult:
     now = datetime.now(timezone.utc).isoformat()
     try:
         pmcid = resolve_pmcid(paper)
+    except (httpx.TransportError, Transient) as e:
+        return FetchResult(
+            paperId=paper_id, status="failed:fetch", fetchedAt=now,
+            reason=f"PMCID lookup failed, not cached — try again: {e}",
+        )
     except (httpx.HTTPError, NetworkRefused, ValueError) as e:
         return _persist(FetchResult(
             paperId=paper_id, status="failed:fetch", reason=f"PMCID lookup failed: {e}", fetchedAt=now,
@@ -425,6 +461,11 @@ def fetch_paper(paper: dict[str, Any], *, force: bool = False) -> FetchResult:
         ))
     try:
         xml = fetch_fulltext(pmcid)
+    except (httpx.TransportError, Transient) as e:
+        return FetchResult(
+            paperId=paper_id, pmcid=pmcid, status="failed:fetch", fetchedAt=now,
+            reason=f"not cached — try again: {e}",
+        )
     except (httpx.HTTPError, NetworkRefused) as e:
         return _persist(FetchResult(
             paperId=paper_id, pmcid=pmcid, status="failed:fetch", reason=str(e), fetchedAt=now,

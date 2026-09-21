@@ -106,8 +106,11 @@ def rebuild_decisions(scratch: Path) -> list[str]:
     fetched = intake.fetch_paper(B5, force=True)
     assert fetched.status == "complete", fetched.reason
     result = extract.extract_paper("B5", force=True)
-    if len(result.candidates) < 1:
-        sys.exit("the saved response anchors no candidate against the saved JATS; nothing to decide on")
+    if len(result.candidates) < 2:
+        sys.exit(
+            f"the saved response anchors {len(result.candidates)} candidate(s) against the saved JATS; "
+            "the three decisions below need two — nothing to decide on"
+        )
     if biorepo.PATH.exists():
         biorepo.PATH.unlink()
     # One of each kind of decision, so `pnpm test:export` has all three merge

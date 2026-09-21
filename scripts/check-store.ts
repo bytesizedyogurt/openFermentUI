@@ -180,5 +180,107 @@ useStore.getState().editRecord(seeded.id, 43, 'g L⁻¹');
 await new Promise((r) => setTimeout(r, 20));
 check('a re-anchored record posts the sentence it was moved to', posted[0]?.quote === 'the sentence a promotion moved it to', posted[0]?.quote);
 
+// ── §6.9 — what a review of the branch found ─────────────────────────
+
+// 7. F3 again — a live FETCH is a paper arriving, not an extractor saying
+//    nothing. `ingestPaperLive` applies its result through `applyOverlay`,
+//    and sent it with `candidates: []` and `runs: []`; under F3 those read
+//    as "the extractor produced nothing", so every fetch wiped the undecided
+//    candidates from the store and the queue. A fetch supplies papers only.
+(globalThis as any).fetch = async (url: string, init?: { body: string }) => {
+  const u = String(url);
+  if (/\/api\/intake\/[^/]+\/fetch/.test(u)) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        paperId: paper.id,
+        pmcid: 'PMC0000000',
+        status: 'complete',
+        reason: null,
+        fetchedAt: new Date().toISOString(),
+        license: null,
+        sections: [{ id: 's1', heading: 'Results', text: 'a sentence the extractor read, number 1' }],
+        bytes: 1,
+      }),
+    };
+  }
+  if (u.includes('/api/biorepo/')) {
+    const body = JSON.parse(init!.body);
+    if (u.endsWith('/decisions')) posted.push(body);
+    return { status: 200, ok: true, json: async () => (u.endsWith('/check') ? { ok: true } : body) };
+  }
+  throw new Error('no service');
+};
+useStore.setState({ serviceUp: true });
+useStore.getState().applyOverlay(overlay({ candidates: THREE }));
+check('three candidates are in the store before the fetch', ours().length === 3);
+await useStore.getState().ingestPaperLive(paper.id);
+check('the paper now carries its text', s().papers.find((p) => p.id === paper.id)?.textSource === 'full-text');
+check('a live fetch leaves the extractor’s candidates where they were', ours().length === 3, ours().map((r) => r.id));
+check('and the overlay still carries them', (s().overlay?.candidates ?? []).length === 3, (s().overlay?.candidates ?? []).length);
+
+// 8. The reviewer stays on their card when the queue is pruned under them.
+//    `applyOverlay` dropped gone records from the queue and left
+//    `reviewIndex` pointing at a position, so the card under the reviewer
+//    changed — or the index ran past the end and Guild showed "complete"
+//    mid-review. The index follows the RECORD; a reviewer whose record went
+//    lands on the next survivor.
+const seedIds = s()
+  .records.filter((r) => r.status === 'unverified' && r.extractorRun !== 'haiku-1')
+  .slice(0, 3)
+  .map((r) => r.id);
+useStore.getState().startReview([THREE[1].id, THREE[2].id, ...seedIds]);
+useStore.setState({ reviewIndex: 3 });
+useStore.getState().applyOverlay(overlay({ candidates: [] }));
+check('the queue lost the two undecided candidates', s().reviewQueue.length === 3, s().reviewQueue);
+check('and the reviewer is still on the same card', s().reviewQueue[s().reviewIndex] === seedIds[1], {
+  index: s().reviewIndex,
+  card: s().reviewQueue[s().reviewIndex],
+});
+useStore.getState().applyOverlay(overlay({ candidates: THREE }));
+useStore.getState().startReview([THREE[1].id, THREE[2].id, ...seedIds]);
+useStore.setState({ reviewIndex: 1 });
+useStore.getState().applyOverlay(overlay({ candidates: [] }));
+check('a reviewer whose card went lands on the next survivor, not past the end', s().reviewQueue[s().reviewIndex] === seedIds[0], {
+  index: s().reviewIndex,
+  length: s().reviewQueue.length,
+});
+
+// 9. F7 again — withdrawing a correction restores the SENTENCE as well as
+//    the number. A promotion that carried the extractor's span and the
+//    paper's number, withdrawn, put the published number back beside the
+//    carried sentence: a record whose quote no longer states its value.
+const fresh = s().records.find((r) => r.extractorRun !== 'haiku-1' && r.id !== seeded.id && !s().decisionAt[r.id])!;
+const moved = { quote: 'the sentence a promotion moved it to', sectionId: 's2' };
+useStore.getState().applyOverlay(
+  overlay({
+    records: {
+      [fresh.id]: {
+        status: 'verified', provenance: 'curated', reviewer: 'Sam Okonkwo', recordId: fresh.id,
+        at: '2026-09-21T00:00:01Z', corrected: { value: 42, unit: 'g L⁻¹' }, ...moved,
+      },
+    } as never,
+  }),
+);
+const carried = s().records.find((r) => r.id === fresh.id)!;
+check('a promotion with a span moves the record onto it', carried.quote === moved.quote && carried.value === 42);
+useStore.getState().applyOverlay(
+  overlay({
+    records: {
+      [fresh.id]: {
+        status: 'unverified', provenance: 'curated', reviewer: 'Sam Okonkwo', recordId: fresh.id,
+        at: '2026-09-21T00:00:02Z',
+      },
+    } as never,
+  }),
+);
+const back = s().records.find((r) => r.id === fresh.id)!;
+check('withdrawing it restores the published number', back.value === fresh.original?.value, back.value);
+check('and the published sentence with it', back.quote === fresh.original?.quote && back.sectionId === fresh.original?.sectionId, {
+  quote: back.quote,
+  sectionId: back.sectionId,
+});
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);
