@@ -173,7 +173,9 @@ pnpm demo:offline   # no key, no network: the service in fixture mode + the buil
 ```
 
 Replays the loop from saved responses: open Intake, fetch B5, Extract, open Witness, open Guild,
-decide a record, watch Witness move. The fixtures live in `core/tests/fixtures/demo/` and say
+decide a record, watch Witness move. The web server listens on `127.0.0.1:4173` and serves
+nothing outside `dist/`; to show the demo to another machine, set `OPENFERMENT_DEMO_HOST=0.0.0.0`
+on purpose. The fixtures live in `core/tests/fixtures/demo/` and say
 what they are: B5's text is a structural stand-in document, and the "model response" is
 hand-written in the tool's shape. The anchoring, matching, scoring and the write function are
 the real code paths, and the demo writes into a scratch copy of the data directory, never into

@@ -49,6 +49,20 @@ class SeedPatchRefused(RuntimeError):
     """A patch that would have had to guess. Nothing was written."""
 
 
+# What a DOI looks like (a prefix 10.NNNN and a suffix), minus the characters
+# that would end or escape the TypeScript string literal it is written into —
+# whitespace, quotes of either kind, a backtick, a backslash. The suffix is
+# otherwise anything, because registries hand out '(SICI)…<1::AID>' and the
+# like. A value that fails this is refused, not repaired (§6.9): the seed is
+# executed under Node by `pnpm verify`, and a Crossref record is anyone's to
+# deposit.
+DOI = re.compile(r'''^10\.\d{4,9}/[^\s'"`\\]+$''')
+
+
+def is_doi(value: str) -> bool:
+    return bool(DOI.match(value or ""))
+
+
 @dataclass(frozen=True)
 class Match:
     """One Crossref hit, reduced to what a person needs to judge it."""
@@ -115,10 +129,15 @@ def similarity(a: str, b: str) -> float:
     return 0.0 if longest == 0 else 1 - _levenshtein(na, nb) / longest
 
 
-def verdict(seed_title: str, seed_year: int | None, match_title: str, match_year: int | None) -> str:
+def verdict(
+    seed_title: str, seed_year: int | None, match_title: str, match_year: int | None, doi: str = "10.0000/x",
+) -> str:
     """PROPOSE only when the title is nearly the same AND the year is within
-    one. Everything else is REVIEW — a person's call, not this module's."""
+    one AND the DOI is one the seed can hold. Everything else is REVIEW — a
+    person's call, not this module's."""
     if not match_title or match_year is None or seed_year is None:
+        return "REVIEW"
+    if not is_doi(doi):
         return "REVIEW"
     if abs(int(match_year) - int(seed_year)) > YEAR_TOLERANCE:
         return "REVIEW"
@@ -140,7 +159,9 @@ def propose(papers: Iterable[dict[str, Any]], ask: Ask) -> list[Proposal]:
         best = max(hits, key=lambda m: similarity(title, m.title), default=None)
         rows.append(
             Proposal(
-                verdict=verdict(title, year, best.title if best else "", best.year if best else None),
+                verdict=verdict(
+                    title, year, best.title if best else "", best.year if best else None, best.doi if best else "",
+                ),
                 paperId=str(p.get("id") or ""),
                 seedTitle=title,
                 seedYear=year,
@@ -206,6 +227,11 @@ def apply_approved(rows: Iterable[Proposal], seed_dir: Path | None = None) -> li
     for row in rows:
         if row.verdict != "APPROVED" or not row.doi:
             continue
+        if not is_doi(row.doi):
+            raise SeedPatchRefused(
+                f"{row.paperId}: {row.doi!r} is not a DOI the seed can hold (10.NNNN/suffix, no quotes, "
+                "no whitespace); nothing was written for it or for any row after it"
+            )
         where = _find_paper(files, row.paperId)
         if where is None:
             raise SeedPatchRefused(

@@ -105,7 +105,10 @@ def records() -> list[Candidate]:
 # ── resolving a record ─────────────────────────────────────────────────
 
 
-_CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>.+)-[0-9a-f]{8}$")
+# A paper id is letters, digits and underscores ('B5', 'O8m'); the segment is
+# a file name under candidates/, and nothing with a slash or a dot in it is
+# opened (OF-BLD-012.1 §6.9).
+_CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>[A-Za-z0-9_]+)-[0-9a-f]{8}$")
 
 
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:

@@ -5,10 +5,11 @@
  *   pnpm build && node scripts/smoke.mjs
  */
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { createServer, request as httpRequest } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join } from 'node:path';
+import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORT = 4319;
@@ -30,16 +31,6 @@ const HEALTH = JSON.stringify({
   records: 134,
   corpusError: null,
 });
-
-const MIME = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.svg': 'image/svg+xml',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
 
 /** The person the smoke reviews as. `biorepo.write` refuses a placeholder (F2). */
 const REVIEWER = 'Sam Okonkwo';
@@ -96,15 +87,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ detail: 'not part of the smoke double' }));
     }
-    let file = join(DIST, url === '/' ? 'index.html' : url);
-    try {
-      if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    } catch {
-      file = join(DIST, 'index.html'); // SPA fallback
-    }
-    const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' });
-    res.end(body);
+    await serveStatic(DIST, url, res);
   } catch (e) {
     res.writeHead(404).end('not found');
   }
@@ -210,7 +193,33 @@ const REDIRECTS = [
 const IGNORE = [/Download the React DevTools/i, /favicon/i];
 
 async function main() {
-  await new Promise((r) => server.listen(PORT, r));
+  await new Promise((r) => server.listen(PORT, LOOPBACK, r));
+
+  // §6.9 — the static handler is confined to dist/. Every script that serves
+  // the build shares it, the offline demo included, and `join(DIST, url)`
+  // used to collapse `..`: a request for /../core/.env read the key off the
+  // disk of whoever was running the demo. Sent raw — `fetch` would normalise
+  // the path away before it left — and every shape has to come back 404.
+  const rawGet = (path) =>
+    new Promise((resolve, reject) => {
+      const rq = httpRequest({ host: LOOPBACK, port: PORT, path, method: 'GET' }, (rs) => {
+        rs.resume();
+        rs.on('end', () => resolve(rs.statusCode));
+      });
+      rq.on('error', reject);
+      rq.end();
+    });
+  const OUTSIDE = ['/../package.json', '/%2e%2e/core/.env.example', '/../../etc/passwd', '/assets/../../package.json'];
+  let confineFails = 0;
+  for (const path of OUTSIDE) {
+    const status = await rawGet(path);
+    if (status !== 404) {
+      confineFails++;
+      console.log(`✗ confined     ${path} answered ${status}, not 404 — the static server left dist/`);
+    }
+  }
+  if (!confineFails) console.log(`✓ confined     ${OUTSIDE.length} requests outside dist/ refused`);
+
   // Use the environment's pre-installed Chromium rather than downloading one;
   // its build number need not match the npm playwright version.
   const executablePath = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -519,7 +528,8 @@ async function main() {
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
-  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails) process.exit(1);
+  console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
+  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails) process.exit(1);
 }
 
 main();

@@ -71,16 +71,16 @@ def test_a_run_proposes_the_close_ones_and_sends_the_rest_to_a_person():
     ask = fake_crossref(
         {
             PAPERS[0]["title"]: [
-                ids.Match(title="Intron containing algal transgenes", year=2018, doi="10.1/aaa", score=88.0)
+                ids.Match(title="Intron containing algal transgenes", year=2018, doi="10.1000/aaa", score=88.0)
             ],
-            PAPERS[1]["title"]: [ids.Match(title="A quite different paper", year=2009, doi="10.1/bbb", score=41.0)],
+            PAPERS[1]["title"]: [ids.Match(title="A quite different paper", year=2009, doi="10.1000/bbb", score=41.0)],
         }
     )
     rows = ids.propose(PAPERS, ask)
     assert [r.paperId for r in rows] == ["B2", "C5"]
-    assert rows[0].verdict == "PROPOSE" and rows[0].doi == "10.1/aaa"
+    assert rows[0].verdict == "PROPOSE" and rows[0].doi == "10.1000/aaa"
     assert rows[1].verdict == "REVIEW", "a weak match is never proposed"
-    assert rows[1].doi == "10.1/bbb", "but what it found is still shown, so a person can judge"
+    assert rows[1].doi == "10.1000/bbb", "but what it found is still shown, so a person can judge"
 
 
 def test_a_paper_crossref_knows_nothing_about_is_a_row_with_no_doi():
@@ -134,7 +134,7 @@ def approved(**over):
     base = dict(
         verdict="APPROVED", paperId="B2", seedTitle="Intron-containing algal transgenes",
         seedYear=2018, matchTitle="Intron containing algal transgenes", matchYear=2018,
-        doi="10.1/aaa", score=88.0, similarity=0.99,
+        doi="10.1000/aaa", score=88.0, similarity=0.99,
     )
     base.update(over)
     return ids.Proposal(**base)
@@ -143,8 +143,8 @@ def approved(**over):
 def test_an_approved_row_writes_the_doi_under_the_venue(seed_dir):
     changed = ids.apply_approved([approved()], seed_dir)
     text = (seed_dir / "threadAB.ts").read_text(encoding="utf-8")
-    assert "    venue: 'Nucleic Acids Res',\n    doi: '10.1/aaa',\n" in text
-    assert changed == ["B2: doi '10.1/aaa' added to threadAB.ts"]
+    assert "    venue: 'Nucleic Acids Res',\n    doi: '10.1000/aaa',\n" in text
+    assert changed == ["B2: doi '10.1000/aaa' added to threadAB.ts"]
     # and nothing else moved
     assert text.count("doi:") == 2 and "Already identified" in text
 
@@ -183,7 +183,7 @@ def test_the_patch_is_one_line_and_nothing_else(seed_dir):
     ids.apply_approved([approved()], seed_dir)
     after = (seed_dir / "threadAB.ts").read_text(encoding="utf-8")
     added = [line for line in after.split("\n") if line not in before.split("\n")]
-    assert added == ["    doi: '10.1/aaa',"]
+    assert added == ["    doi: '10.1000/aaa',"]
     assert len(after.split("\n")) == len(before.split("\n")) + 1
     assert after.endswith("];\n") and not after.endswith("\n\n"), "no blank line grown at the end"
 
@@ -212,3 +212,34 @@ def test_crossref_answers_with_a_doi_for_a_paper_it_knows():
                                                   "green microalga Chlamydomonas reinhardtii", m.title))
     assert best.doi.startswith("10."), best
     assert best.year and 2017 <= best.year <= 2019
+
+
+# ── what a security review found (OF-BLD-012.1 §6.9) ────────────────────
+
+
+def test_a_doi_that_is_not_doi_shaped_is_never_written(seed_dir):
+    # The DOI lands inside a TypeScript string literal in the seed, which
+    # `pnpm verify` then executes under Node. A Crossref record is anyone's
+    # to deposit, and a quote in the value would end the literal and run
+    # whatever follows. Refused — never repaired — before anything is written.
+    crafted = "10.5555/abc' + (console.log('x'), '') + '"
+    before = (seed_dir / "threadAB.ts").read_text(encoding="utf-8")
+    with pytest.raises(ids.SeedPatchRefused) as caught:
+        ids.apply_approved([approved(doi=crafted)], seed_dir)
+    assert "B2" in str(caught.value) and "not a DOI" in str(caught.value)
+    assert (seed_dir / "threadAB.ts").read_text(encoding="utf-8") == before
+    for shape in ("doi:10.1000/x", "https://doi.org/10.1000/x", "10.1000/with space", '10.1000/a"b', "10.1000/a\\b", "1.1/x"):
+        with pytest.raises(ids.SeedPatchRefused):
+            ids.apply_approved([approved(doi=shape)], seed_dir)
+    assert (seed_dir / "threadAB.ts").read_text(encoding="utf-8") == before
+
+
+def test_the_doi_shapes_a_real_registry_hands_out_are_accepted():
+    for doi in ("10.1093/nar/gky532", "10.1002/(SICI)1097-0290(19990705)64:1<1::AID-BIT1>3.0.CO;2-#", "10.3390/life11090964"):
+        assert ids.is_doi(doi), doi
+
+
+def test_a_proposal_whose_doi_is_not_doi_shaped_is_review_not_propose():
+    ask = fake_crossref({PAPERS[0]["title"]: [ids.Match(title=PAPERS[0]["title"], year=2018, doi="10.1000/a'b", score=99.0)]})
+    row = ids.propose(PAPERS[:1], ask)[0]
+    assert row.verdict == "REVIEW", "a value that cannot be written is a person's call, not this module's"

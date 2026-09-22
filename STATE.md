@@ -117,3 +117,25 @@ transcript; this file is the index a later session reads first.
   carried F1's `valueBasis` list and the `/check` rule from §6.1–6.2; it
   gains the typed-value and withdrawal rules. `pnpm verify` green, nineteen
   stages. PR opened to `main`.
+- **2026-09-22 · OF-BLD-012.1 §6.9 (security pass)** — the branch read once
+  more, for what an attacker rather than a reviewer would find. **One
+  vulnerability, confirmed and closed:** every script that serves `dist/` —
+  the smoke, the five browser checks and `pnpm demo:offline` — resolved the
+  request path with `join(DIST, url)`, which collapses `..`, so
+  `/../core/.env` read the key off the disk of whoever was running the demo,
+  and the demo listened on every interface while it did. The seven copies are
+  one confined handler now, `scripts/lib/serve-dist.mjs`; a request that
+  leaves `dist/` is a 404, every server binds to loopback, and the demo takes
+  `OPENFERMENT_DEMO_HOST` to be shown to another machine on purpose. The
+  smoke sends four traversal shapes raw and expects four 404s; with the
+  confinement removed it says so. **Two hardening fixes, below the bar as
+  vulnerabilities and taken anyway:** a DOI is written into a TypeScript
+  string literal the gate then executes, so `ids:apply` refuses — never
+  repairs — any value that is not `10.NNNN/suffix` free of quotes and
+  whitespace, and `ids:propose` marks such a hit REVIEW; and a candidate id's
+  paper segment is `[A-Za-z0-9_]+`, so `_resolve` cannot be asked to open
+  `candidates/../../x.json`. Examined and clean: the API's `paper_id` is
+  checked against the corpus before it reaches a path; JATS parsing resolves
+  no external entities; no `dangerouslySetInnerHTML`; the workflow uses
+  `pull_request`, not `pull_request_target`. `pnpm verify` green, nineteen
+  stages.

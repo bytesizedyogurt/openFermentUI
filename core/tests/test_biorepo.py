@@ -490,3 +490,23 @@ def test_resolving_a_candidate_opens_its_own_papers_file_and_no_other(monkeypatc
     # A seed record never touches the extractor's cache at all.
     fetch_saying("B5", "r-B5-3", "Selection used paromomycin.")
     assert biorepo.write(decision("r-B5-3", "verified")).status == "verified"
+
+
+def test_a_candidate_id_names_a_paper_id_and_nothing_else(monkeypatch):
+    # The paper segment of a candidate id picks the cache file to open. Read
+    # as `.+` it would have let 'hk1-../../x-deadbeef' ask for
+    # candidates/../../x.json — a file-existence oracle at worst on a
+    # loopback service, and still not a shape a paper id can have.
+    fetch_b5()
+    opened: list[str] = []
+    real = extract.cached
+
+    def watching(paper_id):
+        opened.append(paper_id)
+        return real(paper_id)
+
+    monkeypatch.setattr(extract, "cached", watching)
+    with pytest.raises(biorepo.WriteRefused) as caught:
+        biorepo.write(decision("hk1-../../x-deadbeef", "rejected", rejectReason="no"))
+    assert caught.value.rule == "record"
+    assert opened == [], "nothing outside candidates/ was even asked for"

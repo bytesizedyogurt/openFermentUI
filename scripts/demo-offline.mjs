@@ -30,8 +30,8 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { join } from 'node:path';
+import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
 
 const ROOT = process.cwd();
 const CORE = join(ROOT, 'core');
@@ -40,17 +40,11 @@ const DEMO = join(CORE, 'tests', 'fixtures', 'demo');
 const DATA = join(CORE, 'data', 'demo');
 const API_PORT = Number(process.env.OPENFERMENT_DEMO_API_PORT ?? 8000);
 const PORT = Number(process.env.OPENFERMENT_DEMO_PORT ?? 4173);
+// Loopback unless the operator says otherwise: the demo serves a checkout
+// that may hold core/.env, and a laptop on a conference network is not a
+// place to listen on every interface by default.
+const HOST = process.env.OPENFERMENT_DEMO_HOST || LOOPBACK;
 const noBuild = process.argv.includes('--no-build');
-
-const MIME = {
-  '.html': 'text/html',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.svg': 'image/svg+xml',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
 
 /** The service, once spawned — so no failure path leaves it running on :8000. */
 let service = null;
@@ -179,29 +173,17 @@ const web = createServer(async (req, res) => {
     req.pipe(upstream);
     return;
   }
-  try {
-    let file = join(DIST, url === '/' ? 'index.html' : url);
-    try {
-      if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    } catch {
-      file = join(DIST, 'index.html');
-    }
-    const body = await readFile(file);
-    res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' });
-    res.end(body);
-  } catch {
-    res.writeHead(404).end('not found');
-  }
+  await serveStatic(DIST, url, res);
 });
-web.on('error', (e) => die(`the web server could not listen on ${PORT}: ${e.code ?? e.message}`));
-await new Promise((r) => web.listen(PORT, r));
+web.on('error', (e) => die(`the web server could not listen on ${HOST}:${PORT}: ${e.code ?? e.message}`));
+await new Promise((r) => web.listen(PORT, HOST, r));
 
 console.log('\nopenFerment — offline demo');
 console.log('──────────────────────────');
 console.log(`  service     http://127.0.0.1:${API_PORT}  fixture mode, ${health.records} records, key: ${health.hasKey ? 'PRESENT (unexpected)' : 'none'}`);
 console.log(`  data        ${DATA}  (scratch; seeded with the demo's three decisions)`);
 console.log(`  fixtures    ${DEMO}`);
-console.log(`\n  open        http://localhost:${PORT}/#/intake/ingest`);
+console.log(`\n  open        http://${HOST === LOOPBACK ? LOOPBACK : HOST}:${PORT}/#/intake/ingest`);
 console.log('\n  The loop: fetch B5 · Extract · open Witness · open Guild · decide a record · Witness moves.');
 console.log('  B5’s text is the structural stand-in until the real JATS is saved (see the fixture).');
 console.log('  Ctrl-C stops the service and the server.\n');
