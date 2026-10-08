@@ -166,6 +166,39 @@ function, signed with the reviewer name from Settings; that file is committed, `
 `candidates/` are not. A typed value — a correction, a gold value — has to sit in a sentence of
 the fetched paper like any other number, or the write is refused and Guild says which rule.
 
+### Hosting it on the Mac Mini
+
+After a `pnpm build`, the service serves the app itself at `/` beside `/api`, so
+`http://127.0.0.1:8000` is the whole of openFerment from one process (OF-BLD-012 §B.4).
+`scripts/host/` turns a Mac into the always-on host (Appendix B):
+
+```bash
+# once: Homebrew, then the tools; keep the checkout OUTSIDE Documents, Desktop and Downloads,
+# which macOS will not let a background job read
+brew install git node pnpm uv
+git clone https://github.com/bytesizedyogurt/openFermentUI.git ~/openferment && cd ~/openferment
+cp core/.env.example core/.env          # add the key; spend cap in the console first
+scripts/host/install.sh                 # builds, sets power settings, installs both jobs, checks health
+
+scripts/host/deploy.sh                  # after every merged session: pull, install, build, restart
+scripts/host/deploy.sh --keep-decisions # when Guild decisions made on the Mini need committing first
+scripts/host/nightly.sh                 # what the 03:00 job runs, by hand
+scripts/host/install.sh --uninstall     # stop and remove both jobs
+```
+
+- **Two LaunchDaemons** (macOS's service manager, at the system level): the server, which starts at
+  power-on before anyone logs in, restarts if it stops, and runs as you rather than root; and a
+  03:00 job that fetches from Europe PMC and extracts from whatever arrived. A miss older than a
+  week is asked again, since papers become open access later. Logs: `~/Library/Logs/openferment/`.
+- **The server listens on loopback only.** The service has no login of its own, so the bind address
+  is the access control. `install.sh` runs `tailscale serve`, which publishes the port over HTTPS to
+  your own signed-in Tailscale devices, with nothing opened on the router. A link for someone outside
+  your tailnet is a Cloudflare Tunnel with a login page in front, set up by hand when it is needed.
+- **Review decisions live in this checkout.** Guild writes `core/data/biorepo.json` on the Mini;
+  pushing it is the backup, and `deploy.sh` refuses to pull over decisions that are not committed.
+- **FileVault** holds a rebooted Mini at the unlock screen until someone types the password; the
+  service starts after that.
+
 ### The offline demo
 
 ```bash
