@@ -45,6 +45,7 @@ from typing import Any
 
 import httpx
 
+from . import atomic
 from .models import FetchedSection, FetchLicense, FetchResult, IntakeStatus, OverlayPaper
 
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
@@ -420,8 +421,7 @@ def cached(paper_id: str) -> FetchResult | None:
 
 
 def _persist(result: FetchResult) -> FetchResult:
-    FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
-    _path(result.paperId).write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    atomic.write_text(_path(result.paperId), result.model_dump_json(indent=2) + "\n")
     return result
 
 

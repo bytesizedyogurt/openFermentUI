@@ -37,7 +37,7 @@ from typing import Any
 
 import anthropic
 
-from . import intake
+from . import atomic, intake
 from .models import Candidate, ExtractResponse, Usage
 from .postdoc import MODEL, cost_usd
 from .units import tables
@@ -368,8 +368,7 @@ def all_cached() -> list[ExtractResponse]:
 
 
 def _persist(result: ExtractResponse) -> ExtractResponse:
-    CANDIDATES_DIR.mkdir(parents=True, exist_ok=True)
-    _path(result.paperId).write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    atomic.write_text(_path(result.paperId), result.model_dump_json(indent=2) + "\n")
     return result
 
 

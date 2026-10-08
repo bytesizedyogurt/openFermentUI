@@ -42,11 +42,12 @@ has a quote holds by construction and not by convention.
 from __future__ import annotations
 
 import re
+import threading
 
 import logging
 from typing import Any
 
-from . import extract, intake
+from . import atomic, extract, intake
 from .corpus import load_corpus
 from .models import BioRepo, Candidate, Quantity, ReviewDecision
 from .units import UnitError, field as ontology_field, in_range, to_canonical
@@ -55,6 +56,13 @@ from .validate import anchor_candidate
 log = logging.getLogger("openferment.biorepo")
 
 PATH = intake.DATA_DIR / "biorepo.json"
+
+# One decision at a time (OF-BLD-012 §B.8). FastAPI runs these endpoints on a
+# thread pool, so two reviewers, or one in two tabs, can post together; each
+# would read the file, add its decision and write, and the second write would
+# erase the first. The read-modify-write below holds this lock. The server is
+# the only process that writes this file, so a lock inside it is enough.
+_WRITE_LOCK = threading.Lock()
 
 RULES = ("record", "reviewer", "fulltext", "quote", "paper", "range", "status")
 
@@ -90,8 +98,7 @@ def read() -> BioRepo:
 
 
 def _persist(repo: BioRepo) -> None:
-    PATH.parent.mkdir(parents=True, exist_ok=True)
-    PATH.write_text(repo.model_dump_json(indent=2, exclude_none=True) + "\n", encoding="utf-8")
+    atomic.write_text(PATH, repo.model_dump_json(indent=2, exclude_none=True) + "\n")
 
 
 def decisions() -> dict[str, ReviewDecision]:
@@ -225,13 +232,14 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
         # An undo: the record as it was before anyone decided. Nothing to
         # keep, and nothing to keep beside it — the candidate copy went with
         # the decision it sat next to. Idempotent when there was none.
-        repo = read()
-        if decision.recordId in repo.decisions:
-            del repo.decisions[decision.recordId]
-            repo.records = [c for c in repo.records if c.id != decision.recordId]
-            if not dry_run:
-                _persist(repo)
-                log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
+        with _WRITE_LOCK:
+            repo = read()
+            if decision.recordId in repo.decisions:
+                del repo.decisions[decision.recordId]
+                repo.records = [c for c in repo.records if c.id != decision.recordId]
+                if not dry_run:
+                    _persist(repo)
+                    log.info("biorepo: %s withdrawn by %s", decision.recordId, reviewer)
         return stored
     if _is_promotion(decision) or typed:
         fetched = intake.cached(paper_id)
@@ -287,14 +295,15 @@ def write(decision: ReviewDecision, *, dry_run: bool = False) -> ReviewDecision:
             stored.quote = quote
             stored.sectionId = section_id
 
-    repo = read()
-    repo.decisions[decision.recordId] = stored
-    if isinstance(rec, Candidate):
-        # The candidate the decision is about, kept where the decision is.
-        repo.records = [c for c in repo.records if c.id != rec.id] + [rec]
-    if dry_run:
-        return stored
-    _persist(repo)
+    with _WRITE_LOCK:
+        repo = read()
+        repo.decisions[decision.recordId] = stored
+        if isinstance(rec, Candidate):
+            # The candidate the decision is about, kept where the decision is.
+            repo.records = [c for c in repo.records if c.id != rec.id] + [rec]
+        if dry_run:
+            return stored
+        _persist(repo)
     log.info(
         "biorepo: %s → %s%s by %s",
         decision.recordId,
