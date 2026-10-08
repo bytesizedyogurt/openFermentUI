@@ -101,13 +101,13 @@ def test_refusals(kwargs):
         launchd.daemons(**args)
 
 
-@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh"])
+@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "sync_decisions.sh", "merge-biorepo"])
 def test_scripts_are_executable(name):
     assert os.access(HOST_DIR / name, os.X_OK), f"chmod +x scripts/host/{name}"
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
-@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "lib.sh"])
+@pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "lib.sh", "sync_decisions.sh", "merge-biorepo"])
 def test_scripts_parse(name):
     subprocess.run(["bash", "-n", str(HOST_DIR / name)], check=True)
 
@@ -128,6 +128,7 @@ def test_reads_back_the_address_an_installed_job_was_given(tmp_path, capsys):
      ("192.168.1.5", "192.168.1.5"), ("::", "[::1]"), ("fd7a:115c::5", "[fd7a:115c::5]")],
 )
 def test_health_is_asked_where_the_server_listens(host, poll):
+    assert launchd.poll_host(host) == poll, "launchd.poll_host and lib.sh's poll_host disagree"
     env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
     if host:
         env["OPENFERMENT_HOST"] = host
@@ -149,3 +150,17 @@ def test_deploy_uses_the_address_the_job_was_installed_with(tmp_path):
     env["OPENFERMENT_PORT"] = "9000"  # the environment still wins
     out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
     assert out.split() == ["0.0.0.0", "9000", "127.0.0.1"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+@pytest.mark.parametrize(("asked", "expected"), [(None, "127.0.0.1"), ("0.0.0.0", "0.0.0.0")])
+def test_a_reinstall_never_keeps_a_wide_host_unasked(tmp_path, asked, expected):
+    render(tmp_path, "--host", "0.0.0.0", "--port", "8123")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
+    env["OPENFERMENT_LAUNCHD_DIR"] = str(tmp_path / "out")
+    if asked:
+        env["OPENFERMENT_HOST"] = asked
+    script = f'source "{HOST_DIR / "lib.sh"}"; install_address; echo "= $HOST $PORT"'
+    out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
+    assert out.splitlines()[-1].split() == ["=", expected, "8123"]
+    assert ("will now listen on 127.0.0.1" in out) is (asked is None)

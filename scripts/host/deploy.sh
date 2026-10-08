@@ -39,19 +39,7 @@ if [ -n "$changed" ] && [ "$KEEP" = 0 ]; then
 fi
 
 if [ "$KEEP" = 1 ]; then
-  if [ -n "$changed" ]; then
-    say "Committing the review decisions made on this machine"
-    git add core/data/biorepo.json
-    git commit -m "BioRepo: review decisions from the Mini, $(date +%F)"
-  fi
-  # Decisions made elsewhere since are merged in by record (merge_biorepo.py).
-  # If the two sides decided the same record differently, put the file back
-  # the way this machine had it, so the service keeps reading valid JSON.
-  if ! git pull --rebase; then
-    git rebase --abort 2>/dev/null || true
-    die "the records listed above were withdrawn on one machine and changed on the other, or decided at the same instant, which only a person can settle. This machine's decisions are kept, committed here and in the file the service reads. Make both machines agree on those records in Guild, then run deploy.sh --keep-decisions again"
-  fi
-  git push || die "the decisions are committed here but could not be pushed. Check this machine can push (pnpm ready), then run deploy.sh --keep-decisions again"
+  "$REPO/scripts/host/sync_decisions.sh"
 fi
 
 if [ "$PULL" = 1 ]; then

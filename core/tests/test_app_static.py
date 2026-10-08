@@ -93,7 +93,11 @@ client = TestClient(app)
 answers = {}
 for _, path, method in api:
     r = client.request(method, path.replace("{paper_id}", "B5"), json={} if method == "POST" else None)
-    answers[f"{method} {path}"] = r.headers.get("content-type", "")
+    try:
+        detail = r.json().get("detail") if isinstance(r.json(), dict) else None
+    except ValueError:
+        detail = None
+    answers[f"{method} {path}"] = [r.status_code, detail]
 print(json.dumps({"mounts": mounts, "last": len(routes) - 1, "api": [i for i, _, _ in api], "answers": answers}))
 """
 
@@ -115,5 +119,8 @@ def test_the_app_as_imported_mounts_last_and_every_api_route_answers(tmp_path):
     seen = json.loads(out)
     assert seen["mounts"] == [seen["last"]], "the build must be mounted, and last"
     assert max(seen["api"]) < seen["last"]
-    for route, content_type in seen["answers"].items():
-        assert content_type.startswith("application/json"), f"{route} was answered by the static mount"
+    # What the static mount answers a path it does not serve, or a method it
+    # does not take. Every /api route must have been answered by its endpoint.
+    static = [(404, "Not Found"), (405, "Method Not Allowed")]
+    for route, (status, detail) in seen["answers"].items():
+        assert [status, detail] not in [list(s) for s in static], f"{route} was answered by the static mount"

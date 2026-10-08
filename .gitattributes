@@ -1,4 +1,4 @@
-# Guild's decisions merge by record, never as text (OF-BLD-012 §B.8). The
-# driver is registered per clone by scripts/host/lib.sh; a clone without it
-# falls back to git's text merge.
+# Guild's decisions merge by record, never as text (OF-BLD-012 §B.8). Each
+# clone registers the driver on `pnpm install` (scripts/register-merge-driver.mjs);
+# a clone that never ran it falls back to git's text merge.
 core/data/biorepo.json merge=biorepo

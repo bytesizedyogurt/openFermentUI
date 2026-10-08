@@ -107,9 +107,12 @@ def refusal(method: str, headers: Mapping[str, str]) -> str | None:
         return None  # not a browser: curl, a script, the test client
     origin = headers.get("origin")
     # A proxy in front may present itself as Host and pass the address the
-    # browser used in X-Forwarded-Host: Vite's dev proxy (changeOrigin, xfwd)
-    # does. A cross-site page cannot set that header without a preflight this
-    # service never approves.
+    # browser used in X-Forwarded-Host. Both proxies that stand in front of
+    # this service set it themselves, overwriting whatever the request
+    # carried: Vite's dev proxy (vite.config.ts), and tailscale serve
+    # (ipn/ipnlocal/serve.go). A request straight to the service can carry
+    # any value, but a cross-site page could only add the header after a
+    # preflight, and this service approves none.
     forwarded = headers.get("x-forwarded-host")
     if same_site(origin, headers.get("host")) or (
         forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)

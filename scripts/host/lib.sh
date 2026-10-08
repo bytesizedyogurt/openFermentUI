@@ -22,13 +22,28 @@ PORT="${OPENFERMENT_PORT:-${INSTALLED_PORT:-8000}}"
 HOST="${OPENFERMENT_HOST:-${INSTALLED_HOST:-127.0.0.1}}"
 
 # Where this machine asks for /api/health: loopback when the server listens
-# there or everywhere, else the one address it listens on.
-case "$HOST" in
-  127.0.0.1 | localhost | 0.0.0.0 | "") POLL=127.0.0.1 ;;
-  :: | ::1) POLL="[::1]" ;;
-  *:*) POLL="[$HOST]" ;;
-  *) POLL="$HOST" ;;
-esac
+# there or everywhere, else the one address it listens on. launchd.py's
+# poll_host is the same rule for `pnpm ready`; test_host holds them equal.
+poll_host() {
+  case "$1" in
+    127.0.0.1 | localhost | 0.0.0.0 | "") echo 127.0.0.1 ;;
+    :: | ::1) echo "[::1]" ;;
+    *:*) echo "[$1]" ;;
+    *) echo "$1" ;;
+  esac
+}
+POLL="$(poll_host "$HOST")"
+
+# install.sh only. The host is what OPENFERMENT_HOST says this time, else
+# loopback; never what an earlier install was given, because listening wider
+# than loopback is a choice made each time, never a default that lingers.
+install_address() {
+  HOST="${OPENFERMENT_HOST:-127.0.0.1}"
+  POLL="$(poll_host "$HOST")"
+  if [ -n "$INSTALLED_HOST" ] && [ "$INSTALLED_HOST" != "$HOST" ]; then
+    echo "The server listened on $INSTALLED_HOST and will now listen on $HOST. Set OPENFERMENT_HOST to choose otherwise."
+  fi
+}
 
 say() { printf '\n── %s\n' "$*"; }
 die() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
@@ -48,11 +63,10 @@ wait_for_health() {
 
 # Teach this clone to merge core/data/biorepo.json by record (.gitattributes
 # names the driver; scripts/host/merge_biorepo.py is it). Idempotent.
+# The same registration `pnpm install` makes (scripts/register-merge-driver.mjs).
 register_merge_driver() {
-  local py="$REPO/core/.venv/bin/python"
-  [ -x "$py" ] || py=python3
   git -C "$REPO" config merge.biorepo.name "BioRepo decisions, merged by record"
-  git -C "$REPO" config merge.biorepo.driver "\"$py\" scripts/host/merge_biorepo.py %O %A %B"
+  git -C "$REPO" config merge.biorepo.driver "sh scripts/host/merge-biorepo %O %A %B"
 }
 
 # Stop when a rebase or merge was left half-done: the decisions file may hold

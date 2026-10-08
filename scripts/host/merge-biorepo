@@ -1,0 +1,8 @@
+#!/bin/sh
+# git's entry point for the biorepo.json merge driver (OF-BLD-012 §B.8): the
+# service's own Python when core/.venv exists, else the system's, chosen at
+# merge time so a clone registered before its first `uv sync` still uses it.
+here="$(dirname "$0")"
+py="$here/../../core/.venv/bin/python"
+[ -x "$py" ] || py=python3
+exec "$py" "$here/merge_biorepo.py" "$@"

@@ -152,8 +152,36 @@ def check_europe_pmc() -> Check:
     return Check("europepmc", "ok", "Europe PMC answers")
 
 
-def check_service(port: int, have_key: bool) -> Check:
-    host = os.environ.get("OPENFERMENT_POLL_HOST", "127.0.0.1")
+def _launchd():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("of_launchd", REPO / "scripts" / "host" / "launchd.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def service_address() -> tuple[str, int]:
+    """Where to ask the service for its health: the environment first (what
+    install.sh and deploy.sh pass), else the address the installed server
+    job was given, else 127.0.0.1:8000. So `pnpm ready` typed by hand asks
+    the job where it actually listens."""
+    host, port = os.environ.get("OPENFERMENT_POLL_HOST"), os.environ.get("OPENFERMENT_PORT")
+    launchd = _launchd()
+    plist = Path(os.environ.get("OPENFERMENT_LAUNCHD_DIR", "/Library/LaunchDaemons")) / f"{launchd.SERVER}.plist"
+    installed: tuple[str, int] | None = None
+    if not (host and port) and plist.is_file():
+        try:
+            installed = launchd.installed_address(plist)
+        except (OSError, ValueError, KeyError, IndexError):
+            installed = None
+    return (
+        host or launchd.poll_host(installed[0] if installed else ""),
+        int(port) if port else (installed[1] if installed else 8000),
+    )
+
+
+def check_service(port: int, have_key: bool, host: str = "127.0.0.1") -> Check:
     try:
         body = httpx.get(f"http://{host}:{port}/api/health", timeout=3).json()
     except (httpx.HTTPError, ValueError):
@@ -194,7 +222,8 @@ def check_backup() -> Check:
 
 def run(no_network: bool = False, port: int | None = None) -> list[Check]:
     load_dotenv(CORE / ".env", override=False)
-    port = port or int(os.environ.get("OPENFERMENT_PORT", "8000"))
+    host, found_port = service_address()
+    port = port or found_port
     key = check_key()
     have_key = key.mark in ("ok", "warn")
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
@@ -202,7 +231,7 @@ def run(no_network: bool = False, port: int | None = None) -> list[Check]:
         checks += [Check(n, "skip", "--no-network") for n in ("model", "europepmc", "backup")]
     else:
         checks += [check_model(have_key), check_europe_pmc(), check_backup()]
-    checks.append(check_service(port, have_key))
+    checks.append(check_service(port, have_key, host))
     return checks
 
 

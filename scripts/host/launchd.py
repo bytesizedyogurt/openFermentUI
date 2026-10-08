@@ -104,6 +104,17 @@ def daemons(
     }
 
 
+def poll_host(host: str) -> str:
+    """Where this machine asks a server listening on `host` for its health:
+    loopback when it listens there or everywhere, else the one address. The
+    same rule as poll_host in lib.sh; test_host holds the two equal."""
+    if host in ("127.0.0.1", "localhost", "0.0.0.0", ""):
+        return "127.0.0.1"
+    if host in ("::", "::1"):
+        return "[::1]"
+    return f"[{host}]" if ":" in host else host
+
+
 def installed_address(plist: Path) -> tuple[str, int]:
     """The host and port an installed server job was given, so deploy.sh
     restarts and checks the job on its own address."""

@@ -138,17 +138,21 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 - The server binds to `127.0.0.1`. The service has no login, so the bind
   address is the access control; `tailscale serve` publishes it to the owner's
   devices. Widening it (`OPENFERMENT_HOST`) is a decision for Sean, never a
-  default. Host and port given at install are baked into the plist and
-  `lib.sh` reads them back (`launchd.py --read`), so deploy and `pnpm ready`
-  ask the job on its own address. Tailscale on the Mini is the background
+  default. Host and port given at install are baked into the plist, and
+  `lib.sh` and `ready.service_address` read them back (`launchd.py`), so
+  deploy and `pnpm ready` ask the job on its own address. `install.sh` takes
+  the host only from `OPENFERMENT_HOST`, else loopback, never from the
+  earlier install. `poll_host` exists in bash and Python; `test_host` keeps
+  them equal. Tailscale on the Mini is the background
   service (`brew install tailscale`, `sudo brew services start tailscale`);
   its apps run only after a login. Uninstall turns off openFerment's serve
   alone (`serve --https=443 off`), never `serve reset`.
 - `guard.py`, run as middleware on every request: a POST/PUT/PATCH/DELETE must
   name a host the service answers to (IP, dotless, `.local`, `.ts.net`, or
   `OPENFERMENT_ALLOWED_HOSTS`), and a browser `Origin` must be that host on
-  the same port (or match `X-Forwarded-Host`, which Vite's proxy sends with
-  `xfwd: true`; keep it). Requests through Tailscale Funnel change nothing.
+  the same port (or match `X-Forwarded-Host`, which Vite's proxy SETS from
+  the browser's Host in `vite.config.ts`, overwriting any sent value; never
+  switch that to `xfwd`, which keeps a forged one; `server.cors` stays off). Requests through Tailscale Funnel change nothing.
   This stops cross-site posts, DNS rebinding and other local apps. Reads stay
   open. New changing endpoints are covered automatically; `test_request_guard`
   is its test.
@@ -158,9 +162,15 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 - `core/data/biorepo.json` merges by record through a git merge driver
   (`.gitattributes` → `scripts/host/merge_biorepo.py`, registered per clone
   by `lib.sh`). The driver never writes conflict markers: it writes a valid
-  merge or leaves the file untouched and fails. `deploy.sh` aborts a failed
-  rebase and refuses to start over an unfinished one. `test_merge_biorepo`
-  runs it through real git.
+  merge or leaves the file untouched and fails. Every clone registers it on
+  `pnpm install` (`prepare` → `scripts/register-merge-driver.mjs`) and
+  `lib.sh` registers the same string; both go through
+  `scripts/host/merge-biorepo`, which picks the Python at merge time.
+  `sync_decisions.sh` (what `deploy.sh --keep-decisions` runs) squashes every
+  unpushed decision commit into one before rebasing, aborts a failed rebase,
+  and refuses to start over an unfinished one. Decisions on one record are
+  settled by the later `at`, compared as moments. `test_merge_biorepo` runs
+  all of it through real git.
 
 ## Persistence tiers
 

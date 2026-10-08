@@ -187,6 +187,7 @@ pnpm ready                              # is the live loop wired: key, model, co
 
 scripts/host/deploy.sh                  # after every merged session: pull, install, build, restart
 scripts/host/deploy.sh --keep-decisions # when Guild decisions made on the Mini need committing first
+scripts/host/sync_decisions.sh          # back up the Mini's decisions alone, no deploy
 scripts/host/nightly.sh                 # what the 03:00 job runs, by hand
 scripts/host/install.sh --uninstall     # stop and remove both jobs
 ```
@@ -212,12 +213,16 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
   `--keep-decisions` merges them with decisions pushed from elsewhere record by record
   (`scripts/host/merge_biorepo.py`, attached by `.gitattributes`): different records are all kept,
   and one record decided differently on two machines keeps the later decision. A record withdrawn
-  on one machine and changed on the other stops the deploy with the file left valid.
+  on one machine and changed on the other stops the deploy with the file left valid; once the two
+  machines agree, the next run goes through, because every unpushed decision is sent as one commit.
+  Every clone learns the merge on `pnpm install` (the `prepare` script), so the laptop merges the
+  same way.
 - **FileVault** holds a rebooted Mini at the unlock screen until someone types the password; the
   server job and Tailscale's background service start after that. With FileVault off, both start at
   power-on and the login window can stay locked.
 - **Host and port** default to `127.0.0.1:8000`. `OPENFERMENT_HOST` and `OPENFERMENT_PORT` at install
-  time are baked into the job, and `deploy.sh` reads them back from it.
+  time are baked into the job; `deploy.sh` and `pnpm ready` read them back from it. A reinstall without
+  `OPENFERMENT_HOST` returns to loopback, so a wider address never lingers unasked.
 
 ### The offline demo
 

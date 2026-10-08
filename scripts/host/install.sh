@@ -32,6 +32,7 @@ if [ "${1:-}" = --uninstall ]; then
   exit 0
 fi
 [ -z "${1:-}" ] || die "unknown option $1. Usage: install.sh [--uninstall]"
+install_address
 
 say "Checking the checkout and the tools"
 # macOS privacy protection stops background jobs reading these folders: the

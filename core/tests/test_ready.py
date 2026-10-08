@@ -6,6 +6,9 @@ they skip.
 """
 from __future__ import annotations
 
+import plistlib
+from pathlib import Path
+
 import anthropic
 import pytest
 
@@ -175,3 +178,23 @@ def test_exit_code_follows_the_failures(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     assert ready.main(["--no-network"]) == 0
     assert ready.main(["--bogus"]) == 2
+
+
+def test_service_address_comes_from_the_installed_job(tmp_path, monkeypatch):
+    launchd = ready._launchd()
+    jobs = launchd.daemons(Path("/Users/sean/openferment"), "sean", Path("/Users/sean"), "/usr/bin", "0.0.0.0", 8123)
+    (tmp_path / f"{launchd.SERVER}.plist").write_bytes(plistlib.dumps(jobs[launchd.SERVER]))
+    monkeypatch.setenv("OPENFERMENT_LAUNCHD_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENFERMENT_PORT", raising=False)
+    monkeypatch.delenv("OPENFERMENT_POLL_HOST", raising=False)
+    assert ready.service_address() == ("127.0.0.1", 8123)
+    monkeypatch.setenv("OPENFERMENT_PORT", "9000")
+    monkeypatch.setenv("OPENFERMENT_POLL_HOST", "192.168.1.5")
+    assert ready.service_address() == ("192.168.1.5", 9000), "what install.sh and deploy.sh pass wins"
+
+
+def test_service_address_without_an_installed_job(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_LAUNCHD_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENFERMENT_PORT", raising=False)
+    monkeypatch.delenv("OPENFERMENT_POLL_HOST", raising=False)
+    assert ready.service_address() == ("127.0.0.1", 8000)

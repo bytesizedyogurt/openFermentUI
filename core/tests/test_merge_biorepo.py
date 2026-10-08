@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -186,3 +187,117 @@ def test_what_only_a_person_can_settle_stops_git_and_leaves_valid_json(two_machi
     model = BioRepo.model_validate_json((mini / FILE).read_text(encoding="utf-8"))
     assert model.decisions["r-0"].status == "rejected", "this machine's decision is what the service reads"
     assert "<<<<<<<" not in (mini / FILE).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("ours_at", "theirs_at", "kept"),
+    [
+        ("2026-10-07T12:00:00+02:00", "2026-10-07T11:00:00Z", "theirs"),  # 10:00Z against 11:00Z
+        ("2026-10-07T11:00:00.500Z", "2026-10-07T11:00:00Z", "ours"),
+        ("2026-10-07T11:00:00.000Z", "2026-10-07T11:00:00Z", None),  # the same instant
+        ("2026-10-07T11:00:00", "2026-10-07T10:00:00Z", None),  # no zone: cannot be told
+        ("yesterday", "2026-10-07T10:00:00Z", None),
+    ],
+)
+def test_later_means_later_in_time(ours_at, theirs_at, kept):
+    o, t = d("r-A", "verified", ours_at), d("r-A", "rejected", theirs_at)
+    merged, settled, conflicts = mb.merge(repo(), repo(o), repo(t))
+    if kept is None:
+        assert conflicts == ["decision r-A"]
+    else:
+        assert settled == ["r-A"]
+        assert merged["decisions"]["r-A"]["status"] == ("verified" if kept == "ours" else "rejected")
+
+
+# ── sync_decisions.sh, the script deploy.sh --keep-decisions runs ──────
+
+HOST_DIR = SCRIPT.parent
+
+
+def run_sync(where: Path) -> subprocess.CompletedProcess:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
+    return subprocess.run(
+        ["bash", str(where / "scripts" / "host" / "sync_decisions.sh")],
+        cwd=where, env=env, capture_output=True, text=True,
+    )
+
+
+def put(where: Path, *decisions: dict) -> None:
+    write(where / FILE, BioRepo.model_validate(repo(*decisions)).model_dump_json(indent=2, exclude_none=True) + "\n")
+
+
+def on_github(remote: Path) -> BioRepo:
+    text = git(remote, "show", f"main:{FILE.as_posix()}").stdout
+    return BioRepo.model_validate_json(text)
+
+
+@pytest.fixture
+def scripted(tmp_path):
+    """Two clones of a remote whose tree carries the real host scripts."""
+    seed = tmp_path / "seed"
+    (seed / FILE).parent.mkdir(parents=True)
+    git(tmp_path, "init", "-q", "-b", "main", str(seed))
+    for cfg in (("user.email", "t@example.org"), ("user.name", "t")):
+        git(seed, "config", *cfg)
+    (seed / "scripts" / "host").mkdir(parents=True)
+    for name in ("lib.sh", "sync_decisions.sh", "merge_biorepo.py", "merge-biorepo"):
+        shutil.copy2(HOST_DIR / name, seed / "scripts" / "host" / name)
+    shutil.copy2(HOST_DIR.parents[1] / ".gitattributes", seed / ".gitattributes")
+    put(seed, d("r-0"))
+    git(seed, "add", "-A")
+    git(seed, "commit", "-qm", "seed")
+    remote = tmp_path / "remote.git"
+    git(tmp_path, "clone", "-q", "--bare", str(seed), str(remote))
+    clones = []
+    for name in ("laptop", "mini"):
+        git(tmp_path, "clone", "-q", str(remote), name)
+        for cfg in (("user.email", "t@example.org"), ("user.name", "t")):
+            git(tmp_path / name, "config", *cfg)
+        clones.append(tmp_path / name)
+    return remote, *clones
+
+
+@needs_git
+def test_sync_backs_up_decisions_from_two_machines(scripted):
+    remote, laptop, mini = scripted
+    put(laptop, d("r-0"), d("r-laptop"))
+    assert run_sync(laptop).returncode == 0
+    put(mini, d("r-0"), d("r-mini"))
+    r = run_sync(mini)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert set(on_github(remote).decisions) == {"r-0", "r-laptop", "r-mini"}
+    assert "Nothing new" in run_sync(mini).stdout
+
+
+@needs_git
+def test_sync_recovers_once_the_machines_agree(scripted):
+    """The dead end the re-check found: an unpushed commit that disagreed
+    once used to fail again on every later run."""
+    remote, laptop, mini = scripted
+    put(laptop)  # the laptop withdraws r-0
+    assert run_sync(laptop).returncode == 0
+
+    put(mini, d("r-0", "rejected", "2026-10-08T00:00:00Z"))  # the Mini changes it
+    first = run_sync(mini)
+    assert first.returncode == 1
+    model = BioRepo.model_validate_json((mini / FILE).read_text(encoding="utf-8"))
+    assert model.decisions["r-0"].status == "rejected", "the service reads this machine's decision"
+    assert not (mini / ".git" / "rebase-merge").exists()
+
+    put(mini, d("r-new"))  # the Mini withdraws r-0 too, so the machines agree, and decides r-new
+    second = run_sync(mini)
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert set(on_github(remote).decisions) == {"r-new"}
+
+
+@needs_git
+@pytest.mark.skipif(shutil.which("node") is None, reason="no node on this machine")
+def test_pnpm_install_registers_the_driver_on_any_clone(tmp_path):
+    """`prepare` runs on every `pnpm install`, so the laptop gets the driver
+    as well as the Mini; without it the attribute falls back to a text merge."""
+    git(tmp_path, "init", "-q")
+    subprocess.run(["node", str(HOST_DIR.parent / "register-merge-driver.mjs")], cwd=tmp_path, check=True)
+    driver = git(tmp_path, "config", "--get", "merge.biorepo.driver").stdout.strip()
+    assert driver == "sh scripts/host/merge-biorepo %O %A %B"
+    registered_by_lib = (HOST_DIR / "lib.sh").read_text(encoding="utf-8")
+    assert f'merge.biorepo.driver "{driver}"' in registered_by_lib, "install and deploy register the same driver"

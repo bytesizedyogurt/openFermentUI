@@ -16,8 +16,9 @@ other, two decisions at the same instant) leaves OURS exactly as it was,
 goes to stderr, and exits 1, so git stops and nothing unparseable is ever
 written. A clean merge is written to OURS and exits 0.
 
-Registered per clone by scripts/host/lib.sh (`git config merge.biorepo.*`)
-and attached to the file by .gitattributes. Needs only the standard library;
+Registered per clone on `pnpm install` (scripts/register-merge-driver.mjs)
+and by scripts/host/lib.sh, through scripts/host/merge-biorepo, which picks
+the Python; attached to the file by .gitattributes. Needs only the standard library;
 when openferment_core is importable it also validates the result against
 the BioRepo model and writes it in the model's own format.
 """
@@ -25,6 +26,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -44,13 +46,27 @@ def _keys(base: dict, ours: dict, theirs: dict) -> list[str]:
     return list(ours) + [k for k in theirs if k not in ours] + [k for k in base if k not in ours and k not in theirs]
 
 
+def _when(value: Any) -> datetime | None:
+    """An `at` as a moment. None for anything that is not an ISO-8601 time
+    with an offset (a time with no zone could be any of twenty-four)."""
+    if not isinstance(value, str):
+        return None
+    try:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo is not None else None
+
+
 def _later(o: Any, t: Any) -> str | None:
     """Which side's decision is the later one, 'ours' or 'theirs', or None
-    when that cannot be told (a withdrawal on one side, no time, a tie)."""
+    when that cannot be told (a withdrawal on one side, a time that does not
+    parse, the same instant). Compared as moments, so '12:00+02:00' is
+    earlier than '11:00Z' and '...:00.500Z' is later than '...:00Z'."""
     if not (isinstance(o, dict) and isinstance(t, dict)):
         return None
-    a, b = o.get("at"), t.get("at")
-    if not a or not b or a == b:
+    a, b = _when(o.get("at")), _when(t.get("at"))
+    if a is None or b is None or a == b:
         return None
     return "ours" if a > b else "theirs"
 
@@ -60,7 +76,7 @@ def merge(base: dict, ours: dict, theirs: dict) -> tuple[dict, list[str], list[s
     the later decision settled, and the disagreements left (empty when clean).
 
     A record decided differently on two machines is settled by the later
-    decision (ISO-8601 `at` strings order as times): one reviewer on two
+    decision (`at`, compared as moments): one reviewer on two
     devices means the later is the current judgement, and git history keeps
     the other. A withdrawal against a change, or two decisions at the same
     instant, cannot be settled that way and is left for a person."""
