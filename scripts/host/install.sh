@@ -92,10 +92,14 @@ else
   echo "(your own signed-in devices only, over HTTPS; nothing is opened on the router)"
 fi
 
+say "Checking the live loop"
+run_ready
+
 say "Done"
 cat <<EOF
 On this Mac:      http://127.0.0.1:$PORT
 Logs:             tail -f "$LOGS/server.log"   ·   "$LOGS/nightly.log"
 After a change:   scripts/host/deploy.sh
 Nightly intake:   03:00, or now by hand: scripts/host/nightly.sh
+Is it all wired:  pnpm ready
 EOF

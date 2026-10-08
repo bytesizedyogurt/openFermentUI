@@ -30,6 +30,7 @@
     "test:live": "cd core && uv run --extra dev pytest tests/ -q -m live -s",
     "check:reference": "tsx scripts/check-reference.ts",
     "intake:fetch": "cd core && uv run python -m openferment_core.intake",
+    "ready": "cd core && uv run python -m openferment_core.ready",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "demo:offline": "node scripts/demo-offline.mjs",
     "demo:fixtures": "cd core && uv run python -m openferment_core.demo",

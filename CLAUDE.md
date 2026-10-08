@@ -127,6 +127,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   merged session, `nightly.sh` at 03:00. `launchd.py` renders the two
   LaunchDaemons (`com.umutuzo.openferment`, `.nightly`), which run as the
   checkout's owner and never as root; `test_host` checks them.
+- `pnpm ready` (`core/openferment_core/ready.py`) answers "will the live loop
+  work here" without spending: key, model (the free Models API, which is also
+  how a retired model shows), corpus, build, data, intake counts, Europe PMC,
+  push access for the decisions backup, the running service. install.sh and
+  deploy.sh run it last. It never prints any part of the key; `test_ready`
+  holds it to that. (`pnpm doctor` and `--offline` belong to pnpm itself.)
 - The server binds to `127.0.0.1`. The service has no login, so the bind
   address is the access control; `tailscale serve` publishes it to the owner's
   devices. Widening it (`OPENFERMENT_HOST`) is a decision for Sean, never a

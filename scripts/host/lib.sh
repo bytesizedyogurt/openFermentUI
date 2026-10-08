@@ -27,6 +27,13 @@ wait_for_health() {
   die "the service did not answer /api/health within 30 s. Its log: tail -50 \"$LOGS/server.log\""
 }
 
+# pnpm ready, from the service's own environment. Prints its report and never
+# stops the caller: install and deploy have done their work by the time it runs.
+run_ready() {
+  (cd "$REPO/core" && OPENFERMENT_PORT="$PORT" .venv/bin/python -m openferment_core.ready) ||
+    echo "Something above needs fixing. Run pnpm ready again once it is."
+}
+
 # True when core/.env holds something shaped like a real key. Never prints it.
 has_key() {
   [ -f "$REPO/core/.env" ] &&

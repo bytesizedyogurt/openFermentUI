@@ -69,5 +69,6 @@ if [ "$RESTART" = 1 ]; then
   say "Restarting the service"
   sudo launchctl kickstart -k "system/$SERVER"
   wait_for_health
-  has_key || echo "core/.env holds no key: Postdoc's Live mode and Extract stay off until it does."
+  say "Checking the live loop"
+  run_ready
 fi

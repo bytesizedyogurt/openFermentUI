@@ -145,6 +145,8 @@ The service, for Postdoc's live mode and for Intake's real fetch and extraction
 cp core/.env.example core/.env        # ANTHROPIC_API_KEY — gitignored, guarded by check:secrets;
                                       # set a spend cap in the console first
 pnpm export:corpus                    # project the TS seed (+ biorepo.json) to core/.../corpus.json
+pnpm ready                            # before spending anything: is the key accepted, is the model there,
+                                      # does Europe PMC answer. Free; --no-network for the local checks only
 cd core && uv run uvicorn openferment_core.api:app --reload
 
 pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for the 59 papers with an identifier:
@@ -179,6 +181,7 @@ brew install git node pnpm uv
 git clone https://github.com/bytesizedyogurt/openFermentUI.git ~/openferment && cd ~/openferment
 cp core/.env.example core/.env          # add the key; spend cap in the console first
 scripts/host/install.sh                 # builds, sets power settings, installs both jobs, checks health
+pnpm ready                              # is the live loop wired: key, model, corpus, Europe PMC, GitHub, service
 
 scripts/host/deploy.sh                  # after every merged session: pull, install, build, restart
 scripts/host/deploy.sh --keep-decisions # when Guild decisions made on the Mini need committing first
