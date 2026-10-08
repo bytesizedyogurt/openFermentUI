@@ -130,7 +130,13 @@ TOOL = {
 
 
 class PostdocUnavailable(RuntimeError):
-    """No key, or the API could not be reached. Distinct from a bad answer."""
+    """No key, or the API could not be reached. Distinct from a bad answer.
+    `usage` is anything already spent, such as a billed refusal before an
+    outage, so the plan that reports the failure can still show the cost."""
+
+    def __init__(self, message: str, usage: Usage | None = None):
+        super().__init__(message)
+        self.usage = usage or Usage()
 
 
 def _evidence_payload(records: list[dict[str, Any]], corpus) -> list[dict[str, Any]]:
@@ -223,7 +229,7 @@ def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dic
             e.usage,
         )
     except llm.ModelUnavailable as e:
-        raise PostdocUnavailable(str(e)) from e
+        raise PostdocUnavailable(str(e), e.usage) from e
 
     if result.data is not None:
         return result.data, result.usage

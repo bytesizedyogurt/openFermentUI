@@ -129,6 +129,14 @@ def test_a_model_with_no_price_on_file_is_named(monkeypatch):
     assert check.mark == "warn" and "no price on file for claude-some-future-model" in check.detail
 
 
+def test_an_effort_the_api_does_not_accept_fails_before_any_call(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "maximum")
+    check = ready.check_model(False)
+    assert check.mark == "fail" and "OPENFERMENT_EFFORT=maximum" in check.detail
+    monkeypatch.setenv("OPENFERMENT_EFFORT", "xhigh")
+    assert ready.check_model(False).mark == "skip"
+
+
 def test_model_waits_for_a_key_and_for_the_network():
     assert ready.check_model(False).mark == "skip"
 

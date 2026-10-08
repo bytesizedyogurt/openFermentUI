@@ -3,8 +3,10 @@
     PRIMARY   claude-opus-5-5     every call starts here
     FALLBACK  claude-sonnet-5-5   when the primary declines or is unavailable
 
-Override with OPENFERMENT_MODEL and OPENFERMENT_FALLBACK_MODEL in core/.env;
-thinking depth with OPENFERMENT_EFFORT (low, medium, high; default medium).
+Override with OPENFERMENT_MODEL and OPENFERMENT_FALLBACK_MODEL in core/.env
+(the fallback may be a comma-separated list, tried in order);
+thinking depth with OPENFERMENT_EFFORT (low, medium, high, xhigh, max;
+default medium).
 
 STRUCTURED OUTPUT BY CONSTRUCTION. Both callers used to pin `tool_choice` to a
 single tool, so the model had exactly one way to answer. Claude Opus 5.5 and
@@ -26,8 +28,18 @@ TWO KINDS OF FALLING BACK, both to the same next model:
   rate limited past the SDK's own retries (429), overloaded (529) or failing
   (5xx).
 
-What does not fall back: a rejected key, an unreachable network, or a request
-the API calls malformed. Another model would fail the same way.
+What does not fall back: a rejected key, an unreachable network, a request
+the API calls malformed, or a refusal in the `reasoning_extraction` category,
+which Anthropic's docs say to answer by changing the prompt. Another model
+would fail the same way.
+
+A connection that drops after the stream has opened surfaces from the SDK as
+a raw transport error (it wraps only the opening of the request), so it is
+caught here and treated as the model being unavailable.
+
+A refusal that produced no output is billed only in the categories Anthropic
+bills (`bio`, `frontier_llm`, `reasoning_extraction`, as of September 2026);
+its tokens are counted either way and its cost is $0 otherwise.
 
 Calls stream, because a long extraction with thinking can run for minutes and
 a non-streaming request is cut off at ten; the final message is the same.
@@ -45,11 +57,19 @@ import anthropic
 
 from .models import Usage
 
+try:  # what the anthropic SDK is built on; its stream readers raise these raw
+    import httpx2 as _http
+except ImportError:  # pragma: no cover - an SDK built on plain httpx
+    import httpx as _http
+
 log = logging.getLogger("openferment.llm")
 
 DEFAULT_PRIMARY = "claude-opus-5-5"
 DEFAULT_FALLBACK = "claude-sonnet-5-5"
 DEFAULT_EFFORT = "medium"
+# What `output_config.effort` accepts; anything else is a 400 on every call,
+# which `pnpm ready` reports before the first one.
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
 # Read when a call is made, so core/.env (which api.py and the batch commands
@@ -72,6 +92,7 @@ def effort() -> str:
 PRICES: dict[str, tuple[float, float]] = {
     "claude-opus-5-5": (4.00, 20.00),
     "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-opus-4-8": (5.00, 25.00),  # a possible third rung; see core/.env.example
     "claude-haiku-4-5-20251001": (1.00, 5.00),
 }
 
@@ -81,10 +102,22 @@ PRICES: dict[str, tuple[float, float]] = {
 _UNSUPPORTED = ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
                 "multipleOf", "minLength", "maxLength", "maxItems", "pattern")
 
+# Refusal categories billed when they arrive before any output, per
+# platform.claude.com/docs/en/build-with-claude/refusals-and-fallback (read
+# 2026-10-08). Every other category, and none, is free when nothing came out.
+BILLED_REFUSALS = frozenset({"bio", "frontier_llm", "reasoning_extraction"})
+# Refusals no other model is recommended for; the docs say to change the prompt.
+NO_FALLBACK_REFUSALS = frozenset({"reasoning_extraction"})
+
 
 class ModelUnavailable(RuntimeError):
     """No answer could be had: the key, the network, or every model in the
-    chain unavailable. Distinct from a refusal and from a bad answer."""
+    chain unavailable. Distinct from a refusal and from a bad answer. `usage`
+    is what was spent getting here: a billed refusal before the outage."""
+
+    def __init__(self, message: str, usage: Usage | None = None):
+        super().__init__(message)
+        self.usage = usage or Usage()
 
 
 class ModelRefused(RuntimeError):
@@ -119,8 +152,10 @@ class Result:
 
 
 def chain() -> list[str]:
-    """The models a call tries, in order, without repeats."""
-    return list(dict.fromkeys(m for m in (primary(), fallback()) if m))
+    """The models a call tries, in order, without repeats. The fallback may
+    name several, comma-separated, each tried in turn."""
+    rungs = [primary(), *(m.strip() for m in fallback().split(","))]
+    return list(dict.fromkeys(m for m in rungs if m))
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -135,12 +170,18 @@ def _get(obj: Any, name: str, default: Any = None) -> Any:
 
 
 def usage_of(response: Any) -> Usage:
-    """Tokens and cost of one response, read from the response itself."""
+    """Tokens and cost of one response, read from the response itself. Output
+    tokens include the model's thinking, which is billed as output."""
     usage = _get(response, "usage")
     model = str(_get(response, "model") or primary())
     tin = int(_get(usage, "input_tokens", 0) or 0)
     tout = int(_get(usage, "output_tokens", 0) or 0)
-    return Usage(inputTokens=tin, outputTokens=tout, costUsd=cost_usd(model, tin, tout), models=[model])
+    cost = cost_usd(model, tin, tout)
+    if _get(response, "stop_reason") == "refusal" and tout == 0:
+        category = _get(_get(response, "stop_details"), "category")
+        if category not in BILLED_REFUSALS:
+            cost = 0.0
+    return Usage(inputTokens=tin, outputTokens=tout, costUsd=cost, models=[model])
 
 
 def add(a: Usage, b: Usage) -> Usage:
@@ -198,6 +239,14 @@ def _text_json(response: Any) -> dict[str, Any] | None:
     return None
 
 
+def _error_type(e: Exception) -> str:
+    """The API's own name for an error sent inside a stream
+    (`overloaded_error`), else the exception's class name."""
+    body = getattr(e, "body", None)
+    inner = _get(body, "error") if isinstance(body, dict) else None
+    return str(_get(inner, "type") or type(e).__name__) if inner else type(e).__name__
+
+
 def _default_client() -> Any:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
@@ -237,21 +286,28 @@ def call(
             with client.messages.stream(model=model, **request) as stream:
                 response = stream.get_final_message()
         except anthropic.AuthenticationError as e:
-            raise ModelUnavailable("The Anthropic API rejected the key in core/.env.") from e
+            raise ModelUnavailable("The Anthropic API rejected the key in core/.env.", spent) from e
         except anthropic.APIConnectionError as e:
-            raise ModelUnavailable(f"Could not reach the Anthropic API: {e}") from e
+            raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
         except anthropic.BadRequestError as e:
-            raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}") from e
+            raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}", spent) from e
         except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
             why = f"{model} is not available to this key ({e.status_code})"
             if last:
-                raise ModelUnavailable(why) from e
+                raise ModelUnavailable(why, spent) from e
             log.warning("%s%s; trying %s", label, why, models[i + 1])
             continue
-        except anthropic.APIStatusError as e:  # 429 after retries, 529, 5xx
-            why = f"{model} answered {e.status_code}"
+        except (anthropic.APIError, _http.TransportError) as e:
+            # 429 after the SDK's retries, 529, 5xx, an error event inside the
+            # stream (which the SDK reports with the stream's own 200), or the
+            # connection dropping after the stream opened.
+            status = getattr(e, "status_code", None)
+            if status and status != 200:
+                why = f"{model} answered {status}"
+            else:
+                why = f"{model} stream failed ({_error_type(e)})"
             if last:
-                raise ModelUnavailable(f"{why}: {e.message}") from e
+                raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}", spent) from e
             log.warning("%s%s; trying %s", label, why, models[i + 1])
             continue
 
@@ -262,7 +318,7 @@ def call(
             details = _get(response, "stop_details")
             refusal = _get(details, "category") or refusal
             refused_by.append(str(_get(response, "model") or model))
-            if last:
+            if last or refusal in NO_FALLBACK_REFUSALS:
                 raise ModelRefused(refusal, refused_by, spent)
             log.warning("%s%s declined (%s); trying %s", label, model, refusal or "no category", models[i + 1])
             continue

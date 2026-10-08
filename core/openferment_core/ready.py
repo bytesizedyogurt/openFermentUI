@@ -116,6 +116,9 @@ def check_intake() -> Check:
 def check_model(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
     """Both models in the chain, through the free Models API: the primary every
     call starts on and the fallback it moves to (llm.py)."""
+    if llm.effort() not in llm.EFFORTS:
+        return Check("model", "fail", f"OPENFERMENT_EFFORT={llm.effort()} is not one of "
+                     f"{', '.join(llm.EFFORTS)}, so every call would be refused")
     if not have_key:
         return Check("model", "skip", "needs the key")
     if intake.fixtures_only():

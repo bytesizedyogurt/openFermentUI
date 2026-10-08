@@ -135,7 +135,7 @@ def ask(request: AskRequest) -> AnswerPlan:
         raw, usage = ask_model(question, records, corpus)
     except PostdocUnavailable as e:
         log.error("postdoc unavailable: %s", e)
-        return AnswerPlan(question=question, declined=str(e), usage=Usage())
+        return AnswerPlan(question=question, declined=str(e), usage=e.usage)
 
     result = validate_claims(
         raw.get("claims") or [],

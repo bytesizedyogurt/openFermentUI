@@ -131,7 +131,8 @@ records which model answered in the plan's `usage.models`, shown beside the cost
 Both models reject forced tool use, so the plan comes back through structured
 outputs: JSON that matches the schema, checked by the API, with no free-text way to
 answer. `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL` and `OPENFERMENT_EFFORT` in
-`core/.env` change the models and how hard they think (`medium` by default).
+`core/.env` change the models and how hard they think (`medium` by default); the
+fallback may name several models, comma-separated, tried in order.
 
 Both models run safety classifiers, a biology one among them, and a question about
 fermentation can trip it. A declined request comes back as a refusal; the same

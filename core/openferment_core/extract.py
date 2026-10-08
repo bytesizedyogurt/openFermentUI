@@ -112,8 +112,8 @@ field the paper simply never mentions is not, and gets no candidate at all."""
 
 
 class ExtractTruncated(RuntimeError):
-    """The model's response was cut off at the token limit, or carried no tool
-    call at all. Nothing is kept and NOTHING IS CACHED: an empty extraction
+    """The model's response was cut off at the token limit, or held no
+    candidates in the expected form. Nothing is kept and NOTHING IS CACHED: an empty extraction
     written to disk would be scored as every record missed and could never
     be re-run without --force. Raised as its own type so the batch can say
     which papers need a second look."""
@@ -311,7 +311,8 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
         # the paper, and the batch reports it as not extracted.
         raise ExtractUnavailable(f"{paper_id} {e}") from e
     except llm.ModelUnavailable as e:
-        raise ExtractUnavailable(str(e)) from e
+        spent = f" (${e.usage.costUsd:.4f} spent first)" if e.usage.costUsd else ""
+        raise ExtractUnavailable(f"{e}{spent}") from e
 
     if result.truncated:
         # A list cut off mid-way does not parse into candidates the validator
@@ -332,10 +333,23 @@ def _path(paper_id: str) -> Path:
 
 
 def cached(paper_id: str) -> ExtractResponse | None:
+    """This run's extraction of a paper, or None. A file left by an earlier
+    run (`haiku-1`, from before the move to Opus) is not this run's and is
+    not read: the paper counts as unextracted and the next batch extracts it
+    again, under the current run, rather than serving one model's output
+    under another's name."""
     path = _path(paper_id)
     if not path.exists():
         return None
-    return ExtractResponse.model_validate_json(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    try:
+        run = json.loads(text).get("run")
+    except (ValueError, AttributeError):
+        run = None
+    if run is not None and run != RUN:
+        log.info("%s: cached extraction is from run %r, not %r; it will be extracted again", paper_id, run, RUN)
+        return None
+    return ExtractResponse.model_validate_json(text)
 
 
 def all_cached() -> list[ExtractResponse]:
@@ -394,8 +408,8 @@ def _halve(sections: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[d
 def _extract_sections(paper_id: str, sections: list[dict[str, Any]], *, depth: int = 0) -> _Extracted:
     """One call over these sections; on truncation, two calls over halves.
 
-    A response cut off at the token limit is not an extraction — the tool
-    call is incomplete and nothing in it can be trusted — but it is also not
+    A response cut off at the token limit is not an extraction — the JSON
+    is incomplete and nothing in it can be trusted — but it is also not
     evidence that the paper holds no measurements, which is how Witness read
     it before F8. So the paper is halved and asked again, twice, and only the
     remainder that still will not fit is reported as truncated. Candidates
@@ -459,7 +473,7 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         # every record missed and could never be re-run without --force.
         raise ExtractTruncated(
             f"{paper_id}: the model's response hit the token limit over every section, "
-            f"even split {MAX_SPLIT_DEPTH} deep, or carried no tool call; nothing kept, "
+            f"even split {MAX_SPLIT_DEPTH} deep, or held no candidates in the expected form; nothing kept, "
             f"nothing cached (${got.usage.costUsd:.4f} spent over {got.calls} calls)."
         )
     if got.truncatedSections:
