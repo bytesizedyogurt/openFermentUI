@@ -14,8 +14,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
   },
   server: {
-    // OF-BLD-007 §8 — /api goes to openferment-core on localhost. Dev only:
-    // the built artifact is a single file with no server behind it, and
+    // OF-BLD-007 §8 — /api goes to openferment-core on localhost. Dev only.
+    // A build reaches the service one of two ways: served by openferment-core
+    // itself at / (OF-BLD-012 §B.4), where /api is the same origin and needs no
+    // proxy; or as the `bundle:single` file with no server behind it, where
     // src/lib/postdoc.ts says so plainly when the fetch fails rather than
     // pretending the service is there.
     proxy: {

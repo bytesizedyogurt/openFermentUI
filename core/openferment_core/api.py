@@ -9,6 +9,9 @@ Run it from `core/`:
 
     uv run uvicorn openferment_core.api:app --reload
 
+After a `pnpm build` the same process serves the app itself at / (§B.4 at the
+bottom of this file), so http://127.0.0.1:8000 is the whole of openFerment.
+
 The browser never sees a key and never renders model prose. It renders a plan.
 """
 from __future__ import annotations
@@ -19,6 +22,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from . import biorepo, extract, intake, witness
 from .corpus import load_corpus
@@ -278,3 +282,33 @@ def witness_runs() -> list[ExtractRun]:
         return witness.runs()
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────
+
+# One process, one port. When `pnpm build` has produced dist/, the service
+# serves it at / beside /api, so the whole app is one address: the browser's
+# relative /api calls land on this same process, and the Mac Mini daemon
+# (scripts/host/) runs nothing else. With no dist/ (a fresh clone, the test
+# suite, `pnpm dev` before a first build) nothing is mounted and the service
+# answers /api alone, exactly as before.
+#
+# Mounted LAST, and that is load-bearing: Starlette tries routes in order and
+# a mount at "/" matches every path, so each /api route above answers first.
+# StaticFiles resolves every request and refuses one that leaves the
+# directory, the same confinement scripts/lib/serve-dist.mjs gives the test
+# servers (OF-BLD-012.1 §6.9). OPENFERMENT_DIST_DIR overrides the location; a
+# relative value is taken from the repository root, like the data overrides.
+DIST_DIR = intake._env_path("OPENFERMENT_DIST_DIR", Path(__file__).parent.parent.parent / "dist")
+
+
+def mount_app(target: FastAPI, dist: Path) -> bool:
+    """Serve `dist` at / on `target` when it holds a build. True if mounted."""
+    if not (dist / "index.html").is_file():
+        return False
+    target.mount("/", StaticFiles(directory=dist, html=True), name="app")
+    return True
+
+
+if mount_app(app, DIST_DIR):
+    log.info("serving the built app from %s at /", DIST_DIR)
