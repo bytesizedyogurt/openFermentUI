@@ -202,6 +202,10 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
   A name of your own in front of it goes in `OPENFERMENT_ALLOWED_HOSTS`.
 - **Review decisions live in this checkout.** Guild writes `core/data/biorepo.json` on the Mini;
   pushing it is the backup, and `deploy.sh` refuses to pull over decisions that are not committed.
+  `--keep-decisions` merges them with decisions pushed from elsewhere record by record
+  (`scripts/host/merge_biorepo.py`, attached by `.gitattributes`): different records are all kept,
+  and one record decided differently on two machines keeps the later decision. A record withdrawn
+  on one machine and changed on the other stops the deploy with the file left valid.
 - **FileVault** holds a rebooted Mini at the unlock screen until someone types the password; the
   service starts after that.
 

@@ -27,6 +27,26 @@ wait_for_health() {
   die "the service did not answer /api/health within 30 s. Its log: tail -50 \"$LOGS/server.log\""
 }
 
+# Teach this clone to merge core/data/biorepo.json by record (.gitattributes
+# names the driver; scripts/host/merge_biorepo.py is it). Idempotent.
+register_merge_driver() {
+  local py="$REPO/core/.venv/bin/python"
+  [ -x "$py" ] || py=python3
+  git -C "$REPO" config merge.biorepo.name "BioRepo decisions, merged by record"
+  git -C "$REPO" config merge.biorepo.driver "\"$py\" scripts/host/merge_biorepo.py %O %A %B"
+}
+
+# Stop when a rebase or merge was left half-done: the decisions file may hold
+# conflict markers, and building on it would commit them.
+refuse_unfinished_git() {
+  local p
+  for p in rebase-merge rebase-apply MERGE_HEAD; do
+    if [ -e "$(git -C "$REPO" rev-parse --git-path "$p")" ]; then
+      die "a git rebase or merge was left unfinished in $REPO. Run: git rebase --abort (or git merge --abort), then deploy again"
+    fi
+  done
+}
+
 # pnpm ready, from the service's own environment. Prints its report and never
 # stops the caller: install and deploy have done their work by the time it runs.
 run_ready() {

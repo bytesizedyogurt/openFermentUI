@@ -145,6 +145,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 - Every file the service keeps is written through `atomic.write_text`
   (write beside, fsync, rename). `biorepo.write` holds `_WRITE_LOCK` across
   its read-modify-write. Never write those files with `Path.write_text`.
+- `core/data/biorepo.json` merges by record through a git merge driver
+  (`.gitattributes` → `scripts/host/merge_biorepo.py`, registered per clone
+  by `lib.sh`). The driver never writes conflict markers: it writes a valid
+  merge or leaves the file untouched and fails. `deploy.sh` aborts a failed
+  rebase and refuses to start over an unfinished one. `test_merge_biorepo`
+  runs it through real git.
 
 ## Persistence tiers
 
