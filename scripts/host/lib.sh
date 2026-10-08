@@ -6,10 +6,29 @@
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SERVER=com.umutuzo.openferment
 NIGHTLY=com.umutuzo.openferment.nightly
-DAEMONS=/Library/LaunchDaemons
-PORT="${OPENFERMENT_PORT:-8000}"
-HOST="${OPENFERMENT_HOST:-127.0.0.1}"
+DAEMONS="${OPENFERMENT_LAUNCHD_DIR:-/Library/LaunchDaemons}"  # the override is for test_host
 LOGS="$HOME/Library/Logs/openferment"
+
+# Host and port: what the environment says, else what the installed server
+# job was given, else loopback:8000. So a deploy restarts and checks the job
+# on the address it was installed with, whatever this shell has set.
+INSTALLED_HOST="" INSTALLED_PORT=""
+if [ -r "$DAEMONS/$SERVER.plist" ] && [ -x "$REPO/core/.venv/bin/python" ]; then
+  read -r INSTALLED_HOST INSTALLED_PORT < <(
+    "$REPO/core/.venv/bin/python" "$REPO/scripts/host/launchd.py" --read "$DAEMONS/$SERVER.plist" 2>/dev/null
+  ) || true
+fi
+PORT="${OPENFERMENT_PORT:-${INSTALLED_PORT:-8000}}"
+HOST="${OPENFERMENT_HOST:-${INSTALLED_HOST:-127.0.0.1}}"
+
+# Where this machine asks for /api/health: loopback when the server listens
+# there or everywhere, else the one address it listens on.
+case "$HOST" in
+  127.0.0.1 | localhost | 0.0.0.0 | "") POLL=127.0.0.1 ;;
+  :: | ::1) POLL="[::1]" ;;
+  *:*) POLL="[$HOST]" ;;
+  *) POLL="$HOST" ;;
+esac
 
 say() { printf '\n── %s\n' "$*"; }
 die() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
@@ -18,7 +37,7 @@ die() { printf '\n✗ %s\n' "$*" >&2; exit 1; }
 wait_for_health() {
   local body
   for _ in $(seq 1 30); do
-    if body="$(curl -fsS "http://127.0.0.1:${PORT}/api/health" 2>/dev/null)"; then
+    if body="$(curl -fsS "http://${POLL}:${PORT}/api/health" 2>/dev/null)"; then
       printf '%s\n' "$body"
       return 0
     fi
@@ -50,8 +69,14 @@ refuse_unfinished_git() {
 # pnpm ready, from the service's own environment. Prints its report and never
 # stops the caller: install and deploy have done their work by the time it runs.
 run_ready() {
-  (cd "$REPO/core" && OPENFERMENT_PORT="$PORT" .venv/bin/python -m openferment_core.ready) ||
+  (cd "$REPO/core" && OPENFERMENT_PORT="$PORT" OPENFERMENT_POLL_HOST="$POLL" .venv/bin/python -m openferment_core.ready) ||
     echo "Something above needs fixing. Run pnpm ready again once it is."
+}
+
+# Tailscale's CLI, as yourself, else with sudo: the background-service
+# variant (tailscaled) answers changes from root or its operator only.
+tailscale_cli() {
+  tailscale "$@" 2>/dev/null || sudo tailscale "$@"
 }
 
 # True when core/.env holds something shaped like a real key. Never prints it.

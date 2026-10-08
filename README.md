@@ -177,7 +177,9 @@ After a `pnpm build`, the service serves the app itself at `/` beside `/api`, so
 ```bash
 # once: Homebrew, then the tools; keep the checkout OUTSIDE Documents, Desktop and Downloads,
 # which macOS will not let a background job read
-brew install git node pnpm uv
+brew install git node pnpm uv tailscale
+sudo brew services start tailscale && sudo tailscale up   # Tailscale's background service, which runs
+                                                         # from power-on (its apps wait for a login)
 git clone https://github.com/bytesizedyogurt/openFermentUI.git ~/openferment && cd ~/openferment
 cp core/.env.example core/.env          # add the key; spend cap in the console first
 scripts/host/install.sh                 # builds, sets power settings, installs both jobs, checks health
@@ -195,7 +197,10 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
   week is asked again, since papers become open access later. Logs: `~/Library/Logs/openferment/`.
 - **The server listens on loopback only.** The service has no login of its own, so the bind address
   is the access control. `install.sh` runs `tailscale serve`, which publishes the port over HTTPS to
-  your own signed-in Tailscale devices, with nothing opened on the router. A link for someone outside
+  the devices your tailnet's access rules allow (by default, only yours), with nothing opened on the
+  router. Use Tailscale's background service (`tailscaled`, above): the App Store and standalone apps
+  run only while someone is logged in, so after a power cut the Mini would be up and unreachable until
+  a login, and `install.sh` warns when it finds one of them. A link for someone outside
   your tailnet is a Cloudflare Tunnel with a login page in front, set up by hand when it is needed.
   A request that changes something must also come from a page on openFerment's own address and
   port, so a web page you happen to open elsewhere, or another app running on the Mini, cannot post
@@ -209,7 +214,10 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
   and one record decided differently on two machines keeps the later decision. A record withdrawn
   on one machine and changed on the other stops the deploy with the file left valid.
 - **FileVault** holds a rebooted Mini at the unlock screen until someone types the password; the
-  service starts after that.
+  server job and Tailscale's background service start after that. With FileVault off, both start at
+  power-on and the login window can stay locked.
+- **Host and port** default to `127.0.0.1:8000`. `OPENFERMENT_HOST` and `OPENFERMENT_PORT` at install
+  time are baked into the job, and `deploy.sh` reads them back from it.
 
 ### The offline demo
 

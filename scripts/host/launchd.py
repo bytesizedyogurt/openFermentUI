@@ -2,12 +2,14 @@
 
     python scripts/host/launchd.py --repo DIR --user NAME --home DIR \
         --path PATH --out DIR [--host 127.0.0.1] [--port 8000]
+    python scripts/host/launchd.py --read /Library/LaunchDaemons/com.umutuzo.openferment.plist
 
 writes `com.umutuzo.openferment.plist` (the server) and
 `com.umutuzo.openferment.nightly.plist` (fetch and extract at 03:00) into
 --out. `install.sh` calls this and copies both into /Library/LaunchDaemons.
 They are rendered here, by plistlib, so they are valid by construction and
-can be checked on any operating system (core/tests/test_host.py).
+can be checked on any operating system (core/tests/test_host.py). `--read`
+prints the host and port an installed server job was given.
 
 A LaunchDaemon starts at power-on, before anyone logs in, and keeps running
 with the screen locked. `UserName` makes each job run as the person who owns
@@ -18,7 +20,7 @@ The server binds to loopback. The service has no login of its own (Guild's
 write endpoint answers whoever reaches it), so the bind address IS the access
 control, the rule scripts/lib/serve-dist.mjs follows for the test servers
 (OF-BLD-012.1 §6.9). `tailscale serve`, which install.sh sets up, publishes
-the loopback port to the owner's own signed-in devices over HTTPS.
+the loopback port over HTTPS to the devices the owner's tailnet allows.
 
 Nothing here reads the key or writes it anywhere.
 """
@@ -102,7 +104,23 @@ def daemons(
     }
 
 
+def installed_address(plist: Path) -> tuple[str, int]:
+    """The host and port an installed server job was given, so deploy.sh
+    restarts and checks the job on its own address."""
+    args = plistlib.loads(plist.read_bytes())["ProgramArguments"]
+    return args[args.index("--host") + 1], int(args[args.index("--port") + 1])
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--read"] and len(argv) == 2:
+        try:
+            host, port = installed_address(Path(argv[1]))
+        except (OSError, ValueError, KeyError, IndexError) as e:
+            print(f"launchd.py: cannot read {argv[1]}: {e}", file=sys.stderr)
+            return 1
+        print(host, port)
+        return 0
     ap = argparse.ArgumentParser(description="Render openFerment's LaunchDaemon plists.")
     ap.add_argument("--repo", required=True, type=Path)
     ap.add_argument("--user", required=True)

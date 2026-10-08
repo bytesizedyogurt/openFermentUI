@@ -110,3 +110,42 @@ def test_scripts_are_executable(name):
 @pytest.mark.parametrize("name", ["install.sh", "deploy.sh", "nightly.sh", "lib.sh"])
 def test_scripts_parse(name):
     subprocess.run(["bash", "-n", str(HOST_DIR / name)], check=True)
+
+
+def test_reads_back_the_address_an_installed_job_was_given(tmp_path, capsys):
+    render(tmp_path, "--host", "0.0.0.0", "--port", "8123")
+    plist = tmp_path / "out" / f"{launchd.SERVER}.plist"
+    capsys.readouterr()  # what render printed
+    assert launchd.main(["--read", str(plist)]) == 0
+    assert capsys.readouterr().out.split() == ["0.0.0.0", "8123"]
+    assert launchd.main(["--read", str(tmp_path / "missing.plist")]) == 1
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+@pytest.mark.parametrize(
+    ("host", "poll"),
+    [("", "127.0.0.1"), ("127.0.0.1", "127.0.0.1"), ("0.0.0.0", "127.0.0.1"),
+     ("192.168.1.5", "192.168.1.5"), ("::", "[::1]"), ("fd7a:115c::5", "[fd7a:115c::5]")],
+)
+def test_health_is_asked_where_the_server_listens(host, poll):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
+    if host:
+        env["OPENFERMENT_HOST"] = host
+    out = subprocess.run(
+        ["bash", "-c", f'source "{HOST_DIR / "lib.sh"}"; echo "$POLL $PORT"'],
+        env=env, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    assert out == [poll, "8000"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="no bash on this machine")
+def test_deploy_uses_the_address_the_job_was_installed_with(tmp_path):
+    render(tmp_path, "--host", "0.0.0.0", "--port", "8123")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFERMENT_")}
+    env["OPENFERMENT_LAUNCHD_DIR"] = str(tmp_path / "out")
+    script = f'source "{HOST_DIR / "lib.sh"}"; echo "$HOST $PORT $POLL"'
+    out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
+    assert out.split() == ["0.0.0.0", "8123", "127.0.0.1"]
+    env["OPENFERMENT_PORT"] = "9000"  # the environment still wins
+    out = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True).stdout
+    assert out.split() == ["0.0.0.0", "9000", "127.0.0.1"]

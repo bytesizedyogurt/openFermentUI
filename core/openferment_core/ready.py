@@ -153,17 +153,18 @@ def check_europe_pmc() -> Check:
 
 
 def check_service(port: int, have_key: bool) -> Check:
+    host = os.environ.get("OPENFERMENT_POLL_HOST", "127.0.0.1")
     try:
-        body = httpx.get(f"http://127.0.0.1:{port}/api/health", timeout=3).json()
+        body = httpx.get(f"http://{host}:{port}/api/health", timeout=3).json()
     except (httpx.HTTPError, ValueError):
-        return Check("service", "warn", f"nothing answers on 127.0.0.1:{port}. Expected before install.sh; "
+        return Check("service", "warn", f"nothing answers on {host}:{port}. Expected before install.sh; "
                      "after it: sudo launchctl kickstart -k system/com.umutuzo.openferment")
     if have_key and not body.get("hasKey"):
         return Check("service", "warn", "running, but started before the key was added. "
                      "Restart it: sudo launchctl kickstart -k system/com.umutuzo.openferment")
     if not body.get("ok"):
         return Check("service", "warn", f"running, but reports: {body.get('corpusError') or 'not ok'}")
-    return Check("service", "ok", f"answers on 127.0.0.1:{port} with {body.get('records')} records")
+    return Check("service", "ok", f"answers on {host}:{port} with {body.get('records')} records")
 
 
 def check_backup() -> Check:

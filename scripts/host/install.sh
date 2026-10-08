@@ -26,7 +26,8 @@ if [ "${1:-}" = --uninstall ]; then
     sudo launchctl bootout "system/$label" 2>/dev/null || true
     sudo rm -f "$DAEMONS/$label.plist"
   done
-  command -v tailscale >/dev/null && tailscale serve reset 2>/dev/null || true
+  # Only openFerment's own serve: `serve reset` would remove every one.
+  command -v tailscale >/dev/null && tailscale_cli serve --https=443 off >/dev/null 2>&1 || true
   say "Both jobs are stopped and removed. The checkout and core/data are untouched."
   exit 0
 fi
@@ -81,15 +82,29 @@ say "Reaching it from your other devices"
 if [ "$HOST" != 127.0.0.1 ]; then
   echo "The server listens on $HOST:$PORT (OPENFERMENT_HOST), so Tailscale is left alone."
 elif command -v tailscale >/dev/null && tailscale status >/dev/null 2>&1; then
-  if tailscale serve --bg "$PORT"; then
+  # The Tailscale apps (App Store and standalone) run only while someone is
+  # logged in; only the background service, tailscaled, runs from power-on,
+  # which is what a host that restarts itself after a power cut needs.
+  if ! pgrep -x tailscaled >/dev/null; then
+    echo "Tailscale here is the app, which runs only while someone is logged in: after a restart the Mini"
+    echo "is unreachable until a login. For an always-on host, quit the app and use the background service:"
+    echo "  brew install tailscale && sudo brew services start tailscale && sudo tailscale up"
+    echo "then run this again."
+  fi
+  # Shown, never hidden: when HTTPS is off for the tailnet, this prints the link
+  # that turns it on, and still exits 0. The status check below is the answer.
+  tailscale_cli serve --bg "$PORT" || true
+  if tailscale serve status 2>/dev/null | grep -q ":$PORT"; then
     tailscale serve status
   else
-    echo "tailscale serve did not take. If it printed a link to enable HTTPS for your tailnet, open it, then run: tailscale serve --bg $PORT"
+    echo "Tailscale is not serving it yet. If a link to enable HTTPS appeared above, open it, then run:"
+    echo "  tailscale serve --bg $PORT"
   fi
 else
-  echo "Tailscale is not installed or not signed in. Install it from tailscale.com, sign in, check that the"
-  echo "tailscale command works in Terminal, then run: tailscale serve --bg $PORT"
-  echo "(your own signed-in devices only, over HTTPS; nothing is opened on the router)"
+  echo "Tailscale is not installed or not signed in. For an always-on host, use its background service:"
+  echo "  brew install tailscale && sudo brew services start tailscale && sudo tailscale up"
+  echo "then run this again. It publishes the service over HTTPS to the devices your tailnet allows"
+  echo "(by default, only yours), and opens nothing on the router."
 fi
 
 say "Checking the live loop"

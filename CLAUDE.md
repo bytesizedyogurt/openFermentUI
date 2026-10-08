@@ -138,7 +138,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 - The server binds to `127.0.0.1`. The service has no login, so the bind
   address is the access control; `tailscale serve` publishes it to the owner's
   devices. Widening it (`OPENFERMENT_HOST`) is a decision for Sean, never a
-  default.
+  default. Host and port given at install are baked into the plist and
+  `lib.sh` reads them back (`launchd.py --read`), so deploy and `pnpm ready`
+  ask the job on its own address. Tailscale on the Mini is the background
+  service (`brew install tailscale`, `sudo brew services start tailscale`);
+  its apps run only after a login. Uninstall turns off openFerment's serve
+  alone (`serve --https=443 off`), never `serve reset`.
 - `guard.py`, run as middleware on every request: a POST/PUT/PATCH/DELETE must
   name a host the service answers to (IP, dotless, `.local`, `.ts.net`, or
   `OPENFERMENT_ALLOWED_HOSTS`), and a browser `Origin` must be that host on
