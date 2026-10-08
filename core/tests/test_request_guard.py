@@ -44,6 +44,29 @@ def test_a_sandboxed_page_or_a_file_is_refused(client):
     assert post(client, host="127.0.0.1:8000", origin="null").status_code == 403
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"host": "127.0.0.1:8000", "origin": "http://127.0.0.1:3000"},  # another local app
+        {"host": "127.0.0.1:8000", "origin": "http://localhost:8888"},  # a notebook server
+        {"host": "mini.tail1234.ts.net", "origin": "https://mini.tail1234.ts.net:8443"},  # another serve port
+        {"host": "localhost:8000", "origin": "http://127.0.0.1:5173"},  # a dev proxy that does not say who it forwards for
+    ],
+)
+def test_another_port_is_another_site(client, headers):
+    assert post(client, **headers).status_code == 403
+
+
+def test_a_request_through_funnel_is_refused(client):
+    headers = {
+        "host": "mini.tail1234.ts.net",
+        "origin": "https://mini.tail1234.ts.net",
+        "tailscale-funnel-request": "?1",
+    }
+    r = post(client, **headers)
+    assert r.status_code == 403 and "Funnel" in r.json()["detail"]
+
+
 def test_a_forwarded_name_cannot_launder_a_hostile_host(client):
     r = post(
         client,
@@ -61,9 +84,18 @@ def test_a_forwarded_name_cannot_launder_a_hostile_host(client):
     "headers",
     [
         {"host": "127.0.0.1:8000", "origin": "http://127.0.0.1:8000"},  # the Mini itself
-        {"host": "localhost:8000", "origin": "http://127.0.0.1:5173"},  # pnpm dev's proxy
+        {"host": "localhost:8000", "origin": "http://127.0.0.1:5173", "x-forwarded-host": "127.0.0.1:5173"},  # pnpm dev
+        {
+            "host": "localhost:8000",
+            "origin": "http://100.101.102.103:5173",
+            "x-forwarded-host": "100.101.102.103:5173",
+        },  # pnpm dev, opened from another device
         {"host": "[::1]:8000", "origin": "http://[::1]:8000"},
-        {"host": "mini.tail1234.ts.net", "origin": "https://mini.tail1234.ts.net"},  # tailscale serve
+        {
+            "host": "mini.tail1234.ts.net",
+            "origin": "https://mini.tail1234.ts.net",
+            "x-forwarded-host": "mini.tail1234.ts.net",
+        },  # tailscale serve: Host kept, X-Forwarded-Host set
         {
             "host": "127.0.0.1:8000",
             "origin": "https://mini.tail1234.ts.net",
@@ -108,6 +140,25 @@ def test_a_listed_name_is_answered(client, monkeypatch):
 )
 def test_hostname(value, expected):
     assert guard.hostname(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("origin", "host", "same"),
+    [
+        ("http://127.0.0.1:8000", "127.0.0.1:8000", True),
+        ("http://localhost:8000", "127.0.0.1:8000", True),
+        ("http://127.0.0.1:8001", "127.0.0.1:8000", False),
+        ("https://mini.tail1234.ts.net", "mini.tail1234.ts.net", True),
+        ("http://mini.local", "mini.local", True),
+        ("https://mini.tail1234.ts.net:8443", "mini.tail1234.ts.net", False),
+        ("https://mini.tail1234.ts.net:8443", "mini.tail1234.ts.net:8443", True),
+        ("http://other.local:8000", "mini.local:8000", False),
+        ("null", "127.0.0.1:8000", False),
+        ("chrome-extension://abc", "abc", False),
+    ],
+)
+def test_same_site(origin, host, same):
+    assert guard.same_site(origin, host) is same
 
 
 def test_only_changing_methods_are_checked():

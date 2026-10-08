@@ -24,6 +24,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // Says which address the page is on (X-Forwarded-Host), which the
+        // service's guard compares with the page's Origin before a change
+        // (core/openferment_core/guard.py, OF-BLD-012 §B.6).
+        xfwd: true,
       },
     },
   },

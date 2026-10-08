@@ -13,7 +13,10 @@ let a web page the owner happens to open change things through his browser:
 
 So a request that changes something (POST, PUT, PATCH, DELETE) must name a
 host this service answers to, and when the browser states an Origin, it must
-be that same host. Reads stay open: everything they return is literature and
+be that same host on the same port: a browser treats another port as another
+site, so another local app (a notebook server, a docs preview) is one too.
+A request that came in through Tailscale Funnel, from the public internet,
+changes nothing. Reads stay open: everything they return is literature and
 counts, and the app has to load before anything else can happen.
 
 A host this service answers to: an IP address, a name with no dot, a `.local`
@@ -32,18 +35,29 @@ from urllib.parse import urlsplit
 CHANGING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 OWN_SUFFIXES = (".local", ".localhost", ".ts.net")
+DEFAULT_PORTS = {"http": 80, "https": 443}
+# Set by `tailscale serve` on a request that arrived through Funnel; Tailscale
+# deletes any copy a client sends, so its presence is Tailscale's word.
+FUNNEL = "tailscale-funnel-request"
+
+
+def _split(value: str | None) -> tuple[str, int | None, str] | None:
+    if not value or value == "null":
+        return None
+    try:
+        parts = urlsplit(value if "//" in value else "//" + value)
+        host, port = parts.hostname, parts.port
+    except ValueError:
+        return None
+    return (host, port, parts.scheme) if host else None
 
 
 def hostname(value: str | None) -> str | None:
     """The host in a Host header or an Origin, lowercased, without port or
     brackets. None for an absent, empty or unparseable value, and for the
     Origin `null` a sandboxed page or a file sends."""
-    if not value or value == "null":
-        return None
-    try:
-        return urlsplit(value if "//" in value else "//" + value).hostname or None
-    except ValueError:
-        return None
+    parts = _split(value)
+    return parts[0] if parts else None
 
 
 def extra_hosts() -> frozenset[str]:
@@ -64,16 +78,25 @@ def answers_to(host: str | None) -> bool:
     return "." not in host or host.endswith(OWN_SUFFIXES)
 
 
-def _same(a: str | None, b: str | None) -> bool:
-    # The dev proxy asks for localhost while the page may be on 127.0.0.1; the
-    # loopback names are one machine.
-    return a is not None and (a == b or (a in LOOPBACK and b in LOOPBACK))
+def same_site(origin: str | None, host: str | None) -> bool:
+    """Whether a browser Origin names the host a Host-style header does, on
+    the same port. A Host with no port means its scheme's default, so the
+    Origin must be on 80 or 443. The loopback names count as one machine."""
+    o, h = _split(origin), _split(host)
+    if o is None or h is None or o[2] not in DEFAULT_PORTS:
+        return False
+    if not (o[0] == h[0] or (o[0] in LOOPBACK and h[0] in LOOPBACK)):
+        return False
+    origin_port = o[1] or DEFAULT_PORTS[o[2]]
+    return origin_port == h[1] if h[1] is not None else origin_port in DEFAULT_PORTS.values()
 
 
 def refusal(method: str, headers: Mapping[str, str]) -> str | None:
     """Why this request may not proceed, or None when it may."""
     if method.upper() not in CHANGING:
         return None
+    if FUNNEL in headers:
+        return "a request through Tailscale Funnel comes from the public internet and may not change anything"
     host = hostname(headers.get("host"))
     if not answers_to(host):
         return (
@@ -82,11 +105,14 @@ def refusal(method: str, headers: Mapping[str, str]) -> str | None:
         )
     if "origin" not in headers:
         return None  # not a browser: curl, a script, the test client
-    origin = hostname(headers.get("origin"))
-    # A proxy in front (tailscale serve) may present itself as Host and pass
-    # the name the browser used in X-Forwarded-Host. A cross-site page cannot
-    # set that header without a preflight this service never approves.
-    forwarded = hostname(headers.get("x-forwarded-host"))
-    if _same(origin, host) or (forwarded and answers_to(forwarded) and _same(origin, forwarded)):
+    origin = headers.get("origin")
+    # A proxy in front may present itself as Host and pass the address the
+    # browser used in X-Forwarded-Host: Vite's dev proxy (changeOrigin, xfwd)
+    # does. A cross-site page cannot set that header without a preflight this
+    # service never approves.
+    forwarded = headers.get("x-forwarded-host")
+    if same_site(origin, headers.get("host")) or (
+        forwarded and answers_to(hostname(forwarded)) and same_site(origin, forwarded)
+    ):
         return None
     return f"a page on {origin or 'an unnamed origin'!r} may not change anything here"
