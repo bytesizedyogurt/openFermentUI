@@ -104,3 +104,30 @@ def test_decisions_posted_together_all_survive(scratch_repo, monkeypatch):
     for t in threads:
         t.join()
     assert sorted(real_read().decisions) == sorted(ids)
+
+
+def test_uses_the_full_flush_where_the_platform_has_one(tmp_path, monkeypatch):
+    """macOS's fsync stops at the drive's cache; F_FULLFSYNC goes through it."""
+    import fcntl
+
+    calls = []
+    monkeypatch.setattr(fcntl, "F_FULLFSYNC", 51, raising=False)  # macOS's value
+    monkeypatch.setattr(fcntl, "fcntl", lambda fd, op, *a: calls.append(op))
+    monkeypatch.setattr(os, "fsync", lambda fd: calls.append("fsync"))
+    atomic.write_text(tmp_path / "f.json", "x")
+    assert calls == [51, 51], "the file, then its folder, both through F_FULLFSYNC"
+
+
+def test_falls_back_to_fsync_where_the_full_flush_is_refused(tmp_path, monkeypatch):
+    import fcntl
+
+    calls = []
+
+    def refuse(fd, op, *a):
+        raise OSError("not supported here")
+
+    monkeypatch.setattr(fcntl, "F_FULLFSYNC", 51, raising=False)
+    monkeypatch.setattr(fcntl, "fcntl", refuse)
+    monkeypatch.setattr(os, "fsync", lambda fd: calls.append("fsync"))
+    atomic.write_text(tmp_path / "f.json", "x")
+    assert calls.count("fsync") == 2 and (tmp_path / "f.json").read_text(encoding="utf-8") == "x"

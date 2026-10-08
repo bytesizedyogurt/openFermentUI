@@ -567,8 +567,16 @@ def main(argv: list[str]) -> int:
     load_dotenv(Path(__file__).parent.parent / ".env", override=False)
     force = "--force" in argv
     if "--all" in argv:
-        _print_table(fetch_all(_papers(), force=force))
-        return 0
+        results = fetch_all(_papers(), force=force)
+        _print_table(results)
+        # A miss is an answer and is cached; an outage is not (fetch_paper).
+        # A result the cache does not hold is one this run could not get, and
+        # the batch exits 1 for it so the nightly log shows a failed night
+        # as one (OF-BLD-012 §B.8).
+        unreached = [r.paperId for r in results if cached(r.paperId) != r]
+        if unreached:
+            print(f"{len(unreached)} not reached, will be asked again: {', '.join(unreached)}")
+        return 1 if unreached else 0
     ids = [a for a in argv if not a.startswith("--")]
     if not ids:
         print("usage: python -m openferment_core.intake --all [--force] | <paperId> [...]")

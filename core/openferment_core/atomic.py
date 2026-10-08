@@ -11,12 +11,46 @@ nightly job writes while the server reads) could also catch a file mid-write.
 it. A rename within one directory is atomic, so the target holds either the
 old contents or the new ones, never a mixture, and a failed write leaves the
 old file exactly as it was and nothing beside it.
+
+"Flushes to disk" has to mean the disk. On macOS, fsync hands the data to the
+drive, whose own cache can still lose it in a power cut; F_FULLFSYNC asks the
+drive to write it out, and is used wherever it exists. The folder is synced
+after the rename too, so the new name itself survives the cut.
 """
 from __future__ import annotations
 
 import os
 import tempfile
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - not on Windows, where this never runs
+    fcntl = None  # type: ignore[assignment]
+
+
+def _flush(fd: int) -> None:
+    """Make what was written to `fd` survive a power cut."""
+    if fcntl is not None and hasattr(fcntl, "F_FULLFSYNC"):
+        try:
+            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+            return
+        except OSError:
+            pass  # a filesystem that does not support it; fsync is the next best
+    os.fsync(fd)
+
+
+def _sync_folder(folder: Path) -> None:
+    try:
+        fd = os.open(folder, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        _flush(fd)
+    except OSError:
+        pass  # some filesystems refuse to sync a directory; the rename stands
+    finally:
+        os.close(fd)
 
 
 def write_text(path: Path, text: str) -> None:
@@ -34,8 +68,9 @@ def write_text(path: Path, text: str) -> None:
             os.fchmod(f.fileno(), mode)
             f.write(text)
             f.flush()
-            os.fsync(f.fileno())
+            _flush(f.fileno())
         os.replace(tmp, path)
+        _sync_folder(path.parent)
     except BaseException:
         try:
             os.unlink(tmp)

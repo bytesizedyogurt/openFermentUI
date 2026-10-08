@@ -546,9 +546,11 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
 # ── batch ──────────────────────────────────────────────────────────────
 
 
-def extract_all(*, force: bool = False) -> list[ExtractResponse]:
+def extract_all(*, force: bool = False, failed: list[str] | None = None) -> list[ExtractResponse]:
     """Every paper with cached full text, in id order. A paper whose call
-    fails is reported and skipped; the batch does not stop for it."""
+    fails is reported and skipped; the batch does not stop for it, and its id
+    goes into `failed` when one is given, so the caller can say the batch did
+    not finish clean."""
     out: list[ExtractResponse] = []
     for paper_id, status in intake.all_statuses().items():
         if status.ingest != "complete":
@@ -557,8 +559,12 @@ def extract_all(*, force: bool = False) -> list[ExtractResponse]:
             out.append(extract_paper(paper_id, force=force))
         except ExtractTruncated as e:
             print(f"{paper_id:<6} NOT extracted — {e}")
+            if failed is not None:
+                failed.append(paper_id)
         except ExtractUnavailable as e:
             print(f"{paper_id:<6} skipped — {e}")
+            if failed is not None:
+                failed.append(paper_id)
     return out
 
 
@@ -586,8 +592,14 @@ def main(argv: list[str]) -> int:
     force = "--force" in argv
     SAVE_RESPONSES = "--save-fixture" in argv
     if "--all" in argv:
-        _print_table(extract_all(force=force))
-        return 0
+        # Exit 1 when any paper could not be extracted (no key, an outage, a
+        # paper too long even split), so the nightly log shows a failed night
+        # as one (OF-BLD-012 §B.8). A clean night with nothing new exits 0.
+        failed: list[str] = []
+        _print_table(extract_all(force=force, failed=failed))
+        if failed:
+            print(f"{len(failed)} not extracted: {', '.join(failed)}")
+        return 1 if failed else 0
     ids = [a for a in argv if not a.startswith("--")]
     if not ids:
         print("usage: python -m openferment_core.extract --all [--force] [--save-fixture] | <paperId> [...]")
