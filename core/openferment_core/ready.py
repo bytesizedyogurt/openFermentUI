@@ -64,6 +64,8 @@ def check_corpus() -> Check:
         corpus = load_corpus()
     except FileNotFoundError:
         return Check("corpus", "fail", "the service has no corpus to answer from. Run: pnpm export:corpus")
+    except (ValueError, KeyError):
+        return Check("corpus", "fail", "the corpus projection is damaged. Run: pnpm export:corpus")
     return Check("corpus", "ok", f"{len(corpus.records)} records on {len(corpus.papers)} papers")
 
 
@@ -87,14 +89,22 @@ def check_data() -> Check:
 
 def check_intake() -> Check:
     complete = missed = 0
-    for path in intake.FULLTEXT_DIR.glob("*.json"):
-        hit = intake.cached(path.stem)
+    damaged: list[str] = []
+    for path in sorted(intake.FULLTEXT_DIR.glob("*.json")):
+        try:
+            hit = intake.cached(path.stem)
+        except ValueError:
+            damaged.append(path.name)
+            continue
         if hit is not None and hit.status == "complete":
             complete += 1
         else:
             missed += 1
     extracted = len(list(extract.CANDIDATES_DIR.glob("*.json")))
     summary = f"{complete} papers fetched with full text, {missed} misses cached, {extracted} extracted"
+    if damaged:
+        return Check("intake", "warn", f"{summary}; {len(damaged)} damaged ({', '.join(damaged[:5])}). "
+                     "Delete them from core/data/fulltext/ and they are fetched again tonight")
     if complete == 0:
         return Check("intake", "warn", f"{summary}. Fetch now: scripts/host/nightly.sh (or pnpm intake:fetch --all)")
     return Check("intake", "ok", summary)

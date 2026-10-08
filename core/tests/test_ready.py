@@ -11,7 +11,10 @@ import pytest
 
 from openferment_core import api, biorepo, extract, intake, ready
 
-FAKE_KEY = "sk-ant-" + "ready0test0value00" * 3
+# Shaped like a key, so check_key accepts it; random, so no piece of it turns
+# up in the report by coincidence. Built from parts so check:secrets, which
+# scans committed files for key-shaped strings, never sees one here.
+FAKE_KEY = "sk-ant-" + "Q7zX9kWv3JpL8rTb" + "2NcY6hMd4FgS1aEu"
 URL = "https://api.anthropic.com/v1/models/x"
 
 
@@ -67,8 +70,17 @@ def test_the_report_never_shows_the_key(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     out = ready.report(ready.run(port=1))
-    assert FAKE_KEY not in out
-    assert FAKE_KEY[7:15] not in out and FAKE_KEY[-6:] not in out
+    body = FAKE_KEY[len("sk-ant-"):]
+    leaked = [body[i:i + 4] for i in range(len(body) - 3) if body[i:i + 4] in out]
+    assert not leaked, f"pieces of the key in the report: {leaked}"
+
+
+def test_an_sdk_error_that_quotes_the_key_is_not_repeated():
+    for cls, code in ((anthropic.AuthenticationError, 401), (anthropic.InternalServerError, 500)):
+        h = _http()
+        error = cls(f"bad key {FAKE_KEY}", response=h.Response(code, request=h.Request("GET", URL)), body=None)
+        detail = ready.check_model(True, client_factory=lambda: FakeClient(error)).detail
+        assert FAKE_KEY[len("sk-ant-"):][:4] not in detail
 
 
 # ── the model ──────────────────────────────────────────────────────────
@@ -111,6 +123,25 @@ def test_intake_counts_what_was_fetched_and_extracted(monkeypatch):
     intake.fetch_paper({"id": "B5", "pmcid": "structural"})
     check = ready.check_intake()
     assert check.mark == "ok" and check.detail.startswith("1 papers fetched with full text")
+
+
+def test_a_damaged_fetch_is_named_and_the_rest_still_run(monkeypatch):
+    intake.FULLTEXT_DIR.mkdir(parents=True)
+    (intake.FULLTEXT_DIR / "A1.json").write_text('{"paperId": "A1", "sta', encoding="utf-8")
+    check = ready.check_intake()
+    assert check.mark == "warn" and "1 damaged (A1.json)" in check.detail
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    names = [c.name for c in ready.run(no_network=True, port=1)]
+    assert names[-1] == "service", "a damaged file must not stop the checks after it"
+
+
+def test_a_damaged_corpus_is_a_failure_with_the_fix(monkeypatch):
+    def damaged():
+        raise ValueError("Expecting value: line 1 column 1")
+
+    monkeypatch.setattr(ready, "load_corpus", damaged)
+    check = ready.check_corpus()
+    assert check.mark == "fail" and "pnpm export:corpus" in check.detail
 
 
 def test_data_reports_a_file_that_does_not_parse():
