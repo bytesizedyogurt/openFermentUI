@@ -314,11 +314,29 @@ def witness_runs() -> list[ExtractRun]:
 DIST_DIR = intake._env_path("OPENFERMENT_DIST_DIR", Path(__file__).parent.parent.parent / "dist")
 
 
+IMMUTABLE = "public, max-age=31536000, immutable"
+
+
+class AppFiles(StaticFiles):
+    """dist/, with caching that survives a deploy. A build names its scripts
+    and styles by content hash under assets/ and deletes the old ones, so a
+    browser holding last week's index.html would ask for files that are gone
+    and show a blank page. The page and anything else outside assets/ is
+    revalidated on every load; what is under assets/ never changes under its
+    name and is kept for a year."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304):
+            response.headers["Cache-Control"] = IMMUTABLE if path.startswith("assets/") else "no-cache"
+        return response
+
+
 def mount_app(target: FastAPI, dist: Path) -> bool:
     """Serve `dist` at / on `target` when it holds a build. True if mounted."""
     if not (dist / "index.html").is_file():
         return False
-    target.mount("/", StaticFiles(directory=dist, html=True), name="app")
+    target.mount("/", AppFiles(directory=dist, html=True), name="app")
     return True
 
 

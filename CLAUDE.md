@@ -121,8 +121,10 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 
 - After `pnpm build`, the service serves `dist/` at `/` beside `/api`
   (`mount_app` at the bottom of `api.py`). The mount is a catch-all and MUST
-  stay the last route; `test_app_static` fails if any `/api` route stops
-  answering first. With no `dist/` nothing is mounted.
+  stay the last route; `test_app_static` imports `api.py` with a build present
+  and fails if the mount is not last or any `/api` route is answered by it.
+  With no `dist/` nothing is mounted. The page is served `no-cache` and
+  `assets/` immutable, so a deploy never strands a browser on deleted assets.
 - `scripts/host/` is the Mac Mini: `install.sh` once, `deploy.sh` after each
   merged session, `nightly.sh` at 03:00. `launchd.py` renders the two
   LaunchDaemons (`com.umutuzo.openferment`, `.nightly`), which run as the
