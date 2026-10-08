@@ -113,7 +113,7 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     assert "not the paper" in raw["_note"]
     # §6.4 — the run Witness scores in the smoke test: match_run's own output
     # over B5's three curated records and the two candidates below.
-    assert [r.run for r in overlay.runs] == ["haiku-1"]
+    assert [r.run for r in overlay.runs] == ["claude-1"]
     # One candidate scores one record: the colony-time candidate is spent
     # on r-B5-1 as a mismatch; its siblings are misses, not mismatches.
     assert [r.outcome for r in overlay.runs[0].results] == ["value_mismatch", "miss", "miss"]
@@ -122,7 +122,7 @@ def test_the_smoke_overlay_fixture_matches_the_overlay_shape():
     # (a new record, so Guild queues it) and the same row read as a colony
     # time (matching r-B5-*'s field, so it sits beside those cards).
     assert [(c.id, c.field) for c in overlay.candidates] == [
-        ("hk1-B5-a07dd73c", "titer_secreted"),
-        ("hk1-B5-95f64ef4", "time_to_colony"),
+        ("cl1-B5-a07dd73c", "titer_secreted"),
+        ("cl1-B5-95f64ef4", "time_to_colony"),
     ]
-    assert all(c.extractorRun == "haiku-1" and c.status == "unverified" for c in overlay.candidates)
+    assert all(c.extractorRun == "claude-1" and c.status == "unverified" for c in overlay.candidates)

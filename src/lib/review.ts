@@ -11,7 +11,7 @@ import type { Candidate, DecisionCheck, ExtractionRecord, Paper, ReviewDecision 
 import { convert, normalizeUnit, quantityEquals, sameFamily } from '@/engine/units';
 
 /** The extractor's run, the only one that ever ran (§6). */
-export const EXTRACTOR_RUN = 'haiku-1';
+export const EXTRACTOR_RUN = 'claude-1';
 
 /** Match tolerance, the same 2 % Witness scores with (§6.2). */
 export const AGREE_PCT = 2;

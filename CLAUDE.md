@@ -25,8 +25,13 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   `package.json` and imported nowhere; the listing is not permission.
 - UI primitives live in `src/components/ui.tsx`. **Never import `shadcn/ui`.**
 - React 18 + TypeScript + Vite + Tailwind + zustand. Python side is `core/`
-  (uv, FastAPI, Pydantic, `anthropic`). Model for every call is
-  `claude-haiku-4-5-20251001`, forced tool choice, no agent loop.
+  (uv, FastAPI, Pydantic, `anthropic`). Every model call goes through
+  `core/openferment_core/llm.py`: `claude-opus-5-5`, falling back to
+  `claude-sonnet-5-5` on a refusal or when Opus is unavailable; structured
+  outputs (`output_config.format`, schema made strict by `strict_schema`),
+  effort `medium`, streamed, no agent loop. Both models REJECT forced tool use
+  (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices live in
+  `llm.PRICES`; `usage.models` records which model answered.
 
 ## Rule 1 and its mirror
 
@@ -94,7 +99,7 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   exactly the seed. The overlay is AUTHORITATIVE: `candidates` and `runs` are
   a list or `null`, an empty list means the extractor produced nothing and the
   store drops what it had, and only `null` means "not supplied"
-  (OF-BLD-012.1 F3). An undecided `haiku-1` record absent from an incoming
+  (OF-BLD-012.1 F3). An undecided `claude-1` record absent from an incoming
   list is removed; a decided one stays and is marked `absentFromRun`.
 - A record carries `original` — what it was published as — stamped once as it
   enters the store and never touched by a decision (OF-BLD-012.1 F7). Whether

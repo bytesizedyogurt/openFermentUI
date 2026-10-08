@@ -124,7 +124,7 @@ def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     refreshed on write — then the copy biorepo.json keeps (the only one on a
     checkout that never ran the extractor), then the seed record.
 
-    A candidate id names its paper ('hk1-B5-a07dd73c'), so there is one file
+    A candidate id names its paper ('cl1-B5-a07dd73c'), so there is one file
     to open; a seed id ('r-B5-1') names none, and the cache is not read at
     all. Guild asks `/check` twice per card, and each ask used to read and
     validate every candidates/*.json on disk."""

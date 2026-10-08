@@ -47,14 +47,14 @@ import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
 
-// haiku-1 last: it is the only run that actually ran (OF-BLD-012 §6), and it
+// claude-1 last: it is the only run that actually ran (OF-BLD-012 §6), and it
 // arrives through the service overlay rather than the seed.
-const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r', 'haiku-1'];
+const RUN_ORDER: ExtractorRun[] = ['v0.3', 'v0.4', 'v0.4r', 'claude-1'];
 const RUN_LABEL: Record<ExtractorRun, string> = {
   'v0.3': 'v0.3',
   'v0.4': 'v0.4',
   'v0.4r': 'v0.4 + rules',
-  'haiku-1': 'haiku-1',
+  'claude-1': 'claude-1',
 };
 
 /** The spec's own sentence (OF-BLD-012 §6.4); the smoke test looks for it. */
@@ -67,7 +67,7 @@ const RUN_BLURB: Record<ExtractorRun, string> = {
   'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
   'v0.4': 'Adds unit normalisation against the ontology before scoring.',
   'v0.4r': 'v0.4 with hand-written guard rules for the fields that failed most.',
-  'haiku-1': 'Claude Haiku, one forced tool call per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
+  'claude-1': 'Claude Opus 5.5, with Sonnet 5.5 for a paper Opus declines: one structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
 };
 
 const INSUFFICIENT_N = 5;
@@ -286,7 +286,7 @@ export default function Witness() {
   const provisionalRecords = useMemo<ExtractionRecord[]>(
     () =>
       records.map((r) =>
-        r.gold || r.status === 'rejected' || r.extractorRun === 'haiku-1' || !fetchedPapers.has(r.paperId)
+        r.gold || r.status === 'rejected' || r.extractorRun === 'claude-1' || !fetchedPapers.has(r.paperId)
           ? r
           : { ...r, gold: { value: r.value, unit: r.unit } },
       ),
@@ -638,12 +638,12 @@ export default function Witness() {
         <span className="font-num">{defined ? `${pct(value)} %` : '—'}</span>
       </div>
     ) : null;
-  // The seeded runs are demo data; haiku-1's numbers rest on whichever gold
+  // The seeded runs are demo data; claude-1's numbers rest on whichever gold
   // basis is in force, and the tick says which.
   const headlineTick: 'demo' | 'curated' | 'gold' =
-    run.run === 'haiku-1' ? (provisional ? 'curated' : 'gold') : 'demo';
+    run.run === 'claude-1' ? (provisional ? 'curated' : 'gold') : 'demo';
   const headlineTitle =
-    run.run === 'haiku-1'
+    run.run === 'claude-1'
       ? provisional
         ? 'Micro-averaged over this run against curated values standing in as gold'
         : 'Micro-averaged over this run against reviewer-flagged gold records'
@@ -859,7 +859,7 @@ export default function Witness() {
         promote a record in the review queue.
       </p>
 
-      {run.run === 'haiku-1' && unscored.length > 0 && (
+      {run.run === 'claude-1' && unscored.length > 0 && (
         <div className="mb-6 max-w-4xl">
           <Callout
             kind="info"

@@ -635,7 +635,7 @@ def anchor_candidate(
     *,
     paper_id: str,
     candidate_id: str | None = None,
-    id_prefix: str = "hk1",
+    id_prefix: str = "cl1",
 ) -> tuple[Candidate | None, str | None, str | None]:
     """One candidate against §2.4. Returns (candidate, None, None) when it
     anchors, or (None, rule, detail) naming the rule that refused it.
@@ -786,7 +786,7 @@ def anchor_all(
     sections: list[dict[str, Any]],
     *,
     paper_id: str,
-    id_prefix: str = "hk1",
+    id_prefix: str = "cl1",
 ) -> AnchorResult:
     """Every candidate through `anchor_candidate`; survivors keep document
     order under content-addressed ids (`content_id`), exact duplicates

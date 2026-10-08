@@ -455,7 +455,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   };
 
   async function run(text: string, sid?: string) {
-    // Live: one call to openferment-core, which retrieves, asks Haiku, and
+    // Live: one call to openferment-core, which retrieves, asks the model, and
     // validates. NO FALLBACK to the scripted flows when it fails — a
     // convincing fake standing in for a broken service is the one outcome
     // worth avoiding, because everything looks like it is working and the
@@ -830,7 +830,13 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               demo the transcript by accident (§9). */}
           {chatMode === 'scripted' && health?.ok && health.hasKey && (
             <div className="mb-2 text-caption text-ink-soft">
-              Postdoc service is running on <span className="font-num">{health.model}</span>.
+              Postdoc service is running on <span className="font-num">{health.model}</span>
+              {health.fallbackModel && health.fallbackModel !== health.model && (
+                <>
+                  , falling back to <span className="font-num">{health.fallbackModel}</span>
+                </>
+              )}
+              .
               These are authored transcripts —{' '}
               <button className="text-accent hover:underline" onClick={() => setUI({ chatMode: 'live' })}>
                 switch to Live

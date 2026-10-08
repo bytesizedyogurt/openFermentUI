@@ -203,9 +203,9 @@ export interface Paper {
 }
 
 export type RecordStatus = 'unverified' | 'verified' | 'rejected';
-// 'haiku-1' is the first run that actually ran (OF-BLD-012 §6). The three
+// 'claude-1' is the first run that actually ran (OF-BLD-012 §6). The three
 // before it are the seed's names for runs that never happened.
-export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r' | 'haiku-1';
+export type ExtractorRun = 'v0.3' | 'v0.4' | 'v0.4r' | 'claude-1';
 
 export interface AuditEvent {
   at: string;
@@ -1146,6 +1146,12 @@ export interface AnswerPlanUsage {
   outputTokens: number;
   /** Computed from the response's own token counts, not estimated. */
   costUsd: number;
+  /**
+   * The models that answered, in order: Claude Opus 5.5, or Opus then the
+   * Claude Sonnet 5.5 it fell back to (core/openferment_core/llm.py). Absent
+   * or empty for a saved fixture that never called one.
+   */
+  models?: string[];
 }
 
 export interface AnswerPlan {

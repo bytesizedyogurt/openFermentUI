@@ -8,9 +8,10 @@
 // honest empty state instead of a fabricated F1.
 //
 // Now one has. OF-BLD-012 §6 fetches the open-access papers' full text, runs
-// Claude Haiku once per paper with a forced tool call, anchors every candidate
+// Claude Opus 5.5 once per paper for one structured response (Sonnet 5.5 where
+// Opus declines), anchors every candidate
 // to a verbatim quote, and scores the run against the curated records
-// (`match_run`, core/openferment_core/witness.py). That run — `haiku-1` — does
+// (`match_run`, core/openferment_core/witness.py). That run — `claude-1` — does
 // NOT land in this file. It arrives through the service's overlay,
 // `GET /api/biorepo/overlay` → `overlay.runs`, recomputed from
 // core/data/candidates/ on every request, and the store merges it into

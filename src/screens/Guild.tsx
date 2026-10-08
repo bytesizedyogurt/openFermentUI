@@ -848,7 +848,7 @@ export default function Guild() {
 
   // §7.3 — beside a curated record on a fetched paper: what the extractor
   // read for the same field, whether it agrees, and what a promotion carries.
-  const fromExtractor = record.extractorRun === 'haiku-1';
+  const fromExtractor = record.extractorRun === 'claude-1';
   const fetched = paperFetched(paper);
   const best = fetched && !fromExtractor ? bestCandidate(record, candidates) : null;
   const bestSection = best ? paper?.sections.find((s) => s.id === best.candidate.sectionId) : undefined;
@@ -1084,7 +1084,7 @@ export default function Guild() {
                       )}
                     </span>
                     <span className="text-caption text-ink-soft">
-                      haiku-1 · {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`} ·
+                      claude-1 · {bestSection ? bestSection.heading : `§${best.candidate.sectionId}`} ·
                       confidence <span className="font-num">{best.candidate.confidence.toFixed(2)}</span>
                     </span>
                     {best.agrees ? (
@@ -1200,9 +1200,9 @@ export default function Guild() {
               <>
                 <Tick
                   p={provOf(record)}
-                  title="Extracted by haiku-1 from the fetched full text (OF-BLD-012 §6)"
+                  title="Extracted by claude-1 from the fetched full text (OF-BLD-012 §6)"
                 >
-                  <div className="text-body">Extracted by haiku-1 — new to the corpus</div>
+                  <div className="text-body">Extracted by claude-1 — new to the corpus</div>
                   <div className="font-num text-caption text-ink-soft">
                     field {record.field} · confidence {record.confidence.toFixed(2)}
                   </div>
@@ -1215,7 +1215,7 @@ export default function Guild() {
                   </p>
                 )}
                 <p className="text-caption text-ink-soft mt-2">
-                  One forced tool call over the paper&rsquo;s own text produced this candidate, and
+                  One structured model response over the paper&rsquo;s own text produced this candidate, and
                   anchoring checked that its quote is verbatim in the section and holds the value.
                   No curated record covers this field on this paper: accepting makes it a record,
                   rejecting makes it a false positive in Witness.

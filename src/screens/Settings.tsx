@@ -1059,7 +1059,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Agent chat — live mode',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc on Claude Haiku when the service is running: one retrieval, one forced tool call, and the browser renders every value from the cited record — the prose carries no numbers of its own. With the service down the switch says so and the turn runs scripted.',
+      'Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 when Opus declines or is unavailable, when the service is running: one retrieval, one structured response, and the browser renders every value from the cited record — the prose carries no numbers of its own. With the service down the switch says so and the turn runs scripted.',
   },
   {
     feature: 'Retrieval inspector and tool traces',
@@ -1312,7 +1312,7 @@ function AboutSection() {
           </Row>
           <Row label="Agent">
             Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
-            flows and no model is called. Live: Postdoc on Claude Haiku through openferment-core,
+            flows and no model is called. Live: Postdoc on Claude Opus 5.5 (Sonnet 5.5 as fallback) through openferment-core,
             values rendered from the cited records.
           </Row>
           <Row label="Retrieval">
@@ -1320,7 +1320,7 @@ function AboutSection() {
             for an entry the service has not fetched, the paper&rsquo;s own words for one it has. No
             embedding model, no vector store; the &ldquo;Embed&rdquo; stage in ingest is a timed
             animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
-            one forced tool call for the candidates.
+            one structured response per paper for the candidates.
           </Row>
           <Row label="Storage">
             Split by lifetime. Reference data — papers, protocols, molecules, vocabulary — is never

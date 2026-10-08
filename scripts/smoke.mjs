@@ -403,10 +403,10 @@ async function main() {
       await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
       // Witness renders a skeleton for a simulated 200–450 ms before its
       // numbers; wait for the run's own label rather than a guessed sleep.
-      await page.locator('text=haiku-1').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('text=claude-1').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(150);
       const witness = await page.locator('body').innerText();
-      if (!/haiku-1/.test(witness)) problems.push('Witness does not show the overlay run');
+      if (!/claude-1/.test(witness)) problems.push('Witness does not show the overlay run');
       if (!/Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild\./.test(witness)) {
         problems.push('Witness is not labelled provisional');
       }
@@ -460,13 +460,13 @@ async function main() {
       else if (!/\b1 \/ 135\b/.test(unfiltered))
         problems.push(`the rebuilt queue snapped back to the deep-linked record instead of starting at its first card (progress reads ${(unfiltered.match(/\d+ \/ \d+/) ?? ['?'])[0]})`);
 
-      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
+      await page.goto(`http://localhost:${PORT}/#/guild?record=cl1-B5-a07dd73c`, { waitUntil: 'networkidle' });
       // A hash navigation on the same document returns at once; wait for the
       // card itself, not a clock.
-      await page.locator('text=hk1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('text=cl1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(150);
       const newCard = await page.locator('body').innerText();
-      if (!/Extracted by haiku-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
+      if (!/Extracted by claude-1 — new to the corpus/.test(newCard)) problems.push('the new candidate is not labelled as new to the corpus');
       if (!/Placeholder A \| 7 \| mg L-1/.test(newCard)) problems.push('the new candidate\'s quote is not on its card');
       // Nobody can decide anything the committed file would keep until they
       // have said who they are (OF-BLD-012.1 F2) — so the card refuses first,
@@ -481,12 +481,12 @@ async function main() {
       await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
       await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
       await page.waitForTimeout(400);
-      await page.goto(`http://localhost:${PORT}/#/guild?record=hk1-B5-a07dd73c`, { waitUntil: 'networkidle' });
-      await page.locator('text=hk1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.goto(`http://localhost:${PORT}/#/guild?record=cl1-B5-a07dd73c`, { waitUntil: 'networkidle' });
+      await page.locator('text=cl1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(700);
       await page.keyboard.press('a');
       await page.waitForTimeout(700);
-      const posted = decisions.find((d) => d.recordId === 'hk1-B5-a07dd73c');
+      const posted = decisions.find((d) => d.recordId === 'cl1-B5-a07dd73c');
       if (!posted) problems.push('accepting the new candidate posted no decision to the service');
       else if (posted.status !== 'verified' || !posted.at) problems.push(`the posted decision is wrong: ${JSON.stringify(posted)}`);
       else if (posted.reviewer !== REVIEWER) problems.push(`the decision is signed ${JSON.stringify(posted.reviewer)}, not the name set in Settings`);

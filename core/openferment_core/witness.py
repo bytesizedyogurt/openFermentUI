@@ -1,6 +1,6 @@
 """Witness — scoring the run that actually ran (OF-BLD-012 §6.2).
 
-`match_run` builds one RunOutput for 'haiku-1' by holding every seed record
+`match_run` builds one RunOutput for 'claude-1' by holding every seed record
 on an extracted paper against the candidates the extractor produced for that
 paper and field. The outcome vocabulary is the browser's, from
 `computeRunMetrics` in src/engine/metrics.ts, so Witness scores a real run

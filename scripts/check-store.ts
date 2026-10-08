@@ -49,7 +49,7 @@ if (FIELDS.length < 3) {
 
 const candidate = (n: number, field: string): Candidate =>
   ({
-    id: `hk1-${paper.id}-overlay${n}`,
+    id: `cl1-${paper.id}-overlay${n}`,
     paperId: paper.id,
     sectionId: 's1',
     quote: `a sentence the extractor read, number ${n}`,
@@ -61,7 +61,7 @@ const candidate = (n: number, field: string): Candidate =>
     status: 'unverified',
     provenance: 'unverified',
     isPrimary: true,
-    extractorRun: 'haiku-1',
+    extractorRun: 'claude-1',
   }) as Candidate;
 
 const THREE = FIELDS.map((f, i) => candidate(i + 1, f));
@@ -144,7 +144,7 @@ const posted: { quote?: string; sectionId?: string; recordId: string }[] = [];
   throw new Error('no service');
 };
 
-const seeded = s().records.find((r) => r.extractorRun !== 'haiku-1')!;
+const seeded = s().records.find((r) => r.extractorRun !== 'claude-1')!;
 check('a seeded record carries what it was published as', !!seeded.original, seeded.original);
 check(
   'and it is the record as the seed wrote it',
@@ -227,7 +227,7 @@ check('and the overlay still carries them', (s().overlay?.candidates ?? []).leng
 //    mid-review. The index follows the RECORD; a reviewer whose record went
 //    lands on the next survivor.
 const seedIds = s()
-  .records.filter((r) => r.status === 'unverified' && r.extractorRun !== 'haiku-1')
+  .records.filter((r) => r.status === 'unverified' && r.extractorRun !== 'claude-1')
   .slice(0, 3)
   .map((r) => r.id);
 useStore.getState().startReview([THREE[1].id, THREE[2].id, ...seedIds]);
@@ -251,7 +251,7 @@ check('a reviewer whose card went lands on the next survivor, not past the end',
 //    the number. A promotion that carried the extractor's span and the
 //    paper's number, withdrawn, put the published number back beside the
 //    carried sentence: a record whose quote no longer states its value.
-const fresh = s().records.find((r) => r.extractorRun !== 'haiku-1' && r.id !== seeded.id && !s().decisionAt[r.id])!;
+const fresh = s().records.find((r) => r.extractorRun !== 'claude-1' && r.id !== seeded.id && !s().decisionAt[r.id])!;
 const moved = { quote: 'the sentence a promotion moved it to', sectionId: 's2' };
 useStore.getState().applyOverlay(
   overlay({

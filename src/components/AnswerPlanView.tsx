@@ -205,6 +205,12 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             {formatCost(plan.usage.costUsd)}
             <span className="opacity-45">·</span>
             {plan.usage.inputTokens.toLocaleString()} in / {plan.usage.outputTokens.toLocaleString()} out
+            {plan.usage.models && plan.usage.models.length > 0 && (
+              <>
+                <span className="opacity-45">·</span>
+                {plan.usage.models.join(' → ')}
+              </>
+            )}
           </span>
         )}
       </div>

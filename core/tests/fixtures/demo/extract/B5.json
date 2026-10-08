@@ -1,5 +1,5 @@
 {
-  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): what fixture-mode extract.py returns for B5 instead of calling claude-haiku-4-5-20251001. HAND-WRITTEN, not a model output — the sandbox this was written in had no key — in the exact shape of the emit_candidates tool input, over the structural stand-in text. Both candidates anchor (§2.4): the value is in the quote, the unit is in the field's family, the converted value is in range. Regenerate with a key: OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture",
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): what fixture-mode extract.py returns for B5 instead of calling the model (claude-opus-5-5, then claude-sonnet-5-5). HAND-WRITTEN, not a model output — the sandbox this was written in had no key — in the exact shape of the emit_candidates schema, over the structural stand-in text. Both candidates anchor (§2.4): the value is in the quote, the unit is in the field's family, the converted value is in range. Regenerate with a key: OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture",
   "raw": {
     "candidates": [
       {

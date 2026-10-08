@@ -49,7 +49,7 @@
   "records": {},
   "candidates": [
     {
-      "id": "hk1-B5-a07dd73c",
+      "id": "cl1-B5-a07dd73c",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -63,12 +63,12 @@
       "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
-      "extractorRun": "haiku-1",
+      "extractorRun": "claude-1",
       "isPrimary": true,
       "valueBasis": "exact"
     },
     {
-      "id": "hk1-B5-95f64ef4",
+      "id": "cl1-B5-95f64ef4",
       "paperId": "B5",
       "sectionId": "t1",
       "quote": "Placeholder A | 7 | mg L-1",
@@ -82,14 +82,14 @@
       "confidence": 0.55,
       "status": "unverified",
       "provenance": "unverified",
-      "extractorRun": "haiku-1",
+      "extractorRun": "claude-1",
       "isPrimary": true,
       "valueBasis": "converted"
     }
   ],
   "runs": [
     {
-      "run": "haiku-1",
+      "run": "claude-1",
       "results": [
         {
           "goldRecordId": "r-B5-1",

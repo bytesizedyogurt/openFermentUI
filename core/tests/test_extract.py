@@ -6,7 +6,7 @@ without spending a token: what the prompt and tool contain, how a section is
 cut, what happens to the candidates the stub returns, what is persisted, and
 what the endpoint answers when there is nothing to anchor to.
 
-The live test that actually calls Haiku is test_extract_live.py, marked live.
+The live test that actually calls the model is test_extract_live.py, marked live.
 """
 from __future__ import annotations
 
@@ -120,11 +120,11 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     monkeypatch.setattr(extract, "call_model", call)
 
     r = extract.extract_paper("X1")
-    assert [c.id for c in r.candidates] == ["hk1-X1-31a6caf5", "hk1-X1-18c2cdd5"], "content-addressed, stable across runs"
+    assert [c.id for c in r.candidates] == ["cl1-X1-31a6caf5", "cl1-X1-18c2cdd5"], "content-addressed, stable across runs"
     assert r.candidates[0].value == 7 and r.candidates[0].unit == "mg L⁻¹"
     assert r.candidates[1].organism == "imaginary yeast"
     assert all(c.status == "unverified" and c.provenance == "unverified" for c in r.candidates)
-    assert all(c.extractorRun == "haiku-1" for c in r.candidates)
+    assert all(c.extractorRun == "claude-1" for c in r.candidates)
     assert r.rejected == 4
     assert r.rejectionReasons["quote"] == 1
     assert r.rejectionReasons["value"] == 1
@@ -137,7 +137,7 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     assert all(d.paperId == "X1" and d.field == "titer_secreted" for d in r.dropped)
     assert r.dropped[0].value == 7 and r.dropped[0].unit == "mg L-1"
     assert r.usage.costUsd == 0.002 and r.usage.inputTokens == 1000
-    assert r.audit and r.audit[0].who == "haiku-1" and r.audit[0].action == "extracted"
+    assert r.audit and r.audit[0].who == "claude-1" and r.audit[0].action == "extracted"
 
     # The call saw the whole paper and the pinned tool.
     assert len(call.calls) == 1
@@ -150,7 +150,7 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     path = extract.CANDIDATES_DIR / "X1.json"
     assert path.exists()
     stored = json.loads(path.read_text())
-    assert stored["run"] == "haiku-1" and len(stored["candidates"]) == 2 and len(stored["dropped"]) == 4
+    assert stored["run"] == "claude-1" and len(stored["candidates"]) == 2 and len(stored["dropped"]) == 4
     again = extract.extract_paper("X1")
     assert again.extractedAt == r.extractedAt and len(call.calls) == 1
     forced = extract.extract_paper("X1", force=True)
@@ -228,7 +228,7 @@ def test_extract_endpoint_returns_the_anchored_candidates(client, monkeypatch):
     assert r.status_code == 200, r.text
     body = ExtractResponse.model_validate(r.json())
     assert body.paperId == "B5" and len(body.candidates) == 2 and body.rejected == 4
-    assert body.candidates[0].id == "hk1-B5-a07dd73c"
+    assert body.candidates[0].id == "cl1-B5-a07dd73c"
 
 
 def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):

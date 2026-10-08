@@ -39,7 +39,8 @@ from .models import (
     ReviewDecision,
     Usage,
 )
-from .postdoc import MODEL, PostdocUnavailable, ask_model
+from . import llm
+from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
 # core/.env, which is gitignored. Loaded here rather than by the shell so that
@@ -85,7 +86,10 @@ def health() -> dict:
     return {
         "ok": corpus_error is None,
         "service": "openferment-core",
-        "model": MODEL,
+        "model": llm.primary(),
+        # The model a call falls back to when the primary declines or is
+        # unavailable (llm.py).
+        "fallbackModel": llm.fallback(),
         "hasKey": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "records": records,
         "corpusError": corpus_error,
@@ -194,7 +198,7 @@ def intake_status() -> dict[str, IntakeStatus]:
 
 @app.post("/api/intake/{paper_id}/extract", response_model=ExtractResponse)
 def intake_extract(paper_id: str, force: bool = False) -> ExtractResponse:
-    """One forced tool call over the paper's cached full text (§6.1, §6.3).
+    """One structured model response over the paper's cached full text (§6.1, §6.3).
 
     422 when the paper has no cached full text — there is nothing to anchor
     to, and an extraction over a curation note would be an extraction over

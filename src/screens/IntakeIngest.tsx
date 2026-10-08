@@ -5,7 +5,7 @@
 // TWO PATHS, LABELLED. When openferment-core is running, "Fetch" is a real
 // network request: the service asks Europe PMC for the JATS, splits it, and
 // the paper's own text replaces the curation note; "Extract" is then one
-// forced tool call over that text, every candidate anchored to a verbatim
+// structured model response over that text, every candidate anchored to a verbatim
 // quote, and the run, the candidates and the decisions come back through the
 // overlay for Witness and Guild (OF-BLD-012 §6). Chunk and Embed are not
 // built and are shown as not run. When the service is not running, the
@@ -508,7 +508,7 @@ export default function IntakeIngest() {
                             size="sm"
                             onClick={() => void extractPaperLive(row.paper.id)}
                             disabled={jobs.some((j) => j.status === 'running' && j.title === `Extract ${row.paper.id}`)}
-                            title="One forced tool call over the fetched text; every candidate anchored to a verbatim quote (OF-BLD-012 §6)"
+                            title="One structured model response over the fetched text; every candidate anchored to a verbatim quote (OF-BLD-012 §6)"
                           >
                             <Sparkles size={12} /> Extract
                           </Button>

@@ -101,7 +101,7 @@ papers.
 
 **Documents in, anchored to source.** `/intake` · chord `g i`
 
-Ingest and extraction. A claim enters the system here or it does not enter at all. With openferment-core running, Fetch asks Europe PMC for a paper's open-access full text and Extract runs Claude Haiku once over it, every candidate anchored to a verbatim quote (OF-BLD-012 §5–6); the seed's curator notes stand in for the papers nobody has fetched, and the reader says which is which.
+Ingest and extraction. A claim enters the system here or it does not enter at all. With openferment-core running, Fetch asks Europe PMC for a paper's open-access full text and Extract runs Claude Opus 5.5 once over it (Sonnet 5.5 where Opus declines), every candidate anchored to a verbatim quote (OF-BLD-012 §5–6); the seed's curator notes stand in for the papers nobody has fetched, and the reader says which is which.
 
 Views: [Ingest](#) `/intake/ingest`
 
@@ -113,7 +113,7 @@ Views: [Ingest](#) `/intake/ingest`
 
 **Records, artifacts, provenance.** `/biorepo` · chord `g b`
 
-The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `haiku-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7).
+The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `claude-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7).
 
 Views: [Witness](#) `/biorepo/witness` · [Compare](#) `/biorepo/compare`
 
@@ -129,7 +129,7 @@ Not built: Common Seal.
 
 **Ask, plan, answer from records.** `/postdoc` · chord `g o`
 
-The thing you talk to. Runs on Claude Haiku through `openferment-core`; writes claims that carry no numbers of their own.
+The thing you talk to. Runs on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; writes claims that carry no numbers of their own.
 
 | Component | Implemented in |
 |---|---|

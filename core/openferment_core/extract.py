@@ -1,10 +1,12 @@
-"""Extract — one forced tool call per paper (OF-BLD-012 §6.1).
+"""Extract — one structured response per paper (OF-BLD-012 §6.1).
 
-The whole paper goes in, as sections; candidate records come out, through a
-single tool, `emit_candidates`, with `tool_choice` pinned to it so the model
-has exactly one way to respond and the API checks the shape before we see it.
-The same pattern `postdoc.py` uses with `emit_answer_plan`, for the same
-reason: structured output by construction, not by asking nicely for JSON.
+The whole paper goes in, as sections; candidate records come out as JSON that
+matches the `emit_candidates` schema, through structured outputs (llm.py), so
+the model has exactly one way to respond and the API checks the shape before
+we see it. The same pattern `postdoc.py` uses with `emit_answer_plan`, for the
+same reason: structured output by construction, not by asking nicely for JSON.
+The model is Claude Opus 5.5, with Claude Sonnet 5.5 for a paper Opus declines
+or cannot take; each response records which answered.
 
 NOTHING THE MODEL EMITS ENTERS BIOREPO ON ITS SAY-SO. Every candidate goes
 through `validate.anchor_candidate` — §2.4's six rules — and only a candidate
@@ -28,18 +30,15 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any
 
-import anthropic
 
-from . import atomic, intake
+from . import atomic, intake, llm
 from .models import Candidate, ExtractResponse, Usage
-from .postdoc import MODEL, cost_usd
 from .units import tables
 from .validate import anchor_all
 
@@ -47,23 +46,23 @@ log = logging.getLogger("openferment.extract")
 
 CANDIDATES_DIR = intake.DATA_DIR / "candidates"
 FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
-RUN = "haiku-1"
+# The first extraction run that runs for real. Named for the pipeline and not
+# for one model: Opus answers most papers and Sonnet the ones Opus declines,
+# and each response's `usage.models` says which (OF-BLD-012 §6).
+RUN = "claude-1"
 # `--save-fixture`: after a real call, write {raw, usage} to FIXTURE_DIR so a
 # fixture-mode service can replay it (§8.1). Off by default; never in
 # fixture mode, where there is no call to save.
 SAVE_RESPONSES = False
 
-# A paper can yield dozens of candidates at roughly eighty tokens each, and
-# Postdoc's 2000 would truncate the tool call mid-list — a truncated tool
-# input is a malformed response, not a shorter one. Four times Postdoc's
-# budget, and still one call.
-# The response has to hold EVERY candidate for a paper, and a review with
-# many tables carries more than a hundred. No longer derived from Postdoc's
-# (OF-BLD-012.1 F8): the two calls answer different questions — one writes a
-# handful of claims, this one lists every measurement in a paper — and tying
-# them together meant a limit chosen for the first silently capped the
-# second. 16 000 covers the corpus; the split below covers what it does not.
-MAX_TOKENS = 16_000
+# The response has to hold EVERY candidate for a paper, at roughly eighty
+# tokens each, and a review with many tables carries more than a hundred; a
+# response cut off mid-list is malformed, not shorter. Not derived from
+# Postdoc's (OF-BLD-012.1 F8): one call writes a handful of claims, this one
+# lists every measurement in a paper. The model thinks before it answers and
+# the thinking counts against this limit too, hence 32 000 (the call streams,
+# so its length is no problem). The split below covers what still does not fit.
+MAX_TOKENS = 32_000
 
 # How many times a paper may be halved before the remainder is REPORTED as
 # truncated rather than split again (F8). Two is a quarter of a paper per
@@ -287,7 +286,7 @@ def build_prompt(sections: list[dict[str, Any]]) -> tuple[str, list[str]]:
 
 
 def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dict[str, Any], Usage]:
-    """One call. Returns the raw tool input and what it cost.
+    """One call. Returns the raw candidates and what they cost.
 
     In fixture mode the saved response for the paper is returned instead and
     the API is never touched.
@@ -299,47 +298,30 @@ def call_model(paper_id: str, user_text: str, tool: dict[str, Any]) -> tuple[dic
         saved = json.loads(path.read_text(encoding="utf-8"))
         return saved["raw"], Usage.model_validate(saved.get("usage") or {})
 
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise ExtractUnavailable(
-            "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."
-        )
-    client = anthropic.Anthropic(api_key=key)
     try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
+        result = llm.call(
             system=SYSTEM,
-            messages=[{"role": "user", "content": user_text}],
-            tools=[tool],
-            # Forced, not suggested — the same discipline as Postdoc.
-            tool_choice={"type": "tool", "name": "emit_candidates"},
+            user=user_text,
+            schema=tool["input_schema"],
+            max_tokens=MAX_TOKENS,
+            label=f"{paper_id}: ",
         )
-    except anthropic.APIConnectionError as e:
-        raise ExtractUnavailable(f"Could not reach the Anthropic API: {e}") from e
-    except anthropic.AuthenticationError as e:
-        raise ExtractUnavailable("The Anthropic API rejected the key in core/.env.") from e
-    except anthropic.RateLimitError as e:
-        raise ExtractUnavailable("Rate limited by the Anthropic API. Wait and try again.") from e
-    except anthropic.APIStatusError as e:
-        raise ExtractUnavailable(f"Anthropic API error {e.status_code}: {e.message}") from e
+    except llm.ModelRefused as e:
+        # Not cached: a later model, or a later version of this one, may take
+        # the paper, and the batch reports it as not extracted.
+        raise ExtractUnavailable(f"{paper_id} {e}") from e
+    except llm.ModelUnavailable as e:
+        raise ExtractUnavailable(str(e)) from e
 
-    usage = Usage(
-        inputTokens=response.usage.input_tokens,
-        outputTokens=response.usage.output_tokens,
-        costUsd=cost_usd(response.usage.input_tokens, response.usage.output_tokens),
-    )
-    if response.stop_reason == "max_tokens":
-        # A tool input cut off mid-list does not parse into candidates the
-        # validator can trust; better no candidates and a loud log line.
+    if result.truncated:
+        # A list cut off mid-way does not parse into candidates the validator
+        # can trust; better no candidates and a loud log line.
         log.warning("%s: response hit max_tokens (%d); candidates dropped", paper_id, MAX_TOKENS)
-        return {"candidates": [], "truncated": True, "usage": usage.model_dump()}, usage
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "emit_candidates":
-            raw = block.input if isinstance(block.input, dict) else json.loads(block.input)
-            return raw, usage
-    log.warning("%s: no tool_use block; stop_reason=%s", paper_id, response.stop_reason)
-    return {"candidates": [], "truncated": True, "usage": usage.model_dump()}, usage
+        return {"candidates": [], "truncated": True, "usage": result.usage.model_dump()}, result.usage
+    if result.data is None:
+        log.warning("%s: no candidates in the response; stop_reason=%s", paper_id, result.stop_reason)
+        return {"candidates": [], "truncated": True, "usage": result.usage.model_dump()}, result.usage
+    return result.data, result.usage
 
 
 # ── persistence ────────────────────────────────────────────────────────
@@ -390,11 +372,7 @@ class _Extracted:
 
 def _spent(a: Usage, b: Usage) -> Usage:
     """Every call is paid for, including one that produced nothing."""
-    return Usage(
-        inputTokens=a.inputTokens + b.inputTokens,
-        outputTokens=a.outputTokens + b.outputTokens,
-        costUsd=a.costUsd + b.costUsd,
-    )
+    return llm.add(a, b)
 
 
 def _halve(sections: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -497,7 +475,10 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         (FIXTURE_DIR / f"{paper_id}.json").write_text(
             json.dumps(
                 {
-                    "_note": f"Saved response of {MODEL} for {paper_id}, for OPENFERMENT_FIXTURES=1 replay.",
+                    "_note": (
+                        f"Saved response of {', '.join(got.usage.models) or 'the model'} for {paper_id}, "
+                        "for OPENFERMENT_FIXTURES=1 replay."
+                    ),
                     "raw": {"candidates": got.raws},
                     "usage": got.usage.model_dump(),
                 },

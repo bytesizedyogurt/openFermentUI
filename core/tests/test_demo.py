@@ -56,7 +56,7 @@ def test_the_loop_replays_from_the_fixtures():
     assert result.usage.costUsd == 0, "nothing was spent — no call was made"
 
     runs = witness.runs()
-    assert [r.run for r in runs] == ["haiku-1"]
+    assert [r.run for r in runs] == ["claude-1"]
     assert {r.goldRecordId for r in runs[0].results} == {"r-B5-1", "r-B5-2", "r-B5-3"}
 
 

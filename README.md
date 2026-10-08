@@ -40,11 +40,11 @@ question the app labels as open** rather than answering.
 | Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
 | Full text | **Real, when fetched** — as of 2026-09-21, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `haiku-1`, one forced tool call per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
+| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
 | Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
-| Agent answer prose | **Real model call** — Postdoc on Claude Haiku through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
+| Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
 The corpus is real literature. That is the whole point of OF-COR-001, and it is why the
 demo-labelling policy is narrow rather than blanket: only the two genuinely synthetic
@@ -77,7 +77,7 @@ fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not chan
  13 chat flows       3 scenarios · 6 learn modules / 9 lessons
 ```
 
-## Postdoc runs on Claude Haiku
+## Postdoc runs on Claude Opus
 
 Postdoc's answers come from a real model call, routed through `core/` — a
 Python service (`openferment-core`) that is the first surface of the tool layer
@@ -88,7 +88,7 @@ fails the build if anything under `src/` so much as names it.
 ```
 browser ──POST /api/ask──▶ FastAPI
                              ├─ BM25 retrieval over corpus.json (≤30 records)
-                             ├─ Claude Haiku 4.5, one forced tool call
+                             ├─ Claude Opus 5.5 (Sonnet 5.5 as fallback), one structured response
                              ├─ Rule 1 enforcement
                              └─ AnswerPlan
 browser ◀────────────────────┘   renders values from the cited records
@@ -125,9 +125,24 @@ criteria now rather than a parallel implementation: `pnpm test:live` asks the
 real pipeline each one and checks the plan cites the records a human said were
 the answer. `pnpm verify` stays offline and needs no key.
 
-Roughly $0.011 a query at 30 records. Set a spend limit in the Anthropic console
-first — not because the volume is risky, but because a cap turns a runaway loop
-from a bill into a bug report.
+Every model call goes through `core/openferment_core/llm.py`. It asks **Claude Opus
+5.5** first and **Claude Sonnet 5.5** when Opus declines or is unavailable, and it
+records which model answered in the plan's `usage.models`, shown beside the cost.
+Both models reject forced tool use, so the plan comes back through structured
+outputs: JSON that matches the schema, checked by the API, with no free-text way to
+answer. `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL` and `OPENFERMENT_EFFORT` in
+`core/.env` change the models and how hard they think (`medium` by default).
+
+Both models run safety classifiers, a biology one among them, and a question about
+fermentation can trip it. A declined request comes back as a refusal; the same
+request goes to Sonnet; a question both decline comes back as a declined plan that
+says so. A refusal in the biology category is billed even though it produced
+nothing.
+
+Expect a few cents a question at 30 records on Opus (thinking included), less when
+Sonnet answers; the plan shows the exact cost. Set a spend limit in the Anthropic
+console first, not because the volume is risky, but because a cap turns a runaway
+loop from a bill into a bug report.
 
 ## Running it
 
@@ -152,7 +167,8 @@ cd core && uv run uvicorn openferment_core.api:app --reload
 pnpm intake:fetch --all               # Europe PMC → core/data/fulltext/ for the 59 papers with an identifier:
                                       # the 27 with a PMCID fetch directly, the rest are looked up by DOI or
                                       # PMID and most are not open access (no key; ≤ 2 requests/s, a User-Agent)
-pnpm intake:extract --all             # Claude Haiku, one forced tool call per fetched paper
+pnpm intake:extract --all             # Claude Opus 5.5 (Sonnet 5.5 as fallback), one structured response per
+                                      # fetched paper; expect a few dollars to low tens for all 27
                                       # → core/data/candidates/; prints anchored, rejected by rule, cost
 
 pnpm ids:propose                      # Crossref, one request a second, for the 73 papers with no identifier
@@ -243,7 +259,7 @@ To make the demo real, regenerate all three fixtures together — they only make
 and `test_demo` checks that they still fit the code:
 
 ```bash
-pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one Haiku call);
+pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one model call);
                               # writes jats/PMC8471596.xml, extract/B5.json and biorepo.json
 pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and the smoke overlay
                               # fixture from whatever JATS and response are saved
@@ -459,7 +475,7 @@ flows — the plan ticks, tool calls appear, retrieval sets render, the answer s
 every message comes from the flow object, the inspector's "trace" is the literal data that
 produced the answer, honest by construction rather than reconstructed afterward. The composer
 offers a **Live** toggle, which is not inert: with `openferment-core` running it is a real
-model call (see *Postdoc runs on Claude Haiku* above), and with the service down it says so
+model call (see *Postdoc runs on Claude Opus* above), and with the service down it says so
 and the turn runs scripted. In scripted mode no language model is called.
 
 When no flow matches, a fallback ladder takes over: first an **entity-lookup flow** that
@@ -501,7 +517,7 @@ Recorded here because the app records them rather than papering over them:
 - **The seed is catalogued; full text arrives through the service.** The seed holds metadata
   and a curator note per paper, so with the service down extraction spans anchor to curator
   prose and the reader says so. With it up, the 27 papers with a PMCID fetch as full text, the
-  extractor runs over them, and Witness scores that run (`haiku-1`) provisionally against the
+  extractor runs over them, and Witness scores that run (`claude-1`) provisionally against the
   curated values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
   arrives through the overlay, not the seed. The 66-record gold-set *plan* and 6 difficulty
   cases are still shown until the run exists in a checkout.

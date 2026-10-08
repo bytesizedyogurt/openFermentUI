@@ -152,7 +152,7 @@ export async function fetchPaper(
 
 /**
  * Extract one fetched paper through the service (OF-BLD-012 §6.3): one
- * forced tool call, every candidate anchored, the refusals counted. 422 when
+ * structured model response, every candidate anchored, the refusals counted. 422 when
  * the paper has no full text and 503 when there is no key both surface as
  * IntakeDown with the service's own reason; nothing is invented to fill in.
  */

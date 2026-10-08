@@ -12,7 +12,7 @@ from pathlib import Path
 import anthropic
 import pytest
 
-from openferment_core import api, biorepo, extract, intake, ready
+from openferment_core import api, biorepo, extract, intake, llm, ready
 
 # Shaped like a key, so check_key accepts it; random, so no piece of it turns
 # up in the report by coincidence. Built from parts so check:secrets, which
@@ -35,14 +35,20 @@ def status_error(cls, code):
 
 
 class FakeClient:
+    """The Models API. `raises` is one error for every model, or a dict from
+    model id to the error that model's lookup raises."""
+
     def __init__(self, raises=None):
         self.raises = raises
         self.models = self
+        self.asked: list[str] = []
 
     def retrieve(self, model_id, **_):
-        assert model_id == ready.MODEL
-        if self.raises is not None:
-            raise self.raises
+        assert model_id in llm.chain()
+        self.asked.append(model_id)
+        error = self.raises.get(model_id) if isinstance(self.raises, dict) else self.raises
+        if error is not None:
+            raise error
         return {"id": model_id}
 
 
@@ -89,21 +95,38 @@ def test_an_sdk_error_that_quotes_the_key_is_not_repeated():
 # ── the model ──────────────────────────────────────────────────────────
 
 
+OPUS, SONNET = "claude-opus-5-5", "claude-sonnet-5-5"
+
+
+@pytest.fixture(autouse=True)
+def _default_chain(monkeypatch):
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_EFFORT"):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.mark.parametrize(
-    ("error", "mark", "says"),
+    ("errors", "mark", "says"),
     [
-        (None, "ok", "is available"),
+        (None, "ok", f"{OPUS} then {SONNET}"),
         (lambda: status_error(anthropic.AuthenticationError, 401), "fail", "rejected the key"),
-        (lambda: status_error(anthropic.PermissionDeniedError, 403), "fail", "may not use"),
-        (lambda: status_error(anthropic.NotFoundError, 404), "fail", "retired"),
+        (lambda: {OPUS: status_error(anthropic.NotFoundError, 404)}, "warn", f"every call runs on {SONNET}"),
+        (lambda: {SONNET: status_error(anthropic.PermissionDeniedError, 403)}, "warn", f"every call runs on {OPUS}"),
+        (lambda: {OPUS: status_error(anthropic.NotFoundError, 404), SONNET: status_error(anthropic.NotFoundError, 404)},
+         "fail", "no model in the chain"),
         (lambda: status_error(anthropic.InternalServerError, 500), "fail", "answered 500"),
         (lambda: anthropic.APIConnectionError(request=_http().Request("GET", URL)), "fail", "could not reach"),
     ],
 )
-def test_model(error, mark, says):
-    client = FakeClient(error() if error else None)
+def test_model_checks_both_models_in_the_chain(errors, mark, says):
+    client = FakeClient(errors() if errors else None)
     check = ready.check_model(True, client_factory=lambda: client)
-    assert check.mark == mark and says in check.detail
+    assert check.mark == mark and says in check.detail, check.detail
+
+
+def test_a_model_with_no_price_on_file_is_named(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", "claude-some-future-model")
+    check = ready.check_model(True, client_factory=FakeClient)
+    assert check.mark == "warn" and "no price on file for claude-some-future-model" in check.detail
 
 
 def test_model_waits_for_a_key_and_for_the_network():

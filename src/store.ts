@@ -458,7 +458,7 @@ export interface OFState {
   ingestPaperLive: (paperId: string, force?: boolean) => Promise<void>;
   /** The timer simulation. Called by `ingestPaper` when the service is down; labelled as such. */
   ingestPaperScripted: (paperId: string) => void;
-  /** One forced tool call over a fetched paper, through the service (§6.3); then the overlay again. */
+  /** One structured model response over a fetched paper, through the service (§6.3); then the overlay again. */
   extractPaperLive: (paperId: string) => Promise<void>;
   completeJob: (id: string) => void;
   /** Put one record's card in front of the reviewer — the reader's rail links here. */
@@ -1003,7 +1003,7 @@ export const useStore = create<OFState>()((set, get) => ({
     get().logActivity({
       at: stamp(),
       icon: 'sparkles',
-      text: `Extracting ${paperId} — one forced tool call over its full text`,
+      text: `Extracting ${paperId} — one structured model response over its full text`,
       href: '#/intake/ingest',
       provenance: 'user',
     });
@@ -2221,13 +2221,13 @@ export const useStore = create<OFState>()((set, get) => ({
         return applyDecision(r, d);
       };
       // §7.3 — candidates for a field the seed has no record of join the
-      // records, after the seed, as unverified records extracted by haiku-1.
+      // records, after the seed, as unverified records extracted by claude-1.
       // A candidate that matches a seed record's field stays in the overlay,
       // beside that record on its review card. Idempotent: a candidate
       // already here is not added twice, and a Durable decision on one that
       // just arrived is applied to it.
       const local = s.durableReview;
-      const seed = s.records.filter((r) => r.extractorRun !== 'haiku-1');
+      const seed = s.records.filter((r) => r.extractorRun !== 'claude-1');
       const present = new Set(s.records.map((r) => r.id));
       const arrivingIds: string[] = [];
       const arriving: ExtractionRecord[] = currentCandidates
@@ -2252,11 +2252,11 @@ export const useStore = create<OFState>()((set, get) => ({
       const surviving =
         overlay.candidates === null || overlay.candidates === undefined
           ? s.records
-          : s.records.filter((r) => r.extractorRun !== 'haiku-1' || stillExtracted.has(r.id) || wasDecided(r.id));
+          : s.records.filter((r) => r.extractorRun !== 'claude-1' || stillExtracted.has(r.id) || wasDecided(r.id));
       const records = [...surviving, ...arriving]
         .map(decide)
         .map((r) =>
-          r.extractorRun !== 'haiku-1' || overlay.candidates == null
+          r.extractorRun !== 'claude-1' || overlay.candidates == null
             ? r
             : { ...r, absentFromRun: stillExtracted.has(r.id) ? undefined : true },
         );

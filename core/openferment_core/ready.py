@@ -8,9 +8,9 @@ loop fails here, · skipped. Each ✗ and ! says what to do. Exits 1 when any
 check is ✗, so install.sh and deploy.sh can show it.
 
 It spends nothing. The model check asks Anthropic's Models API whether the key
-may use MODEL, which is free and is also how a retired model shows up before a
-real call fails; the Europe PMC check is one search. The key itself is never
-printed, in whole or in part.
+may use each model in the chain (llm.py: Opus, then Sonnet), which is free and
+is also how a retired model shows up before a real call fails; the Europe PMC
+check is one search. The key itself is never printed, in whole or in part.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 
 from . import biorepo, extract, intake
 from .corpus import load_corpus
-from .postdoc import MODEL
+from . import llm
 
 CORE = Path(__file__).parent.parent
 REPO = CORE.parent
@@ -114,6 +114,8 @@ def check_intake() -> Check:
 
 
 def check_model(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
+    """Both models in the chain, through the free Models API: the primary every
+    call starts on and the fallback it moves to (llm.py)."""
     if not have_key:
         return Check("model", "skip", "needs the key")
     if intake.fixtures_only():
@@ -121,20 +123,32 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
     import anthropic
 
     client = (client_factory or anthropic.Anthropic)()
-    try:
-        client.models.retrieve(MODEL, timeout=15)
-    except anthropic.AuthenticationError:
-        return Check("model", "fail", "Anthropic rejected the key. Make a new one in the console and put it in core/.env")
-    except anthropic.PermissionDeniedError:
-        return Check("model", "fail", f"the key may not use {MODEL}")
-    except anthropic.NotFoundError:
-        return Check("model", "fail", f"{MODEL} is not available to this key; it may have been retired. "
-                     "The model name and its prices are at the top of core/openferment_core/postdoc.py")
-    except anthropic.APIConnectionError:
-        return Check("model", "fail", "could not reach api.anthropic.com")
-    except anthropic.APIStatusError as e:
-        return Check("model", "fail", f"api.anthropic.com answered {e.status_code}")
-    return Check("model", "ok", f"the key is accepted and {MODEL} is available")
+    offered: list[str] = []
+    missing: list[str] = []
+    for model in llm.chain():
+        try:
+            client.models.retrieve(model, timeout=15)
+        except anthropic.AuthenticationError:
+            return Check("model", "fail", "Anthropic rejected the key. Make a new one in the console and put it in core/.env")
+        except (anthropic.PermissionDeniedError, anthropic.NotFoundError):
+            missing.append(model)
+            continue
+        except anthropic.APIConnectionError:
+            return Check("model", "fail", "could not reach api.anthropic.com")
+        except anthropic.APIStatusError as e:
+            return Check("model", "fail", f"api.anthropic.com answered {e.status_code}")
+        offered.append(model)
+    unpriced = [m for m in offered if m not in llm.PRICES]
+    if not offered:
+        return Check("model", "fail", f"no model in the chain is available to this key ({', '.join(missing)}). "
+                     "Set OPENFERMENT_MODEL in core/.env to one that is")
+    if missing:
+        return Check("model", "warn", f"{', '.join(missing)} is not available to this key, so every call runs on "
+                     f"{', '.join(offered)}. Set OPENFERMENT_MODEL or OPENFERMENT_FALLBACK_MODEL in core/.env")
+    if unpriced:
+        return Check("model", "warn", f"no price on file for {', '.join(unpriced)}, so its cost shows as $0. "
+                     "Add it to PRICES in core/openferment_core/llm.py")
+    return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
 
 
 def check_europe_pmc() -> Check:

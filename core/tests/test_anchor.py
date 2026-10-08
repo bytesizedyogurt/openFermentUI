@@ -86,7 +86,7 @@ def good(**overrides):
 
 
 def anchor(raw):
-    return anchor_candidate(raw, SECTIONS, paper_id="X1", candidate_id="hk1-X1-1")
+    return anchor_candidate(raw, SECTIONS, paper_id="X1", candidate_id="cl1-X1-1")
 
 
 # ── normalisation and number parsing ───────────────────────────────────
@@ -141,11 +141,11 @@ def test_a_power_of_ten_in_the_quote_is_read_as_a_number():
         {"id": "s8", "heading": "Titre", "text": "The titre reached 4.2 × 10³ mg L⁻¹ by day 4."}
     ]
     raw = good(sectionId="s8", value=4200, unit="mg/L", quote="reached 4.2 × 10³ mg L⁻¹")
-    c, rule, detail = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    c, rule, detail = anchor_candidate(raw, sections, paper_id="X1", candidate_id="cl1-X1-1")
     assert rule is None, detail
     assert c.si.value == 4.2
     raw = good(sectionId="s8", value=4.2, unit="mg/L", quote="reached 4.2 × 10³ mg L⁻¹")
-    _, rule, _ = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    _, rule, _ = anchor_candidate(raw, sections, paper_id="X1", candidate_id="cl1-X1-1")
     assert rule == "value", "4.2 is the mantissa, not a number the sentence states"
 
 
@@ -171,11 +171,11 @@ def test_a_good_numeric_candidate_anchors_with_si_and_fixed_provenance():
     c, rule, detail = anchor(good())
     assert rule is None, detail
     assert c is not None
-    assert c.id == "hk1-X1-1" and c.paperId == "X1" and c.sectionId == "s3"
+    assert c.id == "cl1-X1-1" and c.paperId == "X1" and c.sectionId == "s3"
     assert c.value == 4.2 and c.unit == "g L⁻¹"
     assert c.si.unit == "kg m⁻³" and c.si.value == 4.2
     assert c.status == "unverified" and c.provenance == "unverified"
-    assert c.extractorRun == "haiku-1"
+    assert c.extractorRun == "claude-1"
     assert c.confidence == 0.9 and c.isPrimary is True
 
 
@@ -229,12 +229,12 @@ def test_undetermined_is_a_valid_method():
     sections = SECTIONS + [{"id": "s9", "heading": "Extra", "text": sentence}]
     raw = good(sectionId="s9", field=needs, value=value, unit=spec["canonicalUnit"],
                method="undetermined", quote=sentence)
-    c, rule, detail = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    c, rule, detail = anchor_candidate(raw, sections, paper_id="X1", candidate_id="cl1-X1-1")
     assert rule is None, detail
     assert c.method == "undetermined"
     # And without the method, the same candidate is refused on rule 6.
     raw.pop("method")
-    _, rule, _ = anchor_candidate(raw, sections, paper_id="X1", candidate_id="hk1-X1-1")
+    _, rule, _ = anchor_candidate(raw, sections, paper_id="X1", candidate_id="cl1-X1-1")
     assert rule == "method"
 
 
@@ -341,7 +341,7 @@ def test_anchor_all_counts_rejections_per_rule():
         paper_id="X1",
     )
     ids = [c.id for c in result.accepted]
-    assert len(ids) == 2 and all(re.fullmatch(r"hk1-X1-[0-9a-f]{8}", i) for i in ids) and ids[0] != ids[1]
+    assert len(ids) == 2 and all(re.fullmatch(r"cl1-X1-[0-9a-f]{8}", i) for i in ids) and ids[0] != ids[1]
     # Stable: the same content gets the same id on a second run, however the
     # unit was spelled; a duplicate collapses.
     again = anchor_all([good(), good(unit="g L⁻¹"), good()], SECTIONS, paper_id="X1")

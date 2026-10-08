@@ -1,7 +1,7 @@
 """Extraction against the real model (OF-BLD-012 §6.1).
 
 Marked `live`: needs the network for the fetch, a key for the call, and it
-spends money — one Haiku call over one paper. Excluded from `pnpm verify`;
+spends money — one model call (Opus, or Sonnet on fallback) over one paper. Excluded from `pnpm verify`;
 run with `pnpm test:live`. Prints the per-paper usage so the cost of a real
 extraction is a number somebody has seen rather than an estimate.
 """
@@ -35,5 +35,5 @@ def test_h1_extracts_at_least_one_anchored_candidate():
     assert result.candidates, "a real paper with real tables yielded nothing that anchors"
     for c in result.candidates:
         assert c.status == "unverified" and c.provenance == "unverified"
-        assert c.extractorRun == "haiku-1"
+        assert c.extractorRun == "claude-1"
     assert result.usage.costUsd > 0

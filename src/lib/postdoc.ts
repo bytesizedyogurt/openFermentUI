@@ -28,6 +28,8 @@ export class PostdocDown extends Error {
 export interface PostdocHealth {
   ok: boolean;
   model: string;
+  /** The model a call moves to when `model` declines or is unavailable. */
+  fallbackModel?: string;
   /** False means the service is up but has no key — a different fix entirely. */
   hasKey: boolean;
   records: number;

@@ -125,7 +125,7 @@ for (const [id, d] of Object.entries(decisions)) {
 for (const c of copies.values()) {
   if (!decisions[c.id]) fail(`records[] holds ${c.id} with no decision about it`);
   if (seed.has(c.id)) fail(`records[] holds ${c.id}, which is a seed record, not a candidate`);
-  if (c.extractorRun !== 'haiku-1') fail(`records[] holds ${c.id} from run ${JSON.stringify(c.extractorRun)}`);
+  if (c.extractorRun !== 'claude-1') fail(`records[] holds ${c.id} from run ${JSON.stringify(c.extractorRun)}`);
 }
 
 // ── report ─────────────────────────────────────────────────────────────

@@ -209,7 +209,7 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 const STATE: Record<string, { now: string; built: boolean }> = {
   Intake: { now: `${RECORDS.length} extraction records`, built: true },
   BioRepo: { now: `${PAPERS.length} papers · gold set not yet annotated`, built: true },
-  Postdoc: { now: 'live on Claude Haiku, via openferment-core', built: true },
+  Postdoc: { now: 'live on Claude Opus 5.5, via openferment-core', built: true },
   geneOS: { now: `${STRAINS.length} hosts · no sequence tooling`, built: true },
   fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
   pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },

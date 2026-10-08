@@ -70,6 +70,9 @@ class Usage(BaseModel):
     # the UI because a visible per-query cost is what makes budget gating real
     # rather than theoretical.
     costUsd: float = 0.0
+    # The models that answered, in order: one, or the primary and the model it
+    # fell back to (llm.py). Empty for a saved fixture that never called one.
+    models: list[str] = Field(default_factory=list)
 
 
 class AnswerPlan(BaseModel):
@@ -213,8 +216,9 @@ class Overlay(BaseModel):
 # ── Extraction and review (OF-BLD-012 §2.5, §6, §7) ──────────────────────
 
 RecordStatus = Literal["unverified", "verified", "rejected"]
-# Mirrors ExtractorRun in types.ts. 'haiku-1' is the first run that actually ran.
-ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "haiku-1"]
+# Mirrors ExtractorRun in types.ts. 'claude-1' is the first run that runs for
+# real: Claude Opus 5.5, with Claude Sonnet 5.5 where Opus declined (llm.py).
+ExtractorRun = Literal["v0.3", "v0.4", "v0.4r", "claude-1"]
 Outcome = Literal["match", "value_mismatch", "unit_error", "span_error", "miss"]
 
 
@@ -273,7 +277,7 @@ class Candidate(BaseModel):
     organism: str | None = None
     componentTag: str | None = None
     goldOnly: bool | None = None
-    extractorRun: ExtractorRun = "haiku-1"
+    extractorRun: ExtractorRun = "claude-1"
     rejectReason: str | None = None
     isPrimary: bool = True
     citesRecordId: str | None = None
@@ -390,7 +394,7 @@ class ExtractResponse(BaseModel):
     signal that the prompt has drifted."""
 
     paperId: str
-    run: ExtractorRun = "haiku-1"
+    run: ExtractorRun = "claude-1"
     extractedAt: str
     candidates: list[Candidate] = Field(default_factory=list)
     audit: list[AuditEvent] = Field(default_factory=list)

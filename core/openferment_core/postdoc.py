@@ -1,10 +1,10 @@
-"""The Haiku call (OF-BLD-007 §6).
+"""The Postdoc call (OF-BLD-007 §6).
 
-One retrieval, one call, no agent loop. Structured output comes from forced
-tool use rather than from asking for JSON in prose: a single tool,
-`emit_answer_plan`, with `tool_choice` pinned to it, so the model has exactly
-one way to respond and the response is schema-checked by the API before it
-reaches us.
+One retrieval, one call, no agent loop. The answer comes back as JSON that
+matches the `emit_answer_plan` schema, through structured outputs (llm.py):
+the model has exactly one way to respond and the API checks the shape before
+it reaches us. The model is Claude Opus 5.5, with Claude Sonnet 5.5 when Opus
+declines or is unavailable; llm.py says which answered and what it cost.
 
 WHAT THIS MODULE IS NOT ALLOWED TO DO. It does not decide whether a claim is
 good — `validate.py` does, and it runs on everything that comes back. It does
@@ -18,20 +18,14 @@ import logging
 import os
 from typing import Any
 
-import anthropic
-
+from . import llm
 from .models import Usage
 
 log = logging.getLogger("openferment.postdoc")
 
-MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 2000
-
-# Haiku 4.5, per million tokens. Stated here rather than inlined so the number
-# a cost is computed from is the number somebody can check against the pricing
-# page — a cost figure whose source is buried is a cost figure nobody audits.
-USD_PER_MTOK_IN = 1.00
-USD_PER_MTOK_OUT = 5.00
+# A plan is a handful of claims, but these models think before they answer and
+# the thinking counts against this limit. Room for both.
+MAX_TOKENS = 8000
 
 SYSTEM = """You are Postdoc, a research assistant for precision fermentation \
 in the openFerment platform.
@@ -139,15 +133,6 @@ class PostdocUnavailable(RuntimeError):
     """No key, or the API could not be reached. Distinct from a bad answer."""
 
 
-def cost_usd(input_tokens: int, output_tokens: int) -> float:
-    """Cost from the response's own token counts, never an estimate."""
-    return round(
-        input_tokens / 1_000_000 * USD_PER_MTOK_IN
-        + output_tokens / 1_000_000 * USD_PER_MTOK_OUT,
-        6,
-    )
-
-
 def _evidence_payload(records: list[dict[str, Any]], corpus) -> list[dict[str, Any]]:
     """Records as structured JSON, not prose (§6).
 
@@ -198,7 +183,6 @@ def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dic
             "restart the service."
         )
 
-    client = anthropic.Anthropic(api_key=key)
     evidence = _evidence_payload(records, corpus)
 
     user_turn = (
@@ -215,45 +199,38 @@ def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dic
         )
 
     try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
+        result = llm.call(
             system=SYSTEM,
-            messages=[{"role": "user", "content": user_turn}],
-            tools=[TOOL],
-            # Forced, not suggested. The model has exactly one way to respond,
-            # and the API validates the shape before we see it — far more
-            # reliable than asking for JSON in prose and parsing what comes back.
-            tool_choice={"type": "tool", "name": "emit_answer_plan"},
+            user=user_turn,
+            # One way to respond, and the API checks the shape before we see
+            # it: far more reliable than asking for JSON in prose.
+            schema=TOOL["input_schema"],
+            max_tokens=MAX_TOKENS,
+            label="postdoc: ",
         )
-    except anthropic.APIConnectionError as e:
-        raise PostdocUnavailable(f"Could not reach the Anthropic API: {e}") from e
-    except anthropic.AuthenticationError as e:
-        raise PostdocUnavailable(
-            "The Anthropic API rejected the key in core/.env."
-        ) from e
-    except anthropic.RateLimitError as e:
-        raise PostdocUnavailable(
-            "Rate limited by the Anthropic API. Wait and try again."
-        ) from e
-    except anthropic.APIStatusError as e:
-        raise PostdocUnavailable(f"Anthropic API error {e.status_code}: {e.message}") from e
+    except llm.ModelRefused as e:
+        log.warning("postdoc: %s", e)
+        return (
+            {
+                "claims": [],
+                "gaps": [],
+                "declined": (
+                    "The model's safety classifier declined this question "
+                    f"({e.category or 'no category given'}), on every model tried. "
+                    "Nothing is shown rather than an answer nobody gave."
+                ),
+            },
+            e.usage,
+        )
+    except llm.ModelUnavailable as e:
+        raise PostdocUnavailable(str(e)) from e
 
-    usage = Usage(
-        inputTokens=response.usage.input_tokens,
-        outputTokens=response.usage.output_tokens,
-        costUsd=cost_usd(response.usage.input_tokens, response.usage.output_tokens),
-    )
-
-    for block in response.content:
-        if block.type == "tool_use" and block.name == "emit_answer_plan":
-            # Tool inputs are parsed, never string-matched — escaping varies.
-            raw = block.input if isinstance(block.input, dict) else json.loads(block.input)
-            return raw, usage
-
-    # Forced tool choice makes this close to unreachable, but "close to" is not
-    # "never", and a silently empty plan would render as a blank answer.
-    log.warning("no tool_use block in response; stop_reason=%s", response.stop_reason)
+    if result.data is not None:
+        return result.data, result.usage
+    # Structured outputs make this close to unreachable (a response cut off at
+    # max_tokens is the likely way), but "close to" is not "never", and a
+    # silently empty plan would render as a blank answer.
+    log.warning("no plan in the response; stop_reason=%s", result.stop_reason)
     return (
         {
             "claims": [],
@@ -263,5 +240,5 @@ def ask_model(question: str, records: list[dict[str, Any]], corpus) -> tuple[dic
                 "shown rather than guessing at what it meant."
             ),
         },
-        usage,
+        result.usage,
     )
