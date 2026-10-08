@@ -131,6 +131,14 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   address is the access control; `tailscale serve` publishes it to the owner's
   devices. Widening it (`OPENFERMENT_HOST`) is a decision for Sean, never a
   default.
+- `guard.py`, run as middleware on every request: a POST/PUT/PATCH/DELETE must
+  name a host the service answers to (IP, dotless, `.local`, `.ts.net`, or
+  `OPENFERMENT_ALLOWED_HOSTS`), and a browser `Origin` must be that host. This
+  stops cross-site posts and DNS rebinding. Reads stay open. New changing
+  endpoints are covered automatically; `test_request_guard` is its test.
+- Every file the service keeps is written through `atomic.write_text`
+  (write beside, fsync, rename). `biorepo.write` holds `_WRITE_LOCK` across
+  its read-modify-write. Never write those files with `Path.write_text`.
 
 ## Persistence tiers
 

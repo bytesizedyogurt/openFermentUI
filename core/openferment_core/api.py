@@ -21,10 +21,11 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, intake, witness
+from . import biorepo, extract, guard, intake, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -50,6 +51,17 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 log = logging.getLogger("openferment.api")
 
 app = FastAPI(title="openferment-core", version="0.1.0")
+
+
+@app.middleware("http")
+async def refuse_changes_from_elsewhere(request: Request, call_next):
+    """A changing request from another site, or under a hostile name, stops
+    here with a 403 that says why (guard.py, OF-BLD-012 §B.6)."""
+    why = guard.refusal(request.method, request.headers)
+    if why is not None:
+        log.warning("refused %s %s: %s", request.method, request.url.path, why)
+        return JSONResponse(status_code=403, content={"detail": why})
+    return await call_next(request)
 
 # §6 caps evidence at 30 records. The cap is the contract with the token budget.
 MAX_EVIDENCE = 30

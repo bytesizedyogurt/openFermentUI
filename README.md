@@ -194,6 +194,9 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
   is the access control. `install.sh` runs `tailscale serve`, which publishes the port over HTTPS to
   your own signed-in Tailscale devices, with nothing opened on the router. A link for someone outside
   your tailnet is a Cloudflare Tunnel with a login page in front, set up by hand when it is needed.
+  A request that changes something must also come from a page on openFerment's own address, so a
+  web page you happen to open elsewhere cannot post through your browser (`core/openferment_core/guard.py`).
+  A name of your own in front of it goes in `OPENFERMENT_ALLOWED_HOSTS`.
 - **Review decisions live in this checkout.** Guild writes `core/data/biorepo.json` on the Mini;
   pushing it is the backup, and `deploy.sh` refuses to pull over decisions that are not committed.
 - **FileVault** holds a rebooted Mini at the unlock screen until someone types the password; the
