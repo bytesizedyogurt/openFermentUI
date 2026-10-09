@@ -17,7 +17,10 @@
  *   3. the store: writes made with the service down are kept and marked
  *      pending, the sample never leaks into the ledger, and `syncGuild`
  *      posts people, then entries, then withdrawals, and drops what the
- *      service refuses.
+ *      service refuses;
+ *   4. a run (OF-BLD-013 §2): completing a step writes a run alone, a
+ *      supervised run or a deviation, once per step, for whoever is the
+ *      operator at the time.
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
@@ -248,8 +251,52 @@ async function main() {
   check('afterwards the service ledger is the truth and nothing is pending', s().guild.people.length === 1 && s().guildPending.length === 0 && s().guildPendingWithdrawals.length === 0);
   check('the refusal is said out loud', s().toasts.some((t) => t.kind === 'error' && /refused 1 Guild change/.test(t.text)));
 
+  // With the service down, so the reset's own sync does not race what follows.
+  useStore.setState({ serviceUp: false });
   s().resetDemo();
-  check('a reset clears what was only ever in this browser', s().guildPending.length === 0 && s().guildSample === null);
+  check('a reset clears what was only ever in this browser', s().guildPending.length === 0 && s().guildSample === null && s().guild.people.length === 0);
+
+  // ── 4. a run writes to the ledger (OF-BLD-013 §2) ───────────────────
+  useStore.setState({
+    serviceUp: false,
+    guild: {
+      version: 1,
+      people: [person('p-lead', 'lead'), person('p-ann'), person('p-tom')],
+      evidence: [
+        ev('p-ann', 'SK-OD', 'designation', '2026-02-01'),
+        ev('p-ann', 'SK-DCW', 'designation', '2026-02-01'),
+        ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01'),
+      ],
+    },
+    guildPending: [],
+    guildActingId: 'p-tom',
+  });
+  const lastEntry = () => s().guild.evidence[s().guild.evidence.length - 1];
+  const runId = s().startRun('PR-OD-01', '1.0', 1);
+  check('a run starts with whoever is signing as its operator', s().runs[runId].operatorId === 'p-tom');
+  const before4 = s().guild.evidence.length;
+  s().setRunCosigner(runId, 'o3', 'p-ann');
+  await s().recordStepForGuild(runId, 'o3');
+  const o3 = s().guild.evidence.slice(before4);
+  check('Supervised with a cosigner beside them writes a supervised run', o3.length === 1 && o3[0].kind === 'supervised' && o3[0].observerId === 'p-ann' && o3[0].source.stepId === 'o3', o3.map((e) => [e.kind, e.observerId]));
+  const dev4 = await s().recordStepForGuild(runId, 'o4');
+  check('Supervised with nobody beside them writes a deviation', dev4 === 1 && lastEntry()?.kind === 'deviation' && lastEntry()?.observerId === null);
+  const dev1 = await s().recordStepForGuild(runId, 'o1');
+  check('below Supervised writes a deviation', dev1 === 1 && /below Supervised/.test(lastEntry()?.raw ?? ''));
+  s().setRunCosigner(runId, 'o2', 'p-ann');
+  const dev2 = await s().recordStepForGuild(runId, 'o2');
+  check('below Supervised is a deviation even with a cosigner beside them', dev2 === 1 && lastEntry()?.kind === 'deviation');
+  const again = s().guild.evidence.length;
+  await s().recordStepForGuild(runId, 'o3');
+  check('completing a step twice writes once', s().guild.evidence.length === again);
+  s().setRunOperator(runId, 'p-ann');
+  await s().recordStepForGuild(runId, 'o5');
+  check('a handover changes who the next step is written for', lastEntry()?.personId === 'p-ann' && lastEntry()?.kind === 'independent');
+  const untagged = s().guild.evidence.length;
+  const seed = s().startRun('PR-SEED-01', '1.0', 1);
+  await s().recordStepForGuild(seed, 's6');
+  check('a step that needs no skill writes nothing', s().guild.evidence.length === untagged);
+  check('every run entry is one the service would accept, as far as the browser can tell', s().guild.evidence.filter((e) => e.source.kind === 'deposition').every((e) => offlineRefusal(e, s().guild) === null));
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);

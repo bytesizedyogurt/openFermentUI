@@ -596,8 +596,33 @@ async function main() {
         const moved = await page.locator('button[aria-label="Aline Uwase, OD750 reading: Supervised"]').count();
         if (moved !== 1) problems.push('a training sign-off did not move the cell to Supervised');
       }
+      // §2 — run mode reads the same ledger and writes to it as steps complete.
+      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-OD-01'));
+      await page.waitForTimeout(400);
+      await page.locator('button:has-text("Start run at")').first().click();
+      await page.waitForTimeout(500);
+      let bench = await page.locator('body').innerText();
+      if (!/Eric Habimana holds every skill this step needs/.test(bench)) problems.push('run mode does not start with the acting assessor cleared');
+      await page.locator('button:has-text("Hand over")').click();
+      await page.locator('button:has-text("Patrick Mugisha")').first().click();
+      await page.waitForTimeout(200);
+      bench = await page.locator('body').innerText();
+      if (!/Cosign needed/.test(bench)) problems.push('a Supervised operator is not asked for a cosigner');
+      await page.locator('button:has-text("Record cosigner")').click();
+      await page.locator('button:has-text("Eric Habimana")').first().click();
+      await page.waitForTimeout(200);
+      if (!/Cosigned by Eric Habimana/.test(await page.locator('body').innerText())) problems.push('the cosigner is not shown');
+      await page.locator('button:has-text("Mark step complete")').click();
+      await page.waitForTimeout(400);
+      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-patrick'));
+      await page.waitForTimeout(400);
+      const ledger = await page.locator('body').innerText();
+      if (!/Supervised run[\s\S]{0,200}PR-OD-01 · step o1 · cosigned by Eric Habimana/.test(ledger))
+        problems.push('completing a cosigned step did not write a supervised run to the ledger');
       await page.locator('button:has-text("Hide the sample")').click();
       await page.waitForTimeout(200);
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(300);
       if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('hiding the sample left something behind');
       if (guildPosts.length) problems.push(`the sample sent ${guildPosts.length} write(s) to the service`);
       await page.fill('#person-name', 'Smoke Lead');
@@ -617,7 +642,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -631,7 +656,7 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, first person, reload`);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, first person, reload`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 

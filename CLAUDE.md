@@ -197,6 +197,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   `core/openferment_core/competence.py`, a mirror of `competence.ts` held to
   it by a fixture (`pnpm export:competence-fixtures`, run by `test:core`).
   When the two disagree, the TypeScript side is right and the mirror is fixed.
+- **Run mode writes to the ledger, in advise mode.** `GuildGate` in
+  Deposition names the operator, asks for a cosigner when they are
+  Supervised, lapsed or suspended on a skill the step needs, and lets every
+  step complete. Completing a step writes one entry per skill it needs, once
+  per step: a run alone, a cosigned run or a deviation
+  (`recordStepForGuild` in `src/store.ts`). Holding a step waits for Phase 5.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

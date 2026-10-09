@@ -41,6 +41,7 @@ import { Button, Modal, cx, EmptyState, Callout } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { DepositionPanel } from '@/components/DepositionPanel';
 import { ComponentTag } from '@/components/ComponentTag';
+import { GuildGate } from '@/components/GuildGate';
 
 const SKIP_REASONS = [
   'Not applicable to this batch',
@@ -122,6 +123,8 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
   const closeDeposition = useStore((s) => s.closeDeposition);
   const startRun = useStore((s) => s.startRun);
   const toast = useStore((s) => s.toast);
+  // OF-BLD-013 §2 — completing a step writes what happened to Guild's ledger.
+  const recordStepForGuild = useStore((s) => s.recordStepForGuild);
 
   const [now, setNow] = useState(Date.now());
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -167,6 +170,13 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
 
   const markComplete = () => {
     if (!run || !step) return;
+    void recordStepForGuild(runId, step.id).then((deviations) => {
+      if (deviations > 0)
+        toast({
+          text: `Step completed without the level it needs: ${deviations} deviation${deviations === 1 ? '' : 's'} written to Guild's ledger`,
+          kind: 'warn',
+        });
+    });
     completeStep(runId, step.id);
     if (run.currentStep < steps.length - 1) advance(1);
     else setSummary(true);
@@ -695,6 +705,9 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
             <p className="text-ink font-medium mb-5" style={{ fontSize: 21, lineHeight: '31px' }}>
               {stepText}
             </p>
+
+            {/* OF-BLD-013 §2 — who may perform this step, from Guild's ledger. */}
+            <GuildGate runId={runId} step={step} />
 
             {step?.note && (
               <Callout kind="info" title="Why this step">

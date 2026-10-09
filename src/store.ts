@@ -75,7 +75,8 @@ import {
   postWithdrawal,
 } from '@/lib/guild';
 import { sampleGuild } from '@/data/guildSample';
-import { localToday } from '@/engine/competence';
+import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
+import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -510,6 +511,17 @@ export interface OFState {
   guildRecord: (entry: Omit<GuildEvidence, 'id' | 'recordedAt'>) => Promise<GuildEvidence | null>;
   guildWithdraw: (evidenceId: string, reason: string) => Promise<boolean>;
   guildSetActing: (id: string | null) => void;
+  /** Who is performing this run's steps (OF-BLD-013 §2). A handover is a change of operator. */
+  setRunOperator: (runId: string, personId: string | null) => void;
+  /** Who stood beside the operator for one step, or null to clear it. */
+  setRunCosigner: (runId: string, stepId: string, personId: string | null) => void;
+  /**
+   * What completing a step writes to Guild's ledger, once per step per run:
+   * a run alone where the operator holds every skill, a supervised run where a
+   * cosigner stood beside them, a deviation where the step went ahead without
+   * the level it needs. Returns how many deviations it wrote.
+   */
+  recordStepForGuild: (runId: string, stepId: string) => Promise<number>;
   guildLoadSample: () => void;
   guildClearSample: () => void;
   /** Post what this browser made offline, then take the service's ledger as the truth. */
@@ -1248,6 +1260,10 @@ export const useStore = create<OFState>()((set, get) => ({
       checks: {},
       deviations: [],
       timers: [],
+      // OF-BLD-013 §2 — whoever is signing in Guild runs it, when they can hold skills.
+      operatorId: runOperatorDefault(get()),
+      cosigned: {},
+      guildRecorded: {},
     };
     set((s) => ({ runs: { ...s.runs, [id]: run }, activeRunId: id }));
     return id;
@@ -1865,7 +1881,8 @@ export const useStore = create<OFState>()((set, get) => ({
       id: depositionId,
       runbookId,
       protocolId,
-      operatorId: null, // Guild will populate this once people exist.
+      // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who holds skills.
+      operatorId: runOperatorDefault(s),
       startedAt: new Date().toISOString(),
       closedAt: null,
       state: 'staged',
@@ -2564,6 +2581,78 @@ export const useStore = create<OFState>()((set, get) => ({
 
   guildClearSample: () => set({ guildSample: null, guildSampleActingId: null }),
 
+  setRunOperator: (runId, personId) =>
+    set((s) => {
+      const run = s.runs[runId];
+      if (!run) return {};
+      return {
+        runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
+        // The deposition names whoever is performing now; each step's entry
+        // on the ledger names who performed that step.
+        depositions: run.depositionId
+          ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
+          : s.depositions,
+      };
+    }),
+
+  setRunCosigner: (runId, stepId, personId) =>
+    set((s) => {
+      const run = s.runs[runId];
+      if (!run) return {};
+      const cosigned = { ...(run.cosigned ?? {}) };
+      if (personId) cosigned[stepId] = personId;
+      else delete cosigned[stepId];
+      return { runs: { ...s.runs, [runId]: { ...run, cosigned } } };
+    }),
+
+  recordStepForGuild: async (runId, stepId) => {
+    const s = get();
+    const run = s.runs[runId];
+    if (!run || run.guildRecorded?.[stepId]) return 0;
+    const operatorId = run.operatorId ?? null;
+    const ledger = guildView(s);
+    if (!operatorId || !ledger.people.some((p) => p.id === operatorId)) return 0;
+    const protocol = s.protocols.find((p) => p.id === run.protocolId);
+    const step = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId);
+    const tags = step?.skills ?? [];
+    if (!protocol || tags.length === 0) return 0;
+    set((x) => ({
+      runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
+    }));
+    const today = localToday();
+    const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, today);
+    const cosigner = run.cosigned?.[stepId] ?? null;
+    const where = `${run.depositionId ? `Deposition ${run.depositionId}` : `Run ${runId}`}, step ${stepId}`;
+    let deviations = 0;
+    for (const skillId of tags) {
+      const e = statusOf(map, operatorId, skillId).effective;
+      const base = {
+        personId: operatorId,
+        skillId,
+        outcome: 'pass' as const,
+        at: today,
+        source: { kind: 'deposition' as const, ref: protocol.id, stepId },
+      };
+      if (e >= 3) {
+        await get().guildRecord({ ...base, kind: 'independent', observerId: null, raw: `${where}: performed alone` });
+      } else if (e === 2 && cosigner && mayCosign(map, cosigner, [skillId])) {
+        await get().guildRecord({ ...base, kind: 'supervised', observerId: cosigner, raw: `${where}: performed with a cosigner beside them` });
+      } else {
+        deviations += 1;
+        await get().guildRecord({
+          ...base,
+          kind: 'deviation',
+          observerId: null,
+          raw:
+            e === 2
+              ? `${where}: performed without the cosigner it needs`
+              : `${where}: performed below Supervised, which needs a qualified operator`,
+        });
+      }
+    }
+    return deviations;
+  },
+
   syncGuild: async () => {
     if (guildSyncing) return;
     guildSyncing = true;
@@ -2660,6 +2749,13 @@ export function actingIdOf(s: Pick<OFState, 'guildSample' | 'guildActingId' | 'g
 }
 
 let guildSyncing = false;
+
+/** Whoever is signing in Guild, when they are on the ledger and can hold skills. */
+function runOperatorDefault(s: OFState): string | null {
+  const id = actingIdOf(s);
+  const p = id ? guildView(s).people.find((x) => x.id === id) : undefined;
+  return p && p.active && p.role !== 'auditor' ? p.id : null;
+}
 
 type StoreSet = (partial: Partial<OFState> | ((s: OFState) => Partial<OFState>)) => void;
 

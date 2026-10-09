@@ -10,10 +10,11 @@ import { SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { Button, Callout, PageHeader, Sheet, cx } from '@/components/ui';
+import { Button, Callout, Card, PageHeader, Sheet, cx } from '@/components/ui';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import {
   LEVEL_NAME,
+  addDays,
   competenceOf,
   isAssessor,
   localToday,
@@ -713,5 +714,58 @@ export function ExportLedgerButton({ ctx, personId }: { ctx: GuildContext; perso
     <Button onClick={() => exportLedger(ctx, personId)}>
       <Download size={14} /> Export ledger as CSV
     </Button>
+  );
+}
+
+// ── Home ───────────────────────────────────────────────────────────────
+
+/**
+ * The workforce at a glance, for Home's right rail (OF-BLD-013 §2): what
+ * lapses in the next 30 days, who is ready for a witnessed check, and the
+ * deviations runs wrote this week. Each line opens the view that acts on it.
+ */
+export function WorkforceCard() {
+  const ctx = useGuild();
+  if (ctx.guild.people.length === 0) {
+    return (
+      <Card className="p-3 text-body">
+        <span className="text-ink-soft">Nobody is on Guild&rsquo;s ledger yet. </span>
+        <a className="text-accent hover:underline" href={href('/guild/matrix')}>
+          Start it
+        </a>
+      </Card>
+    );
+  }
+  let lapsing = 0;
+  let lapsed = 0;
+  let ready = 0;
+  for (const m of ctx.members)
+    for (const sk of Object.values(SKILL_BY_ID)) {
+      const st = statusOf(ctx.status, m.id, sk.id);
+      if (st.lapsed || st.suspended) lapsed += 1;
+      else if (st.lapsesAt && st.lapsesAt <= addDays(ctx.today, 30)) lapsing += 1;
+      if (readyForCheck(st, sk)) ready += 1;
+    }
+  const weekAgo = addDays(ctx.today, -7);
+  const deviations = ctx.guild.evidence.filter((e) => e.kind === 'deviation' && !e.withdrawnAt && e.at.slice(0, 10) >= weekAgo).length;
+  const rows: [string, number, string][] = [
+    ['qualifications lapsed or suspended', lapsed, '/guild/matrix'],
+    ['qualifications lapse within 30 days', lapsing, '/guild/matrix'],
+    ['ready for a witnessed check', ready, '/guild/matrix'],
+    ['deviations logged from runs this week', deviations, '/guild/people'],
+  ];
+  return (
+    <Card className="p-3 space-y-1.5">
+      {ctx.sample && <div className="text-caption text-signal-warn">Sample team: invented people</div>}
+      {rows.map(([label, n, to]) => (
+        <a key={label} href={href(to)} className="flex items-baseline gap-2 text-body hover:text-accent">
+          <span className={cx('font-num w-8 text-right', n > 0 && label !== 'ready for a witnessed check' ? 'text-signal-warn' : 'text-ink')}>{n}</span>
+          <span>{label}</span>
+        </a>
+      ))}
+      <div className="text-caption text-ink-soft pt-1">
+        {ctx.members.length} {ctx.members.length === 1 ? 'person' : 'people'} on the ledger, auditors aside
+      </div>
+    </Card>
   );
 }

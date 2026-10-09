@@ -470,6 +470,16 @@ export interface RunState {
    * that will not survive alongside it.
    */
   depositionId?: string;
+  /**
+   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
+   * as whoever is signing in Guild; a handover changes it. Null when the
+   * ledger has nobody on it, and then no step is gated.
+   */
+  operatorId?: string | null;
+  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
+  cosigned?: Record<string, string>;
+  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
+  guildRecorded?: Record<string, true>;
 }
 
 export interface TimerState {
