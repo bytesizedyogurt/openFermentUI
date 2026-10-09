@@ -67,6 +67,8 @@ function stepFor(skillId: string): { ref: string; stepId: string } {
   return { ref: 'induction', stepId: '' };
 }
 
+const daysInOf = (id: string): number => PEOPLE.find((p) => p[0] === id)?.[4] ?? 0;
+
 function assessorFor(skillId: string, personId: string): string {
   for (const who of ['p-sample-eric', 'p-sample-diane'])
     if (who !== personId && codeOf(who, skillId) === 'A') return who;
@@ -121,7 +123,10 @@ export function sampleGuild(today: string): Guild {
       const code = codeOf(personId, skillId);
       const skill = SKILL_BY_ID[skillId];
       const obs = assessorFor(skillId, personId);
-      const t = daysIn;
+      // Nobody signs before they joined and were designated: an assessor's
+      // designation is dated just after they joined, and what they sign
+      // comes after that.
+      const t = Math.min(daysIn, daysInOf(obs) * 0.95);
       switch (code) {
         case '-':
           break;
@@ -137,7 +142,7 @@ export function sampleGuild(today: string): Guild {
           break;
         }
         case 'A':
-          add(personId, skillId, 'designation', t * 0.9, SAMPLE_LEAD, 'Founding assessor');
+          add(personId, skillId, 'designation', daysIn * 0.98, SAMPLE_LEAD, 'Founding assessor');
           break;
         default: {
           // Q, QL, X
@@ -163,7 +168,7 @@ export function sampleGuild(today: string): Guild {
   // above; every skill needs at least one assessor or nobody could sign it.
   for (const sk of SKILLS)
     if (!evidence.some((e) => e.kind === 'designation' && e.skillId === sk.id))
-      add('p-sample-diane', sk.id, 'designation', 180, SAMPLE_LEAD, 'Founding assessor');
+      add('p-sample-diane', sk.id, 'designation', daysInOf('p-sample-diane') * 0.98, SAMPLE_LEAD, 'Founding assessor');
 
   return { version: 1, people, evidence };
 }

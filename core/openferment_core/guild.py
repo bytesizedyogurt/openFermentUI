@@ -36,8 +36,10 @@ The rules, by name:
               one
   authority   a sign-off by someone with no assessor designation on the skill,
               a cosign by someone who does not hold it, a run alone by someone
-              who does not hold it, a designation by anyone but the lead, or a
-              withdrawal by anyone but the entry's observer or the lead
+              who does not hold it (both judged on the day of the run), any
+              entry observed by an auditor, a designation by anyone but the
+              lead, or a withdrawal by anyone but the entry's observer or the
+              lead
   outcome     a failed entry of a kind that cannot fail
   note        an entry or a withdrawal with no words to audit
   date        `at` that is not a date, or is later than tomorrow
@@ -360,7 +362,12 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
         skill_name = known[entry.skillId]["name"]
 
         def holds(person_id: str) -> bool:
-            return Competence(ledger.evidence, known, date.today().isoformat()).holds(person_id, entry.skillId)
+            # Judged on the day the step was run, from what the ledger held
+            # by then: a run recorded offline and posted days later is held
+            # to the level its operator and cosigner had when they did it.
+            on = day.isoformat()
+            seen = [e for e in ledger.evidence if e.at[:10] <= on]
+            return Competence(seen, known, on).holds(person_id, entry.skillId)
 
         if src == "lesson":
             # Primer records it as the learner passes the checkpoint; nobody
@@ -391,6 +398,12 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
                 raise GuildRefused("observer", f"a {kind} entry needs an observer who is an active person on the ledger")
             if observer.id == person.id:
                 raise GuildRefused("observer", "nobody signs off their own work")
+            if observer.role == "auditor":
+                raise GuildRefused(
+                    "authority",
+                    f"{observer.name} is an auditor; an auditor reads the ledger and signs nothing, "
+                    "whatever entries they held before",
+                )
             if kind == "designation":
                 if observer.role != "lead":
                     raise GuildRefused("authority", f"{observer.name} is not the lead; only the lead designates assessors")

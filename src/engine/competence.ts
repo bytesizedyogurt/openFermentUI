@@ -21,8 +21,9 @@
 // Two overlays on Qualified, both of which make the gate treat the person as
 // Supervised until an assessor sees them again:
 //
-//   lapsed       nobody has seen them perform within the skill's recency
-//                window (a witnessed check or a supervised run counts)
+//   lapsed       nothing on the ledger shows them performing it within the
+//                skill's recency window (a witnessed check, a cosigned run
+//                or a run alone counts)
 //   suspended    their latest witnessed check did not pass
 //
 // An Assessor neither lapses nor is suspended here: the designation is the
@@ -91,13 +92,16 @@ export function localToday(now: Date = new Date()): string {
   return `${now.getFullYear()}-${m}-${d}`;
 }
 
+/** An entry the service has not stored yet is the newest of its day. */
+const NOT_YET_RECORDED = '\uffff';
+
 /** Ledger order: by the day it happened, then by when it was recorded, then id. */
 export function byWhen(a: GuildEvidence, b: GuildEvidence): number {
   const da = a.at.slice(0, 10);
   const db = b.at.slice(0, 10);
   if (da !== db) return da < db ? -1 : 1;
-  const ra = a.recordedAt ?? '';
-  const rb = b.recordedAt ?? '';
+  const ra = a.recordedAt || NOT_YET_RECORDED;
+  const rb = b.recordedAt || NOT_YET_RECORDED;
   if (ra !== rb) return ra < rb ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

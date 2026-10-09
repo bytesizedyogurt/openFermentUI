@@ -38,9 +38,13 @@ def _day(at: str) -> str:
     return at[:10]
 
 
+# An entry the service has not stored yet is the newest of its day.
+NOT_YET_RECORDED = "\uffff"
+
+
 def _when(e: GuildEvidence) -> tuple[str, str, str]:
     """Ledger order: by the day it happened, then by when it was recorded, then id."""
-    return (_day(e.at), e.recordedAt or "", e.id)
+    return (_day(e.at), e.recordedAt or NOT_YET_RECORDED, e.id)
 
 
 def _signed_off(ev: list[GuildEvidence]) -> bool:
@@ -60,7 +64,7 @@ class Competence:
         self.skills = skills
         self.today = today
         self._by_key: dict[tuple[str, str], list[GuildEvidence]] = {}
-        for e in sorted((e for e in evidence if e.withdrawnAt is None), key=_when):
+        for e in sorted((e for e in evidence if not e.withdrawnAt), key=_when):
             self._by_key.setdefault((e.personId, e.skillId), []).append(e)
         self._base: dict[tuple[str, str], int] = {}
         self._visiting: set[tuple[str, str]] = set()

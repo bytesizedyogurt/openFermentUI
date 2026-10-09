@@ -1888,8 +1888,10 @@ export const useStore = create<OFState>()((set, get) => ({
       id: depositionId,
       runbookId,
       protocolId,
-      // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who holds skills.
-      operatorId: runOperatorDefault(s),
+      // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
+      // holds skills. Never a sample person: depositions are Durable, and the
+      // sample is kept out of the Durable tier.
+      operatorId: s.guildSample ? null : runOperatorDefault(s),
       startedAt: new Date().toISOString(),
       closedAt: null,
       state: 'staged',
@@ -2565,7 +2567,8 @@ export const useStore = create<OFState>()((set, get) => ({
     const unmark = () => ({
       guild: { ...get().guild, evidence: get().guild.evidence.map((e) => (e.id === evidenceId && before ? before : e)) },
     });
-    if (!s.serviceUp) {
+    // An entry the service does not hold yet is withdrawn after it is sent.
+    if (!s.serviceUp || s.guildPending.includes(evidenceId)) {
       set((x) => ({ guildPendingWithdrawals: [...x.guildPendingWithdrawals, w] }));
       return true;
     }
@@ -2602,10 +2605,12 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step.
-        depositions: run.depositionId
-          ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
-          : s.depositions,
+        // on the ledger names who performed that step. A sample person is
+        // never written into a deposition, which is Durable.
+        depositions:
+          run.depositionId && !s.guildSample
+            ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
+            : s.depositions,
       };
     }),
 
@@ -2625,7 +2630,9 @@ export const useStore = create<OFState>()((set, get) => ({
     if (!run || run.guildRecorded?.[stepId]) return 0;
     const operatorId = run.operatorId ?? null;
     const ledger = guildView(s);
-    if (!operatorId || !ledger.people.some((p) => p.id === operatorId)) return 0;
+    const canHold = (id: string | null): id is string => !!id && ledger.people.some((p) => p.id === id && p.active && p.role !== 'auditor');
+    // The gate shows "Nobody chosen" for anyone else, and nothing is written for them.
+    if (!canHold(operatorId)) return 0;
     const protocol = s.protocols.find((p) => p.id === run.protocolId);
     const step = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId);
     const tags = step?.skills ?? [];
@@ -2635,7 +2642,8 @@ export const useStore = create<OFState>()((set, get) => ({
     }));
     const today = localToday();
     const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, today);
-    const cosigner = run.cosigned?.[stepId] ?? null;
+    const chosen = run.cosigned?.[stepId] ?? null;
+    const cosigner = canHold(chosen) ? chosen : null;
     const where = `${run.depositionId ? `Deposition ${run.depositionId}` : `Run ${runId}`}, step ${stepId}`;
     let deviations = 0;
     for (const skillId of tags) {
@@ -2647,10 +2655,29 @@ export const useStore = create<OFState>()((set, get) => ({
         at: today,
         source: { kind: 'deposition' as const, ref: protocol.id, stepId },
       };
+      // A run the service will not take as a run alone or a cosigned run (its
+      // ledger knew something this browser did not) still happened: it is
+      // kept as a deviation, so the step leaves its mark either way.
+      const orDeviation = async (stored: GuildEvidence | null, as: string) => {
+        if (stored) return;
+        deviations += 1;
+        await get().guildRecord({
+          ...base,
+          kind: 'deviation',
+          observerId: null,
+          raw: `${where}: performed, and the service refused it as ${as}, so it stands as a deviation`,
+        });
+      };
       if (e >= 3) {
-        await get().guildRecord({ ...base, kind: 'independent', observerId: null, raw: `${where}: performed alone` });
+        await orDeviation(
+          await get().guildRecord({ ...base, kind: 'independent', observerId: null, raw: `${where}: performed alone` }),
+          'a run alone',
+        );
       } else if (e === 2 && cosigner && mayCosign(map, cosigner, [skillId])) {
-        await get().guildRecord({ ...base, kind: 'supervised', observerId: cosigner, raw: `${where}: performed with a cosigner beside them` });
+        await orDeviation(
+          await get().guildRecord({ ...base, kind: 'supervised', observerId: cosigner, raw: `${where}: performed with a cosigner beside them` }),
+          'a cosigned run',
+        );
       } else {
         deviations += 1;
         await get().guildRecord({
@@ -2713,9 +2740,15 @@ export const useStore = create<OFState>()((set, get) => ({
       if (!server) return;
       const s = get();
       const pending = new Set(s.guildPending);
+      // Already on the service: stored, with the answer lost on the way back.
+      const stored = new Set([...server.people.map((p) => p.id), ...server.evidence.map((e) => e.id)]);
       const refused: string[] = [];
       let posted = 0;
-      const attempt = async (label: string, post: () => Promise<unknown>): Promise<boolean> => {
+      const attempt = async (
+        label: string,
+        post: () => Promise<unknown>,
+        onRefused?: (e: GuildRefused) => Promise<void>,
+      ): Promise<boolean> => {
         try {
           await post();
           posted += 1;
@@ -2723,6 +2756,7 @@ export const useStore = create<OFState>()((set, get) => ({
         } catch (e) {
           if (e instanceof GuildRefused) {
             refused.push(`${label} (${e.rule}: ${e.why})`);
+            if (onRefused) await onRefused(e);
             return true;
           }
           if (e instanceof IntakeDown) {
@@ -2732,15 +2766,48 @@ export const useStore = create<OFState>()((set, get) => ({
           throw e;
         }
       };
+      // A run made offline that the service will not take as a run alone or a
+      // cosigned run still happened, and is sent again as a deviation.
+      const asDeviation = (e: GuildEvidence) => async (r: GuildRefused) => {
+        if (e.source.kind !== 'deposition' || (e.kind !== 'independent' && e.kind !== 'supervised')) return;
+        if (r.rule !== 'authority' && r.rule !== 'observer') return;
+        const deviation: GuildEvidence = {
+          ...e,
+          id: newEvidenceId(),
+          kind: 'deviation',
+          observerId: null,
+          raw: `${e.raw}; refused as ${e.kind === 'independent' ? 'a run alone' : 'a cosigned run'} (${r.why}), so it stands as a deviation`,
+          recordedAt: null,
+        };
+        await attempt(`deviation on ${e.skillId}`, () => postEvidence(deviation));
+      };
       // People first, then entries, then withdrawals: each may name the one before.
       for (const p of s.guild.people)
-        if (pending.has(p.id) && !(await attempt(p.name, () => postPerson(p)))) return;
+        if (pending.has(p.id) && !stored.has(p.id) && !(await attempt(p.name, () => postPerson(p)))) return;
       for (const e of s.guild.evidence)
-        if (pending.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e)))) return;
+        if (pending.has(e.id) && !stored.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e), asDeviation(e))))
+          return;
       for (const w of s.guildPendingWithdrawals)
         if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
       const fresh = (await loadGuild()) ?? server;
-      set({ guild: fresh, guildPending: [], guildPendingWithdrawals: [] });
+      // The service's ledger is the truth for everything this sync sent.
+      // Anything made while it ran, and anything it did not send, stays.
+      const sent = new Set(s.guildPending);
+      const before = new Set([...s.guild.people.map((p) => p.id), ...s.guild.evidence.map((e) => e.id)]);
+      set((x) => {
+        const inFresh = new Set([...fresh.people.map((p) => p.id), ...fresh.evidence.map((e) => e.id)]);
+        const still = x.guildPending.filter((id) => !sent.has(id));
+        const keep = (id: string) => !inFresh.has(id) && (still.includes(id) || !before.has(id));
+        return {
+          guild: {
+            ...fresh,
+            people: [...fresh.people, ...x.guild.people.filter((p) => keep(p.id))],
+            evidence: [...fresh.evidence, ...x.guild.evidence.filter((e) => keep(e.id))],
+          },
+          guildPending: still,
+          guildPendingWithdrawals: x.guildPendingWithdrawals.filter((w) => !s.guildPendingWithdrawals.includes(w)),
+        };
+      });
       if (posted || refused.length)
         get().logActivity({
           at: stamp(),

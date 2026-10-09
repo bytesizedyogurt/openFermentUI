@@ -433,7 +433,8 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
         )}
         {st.lapsed && (
           <Callout kind="warn" title="Lapsed">
-            Nobody has recorded seeing {person.name} perform this within {skill.recencyDays} days. A passed witnessed check restores it.
+            Nothing on {person.name}&rsquo;s ledger shows them performing this within {skill.recencyDays} days: no witnessed check, cosigned
+            run or run alone. A cosigned run or a passed witnessed check brings it back.
           </Callout>
         )}
         {readyForCheck(st, skill) && (

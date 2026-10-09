@@ -45,5 +45,7 @@ core/data/demo/
 core/data/identifiers-proposed.tsv
 # OF-BLD-013 §1.2 — Guild's ledger: who holds which skill, and who signed it.
 # Personnel data, and this repository is public, so it never enters git. The
-# Mac Mini keeps it; where its backup goes is a decision for Sean.
+# Mac Mini keeps it; where its backup goes is a decision for Sean. The second
+# line covers OPENFERMENT_DATA_DIR pointed anywhere else inside the checkout.
 core/data/guild.json
+**/guild.json

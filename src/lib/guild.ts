@@ -119,6 +119,7 @@ export function offlineRefusal(e: GuildEvidence, ledger: Guild): { rule: string;
   if (!observer || !observer.active)
     return { rule: 'observer', why: 'choose who you are with Acting as; a sign-off needs a named observer' };
   if (observer.id === person.id) return { rule: 'observer', why: 'nobody signs off their own work' };
+  if (observer.role === 'auditor') return { rule: 'authority', why: `${observer.name} is an auditor and signs nothing` };
   if (e.kind === 'designation') {
     if (observer.role !== 'lead') return { rule: 'authority', why: 'only the lead designates assessors' };
   } else if (e.source.kind === 'deposition') {

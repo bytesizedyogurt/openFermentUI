@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import threading
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -415,3 +416,46 @@ def test_a_lesson_puts_someone_at_learning_and_no_further():
     assert level() == 1
     guild.write_evidence(entry("e-brief-0001", "p-patrick", kind="knowledge", raw="Talked the steps back"))
     assert level() == 2
+
+
+# ── what the review found (OF-BLD-013 §3.4) ────────────────────────────
+
+
+def test_an_auditor_signs_nothing_whatever_they_held_before():
+    team()
+    qualify("p-patrick")
+    guild.write_evidence(entry("e-desig-pat-od", "p-patrick", kind="designation", observer="p-sean", raw="Second assessor"))
+    guild.write_person(person("p-patrick", "Patrick Mugisha", role="auditor", updatedBy="p-sean"))
+    guild.write_person(person("p-grace", "Grace Ingabire"))
+    why = refused("authority", guild.write_evidence, entry("e-aud-0001", "p-grace", observer="p-patrick"))
+    assert "auditor" in why
+    refused("authority", guild.write_evidence, run("e-aud-0002", "p-grace", "supervised", observer="p-patrick"))
+
+
+def test_a_run_is_judged_on_the_day_it_was_run():
+    team()
+    guild.write_person(person("p-grace", "Grace Ingabire"))
+    back = lambda n: (date.today() - timedelta(days=n)).isoformat()  # noqa: E731
+    guild.write_evidence(entry("e-day-k", "p-grace", kind="knowledge", raw="Briefed", at=back(80)))
+    for i in range(3):
+        guild.write_evidence(entry(f"e-day-s{i}", "p-grace", kind="supervised", raw="Beside them", at=back(79 - i)))
+    guild.write_evidence(entry("e-day-w", "p-grace", kind="witnessed", at=back(70)))
+    # Qualified until back(10): a run alone dated today, after the window
+    # closed, is refused, and the same run dated back(15), posted today, stands.
+    refused("authority", guild.write_evidence, run("e-day-run2", "p-grace", "independent", at=back(0)))
+    guild.write_evidence(run("e-day-run1", "p-grace", "independent", at=back(15)))
+    # And a check failed after the run day does not reach back to it.
+    guild.write_evidence(entry("e-day-fail", "p-grace", kind="witnessed", outcome="fail", at=back(5)))
+    guild.write_evidence(run("e-day-run3", "p-grace", "independent", at=back(12)))
+
+
+def test_the_sample_team_passes_the_service_rules():
+    """The invented team is built in TypeScript and checked there only against
+    the offline fallback. Replayed here, in ledger order, through every rule."""
+    fixtures = json.loads((Path(__file__).parent / "fixtures" / "competence.json").read_text(encoding="utf-8"))
+    case = next(c for c in fixtures["cases"] if c["name"] == "sample, its own day")
+    for p in case["people"]:
+        guild.write_person(GuildPerson.model_validate(p))
+    for e in sorted(case["evidence"], key=lambda e: (e["at"][:10], e["kind"] != "designation", e["id"])):
+        guild.write_evidence(GuildEvidence.model_validate(e))
+    assert len(guild.read().evidence) == len(case["evidence"])

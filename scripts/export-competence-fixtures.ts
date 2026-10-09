@@ -12,8 +12,9 @@
  * covers every level, a suspension and lapses; a second ledger adds withdrawn
  * entries, a failed check followed by a passed one, entries recorded on the
  * same day in an order their ids do not follow, a prerequisite chain, a
- * qualification whose recency window closes on the very day it is read, and
- * lessons passed, alone, beside a sign-off and under a prerequisite.
+ * qualification whose recency window closes on the very day it is read,
+ * lessons passed, alone, beside a sign-off and under a prerequisite, and an
+ * entry not yet stored on the same day as one that is.
  *
  * Emits core/tests/fixtures/competence.json, gitignored like units.json.
  */
@@ -39,7 +40,7 @@ const ev = (personId: string, skillId: string, kind: GuildEvidence['kind'], at: 
 
 const awkward: Guild = {
   version: 1,
-  people: [person('p-lead', 'lead'), person('p-a'), person('p-b'), person('p-c'), person('p-qa', 'auditor')],
+  people: [person('p-lead', 'lead'), person('p-a'), person('p-b'), person('p-c'), person('p-d'), person('p-qa', 'auditor')],
   evidence: [
     ev('p-a', 'SK-OD', 'knowledge', '2026-08-01'),
     ...[1, 2, 3].map((k) => ev('p-a', 'SK-OD', 'supervised', `2026-08-0${k + 1}`)),
@@ -68,6 +69,14 @@ const awkward: Guild = {
     ev('p-c', 'SK-CAUSTIC', 'knowledge', '2026-08-05', { observerId: null, source: { kind: 'lesson', ref: 'l6-2' } }),
     ev('p-c', 'SK-CIP', 'knowledge', '2026-08-06'),
     ev('p-b', 'SK-STER', 'knowledge', '2026-08-06', { observerId: null, source: { kind: 'lesson', ref: 'l6-3' } }),
+    // An entry the service has not stored yet is the newest of its day: the
+    // pending pass comes after the stored failure, so nothing is suspended.
+    ev('p-d', 'SK-OD', 'knowledge', '2026-08-01'),
+    ...[1, 2, 3].map((k) => ev('p-d', 'SK-OD', 'supervised', `2026-08-0${k + 1}`)),
+    ev('p-d', 'SK-OD', 'witnessed', '2026-09-30', { recordedAt: null }),
+    ev('p-d', 'SK-OD', 'witnessed', '2026-09-30', { outcome: 'fail', recordedAt: '2026-09-30T08:00:00Z' }),
+    // An empty withdrawal stamp is no withdrawal.
+    ev('p-d', 'SK-DCW', 'knowledge', '2026-08-01', { withdrawnAt: '' }),
   ],
 };
 

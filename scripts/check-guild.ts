@@ -180,7 +180,7 @@ check(
 const sample = sampleGuild(TODAY);
 const sampleMap = competenceOf(sample.evidence, sample.people, SKILLS_MAP, TODAY);
 const unacceptable = sample.evidence.filter((e) => offlineRefusal(e, sample) !== null);
-check('every sample entry is one the service would accept', unacceptable.length === 0, unacceptable.slice(0, 3).map((e) => [e.id, offlineRefusal(e, sample)?.why]));
+check('every sample entry passes the offline fallback (test_guild replays them through the service)', unacceptable.length === 0, unacceptable.slice(0, 3).map((e) => [e.id, offlineRefusal(e, sample)?.why]));
 check('every sample entry is dated on or before the day it was built', sample.evidence.every((e) => e.at <= TODAY));
 check('every sample entry is dated after its person joined', sample.evidence.every((e) => e.at >= (sample.people.find((p) => p.id === e.personId)?.joinedAt ?? '')));
 check('every skill has at least one sample assessor', SKILLS.every((sk) => sample.people.some((p) => isAssessor(sampleMap, p.id, sk.id))));
@@ -402,6 +402,105 @@ async function main() {
   const ranked = stepFor([], 'SK-OD').items.filter((i) => i.section === 'next');
   const firstRoutine = ranked.findIndex((i) => i.skill.criticality !== 'critical');
   check('then critical skills before the rest', firstRoutine > 0 && ranked.slice(firstRoutine).every((i) => i.skill.criticality !== 'critical'));
+
+  // ── 7. what the review found (OF-BLD-013 §3.4) ─────────────────────
+  const R_PEOPLE = [person('p-lead', 'lead'), person('p-ann'), person('p-tom'), person('p-qa', 'auditor')];
+  const reset7 = (extra: Partial<Parameters<typeof useStore.setState>[0]> = {}) =>
+    useStore.setState({
+      serviceUp: false,
+      guildSample: null,
+      guild: { version: 1, people: R_PEOPLE, evidence: [ev('p-ann', 'SK-OD', 'designation', '2026-02-01'), ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01')] },
+      guildPending: [],
+      guildPendingWithdrawals: [],
+      guildActingId: 'p-ann',
+      ...extra,
+    } as never);
+  const server7: Guild = { version: 1, people: [...R_PEOPLE], evidence: [] };
+  const posts7: string[] = [];
+  let duringSync: (() => void) | null = null;
+  (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
+    const reply = (status: number, body: unknown) => ({ ok: status === 200, status, json: async () => body }) as Response;
+    if (!init?.body) return reply(200, server7);
+    const body = JSON.parse(init.body);
+    posts7.push(`${url.replace('/api/guild/', '')}:${body.kind ?? ''}:${body.id ?? body.evidenceId}`);
+    if (duringSync) {
+      duringSync();
+      duringSync = null;
+    }
+    if (url.endsWith('/evidence')) {
+      if (body.kind === 'independent' || (body.kind === 'supervised' && body.source?.kind === 'deposition'))
+        return reply(422, { detail: 'authority: the service knows of a failed check this browser has not seen' });
+      const kept = { ...body, recordedAt: '2026-10-09T12:00:00Z' };
+      server7.evidence.push(kept);
+      return reply(200, kept);
+    }
+    if (url.endsWith('/withdraw')) return reply(200, server7.evidence.find((e) => e.id === body.evidenceId));
+    return reply(200, body);
+  };
+
+  reset7({ serviceUp: true });
+  const r7 = s().startRun('PR-OD-01', '1.0', 1);
+  check('a run started by an assessor names them', s().runs[r7].operatorId === 'p-ann');
+  const dev7 = await s().recordStepForGuild(r7, 'o3');
+  const o3entries = s().guild.evidence.filter((e) => e.source.stepId === 'o3');
+  check(
+    'a run alone the service refuses is kept as a deviation, so the step leaves its mark',
+    dev7 === 1 && o3entries.length === 1 && o3entries[0].kind === 'deviation' && /refused it as a run alone/.test(o3entries[0].raw),
+    o3entries.map((e) => [e.kind, e.raw]),
+  );
+
+  reset7();
+  const r7b = s().startRun('PR-OD-01', '1.0', 1);
+  useStore.setState((x) => ({ guild: { ...x.guild, people: x.guild.people.map((p) => (p.id === 'p-ann' ? { ...p, active: false } : p)) } }));
+  const before7 = s().guild.evidence.length;
+  check('an operator who is no longer active writes nothing, as the gate says', (await s().recordStepForGuild(r7b, 'o3')) === 0 && s().guild.evidence.length === before7);
+
+  reset7({ guildActingId: 'p-tom' });
+  const r7c = s().startRun('PR-OD-01', '1.0', 1);
+  s().setRunCosigner(r7c, 'o3', 'p-ann');
+  useStore.setState((x) => ({ guild: { ...x.guild, people: x.guild.people.map((p) => (p.id === 'p-ann' ? { ...p, active: false } : p)) } }));
+  await s().recordStepForGuild(r7c, 'o3');
+  check('a cosigner who is no longer active cosigns nothing: the step is a deviation', lastEntry()?.kind === 'deviation' && lastEntry()?.observerId === null);
+
+  // Offline, then the service answers.
+  reset7({ guildActingId: 'p-ann' });
+  const r7d = s().startRun('PR-OD-01', '1.0', 1);
+  await s().recordStepForGuild(r7d, 'o4');
+  const offlineRun = lastEntry()!;
+  const already = await s().guildRecord({ personId: 'p-tom', skillId: 'SK-OD', kind: 'knowledge', outcome: 'pass', at: TODAY, observerId: 'p-ann', source: { kind: 'signoff', ref: 'PR-OD-01' }, raw: 'Briefed' });
+  server7.evidence.push({ ...already!, recordedAt: '2026-10-09T10:00:00Z' });
+  const queued = await s().guildRecord({ personId: 'p-tom', skillId: 'SK-OD', kind: 'supervised', outcome: 'pass', at: TODAY, observerId: 'p-ann', source: { kind: 'signoff', ref: 'PR-OD-01' }, raw: 'Beside them' });
+  useStore.setState({ serviceUp: true });
+  await s().guildWithdraw(queued!.id, 'Wrong day');
+  check('withdrawing an entry the service does not hold yet waits for it to be sent', s().guildPendingWithdrawals.some((w) => w.evidenceId === queued!.id) && !posts7.some((p) => p.startsWith('withdraw')));
+  const meanwhile: GuildEvidence = { ...ev('p-tom', 'SK-DCW', 'knowledge', TODAY, { observerId: null, source: { kind: 'lesson', ref: 'l6-1' } }), id: 'e-made-meanwhile' };
+  duringSync = () => useStore.setState((x) => ({ guild: { ...x.guild, evidence: [...x.guild.evidence, meanwhile] }, guildPending: [...x.guildPending, meanwhile.id] }));
+  posts7.length = 0;
+  await s().syncGuild();
+  check('an entry the service already holds is not sent again', !posts7.some((p) => p.endsWith(`:${already!.id}`)), posts7);
+  check(
+    'a run alone made offline and refused at sync is sent again as a deviation',
+    posts7.some((p) => p.endsWith(`:independent:${offlineRun.id}`)) && server7.evidence.some((e) => e.kind === 'deviation' && e.source.stepId === 'o4'),
+    posts7,
+  );
+  check('the withdrawal goes after the entry it names', posts7.findIndex((p) => p.endsWith(`:${queued!.id}`)) < posts7.findIndex((p) => p.startsWith('withdraw')));
+  check(
+    'an entry made while the sync ran is kept, and still owed to the service',
+    s().guild.evidence.some((e) => e.id === meanwhile.id) && s().guildPending.includes(meanwhile.id),
+    s().guildPending,
+  );
+
+  // The sample stays out of the Durable tier.
+  reset7();
+  s().guildLoadSample();
+  const opened = s().openDeposition(s().runbooks[0].id, 'PR-OD-01', 1)!;
+  check('a deposition opened while the sample is shown names no sample person', s().depositions.find((d) => d.id === opened.depositionId)?.operatorId === null);
+  s().setRunOperator(opened.runId, 'p-sample-patrick');
+  check('nor does a handover to one', s().depositions.find((d) => d.id === opened.depositionId)?.operatorId === null && s().runs[opened.runId].operatorId === 'p-sample-patrick');
+  s().guildClearSample();
+
+  const audited = { ...ev('p-tom', 'SK-OD', 'witnessed', TODAY), observerId: 'p-qa' };
+  check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, { version: 1, people: R_PEOPLE, evidence: [] })?.rule === 'authority');
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);
