@@ -546,6 +546,10 @@ class PracticeValue(BaseModel):
     value: float | None = None
     unit: str | None = None
     at: str | None = None
+    # For a run's entry, the runbook's name for what was measured.
+    measure: str | None = None
+    # For a protocol's step or material, the batch its amounts are written for.
+    basis: str | None = None
 
 
 class PracticeScenario(BaseModel):
@@ -574,6 +578,9 @@ class PracticeDepositionEntry(BaseModel):
     unit: str
     raw: str
     label: str | None = None
+    # An entry nobody has confirmed may be a misheard number ("four two" as
+    # forty-two), so Practice never teaches from one.
+    confirmed: bool = True
 
 
 class PracticeDepositionObservation(BaseModel):
@@ -596,7 +603,7 @@ class PracticeDeposition(BaseModel):
 
 class PracticeDraftRequest(BaseModel):
     skillId: str
-    depositions: list[PracticeDeposition] = Field(default_factory=list)
+    depositions: list[PracticeDeposition] = Field(default_factory=list, max_length=40)
 
 
 class PracticeTurn(BaseModel):

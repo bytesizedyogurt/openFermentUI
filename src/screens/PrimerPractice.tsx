@@ -24,7 +24,7 @@ import { ActingAs, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
-import { PracticeRefused, draftScenario, forDrafting, splitMarkers, takeTurn } from '@/lib/practice';
+import { PracticeRefused, draftScenario, forDrafting, recordSession, splitMarkers, takeTurn } from '@/lib/practice';
 import { IntakeDown } from '@/lib/intake';
 import { href, navigate, useRoute } from '@/router';
 
@@ -264,10 +264,14 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
   const closed = useStore((s) => s.practiceClosed);
   const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
 
-  // Resume this learner's open session on the scenario, unless a session was opened by its id.
-  const resumable = (practice?.sessions ?? [])
-    .filter((x) => x.scenarioId === scenario.id && !x.closedAt && (x.personId ?? null) === learnerForService)
-    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0];
+  // Resume this learner's open session on the scenario, unless a session was
+  // opened by its id. A session named on nobody is resumed only by its id:
+  // anyone could have started it.
+  const resumable = learnerForService
+    ? (practice?.sessions ?? [])
+        .filter((x) => x.scenarioId === scenario.id && !x.closedAt && x.personId === learnerForService)
+        .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))[0]
+    : undefined;
   const [sessionId, setSessionId] = useState<string | null>(opened?.id ?? resumable?.id ?? null);
   const session = (practice?.sessions ?? []).find((x) => x.id === sessionId) ?? null;
   const [answer, setAnswer] = useState('');
@@ -300,6 +304,17 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
       );
     } finally {
       setSending(false);
+    }
+  };
+
+  const retryRecord = async () => {
+    if (!session) return;
+    try {
+      const next = await recordSession(session.id);
+      merge({ session: next });
+      await closed(next, scenario.title);
+    } catch (e) {
+      setProblem(e instanceof PracticeRefused ? `${e.why}.` : e instanceof IntakeDown ? e.message : String(e));
     }
   };
 
@@ -381,6 +396,11 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
                       ? `Recorded for ${learner.name} in the sample team alone.`
                       : 'On nobody’s record: nobody was chosen as learning.'}
               </p>
+              {session.personId && !session.evidenceId && (
+                <Button size="sm" onClick={retryRecord} style={{ minHeight: 44 }}>
+                  Put it on {owner}&rsquo;s record
+                </Button>
+              )}
             </Card>
             {scenario.watchFor.length > 0 && (
               <div className="mt-4">
@@ -488,14 +508,22 @@ function EvidenceItem({ v }: { v: PracticeValue }) {
           <span className="font-num text-[22px] leading-tight">{fmt(v.value as number)}</span>{' '}
           <span className="text-body text-ink-soft">{v.unit}</span>
           <div className="text-caption text-ink-soft">
-            {v.source.kind === 'entry' ? <>Recorded as &ldquo;{v.text}&rdquo;</> : v.text}
+            {v.source.kind === 'entry' ? (
+              <>
+                {v.measure && <>{v.measure} · </>}the operator said &ldquo;{v.text}&rdquo;
+              </>
+            ) : (
+              v.text
+            )}
             {v.at && <> · {v.at.slice(0, 16).replace('T', ' ')}</>}
+            {v.basis && <div>{v.basis}</div>}
           </div>
         </div>
       ) : (
         <p className="text-body mt-1">
           {v.source.kind === 'observation' ? <>&ldquo;{v.text}&rdquo;</> : v.text}
           {v.at && <span className="text-caption text-ink-soft"> · {v.at.slice(0, 16).replace('T', ' ')}</span>}
+          {v.basis && <span className="block text-caption text-ink-soft mt-0.5">{v.basis}</span>}
         </p>
       )}
     </Card>

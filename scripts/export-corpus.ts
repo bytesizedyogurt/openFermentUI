@@ -245,6 +245,7 @@ const guildProjection = {
         protocolId: p.id,
         version: v.version,
         title: p.title,
+        baseBatch: `${v.baseBatch.value} ${v.baseBatch.unit} ${v.baseBatch.label}`,
         steps: v.steps.map((st) => ({ stepId: st.id, text: renderStepText(st, v, 1), note: st.note ?? null, skills: st.skills ?? [] })),
         materials: v.materials.map((m) => ({ name: m.name, amount: m.amount, unit: m.unit })),
       },

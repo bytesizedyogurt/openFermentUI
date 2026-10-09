@@ -62,20 +62,38 @@ RULES = ("shape", "quantity", "unresolved", "steps", "skill", "scenario", "sessi
 
 MAX_EVIDENCE = 6
 MAX_DEPOSITIONS = 3
+# Per run shown to the model, the newest items at the steps that need the
+# skill. An operator's note longer than this is left out whole, never cut.
+MAX_ITEMS_PER_RUN = 12
+MAX_NOTE_CHARS = 600
 DRAFT_TOKENS = 8000
 
 MARKER = re.compile(r"\[v(\d+)\]")
 
+# What validate.find_number lets through and a bench conversation reaches for:
+# a pH written as an identifier (pH7, pH-7), a dilution or magnification
+# (x10, ×10), and multiplying words. Checked here, beside find_number, so
+# Postdoc's claims keep the validator they were tuned against.
+PRACTICE_QUANTITY = re.compile(
+    r"(?<![A-Za-z])(?:pH\s*-?\s*\d|[x×]\s?\d|double[sd]?|triple[sd]?|quadruple[sd]?|halve[sd]?|single)(?![a-z])",
+    re.IGNORECASE,
+)
+
 
 class PracticeRefused(ValueError):
-    """What the model wrote was discarded, and `rule` says why."""
+    """What the model wrote was discarded, and `rule` says why.
 
-    def __init__(self, rule: str, why: str, usage: Usage | None = None):
+    `why` goes to the browser and never quotes what the model wrote: a
+    refusal that repeated a number the model invented would put it on screen
+    after all. `detail` names it, for the service's log alone."""
+
+    def __init__(self, rule: str, why: str, usage: Usage | None = None, detail: str | None = None):
         assert rule in RULES, rule
         super().__init__(f"{rule}: {why}")
         self.rule = rule
         self.why = why
         self.usage = usage or Usage()
+        self.detail = detail or why
 
 
 class PracticeUnavailable(RuntimeError):
@@ -139,6 +157,7 @@ def sources_for(skill_id: str, depositions: list[PracticeDeposition]) -> dict[st
         if not steps:
             continue
         needing[p["protocolId"]] = {st["stepId"] for st in steps}
+        basis = f"{p['protocolId']} as written, for its base batch ({p['baseBatch']})" if p.get("baseBatch") else None
         for st in steps:
             out[f"step:{p['protocolId']}:{st['stepId']}"] = {
                 "kind": "step",
@@ -146,6 +165,7 @@ def sources_for(skill_id: str, depositions: list[PracticeDeposition]) -> dict[st
                 "stepId": st["stepId"],
                 "text": st["text"],
                 "note": st.get("note"),
+                "basis": basis,
             }
         for m in p["materials"]:
             out[f"material:{p['protocolId']}:{m['name']}"] = {
@@ -155,38 +175,45 @@ def sources_for(skill_id: str, depositions: list[PracticeDeposition]) -> dict[st
                 "text": m["name"],
                 "value": m["amount"],
                 "unit": m["unit"],
+                "basis": basis,
             }
-    newest = sorted(depositions, key=lambda d: d.startedAt, reverse=True)
-    shown = [d for d in newest if d.protocolId in needing][:MAX_DEPOSITIONS]
-    for d in shown:
-        steps = needing[d.protocolId]
-        for e in d.entries:
-            if e.stepId in steps:
-                out[f"entry:{d.id}:{e.id}"] = {
-                    "kind": "entry",
-                    "protocolId": d.protocolId,
-                    "depositionId": d.id,
-                    "itemId": e.id,
-                    "stepId": e.stepId,
-                    # The operator's own words; the measure's name is for the
-                    # model to read, and stays out of the evidence pane.
-                    "text": e.raw,
-                    "measure": e.label,
-                    "value": e.value,
-                    "unit": e.unit,
-                    "at": e.at,
-                }
-        for o in d.observations:
-            if o.stepId in steps:
-                out[f"observation:{d.id}:{o.id}"] = {
-                    "kind": "observation",
-                    "protocolId": d.protocolId,
-                    "depositionId": d.id,
-                    "itemId": o.id,
-                    "stepId": o.stepId,
-                    "text": o.raw,
-                    "at": o.at,
-                }
+
+    def usable(d: PracticeDeposition) -> tuple[list, list]:
+        steps = needing.get(d.protocolId, set())
+        entries = [e for e in d.entries if e.stepId in steps and e.confirmed]
+        notes = [o for o in d.observations if o.stepId in steps and len(o.raw) <= MAX_NOTE_CHARS]
+        newest_first = lambda items: sorted(items, key=lambda x: x.at, reverse=True)[:MAX_ITEMS_PER_RUN]  # noqa: E731
+        return newest_first(entries), newest_first(notes)
+
+    # The newest runs that recorded something at the steps that need the skill.
+    shown = [(d, *usable(d)) for d in sorted(depositions, key=lambda d: d.startedAt, reverse=True)]
+    shown = [x for x in shown if x[1] or x[2]][:MAX_DEPOSITIONS]
+    for d, entries, notes in shown:
+        for e in entries:
+            out[f"entry:{d.id}:{e.id}"] = {
+                "kind": "entry",
+                "protocolId": d.protocolId,
+                "depositionId": d.id,
+                "itemId": e.id,
+                "stepId": e.stepId,
+                # The operator's own words, and the runbook's name for what
+                # they measured: both the source's, shown with the value.
+                "text": e.raw,
+                "measure": e.label,
+                "value": e.value,
+                "unit": e.unit,
+                "at": e.at,
+            }
+        for o in notes:
+            out[f"observation:{d.id}:{o.id}"] = {
+                "kind": "observation",
+                "protocolId": d.protocolId,
+                "depositionId": d.id,
+                "itemId": o.id,
+                "stepId": o.stepId,
+                "text": o.raw,
+                "at": o.at,
+            }
     return out
 
 
@@ -207,6 +234,8 @@ def _value(index: int, label: str, src: dict[str, Any]) -> PracticeValue:
         value=src.get("value"),
         unit=src.get("unit"),
         at=src.get("at"),
+        measure=src.get("measure"),
+        basis=src.get("basis"),
     )
 
 
@@ -219,15 +248,24 @@ def _step_ref(ref: str) -> PracticeStepRef | None:
 
 def check_text(field: str, text: str, evidence: int, usage: Usage | None = None) -> None:
     """Rule 1 and the markers, for one piece of text the model wrote."""
-    if hit := find_number(text):
-        raise PracticeRefused("quantity", f"the {field} says {hit!r}; a value reaches the trainee through the evidence pane", usage)
+    hit = find_number(text)
+    if hit is None and (m := PRACTICE_QUANTITY.search(text)):
+        hit = m.group(0)
+    if hit:
+        raise PracticeRefused(
+            "quantity",
+            f"the {field} states a number of its own; a value reaches the trainee through the evidence pane",
+            usage,
+            detail=f"the {field} says {hit!r}",
+        )
     for m in MARKER.finditer(text):
         n = int(m.group(1))
         if n < 1 or n > evidence:
             raise PracticeRefused(
                 "unresolved",
-                f"the {field} marks [v{n}], and the evidence pane holds {evidence} item{'s' if evidence != 1 else ''}",
+                f"the {field} marks an item past the end of the evidence pane",
                 usage,
+                detail=f"the {field} marks [v{n}] of {evidence}",
             )
 
 
@@ -236,7 +274,7 @@ def check_steps(refs: list[str], skill_id: str, usage: Usage | None = None, *, n
     for ref in refs:
         step = _step_ref(ref)
         if step is None or step_needs(step.protocolId, step.stepId) is None:
-            raise PracticeRefused("steps", f"{ref!r} is not a protocol step (PR-ID:stepId)", usage)
+            raise PracticeRefused("steps", "a step it names is not a protocol step", usage, detail=f"{ref!r} is not a step")
         if step not in steps:
             steps.append(step)
     if need_one and not any(skill_id in (step_needs(s.protocolId, s.stepId) or []) for s in steps):
@@ -270,7 +308,7 @@ def validate_draft(
         raise PracticeRefused("shape", "a source is cited twice in the evidence pane", usage)
     for ref in refs:
         if ref not in sources:
-            raise PracticeRefused("unresolved", f"{ref!r} is not a source the model was given", usage)
+            raise PracticeRefused("unresolved", "the draft cites a source it was not given", usage, detail=f"{ref!r} is not a source")
 
     n = len(cited)
     watch = [str(w).strip() for w in raw.get("watchFor") or [] if str(w).strip()]
@@ -323,15 +361,19 @@ note for the tutor. No digits, no number words (one, two, first, second, \
 once, twice, half, double, dozen), no "twofold", no "an order of magnitude". \
 Every value the trainee needs goes in the evidence pane: cite its source by \
 its ref, exactly as given, and write [v1], [v2] and so on in the situation or \
-the prompt where it belongs, numbered in the order of your evidence list. The \
-interface shows the value from the source beside its label. Identifiers with \
+the prompt where it belongs, numbered in the order of your evidence list. In \
+the text a mark shows your label for the item; the evidence pane shows the \
+item with its value, copied from the source. Identifiers with \
 digits are fine: OD750, PR-OD-01, step c12, cw15. A draft that contains a \
 number, cites a ref you were not given, or marks a [vN] past the end of the \
 evidence list is discarded whole.
 
 When a real run's records are among the sources, prefer them: a situation \
 built on what happened at this bench teaches more than one built on the \
-protocol alone. Use only what the sources say; invent no reading and no event.
+protocol alone. Use only what the sources say; invent no reading and no event. \
+A protocol's amounts are written for its base batch, and a run may have been \
+scaled up or down from it, so a run's amount that differs from the \
+protocol's is no discrepancy on that ground alone.
 
 `steps` names the protocol steps the scenario is about, as "PROTOCOL:step" \
 (for example "PR-OD-01:o4"), and at least one of them must need the skill. \
@@ -586,9 +628,21 @@ def validate_turn(
 
 def _record(held: PracticeSession, sc: PracticeScenario) -> str | None:
     """Practice on the learner's ledger, when there is a learner. The id of the
-    entry, or None when there is none or the ledger refused it."""
-    if held.personId is None:
+    entry, or None when there is none or the ledger could not take it. An
+    entry already standing on this session is the entry: the session was
+    written, and its link to the entry lost, before the ledger was asked."""
+    if held.personId is None or held.closedAt is None:
         return None
+    standing = next(
+        (
+            e
+            for e in guild.read().evidence
+            if e.source.kind == "scenario" and e.source.ref == held.id and not e.withdrawnAt
+        ),
+        None,
+    )
+    if standing is not None:
+        return standing.id
     raw = f"Practice, “{sc.title}”. The tutor observed: " + " ".join(o.text for o in held.observed)
     entry = GuildEvidence(
         id=f"e-{_id('pt')[3:]}",
@@ -603,9 +657,37 @@ def _record(held: PracticeSession, sc: PracticeScenario) -> str | None:
     )
     try:
         return guild.write_evidence(entry).id
-    except guild.GuildRefused as e:
-        log.warning("practice: %s closed, and the ledger kept nothing (%s)", held.id, e)
+    except Exception as e:  # noqa: BLE001 - the session has closed either way; say so and leave a way back
+        log.warning("practice: %s closed, and the ledger kept nothing (%s); POST /api/practice/record retries", held.id, e)
         return None
+
+
+def _link(held: PracticeSession, sc: PracticeScenario) -> PracticeSession:
+    evidence_id = _record(held, sc)
+    if not evidence_id:
+        return held
+    with _WRITE_LOCK:
+        practice = read()
+        held = held.model_copy(update={"evidenceId": evidence_id})
+        practice.sessions = [held if s.id == held.id else s for s in practice.sessions]
+        _persist(practice)
+    return held
+
+
+def record(session_id: str) -> PracticeSession:
+    """Ask the ledger again for a closed session it has no entry for. Asking
+    twice leaves one entry: the ledger keeps one per session."""
+    held = session(session_id)
+    if held is None:
+        raise PracticeRefused("session", f"{session_id!r} is not a practice session")
+    if held.closedAt is None:
+        raise PracticeRefused("session", f"{held.id} is still open; it goes on the ledger when it closes")
+    if held.evidenceId or held.personId is None:
+        return held
+    sc = scenario(held.scenarioId)
+    if sc is None:
+        raise PracticeRefused("scenario", f"{held.scenarioId!r} is not a practice scenario")
+    return _link(held, sc)
 
 
 def turn(request: PracticeTurnRequest, *, ask: Ask | None = None) -> PracticeSession:
@@ -658,12 +740,6 @@ def turn(request: PracticeTurnRequest, *, ask: Ask | None = None) -> PracticeSes
         _persist(practice)
 
     if held.closedAt:
-        evidence_id = _record(held, sc)
-        if evidence_id:
-            with _WRITE_LOCK:
-                practice = read()
-                held = held.model_copy(update={"evidenceId": evidence_id})
-                practice.sessions = [held if s.id == held.id else s for s in practice.sessions]
-                _persist(practice)
+        held = _link(held, sc)
     log.info("practice: %s %s on %s, $%.4f", held.id, reply.move, sc.id, result.usage.costUsd)
     return held

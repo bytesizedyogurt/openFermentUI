@@ -135,13 +135,14 @@ def test_only_steps_that_need_the_skill_and_runs_of_their_protocols_are_sources(
 
 def test_a_source_the_model_was_not_given_refuses_the_draft():
     bad = with_(evidence=[*GOOD["evidence"][:2], {"ref": "entry:dep-9:ent-1", "label": "Another reading"}])
-    assert "not a source" in refused("unresolved", bad)
+    why = refused("unresolved", bad)
+    assert "not given" in why and "dep-9" not in why, "the reader is told the rule, never the model's words"
     refused("unresolved", with_(evidence=[*GOOD["evidence"][:2], {"ref": "step:PR-OD-01:o1", "label": "Taring"}]))
 
 
 def test_a_marker_past_the_evidence_pane_refuses_the_draft():
     why = refused("unresolved", with_(prompt="Given [v4], what do you do next, and why?"))
-    assert "[v4]" in why
+    assert "past the end" in why and "[v4]" not in why
 
 
 # ── Rule 1 ─────────────────────────────────────────────────────────────
@@ -159,6 +160,16 @@ def test_a_marker_past_the_evidence_pane_refuses_the_draft():
 def test_a_number_the_model_wrote_refuses_the_draft(field, value):
     why = refused("quantity", with_(**{field: value}))
     assert "evidence pane" in why
+    for said in ("1.5", "twice", "first", "tenfold"):
+        assert said not in why, "a refusal never repeats the number it refused"
+
+
+@pytest.mark.parametrize(
+    "said",
+    ["What if the probe reads pH7 in that buffer?", "Would pH-4 change it?", "Dilute it x10 and read again?", "The reading doubled overnight.", "Halve the volume?", "Take a single reading?"],
+)
+def test_bench_quantities_the_shared_validator_lets_through_are_refused_here(said):
+    refused("quantity", with_(prompt=said))
 
 
 def test_a_number_in_a_label_refuses_the_draft():
@@ -407,10 +418,59 @@ def test_the_ledger_takes_practice_only_from_a_closed_session_of_that_person(tea
         with pytest.raises(guild.GuildRefused) as caught:
             guild.write_evidence(e)
         assert caught.value.rule == "source"
+    # One session stands behind one entry, however it is asked.
+    with pytest.raises(guild.GuildRefused) as caught:
+        guild.write_evidence(entry("e-prac-again", held.id))
+    assert caught.value.rule == "duplicate"
+    from openferment_core.models import GuildWithdrawal
+
+    guild.withdraw(GuildWithdrawal(evidenceId=held.evidenceId, by="p-sean", at=date.today().isoformat(), reason="Testing the rules"))
+    with pytest.raises(guild.GuildRefused) as caught:
+        guild.write_evidence(entry("e-prac-backdated", held.id).model_copy(update={"at": "2026-01-01"}))
+    assert caught.value.rule == "date"
     observed = entry("e-prac-obs", held.id).model_copy(update={"observerId": "p-sean"})
     with pytest.raises(guild.GuildRefused) as caught:
         guild.write_evidence(observed)
     assert caught.value.rule == "observer"
+
+
+def test_a_lost_link_or_a_failed_write_has_a_way_back(team, monkeypatch):
+    sc = drafted()
+    held = answer(sc)
+    real = guild.write_evidence
+
+    def broken(entry, **kw):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(guild, "write_evidence", broken)
+    held = answer(sc, "Spent medium", session=held, ask=stand_in(CLOSE))
+    assert held.closedAt and held.evidenceId is None, "the session closes either way"
+    monkeypatch.setattr(guild, "write_evidence", real)
+    again = practice.record(held.id)
+    assert again.evidenceId and practice.session(held.id).evidenceId == again.evidenceId
+    # The link lost after the ledger took the entry: asking again finds it.
+    with practice._WRITE_LOCK:
+        p = practice.read()
+        p.sessions = [s.model_copy(update={"evidenceId": None}) if s.id == held.id else s for s in p.sessions]
+        practice._persist(p)
+    assert practice.record(held.id).evidenceId == again.evidenceId
+    assert sum(1 for e in guild.read().evidence if e.source.ref == held.id) == 1
+
+
+def test_what_reaches_the_model_from_the_runs():
+    unconfirmed = run("dep-u", started="2026-10-08T09:00:00Z")
+    unconfirmed.entries[0] = unconfirmed.entries[0].model_copy(update={"confirmed": False})
+    unconfirmed.observations = []
+    quiet = [PracticeDeposition(id=f"dep-q{i}", protocolId="PR-OD-01", startedAt=f"2026-10-0{i}T09:00:00Z") for i in (5, 6, 7)]
+    long_note = run("dep-l", started="2026-09-30T09:00:00Z")
+    long_note.observations[0] = long_note.observations[0].model_copy(update={"raw": "x" * 700})
+    sources = practice.sources_for("SK-OD", [run(), unconfirmed, *quiet, long_note])
+    assert "entry:dep-u:ent-1" not in sources, "an unconfirmed entry may be a misheard number"
+    assert not any("dep-q" in r for r in sources), "runs that recorded nothing at these steps make no room"
+    assert "entry:dep-1:ent-1" in sources and "observation:dep-l:obs-1" not in sources
+    e = sources["entry:dep-1:ent-1"]
+    assert e["measure"] == "OD750, flask B" and e["text"] == "one point four two"
+    assert "base batch" in sources["step:PR-OD-01:o4"]["basis"]
 
 
 def test_the_turn_endpoint(team, monkeypatch):

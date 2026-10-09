@@ -528,6 +528,10 @@ async function main() {
   );
   check('and the offline fallback would take it', offlineRefusal(practised[0], s().guildSample!) === null);
   check('the offline fallback refuses practice that names an observer', offlineRefusal({ ...practised[0], observerId: 'p-sample-eric' }, s().guildSample!)?.rule === 'observer');
+  check('and a second entry on the same session', offlineRefusal({ ...practised[0], id: 'e-second-on-session' }, s().guildSample!)?.rule === 'duplicate');
+  const sampleBefore = s().guildSample!.evidence.length;
+  await s().practiceClosed({ ...closedSession('p-tom', null), id: 'pt-check-3' }, 'A reading above the range');
+  check('a real person\u2019s session closing while the sample is shown credits nobody in the sample', s().guildSample!.evidence.length === sampleBefore);
   s().guildClearSample();
   reset7({ guildActingId: 'p-tom', serviceUp: true });
   server7.evidence.push({ ...ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-2' } }), id: 'e-practice-from-service', recordedAt: `${TODAY}T09:21:00Z` });

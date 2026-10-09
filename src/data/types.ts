@@ -1576,6 +1576,10 @@ export interface PracticeValue {
   value?: number | null;
   unit?: string | null;
   at?: string | null;
+  /** For a run's entry, the runbook's name for what was measured. */
+  measure?: string | null;
+  /** For a protocol's step or material, the batch its amounts are written for. */
+  basis?: string | null;
 }
 
 export interface PracticeScenario {
@@ -1603,6 +1607,8 @@ export interface PracticeDepositionEntry {
   unit: string;
   raw: string;
   label?: string | null;
+  /** An unconfirmed entry may be a misheard number, so Practice never teaches from one. */
+  confirmed: boolean;
 }
 
 export interface PracticeDepositionObservation {

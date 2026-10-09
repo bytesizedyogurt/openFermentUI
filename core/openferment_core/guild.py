@@ -23,7 +23,8 @@ The rules, by name:
               change would leave no active lead, or an auditor is named as
               holding a skill
   added       a person is added or changed by someone who is not an active lead
-  duplicate   an entry id or a new person id is already on the ledger
+  duplicate   an entry id or a new person id is already on the ledger, or a
+              practice session already stands behind another entry
   person      an entry names a person who is not on the ledger, or not active
   skill       an entry names a skill the projection does not hold
   source      an entry pairs a kind with a source that does not produce it,
@@ -345,6 +346,8 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
             raise GuildRefused("source", f"practice session {held.id} is still open")
         if held.personId != entry.personId or held.skillId != entry.skillId:
             raise GuildRefused("source", f"practice session {held.id} is someone else's, or on another skill")
+        if entry.at[:10] != held.closedAt[:10]:
+            raise GuildRefused("date", f"practice session {held.id} closed on {held.closedAt[:10]}, and the entry is dated otherwise")
 
     if entry.outcome == "fail" and kind not in CAN_FAIL:
         raise GuildRefused("outcome", f"a {kind} entry records something that happened; only a witnessed check can fail")
@@ -361,6 +364,10 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
         people = _people(ledger)
         if any(e.id == entry.id for e in ledger.evidence):
             raise GuildRefused("duplicate", f"{entry.id} is already on the ledger")
+        if src == "scenario" and any(
+            e.source.kind == "scenario" and e.source.ref == entry.source.ref and not e.withdrawnAt for e in ledger.evidence
+        ):
+            raise GuildRefused("duplicate", f"practice session {entry.source.ref} is already on the ledger")
         person = people.get(entry.personId)
         if person is None or not person.active:
             raise GuildRefused("person", f"{entry.personId!r} is not an active person on the ledger")

@@ -2652,6 +2652,12 @@ export const useStore = create<OFState>()((set, get) => ({
   practiceClosed: async (session, title) => {
     const s = get();
     if (!session.closedAt) return;
+    // A session the service named somebody on is theirs, whatever is shown
+    // now: the service has put it on their ledger, so fetch the ledger back.
+    if (session.personId) {
+      if (session.evidenceId) await get().syncGuild();
+      return;
+    }
     if (s.guildSample) {
       const learner = runOperatorDefault(s);
       if (!learner) return;
@@ -2665,9 +2671,7 @@ export const useStore = create<OFState>()((set, get) => ({
         source: { kind: 'scenario', ref: session.id },
         raw: `Practice, \u201c${title}\u201d. The tutor observed: ${session.observed.map((o) => o.text).join(' ')}`,
       });
-      return;
     }
-    if (session.evidenceId) await get().syncGuild();
   },
 
   setRunOperator: (runId, personId) =>

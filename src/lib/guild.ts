@@ -109,7 +109,11 @@ export function offlineRefusal(e: GuildEvidence, ledger: Guild): { rule: string;
     // Primer's own record of a lesson passed or a practice session closed;
     // which lessons count toward which skills, and which sessions closed, are
     // the service's questions.
-    return e.observerId ? { rule: 'observer', why: 'Primer records this with nobody watching, so it names no observer' } : null;
+    if (e.observerId) return { rule: 'observer', why: 'Primer records this with nobody watching, so it names no observer' };
+    const again = ledger.evidence.some(
+      (x) => x.id !== e.id && x.source.kind === 'scenario' && e.source.kind === 'scenario' && x.source.ref === e.source.ref && !x.withdrawnAt,
+    );
+    return again ? { rule: 'duplicate', why: 'this practice session already stands behind an entry' } : null;
   }
   if (e.source.kind === 'deposition' && (e.kind === 'independent' || e.kind === 'deviation')) {
     // The operator's own record of a run. Whether they hold the skill is the

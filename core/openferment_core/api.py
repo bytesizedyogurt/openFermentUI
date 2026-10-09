@@ -22,6 +22,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -373,7 +374,7 @@ def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
     try:
         return practice.draft(request)
     except practice.PracticeRefused as e:
-        log.warning("practice refused a draft for %s — %s ($%.4f spent)", request.skillId, e, e.usage.costUsd)
+        log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
     except practice.PracticeUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -388,12 +389,25 @@ def practice_turn(request: PracticeTurnRequest) -> PracticeSession:
     try:
         return practice.turn(request)
     except practice.PracticeRefused as e:
-        log.warning("practice refused a turn on %s — %s ($%.4f spent)", request.scenarioId, e, e.usage.costUsd)
+        log.warning("practice refused a turn on %s — %s: %s ($%.4f spent)", request.scenarioId, e.rule, e.detail, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
     except practice.PracticeUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class PracticeRecordRequest(BaseModel):
+    sessionId: str
+
+
+@app.post("/api/practice/record", response_model=PracticeSession)
+def practice_record(request: PracticeRecordRequest) -> PracticeSession:
+    """Ask the ledger again for a closed session it has no entry for."""
+    try:
+        return practice.record(request.sessionId)
+    except practice.PracticeRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────

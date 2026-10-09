@@ -70,6 +70,8 @@ export async function loadPractice(signal?: AbortSignal): Promise<Practice | nul
 
 export const draftScenario = (r: PracticeDraftRequest) => call<PracticeScenario>('/api/practice/draft', r);
 export const takeTurn = (r: PracticeTurnRequest) => call<PracticeSession>('/api/practice/turn', r);
+/** Ask the ledger again for a closed session it holds no entry for. */
+export const recordSession = (sessionId: string) => call<PracticeSession>('/api/practice/record', { sessionId });
 
 /**
  * A Deposition as the service reads it for drafting: what was recorded, at
@@ -91,6 +93,7 @@ export function forDrafting(d: Deposition, runbooks: Runbook[]): PracticeDeposit
       unit: e.unit,
       raw: e.raw,
       label: schema.find((m) => m.id === e.measureId)?.label ?? null,
+      confirmed: e.confirmed,
     })),
     observations: d.observations.map((o) => ({ id: o.id, stepId: o.stepId, at: o.at, raw: o.raw })),
   };
