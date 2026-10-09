@@ -2,6 +2,9 @@
 import { BookOpen, Check, Clock, Lock } from 'lucide-react';
 import { useStore } from '@/store';
 import { PageHeader, Card, LinkButton, cx } from '@/components/ui';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { PRIMER_TABS } from '@/data/tabs';
+import { SKILL_BY_ID } from '@/data/skills';
 
 /** Completion ring — session-scoped progress, no persistence (§9.5). */
 function Ring({ done, total }: { done: number; total: number }) {
@@ -52,6 +55,7 @@ export default function Primer() {
           </span>
         }
       />
+      <OwnerTabs tabs={PRIMER_TABS} />
 
       <div className="max-w-[860px] space-y-4">
         {modules.map((mod) => {
@@ -101,7 +105,14 @@ export default function Primer() {
                           >
                             {complete ? <Check size={12} /> : <BookOpen size={11} className="text-ink-soft" />}
                           </span>
-                          <span className="flex-1 text-body truncate">{lesson.title}</span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-body truncate">{lesson.title}</span>
+                            {(lesson.skills ?? []).length > 0 && (
+                              <span className="block text-caption text-ink-soft truncate">
+                                Counts toward {(lesson.skills ?? []).map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ')}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-caption text-ink-soft font-num shrink-0 flex items-center gap-1">
                             <Clock size={11} /> {lesson.minutes} min
                           </span>

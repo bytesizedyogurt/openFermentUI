@@ -405,6 +405,15 @@ export interface Step {
   multiCheck?: string[];
   note?: string;
   refs?: string[]; // record or paper ids
+  /**
+   * The skills a person needs to perform this step (OF-BLD-013 §1.1), as ids
+   * from `src/data/skills.ts`. Guild's Matrix reads these to say who can run
+   * a protocol, and the run-mode gate reads them to decide whether a step
+   * needs a cosigner. A step with no skills needs no qualification. Versioned
+   * with the protocol, so a new version that changes a step can change what
+   * it asks of the person doing it.
+   */
+  skills?: string[];
 }
 
 export interface ProtocolVersion {
@@ -461,6 +470,16 @@ export interface RunState {
    * that will not survive alongside it.
    */
   depositionId?: string;
+  /**
+   * Who is performing the steps, from Guild's ledger (OF-BLD-013 §2). Starts
+   * as whoever is signing in Guild; a handover changes it. Null when the
+   * ledger has nobody on it, and then no step is gated.
+   */
+  operatorId?: string | null;
+  /** Who stood beside the operator, per step, for a step that needed a cosigner. */
+  cosigned?: Record<string, string>;
+  /** Steps whose completion has already written to Guild's ledger, so a redo does not count twice. */
+  guildRecorded?: Record<string, true>;
 }
 
 export interface TimerState {
@@ -616,11 +635,32 @@ export interface Lesson {
   minutes: number;
   blocks: LessonBlock[];
   checkpoint: CheckpointQuestion[];
+  /**
+   * The skills this lesson teaches toward (OF-BLD-013 §3.1), as ids from
+   * `src/data/skills.ts`. Passing its checkpoint writes a knowledge entry for
+   * each one on the learner's ledger, which puts them at Learning. Only an
+   * assessor's training sign-off moves them to Supervised.
+   */
+  skills?: string[];
 }
 
 export type LessonBlock =
   | { kind: 'prose'; md: string }
-  | { kind: 'embed'; embed: 'chip-demo' | 'record-card' | 'unit-playground' | 'mini-queue' | 'metrics-tiles' | 'strip-plot' | 'protocol-card' | 'ask-prompt' | 'scenario-widget'; arg?: string };
+  | {
+      kind: 'embed';
+      embed:
+        | 'chip-demo'
+        | 'record-card'
+        | 'unit-playground'
+        | 'mini-queue'
+        | 'metrics-tiles'
+        | 'strip-plot'
+        | 'protocol-card'
+        | 'ask-prompt'
+        | 'scenario-widget'
+        | 'skill-steps';
+      arg?: string;
+    };
 
 export interface LearnModule {
   id: string;
@@ -1382,4 +1422,371 @@ export interface ReviewDecision {
   at: string;
   quote?: string;
   sectionId?: string;
+}
+
+// ── Guild: skills and competence (OF-BLD-013) ──────────────────────────
+//
+// The workforce layer. A Skill is reference data, like a protocol: it lives
+// in src/data/skills.ts and changes by commit. Protocol steps name the skills
+// they need (`Step.skills`). Everything a person has done to earn a skill is
+// an entry in Guild's ledger, and their level on that skill is computed from
+// those entries by `src/engine/competence.ts`. Nothing stores a level.
+
+/** The six trunk families. Working names until the skills content pass. */
+export type SkillFamilyId = 'contamination' | 'vessel' | 'monitoring' | 'qc' | 'records' | 'safety';
+
+export interface SkillFamily {
+  id: SkillFamilyId;
+  name: string;
+  /** Column-header form for the Matrix. */
+  short: string;
+}
+
+export interface Skill {
+  /** `SK-` followed by capitals, stable forever once a ledger names it. */
+  id: string;
+  name: string;
+  family: SkillFamilyId;
+  /** One line on what the skill is, in plain words. */
+  summary: string;
+  /**
+   * What an assessor watches for, each one a behaviour that can be seen at
+   * the bench. A criterion nobody can observe cannot be signed off.
+   */
+  mastery: string[];
+  /** A critical skill is one where a mistake hurts a person or loses a batch. */
+  criticality: 'routine' | 'critical';
+  /** How long a qualification stands without anyone seeing the person perform. */
+  recencyDays: number;
+  /** Cosigned performances needed before a witnessed check can qualify. */
+  supervisedRuns: number;
+  /** Skills that must be at Supervised or above before this one moves past Learning. */
+  prerequisites: string[];
+}
+
+// ── Guild: the ledger (OF-BLD-013 §1.2) ────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`; `check:plan` fails
+// the build if a field exists on one side only. The ledger is
+// core/data/guild.json, which only `guild.write_*` writes and git never sees.
+
+export type GuildRole = 'member' | 'lead' | 'auditor';
+
+/**
+ * Every kind the ledger will hold. Sign-offs and designations come from Guild;
+ * runs alone, cosigned runs and deviations from Deposition as the operator
+ * completes a step; a lesson passed and a practice session from Primer, each
+ * with nobody watching.
+ */
+export type EvidenceKind =
+  | 'witnessed'
+  | 'supervised'
+  | 'independent'
+  | 'deviation'
+  | 'scenario'
+  | 'knowledge'
+  | 'designation';
+
+export type EvidenceSourceKind = 'signoff' | 'lead' | 'deposition' | 'lesson' | 'scenario' | 'check';
+
+export interface GuildPerson {
+  /** Chosen by the browser, so a person added offline keeps their id. */
+  id: string;
+  name: string;
+  role: GuildRole;
+  title: string;
+  joinedAt: string;
+  active: boolean;
+  addedBy: string | null;
+  addedAt: string;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EvidenceSource {
+  kind: EvidenceSourceKind;
+  /** A protocol id, a lesson id, or what a sign-off names. */
+  ref: string;
+  stepId?: string | null;
+}
+
+/** One thing a person did that bears on one skill. Append-only. */
+export interface GuildEvidence {
+  id: string;
+  personId: string;
+  skillId: string;
+  kind: EvidenceKind;
+  outcome: 'pass' | 'fail';
+  /** When it happened, YYYY-MM-DD or a full ISO time. */
+  at: string;
+  observerId: string | null;
+  source: EvidenceSource;
+  /** The observer's own words, verbatim. */
+  raw: string;
+  /** Stamped by the service when it stored the entry. */
+  recordedAt?: string | null;
+  withdrawnAt?: string | null;
+  withdrawnBy?: string | null;
+  withdrawReason?: string | null;
+}
+
+export interface GuildWithdrawal {
+  evidenceId: string;
+  by: string;
+  at: string;
+  reason: string;
+}
+
+export type GateMode = 'advise' | 'enforce';
+
+/**
+ * The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+ * run-mode gate warns and records a deviation; in enforce mode it holds the
+ * step until a cosigner is recorded, or someone qualified takes over.
+ */
+export interface GuildPolicy {
+  routineGate: GateMode;
+  criticalGate: GateMode;
+  /** The witnessed checks each holder of a critical skill gets at least, every quarter. */
+  checksPerQuarter: number;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface Guild {
+  version: 1;
+  people: GuildPerson[];
+  evidence: GuildEvidence[];
+  /** Absent in a ledger written before Phase 5; `policyOf` supplies the default. */
+  policy?: GuildPolicy;
+}
+
+// ── Practice (OF-BLD-013 §4) ───────────────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`. The model writes
+// words and cites sources; every value the trainee sees is copied by the
+// service from the source it cites. core/data/practice.json never enters git.
+
+export type PracticeSourceKind = 'step' | 'material' | 'entry' | 'observation';
+export type PracticeMove = 'why' | 'change' | 'next' | 'close';
+
+export interface PracticeStepRef {
+  protocolId: string;
+  stepId: string;
+}
+
+/** What a value in the evidence pane was copied from. */
+export interface PracticeSource {
+  kind: PracticeSourceKind;
+  protocolId?: string | null;
+  stepId?: string | null;
+  material?: string | null;
+  depositionId?: string | null;
+  itemId?: string | null;
+}
+
+/** One item in the evidence pane: the model's label, the source's words and number. */
+export interface PracticeValue {
+  id: string;
+  label: string;
+  source: PracticeSource;
+  text: string;
+  value?: number | null;
+  unit?: string | null;
+  at?: string | null;
+  /** For a run's entry, the runbook's name for what was measured. */
+  measure?: string | null;
+  /** For a protocol's step or material, the batch its amounts are written for. */
+  basis?: string | null;
+}
+
+export interface PracticeScenario {
+  id: string;
+  skillId: string;
+  title: string;
+  /** [v1] marks where an item of the evidence pane belongs. */
+  situation: string;
+  prompt: string;
+  /** What a sound answer would reach. The tutor reads it; the trainee does not. */
+  watchFor: string[];
+  evidence: PracticeValue[];
+  steps: PracticeStepRef[];
+  depositionIds: string[];
+  model: string;
+  usage: AnswerPlanUsage;
+  createdAt: string;
+}
+
+export interface PracticeDepositionEntry {
+  id: string;
+  stepId: string;
+  at: string;
+  value: number;
+  unit: string;
+  raw: string;
+  label?: string | null;
+  /** An unconfirmed entry may be a misheard number, so Practice never teaches from one. */
+  confirmed: boolean;
+}
+
+export interface PracticeDepositionObservation {
+  id: string;
+  stepId: string;
+  at: string;
+  raw: string;
+}
+
+/** A Deposition as the browser sends it for drafting. */
+export interface PracticeDeposition {
+  id: string;
+  protocolId: string;
+  startedAt: string;
+  entries: PracticeDepositionEntry[];
+  observations: PracticeDepositionObservation[];
+}
+
+export interface PracticeDraftRequest {
+  skillId: string;
+  depositions: PracticeDeposition[];
+}
+
+export interface PracticeTurn {
+  role: 'trainee' | 'tutor';
+  text: string;
+  move?: PracticeMove | null;
+  steps: PracticeStepRef[];
+  at: string;
+}
+
+/** What the tutor observed, with the steps it bears on. No grade. */
+export interface PracticeObservation {
+  text: string;
+  steps: PracticeStepRef[];
+}
+
+export interface PracticeSession {
+  id: string;
+  scenarioId: string;
+  skillId: string;
+  /** A person on Guild's ledger, or null for a session nobody's record keeps. */
+  personId?: string | null;
+  turns: PracticeTurn[];
+  observed: PracticeObservation[];
+  startedAt: string;
+  closedAt?: string | null;
+  /** The ledger entry written when the session closed, when there is one. */
+  evidenceId?: string | null;
+  usage: AnswerPlanUsage;
+}
+
+export interface PracticeTurnRequest {
+  scenarioId: string;
+  sessionId?: string | null;
+  personId?: string | null;
+  answer: string;
+}
+
+/** core/data/practice.json — every scenario drafted and every session held. */
+export interface Practice {
+  version: 1;
+  scenarios: PracticeScenario[];
+  sessions: PracticeSession[];
+}
+
+// ── Checks (OF-BLD-013 §5) ─────────────────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`. A check is
+// proposed by fixed rules over the ledger (src/engine/checks.ts), or asked
+// for, then scheduled and run at the bench by an assessor; running it writes
+// one witnessed entry per skill with the check as its source.
+
+export type CheckState = 'proposed' | 'scheduled' | 'done' | 'dismissed';
+export type CheckReasonKind = 'suspended' | 'lapsed' | 'lapsing' | 'ready' | 'deviation' | 'confidence' | 'rate' | 'requested';
+
+/** Why a check is proposed, written by fixed rules from the ledger. */
+export interface CheckReason {
+  kind: CheckReasonKind;
+  skillId: string;
+  text: string;
+}
+
+/** One of a skill's mastery criteria, by its place in src/data/skills.ts. */
+export interface CheckCriterion {
+  skillId: string;
+  index: number;
+}
+
+/** What the model suggests the assessor watch for: references and questions with no number. */
+export interface CheckBrief {
+  steps: PracticeStepRef[];
+  criteria: CheckCriterion[];
+  questions: string[];
+  model: string;
+  usage: AnswerPlanUsage;
+  draftedAt: string;
+}
+
+/** The assessor's call on one criterion, with their own words. */
+export interface CheckResult {
+  skillId: string;
+  criterion: number;
+  meets: boolean;
+  note: string;
+}
+
+export interface Check {
+  id: string;
+  personId: string;
+  skillIds: string[];
+  reasons: CheckReason[];
+  state: CheckState;
+  score: number;
+  proposedAt: string;
+  /** Null for the nightly ranking; otherwise who asked for it. */
+  proposedBy?: string | null;
+  /** Who scheduled or ran it. */
+  assessorId?: string | null;
+  /** The day the assessor picked. The person is not told. */
+  scheduledFor?: string | null;
+  brief?: CheckBrief | null;
+  results: CheckResult[];
+  evidenceIds: string[];
+  closedAt?: string | null;
+  dismissedBy?: string | null;
+  dismissReason?: string | null;
+}
+
+/** core/data/checks.json — every check proposed, asked for, run or dismissed. */
+export interface Checks {
+  version: 1;
+  checks: Check[];
+}
+
+export interface CheckRequest {
+  personId: string;
+  skillIds: string[];
+  by: string;
+}
+
+export interface CheckSchedule {
+  by: string;
+  scheduledFor: string;
+}
+
+export interface CheckDismiss {
+  by: string;
+  reason: string;
+}
+
+/** The assessor's own words on one skill, kept verbatim as the entry's raw. */
+export interface CheckNote {
+  skillId: string;
+  text: string;
+}
+
+export interface CheckRecord {
+  by: string;
+  at: string;
+  results: CheckResult[];
+  notes: CheckNote[];
 }

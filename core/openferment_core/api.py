@@ -22,20 +22,37 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, guard, intake, witness
+from . import biorepo, checks, extract, guard, guild, intake, practice, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
     AskRequest,
+    Check,
+    CheckDismiss,
+    CheckRecord,
+    CheckRequest,
+    Checks,
+    CheckSchedule,
     DecisionCheck,
     ExtractResponse,
     ExtractRun,
     FetchResult,
+    Guild,
+    GuildEvidence,
+    GuildPerson,
+    GuildPolicy,
+    GuildWithdrawal,
     IntakeStatus,
     Overlay,
+    Practice,
+    PracticeDraftRequest,
+    PracticeScenario,
+    PracticeSession,
+    PracticeTurnRequest,
     ReviewDecision,
     Usage,
 )
@@ -284,6 +301,207 @@ def biorepo_check(decision: ReviewDecision) -> DecisionCheck:
         return DecisionCheck(ok=False, rule=e.rule, why=e.why)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Guild (OF-BLD-013 §1.2) ──────────────────────────────────────────────
+#
+# The competence ledger. Reads are open like every read here; each write goes
+# through one function in guild.py, which stores it or refuses it with the
+# rule that failed. 422 carries the rule and the reason, the same shape
+# /api/biorepo/decisions uses, and /api/guild/check answers 200 either way.
+
+
+def _refused(e: guild.GuildRefused, what: str) -> HTTPException:
+    log.warning("guild refused %s — %s", what, e)
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild", response_model=Guild)
+def guild_ledger() -> Guild:
+    """The whole ledger: people and every entry, withdrawn ones included.
+    The browser applies it at load the way it applies the overlay, and
+    computes every level from it."""
+    return guild.read()
+
+
+@app.post("/api/guild/people", response_model=GuildPerson)
+def guild_people(person: GuildPerson) -> GuildPerson:
+    try:
+        return guild.write_person(person)
+    except guild.GuildRefused as e:
+        raise _refused(e, person.id) from e
+
+
+@app.post("/api/guild/evidence", response_model=GuildEvidence)
+def guild_evidence(entry: GuildEvidence) -> GuildEvidence:
+    try:
+        return guild.write_evidence(entry)
+    except guild.GuildRefused as e:
+        raise _refused(e, entry.id) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/check", response_model=DecisionCheck)
+def guild_check(entry: GuildEvidence) -> DecisionCheck:
+    """Would `guild.write_evidence` keep this entry? Every rule runs and
+    nothing is written. A refusal is an answer, so it comes back 200."""
+    try:
+        guild.write_evidence(entry, dry_run=True)
+        return DecisionCheck(ok=True)
+    except guild.GuildRefused as e:
+        return DecisionCheck(ok=False, rule=e.rule, why=e.why)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/policy", response_model=GuildPolicy)
+def guild_policy(policy: GuildPolicy) -> GuildPolicy:
+    try:
+        return guild.write_policy(policy)
+    except guild.GuildRefused as e:
+        raise _refused(e, "policy") from e
+
+
+@app.post("/api/guild/withdraw", response_model=GuildEvidence)
+def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
+    try:
+        return guild.withdraw(request)
+    except guild.GuildRefused as e:
+        raise _refused(e, request.evidenceId) from e
+
+
+# ── Checks (OF-BLD-013 §5.2) ────────────────────────────────────────────
+#
+# Proposed by fixed rules, asked for, scheduled, dismissed and run, each
+# through one function in checks.py; a run writes witnessed entries through
+# guild.write_evidence. 422 carries the rule and the reason.
+
+
+class ProposeRequest(BaseModel):
+    by: str
+
+
+def _check_refused(e: Exception) -> HTTPException:
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild/checks", response_model=Checks)
+def checks_read() -> Checks:
+    return checks.read()
+
+
+@app.post("/api/guild/checks/propose", response_model=list[Check])
+def checks_propose(request: ProposeRequest) -> list[Check]:
+    try:
+        return checks.propose(request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/checks/request", response_model=Check)
+def checks_request(request: CheckRequest) -> Check:
+    try:
+        return checks.request(request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/schedule", response_model=Check)
+def checks_schedule(check_id: str, request: CheckSchedule) -> Check:
+    try:
+        return checks.schedule(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/dismiss", response_model=Check)
+def checks_dismiss(check_id: str, request: CheckDismiss) -> Check:
+    try:
+        return checks.dismiss(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/record", response_model=Check)
+def checks_record(check_id: str, request: CheckRecord) -> Check:
+    try:
+        return checks.record(check_id, request)
+    except (checks.CheckRefused, guild.GuildRefused) as e:
+        raise _check_refused(e) from e
+
+
+class BriefRequest(BaseModel):
+    by: str
+
+
+@app.post("/api/guild/checks/{check_id}/brief", response_model=Check)
+def checks_brief(check_id: str, request: BriefRequest) -> Check:
+    """One model call: what the assessor should watch, kept on the check."""
+    try:
+        return checks.brief(check_id, request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except checks.BriefUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
+#
+# Scenarios drafted by the model and checked by practice.py, which copies
+# every value from the source a draft cites and refuses a draft that states a
+# number of its own. 422 carries the rule and the reason, as Guild's do; 503
+# means no key, no network, or every model declined.
+
+
+@app.get("/api/practice", response_model=Practice)
+def practice_read() -> Practice:
+    return practice.read()
+
+
+@app.post("/api/practice/draft", response_model=PracticeScenario)
+def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
+    try:
+        return practice.draft(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/practice/turn", response_model=PracticeSession)
+def practice_turn(request: PracticeTurnRequest) -> PracticeSession:
+    """The trainee's answer and the tutor's reply, kept together or not at all.
+    The session that closes for a person on the ledger puts practice on it."""
+    try:
+        return practice.turn(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a turn on %s — %s: %s ($%.4f spent)", request.scenarioId, e.rule, e.detail, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class PracticeRecordRequest(BaseModel):
+    sessionId: str
+
+
+@app.post("/api/practice/record", response_model=PracticeSession)
+def practice_record(request: PracticeRecordRequest) -> PracticeSession:
+    """Ask the ledger again for a closed session it has no entry for."""
+    try:
+        return practice.record(request.sessionId)
+    except practice.PracticeRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────

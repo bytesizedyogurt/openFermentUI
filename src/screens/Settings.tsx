@@ -13,9 +13,11 @@ import {
   Palette,
   RotateCcw,
   Ruler,
+  ShieldCheck,
   Sun,
 } from 'lucide-react';
-import { useStore, provenanceOf, type Density, type Theme, type UnitMode } from '@/store';
+import { useStore, provenanceOf, guildView, actingIdOf, type Density, type Theme, type UnitMode } from '@/store';
+import { policyOf } from '@/engine/competence';
 import { Tick } from '@/components/Provenance';
 import {
   Bar,
@@ -32,7 +34,7 @@ import {
 import { DataTable, type Column } from '@/components/DataTable';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import type { FieldId, ParameterDef } from '@/data/types';
+import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
 
@@ -78,6 +80,13 @@ const SECTIONS: SectionDef[] = [
     id: 'corpus',
     label: 'Corpus & ontology',
     blurb: 'Owner controls: the ontology reference, the gold set, and demo data reset.',
+    owner: true,
+  },
+  {
+    id: 'guild',
+    label: 'Guild policy',
+    blurb:
+      'How the run-mode gate treats routine and critical skills, and how often each holder of a critical skill is checked. Set by the lead, kept by the service for every device.',
     owner: true,
   },
   {
@@ -136,6 +145,84 @@ function RadioCards<T extends string | number>({
           </label>
         );
       })}
+    </div>
+  );
+}
+
+// ── Guild policy (OF-BLD-013 §5.1) ──────────────────────────────────────
+
+function GuildPolicySection() {
+  const ledger = useStore((s) => guildView(s));
+  const actingId = useStore((s) => actingIdOf(s));
+  const sample = useStore((s) => s.guildSample !== null);
+  const save = useStore((s) => s.guildSetPolicy);
+  const current = policyOf(ledger);
+  // Only what the lead has changed is held here; every other field reads the
+  // stored policy, so a ledger that arrives after this mounts is shown as it
+  // is, and a save never sends back a default nobody chose (§5.5).
+  const [edits, setEdits] = useState<Partial<Pick<GuildPolicy, 'routineGate' | 'criticalGate' | 'checksPerQuarter'>>>({});
+  const routineGate = edits.routineGate ?? current.routineGate;
+  const criticalGate = edits.criticalGate ?? current.criticalGate;
+  const checksPerQuarter = edits.checksPerQuarter ?? current.checksPerQuarter;
+  const setRoutine = (v: GateMode) => setEdits((e) => ({ ...e, routineGate: v }));
+  const setCritical = (v: GateMode) => setEdits((e) => ({ ...e, criticalGate: v }));
+  const setRate = (v: number) => setEdits((e) => ({ ...e, checksPerQuarter: v }));
+  const lead = ledger.people.find((p) => p.id === actingId && p.active && p.role === 'lead') ?? null;
+  const by = ledger.people.find((p) => p.id === current.updatedBy)?.name;
+  const changed =
+    routineGate !== current.routineGate || criticalGate !== current.criticalGate || checksPerQuarter !== current.checksPerQuarter;
+  const MODES: { value: GateMode; label: string; desc: string }[] = [
+    { value: 'advise', label: 'Advise', desc: 'The gate says what the step needs and lets it complete; a step done without that level is written as a deviation.' },
+    { value: 'enforce', label: 'Enforce', desc: 'The step waits until a cosigner who holds the skill is recorded, or someone qualified takes over.' },
+  ];
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {sample && (
+        <Callout kind="warn" title="Sample team: invented people">
+          A change made now applies to the sample alone, and goes when the sample is hidden.
+        </Callout>
+      )}
+      {ledger.people.length === 0 && (
+        <p className="text-body text-ink-soft">
+          Nobody is on Guild&rsquo;s ledger yet, so the gate holds nothing. The first person added is the lead, who sets these.
+        </p>
+      )}
+      <section>
+        <h2 className="font-serif text-section-title font-semibold mb-2">Critical skills</h2>
+        <RadioCards name="critical-gate" label="Gate on critical skills" value={criticalGate} onChange={setCritical} options={MODES} />
+      </section>
+      <section>
+        <h2 className="font-serif text-section-title font-semibold mb-2">Routine skills</h2>
+        <RadioCards name="routine-gate" label="Gate on routine skills" value={routineGate} onChange={setRoutine} options={MODES} />
+      </section>
+      <section>
+        <h2 className="font-serif text-section-title font-semibold mb-2">Checks on critical skills</h2>
+        <label className="flex flex-wrap items-center gap-3 text-body">
+          <span>Witnessed checks each holder gets, at least, every quarter</span>
+          <input
+            type="number"
+            min={0}
+            max={12}
+            step={1}
+            className="input w-20 font-num"
+            value={checksPerQuarter}
+            onChange={(e) => setRate(Math.max(0, Math.min(12, Math.round(Number(e.target.value) || 0))))}
+            aria-label="Witnessed checks per quarter"
+          />
+        </label>
+        <p className="text-caption text-ink-soft mt-1">Fewer than this puts the holder in the assessors&rsquo; queue of proposed checks.</p>
+      </section>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="primary" disabled={!lead || !changed} onClick={async () => {
+            if (await save({ routineGate, criticalGate, checksPerQuarter })) setEdits({});
+          }}>
+          Save the policy
+        </Button>
+        <span className="text-caption text-ink-soft">
+          {lead ? `Saved as ${lead.name}, the lead.` : 'Only the lead changes these. Choose who you are with Acting as in Guild.'}
+          {current.updatedAt && by && ` Last set by ${by} on ${current.updatedAt.slice(0, 10)}.`}
+        </span>
+      </div>
     </div>
   );
 }
@@ -794,9 +881,10 @@ function CorpusSection() {
         <p className="text-body mt-2">
           This also clears the durable store in this browser, so{' '}
           <span className="font-num">{depositions.length}</span> deposition
-          {depositions.length === 1 ? '' : 's'}, every review decision, and every runbook lock are
-          discarded — including the ones that would otherwise survive a refresh. A reset that left
-          them behind would restore itself on the next reload.
+          {depositions.length === 1 ? '' : 's'}, every review decision, every runbook lock, every
+          lesson finished here, and any Guild entry the service has not yet stored are discarded —
+          including the ones that would otherwise survive a refresh. A reset that left them behind
+          would restore itself on the next reload.
         </p>
         <div className="text-caption text-ink-soft mt-2">
           Currently in session: <span className="font-num">{records.length}</span> records,{' '}
@@ -1381,6 +1469,7 @@ export default function Settings({ section }: { section: string }) {
                     {s.id === 'appearance' && <Sun size={14} aria-hidden />}
                     {s.id === 'units' && <Ruler size={14} aria-hidden />}
                     {s.id === 'corpus' && <Database size={14} aria-hidden />}
+                    {s.id === 'guild' && <ShieldCheck size={14} aria-hidden />}
                     {s.id === 'export' && <Download size={14} aria-hidden />}
                     {s.id === 'about' && <Moon size={14} aria-hidden />}
                     <span className="truncate">{s.label}</span>
@@ -1400,6 +1489,7 @@ export default function Settings({ section }: { section: string }) {
           {active === 'appearance' && <AppearanceSection />}
           {active === 'units' && <UnitsSection />}
           {active === 'corpus' && <CorpusSection />}
+          {active === 'guild' && <GuildPolicySection />}
           {active === 'export' && <ExportSection />}
           {active === 'about' && <AboutSection />}
         </div>

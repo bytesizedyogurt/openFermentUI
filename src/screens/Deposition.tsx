@@ -41,6 +41,7 @@ import { Button, Modal, cx, EmptyState, Callout } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { DepositionPanel } from '@/components/DepositionPanel';
 import { ComponentTag } from '@/components/ComponentTag';
+import { GuildGate, holdText, useGateHold } from '@/components/GuildGate';
 
 const SKIP_REASONS = [
   'Not applicable to this batch',
@@ -122,6 +123,9 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
   const closeDeposition = useStore((s) => s.closeDeposition);
   const startRun = useStore((s) => s.startRun);
   const toast = useStore((s) => s.toast);
+  // OF-BLD-013 §2 — completing a step writes what happened to Guild's ledger.
+  const recordStepForGuild = useStore((s) => s.recordStepForGuild);
+  const recordHeldSkipForGuild = useStore((s) => s.recordHeldSkipForGuild);
 
   const [now, setNow] = useState(Date.now());
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -165,8 +169,23 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
     setRunStep(runId, Math.max(0, Math.min(steps.length - 1, run.currentStep + delta)));
   };
 
+  // OF-BLD-013 §5.1 — on a skill the lead set to enforce, the gate holds the
+  // step; the button says why and the space bar is refused the same way.
+  const hold = useGateHold(runId, step);
+
   const markComplete = () => {
     if (!run || !step) return;
+    if (hold) {
+      toast({ text: holdText(hold), kind: 'warn' });
+      return;
+    }
+    void recordStepForGuild(runId, step.id).then((deviations) => {
+      if (deviations > 0)
+        toast({
+          text: `Step completed without the level it needs: ${deviations} deviation${deviations === 1 ? '' : 's'} written to Guild's ledger`,
+          kind: 'warn',
+        });
+    });
     completeStep(runId, step.id);
     if (run.currentStep < steps.length - 1) advance(1);
     else setSummary(true);
@@ -696,6 +715,9 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               {stepText}
             </p>
 
+            {/* OF-BLD-013 §2 — who may perform this step, from Guild's ledger. */}
+            <GuildGate runId={runId} step={step} />
+
             {step?.note && (
               <Callout kind="info" title="Why this step">
                 {step.note}
@@ -872,13 +894,26 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
           className="btn btn-primary flex-1 justify-center"
           style={{ minHeight: 56, fontSize: 17 }}
           onClick={markComplete}
+          disabled={!!hold}
+          aria-describedby={hold ? 'gate-hold' : undefined}
         >
           <Check size={20} />
-          {run.currentStep === steps.length - 1 && !allResolved
-            ? 'Complete final step'
-            : 'Mark step complete'}
+          {hold
+            ? hold.kind === 'cosigner'
+              ? 'Waits for a cosigner'
+              : hold.kind === 'qualified'
+                ? 'Waits for a qualified operator'
+                : 'Waits for an operator'
+            : run.currentStep === steps.length - 1 && !allResolved
+              ? 'Complete final step'
+              : 'Mark step complete'}
           <span className="kbd ml-2">space</span>
         </button>
+        {hold && (
+          <span id="gate-hold" className="sr-only">
+            {holdText(hold)}
+          </span>
+        )}
         <Button style={{ minHeight: 56 }} onClick={() => setSkipOpen(true)}>
           <SkipForward size={17} /> Skip
         </Button>
@@ -932,6 +967,13 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
         <p className="text-body text-ink-soft mb-3">
           A skipped step appears in the run summary with its reason. Nothing is silently omitted.
         </p>
+        {/* OF-BLD-013 §5.5 — a held step can still be skipped, and the skip is on the record. */}
+        {hold && (
+          <p className="text-body text-ink mb-3">
+            {holdText(hold)} Skipping it is kept with the run, and goes on the operator&rsquo;s ledger as a deviation on each skill it
+            needs.
+          </p>
+        )}
         <div className="space-y-1.5">
           {SKIP_REASONS.map((reason) => (
             <button
@@ -940,7 +982,13 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               style={{ minHeight: 44 }}
               onClick={() => {
                 if (!step) return;
-                skipStep(runId, step.id, reason);
+                if (hold) {
+                  const why = hold.kind === 'cosigner' ? 'held for a cosigner' : hold.kind === 'qualified' ? 'held for a qualified operator' : 'held for an operator';
+                  skipStep(runId, step.id, `${reason} (${why})`);
+                  void recordHeldSkipForGuild(runId, step.id, reason, why).then((n) => {
+                    if (n > 0) toast({ text: `Held step skipped: ${n} deviation${n === 1 ? '' : 's'} written to Guild's ledger`, kind: 'warn' });
+                  });
+                } else skipStep(runId, step.id, reason);
                 setSkipOpen(false);
                 if (run.currentStep < steps.length - 1) advance(1);
                 else setSummary(true);

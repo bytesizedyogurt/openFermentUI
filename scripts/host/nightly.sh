@@ -1,6 +1,7 @@
 #!/bin/bash
-# Nightly Intake (OF-BLD-012 §B.8). The com.umutuzo.openferment.nightly
-# LaunchDaemon runs this at 03:00; running it by hand does the same thing.
+# Nightly Intake (OF-BLD-012 §B.8), and the night's check proposals
+# (OF-BLD-013 §5.2). The com.umutuzo.openferment.nightly LaunchDaemon runs
+# this at 03:00; running it by hand does the same thing.
 #
 # Fetches every paper Europe PMC can give, then extracts from whatever arrived.
 # Both batches skip what is already done, so a night with nothing new costs
@@ -37,5 +38,12 @@ EOF
 status=0
 "$PY" -m openferment_core.intake --all || status=$?
 "$PY" -m openferment_core.extract --all || status=$?
+# OF-BLD-013 §5.2 — rank the team against the ledger and put the highest
+# person and skill pairs in the assessors' queue. A pair an open check
+# already covers is never proposed again, so a quiet night proposes nothing.
+"$PY" -m openferment_core.checks propose || status=$?
+# Each new check gets the model's brief while the key is there; without one
+# the checks wait in the queue and an assessor can ask for a brief later.
+"$PY" -m openferment_core.checks brief --missing || status=$?
 echo "── $(date '+%Y-%m-%d %H:%M:%S') done, exit $status"
 exit "$status"

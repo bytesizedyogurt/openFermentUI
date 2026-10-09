@@ -11,7 +11,9 @@
 //
 //   Reference  papers, protocols, products, vocabulary — never mutated, so
 //              there is nothing to persist. Reloading gets them from source.
-//   Durable    depositions, review decisions, runbook locks — must survive.
+//   Durable    depositions, review decisions, runbook locks, this browser's
+//              copy of Guild's ledger, and the lessons finished here — must
+//              survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -25,7 +27,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -94,6 +96,25 @@ export interface DurableSnapshot {
    * that carries no name, so nothing reaches the committed file unsigned.
    */
   reviewerName: string;
+  /**
+   * Guild's ledger as this browser last held it, what it still owes the
+   * service, and who was signing (OF-BLD-013 §1.3). Optional, so snapshots
+   * written before Guild held people still load: their depositions are not
+   * dropped for want of a field they could not have had.
+   */
+  guild?: {
+    ledger: Guild;
+    pending: string[];
+    withdrawals: GuildWithdrawal[];
+    actingId: string | null;
+  };
+  /**
+   * Lessons finished in this browser, by id (OF-BLD-013 §3.2). Optional for
+   * the same reason as `guild`. What a lesson counts toward a person's skills
+   * lives on the ledger; this only keeps the module map honest across a
+   * refresh.
+   */
+  learnProgress?: Record<string, true>;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

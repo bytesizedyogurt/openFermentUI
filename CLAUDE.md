@@ -107,9 +107,9 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Nineteen stages, in order: check:secrets → typecheck → check:plan →
+  green.** Twenty stages, in order: check:secrets → typecheck → check:plan →
   check:reference → test:core → check:seed → check:biorepo → test:export →
-  check:anchors → check:store → check:lock → check:capture → build →
+  check:anchors → check:store → check:guild → check:lock → check:capture → build →
   test:durable → test:deposition → test:reconcile → test:smoke → test:golden →
   test:deep. Live tests are `pnpm test:live` and never in verify.
 - `check:biorepo` brings its OWN export (OF-BLD-012.1 F5): it runs
@@ -177,10 +177,100 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   settled by the later `at`, compared as moments. `test_merge_biorepo` runs
   all of it through real git.
 
+## Guild's ledger (OF-BLD-013)
+
+- **A level is computed, never stored.** `competenceOf` in
+  `src/engine/competence.ts` derives every person's level on every skill from
+  the ledger's entries, with `today` passed in. No screen, service field or
+  model output holds a level. `pnpm check:guild` holds the ladder still.
+- **The rules live in `guild.py`, and the browser asks them.** Every write to
+  `core/data/guild.json` goes through `write_person`, `write_evidence` or
+  `withdraw`; `POST /api/guild/check` runs the entry rules and writes nothing.
+  `offlineRefusal` in `src/lib/guild.ts` is the OFFLINE FALLBACK and says so;
+  do not grow it into a second copy of the rules.
+- **`core/data/guild.json` never enters git.** It is personnel data and the
+  repository is public. Skills and step tags are TypeScript seed
+  (`src/data/skills.ts`, `Step.skills`) and reach Python as `skills.json`,
+  written beside `corpus.json` by `pnpm export:corpus`.
+- **The service's one use for a level is mirrored.** Whether a cosigner, or
+  an operator recording a run alone, holds the skill today is decided by
+  `core/openferment_core/competence.py`, a mirror of `competence.ts` held to
+  it by a fixture (`pnpm export:competence-fixtures`, run by `test:core`).
+  When the two disagree, the TypeScript side is right and the mirror is fixed.
+- **Run mode writes to the ledger, and holds on enforced skills.**
+  `GuildGate` in Deposition names the operator and asks for a cosigner when
+  they are Supervised, lapsed or suspended on a skill the step needs.
+  Completing a step writes one entry per skill it needs, once per step: a run
+  alone, a cosigned run or a deviation (`recordStepForGuild` in
+  `src/store.ts`). The lead's `GuildPolicy` (in `guild.json`, set through
+  `write_policy`, Settings → Guild policy) makes each criticality advise or
+  enforce; on an enforced skill `holdFor` in `competence.ts` holds the step
+  until an operator is named, a cosigner who holds the skill is recorded, or
+  someone qualified takes over. Critical skills are enforced by default.
+- **A lesson passed is Learning, and goes no further.** A lesson that names
+  skills (`Lesson.skills`) writes one knowledge entry per skill, with no
+  observer, for whoever is learning when its checkpoint is passed
+  (`recordLessonForGuild`). Supervised needs an assessor's training sign-off
+  (`source.kind === 'signoff'`), in `competence.ts` and its mirror alike. Such
+  a lesson states no quantity of its own: its numbers arrive through the
+  `skill-steps` embed, read live from the protocols, and `check:seed` holds
+  its prose and questions to that.
+- **My path is read, never kept.** `/primer/path` shows one person the next
+  step on each skill from `pathOf` in `src/engine/path.ts`, which reads the
+  statuses and the lessons and holds nothing; `check:guild` holds its rules.
+  Primer reserves `path` and `practice` as second segments, matched before
+  the lesson lookup, and `check:seed` refuses a lesson with either id.
+- **Practice holds Rule 1 for teaching.** `core/openferment_core/practice.py`
+  drafts a scenario through `llm.py` from the steps that need a skill, their
+  protocols' materials (rendered into `skills.json` by `export:corpus`) and
+  the runs the browser sends. The model writes words and cites sources; every
+  value in the evidence pane is copied from the source it cites, and a draft
+  with a number of its own, an unresolved source or marker, or no step
+  needing the skill is refused whole. The tutor is held to the same, closes
+  on the third answer with what it observed, and a closed session for a
+  person on the ledger becomes a `scenario` entry (no observer, the session
+  as its source), which is Learning and no more. With the sample shown the
+  service is sent nobody (`practiceLearner`), and the entry goes on the
+  sample alone. `core/data/practice.json` never enters git. Offline tests use
+  a stand-in model; the real one is `pnpm test:live`.
+- **Checks are proposed by fixed rules, and run by an assessor.**
+  `rankPairs` / `proposeChecks` in `src/engine/checks.ts` rank every person
+  and skill by suspended, lapsed, lapsing, ready, recent deviation, low
+  confidence and the lead's quarterly rate; `core/openferment_core/checks.py`
+  mirrors them (and `competence.py` now mirrors confidence), held by the
+  competence fixture. `nightly.sh` runs `python -m openferment_core.checks
+  propose`. A check is asked for, scheduled, dismissed with a reason, or run
+  through `checks.py`; a run calls every criterion and writes one witnessed
+  entry per skill with the check as its source, in one ledger write
+  (`guild.write_check_entries`; `write_evidence` refuses a check source, so
+  nothing reaches the ledger around the criteria). Every read-modify-write
+  of `checks.json` holds `checks._held()`, the thread lock and a file lock,
+  because the nightly job is a second process. A check's brief is one
+  model call (`checks.brief`, and `brief --missing` nightly when a key is
+  there): steps to watch by ref, criteria by index, and questions held to
+  Practice's number check; the model is never told who is checked, and a
+  brief that breaks a rule is refused whole. `core/data/checks.json` never
+  enters git.
+- **A check never shows to the person it names until it is run.**
+  `shownTo` and `mayQueue` in `src/engine/checks.ts` decide what Guild's
+  Checks tab, `/guild/checks`, Home's Workforce card and the tab badge show;
+  the queue is for the lead and assessors. Asking for your own check from
+  My path answers the same whether or not one is open (a `duplicate` refusal
+  is swallowed for the asker alone). `/guild/checks/:id/run` is the bench
+  (`BenchCheck.tsx`), a full-screen takeover under Deposition's constraints:
+  one criterion at a time, Meets or Needs work, the assessor's words per
+  skill, then a sign step in the assessor's name. With the sample shown the
+  queue is the ranking run in the browser and the bench writes to the sample
+  alone. `check:guild` part 10 and the smoke's bench flow hold all of it.
+- **The sample team is invented and stays in the browser.** `guildSample` is
+  shown in place of the ledger while loaded; nothing in it is posted, written
+  to `guild.json` or kept in the Durable tier.
+
 ## Persistence tiers
 
-- The **Durable** tier persists depositions, review decisions and runbook
-  locks across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+- The **Durable** tier persists depositions, review decisions, runbook locks,
+  this browser's copy of Guild's ledger with what it still owes the service,
+  and the lessons finished here across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —

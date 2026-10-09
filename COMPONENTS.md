@@ -230,21 +230,25 @@ Not built: Claim Workbench, Priority Engine, Enablement, Notary.
 
 **How the system works.** `/primer` · chord `g n`
 
-The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state.
+The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state. A lesson may count toward Guild's skills (OF-BLD-013): passing its checkpoint records a lesson passed on the learner's ledger, which puts them at Learning, and My path shows one person the next step on each skill, from lesson to bench. Practice drafts a scenario from the protocol steps and the bench runs that need a skill, and a tutor questions the trainee's reasoning; the model writes words and cites sources, every value is copied from its source, and a closed session goes on the learner's ledger as practice. The drafts and the tutor are model calls the service makes in `core/openferment_core/practice.py`.
+
+Views: [My path](#) `/primer/path` · [Practice](#) `/primer/practice`
 
 | Component | Implemented in |
 |---|---|
-| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` |
+| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` |
 
 ### Guild
 
 **Who may verify.** `/guild` · chord `g g`
 
-The Guild of Applied Life: review, roles, and who decided what.
+The Guild of Applied Life: who may verify a record, and who may perform, cosign and witness a protocol step. The review queue keeps `/guild`. Beside it, the competence ledger (OF-BLD-013): people, the skills protocol steps need, and every entry an assessor signs, from which each person's level on each skill is computed and never stored. The rules live in `core/openferment_core/guild.py`; the ledger is `core/data/guild.json`, which is gitignored. Checks are proposed each night by fixed rules over the ledger (`src/engine/checks.ts`, mirrored in `core/openferment_core/checks.py`), each with its reasons written out and a brief the model drafts with no number in it; an assessor schedules one, dismisses it with a reason, or runs it at the bench one criterion at a time and signs it, which writes a witnessed entry per skill. The person checked never sees a check that names them until it has been run.
+
+Views: [Matrix](#) `/guild/matrix` · [People](#) `/guild/people` · [Skills](#) `/guild/skills` · [Checks](#) `/guild/checks`
 
 | Component | Implemented in |
 |---|---|
-| Guild of Applied Life | `src/screens/Guild.tsx` |
+| Guild of Applied Life | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` |
 
 
 ## The full component map
@@ -263,7 +267,7 @@ for the ones with a rail entry.
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
 | fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
-| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` | the rail, /primer |
+| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
 | Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` | a BioRepo tab, /biorepo/witness |
 | Common Seal | Keeping it honest | not built | — |
@@ -272,7 +276,7 @@ for the ones with a rail entry.
 | Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` | a Dominion tab, /dominion/clearance |
 | Enablement | Patents | not built | — |
 | Notary | Patents | not built | — |
-| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx` | /guild |
+| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` | /guild |
 | Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` | the rail, /runbooks |
 | Deposition | Assay | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` | a Runbooks tab, /runbooks/depositions |
 

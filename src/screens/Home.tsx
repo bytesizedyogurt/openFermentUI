@@ -41,6 +41,7 @@ import { MODULES } from '@/data/learn';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { WorkforceCard } from '@/components/GuildBits';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -850,6 +851,13 @@ export default function Home() {
 
       {/* ── Right rail · recent activity ─────────────────────────────── */}
       <aside className="min-w-0" aria-labelledby="home-activity">
+        {/* OF-BLD-013 §2 — the workforce, from Guild's ledger. */}
+        <SectionTitle>
+          <span>Workforce</span>
+        </SectionTitle>
+        <div className="mb-6">
+          <WorkforceCard />
+        </div>
         <SectionTitle>
           <span id="home-activity">Recent activity</span>
         </SectionTitle>

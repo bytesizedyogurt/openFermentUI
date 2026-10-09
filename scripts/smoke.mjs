@@ -20,7 +20,8 @@ const PORT = 4319;
  * the seed. Serving both here exercises the real hydration path on every
  * route, with an overlay fixture whose B5 text is the structural JATS
  * document the Python parser is tested against — a made-up article shape, not
- * a paper, labelled as such in the file. Nothing else under /api exists.
+ * a paper, labelled as such in the file. Guild's endpoints (OF-BLD-013) are a
+ * double that stores and echoes. Nothing else under /api exists.
  */
 const OVERLAY_FIXTURE = join(process.cwd(), 'core/tests/fixtures/overlay-smoke.json');
 const HEALTH = JSON.stringify({
@@ -39,6 +40,52 @@ const REVIEWER = 'Sam Okonkwo';
 const decisions = [];
 /** Questions the double received on POST /api/biorepo/check (OF-BLD-012.1 F1.5). */
 const checks = [];
+/**
+ * Guild's ledger as the double holds it (OF-BLD-013). It stores what it is
+ * sent and echoes it back with the stamps the service adds; the rules are
+ * guild.py's, tested in core/tests/test_guild.py, so the double refuses
+ * nothing. `guildPosts` is what the browser sent, in order.
+ */
+const guildLedger = { version: 1, people: [], evidence: [] };
+const guildPosts = [];
+/**
+ * Practice as the double holds it (OF-BLD-013 §4). A draft is a fixed
+ * scenario whose values are PR-OD-01's own, and the tutor asks why twice and
+ * closes on the third answer; the rules are practice.py's, tested in
+ * core/tests/test_practice.py. `practicePosts` is what the browser sent.
+ */
+const practiceState = { version: 1, scenarios: [], sessions: [] };
+const practicePosts = [];
+let practiceIds = 0;
+const PRACTICE_SCENARIO = (skillId) => ({
+  id: `ps-smoke-${++practiceIds}`,
+  skillId,
+  title: 'A reading above the linear range',
+  situation: 'A flask read above the top of the linear range at step o4. The step says [v1], and the blank is [v2].',
+  prompt: 'What do you do with the sample before you record it, and why?',
+  watchFor: ['Dilutes into the same spent medium and reads again'],
+  evidence: [
+    {
+      id: 'v1',
+      label: 'Step o4 of PR-OD-01',
+      source: { kind: 'step', protocolId: 'PR-OD-01', stepId: 'o4' },
+      text: 'Read OD750 in a 10 mm cuvette against 250 mL of spent cell-free medium as the blank.',
+    },
+    {
+      id: 'v2',
+      label: 'The blank medium',
+      source: { kind: 'material', protocolId: 'PR-OD-01', material: 'Spent cell-free medium' },
+      text: 'Spent cell-free medium',
+      value: 250,
+      unit: 'mL',
+    },
+  ],
+  steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }],
+  depositionIds: [],
+  model: 'smoke-double',
+  usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+  createdAt: new Date().toISOString(),
+});
 
 const server = createServer(async (req, res) => {
   try {
@@ -74,6 +121,87 @@ const server = createServer(async (req, res) => {
         : { ok: true, rule: null, why: null };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(refused));
+    }
+    if (url === '/api/guild' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(guildLedger));
+    }
+    if (url === '/api/guild/checks' && req.method === 'GET') {
+      // The real ledger's queue: empty here. The flow below runs its check on the sample.
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ version: 1, checks: [] }));
+    }
+    if (url.startsWith('/api/guild/') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const sent = JSON.parse(body);
+      guildPosts.push({ url, body: sent });
+      let stored = sent;
+      if (url === '/api/guild/people') {
+        stored = { ...sent, addedAt: new Date().toISOString() };
+        guildLedger.people = [...guildLedger.people.filter((p) => p.id !== sent.id), stored];
+      } else if (url === '/api/guild/evidence') {
+        stored = { ...sent, recordedAt: new Date().toISOString() };
+        guildLedger.evidence.push(stored);
+      } else if (url === '/api/guild/withdraw') {
+        const e = guildLedger.evidence.find((x) => x.id === sent.evidenceId);
+        stored = { ...e, withdrawnAt: sent.at, withdrawnBy: sent.by, withdrawReason: sent.reason };
+        guildLedger.evidence = guildLedger.evidence.map((x) => (x.id === sent.evidenceId ? stored : x));
+      } else if (url === '/api/guild/check') {
+        stored = { ok: true, rule: null, why: null };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(stored));
+    }
+    if (url === '/api/practice' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(practiceState));
+    }
+    if (url.startsWith('/api/practice/') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const sent = JSON.parse(body);
+      practicePosts.push({ url, body: sent });
+      let out;
+      const at = new Date().toISOString();
+      if (url === '/api/practice/draft') {
+        out = PRACTICE_SCENARIO(sent.skillId);
+        practiceState.scenarios.push(out);
+      } else if (url === '/api/practice/turn') {
+        const sc = practiceState.scenarios.find((x) => x.id === sent.scenarioId);
+        let held = practiceState.sessions.find((x) => x.id === sent.sessionId) ?? {
+          id: `pt-smoke-${++practiceIds}`,
+          scenarioId: sc.id,
+          skillId: sc.skillId,
+          personId: sent.personId ?? null,
+          turns: [],
+          observed: [],
+          startedAt: at,
+          closedAt: null,
+          evidenceId: null,
+          usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+        };
+        const answered = held.turns.filter((t) => t.role === 'trainee').length + 1;
+        const close = answered >= 3;
+        held = {
+          ...held,
+          turns: [
+            ...held.turns,
+            { role: 'trainee', text: sent.answer, steps: [], at },
+            close
+              ? { role: 'tutor', move: 'close', text: 'Look again at why step o4 dilutes into [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at }
+              : { role: 'tutor', move: 'why', text: 'Why would that change what the reading means?', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at },
+          ],
+        };
+        if (close) {
+          held.closedAt = at;
+          held.observed = [{ text: 'Chose to dilute, and was unsure why the diluent is [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }] }];
+        }
+        practiceState.sessions = [...practiceState.sessions.filter((x) => x.id !== held.id), held];
+        out = held;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(out));
     }
     if (url === '/api/biorepo/overlay') {
       // Answered late on purpose: a screen mounted before the overlay arrives
@@ -136,7 +264,19 @@ const ROUTES = [
   ['/primer/l0-1', 'Primer — lesson 0.1'],
   ['/primer/l0-4', 'Primer — lesson 0.4 (metrics)'],
   ['/primer/m0/l0-1', 'Primer — lesson by module and id'],
+  // OF-BLD-013 §3 — a lesson that counts toward skills, and a path with nobody on the ledger.
+  ['/primer/l6-1', 'Primer — bench lesson'],
+  ['/primer/path', 'Primer — my path (empty ledger)'],
+  ['/primer/practice', 'Primer — practice'],
   ['/guild', 'Guild'],
+  // OF-BLD-013 — the competence ledger, empty in a fresh browser.
+  ['/guild/matrix', 'Guild — matrix (empty ledger)'],
+  ['/guild/people', 'Guild — people (empty ledger)'],
+  ['/guild/skills', 'Guild — skills'],
+  ['/guild/checks', 'Guild — checks (empty ledger)'],
+  ['/guild/checks/ck-nothing/run', 'Guild — bench check (nothing to run)'],
+  ['/guild/skills/SK-CIP', 'Guild — skill page'],
+  ['/guild/people/p-nobody', 'Guild — person (absent here)'],
   // ── not rail entries, reachable from Home ────────────────────────────
   ['/settings/appearance', 'Settings — appearance'],
   ['/settings/units', 'Settings — units'],
@@ -520,6 +660,214 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-013 — the competence ledger, end to end in one browser ────
+  //
+  // The sample team loads, a level is computed from it, an assessor's
+  // sign-off moves a cell, and the sample sends nothing to the service and
+  // leaves nothing behind. Then the real ledger: its first person is its
+  // lead, posted to the service as one, and still there after a reload.
+  let guildFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    try {
+      await page.goto(`http://localhost:${PORT}/#/guild/matrix`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
+      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('a fresh browser does not show the empty ledger');
+      await page.locator('button:has-text("Show a sample team")').click();
+      await page.waitForTimeout(300);
+      const body = await page.locator('body').innerText();
+      if (!/Sample team: invented people/.test(body)) problems.push('the sample is not labelled as invented');
+      const suspended = await page.locator('button[aria-label="Patrick Mugisha, OD750 reading: Qualified, suspended"]').count();
+      if (suspended !== 1) problems.push('the sample does not show its suspension on the matrix');
+      const cell = page.locator('button[aria-label="Aline Uwase, OD750 reading: Not started"]');
+      if ((await cell.count()) !== 1) problems.push('the cell to sign is missing');
+      else {
+        await cell.click();
+        await page.waitForTimeout(200);
+        if (!/Record what you saw/.test(await page.locator('[role="dialog"]').innerText())) problems.push('an assessor is not offered a sign-off');
+        await page.fill('#signoff-note', 'Briefed on PR-OD-01 and talked it back');
+        await page.locator('[role="dialog"] button:has-text("Sign as Eric Habimana")').click();
+        await page.waitForTimeout(300);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+        const moved = await page.locator('button[aria-label="Aline Uwase, OD750 reading: Supervised"]').count();
+        if (moved !== 1) problems.push('a training sign-off did not move the cell to Supervised');
+      }
+      // §2 — run mode reads the same ledger and writes to it as steps complete.
+      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-OD-01'));
+      await page.waitForTimeout(400);
+      await page.locator('button:has-text("Start run at")').first().click();
+      await page.waitForTimeout(500);
+      let bench = await page.locator('body').innerText();
+      if (!/Eric Habimana holds every skill this step needs/.test(bench)) problems.push('run mode does not start with the acting assessor cleared');
+      await page.locator('button:has-text("Hand over")').click();
+      await page.locator('button:has-text("Patrick Mugisha")').first().click();
+      await page.waitForTimeout(200);
+      bench = await page.locator('body').innerText();
+      if (!/Cosign needed/.test(bench)) problems.push('a Supervised operator is not asked for a cosigner');
+      await page.locator('button:has-text("Record cosigner")').click();
+      await page.locator('button:has-text("Eric Habimana")').first().click();
+      await page.waitForTimeout(200);
+      if (!/Cosigned by Eric Habimana/.test(await page.locator('body').innerText())) problems.push('the cosigner is not shown');
+      await page.locator('button:has-text("Mark step complete")').click();
+      await page.waitForTimeout(400);
+      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-patrick'));
+      await page.waitForTimeout(400);
+      const ledger = await page.locator('body').innerText();
+      if (!/Supervised run[\s\S]{0,200}PR-OD-01 · step o1 · cosigned by Eric Habimana/.test(ledger))
+        problems.push('completing a cosigned step did not write a supervised run to the ledger');
+      // §5.1 — enforce mode: a critical skill holds the step until a cosigner is recorded.
+      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-CIP-01'));
+      await page.waitForTimeout(400);
+      await page.locator('button:has-text("Start run at")').first().click();
+      await page.waitForTimeout(500);
+      await page.locator('button:has-text("Hand over")').click();
+      await page.locator('button:has-text("Grace Ingabire")').first().click();
+      await page.waitForTimeout(200);
+      for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Next step' }).click();
+      await page.waitForTimeout(300);
+      const held = page.locator('button:has-text("Waits for a cosigner")');
+      if ((await held.count()) !== 1 || !(await held.isDisabled()))
+        problems.push('a Supervised operator on a critical skill is not held for a cosigner in enforce mode');
+      // §5.5 — a held step can be skipped, and the skip says it goes on the record.
+      await page.locator('footer button:has-text("Skip")').click();
+      await page.waitForTimeout(150);
+      if (!/Skipping it is kept with the run, and goes on the operator’s ledger as a deviation/.test(await page.locator('[role="dialog"]').innerText()))
+        problems.push('skipping a held step does not say it goes on the record');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(150);
+      await page.locator('button:has-text("Record cosigner")').click();
+      await page.locator('button:has-text("Eric Habimana")').first().click();
+      await page.waitForTimeout(200);
+      if ((await page.locator('button:has-text("Mark step complete")').count()) !== 1)
+        problems.push('recording a cosigner does not release the held step');
+      // §3 — a lesson passed in Primer moves its learner from Not started to Learning.
+      await page.evaluate(() => (location.hash = '#/primer/l6-3'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#lesson-learning-as', 'p-sample-olivier');
+      for (const answer of [
+        'Step c2: strip the vessel and find the ingress point',
+        'Clear hold water, a negative spore strip, and both results on the vessel log',
+        'A biological indicator spore strip',
+      ]) {
+        await page.locator('button', { hasText: answer }).first().click();
+        await page.getByRole('button', { name: 'Check answer' }).first().click();
+        await page.waitForTimeout(150);
+      }
+      if (!/On Olivier Ndayisaba’s ledger as a lesson passed/.test(await page.locator('main').innerText()))
+        problems.push('a passed lesson does not say it is on the learner’s ledger');
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#matrix-protocol', 'PR-CIP-01');
+      await page.waitForTimeout(200);
+      if ((await page.locator('button[aria-label="Olivier Ndayisaba, Vessel sterilisation: Learning"]').count()) !== 1)
+        problems.push('a passed lesson did not move its learner to Learning on the Matrix');
+      await page.evaluate(() => (location.hash = '#/primer/path'));
+      await page.waitForTimeout(400);
+      const path = await page.locator('main').innerText();
+      if (!/Vessel sterilisation[\s\S]{0,200}Waits for Pressure and heat safety to reach Supervised/.test(path))
+        problems.push('My path does not say a passed lesson waits on its prerequisite');
+      if (!/Next up[\s\S]*Open the lesson/.test(path)) problems.push('My path offers no lesson to take next');
+      // §4 — practice: a draft, three answers to the tutor, and the close on the learner's record.
+      await page.evaluate(() => (location.hash = '#/primer/practice?skill=SK-OD'));
+      await page.waitForTimeout(500);
+      await page.locator('button:has-text("Draft a scenario")').first().click();
+      await page.waitForTimeout(600);
+      let player = await page.locator('main').innerText();
+      if (!/A reading above the linear range[\s\S]*Evidence[\s\S]*The blank medium[\s\S]*250[\s\S]*mL/.test(player))
+        problems.push('a drafted scenario does not show its evidence pane with the value from its source');
+      if ((await page.locator('button.chip:has-text("Step o4 of PR-OD-01")').count()) < 1)
+        problems.push('a [v1] mark in the situation is not shown as its evidence item');
+      for (const said of ['I would dilute it and read again', 'Because above the range it stops tracking biomass', 'Into the same spent medium']) {
+        await page.fill('#practice-answer', said);
+        await page.locator('button:has-text("Send answer")').click();
+        await page.waitForTimeout(500);
+      }
+      player = await page.locator('main').innerText();
+      if (!/Tutor · Asks why[\s\S]*Tutor · Closes[\s\S]*What the tutor observed[\s\S]*Chose to dilute/.test(player))
+        problems.push('the tutor did not question and then close with what it observed');
+      if (!/Recorded for Olivier Ndayisaba in the sample team alone/.test(player))
+        problems.push('a closed session with the sample shown does not say it went on the sample learner alone');
+      if (practicePosts.some((x) => x.body.personId != null)) problems.push('a sample person was named to the service in Practice');
+      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-olivier'));
+      await page.waitForTimeout(400);
+      if (!/Practice[\s\S]{0,300}Practice transcript pt-smoke-/.test(await page.locator('main').innerText()))
+        problems.push('the closed session is not on the learner\u2019s ledger with a link to its transcript');
+      // §5.4 — a check from the queue, run at the bench, signed, and on the ledger.
+      await page.evaluate(() => (location.hash = '#/guild/checks'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#guild-acting-as', 'p-sample-eric');
+      await page.waitForTimeout(200);
+      const card = page.locator('.card', { hasText: 'Patrick Mugisha' }).filter({ hasText: 'Run now at the bench' }).first();
+      if (!/Did not meet every criterion at the witnessed check/.test(await card.innerText())) problems.push('the queue does not say why the suspended trainee is proposed');
+      await card.locator('a:has-text("Run now at the bench")').click();
+      await page.waitForTimeout(400);
+      if ((await page.locator('nav').count()) !== 0) problems.push('the bench check is not a full-screen takeover');
+      // The bench's own targets, buttons and links alike; a toast from earlier in the flow is the shell's, as it is in Deposition.
+      const short = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
+      if (short.length) problems.push(`bench buttons under 44px: ${short.join(', ')}`);
+      await page.locator('button:has-text("Begin with the first criterion")').click();
+      let calls = 0;
+      for (let guard = 0; guard < 60; guard++) {
+        const bench = await page.locator('main').innerText();
+        if (/Sign the check on Patrick Mugisha/.test(bench)) break;
+        if (/What did you see Patrick Mugisha do/.test(bench)) await page.locator('textarea[id^="bench-words-"]').fill('Worked through it at the bench and said each step aloud');
+        else {
+          await page.locator(`button:has-text("${calls === 0 ? 'Needs work' : 'Meets'}")`).click();
+          calls++;
+        }
+        await page.locator('button:has-text("Next"), button:has-text("To the sign step")').first().click();
+        await page.waitForTimeout(60);
+      }
+      if (!/1 need work[\s\S]*every criterion met/.test(await page.locator('main').innerText())) problems.push('the sign step does not sum up each skill');
+      const shortSign = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
+      if (shortSign.length) problems.push(`sign-step targets under 44px: ${shortSign.join(', ')}`);
+      await page.locator('button:has-text("Sign as Eric Habimana")').click();
+      await page.waitForTimeout(400);
+      if (!/Signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('signing the check did not finish it');
+      await page.locator('button:has-text("Open Patrick Mugisha’s ledger")').click();
+      await page.waitForTimeout(400);
+      const signedLedger = await page.locator('main').innerText();
+      if (!/Witnessed check[\s\S]{0,40}not met[\s\S]{0,200}Bench check ck-sample-\d+ · observed by Eric Habimana/.test(signedLedger))
+        problems.push('the check is not on the ledger as a witnessed entry naming its assessor and its check');
+      const checkLink = await page.locator('a:has-text("Bench check ck-sample-")').first().getAttribute('href');
+      await page.evaluate((h) => (location.hash = h), checkLink);
+      await page.waitForTimeout(300);
+      if (!/run and signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('the check\u2019s record does not say who signed it');
+      await page.selectOption('#guild-acting-as', 'p-sample-claudine');
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(300);
+      if ((await page.locator('[role="tablist"] [role="tab"]:has-text("Checks")').count()) !== 0) problems.push('a member who assesses nothing is shown the Checks tab');
+      await page.locator('button:has-text("Hide the sample")').click();
+      await page.waitForTimeout(200);
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(300);
+      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('hiding the sample left something behind');
+      if (guildPosts.length) problems.push(`the sample sent ${guildPosts.length} write(s) to the service`);
+      await page.fill('#person-name', 'Smoke Lead');
+      await page.locator('button:has-text("Start the ledger as its lead")').click();
+      await page.waitForTimeout(800);
+      const first = guildPosts.find((x) => x.url === '/api/guild/people');
+      if (!first || first.body.role !== 'lead' || first.body.addedBy !== null) problems.push('the first person was not posted as the lead, added by nobody');
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(1200);
+      const after = await page.locator('body').innerText();
+      if (!/Smoke Lead/.test(after)) problems.push('the first person did not come back from the service after a reload');
+      if (/kept in this browser/.test(after)) problems.push('a change the service stored is still said to be waiting');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      guildFails++;
+      console.log(`✗ guild        ${problems.join('; ')}`);
+    } else {
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a critical skill holds its step until a cosigner is recorded; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; a check is run at the bench, signed, and read back with its assessor; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
@@ -529,7 +877,8 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails) process.exit(1);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, a bench check, first person, reload`);
+  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 
 main();

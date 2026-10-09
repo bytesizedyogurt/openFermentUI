@@ -210,6 +210,8 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   }, [depositionId]);
 
   const deposition = depositions.find((d) => d.id === depositionId);
+  // The operator as Guild's ledger names them (OF-BLD-013 §2).
+  const operatorName = useStore((s) => s.guild.people.find((p) => p.id === deposition?.operatorId)?.name);
   const evidence = useStore((s) => s.measuredEvidence).filter(
     (e) => e.depositionId === depositionId,
   );
@@ -282,10 +284,14 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
             <span className="font-num">{deposition.closedAt.slice(0, 16).replace('T', ' ')}</span>
           </span>
         )}
-        {deposition.operatorId === null && (
-          <span className="chip text-ink-soft" title="Guild will populate this once people and permissions exist">
+        {deposition.operatorId === null ? (
+          <span className="chip text-ink-soft" title="Nobody on Guild’s ledger was performing the steps when this run was written">
             operator unattributed
           </span>
+        ) : (
+          <a className="chip text-ink-soft hover:text-accent" href={href(`/guild/people/${deposition.operatorId}`)}>
+            operator {operatorName ?? deposition.operatorId}
+          </a>
         )}
       </div>
 

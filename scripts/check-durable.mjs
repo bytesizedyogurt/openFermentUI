@@ -70,6 +70,27 @@ check(
 );
 await go('/runbooks/rb-lyo-ambient');
 
+// A finished lesson is Durable (OF-BLD-013 §3.2): the module map would
+// otherwise forget, on every refresh, what a trainee has already done.
+const LESSON = '/primer/l6-3';
+const LESSON_ANSWERS = [
+  'Step c2: strip the vessel and find the ingress point',
+  'Clear hold water, a negative spore strip, and both results on the vessel log',
+  'A biological indicator spore strip',
+];
+await go(LESSON);
+for (const answer of LESSON_ANSWERS) {
+  await page.locator('button', { hasText: answer }).first().click();
+  await page.getByRole('button', { name: 'Check answer' }).first().click();
+  await page.waitForTimeout(200);
+}
+check('a passed checkpoint completes the lesson', (await body()).includes('Lesson complete'));
+await page.waitForTimeout(1000);           // let the debounced write flush
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1600);
+check('the lesson is STILL COMPLETE after a page reload', (await body()).includes('Lesson complete'));
+await go('/runbooks/rb-lyo-ambient');
+
 // Ephemeral state must NOT survive.
 await page.evaluate(() => document.documentElement.dataset.density);
 const dens1 = await page.evaluate(() => document.documentElement.dataset.density);
@@ -108,6 +129,9 @@ if (await resetBtn.count() > 0) {
   await go('/runbooks/rb-lyo-ambient');
   check('reset cleared the durable store', (await body()).includes('not yet locked'));
 }
+
+await go(LESSON);
+check('reset cleared the finished lesson too', !(await body()).includes('Lesson complete'));
 
 console.log('\nconsole errors:', errs.length);
 if (errs.length) console.log(errs.slice(0,4).join('\n'));

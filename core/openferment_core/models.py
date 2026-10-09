@@ -411,3 +411,369 @@ class ExtractResponse(BaseModel):
     # extraction, rather than a silent zero.
     calls: int = 1
     truncatedSections: list[str] = Field(default_factory=list)
+
+
+# ── Guild (OF-BLD-013) ───────────────────────────────────────────────────
+#
+# Who may verify, extended from records to the people running protocol steps.
+# The ledger is core/data/guild.json, written only by `guild.write_*`, and it is
+# gitignored: the repository is public and a competence ledger is personnel
+# data. Mirrored in src/data/types.ts and held to it by `check:plan`.
+
+GuildRole = Literal["member", "lead", "auditor"]
+
+# Every kind the ledger will ever hold. Sign-offs and designations come from
+# Guild; runs alone, cosigned runs and deviations from Deposition as a step is
+# completed; a lesson passed and a practice session from Primer, each with
+# nobody watching.
+EvidenceKind = Literal[
+    "witnessed",
+    "supervised",
+    "independent",
+    "deviation",
+    "scenario",
+    "knowledge",
+    "designation",
+]
+
+EvidenceSourceKind = Literal["signoff", "lead", "deposition", "lesson", "scenario", "check"]
+
+
+class GuildPerson(BaseModel):
+    """One person on the ledger. `id` is chosen by the browser so a person
+    added offline keeps their id when it is posted later."""
+
+    id: str
+    name: str
+    role: GuildRole = "member"
+    title: str = ""
+    joinedAt: str
+    active: bool = True
+    addedBy: str | None = None
+    addedAt: str
+    updatedBy: str | None = None
+    updatedAt: str | None = None
+
+
+class EvidenceSource(BaseModel):
+    """Where an entry came from. For a sign-off, `ref` is what the assessor
+    names (a protocol id, or a paper training record), and `stepId` the step
+    when there is one."""
+
+    kind: EvidenceSourceKind
+    ref: str
+    stepId: str | None = None
+
+
+class GuildEvidence(BaseModel):
+    """One thing a person did that bears on one skill. Append-only: a mistake
+    is withdrawn, never edited, and the withdrawal stays on the entry."""
+
+    id: str
+    personId: str
+    skillId: str
+    kind: EvidenceKind
+    outcome: Literal["pass", "fail"] = "pass"
+    # When it happened. A sign-off may be backdated to the day it was seen.
+    at: str
+    observerId: str | None = None
+    source: EvidenceSource
+    # The observer's own words, kept verbatim and never rewritten.
+    raw: str
+    # When the service stored it, stamped by the service.
+    recordedAt: str | None = None
+    withdrawnAt: str | None = None
+    withdrawnBy: str | None = None
+    withdrawReason: str | None = None
+
+
+class GuildWithdrawal(BaseModel):
+    """A request to withdraw one entry: who, when, and why."""
+
+    evidenceId: str
+    by: str
+    at: str
+    reason: str
+
+
+GateMode = Literal["advise", "enforce"]
+
+
+class GuildPolicy(BaseModel):
+    """The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+    run-mode gate warns and records a deviation; in enforce mode it holds the
+    step until a cosigner is recorded, or someone qualified takes over. Set
+    per criticality: a routine skill and a critical one can differ."""
+
+    routineGate: GateMode = "advise"
+    criticalGate: GateMode = "enforce"
+    # The witnessed checks each holder of a critical skill gets at least,
+    # every quarter. Fewer puts them in the assessors' queue.
+    checksPerQuarter: int = 1
+    updatedBy: str | None = None
+    updatedAt: str | None = None
+
+
+class Guild(BaseModel):
+    """core/data/guild.json — the people and everything recorded about them."""
+
+    version: Literal[1] = 1
+    people: list[GuildPerson] = Field(default_factory=list)
+    evidence: list[GuildEvidence] = Field(default_factory=list)
+    policy: GuildPolicy = Field(default_factory=GuildPolicy)
+
+
+# ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
+#
+# A practice scenario is drafted by the model from protocol steps and bench
+# runs, and a tutor questions the trainee's reasoning in short turns. The
+# model writes words and cites sources; every value a trainee sees is copied
+# by the service from the source it cites, so no quantity in a scenario comes
+# from model weights. core/data/practice.json holds the scenarios and the
+# sessions, and never enters git: a session is a person's own words.
+
+PracticeSourceKind = Literal["step", "material", "entry", "observation"]
+PracticeMove = Literal["why", "change", "next", "close"]
+
+
+class PracticeStepRef(BaseModel):
+    protocolId: str
+    stepId: str
+
+
+class PracticeSource(BaseModel):
+    """What a value in the evidence pane was copied from: a protocol step or
+    material, or a Deposition's entry or observation."""
+
+    kind: PracticeSourceKind
+    protocolId: str | None = None
+    stepId: str | None = None
+    material: str | None = None
+    depositionId: str | None = None
+    itemId: str | None = None
+
+
+class PracticeValue(BaseModel):
+    """One item in a scenario's evidence pane. `label` is the model's words
+    naming it; `text`, `value`, `unit` and `at` are the source's, copied by
+    the service."""
+
+    id: str
+    label: str
+    source: PracticeSource
+    text: str
+    value: float | None = None
+    unit: str | None = None
+    at: str | None = None
+    # For a run's entry, the runbook's name for what was measured.
+    measure: str | None = None
+    # For a protocol's step or material, the batch its amounts are written for.
+    basis: str | None = None
+
+
+class PracticeScenario(BaseModel):
+    id: str
+    skillId: str
+    title: str
+    # The situation and the question, as the trainee reads them. [v1] marks
+    # where an item of the evidence pane belongs.
+    situation: str
+    prompt: str
+    # What a sound answer would reach. The tutor reads it; the trainee does not.
+    watchFor: list[str] = Field(default_factory=list)
+    evidence: list[PracticeValue] = Field(default_factory=list)
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    depositionIds: list[str] = Field(default_factory=list)
+    model: str
+    usage: Usage = Field(default_factory=Usage)
+    createdAt: str
+
+
+class PracticeDepositionEntry(BaseModel):
+    id: str
+    stepId: str
+    at: str
+    value: float
+    unit: str
+    raw: str
+    label: str | None = None
+    # An entry nobody has confirmed may be a misheard number ("four two" as
+    # forty-two), so Practice never teaches from one.
+    confirmed: bool = True
+
+
+class PracticeDepositionObservation(BaseModel):
+    id: str
+    stepId: str
+    at: str
+    raw: str
+
+
+class PracticeDeposition(BaseModel):
+    """A Deposition as the browser sends it for drafting: Depositions live in
+    the browser's Durable tier, so the service sees the ones it is shown."""
+
+    id: str
+    protocolId: str
+    startedAt: str
+    entries: list[PracticeDepositionEntry] = Field(default_factory=list)
+    observations: list[PracticeDepositionObservation] = Field(default_factory=list)
+
+
+class PracticeDraftRequest(BaseModel):
+    skillId: str
+    depositions: list[PracticeDeposition] = Field(default_factory=list, max_length=40)
+
+
+class PracticeTurn(BaseModel):
+    role: Literal["trainee", "tutor"]
+    text: str
+    move: PracticeMove | None = None
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    at: str
+
+
+class PracticeObservation(BaseModel):
+    """What the tutor observed, in plain words, with the steps it bears on.
+    No grade: the schema has no field for one."""
+
+    text: str
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+
+
+class PracticeSession(BaseModel):
+    id: str
+    scenarioId: str
+    skillId: str
+    # A person on Guild's ledger, or None for a session nobody's record keeps
+    # (the sample team, or nobody chosen).
+    personId: str | None = None
+    turns: list[PracticeTurn] = Field(default_factory=list)
+    observed: list[PracticeObservation] = Field(default_factory=list)
+    startedAt: str
+    closedAt: str | None = None
+    # The ledger entry written when the session closed, when there is one.
+    evidenceId: str | None = None
+    usage: Usage = Field(default_factory=Usage)
+
+
+class PracticeTurnRequest(BaseModel):
+    scenarioId: str
+    sessionId: str | None = None
+    personId: str | None = None
+    answer: str
+
+
+class Practice(BaseModel):
+    """core/data/practice.json — every scenario drafted and every session held."""
+
+    version: Literal[1] = 1
+    scenarios: list[PracticeScenario] = Field(default_factory=list)
+    sessions: list[PracticeSession] = Field(default_factory=list)
+
+
+# ── Checks (OF-BLD-013 §5) ──────────────────────────────────────────────
+#
+# A check is proposed by fixed rules over the ledger (checks.py, mirroring
+# src/engine/checks.ts), or asked for by the person or an assessor, then
+# scheduled and run at the bench by an assessor. Running it writes one
+# witnessed entry per skill through guild.write_evidence, with the check as
+# its source. core/data/checks.json never enters git.
+
+CheckState = Literal["proposed", "scheduled", "done", "dismissed"]
+CheckReasonKind = Literal["suspended", "lapsed", "lapsing", "ready", "deviation", "confidence", "rate", "requested"]
+
+
+class CheckReason(BaseModel):
+    """Why a check is proposed, written by fixed rules from the ledger."""
+
+    kind: CheckReasonKind
+    skillId: str
+    text: str
+
+
+class CheckCriterion(BaseModel):
+    """One of a skill's mastery criteria, by its place in src/data/skills.ts."""
+
+    skillId: str
+    index: int
+
+
+class CheckBrief(BaseModel):
+    """What the model suggests the assessor watch for. Steps and criteria are
+    references the service resolves; questions are words with no number."""
+
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    criteria: list[CheckCriterion] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    model: str
+    usage: Usage = Field(default_factory=Usage)
+    draftedAt: str
+
+
+class CheckResult(BaseModel):
+    """The assessor's call on one criterion, with their own words."""
+
+    skillId: str
+    criterion: int
+    meets: bool
+    note: str = ""
+
+
+class Check(BaseModel):
+    id: str
+    personId: str
+    skillIds: list[str]
+    reasons: list[CheckReason] = Field(default_factory=list)
+    state: CheckState = "proposed"
+    score: int = 0
+    proposedAt: str
+    # None for the nightly ranking; otherwise who asked for it.
+    proposedBy: str | None = None
+    # Who scheduled or ran it.
+    assessorId: str | None = None
+    # The day the assessor picked. The person is not told.
+    scheduledFor: str | None = None
+    brief: CheckBrief | None = None
+    results: list[CheckResult] = Field(default_factory=list)
+    evidenceIds: list[str] = Field(default_factory=list)
+    closedAt: str | None = None
+    dismissedBy: str | None = None
+    dismissReason: str | None = None
+
+
+class Checks(BaseModel):
+    """core/data/checks.json — every check proposed, asked for, run or dismissed."""
+
+    version: Literal[1] = 1
+    checks: list[Check] = Field(default_factory=list)
+
+
+class CheckRequest(BaseModel):
+    personId: str
+    skillIds: list[str]
+    by: str
+
+
+class CheckSchedule(BaseModel):
+    by: str
+    scheduledFor: str
+
+
+class CheckDismiss(BaseModel):
+    by: str
+    reason: str
+
+
+class CheckNote(BaseModel):
+    """The assessor's own words on one skill, kept verbatim as the entry's raw."""
+
+    skillId: str
+    text: str
+
+
+class CheckRecord(BaseModel):
+    by: str
+    at: str
+    results: list[CheckResult]
+    notes: list[CheckNote]
