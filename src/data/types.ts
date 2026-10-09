@@ -1432,3 +1432,81 @@ export interface Skill {
   /** Skills that must be at Supervised or above before this one moves past Learning. */
   prerequisites: string[];
 }
+
+// ── Guild: the ledger (OF-BLD-013 §1.2) ────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`; `check:plan` fails
+// the build if a field exists on one side only. The ledger is
+// core/data/guild.json, which only `guild.write_*` writes and git never sees.
+
+export type GuildRole = 'member' | 'lead' | 'auditor';
+
+/**
+ * Every kind the ledger will hold. Phase 1 writes the sign-off kinds and the
+ * lead's designation; runs, deviations, lessons and practice arrive with the
+ * screens that produce them, and the service refuses them until then.
+ */
+export type EvidenceKind =
+  | 'witnessed'
+  | 'supervised'
+  | 'independent'
+  | 'deviation'
+  | 'scenario'
+  | 'knowledge'
+  | 'designation';
+
+export type EvidenceSourceKind = 'signoff' | 'lead' | 'deposition' | 'lesson' | 'scenario';
+
+export interface GuildPerson {
+  /** Chosen by the browser, so a person added offline keeps their id. */
+  id: string;
+  name: string;
+  role: GuildRole;
+  title: string;
+  joinedAt: string;
+  active: boolean;
+  addedBy: string | null;
+  addedAt: string;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EvidenceSource {
+  kind: EvidenceSourceKind;
+  /** A protocol id, a lesson id, or what a sign-off names. */
+  ref: string;
+  stepId?: string | null;
+}
+
+/** One thing a person did that bears on one skill. Append-only. */
+export interface GuildEvidence {
+  id: string;
+  personId: string;
+  skillId: string;
+  kind: EvidenceKind;
+  outcome: 'pass' | 'fail';
+  /** When it happened, YYYY-MM-DD or a full ISO time. */
+  at: string;
+  observerId: string | null;
+  source: EvidenceSource;
+  /** The observer's own words, verbatim. */
+  raw: string;
+  /** Stamped by the service when it stored the entry. */
+  recordedAt?: string | null;
+  withdrawnAt?: string | null;
+  withdrawnBy?: string | null;
+  withdrawReason?: string | null;
+}
+
+export interface GuildWithdrawal {
+  evidenceId: string;
+  by: string;
+  at: string;
+  reason: string;
+}
+
+export interface Guild {
+  version: 1;
+  people: GuildPerson[];
+  evidence: GuildEvidence[];
+}

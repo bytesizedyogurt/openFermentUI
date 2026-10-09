@@ -411,3 +411,94 @@ class ExtractResponse(BaseModel):
     # extraction, rather than a silent zero.
     calls: int = 1
     truncatedSections: list[str] = Field(default_factory=list)
+
+
+# ── Guild (OF-BLD-013) ───────────────────────────────────────────────────
+#
+# Who may verify, extended from records to the people running protocol steps.
+# The ledger is core/data/guild.json, written only by `guild.write_*`, and it is
+# gitignored: the repository is public and a competence ledger is personnel
+# data. Mirrored in src/data/types.ts and held to it by `check:plan`.
+
+GuildRole = Literal["member", "lead", "auditor"]
+
+# Every kind the ledger will ever hold. Phase 1 writes the sign-off kinds and
+# the lead's designation; the rest arrive with the screens that produce them
+# (Deposition for runs and deviations, Primer for lessons and practice), and
+# `guild.write_evidence` refuses them until then.
+EvidenceKind = Literal[
+    "witnessed",
+    "supervised",
+    "independent",
+    "deviation",
+    "scenario",
+    "knowledge",
+    "designation",
+]
+
+EvidenceSourceKind = Literal["signoff", "lead", "deposition", "lesson", "scenario"]
+
+
+class GuildPerson(BaseModel):
+    """One person on the ledger. `id` is chosen by the browser so a person
+    added offline keeps their id when it is posted later."""
+
+    id: str
+    name: str
+    role: GuildRole = "member"
+    title: str = ""
+    joinedAt: str
+    active: bool = True
+    addedBy: str | None = None
+    addedAt: str
+    updatedBy: str | None = None
+    updatedAt: str | None = None
+
+
+class EvidenceSource(BaseModel):
+    """Where an entry came from. For a sign-off, `ref` is what the assessor
+    names (a protocol id, or a paper training record), and `stepId` the step
+    when there is one."""
+
+    kind: EvidenceSourceKind
+    ref: str
+    stepId: str | None = None
+
+
+class GuildEvidence(BaseModel):
+    """One thing a person did that bears on one skill. Append-only: a mistake
+    is withdrawn, never edited, and the withdrawal stays on the entry."""
+
+    id: str
+    personId: str
+    skillId: str
+    kind: EvidenceKind
+    outcome: Literal["pass", "fail"] = "pass"
+    # When it happened. A sign-off may be backdated to the day it was seen.
+    at: str
+    observerId: str | None = None
+    source: EvidenceSource
+    # The observer's own words, kept verbatim and never rewritten.
+    raw: str
+    # When the service stored it, stamped by the service.
+    recordedAt: str | None = None
+    withdrawnAt: str | None = None
+    withdrawnBy: str | None = None
+    withdrawReason: str | None = None
+
+
+class GuildWithdrawal(BaseModel):
+    """A request to withdraw one entry: who, when, and why."""
+
+    evidenceId: str
+    by: str
+    at: str
+    reason: str
+
+
+class Guild(BaseModel):
+    """core/data/guild.json — the people and everything recorded about them."""
+
+    version: Literal[1] = 1
+    people: list[GuildPerson] = Field(default_factory=list)
+    evidence: list[GuildEvidence] = Field(default_factory=list)

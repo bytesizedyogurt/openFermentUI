@@ -24,6 +24,8 @@ import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
 import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
+import { SKILLS } from '../src/data/skills';
+import { PROTOCOLS } from '../src/data/protocols';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 /**
@@ -211,6 +213,24 @@ const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2) + '\n');
+
+/**
+ * Guild's projection (OF-BLD-013 §1.2), written beside the corpus as
+ * skills.json. `guild.write_evidence` needs to know which skills exist, who an
+ * entry may name, and which protocol steps carry which tag; all three live in
+ * the TypeScript seed, and this is the same arrangement the corpus uses. It
+ * is separate from corpus.json because Postdoc retrieves over the corpus, and
+ * a skill definition is no evidence about anything.
+ */
+const guildProjection = {
+  skills: SKILLS,
+  steps: PROTOCOLS.flatMap((p) =>
+    p.versions.flatMap((v) =>
+      v.steps.map((st) => ({ protocolId: p.id, version: v.version, stepId: st.id, skills: st.skills ?? [] })),
+    ),
+  ),
+};
+writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection, null, 2) + '\n');
 
 const withConditions = records.filter((r) => r.conditions !== null).length;
 const nonPrimary = records.filter((r) => !r.primary).length;

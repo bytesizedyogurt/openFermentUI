@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, guard, intake, witness
+from . import biorepo, extract, guard, guild, intake, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -34,6 +34,10 @@ from .models import (
     ExtractResponse,
     ExtractRun,
     FetchResult,
+    Guild,
+    GuildEvidence,
+    GuildPerson,
+    GuildWithdrawal,
     IntakeStatus,
     Overlay,
     ReviewDecision,
@@ -284,6 +288,66 @@ def biorepo_check(decision: ReviewDecision) -> DecisionCheck:
         return DecisionCheck(ok=False, rule=e.rule, why=e.why)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Guild (OF-BLD-013 §1.2) ──────────────────────────────────────────────
+#
+# The competence ledger. Reads are open like every read here; each write goes
+# through one function in guild.py, which stores it or refuses it with the
+# rule that failed. 422 carries the rule and the reason, the same shape
+# /api/biorepo/decisions uses, and /api/guild/check answers 200 either way.
+
+
+def _refused(e: guild.GuildRefused, what: str) -> HTTPException:
+    log.warning("guild refused %s — %s", what, e)
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild", response_model=Guild)
+def guild_ledger() -> Guild:
+    """The whole ledger: people and every entry, withdrawn ones included.
+    The browser applies it at load the way it applies the overlay, and
+    computes every level from it."""
+    return guild.read()
+
+
+@app.post("/api/guild/people", response_model=GuildPerson)
+def guild_people(person: GuildPerson) -> GuildPerson:
+    try:
+        return guild.write_person(person)
+    except guild.GuildRefused as e:
+        raise _refused(e, person.id) from e
+
+
+@app.post("/api/guild/evidence", response_model=GuildEvidence)
+def guild_evidence(entry: GuildEvidence) -> GuildEvidence:
+    try:
+        return guild.write_evidence(entry)
+    except guild.GuildRefused as e:
+        raise _refused(e, entry.id) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/check", response_model=DecisionCheck)
+def guild_check(entry: GuildEvidence) -> DecisionCheck:
+    """Would `guild.write_evidence` keep this entry? Every rule runs and
+    nothing is written. A refusal is an answer, so it comes back 200."""
+    try:
+        guild.write_evidence(entry, dry_run=True)
+        return DecisionCheck(ok=True)
+    except guild.GuildRefused as e:
+        return DecisionCheck(ok=False, rule=e.rule, why=e.why)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/withdraw", response_model=GuildEvidence)
+def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
+    try:
+        return guild.withdraw(request)
+    except guild.GuildRefused as e:
+        raise _refused(e, request.evidenceId) from e
 
 
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────

@@ -82,6 +82,12 @@ const PAIRS = [
   ['DroppedCandidate', 'DroppedCandidate'],
   ['BioRepo', 'BioRepo'],
   ['ExtractResponse', 'ExtractResponse'],
+  // OF-BLD-013 §1.2 — Guild's ledger.
+  ['GuildPerson', 'GuildPerson'],
+  ['EvidenceSource', 'EvidenceSource'],
+  ['GuildEvidence', 'GuildEvidence'],
+  ['GuildWithdrawal', 'GuildWithdrawal'],
+  ['Guild', 'Guild'],
 ];
 
 let compared = 0;
