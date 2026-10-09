@@ -35,6 +35,7 @@ export const RUNBOOK_TABS: OwnerTab[] = [
 export const PRIMER_TABS: OwnerTab[] = [
   { label: 'Lessons', to: '/primer' },
   { label: 'My path', to: '/primer/path' },
+  { label: 'Practice', to: '/primer/practice' },
 ];
 
 // OF-BLD-013 §1.4. Review keeps /guild, so every link into the queue that

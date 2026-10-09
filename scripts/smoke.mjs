@@ -48,6 +48,44 @@ const checks = [];
  */
 const guildLedger = { version: 1, people: [], evidence: [] };
 const guildPosts = [];
+/**
+ * Practice as the double holds it (OF-BLD-013 §4). A draft is a fixed
+ * scenario whose values are PR-OD-01's own, and the tutor asks why twice and
+ * closes on the third answer; the rules are practice.py's, tested in
+ * core/tests/test_practice.py. `practicePosts` is what the browser sent.
+ */
+const practiceState = { version: 1, scenarios: [], sessions: [] };
+const practicePosts = [];
+let practiceIds = 0;
+const PRACTICE_SCENARIO = (skillId) => ({
+  id: `ps-smoke-${++practiceIds}`,
+  skillId,
+  title: 'A reading above the linear range',
+  situation: 'A flask read above the top of the linear range at step o4. The step says [v1], and the blank is [v2].',
+  prompt: 'What do you do with the sample before you record it, and why?',
+  watchFor: ['Dilutes into the same spent medium and reads again'],
+  evidence: [
+    {
+      id: 'v1',
+      label: 'Step o4 of PR-OD-01',
+      source: { kind: 'step', protocolId: 'PR-OD-01', stepId: 'o4' },
+      text: 'Read OD750 in a 10 mm cuvette against 250 mL of spent cell-free medium as the blank.',
+    },
+    {
+      id: 'v2',
+      label: 'The blank medium',
+      source: { kind: 'material', protocolId: 'PR-OD-01', material: 'Spent cell-free medium' },
+      text: 'Spent cell-free medium',
+      value: 250,
+      unit: 'mL',
+    },
+  ],
+  steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }],
+  depositionIds: [],
+  model: 'smoke-double',
+  usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+  createdAt: new Date().toISOString(),
+});
 
 const server = createServer(async (req, res) => {
   try {
@@ -109,6 +147,56 @@ const server = createServer(async (req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(stored));
+    }
+    if (url === '/api/practice' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(practiceState));
+    }
+    if (url.startsWith('/api/practice/') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const sent = JSON.parse(body);
+      practicePosts.push({ url, body: sent });
+      let out;
+      const at = new Date().toISOString();
+      if (url === '/api/practice/draft') {
+        out = PRACTICE_SCENARIO(sent.skillId);
+        practiceState.scenarios.push(out);
+      } else if (url === '/api/practice/turn') {
+        const sc = practiceState.scenarios.find((x) => x.id === sent.scenarioId);
+        let held = practiceState.sessions.find((x) => x.id === sent.sessionId) ?? {
+          id: `pt-smoke-${++practiceIds}`,
+          scenarioId: sc.id,
+          skillId: sc.skillId,
+          personId: sent.personId ?? null,
+          turns: [],
+          observed: [],
+          startedAt: at,
+          closedAt: null,
+          evidenceId: null,
+          usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+        };
+        const answered = held.turns.filter((t) => t.role === 'trainee').length + 1;
+        const close = answered >= 3;
+        held = {
+          ...held,
+          turns: [
+            ...held.turns,
+            { role: 'trainee', text: sent.answer, steps: [], at },
+            close
+              ? { role: 'tutor', move: 'close', text: 'Look again at why step o4 dilutes into [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at }
+              : { role: 'tutor', move: 'why', text: 'Why would that change what the reading means?', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at },
+          ],
+        };
+        if (close) {
+          held.closedAt = at;
+          held.observed = [{ text: 'Chose to dilute, and was unsure why the diluent is [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }] }];
+        }
+        practiceState.sessions = [...practiceState.sessions.filter((x) => x.id !== held.id), held];
+        out = held;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(out));
     }
     if (url === '/api/biorepo/overlay') {
       // Answered late on purpose: a screen mounted before the overlay arrives
@@ -174,6 +262,7 @@ const ROUTES = [
   // OF-BLD-013 §3 — a lesson that counts toward skills, and a path with nobody on the ledger.
   ['/primer/l6-1', 'Primer — bench lesson'],
   ['/primer/path', 'Primer — my path (empty ledger)'],
+  ['/primer/practice', 'Primer — practice'],
   ['/guild', 'Guild'],
   // OF-BLD-013 — the competence ledger, empty in a fresh browser.
   ['/guild/matrix', 'Guild — matrix (empty ledger)'],
@@ -649,6 +738,31 @@ async function main() {
       if (!/Vessel sterilisation[\s\S]{0,200}Waits for Pressure and heat safety to reach Supervised/.test(path))
         problems.push('My path does not say a passed lesson waits on its prerequisite');
       if (!/Next up[\s\S]*Open the lesson/.test(path)) problems.push('My path offers no lesson to take next');
+      // §4 — practice: a draft, three answers to the tutor, and the close on the learner's record.
+      await page.evaluate(() => (location.hash = '#/primer/practice?skill=SK-OD'));
+      await page.waitForTimeout(500);
+      await page.locator('button:has-text("Draft a scenario")').first().click();
+      await page.waitForTimeout(600);
+      let player = await page.locator('main').innerText();
+      if (!/A reading above the linear range[\s\S]*Evidence[\s\S]*The blank medium[\s\S]*250[\s\S]*mL/.test(player))
+        problems.push('a drafted scenario does not show its evidence pane with the value from its source');
+      if ((await page.locator('button.chip:has-text("Step o4 of PR-OD-01")').count()) < 1)
+        problems.push('a [v1] mark in the situation is not shown as its evidence item');
+      for (const said of ['I would dilute it and read again', 'Because above the range it stops tracking biomass', 'Into the same spent medium']) {
+        await page.fill('#practice-answer', said);
+        await page.locator('button:has-text("Send answer")').click();
+        await page.waitForTimeout(500);
+      }
+      player = await page.locator('main').innerText();
+      if (!/Tutor · Asks why[\s\S]*Tutor · Closes[\s\S]*What the tutor observed[\s\S]*Chose to dilute/.test(player))
+        problems.push('the tutor did not question and then close with what it observed');
+      if (!/Recorded for Olivier Ndayisaba in the sample team alone/.test(player))
+        problems.push('a closed session with the sample shown does not say it went on the sample learner alone');
+      if (practicePosts.some((x) => x.body.personId != null)) problems.push('a sample person was named to the service in Practice');
+      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-olivier'));
+      await page.waitForTimeout(400);
+      if (!/Practice[\s\S]{0,300}Practice transcript pt-smoke-/.test(await page.locator('main').innerText()))
+        problems.push('the closed session is not on the learner\u2019s ledger with a link to its transcript');
       await page.locator('button:has-text("Hide the sample")').click();
       await page.waitForTimeout(200);
       await page.evaluate(() => (location.hash = '#/guild/matrix'));
@@ -672,7 +786,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning and My path names what it waits on; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -686,7 +800,7 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, first person, reload`);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, first person, reload`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 

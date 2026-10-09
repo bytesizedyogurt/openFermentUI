@@ -36,6 +36,9 @@ import type {
   GuildEvidence,
   GuildPerson,
   GuildWithdrawal,
+  Practice,
+  PracticeScenario,
+  PracticeSession,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -75,6 +78,7 @@ import {
   postWithdrawal,
 } from '@/lib/guild';
 import { sampleGuild } from '@/data/guildSample';
+import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
 import { SKILL_BY_ID } from '@/data/skills';
 
@@ -506,6 +510,27 @@ export interface OFState {
   guildSampleActingId: string | null;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
+  /**
+   * Practice as the service last answered it (OF-BLD-013 §4.3): every
+   * scenario drafted and every session held. Null until asked, and while the
+   * service is down. The service's state, so it is never in the Durable tier.
+   */
+  practice: Practice | null;
+  loadPractice: () => Promise<Practice | null>;
+  /** A drafted scenario, or a session the tutor just answered, merged into `practice`. */
+  mergePractice: (item: { scenario?: PracticeScenario; session?: PracticeSession }) => void;
+  /**
+   * Whoever is learning, as Practice names them to the service: a person on
+   * the ledger who can hold skills, or null. A sample person is never sent.
+   */
+  practiceLearner: () => string | null;
+  /**
+   * A session just closed. For a learner on the ledger the service has
+   * already put practice on it, so the ledger is fetched again; with the
+   * sample shown, the sample's learner gets the entry here, in the sample
+   * alone.
+   */
+  practiceClosed: (session: PracticeSession, title: string) => Promise<void>;
   guildAddPerson: (input: Pick<GuildPerson, 'name' | 'title' | 'role' | 'joinedAt'>) => Promise<GuildPerson | null>;
   guildUpdatePerson: (person: GuildPerson) => Promise<GuildPerson | null>;
   guildRecord: (entry: Omit<GuildEvidence, 'id' | 'recordedAt'>) => Promise<GuildEvidence | null>;
@@ -728,6 +753,7 @@ export const useStore = create<OFState>()((set, get) => ({
   guildSample: null as Guild | null,
   guildSampleActingId: null as string | null,
   guildHydrated: false,
+  practice: null as Practice | null,
 
   toast: (t) => {
     const id = nextId('toast');
@@ -2597,6 +2623,52 @@ export const useStore = create<OFState>()((set, get) => ({
     set({ guildSample: sampleGuild(localToday()), guildSampleActingId: 'p-sample-eric' }),
 
   guildClearSample: () => set({ guildSample: null, guildSampleActingId: null }),
+
+  // ── Practice (OF-BLD-013 §4.3) ──────────────────────────────────────
+
+  loadPractice: async () => {
+    const practice = await loadPracticeFromService();
+    set({ practice });
+    return practice;
+  },
+
+  mergePractice: ({ scenario, session }) =>
+    set((s) => {
+      const p: Practice = s.practice ?? { version: 1, scenarios: [], sessions: [] };
+      return {
+        practice: {
+          ...p,
+          scenarios: scenario ? [...p.scenarios.filter((x) => x.id !== scenario.id), scenario] : p.scenarios,
+          sessions: session ? [...p.sessions.filter((x) => x.id !== session.id), session] : p.sessions,
+        },
+      };
+    }),
+
+  practiceLearner: () => {
+    const s = get();
+    return s.guildSample ? null : runOperatorDefault(s);
+  },
+
+  practiceClosed: async (session, title) => {
+    const s = get();
+    if (!session.closedAt) return;
+    if (s.guildSample) {
+      const learner = runOperatorDefault(s);
+      if (!learner) return;
+      await get().guildRecord({
+        personId: learner,
+        skillId: session.skillId,
+        kind: 'scenario',
+        outcome: 'pass',
+        at: session.closedAt.slice(0, 10),
+        observerId: null,
+        source: { kind: 'scenario', ref: session.id },
+        raw: `Practice, \u201c${title}\u201d. The tutor observed: ${session.observed.map((o) => o.text).join(' ')}`,
+      });
+      return;
+    }
+    if (session.evidenceId) await get().syncGuild();
+  },
 
   setRunOperator: (runId, personId) =>
     set((s) => {

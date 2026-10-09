@@ -334,10 +334,15 @@ function Row({ item, say, compact }: { item: PathItem; say: Say; compact?: boole
       </div>
       {text && <p className={cx('text-body mt-1', compact && 'text-ink-soft')}>{text}</p>}
       {!compact && to && cta && (
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <LinkButton to={to} size="sm">
             {cta}
           </LinkButton>
+          {item.step.kind !== 'held' && item.step.kind !== 'waiting' && (
+            <LinkButton to={`/primer/practice?skill=${skill.id}`} size="sm">
+              Practise it with the tutor
+            </LinkButton>
+          )}
         </div>
       )}
     </div>

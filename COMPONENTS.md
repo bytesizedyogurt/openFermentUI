@@ -230,13 +230,13 @@ Not built: Claim Workbench, Priority Engine, Enablement, Notary.
 
 **How the system works.** `/primer` · chord `g n`
 
-The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state. A lesson may count toward Guild's skills (OF-BLD-013): passing its checkpoint records a lesson passed on the learner's ledger, which puts them at Learning, and My path shows one person the next step on each skill, from lesson to bench.
+The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state. A lesson may count toward Guild's skills (OF-BLD-013): passing its checkpoint records a lesson passed on the learner's ledger, which puts them at Learning, and My path shows one person the next step on each skill, from lesson to bench. Practice drafts a scenario from the protocol steps and the bench runs that need a skill, and a tutor questions the trainee's reasoning; the model writes words and cites sources, every value is copied from its source, and a closed session goes on the learner's ledger as practice. The drafts and the tutor are model calls the service makes in `core/openferment_core/practice.py`.
 
-Views: [My path](#) `/primer/path`
+Views: [My path](#) `/primer/path` · [Practice](#) `/primer/practice`
 
 | Component | Implemented in |
 |---|---|
-| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx` |
+| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` |
 
 ### Guild
 
@@ -267,7 +267,7 @@ for the ones with a rail entry.
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
 | fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
-| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx` | the rail, /primer |
+| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
 | Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` | a BioRepo tab, /biorepo/witness |
 | Common Seal | Keeping it honest | not built | — |

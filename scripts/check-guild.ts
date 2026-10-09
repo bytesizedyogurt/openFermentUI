@@ -499,6 +499,41 @@ async function main() {
   check('nor does a handover to one', s().depositions.find((d) => d.id === opened.depositionId)?.operatorId === null && s().runs[opened.runId].operatorId === 'p-sample-patrick');
   s().guildClearSample();
 
+  // ── 8. practice (OF-BLD-013 §4.3) ───────────────────────────────────
+  const closedSession = (personId: string | null, evidenceId: string | null) => ({
+    id: 'pt-check-1',
+    scenarioId: 'ps-check-1',
+    skillId: 'SK-OD',
+    personId,
+    turns: [],
+    observed: [{ text: 'Chose to dilute, unsure why spent medium.', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }] }],
+    startedAt: `${TODAY}T09:00:00Z`,
+    closedAt: `${TODAY}T09:20:00Z`,
+    evidenceId,
+    usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
+  });
+  reset7({ guildActingId: 'p-tom' });
+  check('a learner on the ledger is named to the service', s().practiceLearner() === 'p-tom');
+  s().guildSetActing('p-qa');
+  check('an auditor is named as nobody', s().practiceLearner() === null);
+  s().guildLoadSample();
+  s().guildSetActing('p-sample-olivier');
+  check('a sample person is never named to the service', s().practiceLearner() === null);
+  const realBefore = s().guild;
+  await s().practiceClosed(closedSession(null, null), 'A reading above the range');
+  const practised = s().guildSample!.evidence.filter((e) => e.kind === 'scenario');
+  check(
+    'with the sample shown, a closed session goes on the sample learner, in the sample alone',
+    practised.length === 1 && practised[0].personId === 'p-sample-olivier' && practised[0].source.ref === 'pt-check-1' && practised[0].observerId === null && s().guild === realBefore,
+  );
+  check('and the offline fallback would take it', offlineRefusal(practised[0], s().guildSample!) === null);
+  check('the offline fallback refuses practice that names an observer', offlineRefusal({ ...practised[0], observerId: 'p-sample-eric' }, s().guildSample!)?.rule === 'observer');
+  s().guildClearSample();
+  reset7({ guildActingId: 'p-tom', serviceUp: true });
+  server7.evidence.push({ ...ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-2' } }), id: 'e-practice-from-service', recordedAt: `${TODAY}T09:21:00Z` });
+  await s().practiceClosed({ ...closedSession('p-tom', 'e-practice-from-service'), id: 'pt-check-2' }, 'A reading above the range');
+  check('a session the service put on the ledger is fetched back', s().guild.evidence.some((e) => e.id === 'e-practice-from-service'));
+
   const audited = { ...ev('p-tom', 'SK-OD', 'witnessed', TODAY), observerId: 'p-qa' };
   check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, { version: 1, people: R_PEOPLE, evidence: [] })?.rule === 'authority');
 

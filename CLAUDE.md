@@ -222,8 +222,13 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   the runs the browser sends. The model writes words and cites sources; every
   value in the evidence pane is copied from the source it cites, and a draft
   with a number of its own, an unresolved source or marker, or no step
-  needing the skill is refused whole. `core/data/practice.json` never enters
-  git. Offline tests use a stand-in model; the real one is `pnpm test:live`.
+  needing the skill is refused whole. The tutor is held to the same, closes
+  on the third answer with what it observed, and a closed session for a
+  person on the ledger becomes a `scenario` entry (no observer, the session
+  as its source), which is Learning and no more. With the sample shown the
+  service is sent nobody (`practiceLearner`), and the entry goes on the
+  sample alone. `core/data/practice.json` never enters git. Offline tests use
+  a stand-in model; the real one is `pnpm test:live`.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

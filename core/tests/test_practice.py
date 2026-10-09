@@ -94,7 +94,7 @@ def with_(**changes) -> dict[str, Any]:
 def test_a_good_draft_is_kept_with_every_value_copied_from_its_source():
     s = practice.draft(request(), ask=stand_in(GOOD))
     reading, said, step = s.evidence
-    assert (reading.id, reading.value, reading.unit, reading.text) == ("v1", 1.42, "AU", "OD750, flask B")
+    assert (reading.id, reading.value, reading.unit, reading.text) == ("v1", 1.42, "AU", "one point four two")
     assert reading.source.kind == "entry" and reading.source.depositionId == "dep-1" and reading.source.itemId == "ent-1"
     assert said.text == "Read it straight away, no dilution, it was off the scale I think" and said.value is None
     assert step.source.kind == "step" and step.text == practice.sources_for("SK-OD", [])["step:PR-OD-01:o4"]["text"]

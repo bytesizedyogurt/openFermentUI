@@ -53,6 +53,7 @@ import Compare from '@/screens/Compare';
 import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
 import PrimerPath from '@/screens/PrimerPath';
+import PrimerPractice from '@/screens/PrimerPractice';
 import Settings from '@/screens/Settings';
 import Architecture from '@/screens/Architecture';
 import GeneOS from '@/screens/GeneOS';
@@ -143,10 +144,11 @@ function Screen() {
     case 'primer':
       // Lesson ids are globally unique, so /primer/l0-1 addresses a lesson on
       // its own. /primer/m0/l0-1 still resolves — an old deep link should not
-      // need a redirect when the id it carries is enough. 'path' is reserved
-      // before the lesson lookup (OF-BLD-013 §3.3), and check:seed refuses a
-      // lesson that takes it as an id.
+      // need a redirect when the id it carries is enough. 'path' and
+      // 'practice' are reserved before the lesson lookup (OF-BLD-013 §3.3,
+      // §4.3), and check:seed refuses a lesson that takes either as an id.
       if (b === 'path') return <PrimerPath />;
+      if (b === 'practice') return <PrimerPractice id={c} />;
       if (b && c) return <PrimerLesson moduleId={b} lessonId={c} />;
       if (b) {
         const owner = MODULES.find((m) => m.lessons.some((l) => l.id === b));

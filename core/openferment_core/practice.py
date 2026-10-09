@@ -168,8 +168,10 @@ def sources_for(skill_id: str, depositions: list[PracticeDeposition]) -> dict[st
                     "depositionId": d.id,
                     "itemId": e.id,
                     "stepId": e.stepId,
-                    "text": e.label or e.raw,
-                    "operatorSaid": e.raw,
+                    # The operator's own words; the measure's name is for the
+                    # model to read, and stays out of the evidence pane.
+                    "text": e.raw,
+                    "measure": e.label,
                     "value": e.value,
                     "unit": e.unit,
                     "at": e.at,

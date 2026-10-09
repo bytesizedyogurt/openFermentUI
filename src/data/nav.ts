@@ -341,6 +341,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'Primer',
   },
   {
+    label: 'Practice',
+    to: '/primer/practice',
+    descriptor: 'scenarios from the bench, and a tutor who asks why',
+    aliases: ['practice', 'scenarios', 'tutor', 'drill'],
+    icon: GraduationCap,
+    owner: 'Primer',
+  },
+  {
     label: 'Matrix',
     to: '/guild/matrix',
     descriptor: 'who holds which skill, and who can run a protocol',

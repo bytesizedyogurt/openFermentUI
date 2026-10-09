@@ -148,10 +148,10 @@ export function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
   return e.kind === 'knowledge' && e.source.kind === 'lesson' ? 'Lesson passed' : KIND_LABEL[e.kind];
 }
 
-/** Strongest tick for what an assessor watched, lightest for a briefing; a lesson is self-recorded. */
+/** Strongest tick for what an assessor watched, lightest for a briefing; lessons and practice are self-recorded. */
 function tickFor(e: GuildEvidence): string {
   if (e.withdrawnAt) return 'tick tick-unverified';
-  if (e.source.kind === 'lesson') return 'tick tick-user';
+  if (e.source.kind === 'lesson' || e.source.kind === 'scenario') return 'tick tick-user';
   if (e.kind === 'witnessed') return e.outcome === 'fail' ? 'tick tick-rejected' : 'tick tick-measured';
   if (e.kind === 'designation') return 'tick tick-gold';
   if (e.kind === 'supervised' || e.kind === 'independent') return 'tick tick-verified';
@@ -181,6 +181,10 @@ export function EvidenceRow({
     ) : e.source.kind === 'lesson' ? (
       <a className="text-accent hover:underline" href={href(`/primer/${e.source.ref}`)}>
         Primer lesson {e.source.ref}
+      </a>
+    ) : e.source.kind === 'scenario' ? (
+      <a className="text-accent hover:underline" href={href(`/primer/practice/${e.source.ref}`)}>
+        Practice transcript {e.source.ref}
       </a>
     ) : e.source.stepId ? (
       `${e.source.ref} · step ${e.source.stepId}`
