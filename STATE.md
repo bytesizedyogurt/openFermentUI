@@ -198,3 +198,24 @@ transcript; this file is the index a later session reads first.
   findings are fixed in §4.4. **593** Python tests offline; the real model is
   `pnpm test:live`, which no key here could run. Smoke **56** routes.
   `pnpm verify` green.
+- **2026-10-09 · OF-BLD-013 Phase 5 (§5.1–§5.5)** — Checks. The lead sets
+  each gate to advise or enforce (Settings → Guild; critical skills enforce
+  by default), and in enforce mode a Supervised, lapsed or suspended
+  operator's step waits for a cosigner who holds the skill; skipping a held
+  step writes a deviation. Every night `checks.py` ranks each person and
+  skill by fixed rules (suspended, lapsed, lapsing, ready, a recent
+  deviation, low confidence, the lead's quarterly rate), mirrored from
+  `src/engine/checks.ts` and held to it by the fixture, and proposes the top
+  checks with their reasons written out; a brief beside each is one model
+  call with no number in it and no name. Guild gains Checks for the lead and
+  assessors: schedule, dismiss with a reason, or run at the bench, a
+  full-screen takeover under Deposition's constraints that calls one
+  criterion at a time and signs in the assessor's name, writing one
+  witnessed entry per skill in one ledger write. A check never shows to the
+  person it names until it has been run; My path lets a person ask for one.
+  An independent review's fourteen findings are fixed in §5.5. **623**
+  Python tests offline; `check:guild` **160** checks; smoke **58** routes.
+  Known and left: the plan's practice–bench disagreement signal and an
+  assessor's flag as a cause of suspension are not built; a brief has
+  never been drafted by the real model here, as no key could run
+  `pnpm test:live`. `pnpm verify` green.
