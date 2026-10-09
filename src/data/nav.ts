@@ -373,6 +373,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'Guild',
   },
   {
+    label: 'Checks',
+    to: '/guild/checks',
+    descriptor: 'the assessor queue, and witnessed checks at the bench',
+    aliases: ['checks', 'assessor queue', 'surprise checks', 'bench check', 'witnessed check'],
+    icon: Users,
+    owner: 'Guild',
+  },
+  {
     label: 'Ingest',
     to: '/intake/ingest',
     descriptor: 'what is queued, fetched, failed',

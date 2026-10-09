@@ -248,6 +248,17 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   Practice's number check; the model is never told who is checked, and a
   brief that breaks a rule is refused whole. `core/data/checks.json` never
   enters git.
+- **A check never shows to the person it names until it is run.**
+  `shownTo` and `mayQueue` in `src/engine/checks.ts` decide what Guild's
+  Checks tab, `/guild/checks`, Home's Workforce card and the tab badge show;
+  the queue is for the lead and assessors. Asking for your own check from
+  My path answers the same whether or not one is open (a `duplicate` refusal
+  is swallowed for the asker alone). `/guild/checks/:id/run` is the bench
+  (`BenchCheck.tsx`), a full-screen takeover under Deposition's constraints:
+  one criterion at a time, Meets or Needs work, the assessor's words per
+  skill, then a sign step in the assessor's name. With the sample shown the
+  queue is the ranking run in the browser and the bench writes to the sample
+  alone. `check:guild` part 10 and the smoke's bench flow hold all of it.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

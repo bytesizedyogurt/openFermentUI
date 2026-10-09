@@ -40,6 +40,10 @@ import type {
   Practice,
   PracticeScenario,
   PracticeSession,
+  Check,
+  CheckNote,
+  CheckResult,
+  Checks,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -81,7 +85,9 @@ import {
 } from '@/lib/guild';
 import { sampleGuild } from '@/data/guildSample';
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
-import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
+import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
+import { proposeChecks, type Proposal } from '@/engine/checks';
+import { competenceOf, isAssessor, localToday, mayCosign, statusOf } from '@/engine/competence';
 import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
@@ -533,6 +539,21 @@ export interface OFState {
    * alone.
    */
   practiceClosed: (session: PracticeSession, title: string) => Promise<void>;
+  /**
+   * Guild's checks as the service last answered (OF-BLD-013 §5.4), or null.
+   * With the sample shown, `guildSampleChecks` stands in: the same ranking
+   * run in this browser, kept in memory, never posted.
+   */
+  checks: Checks | null;
+  guildSampleChecks: Check[] | null;
+  loadChecks: () => Promise<void>;
+  /** Each returns null when it worked, or why it did not, in words. */
+  checksPropose: () => Promise<{ made: number } | { why: string }>;
+  checksRequest: (personId: string, skillIds: string[]) => Promise<string | null>;
+  checksSchedule: (checkId: string, day: string) => Promise<string | null>;
+  checksDismiss: (checkId: string, reason: string) => Promise<string | null>;
+  checksBrief: (checkId: string) => Promise<string | null>;
+  checksRecord: (checkId: string, results: CheckResult[], notes: CheckNote[], at: string) => Promise<string | null>;
   guildAddPerson: (input: Pick<GuildPerson, 'name' | 'title' | 'role' | 'joinedAt'>) => Promise<GuildPerson | null>;
   guildUpdatePerson: (person: GuildPerson) => Promise<GuildPerson | null>;
   guildRecord: (entry: Omit<GuildEvidence, 'id' | 'recordedAt'>) => Promise<GuildEvidence | null>;
@@ -762,6 +783,8 @@ export const useStore = create<OFState>()((set, get) => ({
   guildSampleActingId: null as string | null,
   guildHydrated: false,
   practice: null as Practice | null,
+  checks: null as Checks | null,
+  guildSampleChecks: null as Check[] | null,
 
   toast: (t) => {
     const id = nextId('toast');
@@ -2655,10 +2678,149 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  guildLoadSample: () =>
-    set({ guildSample: sampleGuild(localToday()), guildSampleActingId: 'p-sample-eric' }),
+  guildLoadSample: () => {
+    const sample = sampleGuild(localToday());
+    // The sample's queue is the ranking run here on the invented ledger.
+    const checks = proposeChecks(sample, SKILL_BY_ID, localToday()).map((p, i) => sampleCheck(p, i));
+    set({ guildSample: sample, guildSampleActingId: 'p-sample-eric', guildSampleChecks: checks });
+  },
 
-  guildClearSample: () => set({ guildSample: null, guildSampleActingId: null }),
+  guildClearSample: () => set({ guildSample: null, guildSampleActingId: null, guildSampleChecks: null }),
+
+  // ── Checks (OF-BLD-013 §5.4) ─────────────────────────────────────────
+  //
+  // The service's rules decide every write; with the sample shown the same
+  // moves happen to the sample's checks in memory, under the few rules a
+  // screen needs (who may act), and nothing is posted.
+
+  loadChecks: async () => {
+    set({ checks: await loadChecksFromService() });
+  },
+
+  checksPropose: async () => {
+    const s = get();
+    const by = actingIdOf(s);
+    if (s.guildSample) {
+      const open = s.guildSampleChecks ?? [];
+      const made = proposeChecks(s.guildSample, SKILL_BY_ID, localToday(), coveredBy(open)).map((p, i) => sampleCheck(p, open.length + i));
+      set({ guildSampleChecks: [...open, ...made] });
+      return { made: made.length };
+    }
+    if (!by) return { why: 'Choose who you are with Acting as: the ranking is run by an assessor or the lead.' };
+    try {
+      const made = await postPropose(by);
+      await get().loadChecks();
+      return { made: made.length };
+    } catch (e) {
+      return { why: whyNot(e) };
+    }
+  },
+
+  checksRequest: async (personId, skillIds) => {
+    const s = get();
+    const by = actingIdOf(s);
+    if (!by) return 'Choose who you are first.';
+    // Asking for your own check says the same whether or not one is already
+    // open: a duplicate is the queue's to know, and the person never sees a
+    // check that names them before it is run.
+    const own = by === personId;
+    if (s.guildSample) {
+      const open = s.guildSampleChecks ?? [];
+      const cover = coveredBy(open);
+      const fresh = skillIds.filter((k) => !cover.has(`${personId}|${k}`));
+      if (fresh.length === 0) return own ? null : 'A check already in the queue covers this.';
+      const who = by === personId ? 'the person themselves' : guildView(s).people.find((p) => p.id === by)?.name ?? by;
+      const made = sampleCheck(
+        { personId, skillIds: fresh, score: 0, reasons: fresh.map((k) => ({ kind: 'requested' as const, skillId: k, text: `Asked for by ${who}.` })) },
+        open.length,
+        by,
+      );
+      set({ guildSampleChecks: [...open, made] });
+      return null;
+    }
+    try {
+      await postRequest({ personId, skillIds, by });
+      await get().loadChecks();
+      return null;
+    } catch (e) {
+      if (own && e instanceof CheckRefused && e.rule === 'duplicate') return null;
+      return whyNot(e);
+    }
+  },
+
+  checksSchedule: async (checkId, day) =>
+    checkMove(set, get, checkId, (c, by, map) => {
+      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Scheduled by an assessor on every one of its skills, never by the person checked.';
+      return { ...c, state: 'scheduled', assessorId: by, scheduledFor: day };
+    }, (by) => postSchedule(checkId, { by, scheduledFor: day })),
+
+  checksDismiss: async (checkId, reason) =>
+    checkMove(set, get, checkId, (c, by, map, ledger) => {
+      if (reason.trim().length < 2) return 'A dismissal says why; it is kept for the audit trail.';
+      const lead = ledger.people.some((p) => p.id === by && p.active && p.role === 'lead');
+      if (by === c.personId || !(lead || c.skillIds.some((k) => isAssessor(map, by, k))))
+        return 'Dismissed by an assessor on one of its skills or by the lead, never by the person checked.';
+      return { ...c, state: 'dismissed', dismissedBy: by, dismissReason: reason.trim(), closedAt: new Date().toISOString() };
+    }, (by) => postDismiss(checkId, { by, reason })),
+
+  checksBrief: async (checkId) => {
+    const s = get();
+    if (s.guildSample) return 'A brief is drafted by the service from the ledger it keeps, and the sample stays in this browser.';
+    const by = actingIdOf(s);
+    if (!by) return 'Choose who you are first.';
+    try {
+      await postBrief(checkId, by);
+      await get().loadChecks();
+      return null;
+    } catch (e) {
+      return whyNot(e);
+    }
+  },
+
+  checksRecord: async (checkId, results, notes, at) => {
+    const s = get();
+    const by = actingIdOf(s);
+    if (!by) return 'Choose who you are first: a check is signed by the assessor who ran it.';
+    if (s.guildSample) {
+      const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
+      if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
+      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
+      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Run by an assessor on every one of its skills, never by the person checked.';
+      const ids: string[] = [];
+      for (const k of c.skillIds) {
+        const n = SKILL_BY_ID[k].mastery.length;
+        const mine = results.filter((r) => r.skillId === k);
+        if (mine.length !== n) return `Every criterion of ${SKILL_BY_ID[k].name} is called before the check is signed.`;
+        const note = notes.find((x) => x.skillId === k)?.text.trim() ?? '';
+        if (note.length < 2) return `Write what you saw on ${SKILL_BY_ID[k].name}.`;
+        const e = await get().guildRecord({
+          personId: c.personId,
+          skillId: k,
+          kind: 'witnessed',
+          outcome: mine.every((r) => r.meets) ? 'pass' : 'fail',
+          at,
+          observerId: by,
+          source: { kind: 'check', ref: c.id },
+          raw: note,
+        });
+        if (e) ids.push(e.id);
+      }
+      set((x) => ({
+        guildSampleChecks: (x.guildSampleChecks ?? []).map((y) =>
+          y.id === checkId ? { ...y, state: 'done', assessorId: by, results, evidenceIds: ids, closedAt: new Date().toISOString() } : y,
+        ),
+      }));
+      return null;
+    }
+    try {
+      await postRecord(checkId, { by, at, results, notes });
+      await get().loadChecks();
+      await get().syncGuild();
+      return null;
+    } catch (e) {
+      return whyNot(e);
+    }
+  },
 
   // ── Practice (OF-BLD-013 §4.3) ──────────────────────────────────────
 
@@ -2920,6 +3082,8 @@ export const useStore = create<OFState>()((set, get) => ({
           guildPendingWithdrawals: x.guildPendingWithdrawals.filter((w) => !s.guildPendingWithdrawals.includes(w)),
         };
       });
+      // The queue reads the ledger it was ranked from, so it is fetched with it.
+      await get().loadChecks();
       if (posted || refused.length)
         get().logActivity({
           at: stamp(),
@@ -2957,6 +3121,7 @@ export const useStore = create<OFState>()((set, get) => ({
       guildActingId: serviceUp ? get().guildActingId : null,
       guildSample: null,
       guildSampleActingId: null,
+      guildSampleChecks: null,
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
@@ -2971,6 +3136,64 @@ export const useStore = create<OFState>()((set, get) => ({
 /** The ledger every Guild screen reads: the sample team while it is shown. */
 export function guildView(s: Pick<OFState, 'guild' | 'guildSample'>): Guild {
   return s.guildSample ?? s.guild;
+}
+
+/** The checks every Guild screen reads: the sample's while it is shown. */
+export function checksView(s: Pick<OFState, 'checks' | 'guildSample' | 'guildSampleChecks'>): Check[] {
+  return s.guildSample ? (s.guildSampleChecks ?? []) : (s.checks?.checks ?? []);
+}
+
+/** person|skill pairs an open check covers. */
+function coveredBy(checks: Check[]): Set<string> {
+  return new Set(checks.filter((c) => c.state === 'proposed' || c.state === 'scheduled').flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`)));
+}
+
+/** A check in the sample's queue, made here and never posted. */
+function sampleCheck(p: Proposal, n: number, by: string | null = null): Check {
+  return {
+    id: `ck-sample-${n + 1}`,
+    personId: p.personId,
+    skillIds: p.skillIds,
+    reasons: p.reasons,
+    state: 'proposed',
+    score: p.score,
+    proposedAt: new Date().toISOString(),
+    proposedBy: by,
+    results: [],
+    evidenceIds: [],
+  };
+}
+
+/**
+ * One move on one open check: in the sample, `local` makes it here (or says
+ * why not); otherwise `post` asks the service and the queue is fetched again.
+ */
+async function checkMove(
+  set: StoreSet,
+  get: () => OFState,
+  checkId: string,
+  local: (c: Check, by: string, map: ReturnType<typeof competenceOf>, ledger: Guild) => Check | string,
+  post: (by: string) => Promise<unknown>,
+): Promise<string | null> {
+  const s = get();
+  const by = actingIdOf(s);
+  if (!by) return 'Choose who you are first.';
+  if (s.guildSample) {
+    const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
+    if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
+    const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
+    const next = local(c, by, map, s.guildSample);
+    if (typeof next === 'string') return next;
+    set((x) => ({ guildSampleChecks: (x.guildSampleChecks ?? []).map((y) => (y.id === checkId ? next : y)) }));
+    return null;
+  }
+  try {
+    await post(by);
+    await get().loadChecks();
+    return null;
+  } catch (e) {
+    return whyNot(e);
+  }
 }
 
 /** Who is signing: the sample's acting person while the sample is shown. */

@@ -358,6 +358,19 @@ input[type='range']::-moz-range-thumb {
   background: rgb(var(--accent) / 0.88);
   border-color: rgb(var(--accent));
 }
+/* The bench check's "Needs work" once called (OF-BLD-013 §5.4): as solid as Meets. */
+.btn-needs-work {
+  background: rgb(var(--signal-error));
+  border-color: rgb(var(--signal-error));
+  color: rgb(var(--surface-1));
+}
+[data-theme='night'] .btn-needs-work {
+  color: rgb(16 22 19);
+}
+.btn-needs-work:hover:not(:disabled) {
+  background: rgb(var(--signal-error) / 0.88);
+  border-color: rgb(var(--signal-error));
+}
 .btn-sm {
   padding: 3px 8px;
   font-size: 12px;

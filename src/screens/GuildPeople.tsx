@@ -18,6 +18,7 @@ import {
 } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { daysBetween, isAssessor, statusOf } from '@/engine/competence';
+import { quarterStart } from '@/engine/checks';
 import { href, navigate } from '@/router';
 
 const ROLE_LABEL: Record<GuildRole, string> = { member: 'Member', lead: 'Lead', auditor: 'Auditor' };
@@ -32,6 +33,7 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
   const loadSample = useStore((s) => s.guildLoadSample);
   const [adding, setAdding] = useState(false);
   const isLead = ctx.acting?.role === 'lead';
+  const quarter = quarterStart(ctx.today);
   return (
     <>
       <GuildHeader title="People" subtitle="Everyone on the ledger, what they hold, and when anyone last recorded anything about them." />
@@ -63,7 +65,7 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
           )}
           <Card>
             <div className="overflow-x-auto">
-              <table className="w-full text-body border-collapse min-w-[680px]">
+              <table className="w-full text-body border-collapse min-w-[760px]">
                 <thead>
                   <tr className="border-b border-line text-left text-caption uppercase tracking-wide text-ink-soft">
                     <th className="px-4 py-2 font-normal">Person</th>
@@ -71,6 +73,7 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
                     <th className="px-3 py-2 font-normal text-right">Qualified</th>
                     <th className="px-3 py-2 font-normal text-right">Assessor on</th>
                     <th className="px-3 py-2 font-normal text-right">Lapsed or suspended</th>
+                    <th className="px-3 py-2 font-normal text-right">Checks this quarter</th>
                     <th className="px-4 py-2 font-normal text-right">Last entry</th>
                   </tr>
                 </thead>
@@ -80,6 +83,12 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
                     const q = sts.filter((x) => x.effective >= 3).length;
                     const a = sts.filter((x) => x.effective === 4).length;
                     const flagged = sts.filter((x) => x.lapsed || x.suspended).length;
+                    // Witnessed checks since the quarter began: one per bench check, however many skills it covered.
+                    const checked = new Set(
+                      ctx.guild.evidence
+                        .filter((e) => e.personId === p.id && e.kind === 'witnessed' && !e.withdrawnAt && e.at.slice(0, 10) >= quarter && e.at.slice(0, 10) <= ctx.today)
+                        .map((e) => (e.source.kind === 'check' ? `check:${e.source.ref}` : e.id)),
+                    ).size;
                     const last = ctx.guild.evidence
                       .filter((e) => e.personId === p.id)
                       .map((e) => e.at.slice(0, 10))
@@ -104,6 +113,7 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
                         <td className="px-3 py-2 text-right font-num">{p.role === 'auditor' ? '·' : q}</td>
                         <td className="px-3 py-2 text-right font-num">{a || '·'}</td>
                         <td className={cx('px-3 py-2 text-right font-num', flagged > 0 && 'text-signal-warn')}>{flagged || '·'}</td>
+                        <td className="px-3 py-2 text-right font-num">{p.role === 'auditor' ? '·' : checked || '·'}</td>
                         <td className="px-4 py-2 text-right font-num text-ink-soft">{last ?? 'none'}</td>
                       </tr>
                     );

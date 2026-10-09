@@ -8,7 +8,7 @@
 // shows levels and next steps and holds nothing of its own. No points,
 // scores or streaks: a count appears only where a skill asks for one, as the
 // supervised runs it needs before a witnessed check.
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { Lesson } from '@/data/types';
 import { useStore } from '@/store';
 import { SKILLS, SKILL_BY_ID } from '@/data/skills';
@@ -142,7 +142,7 @@ function Path({
   const of = (section: PathSection) => items.filter((i) => i.section === section);
 
   /** What to do next, in words, and where to go to do it. */
-  const say = (i: PathItem): { text: ReactNode; to?: string; cta?: string } => {
+  const say: Say = (i) => {
     const sk = i.skill.id;
     const st = i.status;
     const run = bench(sk) ?? undefined;
@@ -151,6 +151,7 @@ function Path({
         return {
           text: <>Suspended after the latest witnessed check. Until an assessor checks again, run it with a cosigner beside you. Assessors: {assessors(sk)}.</>,
           ...run,
+          ask: personId,
         };
       case 'lapsed':
         return {
@@ -161,6 +162,7 @@ function Path({
             </>
           ),
           ...run,
+          ask: personId,
         };
       case 'lapsing':
         return {
@@ -180,6 +182,7 @@ function Path({
           text: <>Supervised runs done. Ready for a witnessed check: an assessor watches you perform it against the criteria. Assessors: {assessors(sk)}.</>,
           to: `/guild/skills/${sk}`,
           cta: 'What the assessor watches for',
+          ask: personId,
         };
       case 'cosigned-runs':
         return {
@@ -305,7 +308,7 @@ function Path({
   );
 }
 
-type Say = (i: PathItem) => { text: ReactNode; to?: string; cta?: string };
+type Say = (i: PathItem) => { text: ReactNode; to?: string; cta?: string; ask?: string };
 
 function Rows({ items, none, say }: { items: PathItem[]; none: string; say: Say }) {
   if (items.length === 0) return <Card className="p-4 text-body text-ink-soft">{none}</Card>;
@@ -320,7 +323,7 @@ function Rows({ items, none, say }: { items: PathItem[]; none: string; say: Say 
 
 function Row({ item, say, compact }: { item: PathItem; say: Say; compact?: boolean }) {
   const { skill, status } = item;
-  const { text, to, cta } = say(item);
+  const { text, to, cta, ask } = say(item);
   return (
     <div className={cx('px-4 border-b border-line last:border-b-0', compact ? 'py-2.5' : 'py-3')}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -333,11 +336,14 @@ function Row({ item, say, compact }: { item: PathItem; say: Say; compact?: boole
         {item.soon && <span className="chip text-accent border-accent/40">a run in progress needs it</span>}
       </div>
       {text && <p className={cx('text-body mt-1', compact && 'text-ink-soft')}>{text}</p>}
-      {!compact && to && cta && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <LinkButton to={to} size="sm">
-            {cta}
-          </LinkButton>
+      {!compact && ((to && cta) || ask) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {ask && <AskForCheck personId={ask} skillId={skill.id} />}
+          {to && cta && (
+            <LinkButton to={to} size="sm">
+              {cta}
+            </LinkButton>
+          )}
           {item.step.kind !== 'held' && item.step.kind !== 'waiting' && (
             <LinkButton to={`/primer/practice?skill=${skill.id}`} size="sm">
               Practise it with the tutor
@@ -346,5 +352,44 @@ function Row({ item, say, compact }: { item: PathItem; say: Say; compact?: boole
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Puts a check in the assessor queue (OF-BLD-013 §5.4). It says the same
+ * whether or not one was already there, and never which day: the assessor
+ * picks the moment and the person is not told.
+ */
+function AskForCheck({ personId, skillId }: { personId: string; skillId: string }) {
+  const request = useStore((s) => s.checksRequest);
+  const [state, setState] = useState<'idle' | 'busy' | 'asked'>('idle');
+  const [why, setWhy] = useState<string | null>(null);
+  if (state === 'asked')
+    return (
+      <span role="status" className="text-caption text-ink">
+        Asked. It is in the assessors&rsquo; queue; they pick the moment, unannounced.
+      </span>
+    );
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="primary"
+        disabled={state === 'busy'}
+        onClick={async () => {
+          setState('busy');
+          const r = await request(personId, [skillId]);
+          setWhy(r);
+          setState(r ? 'idle' : 'asked');
+        }}
+      >
+        Ask for a check
+      </Button>
+      {why && (
+        <span role="alert" className="text-caption text-signal-error basis-full">
+          {why}
+        </span>
+      )}
+    </>
   );
 }

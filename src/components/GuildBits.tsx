@@ -4,9 +4,9 @@
 // src/screens/Guild.tsx shares only the tab strip.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
-import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Skill } from '@/data/types';
+import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Skill } from '@/data/types';
 import { useStore, guildView, actingIdOf } from '@/store';
-import { SKILL_BY_ID } from '@/data/skills';
+import { SKILLS, SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { GUILD_TABS } from '@/data/tabs';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -23,8 +23,9 @@ import {
   type StatusMap,
 } from '@/engine/competence';
 import { checkEvidence, offlineRefusal } from '@/lib/guild';
+import { isOpen, mayQueue, shownTo } from '@/engine/checks';
 import { download } from '@/lib/csv';
-import { href } from '@/router';
+import { href, useRoute } from '@/router';
 
 // ── the ledger, as every Guild view reads it ───────────────────────────
 
@@ -49,6 +50,37 @@ export function useGuild(): GuildContext {
   const personById = useMemo(() => new Map(guild.people.map((p) => [p.id, p])), [guild.people]);
   const members = useMemo(() => guild.people.filter((p) => p.active && p.role !== 'auditor'), [guild.people]);
   return { guild, status, today, actingId, acting: (actingId && personById.get(actingId)) || null, sample, members, personById };
+}
+
+// ── checks, as every Guild view reads them (OF-BLD-013 §5.4) ──────────
+
+/** The checks the store holds: the sample's while it is shown. `loaded` is false until the service answers. */
+export function useChecks(): { all: GuildCheck[]; loaded: boolean } {
+  const sample = useStore((s) => s.guildSample !== null);
+  const sampleChecks = useStore((s) => s.guildSampleChecks);
+  const served = useStore((s) => s.checks);
+  return useMemo(
+    () => (sample ? { all: sampleChecks ?? [], loaded: true } : { all: served?.checks ?? [], loaded: served !== null }),
+    [sample, sampleChecks, served],
+  );
+}
+
+/**
+ * Guild's tab strip. Checks shows for the lead and for assessors, with the
+ * count of open checks they may see, and for anyone already on it, so the
+ * strip never points at a tab other than the page it sits on.
+ */
+export function GuildTabs() {
+  const ctx = useGuild();
+  const { all } = useChecks();
+  const route = useRoute();
+  const here = route.segments[0] === 'guild' && route.segments[1] === 'checks';
+  const queue = mayQueue(ctx.acting, ctx.status);
+  const open = queue ? shownTo(all, ctx.actingId).filter(isOpen).length : 0;
+  const tabs = GUILD_TABS.filter((t) => t.to !== '/guild/checks' || queue || here).map((t) =>
+    t.to === '/guild/checks' && open > 0 ? { ...t, badge: open } : t,
+  );
+  return <OwnerTabs tabs={tabs} />;
 }
 
 export function nameOf(ctx: Pick<GuildContext, 'personById'>, id: string | null | undefined): string {
@@ -126,7 +158,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
           {serviceUp === false ? ' until the service answers' : ', being sent to the service'}.
         </p>
       )}
-      <OwnerTabs tabs={GUILD_TABS} />
+      <GuildTabs />
     </>
   );
 }
@@ -185,6 +217,10 @@ export function EvidenceRow({
     ) : e.source.kind === 'scenario' ? (
       <a className="text-accent hover:underline" href={href(`/primer/practice/${e.source.ref}`)}>
         Practice transcript {e.source.ref}
+      </a>
+    ) : e.source.kind === 'check' ? (
+      <a className="text-accent hover:underline" href={href(`/guild/checks/${e.source.ref}`)}>
+        Bench check {e.source.ref}
       </a>
     ) : e.source.stepId ? (
       `${e.source.ref} · step ${e.source.stepId}`
@@ -742,6 +778,9 @@ export function ExportLedgerButton({ ctx, personId }: { ctx: GuildContext; perso
 
 // ── Home ───────────────────────────────────────────────────────────────
 
+/** Rows that are work waiting, and no warning. */
+const CALM = new Set(['ready for a witnessed check', 'checks open in the assessor queue']);
+
 /**
  * The workforce at a glance, for Home's right rail (OF-BLD-013 §2): what
  * lapses in the next 30 days, who is ready for a witnessed check, and the
@@ -749,6 +788,7 @@ export function ExportLedgerButton({ ctx, personId }: { ctx: GuildContext; perso
  */
 export function WorkforceCard() {
   const ctx = useGuild();
+  const { all, loaded } = useChecks();
   if (ctx.guild.people.length === 0) {
     return (
       <Card className="p-3 text-body">
@@ -777,12 +817,14 @@ export function WorkforceCard() {
     ['ready for a witnessed check', ready, '/guild/matrix'],
     ['deviations logged from runs this week', deviations, '/guild/people'],
   ];
+  // Checks that name whoever is acting stay out of the count, as they stay out of the queue.
+  if (loaded) rows.push(['checks open in the assessor queue', shownTo(all, ctx.actingId).filter(isOpen).length, '/guild/checks']);
   return (
     <Card className="p-3 space-y-1.5">
       {ctx.sample && <div className="text-caption text-signal-warn">Sample team: invented people</div>}
       {rows.map(([label, n, to]) => (
         <a key={label} href={href(to)} className="flex items-baseline gap-2 text-body hover:text-accent">
-          <span className={cx('font-num w-8 text-right', n > 0 && label !== 'ready for a witnessed check' ? 'text-signal-warn' : 'text-ink')}>{n}</span>
+          <span className={cx('font-num w-8 text-right', n > 0 && !CALM.has(label) ? 'text-signal-warn' : 'text-ink')}>{n}</span>
           <span>{label}</span>
         </a>
       ))}

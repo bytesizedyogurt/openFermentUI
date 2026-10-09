@@ -126,6 +126,11 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(guildLedger));
     }
+    if (url === '/api/guild/checks' && req.method === 'GET') {
+      // The real ledger's queue: empty here. The flow below runs its check on the sample.
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ version: 1, checks: [] }));
+    }
     if (url.startsWith('/api/guild/') && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) body += chunk;
@@ -268,6 +273,8 @@ const ROUTES = [
   ['/guild/matrix', 'Guild — matrix (empty ledger)'],
   ['/guild/people', 'Guild — people (empty ledger)'],
   ['/guild/skills', 'Guild — skills'],
+  ['/guild/checks', 'Guild — checks (empty ledger)'],
+  ['/guild/checks/ck-nothing/run', 'Guild — bench check (nothing to run)'],
   ['/guild/skills/SK-CIP', 'Guild — skill page'],
   ['/guild/people/p-nobody', 'Guild — person (absent here)'],
   // ── not rail entries, reachable from Home ────────────────────────────
@@ -781,6 +788,49 @@ async function main() {
       await page.waitForTimeout(400);
       if (!/Practice[\s\S]{0,300}Practice transcript pt-smoke-/.test(await page.locator('main').innerText()))
         problems.push('the closed session is not on the learner\u2019s ledger with a link to its transcript');
+      // §5.4 — a check from the queue, run at the bench, signed, and on the ledger.
+      await page.evaluate(() => (location.hash = '#/guild/checks'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#guild-acting-as', 'p-sample-eric');
+      await page.waitForTimeout(200);
+      const card = page.locator('.card', { hasText: 'Patrick Mugisha' }).filter({ hasText: 'Run now at the bench' }).first();
+      if (!/Did not meet every criterion at the witnessed check/.test(await card.innerText())) problems.push('the queue does not say why the suspended trainee is proposed');
+      await card.locator('a:has-text("Run now at the bench")').click();
+      await page.waitForTimeout(400);
+      if ((await page.locator('nav').count()) !== 0) problems.push('the bench check is not a full-screen takeover');
+      // The bench's own buttons; a toast from earlier in the flow is the shell's, as it is in Deposition.
+      const short = await page.locator('header button, main button').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
+      if (short.length) problems.push(`bench buttons under 44px: ${short.join(', ')}`);
+      await page.locator('button:has-text("Begin with the first criterion")').click();
+      let calls = 0;
+      for (let guard = 0; guard < 60; guard++) {
+        const bench = await page.locator('main').innerText();
+        if (/Sign the check on Patrick Mugisha/.test(bench)) break;
+        if (/What did you see Patrick Mugisha do/.test(bench)) await page.locator('textarea[id^="bench-words-"]').fill('Worked through it at the bench and said each step aloud');
+        else {
+          await page.locator(`button:has-text("${calls === 0 ? 'Needs work' : 'Meets'}")`).click();
+          calls++;
+        }
+        await page.locator('button:has-text("Next"), button:has-text("To the sign step")').first().click();
+        await page.waitForTimeout(60);
+      }
+      if (!/1 need work[\s\S]*every criterion met/.test(await page.locator('main').innerText())) problems.push('the sign step does not sum up each skill');
+      await page.locator('button:has-text("Sign as Eric Habimana")').click();
+      await page.waitForTimeout(400);
+      if (!/Signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('signing the check did not finish it');
+      await page.locator('button:has-text("Open Patrick Mugisha’s ledger")').click();
+      await page.waitForTimeout(400);
+      const signedLedger = await page.locator('main').innerText();
+      if (!/Witnessed check[\s\S]{0,40}not met[\s\S]{0,200}Bench check ck-sample-\d+ · observed by Eric Habimana/.test(signedLedger))
+        problems.push('the check is not on the ledger as a witnessed entry naming its assessor and its check');
+      const checkLink = await page.locator('a:has-text("Bench check ck-sample-")').first().getAttribute('href');
+      await page.evaluate((h) => (location.hash = h), checkLink);
+      await page.waitForTimeout(300);
+      if (!/run and signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('the check\u2019s record does not say who signed it');
+      await page.selectOption('#guild-acting-as', 'p-sample-claudine');
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(300);
+      if ((await page.locator('[role="tablist"] [role="tab"]:has-text("Checks")').count()) !== 0) problems.push('a member who assesses nothing is shown the Checks tab');
       await page.locator('button:has-text("Hide the sample")').click();
       await page.waitForTimeout(200);
       await page.evaluate(() => (location.hash = '#/guild/matrix'));
@@ -804,7 +854,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a critical skill holds its step until a cosigner is recorded; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a critical skill holds its step until a cosigner is recorded; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; a check is run at the bench, signed, and read back with its assessor; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -818,7 +868,7 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, first person, reload`);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, a bench check, first person, reload`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 

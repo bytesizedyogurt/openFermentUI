@@ -242,13 +242,13 @@ Views: [My path](#) `/primer/path` · [Practice](#) `/primer/practice`
 
 **Who may verify.** `/guild` · chord `g g`
 
-The Guild of Applied Life: who may verify a record, and who may perform, cosign and witness a protocol step. The review queue keeps `/guild`. Beside it, the competence ledger (OF-BLD-013): people, the skills protocol steps need, and every entry an assessor signs, from which each person's level on each skill is computed and never stored. The rules live in `core/openferment_core/guild.py`; the ledger is `core/data/guild.json`, which is gitignored.
+The Guild of Applied Life: who may verify a record, and who may perform, cosign and witness a protocol step. The review queue keeps `/guild`. Beside it, the competence ledger (OF-BLD-013): people, the skills protocol steps need, and every entry an assessor signs, from which each person's level on each skill is computed and never stored. The rules live in `core/openferment_core/guild.py`; the ledger is `core/data/guild.json`, which is gitignored. Checks are proposed each night by fixed rules over the ledger (`src/engine/checks.ts`, mirrored in `core/openferment_core/checks.py`), each with its reasons written out and a brief the model drafts with no number in it; an assessor schedules one, dismisses it with a reason, or runs it at the bench one criterion at a time and signs it, which writes a witnessed entry per skill. The person checked never sees a check that names them until it has been run.
 
-Views: [Matrix](#) `/guild/matrix` · [People](#) `/guild/people` · [Skills](#) `/guild/skills`
+Views: [Matrix](#) `/guild/matrix` · [People](#) `/guild/people` · [Skills](#) `/guild/skills` · [Checks](#) `/guild/checks`
 
 | Component | Implemented in |
 |---|---|
-| Guild of Applied Life | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/engine/competence.ts`, `core/openferment_core/guild.py` |
+| Guild of Applied Life | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` |
 
 
 ## The full component map
@@ -276,7 +276,7 @@ for the ones with a rail entry.
 | Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` | a Dominion tab, /dominion/clearance |
 | Enablement | Patents | not built | — |
 | Notary | Patents | not built | — |
-| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/engine/competence.ts`, `core/openferment_core/guild.py` | /guild |
+| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` | /guild |
 | Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` | the rail, /runbooks |
 | Deposition | Assay | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` | a Runbooks tab, /runbooks/depositions |
 

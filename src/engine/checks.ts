@@ -23,8 +23,9 @@
 // and one more for a critical skill. A person's three highest pairs make one
 // check; the highest checks are proposed first. A pair an open check already
 // covers is not proposed again.
-import type { CheckReason, Guild, Skill } from '@/data/types';
-import { competenceOf, daysBetween, policyOf, readyForCheck, statusOf } from './competence';
+import type { Check, CheckReason, Guild, GuildPerson, Skill } from '@/data/types';
+import { SKILLS } from '@/data/skills';
+import { competenceOf, daysBetween, isAssessor, policyOf, readyForCheck, statusOf, type StatusMap } from './competence';
 
 export const LAPSING_DAYS = 21;
 export const DEVIATION_DAYS = 30;
@@ -140,4 +141,22 @@ export function proposeChecks(
   return proposals
     .sort((a, b) => b.score - a.score || (a.personId < b.personId ? -1 : a.personId > b.personId ? 1 : 0))
     .slice(0, limit);
+}
+
+// ── who sees a check (OF-BLD-013 §5.4) ─────────────────────────────────
+
+export const isOpen = (c: Pick<Check, 'state'>): boolean => c.state === 'proposed' || c.state === 'scheduled';
+
+/**
+ * What the acting person may see: every check but the ones that name them,
+ * until those are run. A person learns of a check when it is on their ledger.
+ */
+export function shownTo(checks: Check[], actingId: string | null): Check[] {
+  return checks.filter((c) => c.personId !== actingId || c.state === 'done');
+}
+
+/** The queue is for the lead and for anyone holding Assessor on a skill. */
+export function mayQueue(acting: GuildPerson | null, status: StatusMap): boolean {
+  if (!acting || !acting.active) return false;
+  return acting.role === 'lead' || (acting.role === 'member' && SKILLS.some((sk) => isAssessor(status, acting.id, sk.id)));
 }

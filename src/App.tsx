@@ -35,6 +35,8 @@ import Guild from '@/screens/Guild';
 import GuildMatrix from '@/screens/GuildMatrix';
 import GuildPeople from '@/screens/GuildPeople';
 import GuildSkills from '@/screens/GuildSkills';
+import GuildChecks from '@/screens/GuildChecks';
+import BenchCheck from '@/screens/BenchCheck';
 import Witness from '@/screens/Witness';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
@@ -156,12 +158,14 @@ function Screen() {
       }
       return <Primer />;
     case 'guild':
-      // OF-BLD-013 §1.4. 'matrix', 'people' and 'skills' are reserved second
-      // segments; the review queue keeps /guild itself, so every link into
-      // it that exists today still lands on it.
+      // OF-BLD-013 §1.4. 'matrix', 'people', 'skills' and 'checks' are
+      // reserved second segments; the review queue keeps /guild itself, so
+      // every link into it that exists today still lands on it. A check's
+      // /run is the bench, a full-screen takeover like Deposition (§5.4).
       if (b === 'matrix') return <GuildMatrix />;
       if (b === 'people') return <GuildPeople personId={c} />;
       if (b === 'skills') return <GuildSkills skillId={c} />;
+      if (b === 'checks') return c && d === 'run' ? <BenchCheck checkId={c} /> : <GuildChecks checkId={c} />;
       return <Guild />;
     case 'settings':
       // Architecture is its own screen rather than a Settings pane: it is a
@@ -282,6 +286,8 @@ export default function App() {
     route.segments[0] === 'runbooks' &&
     route.segments[1] === 'protocols' &&
     route.segments[3] === 'run';
+  // A witnessed check at the bench (OF-BLD-013 §5.4) takes the screen the same way.
+  const inBenchCheck = route.segments[0] === 'guild' && route.segments[1] === 'checks' && route.segments[3] === 'run';
 
   // Restore the Durable tier before anything reads it (OF-BLD-006 §4.6).
   // Asynchronous and best-effort: if IndexedDB is unavailable the app runs on
@@ -378,7 +384,7 @@ export default function App() {
 
   // Deposition is a full-screen takeover (§8.12) — a tablet at the bench has
   // no room for a rail, and nothing on it should compete with the step.
-  if (inDeposition) {
+  if (inDeposition || inBenchCheck) {
     return (
       <>
         <Screen />
