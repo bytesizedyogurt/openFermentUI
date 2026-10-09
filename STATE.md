@@ -139,3 +139,46 @@ transcript; this file is the index a later session reads first.
   no external entities; no `dangerouslySetInnerHTML`; the workflow uses
   `pull_request`, not `pull_request_target`. `pnpm verify` green, nineteen
   stages.
+- **2026-10-09 · OF-BLD-013 Phase 1 (§1.1–§1.4)** — Guild's competence
+  ledger as a training matrix. **14** placeholder skills in six families,
+  tagged on **36** steps of PR-CIP-01, PR-OD-01 and PR-SEED-01; `check:seed`
+  holds ids, prerequisites (acyclic) and tags. People, entries and
+  withdrawals in both languages (five new `PAIRS`), written only by
+  `guild.write_person`, `write_evidence` and `withdraw` under one lock, with
+  `POST /api/guild/check` as the dry run and `offlineRefusal` as the labelled
+  fallback; `core/data/guild.json` is gitignored. Levels are computed by
+  `competenceOf` and never stored. Guild gains Matrix, People and Skills
+  beside Review, a sign-off sheet, ledger export and an invented, labelled
+  sample team that is never posted or kept. New stage `check:guild`; twenty
+  stages now. Every rule negative-tested. `pnpm verify` green at each commit.
+- **2026-10-09 · OF-BLD-013 Phase 2 (§2.1–§2.2)** — the bench link, advise
+  mode. `competence.py` mirrors the ladder for the service's one use of a
+  level (does a cosigner, or a lone operator, hold the skill), held to
+  `competence.ts` by a generated fixture, now **602** statuses over five
+  ledgers. Deposition names its operator, hands over, asks for a cosigner
+  when the operator is Supervised, lapsed or suspended, and names who could
+  take over when they are below it; completing a step writes a run alone, a
+  cosigned run or a deviation, once per step. Home gains a Workforce card.
+  `pnpm verify` green.
+- **2026-10-09 · OF-BLD-013 Phase 3 (§3.1–§3.3)** — path and knowledge.
+  A lesson may name skills; passing its checkpoint writes knowledge with no
+  observer for whoever is learning, which makes **Learning and no more**:
+  Supervised still needs an assessor's training sign-off (the plan's
+  "knowledge evidence complete", read as the sign-off, because a checkpoint
+  can be answered by anyone holding the tablet). A placeholder bench track of
+  **3** lessons teaches from the protocols through a live `skill-steps`
+  embed, and `check:seed` holds such a lesson to Rule 1: no quantity of its
+  own. Lesson progress is Durable. My path (`/primer/path`, rules in
+  `pathOf`) shows one person the next step on each skill. Smoke **55**
+  routes; `check:guild` **93** checks. `pnpm verify` green.
+- **2026-10-09 · OF-BLD-013 §3.4 (review)** — an independent read found no
+  blocking defect; what it did find is fixed and held by `check:guild`
+  part 7 or `test_guild`: a refused run is kept as a deviation; the service
+  judges a run on its own day; an auditor signs nothing; sync skips what is
+  stored and keeps what it did not send; the sample stays out of
+  depositions; pending entries sort last in both engines; the sample's
+  sign-offs follow their assessor's designation, and the whole sample now
+  replays through the service's rules. **559** Python tests. Known and left:
+  entries made offline before an offline deactivation are refused at sync,
+  and a real run continued while the sample is shown records nothing.
+  `pnpm verify` green.

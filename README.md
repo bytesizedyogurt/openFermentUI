@@ -43,6 +43,7 @@ question the app labels as open** rather than answering.
 | Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
 | Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
+| Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
@@ -74,7 +75,10 @@ fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not chan
                     hosts — P. pastoris GS115, T. reesei, E. coli, S. cerevisiae, Y. lipolytica, A. niger,
                     A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila
   9 protocols       TAP media → transformation → PEF disruption → Phos-tag → CIP
- 13 chat flows       3 scenarios · 6 learn modules / 9 lessons
+ 13 chat flows       3 scenarios · 7 learn modules / 12 lessons / 42 checkpoint questions
+ 14 skills          6 families, tagged on 36 protocol steps across 3 protocols (placeholder
+                    definitions until the skills content pass); 3 placeholder bench lessons
+                    count toward 6 of them
 ```
 
 ## Postdoc runs on Claude Opus
@@ -269,24 +273,27 @@ pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and th
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — nineteen stages, in order:
+pnpm verify              # offline — no key, no service, no network — twenty stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
-  pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write
+  pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
+                         #   guild.py's rules, and the competence mirror replayed from competence.ts
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on a fixture that has decisions; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
+  pnpm check:guild       #   Guild's ladder, the sample team, the gate, and what runs and lessons write to the ledger
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm build
-  pnpm test:durable      #   the Durable tier survives a reload
+  pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   48 routes headless, the overlay applied, Witness scored, Guild posting
+  pnpm test:smoke        #   55 routes headless, the overlay applied, Witness scored, Guild posting, and the
+                         #   workforce flow: a sign-off, a cosigned run, a lesson passed, My path
   pnpm test:golden       #   the ten-minute demo script, driven end to end
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
 pnpm test:live           # the thirteen flows against the real pipeline — needs a key, never in verify
@@ -328,6 +335,7 @@ The simulation holds itself to eight conditions (design §11):
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
 | 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/runbooks/depositions` |
+| 6 | Workforce | Who may perform a step is recorded, computed and checked at the bench | `/guild/matrix`, `/guild/people`, `/guild/skills`, `/primer/path`, run mode |
 
 ## The eleven
 
