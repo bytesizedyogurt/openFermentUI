@@ -42,5 +42,8 @@ status=0
 # person and skill pairs in the assessors' queue. A pair an open check
 # already covers is never proposed again, so a quiet night proposes nothing.
 "$PY" -m openferment_core.checks propose || status=$?
+# Each new check gets the model's brief while the key is there; without one
+# the checks wait in the queue and an assessor can ask for a brief later.
+"$PY" -m openferment_core.checks brief --missing || status=$?
 echo "── $(date '+%Y-%m-%d %H:%M:%S') done, exit $status"
 exit "$status"

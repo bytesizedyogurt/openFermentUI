@@ -23,6 +23,8 @@ is a read-modify-write under one lock, refused with the rule that held:
   date       a day that is not a date, or later than tomorrow
   results    a run that does not call every criterion of every skill once
   check      no such check
+  brief      the model's brief named a step or criterion the check does not
+             involve, or wrote a number of its own (§5.3)
 
 Running a check writes one witnessed entry per skill through
 guild.write_evidence, with the check as its source and the assessor's own
@@ -31,7 +33,9 @@ entry is asked first with dry_run, so a run lands whole or not at all.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import secrets
 import sys
 import threading
@@ -39,10 +43,12 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from . import atomic, guild, intake
+from . import atomic, guild, intake, llm
 from .competence import Competence, days_between
 from .models import (
     Check,
+    CheckBrief,
+    CheckCriterion,
     CheckDismiss,
     CheckReason,
     CheckRecord,
@@ -59,7 +65,7 @@ log = logging.getLogger("openferment.checks")
 PATH = intake.DATA_DIR / "checks.json"
 _WRITE_LOCK = threading.Lock()
 
-RULES = ("person", "skill", "authority", "state", "duplicate", "note", "date", "results", "check")
+RULES = ("person", "skill", "authority", "state", "duplicate", "note", "date", "results", "check", "brief")
 OPEN = ("proposed", "scheduled")
 
 LAPSING_DAYS = 21
@@ -385,8 +391,143 @@ def record(check_id: str, r: CheckRecord) -> Check:
         return _replace(checks, done)
 
 
+# ── briefs (§5.3) ──────────────────────────────────────────────────────
+#
+# What the model suggests the assessor watch: the steps to watch, by the
+# refs it was given; the criteria to probe, by their place in the skill's
+# list; and questions to ask, in words with no number (practice.check_text,
+# the same check Practice uses). The model is told what the skills ask and
+# what the ledger holds on them, and never who the person is.
+
+BRIEF_TOKENS = 4000
+MAX_QUESTIONS = 6
+RECENT_ENTRIES = 12
+
+
+class BriefUnavailable(RuntimeError):
+    """No key, no network, or every model declined."""
+
+
+BRIEF_SYSTEM = """You prepare a brief for an assessor about to run a \
+witnessed check at the bench, in a bioprocess lab using openFerment. The \
+assessor watches an operator perform protocol steps and calls each of a \
+skill's mastery criteria met or not. You are given the skills, their \
+criteria by number, the protocol steps that need them, why the check was \
+proposed, and the entries the ledger holds on these skills for this \
+operator, without their name.
+
+Suggest which steps to watch (by ref, exactly as given), which criteria to \
+probe hardest (by skill id and index), and a few questions to ask while the \
+operator works: questions that make their reasoning visible, drawn from what \
+the ledger shows (a deviation, a failed criterion, a long gap).
+
+NEVER WRITE A NUMBER in a question. No digits, no number words (one, two, \
+first, second, once, twice, half, double, single), no "twofold", no "x10", \
+no pH written with a value. Identifiers with digits are fine: OD750, \
+PR-OD-01, step c12. A brief with a number in it is discarded whole. There is \
+no field for a verdict: the assessor decides."""
+
+BRIEF_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "steps": {"type": "array", "items": {"type": "string"}, "description": 'Steps to watch, as "PROTOCOL:step".'},
+        "criteria": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"skillId": {"type": "string"}, "index": {"type": "integer"}},
+                "required": ["skillId", "index"],
+            },
+            "description": "Criteria to probe hardest.",
+        },
+        "questions": {"type": "array", "items": {"type": "string"}, "description": "Questions to ask. No number."},
+    },
+    "required": ["steps", "criteria", "questions"],
+}
+
+
+def _brief_payload(c: Check, ledger: Guild) -> str:
+    known = guild.skills()
+    steps = []
+    for p in guild.projection().get("protocols", []):
+        for st in p["steps"]:
+            if any(k in st["skills"] for k in c.skillIds):
+                steps.append({"ref": f"{p['protocolId']}:{st['stepId']}", "skills": st["skills"], "text": st["text"], "why": st.get("note")})
+    recent = sorted(
+        (e for e in ledger.evidence if e.personId == c.personId and e.skillId in c.skillIds and not e.withdrawnAt),
+        key=lambda e: e.at,
+    )[-RECENT_ENTRIES:]
+    payload = {
+        "skills": [
+            {"id": k, "name": known[k]["name"], "criteria": [{"index": i, "text": t} for i, t in enumerate(known[k]["mastery"])]}
+            for k in c.skillIds
+        ],
+        "steps": steps,
+        "whyProposed": [r.text for r in c.reasons],
+        "ledger": [
+            {"skillId": e.skillId, "kind": e.kind, "outcome": e.outcome, "day": e.at[:10], "note": e.raw} for e in recent
+        ],
+    }
+    return "Prepare the brief for this check.\n\n" + json.dumps(payload, ensure_ascii=False)
+
+
+def validate_brief(raw: dict[str, Any] | None, c: Check, *, model: str, usage) -> CheckBrief:
+    from . import practice  # the number check and the step resolver Practice holds
+
+    if not isinstance(raw, dict):
+        raise CheckRefused("brief", "the model returned no brief in the expected form")
+    known = guild.skills()
+    try:
+        steps = practice.check_steps([str(s) for s in raw.get("steps") or []], c.skillIds[0], need_one=False)
+        questions = [str(q).strip() for q in raw.get("questions") or [] if str(q).strip()]
+        for q in questions:
+            practice.check_text("question", q, 0)
+    except practice.PracticeRefused as e:
+        raise CheckRefused("brief", e.why) from e
+    for st in steps:
+        if not set(practice.step_needs(st.protocolId, st.stepId) or []) & set(c.skillIds):
+            raise CheckRefused("brief", "a step it names needs none of this check's skills")
+    criteria = []
+    for x in raw.get("criteria") or []:
+        k, i = str(x.get("skillId")), x.get("index")
+        if k not in c.skillIds or not isinstance(i, int) or not 0 <= i < len(known[k]["mastery"]):
+            raise CheckRefused("brief", "a criterion it names is not one this check asks about")
+        criteria.append(CheckCriterion(skillId=k, index=i))
+    if not criteria or not questions or len(questions) > MAX_QUESTIONS:
+        raise CheckRefused("brief", f"a brief names at least one criterion and asks between one and {MAX_QUESTIONS} questions")
+    return CheckBrief(steps=steps, criteria=criteria, questions=questions, model=model, usage=usage, draftedAt=_now())
+
+
+def brief(check_id: str, by: str | None, *, ask=None) -> Check:
+    """One model call: the brief for an open check, kept on it, or refused."""
+    ledger = guild.read()
+    c = get(check_id)
+    if c is None:
+        raise CheckRefused("check", f"{check_id!r} is not a check")
+    if c.state not in OPEN:
+        raise CheckRefused("state", f"{c.id} is {c.state}")
+    if by is not None and (by == c.personId or not (_lead(ledger, by) or any(_assessor(ledger, by, k) for k in c.skillIds))):
+        raise CheckRefused("authority", "a brief is asked for by an assessor on one of its skills or by the lead, never by the person checked")
+    try:
+        result = (ask or llm.call)(
+            system=BRIEF_SYSTEM, user=_brief_payload(c, ledger), schema=BRIEF_SCHEMA, max_tokens=BRIEF_TOKENS, label="check brief: "
+        )
+    except llm.ModelRefused as e:
+        raise BriefUnavailable(f"The request was {e}") from e
+    except llm.ModelUnavailable as e:
+        raise BriefUnavailable(str(e)) from e
+    drafted = validate_brief(result.data, c, model=result.model, usage=result.usage)
+    with _WRITE_LOCK:
+        checks = read()
+        now = _open(checks, check_id)
+        made = _replace(checks, now.model_copy(update={"brief": drafted}))
+    log.info("checks: brief for %s, $%.4f", c.id, drafted.usage.costUsd)
+    return made
+
+
 def main(argv: list[str]) -> int:
-    """`python -m openferment_core.checks propose`, which the nightly job runs."""
+    """`python -m openferment_core.checks propose` and `brief --missing`,
+    which the nightly job runs in that order."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     if argv[:1] == ["propose"]:
         made = propose(None)
@@ -394,7 +535,21 @@ def main(argv: list[str]) -> int:
         for c in made:
             print(f"  {c.id} {c.personId}: {', '.join(c.skillIds)} (score {c.score})")
         return 0
-    print("usage: python -m openferment_core.checks propose", file=sys.stderr)
+    if argv[:2] == ["brief", "--missing"]:
+        waiting = [c for c in read().checks if c.state in OPEN and c.brief is None]
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            print(f"{len(waiting)} check(s) without a brief; no key in core/.env, so they wait")
+            return 0
+        failed = 0
+        for c in waiting:
+            try:
+                made = brief(c.id, None)
+                print(f"  {c.id}: brief drafted, ${made.brief.usage.costUsd:.4f}" if made.brief else f"  {c.id}")
+            except (CheckRefused, BriefUnavailable) as e:
+                failed += 1
+                print(f"  {c.id}: no brief ({e})")
+        return 1 if failed and failed == len(waiting) else 0
+    print("usage: python -m openferment_core.checks propose | brief --missing", file=sys.stderr)
     return 2
 
 

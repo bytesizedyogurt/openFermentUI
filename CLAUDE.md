@@ -242,8 +242,12 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   propose`. A check is asked for, scheduled, dismissed with a reason, or run
   through `checks.py`; a run calls every criterion and writes one witnessed
   entry per skill with the check as its source (`guild.py` takes it only
-  from an open check of that person on that skill). `core/data/checks.json`
-  never enters git.
+  from an open check of that person on that skill). A check's brief is one
+  model call (`checks.brief`, and `brief --missing` nightly when a key is
+  there): steps to watch by ref, criteria by index, and questions held to
+  Practice's number check; the model is never told who is checked, and a
+  brief that breaks a rule is refused whole. `core/data/checks.json` never
+  enters git.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

@@ -219,3 +219,89 @@ def test_the_endpoints(team):
     r = client.post(f"/api/guild/checks/{cid}/record", json=all_ok(cid).model_dump(), headers=host)
     assert r.status_code == 200 and r.json()["state"] == "done"
     assert [c["state"] for c in client.get("/api/guild/checks").json()["checks"]] == ["done"]
+
+
+# ── briefs (§5.3) ──────────────────────────────────────────────────────
+
+import copy  # noqa: E402
+from typing import Any  # noqa: E402
+
+from openferment_core import llm  # noqa: E402
+from openferment_core.models import Usage  # noqa: E402
+
+BRIEF: dict[str, Any] = {
+    "steps": ["PR-OD-01:o3", "PR-OD-01:o4"],
+    "criteria": [{"skillId": "SK-OD", "index": 0}, {"skillId": "SK-OD", "index": 2}],
+    "questions": ["Before reading, what do you do with the sample, and why?", "What do you blank against on this protocol?"],
+}
+
+
+def stand_in(data, calls=None):
+    def ask(**kw):
+        if calls is not None:
+            calls.append(kw)
+        return llm.Result(data=copy.deepcopy(data), model="stand-in", usage=Usage(costUsd=0.01, models=["stand-in"]))
+
+    return ask
+
+
+def test_a_brief_is_kept_on_the_check_and_names_nobody(team):
+    (c,) = checks.propose(None)
+    calls: list = []
+    made = checks.brief(c.id, "p-eric", ask=stand_in(BRIEF, calls))
+    assert made.brief and [s.stepId for s in made.brief.steps] == ["o3", "o4"] and made.brief.criteria[1].index == 2
+    assert checks.get(c.id).brief == made.brief and made.brief.usage.costUsd == 0.01
+    user = calls[0]["user"]
+    assert "Patrick" not in user and "p-patrick" not in user, "the model is never told who is checked"
+    assert "NEVER WRITE A NUMBER" in calls[0]["system"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"questions": ["Read it again twice?"]},
+        {"questions": ["What if it reads pH7?"]},
+        {"questions": ["Given [v1], what next?"]},
+        {"steps": ["PR-OD-01:o99"]},
+        {"steps": ["PR-OD-01:o1"]},
+        {"criteria": [{"skillId": "SK-OD", "index": 99}]},
+        {"criteria": [{"skillId": "SK-DCW", "index": 0}]},
+        {"criteria": []},
+        {"questions": []},
+    ],
+)
+def test_a_brief_that_breaks_a_rule_is_refused_whole(team, change):
+    (c,) = checks.propose(None)
+    with pytest.raises(checks.CheckRefused) as caught:
+        checks.brief(c.id, "p-eric", ask=stand_in({**BRIEF, **change}))
+    assert caught.value.rule == "brief"
+    assert checks.get(c.id).brief is None
+    for said in ("twice", "pH7", "o99", "99"):
+        assert said not in caught.value.why, "a refusal never repeats what the model wrote"
+
+
+def test_who_may_ask_for_a_brief_and_when(team):
+    (c,) = checks.propose(None)
+    refused("authority", lambda: checks.brief(c.id, "p-patrick", ask=stand_in(BRIEF)))
+    checks.dismiss(c.id, CheckDismiss(by="p-sean", reason="Seen on Monday"))
+    refused("state", lambda: checks.brief(c.id, "p-eric", ask=stand_in(BRIEF)))
+
+
+def test_no_model_is_unavailable_and_the_nightly_job_waits_without_a_key(team, monkeypatch, capsys):
+    (c,) = checks.propose(None)
+
+    def down(**_):
+        raise llm.ModelUnavailable("ANTHROPIC_API_KEY is not set.")
+
+    with pytest.raises(checks.BriefUnavailable):
+        checks.brief(c.id, "p-eric", ask=down)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert checks.main(["brief", "--missing"]) == 0
+    assert "wait" in capsys.readouterr().out
+    client = TestClient(app)
+    monkeypatch.setattr(llm, "call", down)
+    r = client.post(f"/api/guild/checks/{c.id}/brief", json={"by": "p-eric"}, headers={"Host": "127.0.0.1:8000"})
+    assert r.status_code == 503
+    monkeypatch.setattr(llm, "call", stand_in(BRIEF))
+    r = client.post(f"/api/guild/checks/{c.id}/brief", json={"by": "p-eric"}, headers={"Host": "127.0.0.1:8000"})
+    assert r.status_code == 200 and r.json()["brief"]["questions"]

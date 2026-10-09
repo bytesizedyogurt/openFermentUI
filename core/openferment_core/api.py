@@ -433,6 +433,23 @@ def checks_record(check_id: str, request: CheckRecord) -> Check:
         raise _check_refused(e) from e
 
 
+class BriefRequest(BaseModel):
+    by: str
+
+
+@app.post("/api/guild/checks/{check_id}/brief", response_model=Check)
+def checks_brief(check_id: str, request: BriefRequest) -> Check:
+    """One model call: what the assessor should watch, kept on the check."""
+    try:
+        return checks.brief(check_id, request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except checks.BriefUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
 # ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
 #
 # Scenarios drafted by the model and checked by practice.py, which copies
