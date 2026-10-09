@@ -31,8 +31,9 @@ The rules, by name:
   source      an entry pairs a kind with a source that does not produce it,
               comes from a run without naming its step, names a protocol
               step that does not carry the skill, names a lesson that does
-              not count toward it, or names a practice session that is not a
-              closed session of this person on this skill
+              not count toward it, names a practice session that is not a
+              closed session of this person on this skill, or names a check
+              that is not an open check of this person on this skill
   observer    a sign-off, designation or cosigned run has no observer, an
               observer who is not an active person, or the person themselves;
               or an operator's own record of a run, a lesson passed or a
@@ -102,7 +103,7 @@ RULES = (
 ACCEPTED: dict[str, frozenset[str]] = {
     "knowledge": frozenset({"signoff", "lesson"}),
     "supervised": frozenset({"signoff", "deposition"}),
-    "witnessed": frozenset({"signoff"}),
+    "witnessed": frozenset({"signoff", "check"}),
     "designation": frozenset({"lead"}),
     "independent": frozenset({"deposition"}),
     "deviation": frozenset({"deposition"}),
@@ -357,6 +358,16 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
                 f"lesson {entry.source.ref} does not count toward {entry.skillId}; it counts toward "
                 + (", ".join(counts) or "no skill"),
             )
+    if src == "check":
+        from . import checks  # checks writes through here; imported late to keep the two apart
+
+        ck = checks.get(entry.source.ref)
+        if ck is None:
+            raise GuildRefused("source", f"{entry.source.ref!r} is not a check")
+        if ck.state not in checks.OPEN:
+            raise GuildRefused("source", f"check {ck.id} is {ck.state}")
+        if ck.personId != entry.personId or entry.skillId not in ck.skillIds:
+            raise GuildRefused("source", f"check {ck.id} is for someone else, or for other skills")
     if src == "scenario":
         from . import practice  # practice writes through here; imported late to keep the two apart
 
@@ -389,6 +400,11 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
             e.source.kind == "scenario" and e.source.ref == entry.source.ref and not e.withdrawnAt for e in ledger.evidence
         ):
             raise GuildRefused("duplicate", f"practice session {entry.source.ref} is already on the ledger")
+        if src == "check" and any(
+            e.source.kind == "check" and e.source.ref == entry.source.ref and e.skillId == entry.skillId and not e.withdrawnAt
+            for e in ledger.evidence
+        ):
+            raise GuildRefused("duplicate", f"check {entry.source.ref} is already on the ledger for {entry.skillId}")
         person = people.get(entry.personId)
         if person is None or not person.active:
             raise GuildRefused("person", f"{entry.personId!r} is not an active person on the ledger")

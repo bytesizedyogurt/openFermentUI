@@ -233,6 +233,17 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   service is sent nobody (`practiceLearner`), and the entry goes on the
   sample alone. `core/data/practice.json` never enters git. Offline tests use
   a stand-in model; the real one is `pnpm test:live`.
+- **Checks are proposed by fixed rules, and run by an assessor.**
+  `rankPairs` / `proposeChecks` in `src/engine/checks.ts` rank every person
+  and skill by suspended, lapsed, lapsing, ready, recent deviation, low
+  confidence and the lead's quarterly rate; `core/openferment_core/checks.py`
+  mirrors them (and `competence.py` now mirrors confidence), held by the
+  competence fixture. `nightly.sh` runs `python -m openferment_core.checks
+  propose`. A check is asked for, scheduled, dismissed with a reason, or run
+  through `checks.py`; a run calls every criterion and writes one witnessed
+  entry per skill with the check as its source (`guild.py` takes it only
+  from an open check of that person on that skill). `core/data/checks.json`
+  never enters git.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

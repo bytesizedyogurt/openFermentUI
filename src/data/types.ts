@@ -1487,7 +1487,7 @@ export type EvidenceKind =
   | 'knowledge'
   | 'designation';
 
-export type EvidenceSourceKind = 'signoff' | 'lead' | 'deposition' | 'lesson' | 'scenario';
+export type EvidenceSourceKind = 'signoff' | 'lead' | 'deposition' | 'lesson' | 'scenario' | 'check';
 
 export interface GuildPerson {
   /** Chosen by the browser, so a person added offline keeps their id. */
@@ -1691,4 +1691,102 @@ export interface Practice {
   version: 1;
   scenarios: PracticeScenario[];
   sessions: PracticeSession[];
+}
+
+// ── Checks (OF-BLD-013 §5) ─────────────────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`. A check is
+// proposed by fixed rules over the ledger (src/engine/checks.ts), or asked
+// for, then scheduled and run at the bench by an assessor; running it writes
+// one witnessed entry per skill with the check as its source.
+
+export type CheckState = 'proposed' | 'scheduled' | 'done' | 'dismissed';
+export type CheckReasonKind = 'suspended' | 'lapsed' | 'lapsing' | 'ready' | 'deviation' | 'confidence' | 'rate' | 'requested';
+
+/** Why a check is proposed, written by fixed rules from the ledger. */
+export interface CheckReason {
+  kind: CheckReasonKind;
+  skillId: string;
+  text: string;
+}
+
+/** One of a skill's mastery criteria, by its place in src/data/skills.ts. */
+export interface CheckCriterion {
+  skillId: string;
+  index: number;
+}
+
+/** What the model suggests the assessor watch for: references and questions with no number. */
+export interface CheckBrief {
+  steps: PracticeStepRef[];
+  criteria: CheckCriterion[];
+  questions: string[];
+  model: string;
+  usage: AnswerPlanUsage;
+  draftedAt: string;
+}
+
+/** The assessor's call on one criterion, with their own words. */
+export interface CheckResult {
+  skillId: string;
+  criterion: number;
+  meets: boolean;
+  note: string;
+}
+
+export interface Check {
+  id: string;
+  personId: string;
+  skillIds: string[];
+  reasons: CheckReason[];
+  state: CheckState;
+  score: number;
+  proposedAt: string;
+  /** Null for the nightly ranking; otherwise who asked for it. */
+  proposedBy?: string | null;
+  /** Who scheduled or ran it. */
+  assessorId?: string | null;
+  /** The day the assessor picked. The person is not told. */
+  scheduledFor?: string | null;
+  brief?: CheckBrief | null;
+  results: CheckResult[];
+  evidenceIds: string[];
+  closedAt?: string | null;
+  dismissedBy?: string | null;
+  dismissReason?: string | null;
+}
+
+/** core/data/checks.json — every check proposed, asked for, run or dismissed. */
+export interface Checks {
+  version: 1;
+  checks: Check[];
+}
+
+export interface CheckRequest {
+  personId: string;
+  skillIds: string[];
+  by: string;
+}
+
+export interface CheckSchedule {
+  by: string;
+  scheduledFor: string;
+}
+
+export interface CheckDismiss {
+  by: string;
+  reason: string;
+}
+
+/** The assessor's own words on one skill, kept verbatim as the entry's raw. */
+export interface CheckNote {
+  skillId: string;
+  text: string;
+}
+
+export interface CheckRecord {
+  by: string;
+  at: string;
+  results: CheckResult[];
+  notes: CheckNote[];
 }

@@ -8,9 +8,9 @@ The two are held together by a fixture the TypeScript side writes
 tests/test_competence.py replays here. If they disagree, the TypeScript side
 is right.
 
-Only what a rule needs is mirrored: the ladder, the lapse, the suspension and
-the effective level. Confidence is the browser's alone; nothing the service
-decides depends on it.
+Only what a rule needs is mirrored: the ladder, the lapse, the suspension,
+the effective level, and (since checks are proposed by the service at night,
+OF-BLD-013 §5.2) the confidence sort.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ class Status:
     lapsesAt: str | None
     supervisedCount: int
     knowledgeComplete: bool
+    confidence: str = "low"
 
 
 def _day(at: str) -> str:
@@ -51,6 +52,11 @@ def _signed_off(ev: list[GuildEvidence]) -> bool:
     """Knowledge an assessor signed off. A lesson passed is knowledge too, and
     puts the person at Learning; only the sign-off moves them to Supervised."""
     return any(e.kind == "knowledge" and e.outcome == "pass" and e.source.kind == "signoff" for e in ev)
+
+
+def days_between(a: str, b: str) -> int:
+    """Days from `a` to `b`, both read as calendar days."""
+    return (date.fromisoformat(b[:10]) - date.fromisoformat(a[:10])).days
 
 
 def _add_days(day: str, n: int) -> str:
@@ -112,14 +118,35 @@ class Competence:
         lapses_at = _add_days(last, skill["recencyDays"]) if lvl == 3 and last else None
         lapsed = bool(lapses_at and lapses_at < self.today)
         suspended = lvl == 3 and bool(witnessed) and witnessed[-1].outcome == "fail"
+        supervised_count = sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass")
+
+        # The confidence sort, as competence.ts scores it.
+        today = self.today
+        score = 0
+        if lvl == 4:
+            score += 3
+        if any(e.outcome == "pass" and days_between(e.at, today) <= skill["recencyDays"] for e in witnessed):
+            score += 2
+        score += min(2, sum(1 for e in performed if days_between(e.at, today) <= 60))
+        score -= 2 * sum(1 for e in ev if e.kind == "deviation" and days_between(e.at, today) <= 90)
+        if suspended:
+            score -= 3
+        if lapsed:
+            score -= 2
+        elif lapses_at and days_between(today, lapses_at) <= 21:
+            score -= 1
+        if lvl == 2 and supervised_count >= skill["supervisedRuns"]:
+            score += 1
+        confidence = "high" if score >= 3 else "medium" if score >= 1 else "low"
         return Status(
             level=lvl,
             effective=2 if (lapsed or suspended) else lvl,
             lapsed=lapsed,
             suspended=suspended,
             lapsesAt=lapses_at,
-            supervisedCount=sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass"),
+            supervisedCount=supervised_count,
             knowledgeComplete=_signed_off(ev),
+            confidence=confidence,
         )
 
     def holds(self, person_id: str, skill_id: str) -> bool:

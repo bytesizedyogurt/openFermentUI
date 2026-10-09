@@ -436,7 +436,7 @@ EvidenceKind = Literal[
     "designation",
 ]
 
-EvidenceSourceKind = Literal["signoff", "lead", "deposition", "lesson", "scenario"]
+EvidenceSourceKind = Literal["signoff", "lead", "deposition", "lesson", "scenario", "check"]
 
 
 class GuildPerson(BaseModel):
@@ -670,3 +670,110 @@ class Practice(BaseModel):
     version: Literal[1] = 1
     scenarios: list[PracticeScenario] = Field(default_factory=list)
     sessions: list[PracticeSession] = Field(default_factory=list)
+
+
+# ── Checks (OF-BLD-013 §5) ──────────────────────────────────────────────
+#
+# A check is proposed by fixed rules over the ledger (checks.py, mirroring
+# src/engine/checks.ts), or asked for by the person or an assessor, then
+# scheduled and run at the bench by an assessor. Running it writes one
+# witnessed entry per skill through guild.write_evidence, with the check as
+# its source. core/data/checks.json never enters git.
+
+CheckState = Literal["proposed", "scheduled", "done", "dismissed"]
+CheckReasonKind = Literal["suspended", "lapsed", "lapsing", "ready", "deviation", "confidence", "rate", "requested"]
+
+
+class CheckReason(BaseModel):
+    """Why a check is proposed, written by fixed rules from the ledger."""
+
+    kind: CheckReasonKind
+    skillId: str
+    text: str
+
+
+class CheckCriterion(BaseModel):
+    """One of a skill's mastery criteria, by its place in src/data/skills.ts."""
+
+    skillId: str
+    index: int
+
+
+class CheckBrief(BaseModel):
+    """What the model suggests the assessor watch for. Steps and criteria are
+    references the service resolves; questions are words with no number."""
+
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    criteria: list[CheckCriterion] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    model: str
+    usage: Usage = Field(default_factory=Usage)
+    draftedAt: str
+
+
+class CheckResult(BaseModel):
+    """The assessor's call on one criterion, with their own words."""
+
+    skillId: str
+    criterion: int
+    meets: bool
+    note: str = ""
+
+
+class Check(BaseModel):
+    id: str
+    personId: str
+    skillIds: list[str]
+    reasons: list[CheckReason] = Field(default_factory=list)
+    state: CheckState = "proposed"
+    score: int = 0
+    proposedAt: str
+    # None for the nightly ranking; otherwise who asked for it.
+    proposedBy: str | None = None
+    # Who scheduled or ran it.
+    assessorId: str | None = None
+    # The day the assessor picked. The person is not told.
+    scheduledFor: str | None = None
+    brief: CheckBrief | None = None
+    results: list[CheckResult] = Field(default_factory=list)
+    evidenceIds: list[str] = Field(default_factory=list)
+    closedAt: str | None = None
+    dismissedBy: str | None = None
+    dismissReason: str | None = None
+
+
+class Checks(BaseModel):
+    """core/data/checks.json — every check proposed, asked for, run or dismissed."""
+
+    version: Literal[1] = 1
+    checks: list[Check] = Field(default_factory=list)
+
+
+class CheckRequest(BaseModel):
+    personId: str
+    skillIds: list[str]
+    by: str
+
+
+class CheckSchedule(BaseModel):
+    by: str
+    scheduledFor: str
+
+
+class CheckDismiss(BaseModel):
+    by: str
+    reason: str
+
+
+class CheckNote(BaseModel):
+    """The assessor's own words on one skill, kept verbatim as the entry's raw."""
+
+    skillId: str
+    text: str
+
+
+class CheckRecord(BaseModel):
+    by: str
+    at: str
+    results: list[CheckResult]
+    notes: list[CheckNote]

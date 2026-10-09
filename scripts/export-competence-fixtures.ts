@@ -22,6 +22,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { SKILL_BY_ID } from '../src/data/skills';
 import { sampleGuild } from '../src/data/guildSample';
 import { addDays, competenceOf } from '../src/engine/competence';
+import { proposeChecks, rankPairs } from '../src/engine/checks';
 import type { Guild, GuildEvidence, GuildPerson } from '../src/data/types';
 
 const OUT = 'core/tests/fixtures/competence.json';
@@ -77,6 +78,14 @@ const awkward: Guild = {
     ev('p-d', 'SK-OD', 'witnessed', '2026-09-30', { outcome: 'fail', recordedAt: '2026-09-30T08:00:00Z' }),
     // An empty withdrawal stamp is no withdrawal.
     ev('p-d', 'SK-DCW', 'knowledge', '2026-08-01', { withdrawnAt: '' }),
+    // §5.2 — reasons to propose a check: a recent deviation, a critical skill
+    // held with no check this quarter, and supervised runs complete.
+    ev('p-c', 'SK-OD', 'deviation', addDays(DAY, -5), { observerId: null, source: { kind: 'deposition', ref: 'PR-OD-01', stepId: 'o4' } }),
+    ev('p-b', 'SK-CAUSTIC', 'knowledge', '2026-04-01'),
+    ev('p-b', 'SK-CAUSTIC', 'supervised', '2026-04-02'),
+    ev('p-b', 'SK-CAUSTIC', 'witnessed', '2026-06-20'),
+    ev('p-d', 'SK-ASSY', 'knowledge', '2026-08-01'),
+    ...[1, 2].map((k) => ev('p-d', 'SK-ASSY', 'supervised', `2026-08-0${k + 1}`)),
   ],
 };
 
@@ -94,6 +103,7 @@ const cases = [
     today,
     people: guild.people,
     evidence: guild.evidence,
+    policy: guild.policy ?? null,
     statuses: [...map.values()].map((s) => ({
       personId: s.personId,
       skillId: s.skillId,
@@ -104,7 +114,12 @@ const cases = [
       lapsesAt: s.lapsesAt,
       supervisedCount: s.supervisedCount,
       knowledgeComplete: s.knowledgeComplete,
+      confidence: s.confidence,
     })),
+    // §5.2 — what the ranking proposes on this ledger, nothing covered yet,
+    // and the pairs it ranks, so checks.py is held to both.
+    proposals: proposeChecks(guild, SKILL_BY_ID, today),
+    pairs: rankPairs(guild, SKILL_BY_ID, today),
   };
 });
 

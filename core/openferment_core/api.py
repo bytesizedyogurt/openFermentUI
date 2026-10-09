@@ -26,11 +26,17 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, guard, guild, intake, practice, witness
+from . import biorepo, checks, extract, guard, guild, intake, practice, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
     AskRequest,
+    Check,
+    CheckDismiss,
+    CheckRecord,
+    CheckRequest,
+    Checks,
+    CheckSchedule,
     DecisionCheck,
     ExtractResponse,
     ExtractRun,
@@ -363,6 +369,68 @@ def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
         return guild.withdraw(request)
     except guild.GuildRefused as e:
         raise _refused(e, request.evidenceId) from e
+
+
+# ── Checks (OF-BLD-013 §5.2) ────────────────────────────────────────────
+#
+# Proposed by fixed rules, asked for, scheduled, dismissed and run, each
+# through one function in checks.py; a run writes witnessed entries through
+# guild.write_evidence. 422 carries the rule and the reason.
+
+
+class ProposeRequest(BaseModel):
+    by: str
+
+
+def _check_refused(e: Exception) -> HTTPException:
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild/checks", response_model=Checks)
+def checks_read() -> Checks:
+    return checks.read()
+
+
+@app.post("/api/guild/checks/propose", response_model=list[Check])
+def checks_propose(request: ProposeRequest) -> list[Check]:
+    try:
+        return checks.propose(request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/checks/request", response_model=Check)
+def checks_request(request: CheckRequest) -> Check:
+    try:
+        return checks.request(request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/schedule", response_model=Check)
+def checks_schedule(check_id: str, request: CheckSchedule) -> Check:
+    try:
+        return checks.schedule(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/dismiss", response_model=Check)
+def checks_dismiss(check_id: str, request: CheckDismiss) -> Check:
+    try:
+        return checks.dismiss(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/record", response_model=Check)
+def checks_record(check_id: str, request: CheckRecord) -> Check:
+    try:
+        return checks.record(check_id, request)
+    except (checks.CheckRefused, guild.GuildRefused) as e:
+        raise _check_refused(e) from e
 
 
 # ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────

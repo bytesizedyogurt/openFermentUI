@@ -35,7 +35,7 @@ def test_every_status_matches_the_reference():
         assert len(mine) == len(case["statuses"]), case["name"]
         for want in case["statuses"]:
             got = mine[(want["personId"], want["skillId"])]
-            for field in ("level", "effective", "lapsed", "suspended", "lapsesAt", "supervisedCount", "knowledgeComplete"):
+            for field in ("level", "effective", "lapsed", "suspended", "lapsesAt", "supervisedCount", "knowledgeComplete", "confidence"):
                 assert getattr(got, field) == want[field], (
                     f"{case['name']}: {want['personId']} {want['skillId']} {field}: "
                     f"python {getattr(got, field)!r}, typescript {want[field]!r}"

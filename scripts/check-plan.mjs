@@ -103,6 +103,18 @@ const PAIRS = [
   ['PracticeSession', 'PracticeSession'],
   ['PracticeTurnRequest', 'PracticeTurnRequest'],
   ['Practice', 'Practice'],
+  // OF-BLD-013 §5 — Checks.
+  ['CheckReason', 'CheckReason'],
+  ['CheckCriterion', 'CheckCriterion'],
+  ['CheckBrief', 'CheckBrief'],
+  ['CheckResult', 'CheckResult'],
+  ['Check', 'Check'],
+  ['Checks', 'Checks'],
+  ['CheckRequest', 'CheckRequest'],
+  ['CheckSchedule', 'CheckSchedule'],
+  ['CheckDismiss', 'CheckDismiss'],
+  ['CheckNote', 'CheckNote'],
+  ['CheckRecord', 'CheckRecord'],
 ];
 
 let compared = 0;

@@ -53,3 +53,7 @@ core/data/guild.json
 # own words in answer to the tutor. Kept with the ledger, out of git.
 core/data/practice.json
 **/practice.json
+# OF-BLD-013 §5.2 — checks: who is to be watched at the bench, and how they
+# did. Personnel data, out of git with the ledger.
+core/data/checks.json
+**/checks.json
