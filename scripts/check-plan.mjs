@@ -88,6 +88,20 @@ const PAIRS = [
   ['GuildEvidence', 'GuildEvidence'],
   ['GuildWithdrawal', 'GuildWithdrawal'],
   ['Guild', 'Guild'],
+  // OF-BLD-013 §4 — Practice.
+  ['PracticeStepRef', 'PracticeStepRef'],
+  ['PracticeSource', 'PracticeSource'],
+  ['PracticeValue', 'PracticeValue'],
+  ['PracticeScenario', 'PracticeScenario'],
+  ['PracticeDepositionEntry', 'PracticeDepositionEntry'],
+  ['PracticeDepositionObservation', 'PracticeDepositionObservation'],
+  ['PracticeDeposition', 'PracticeDeposition'],
+  ['PracticeDraftRequest', 'PracticeDraftRequest'],
+  ['PracticeTurn', 'PracticeTurn'],
+  ['PracticeObservation', 'PracticeObservation'],
+  ['PracticeSession', 'PracticeSession'],
+  ['PracticeTurnRequest', 'PracticeTurnRequest'],
+  ['Practice', 'Practice'],
 ];
 
 let compared = 0;

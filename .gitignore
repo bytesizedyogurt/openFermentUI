@@ -49,3 +49,7 @@ core/data/identifiers-proposed.tsv
 # line covers OPENFERMENT_DATA_DIR pointed anywhere else inside the checkout.
 core/data/guild.json
 **/guild.json
+# OF-BLD-013 §4 — Practice: scenarios and sessions, each session a person's
+# own words in answer to the tutor. Kept with the ledger, out of git.
+core/data/practice.json
+**/practice.json

@@ -216,6 +216,14 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   statuses and the lessons and holds nothing; `check:guild` holds its rules.
   Primer reserves `path` and `practice` as second segments, matched before
   the lesson lookup, and `check:seed` refuses a lesson with either id.
+- **Practice holds Rule 1 for teaching.** `core/openferment_core/practice.py`
+  drafts a scenario through `llm.py` from the steps that need a skill, their
+  protocols' materials (rendered into `skills.json` by `export:corpus`) and
+  the runs the browser sends. The model writes words and cites sources; every
+  value in the evidence pane is copied from the source it cites, and a draft
+  with a number of its own, an unresolved source or marker, or no step
+  needing the skill is refused whole. `core/data/practice.json` never enters
+  git. Offline tests use a stand-in model; the real one is `pnpm test:live`.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

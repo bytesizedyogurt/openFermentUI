@@ -27,6 +27,7 @@ import { provenanceOf } from '../src/store';
 import { SKILLS } from '../src/data/skills';
 import { MODULES } from '../src/data/learn';
 import { PROTOCOLS } from '../src/data/protocols';
+import { renderStepText } from '../src/engine/scale';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 /**
@@ -218,9 +219,9 @@ writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2)
 /**
  * Guild's projection (OF-BLD-013 §1.2), written beside the corpus as
  * skills.json. `guild.write_evidence` needs to know which skills exist, which
- * protocol steps carry which tag, and which lessons count toward which skill;
- * all three live in the TypeScript seed, and this is the same arrangement the
- * corpus uses. It is separate from corpus.json because Postdoc retrieves over
+ * protocol steps carry which tag, and which lessons count toward which skill,
+ * and Practice needs the tagged protocols' own words; all of it lives in the
+ * TypeScript seed, and this is the same arrangement the corpus uses. It is separate from corpus.json because Postdoc retrieves over
  * the corpus, and a skill definition is no evidence about anything.
  */
 const guildProjection = {
@@ -233,6 +234,22 @@ const guildProjection = {
   // §3.1 — which lessons count toward which skills, so a knowledge entry
   // from a lesson names one that does.
   lessons: MODULES.flatMap((m) => m.lessons.map((l) => ({ lessonId: l.id, skills: l.skills ?? [] }))),
+  // §4.1 — what Practice may quote. The current version of every protocol a
+  // skill is tagged on, its steps rendered at the base batch by the same code
+  // run mode uses, so a value a scenario shows is the protocol's own.
+  protocols: PROTOCOLS.flatMap((p) => {
+    const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
+    if (!v.steps.some((st) => (st.skills ?? []).length > 0)) return [];
+    return [
+      {
+        protocolId: p.id,
+        version: v.version,
+        title: p.title,
+        steps: v.steps.map((st) => ({ stepId: st.id, text: renderStepText(st, v, 1), note: st.note ?? null, skills: st.skills ?? [] })),
+        materials: v.materials.map((m) => ({ name: m.name, amount: m.amount, unit: m.unit })),
+      },
+    ];
+  }),
 };
 writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection, null, 2) + '\n');
 

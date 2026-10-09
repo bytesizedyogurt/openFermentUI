@@ -503,3 +503,145 @@ class Guild(BaseModel):
     version: Literal[1] = 1
     people: list[GuildPerson] = Field(default_factory=list)
     evidence: list[GuildEvidence] = Field(default_factory=list)
+
+
+# ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
+#
+# A practice scenario is drafted by the model from protocol steps and bench
+# runs, and a tutor questions the trainee's reasoning in short turns. The
+# model writes words and cites sources; every value a trainee sees is copied
+# by the service from the source it cites, so no quantity in a scenario comes
+# from model weights. core/data/practice.json holds the scenarios and the
+# sessions, and never enters git: a session is a person's own words.
+
+PracticeSourceKind = Literal["step", "material", "entry", "observation"]
+PracticeMove = Literal["why", "change", "next", "close"]
+
+
+class PracticeStepRef(BaseModel):
+    protocolId: str
+    stepId: str
+
+
+class PracticeSource(BaseModel):
+    """What a value in the evidence pane was copied from: a protocol step or
+    material, or a Deposition's entry or observation."""
+
+    kind: PracticeSourceKind
+    protocolId: str | None = None
+    stepId: str | None = None
+    material: str | None = None
+    depositionId: str | None = None
+    itemId: str | None = None
+
+
+class PracticeValue(BaseModel):
+    """One item in a scenario's evidence pane. `label` is the model's words
+    naming it; `text`, `value`, `unit` and `at` are the source's, copied by
+    the service."""
+
+    id: str
+    label: str
+    source: PracticeSource
+    text: str
+    value: float | None = None
+    unit: str | None = None
+    at: str | None = None
+
+
+class PracticeScenario(BaseModel):
+    id: str
+    skillId: str
+    title: str
+    # The situation and the question, as the trainee reads them. [v1] marks
+    # where an item of the evidence pane belongs.
+    situation: str
+    prompt: str
+    # What a sound answer would reach. The tutor reads it; the trainee does not.
+    watchFor: list[str] = Field(default_factory=list)
+    evidence: list[PracticeValue] = Field(default_factory=list)
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    depositionIds: list[str] = Field(default_factory=list)
+    model: str
+    usage: Usage = Field(default_factory=Usage)
+    createdAt: str
+
+
+class PracticeDepositionEntry(BaseModel):
+    id: str
+    stepId: str
+    at: str
+    value: float
+    unit: str
+    raw: str
+    label: str | None = None
+
+
+class PracticeDepositionObservation(BaseModel):
+    id: str
+    stepId: str
+    at: str
+    raw: str
+
+
+class PracticeDeposition(BaseModel):
+    """A Deposition as the browser sends it for drafting: Depositions live in
+    the browser's Durable tier, so the service sees the ones it is shown."""
+
+    id: str
+    protocolId: str
+    startedAt: str
+    entries: list[PracticeDepositionEntry] = Field(default_factory=list)
+    observations: list[PracticeDepositionObservation] = Field(default_factory=list)
+
+
+class PracticeDraftRequest(BaseModel):
+    skillId: str
+    depositions: list[PracticeDeposition] = Field(default_factory=list)
+
+
+class PracticeTurn(BaseModel):
+    role: Literal["trainee", "tutor"]
+    text: str
+    move: PracticeMove | None = None
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+    at: str
+
+
+class PracticeObservation(BaseModel):
+    """What the tutor observed, in plain words, with the steps it bears on.
+    No grade: the schema has no field for one."""
+
+    text: str
+    steps: list[PracticeStepRef] = Field(default_factory=list)
+
+
+class PracticeSession(BaseModel):
+    id: str
+    scenarioId: str
+    skillId: str
+    # A person on Guild's ledger, or None for a session nobody's record keeps
+    # (the sample team, or nobody chosen).
+    personId: str | None = None
+    turns: list[PracticeTurn] = Field(default_factory=list)
+    observed: list[PracticeObservation] = Field(default_factory=list)
+    startedAt: str
+    closedAt: str | None = None
+    # The ledger entry written when the session closed, when there is one.
+    evidenceId: str | None = None
+    usage: Usage = Field(default_factory=Usage)
+
+
+class PracticeTurnRequest(BaseModel):
+    scenarioId: str
+    sessionId: str | None = None
+    personId: str | None = None
+    answer: str
+
+
+class Practice(BaseModel):
+    """core/data/practice.json — every scenario drafted and every session held."""
+
+    version: Literal[1] = 1
+    scenarios: list[PracticeScenario] = Field(default_factory=list)
+    sessions: list[PracticeSession] = Field(default_factory=list)

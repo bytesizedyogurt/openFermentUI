@@ -1543,3 +1543,129 @@ export interface Guild {
   people: GuildPerson[];
   evidence: GuildEvidence[];
 }
+
+// ── Practice (OF-BLD-013 §4) ───────────────────────────────────────────
+//
+// Mirrored exactly from `core/openferment_core/models.py`. The model writes
+// words and cites sources; every value the trainee sees is copied by the
+// service from the source it cites. core/data/practice.json never enters git.
+
+export type PracticeSourceKind = 'step' | 'material' | 'entry' | 'observation';
+export type PracticeMove = 'why' | 'change' | 'next' | 'close';
+
+export interface PracticeStepRef {
+  protocolId: string;
+  stepId: string;
+}
+
+/** What a value in the evidence pane was copied from. */
+export interface PracticeSource {
+  kind: PracticeSourceKind;
+  protocolId?: string | null;
+  stepId?: string | null;
+  material?: string | null;
+  depositionId?: string | null;
+  itemId?: string | null;
+}
+
+/** One item in the evidence pane: the model's label, the source's words and number. */
+export interface PracticeValue {
+  id: string;
+  label: string;
+  source: PracticeSource;
+  text: string;
+  value?: number | null;
+  unit?: string | null;
+  at?: string | null;
+}
+
+export interface PracticeScenario {
+  id: string;
+  skillId: string;
+  title: string;
+  /** [v1] marks where an item of the evidence pane belongs. */
+  situation: string;
+  prompt: string;
+  /** What a sound answer would reach. The tutor reads it; the trainee does not. */
+  watchFor: string[];
+  evidence: PracticeValue[];
+  steps: PracticeStepRef[];
+  depositionIds: string[];
+  model: string;
+  usage: AnswerPlanUsage;
+  createdAt: string;
+}
+
+export interface PracticeDepositionEntry {
+  id: string;
+  stepId: string;
+  at: string;
+  value: number;
+  unit: string;
+  raw: string;
+  label?: string | null;
+}
+
+export interface PracticeDepositionObservation {
+  id: string;
+  stepId: string;
+  at: string;
+  raw: string;
+}
+
+/** A Deposition as the browser sends it for drafting. */
+export interface PracticeDeposition {
+  id: string;
+  protocolId: string;
+  startedAt: string;
+  entries: PracticeDepositionEntry[];
+  observations: PracticeDepositionObservation[];
+}
+
+export interface PracticeDraftRequest {
+  skillId: string;
+  depositions: PracticeDeposition[];
+}
+
+export interface PracticeTurn {
+  role: 'trainee' | 'tutor';
+  text: string;
+  move?: PracticeMove | null;
+  steps: PracticeStepRef[];
+  at: string;
+}
+
+/** What the tutor observed, with the steps it bears on. No grade. */
+export interface PracticeObservation {
+  text: string;
+  steps: PracticeStepRef[];
+}
+
+export interface PracticeSession {
+  id: string;
+  scenarioId: string;
+  skillId: string;
+  /** A person on Guild's ledger, or null for a session nobody's record keeps. */
+  personId?: string | null;
+  turns: PracticeTurn[];
+  observed: PracticeObservation[];
+  startedAt: string;
+  closedAt?: string | null;
+  /** The ledger entry written when the session closed, when there is one. */
+  evidenceId?: string | null;
+  usage: AnswerPlanUsage;
+}
+
+export interface PracticeTurnRequest {
+  scenarioId: string;
+  sessionId?: string | null;
+  personId?: string | null;
+  answer: string;
+}
+
+/** core/data/practice.json — every scenario drafted and every session held. */
+export interface Practice {
+  version: 1;
+  scenarios: PracticeScenario[];
+  sessions: PracticeSession[];
+}

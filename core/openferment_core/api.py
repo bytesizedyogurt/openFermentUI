@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, guard, guild, intake, witness
+from . import biorepo, extract, guard, guild, intake, practice, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -40,6 +40,9 @@ from .models import (
     GuildWithdrawal,
     IntakeStatus,
     Overlay,
+    Practice,
+    PracticeDraftRequest,
+    PracticeScenario,
     ReviewDecision,
     Usage,
 )
@@ -348,6 +351,32 @@ def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
         return guild.withdraw(request)
     except guild.GuildRefused as e:
         raise _refused(e, request.evidenceId) from e
+
+
+# ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
+#
+# Scenarios drafted by the model and checked by practice.py, which copies
+# every value from the source a draft cites and refuses a draft that states a
+# number of its own. 422 carries the rule and the reason, as Guild's do; 503
+# means no key, no network, or every model declined.
+
+
+@app.get("/api/practice", response_model=Practice)
+def practice_read() -> Practice:
+    return practice.read()
+
+
+@app.post("/api/practice/draft", response_model=PracticeScenario)
+def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
+    try:
+        return practice.draft(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a draft for %s — %s ($%.4f spent)", request.skillId, e, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────
