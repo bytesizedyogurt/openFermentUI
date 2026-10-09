@@ -182,3 +182,19 @@ transcript; this file is the index a later session reads first.
   entries made offline before an offline deactivation are refused at sync,
   and a real run continued while the sample is shown records nothing.
   `pnpm verify` green.
+- **2026-10-09 · OF-BLD-013 Phase 4 (§4.1–§4.4)** — Practice. `practice.py`
+  drafts a scenario for a skill through `llm.py` from the steps that need it,
+  their materials (now projected into `skills.json`) and the confirmed
+  records of the newest bench runs that recorded something at those steps;
+  the model writes words and cites sources, and every value in the evidence
+  pane is copied from the source it cites. A draft or a tutor reply with a
+  number of its own, an unresolved source or marker, or no step needing the
+  skill is refused whole, and the refusal never quotes it. The tutor asks
+  why, changes one condition or asks what next, closes on the third answer
+  with what it observed, and a closed session becomes one `scenario` entry on
+  the learner's ledger, dated its close: Learning and no more. Primer gains
+  Practice, phone-first, with the transcript an assessor reaches from the
+  ledger. Thirteen new shapes in both languages. An independent review's
+  findings are fixed in §4.4. **593** Python tests offline; the real model is
+  `pnpm test:live`, which no key here could run. Smoke **56** routes.
+  `pnpm verify` green.

@@ -44,6 +44,7 @@ question the app labels as open** rather than answering.
 | Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
+| Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
@@ -279,24 +280,26 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
-                         #   guild.py's rules, and the competence mirror replayed from competence.ts
+                         #   guild.py's rules, the competence mirror replayed from competence.ts, and
+                         #   practice.py's drafts and tutor turns against a stand-in model
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on a fixture that has decisions; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
-  pnpm check:guild       #   Guild's ladder, the sample team, the gate, and what runs and lessons write to the ledger
+  pnpm check:guild       #   Guild's ladder, the sample team, the gate, and what runs, lessons and practice write to the ledger
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm build
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   55 routes headless, the overlay applied, Witness scored, Guild posting, and the
-                         #   workforce flow: a sign-off, a cosigned run, a lesson passed, My path
+  pnpm test:smoke        #   56 routes headless, the overlay applied, Witness scored, Guild posting, and the
+                         #   workforce flow: a sign-off, a cosigned run, a lesson passed, My path, a practice session
   pnpm test:golden       #   the ten-minute demo script, driven end to end
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
-pnpm test:live           # the thirteen flows against the real pipeline — needs a key, never in verify
+pnpm test:live           # the thirteen flows against the real pipeline, and a real practice draft and tutor
+                         # session — needs a key, never in verify
 ```
 
 The test suite is not decoration. `test:golden` is what caught a markdown-renderer infinite
@@ -335,7 +338,7 @@ The simulation holds itself to eight conditions (design §11):
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
 | 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/runbooks/depositions` |
-| 6 | Workforce | Who may perform a step is recorded, computed and checked at the bench | `/guild/matrix`, `/guild/people`, `/guild/skills`, `/primer/path`, run mode |
+| 6 | Workforce | Who may perform a step is recorded, computed and checked at the bench | `/guild/matrix`, `/guild/people`, `/guild/skills`, `/primer/path`, `/primer/practice`, run mode |
 
 ## The eleven
 
