@@ -172,6 +172,12 @@ const ROUTES = [
   ['/primer/l0-4', 'Primer — lesson 0.4 (metrics)'],
   ['/primer/m0/l0-1', 'Primer — lesson by module and id'],
   ['/guild', 'Guild'],
+  // OF-BLD-013 — the competence ledger, empty in a fresh browser.
+  ['/guild/matrix', 'Guild — matrix (empty ledger)'],
+  ['/guild/people', 'Guild — people (empty ledger)'],
+  ['/guild/skills', 'Guild — skills'],
+  ['/guild/skills/SK-CIP', 'Guild — skill page'],
+  ['/guild/people/p-nobody', 'Guild — person (absent here)'],
   // ── not rail entries, reachable from Home ────────────────────────────
   ['/settings/appearance', 'Settings — appearance'],
   ['/settings/units', 'Settings — units'],
@@ -555,6 +561,67 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-013 — the competence ledger, end to end in one browser ────
+  //
+  // The sample team loads, a level is computed from it, an assessor's
+  // sign-off moves a cell, and the sample sends nothing to the service and
+  // leaves nothing behind. Then the real ledger: its first person is its
+  // lead, posted to the service as one, and still there after a reload.
+  let guildFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    try {
+      await page.goto(`http://localhost:${PORT}/#/guild/matrix`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
+      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('a fresh browser does not show the empty ledger');
+      await page.locator('button:has-text("Show a sample team")').click();
+      await page.waitForTimeout(300);
+      const body = await page.locator('body').innerText();
+      if (!/Sample team: invented people/.test(body)) problems.push('the sample is not labelled as invented');
+      const suspended = await page.locator('button[aria-label="Patrick Mugisha, OD750 reading: Qualified, suspended"]').count();
+      if (suspended !== 1) problems.push('the sample does not show its suspension on the matrix');
+      const cell = page.locator('button[aria-label="Aline Uwase, OD750 reading: Not started"]');
+      if ((await cell.count()) !== 1) problems.push('the cell to sign is missing');
+      else {
+        await cell.click();
+        await page.waitForTimeout(200);
+        if (!/Record what you saw/.test(await page.locator('[role="dialog"]').innerText())) problems.push('an assessor is not offered a sign-off');
+        await page.fill('#signoff-note', 'Briefed on PR-OD-01 and talked it back');
+        await page.locator('[role="dialog"] button:has-text("Sign as Eric Habimana")').click();
+        await page.waitForTimeout(300);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+        const moved = await page.locator('button[aria-label="Aline Uwase, OD750 reading: Supervised"]').count();
+        if (moved !== 1) problems.push('a training sign-off did not move the cell to Supervised');
+      }
+      await page.locator('button:has-text("Hide the sample")').click();
+      await page.waitForTimeout(200);
+      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('hiding the sample left something behind');
+      if (guildPosts.length) problems.push(`the sample sent ${guildPosts.length} write(s) to the service`);
+      await page.fill('#person-name', 'Smoke Lead');
+      await page.locator('button:has-text("Start the ledger as its lead")').click();
+      await page.waitForTimeout(800);
+      const first = guildPosts.find((x) => x.url === '/api/guild/people');
+      if (!first || first.body.role !== 'lead' || first.body.addedBy !== null) problems.push('the first person was not posted as the lead, added by nobody');
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(1200);
+      const after = await page.locator('body').innerText();
+      if (!/Smoke Lead/.test(after)) problems.push('the first person did not come back from the service after a reload');
+      if (/kept in this browser/.test(after)) problems.push('a change the service stored is still said to be waiting');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      guildFails++;
+      console.log(`✗ guild        ${problems.join('; ')}`);
+    } else {
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
@@ -564,7 +631,8 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails) process.exit(1);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, first person, reload`);
+  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 
 main();

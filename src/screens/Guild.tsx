@@ -52,6 +52,8 @@ import {
 } from '@/components/ui';
 import { DISCLOSURE, exportText } from '@/lib/csv';
 import { SubsystemShelf } from '@/components/ReferenceView';
+import { OwnerTabs } from '@/components/OwnerTabs';
+import { GUILD_TABS } from '@/data/tabs';
 
 // ── reject reasons (numbered so they are one keystroke away) ────────────
 
@@ -553,6 +555,7 @@ export default function Guild() {
           title="Guild"
           subtitle="The Guild of Applied Life is who may verify. Accept, correct, or reject each extraction against the span it came from."
         />
+        <OwnerTabs tabs={GUILD_TABS} />
         <Card className="max-w-2xl">
           <EmptyState
             icon={<ClipboardCheck size={22} />}
@@ -684,6 +687,7 @@ export default function Guild() {
           title="Guild — queue complete"
           subtitle="Every record in this queue has been through the reviewer. The tallies below separate what you did from where the records ended up."
         />
+        <OwnerTabs tabs={GUILD_TABS} />
         {topStrip}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
@@ -820,6 +824,7 @@ export default function Guild() {
     return (
       <>
         <PageHeader eyebrow="Module 0 · Evidence" title="Review queue" />
+        <OwnerTabs tabs={GUILD_TABS} />
         {topStrip}
         <Card className="p-4 max-w-2xl">
           <Callout kind="warn" title="This queue entry no longer resolves">
@@ -893,6 +898,7 @@ export default function Guild() {
           </>
         }
       />
+      <OwnerTabs tabs={GUILD_TABS} />
 
       {topStrip}
 

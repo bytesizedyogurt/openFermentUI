@@ -29,3 +29,12 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Protocols', to: '/runbooks/protocols' },
   { label: 'Depositions', to: '/runbooks/depositions' },
 ];
+
+// OF-BLD-013 §1.4. Review keeps /guild, so every link into the queue that
+// exists today still lands on it; the workforce views sit beside it.
+export const GUILD_TABS: OwnerTab[] = [
+  { label: 'Review', to: '/guild' },
+  { label: 'Matrix', to: '/guild/matrix' },
+  { label: 'People', to: '/guild/people' },
+  { label: 'Skills', to: '/guild/skills' },
+];

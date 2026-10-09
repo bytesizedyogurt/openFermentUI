@@ -247,9 +247,16 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Guild',
     owner: 'Guild',
     layer: 'People and permissions',
-    livesIn: ['src/screens/Guild.tsx'],
+    livesIn: [
+      'src/screens/Guild.tsx',
+      'src/screens/GuildMatrix.tsx',
+      'src/screens/GuildPeople.tsx',
+      'src/screens/GuildSkills.tsx',
+      'src/engine/competence.ts',
+      'core/openferment_core/guild.py',
+    ],
     surfacedAs: '/guild',
-    role: 'Review, roles, and who decided what',
+    role: 'Review, the competence ledger, and who decided what',
   },
   {
     name: 'Runbook',

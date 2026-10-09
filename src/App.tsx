@@ -32,6 +32,9 @@ import PaperReader from '@/screens/PaperReader';
 import IntakeIngest from '@/screens/IntakeIngest';
 import Intake from '@/screens/Intake';
 import Guild from '@/screens/Guild';
+import GuildMatrix from '@/screens/GuildMatrix';
+import GuildPeople from '@/screens/GuildPeople';
+import GuildSkills from '@/screens/GuildSkills';
 import Witness from '@/screens/Witness';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
@@ -147,6 +150,12 @@ function Screen() {
       }
       return <Primer />;
     case 'guild':
+      // OF-BLD-013 §1.4. 'matrix', 'people' and 'skills' are reserved second
+      // segments; the review queue keeps /guild itself, so every link into
+      // it that exists today still lands on it.
+      if (b === 'matrix') return <GuildMatrix />;
+      if (b === 'people') return <GuildPeople personId={c} />;
+      if (b === 'skills') return <GuildSkills skillId={c} />;
       return <Guild />;
     case 'settings':
       // Architecture is its own screen rather than a Settings pane: it is a

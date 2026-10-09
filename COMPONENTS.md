@@ -240,11 +240,13 @@ The platform taught through itself. Every embedded widget in a lesson is the rea
 
 **Who may verify.** `/guild` · chord `g g`
 
-The Guild of Applied Life: review, roles, and who decided what.
+The Guild of Applied Life: who may verify a record, and who may perform, cosign and witness a protocol step. The review queue keeps `/guild`. Beside it, the competence ledger (OF-BLD-013): people, the skills protocol steps need, and every entry an assessor signs, from which each person's level on each skill is computed and never stored. The rules live in `core/openferment_core/guild.py`; the ledger is `core/data/guild.json`, which is gitignored.
+
+Views: [Matrix](#) `/guild/matrix` · [People](#) `/guild/people` · [Skills](#) `/guild/skills`
 
 | Component | Implemented in |
 |---|---|
-| Guild of Applied Life | `src/screens/Guild.tsx` |
+| Guild of Applied Life | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/engine/competence.ts`, `core/openferment_core/guild.py` |
 
 
 ## The full component map
@@ -272,7 +274,7 @@ for the ones with a rail entry.
 | Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` | a Dominion tab, /dominion/clearance |
 | Enablement | Patents | not built | — |
 | Notary | Patents | not built | — |
-| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx` | /guild |
+| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/engine/competence.ts`, `core/openferment_core/guild.py` | /guild |
 | Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` | the rail, /runbooks |
 | Deposition | Assay | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` | a Runbooks tab, /runbooks/depositions |
 

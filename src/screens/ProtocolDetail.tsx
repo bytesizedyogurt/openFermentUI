@@ -28,6 +28,7 @@ import {
   type ScaledMaterial,
 } from '@/engine/scale';
 import { diffVersions } from '@/engine/diff';
+import { SKILL_BY_ID } from '@/data/skills';
 import { convert, fmt, normalizeUnit, sameFamily } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { Markdown, inlineMarkdown } from '@/components/Markdown';
@@ -308,8 +309,19 @@ function StepCard({
               <StepText step={step} version={version} scale={scale} />
             </div>
 
-            {(step.timerSec !== undefined || (step.refs?.length ?? 0) > 0) && (
+            {(step.timerSec !== undefined || (step.refs?.length ?? 0) > 0 || (step.skills?.length ?? 0) > 0) && (
               <div className="flex flex-wrap items-center gap-1.5">
+                {/* OF-BLD-013 §1.4 — what a person needs to perform this step. */}
+                {(step.skills ?? []).map((sk) => (
+                  <a
+                    key={sk}
+                    className="chip hover:border-accent/50"
+                    href={href(`/guild/skills/${sk}`)}
+                    title="A skill this step needs. Guild records who holds it."
+                  >
+                    {SKILL_BY_ID[sk]?.name ?? sk}
+                  </a>
+                ))}
                 {step.timerSec !== undefined && (
                   <span
                     className="chip text-signal-info border-signal-info/40"
