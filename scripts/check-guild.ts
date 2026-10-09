@@ -28,6 +28,7 @@ import { useStore, guildView, actingIdOf } from '../src/store';
 import { SKILLS, SKILL_BY_ID } from '../src/data/skills';
 import { sampleGuild, SAMPLE_LEAD } from '../src/data/guildSample';
 import { offlineRefusal } from '../src/lib/guild';
+import { REFRESH_WINDOW, pathOf } from '../src/engine/path';
 import {
   addDays,
   competenceOf,
@@ -351,6 +352,56 @@ async function main() {
   s().guildClearSample();
   s().completeLesson(bench!.id);
   check('completing a lesson marks it finished in this browser', s().learnProgress[bench!.id] === true);
+
+  // ── 6. a person's path (OF-BLD-013 §3.3) ────────────────────────────
+  const PATH_PEOPLE = [person('p-lead', 'lead'), person('p-ann'), person('p-tom')];
+  const lessonsFor = { 'SK-OD': [{ id: 'l-a' }, { id: 'l-b' }] } as Record<string, { id: string }[]>;
+  const stepFor = (entries: GuildEvidence[], skillId: string, extra: { soon?: string[]; today?: string } = {}) => {
+    const today = extra.today ?? TODAY;
+    const passedLessons = new Set(entries.filter((e) => e.source.kind === 'lesson').map((e) => `${e.skillId}|${e.source.ref}`));
+    const items = pathOf({
+      personId: 'p-tom',
+      skills: SKILLS,
+      status: competenceOf(entries, PATH_PEOPLE, SKILLS_MAP, today),
+      lessonsFor,
+      passed: (sk, l) => passedLessons.has(`${sk}|${l}`),
+      soon: new Set(extra.soon ?? []),
+      today,
+    });
+    return { item: items.find((i) => i.skill.id === skillId)!, items };
+  };
+  const P: GuildEvidence[] = [];
+  let at = stepFor(P, 'SK-OD').item;
+  check('a skill with lessons starts at its first lesson', at.section === 'next' && at.step.kind === 'lesson' && at.step.lessonId === 'l-a');
+  P.push(ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01', { observerId: null, source: { kind: 'lesson', ref: 'l-a' } }));
+  at = stepFor(P, 'SK-OD').item;
+  check('one lesson passed points at the next, and counts what is passed', at.step.kind === 'lesson' && at.step.lessonId === 'l-b' && at.step.passed === 1 && at.step.total === 2);
+  P.push(ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01', { observerId: null, source: { kind: 'lesson', ref: 'l-b' } }));
+  at = stepFor(P, 'SK-OD').item;
+  check('every lesson passed sends the skill to the bench for a training sign-off', at.section === 'bench' && at.step.kind === 'training-signoff' && at.step.lessons === 2);
+  P.push(ev('p-tom', 'SK-OD', 'knowledge', '2026-09-02'), ev('p-tom', 'SK-OD', 'supervised', '2026-09-03'));
+  at = stepFor(P, 'SK-OD').item;
+  check('signed off, the next step is cosigned runs, counted against what the skill asks', at.section === 'next' && at.step.kind === 'cosigned-runs' && at.step.done === 1 && at.step.needed === 3);
+  P.push(ev('p-tom', 'SK-OD', 'supervised', '2026-09-04'), ev('p-tom', 'SK-OD', 'supervised', '2026-09-05'));
+  at = stepFor(P, 'SK-OD').item;
+  check('with the runs done it goes to the bench for a witnessed check', at.section === 'bench' && at.step.kind === 'witnessed-check');
+  P.push(ev('p-tom', 'SK-OD', 'witnessed', '2026-09-20'));
+  check('qualified and current, it is held', stepFor(P, 'SK-OD').item.section === 'held');
+  at = stepFor(P, 'SK-OD', { today: addDays('2026-09-20', 60 - REFRESH_WINDOW) }).item;
+  check('inside the refresh window it is due for refresh', at.section === 'refresh' && at.step.kind === 'lapsing');
+  check('the day before the window, it is still held', stepFor(P, 'SK-OD', { today: addDays('2026-09-20', 60 - REFRESH_WINDOW - 1) }).item.section === 'held');
+  check('lapsed, it is due for refresh and says so', stepFor(P, 'SK-OD', { today: addDays('2026-09-20', 61) }).item.step.kind === 'lapsed');
+  const failed = [...P, ev('p-tom', 'SK-OD', 'witnessed', '2026-10-01', { outcome: 'fail' })];
+  check('suspended, it is due for refresh and says so', stepFor(failed, 'SK-OD').item.step.kind === 'suspended');
+  at = stepFor([], 'SK-FACTOR').item;
+  check('a prerequisite below Supervised makes it wait, and names the prerequisite', at.section === 'waiting' && at.step.kind === 'waiting' && at.step.on.join() === 'SK-OD,SK-DCW');
+  at = stepFor([], 'SK-CAUSTIC').item;
+  check('with no lesson to take, the next step is a training sign-off', at.section === 'next' && at.step.kind === 'training-signoff' && at.step.lessons === 0);
+  const ordered = stepFor([], 'SK-OD', { soon: ['SK-LOG'] }).items.filter((i) => i.section === 'next');
+  check('what a run in progress needs comes first', ordered[0]?.skill.id === 'SK-LOG', ordered.map((i) => i.skill.id).slice(0, 3));
+  const ranked = stepFor([], 'SK-OD').items.filter((i) => i.section === 'next');
+  const firstRoutine = ranked.findIndex((i) => i.skill.criticality !== 'critical');
+  check('then critical skills before the rest', firstRoutine > 0 && ranked.slice(firstRoutine).every((i) => i.skill.criticality !== 'critical'));
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);

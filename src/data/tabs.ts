@@ -30,6 +30,13 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Depositions', to: '/runbooks/depositions' },
 ];
 
+// OF-BLD-013 §3.3. The module map keeps /primer, so every link to it that
+// exists today still lands on it; a person's path sits beside it.
+export const PRIMER_TABS: OwnerTab[] = [
+  { label: 'Lessons', to: '/primer' },
+  { label: 'My path', to: '/primer/path' },
+];
+
 // OF-BLD-013 §1.4. Review keeps /guild, so every link into the queue that
 // exists today still lands on it; the workforce views sit beside it.
 export const GUILD_TABS: OwnerTab[] = [

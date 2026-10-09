@@ -171,6 +171,9 @@ const ROUTES = [
   ['/primer/l0-1', 'Primer — lesson 0.1'],
   ['/primer/l0-4', 'Primer — lesson 0.4 (metrics)'],
   ['/primer/m0/l0-1', 'Primer — lesson by module and id'],
+  // OF-BLD-013 §3 — a lesson that counts toward skills, and a path with nobody on the ledger.
+  ['/primer/l6-1', 'Primer — bench lesson'],
+  ['/primer/path', 'Primer — my path (empty ledger)'],
   ['/guild', 'Guild'],
   // OF-BLD-013 — the competence ledger, empty in a fresh browser.
   ['/guild/matrix', 'Guild — matrix (empty ledger)'],
@@ -640,6 +643,12 @@ async function main() {
       await page.waitForTimeout(200);
       if ((await page.locator('button[aria-label="Olivier Ndayisaba, Vessel sterilisation: Learning"]').count()) !== 1)
         problems.push('a passed lesson did not move its learner to Learning on the Matrix');
+      await page.evaluate(() => (location.hash = '#/primer/path'));
+      await page.waitForTimeout(400);
+      const path = await page.locator('main').innerText();
+      if (!/Vessel sterilisation[\s\S]{0,200}Waits for Pressure and heat safety to reach Supervised/.test(path))
+        problems.push('My path does not say a passed lesson waits on its prerequisite');
+      if (!/Next up[\s\S]*Open the lesson/.test(path)) problems.push('My path offers no lesson to take next');
       await page.locator('button:has-text("Hide the sample")').click();
       await page.waitForTimeout(200);
       await page.evaluate(() => (location.hash = '#/guild/matrix'));
@@ -663,7 +672,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning and My path names what it waits on; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -677,7 +686,7 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson, first person, reload`);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, first person, reload`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 

@@ -331,7 +331,15 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     icon: LibraryIcon,
     owner: 'BioRepo',
   },
-  // ── OF-BLD-013: Guild's competence ledger ───────────────────────────
+  // ── OF-BLD-013: Primer's path and Guild's competence ledger ─────────
+  {
+    label: 'My path',
+    to: '/primer/path',
+    descriptor: 'the next step on each skill, and what is ready for the bench',
+    aliases: ['my path', 'training path', 'next up', 'what to learn'],
+    icon: GraduationCap,
+    owner: 'Primer',
+  },
   {
     label: 'Matrix',
     to: '/guild/matrix',

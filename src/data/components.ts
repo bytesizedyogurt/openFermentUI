@@ -174,9 +174,9 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Primer',
     owner: 'Primer',
     layer: 'Keeping it honest',
-    livesIn: ['src/screens/Primer.tsx', 'src/screens/PrimerLesson.tsx'],
+    livesIn: ['src/screens/Primer.tsx', 'src/screens/PrimerLesson.tsx', 'src/screens/PrimerPath.tsx'],
     surfacedAs: 'the rail, /primer',
-    role: 'The introductory text: the platform taught through itself',
+    role: 'The introductory text: the platform taught through itself, and each person\u2019s path from lesson to bench',
   },
   {
     name: 'Audit',

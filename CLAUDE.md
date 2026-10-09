@@ -211,6 +211,11 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   a lesson states no quantity of its own: its numbers arrive through the
   `skill-steps` embed, read live from the protocols, and `check:seed` holds
   its prose and questions to that.
+- **My path is read, never kept.** `/primer/path` shows one person the next
+  step on each skill from `pathOf` in `src/engine/path.ts`, which reads the
+  statuses and the lessons and holds nothing; `check:guild` holds its rules.
+  Primer reserves `path` and `practice` as second segments, matched before
+  the lesson lookup, and `check:seed` refuses a lesson with either id.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.
