@@ -21,7 +21,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { SKILL_BY_ID } from '../src/data/skills';
 import { sampleGuild } from '../src/data/guildSample';
-import { addDays, competenceOf } from '../src/engine/competence';
+import { DEFAULT_POLICY, addDays, competenceOf } from '../src/engine/competence';
 import { proposeChecks, rankPairs } from '../src/engine/checks';
 import type { Guild, GuildEvidence, GuildPerson } from '../src/data/types';
 
@@ -89,14 +89,25 @@ const awkward: Guild = {
   ],
 };
 
+// §5.5 — what the review found the fixture never tried: someone no longer
+// active, a lead who asks for more than one check a quarter, and pairs an
+// open check already covers.
+const stricter: Guild = {
+  ...awkward,
+  people: awkward.people.map((p) => (p.id === 'p-d' ? { ...p, active: false } : p)),
+  policy: { ...DEFAULT_POLICY, checksPerQuarter: 2, updatedBy: 'p-lead', updatedAt: '2026-07-01T00:00:00Z' },
+};
+
 const sample = sampleGuild(DAY);
 const cases = [
   { name: 'sample, its own day', guild: sample, today: DAY },
   { name: 'sample, a month on', guild: sample, today: addDays(DAY, 31) },
   { name: 'sample, a year on', guild: sample, today: addDays(DAY, 365) },
+  { name: 'sample, two pairs covered', guild: sample, today: DAY, covered: ['p-sample-patrick|SK-OD', 'p-sample-grace|SK-ASEP'] },
   { name: 'awkward', guild: awkward, today: DAY },
   { name: 'awkward, much later', guild: awkward, today: '2027-06-01' },
-].map(({ name, guild, today }) => {
+  { name: 'awkward, a stricter lead, someone gone', guild: stricter, today: DAY, covered: ['p-c|SK-OD'] },
+].map(({ name, guild, today, covered = [] }: { name: string; guild: Guild; today: string; covered?: string[] }) => {
   const map = competenceOf(guild.evidence, guild.people, SKILL_BY_ID, today);
   return {
     name,
@@ -118,8 +129,9 @@ const cases = [
     })),
     // §5.2 — what the ranking proposes on this ledger, nothing covered yet,
     // and the pairs it ranks, so checks.py is held to both.
-    proposals: proposeChecks(guild, SKILL_BY_ID, today),
-    pairs: rankPairs(guild, SKILL_BY_ID, today),
+    covered,
+    proposals: proposeChecks(guild, SKILL_BY_ID, today, new Set(covered)),
+    pairs: rankPairs(guild, SKILL_BY_ID, today, new Set(covered)),
   };
 });
 

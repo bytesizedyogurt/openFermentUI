@@ -364,12 +364,18 @@ input[type='range']::-moz-range-thumb {
   border-color: rgb(var(--signal-error));
   color: rgb(var(--surface-1));
 }
+/* Night: dark text on this red is under 5:1, so the fill is a tint and the words are ink (over 10:1). */
 [data-theme='night'] .btn-needs-work {
-  color: rgb(16 22 19);
+  background: rgb(var(--signal-error) / 0.22);
+  border-color: rgb(var(--signal-error));
+  color: rgb(var(--ink));
 }
 .btn-needs-work:hover:not(:disabled) {
   background: rgb(var(--signal-error) / 0.88);
   border-color: rgb(var(--signal-error));
+}
+[data-theme='night'] .btn-needs-work:hover:not(:disabled) {
+  background: rgb(var(--signal-error) / 0.3);
 }
 .btn-sm {
   padding: 3px 8px;

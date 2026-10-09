@@ -125,6 +125,7 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
   const toast = useStore((s) => s.toast);
   // OF-BLD-013 §2 — completing a step writes what happened to Guild's ledger.
   const recordStepForGuild = useStore((s) => s.recordStepForGuild);
+  const recordHeldSkipForGuild = useStore((s) => s.recordHeldSkipForGuild);
 
   const [now, setNow] = useState(Date.now());
   const [stepsOpen, setStepsOpen] = useState(false);
@@ -966,6 +967,13 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
         <p className="text-body text-ink-soft mb-3">
           A skipped step appears in the run summary with its reason. Nothing is silently omitted.
         </p>
+        {/* OF-BLD-013 §5.5 — a held step can still be skipped, and the skip is on the record. */}
+        {hold && (
+          <p className="text-body text-ink mb-3">
+            {holdText(hold)} Skipping it is kept with the run, and goes on the operator&rsquo;s ledger as a deviation on each skill it
+            needs.
+          </p>
+        )}
         <div className="space-y-1.5">
           {SKIP_REASONS.map((reason) => (
             <button
@@ -974,7 +982,13 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
               style={{ minHeight: 44 }}
               onClick={() => {
                 if (!step) return;
-                skipStep(runId, step.id, reason);
+                if (hold) {
+                  const why = hold.kind === 'cosigner' ? 'held for a cosigner' : hold.kind === 'qualified' ? 'held for a qualified operator' : 'held for an operator';
+                  skipStep(runId, step.id, `${reason} (${why})`);
+                  void recordHeldSkipForGuild(runId, step.id, reason, why).then((n) => {
+                    if (n > 0) toast({ text: `Held step skipped: ${n} deviation${n === 1 ? '' : 's'} written to Guild's ledger`, kind: 'warn' });
+                  });
+                } else skipStep(runId, step.id, reason);
                 setSkipOpen(false);
                 if (run.currentStep < steps.length - 1) advance(1);
                 else setSummary(true);

@@ -194,7 +194,9 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
 
   const me = ctx.acting!;
   const mine = me.id === c.personId;
-  const canRun = !mine && c.skillIds.every((k) => isAssessor(ctx.status, me.id, k));
+  // Someone no longer active can only have the check dismissed (§5.5).
+  const gone = !ctx.personById.get(c.personId)?.active;
+  const canRun = !gone && !mine && c.skillIds.every((k) => isAssessor(ctx.status, me.id, k));
   const canDismiss = !mine && (me.role === 'lead' || c.skillIds.some((k) => isAssessor(ctx.status, me.id, k)));
   const act = async (label: string, f: () => Promise<string | null>) => {
     setBusy(label);
@@ -213,6 +215,7 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
         </a>
         <span className="text-caption text-ink-soft">{ctx.personById.get(c.personId)?.title}</span>
         <span className={cx('chip', c.state === 'scheduled' && 'text-accent border-accent/40')}>{stateLine(ctx, c)}</span>
+        {gone && <span className="chip text-signal-warn border-signal-warn/40">no longer active</span>}
         <a className="text-caption text-ink-soft hover:text-accent ml-auto font-num" href={href(`/guild/checks/${c.id}`)}>
           {c.id}
         </a>
@@ -234,7 +237,7 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
               <p className="text-caption text-ink-soft">
                 The service drafts one each night: steps to watch, criteria to probe, and questions to ask, with no number in them.
               </p>
-              <Button size="sm" disabled={busy !== null || !canDismiss} onClick={() => act('brief', () => brief(c.id))}>
+              <Button size="sm" disabled={busy !== null || !canDismiss || gone} onClick={() => act('brief', () => brief(c.id))}>
                 {busy === 'brief' ? 'Drafting…' : 'Draft a brief now'}
               </Button>
             </div>
@@ -300,7 +303,9 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
         )}
         {!canRun && (
           <span className="text-caption text-ink-soft">
-            {mine
+            {gone
+              ? `${nameOf(ctx, c.personId)} is no longer active, so the check can only be dismissed.`
+              : mine
               ? 'Never run, scheduled or dismissed by the person checked.'
               : `Run and scheduled by an assessor on every one of its skills${canDismiss ? '; you may dismiss it.' : '.'}`}
           </span>
@@ -354,18 +359,26 @@ export function stepWords(protocolId: string, stepId: string): string {
 }
 
 export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean }) {
+  // Large is the bench: words on ink, and step refs as text, since a link there would leave the takeover.
   const text = large ? 'text-reading text-ink' : 'text-body';
+  const label = large ? 'text-body text-ink font-medium' : 'text-caption text-ink-soft';
   return (
     <div className="space-y-2">
       {brief.steps.length > 0 && (
         <div>
-          <div className="text-caption text-ink-soft">Steps to watch</div>
+          <div className={label}>Steps to watch</div>
           <ul className="space-y-1">
             {brief.steps.map((s) => (
               <li key={`${s.protocolId}:${s.stepId}`} className={text}>
-                <a className="chip mr-1.5" href={href(`/runbooks/protocols/${s.protocolId}`)}>
-                  {s.protocolId} · {s.stepId}
-                </a>
+                {large ? (
+                  <span className="font-num font-medium mr-1.5">
+                    {s.protocolId} · {s.stepId}
+                  </span>
+                ) : (
+                  <a className="chip mr-1.5" href={href(`/runbooks/protocols/${s.protocolId}`)}>
+                    {s.protocolId} · {s.stepId}
+                  </a>
+                )}
                 {stepWords(s.protocolId, s.stepId)}
               </li>
             ))}
@@ -374,12 +387,12 @@ export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean
       )}
       {brief.criteria.length > 0 && (
         <div>
-          <div className="text-caption text-ink-soft">Criteria to probe hardest</div>
+          <div className={label}>Criteria to probe hardest</div>
           <ul className="list-disc pl-5">
             {brief.criteria.map((cr) => (
               <li key={`${cr.skillId}:${cr.index}`} className={text}>
                 {SKILL_BY_ID[cr.skillId]?.mastery[cr.index] ?? `${cr.skillId} #${cr.index}`}{' '}
-                <span className="text-caption text-ink-soft">({SKILL_BY_ID[cr.skillId]?.name ?? cr.skillId})</span>
+                <span className={large ? 'text-body text-ink' : 'text-caption text-ink-soft'}>({SKILL_BY_ID[cr.skillId]?.name ?? cr.skillId})</span>
               </li>
             ))}
           </ul>
@@ -387,7 +400,7 @@ export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean
       )}
       {brief.questions.length > 0 && (
         <div>
-          <div className="text-caption text-ink-soft">Questions to ask while they work</div>
+          <div className={label}>Questions to ask while they work</div>
           <ul className="list-disc pl-5">
             {brief.questions.map((q, i) => (
               <li key={i} className={text}>
@@ -397,7 +410,7 @@ export function BriefView({ brief, large }: { brief: CheckBrief; large?: boolean
           </ul>
         </div>
       )}
-      <p className="text-caption text-ink-soft">
+      <p className={large ? 'text-body text-ink' : 'text-caption text-ink-soft'}>
         Drafted by <span className="font-num">{brief.model}</span> on {brief.draftedAt.slice(0, 10)}. A suggestion of where to look; every call is
         the assessor&rsquo;s.
       </p>

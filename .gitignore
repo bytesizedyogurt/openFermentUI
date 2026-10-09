@@ -57,3 +57,4 @@ core/data/practice.json
 # did. Personnel data, out of git with the ledger.
 core/data/checks.json
 **/checks.json
+**/checks.json.lock

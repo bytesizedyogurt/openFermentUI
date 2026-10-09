@@ -318,6 +318,18 @@ async function main() {
   await s().recordStepForGuild(seed, 's6');
   check('a step that needs no skill writes nothing', s().guild.evidence.length === untagged);
   check('every run entry is one the service would accept, as far as the browser can tell', s().guild.evidence.filter((e) => e.source.kind === 'deposition').every((e) => offlineRefusal(e, s().guild) === null));
+  // §5.5 — a held step can be skipped, and the skip goes on the operator's ledger.
+  s().setRunOperator(runId, 'p-tom');
+  const beforeSkip = s().guild.evidence.length;
+  const skipped = await s().recordHeldSkipForGuild(runId, 'o6', 'Not applicable to this batch', 'held for a cosigner');
+  const skipEntries = s().guild.evidence.slice(beforeSkip);
+  check(
+    'skipping a held step writes a deviation per skill it needs, with the reason and the hold',
+    skipped === skipEntries.length && skipped > 0 && skipEntries.every((e) => e.kind === 'deviation' && e.personId === 'p-tom' && e.observerId === null && /skipped while held \(held for a cosigner\)[\s\S]*Not applicable/.test(e.raw)),
+    skipEntries.map((e) => e.raw),
+  );
+  check('and only once for the step', (await s().recordHeldSkipForGuild(runId, 'o6', 'again', 'held')) === 0);
+  check('a held skip is an entry the service would accept', skipEntries.every((e) => offlineRefusal(e, s().guild) === null));
 
   // ── 5. a lesson passed writes to the ledger (OF-BLD-013 §3.2) ───────
   useStore.setState({
@@ -696,12 +708,35 @@ async function main() {
     (await s().checksRequest('p-sample-olivier', [fresh10])) === null &&
       s().guildSampleChecks!.some((c) => c.personId === 'p-sample-olivier' && c.reasons.some((r) => r.kind === 'requested' && /Eric Habimana/.test(r.text))),
   );
+  s().guildSetActing('p-sample-claudine');
+  check('in the sample too, the ranking is run by an assessor or the lead', 'why' in (await s().checksPropose()));
+  check(
+    'and a check for someone else is asked for by an assessor on one of its skills',
+    (await s().checksRequest('p-sample-olivier', ['SK-OD'])) !== null,
+  );
+  s().guildSetActing('p-sample-eric');
   const proposed10 = await s().checksPropose();
   const covered10 = s().guildSampleChecks!.filter((c) => c.state === 'proposed' || c.state === 'scheduled').flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`));
   check('proposing again never repeats a pair an open check covers', 'made' in proposed10 && new Set(covered10).size === covered10.length, covered10);
   check(
     'a brief is the service\u2019s to draft, and the sample stays here',
     (await s().checksBrief(s().guildSampleChecks!.find((c) => c.state === 'proposed')!.id)) !== null,
+  );
+  // §5.5 — Propose now says how many it made that the proposer can see: one naming them stays out of the count.
+  s().guildClearSample();
+  s().guildLoadSample();
+  const dianes = s().guildSampleChecks!.filter((c) => c.personId === 'p-sample-diane');
+  s().guildSetActing(SAMPLE_LEAD);
+  for (const c of dianes) await s().checksDismiss(c.id, 'Seen at the bench last week');
+  s().guildSetActing('p-sample-diane');
+  const had = s().guildSampleChecks!.length;
+  const told10 = await s().checksPropose();
+  const newOnes = s().guildSampleChecks!.slice(had);
+  check('the fixture proposes a check naming the proposer', dianes.length > 0 && newOnes.some((c) => c.personId === 'p-sample-diane'), newOnes.map((c) => c.personId));
+  check(
+    'and the count leaves it out',
+    'made' in told10 && told10.made === newOnes.filter((c) => c.personId !== 'p-sample-diane').length,
+    [told10, newOnes.length],
   );
   s().guildClearSample();
   check('hiding the sample takes its checks with it', s().guildSampleChecks === null && checksView(s()).length === 0);

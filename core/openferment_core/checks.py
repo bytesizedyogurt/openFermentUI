@@ -11,7 +11,8 @@ assessor can ask for a check by name.
 core/data/checks.json keeps every check, and never enters git. Every write
 is a read-modify-write under one lock, refused with the rule that held:
 
-  person     the person is not active on the ledger, or is an auditor
+  person     the person is not active on the ledger, or is an auditor; an
+             open check on someone no longer active can only be dismissed
   skill      a skill named is not in src/data/skills.ts, or a check names none
   authority  the one acting may not do this: proposing and dismissing take an
              assessor or the lead; scheduling and running take an assessor on
@@ -20,27 +21,37 @@ is a read-modify-write under one lock, refused with the rule that held:
   state      the check has closed, or a run of it is already on the ledger
   duplicate  an open check already covers these skills for this person
   note       a dismissal or a skill's note with no words to audit
-  date       a day that is not a date, or later than tomorrow
+  date       a day that is not a date, later than tomorrow, or a run dated
+             before the day the check was proposed
   results    a run that does not call every criterion of every skill once
   check      no such check
   brief      the model's brief named a step or criterion the check does not
              involve, or wrote a number of its own (§5.3)
 
 Running a check writes one witnessed entry per skill through
-guild.write_evidence, with the check as its source and the assessor's own
-words as its raw: passed when every criterion of that skill was met. Every
-entry is asked first with dry_run, so a run lands whole or not at all.
+guild.write_check_entries, with the check as its source and the assessor's
+own words as its raw: passed when every criterion of that skill was met. The
+entries are asked against one ledger and written in one write, so a run
+lands whole or not at all; an entry naming a check as its source is taken
+from nowhere else (OF-BLD-013 §5.5).
+
+The nightly job is a second process, so every read-modify-write here holds
+`atomic.held(PATH)` as well as the thread lock (`_held`).
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
+import re
 import secrets
 import sys
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from . import atomic, guild, intake, llm
@@ -63,7 +74,16 @@ from .models import (
 log = logging.getLogger("openferment.checks")
 
 PATH = intake.DATA_DIR / "checks.json"
+# Where `main` finds the key for the nightly briefs. Tests point it elsewhere.
+ENV_FILE = Path(__file__).parent.parent / ".env"
 _WRITE_LOCK = threading.Lock()
+
+
+@contextmanager
+def _held() -> Iterator[None]:
+    """The service's threads, and the nightly job's process, one at a time."""
+    with _WRITE_LOCK, atomic.held(PATH):
+        yield
 
 RULES = ("person", "skill", "authority", "state", "duplicate", "note", "date", "results", "check", "brief")
 OPEN = ("proposed", "scheduled")
@@ -237,7 +257,7 @@ def propose(by: str | None, *, today: str | None = None, limit: int = PROPOSALS_
     if by is not None and not (_lead(ledger, by) or _assessor_anywhere(ledger, by)):
         raise CheckRefused("authority", "the ranking is run by an assessor or the lead")
     day = today or date.today().isoformat()
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         made = [
             Check(
@@ -268,7 +288,7 @@ def request(asked: CheckRequest) -> Check:
         raise CheckRefused("skill", "a check names the skills it is for, from src/data/skills.ts")
     if asked.by != asked.personId and not any(_assessor(ledger, asked.by, s) for s in asked.skillIds):
         raise CheckRefused("authority", "a check is asked for by the person, or by an assessor on one of its skills")
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         cover = covered(checks)
         fresh = [s for s in dict.fromkeys(asked.skillIds) if f"{asked.personId}|{s}" not in cover]
@@ -297,6 +317,11 @@ def _open(checks: Checks, check_id: str) -> Check:
     return c
 
 
+def _still_active(ledger: Guild, c: Check) -> None:
+    if _person(ledger, c.personId) is None:
+        raise CheckRefused("person", f"{c.personId!r} is no longer active on the ledger; the check can be dismissed")
+
+
 def _replace(checks: Checks, c: Check) -> Check:
     checks.checks = [c if x.id == c.id else x for x in checks.checks]
     _persist(checks)
@@ -308,9 +333,10 @@ def schedule(check_id: str, s: CheckSchedule) -> Check:
     day = _day(s.scheduledFor)
     if day is None:
         raise CheckRefused("date", f"{s.scheduledFor!r} is not a date")
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         c = _open(checks, check_id)
+        _still_active(ledger, c)
         if s.by == c.personId or not all(_assessor(ledger, s.by, k) for k in c.skillIds):
             raise CheckRefused("authority", "a check is scheduled by an assessor on every one of its skills, never by the person checked")
         return _replace(checks, c.model_copy(update={"state": "scheduled", "assessorId": s.by, "scheduledFor": day.isoformat()}))
@@ -320,7 +346,7 @@ def dismiss(check_id: str, d: CheckDismiss) -> Check:
     ledger = guild.read()
     if len(d.reason.strip()) < 2:
         raise CheckRefused("note", "a dismissal says why; it is kept for the audit trail")
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         c = _open(checks, check_id)
         if d.by == c.personId or not (_lead(ledger, d.by) or any(_assessor(ledger, d.by, k) for k in c.skillIds)):
@@ -340,11 +366,17 @@ def record(check_id: str, r: CheckRecord) -> Check:
         raise CheckRefused("date", f"{r.at!r} is not a date")
     if day > date.today() + timedelta(days=1):
         raise CheckRefused("date", f"{r.at} is in the future")
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         c = _open(checks, check_id)
+        _still_active(ledger, c)
         if r.by == c.personId or not all(_assessor(ledger, r.by, k) for k in c.skillIds):
             raise CheckRefused("authority", "a check is run by an assessor on every one of its skills, never by the person checked")
+        # A day's slack, as for the future: the bench sends its own calendar's
+        # day, and the check was stamped in UTC.
+        proposed = _day(c.proposedAt)
+        if proposed is not None and day < proposed - timedelta(days=1):
+            raise CheckRefused("date", f"{c.id} was proposed on {proposed}, and a run of it cannot come before that")
         calls: dict[tuple[str, int], bool] = {}
         for res in r.results:
             if res.skillId not in c.skillIds or not 0 <= res.criterion < len(known[res.skillId]["mastery"]):
@@ -360,6 +392,18 @@ def record(check_id: str, r: CheckRecord) -> Check:
         for k in c.skillIds:
             if len(notes.get(k, "")) < 2:
                 raise CheckRefused("note", f"write what you saw on {known[k]['name']}; an empty note cannot be audited")
+        landed = [e for e in guild.read().evidence if e.source.kind == "check" and e.source.ref == c.id and not e.withdrawnAt]
+        if landed:
+            # The ledger holds this run and the check was never closed: the
+            # two files are written one after the other, and something
+            # stopped between them. The ledger is the record; close from it.
+            if {e.skillId for e in landed} != set(c.skillIds) or any(e.observerId != r.by for e in landed):
+                raise CheckRefused("state", f"a run of {c.id} is already on the ledger, signed by someone else")
+            done = c.model_copy(
+                update={"state": "done", "assessorId": r.by, "results": r.results, "evidenceIds": [e.id for e in landed], "closedAt": _now()}
+            )
+            log.warning("checks: %s was on the ledger and still open; closed from the ledger", c.id)
+            return _replace(checks, done)
         entries = [
             GuildEvidence(
                 id=f"e-{_id()[3:]}",
@@ -374,10 +418,8 @@ def record(check_id: str, r: CheckRecord) -> Check:
             )
             for k in c.skillIds
         ]
-        # Every entry asked first, so the run lands whole or not at all.
-        for e in entries:
-            guild.write_evidence(e, dry_run=True)
-        stored = [guild.write_evidence(e) for e in entries]
+        # Asked against one ledger and written in one write: whole or not at all.
+        stored = guild.write_check_entries(entries, c.id)
         done = c.model_copy(
             update={
                 "state": "done",
@@ -446,6 +488,20 @@ BRIEF_SCHEMA: dict[str, Any] = {
 }
 
 
+def _unnamed(text: str, ledger: Guild) -> str:
+    """A ledger note with every name on the ledger taken out. The notes are
+    people's own words, and they name people: the model is told what the
+    ledger shows, never who (§5.5). Whole names first, then each part of
+    three letters or more, as whole words, ignoring case."""
+    parts: set[str] = set()
+    for p in ledger.people:
+        parts.add(p.name.strip())
+        parts.update(w for w in re.split(r"\s+", p.name) + re.split(r"[\s\-]+", p.name) if len(w) >= 3)
+    for part in sorted((x for x in parts if x), key=len, reverse=True):
+        text = re.sub(rf"(?<!\w){re.escape(part)}(?:['’]s)?(?!\w)", "[a person]", text, flags=re.IGNORECASE)
+    return text
+
+
 def _brief_payload(c: Check, ledger: Guild) -> str:
     known = guild.skills()
     steps = []
@@ -465,7 +521,7 @@ def _brief_payload(c: Check, ledger: Guild) -> str:
         "steps": steps,
         "whyProposed": [r.text for r in c.reasons],
         "ledger": [
-            {"skillId": e.skillId, "kind": e.kind, "outcome": e.outcome, "day": e.at[:10], "note": e.raw} for e in recent
+            {"skillId": e.skillId, "kind": e.kind, "outcome": e.outcome, "day": e.at[:10], "note": _unnamed(e.raw, ledger)} for e in recent
         ],
     }
     return "Prepare the brief for this check.\n\n" + json.dumps(payload, ensure_ascii=False)
@@ -506,6 +562,7 @@ def brief(check_id: str, by: str | None, *, ask=None) -> Check:
         raise CheckRefused("check", f"{check_id!r} is not a check")
     if c.state not in OPEN:
         raise CheckRefused("state", f"{c.id} is {c.state}")
+    _still_active(ledger, c)
     if by is not None and (by == c.personId or not (_lead(ledger, by) or any(_assessor(ledger, by, k) for k in c.skillIds))):
         raise CheckRefused("authority", "a brief is asked for by an assessor on one of its skills or by the lead, never by the person checked")
     try:
@@ -517,7 +574,7 @@ def brief(check_id: str, by: str | None, *, ask=None) -> Check:
     except llm.ModelUnavailable as e:
         raise BriefUnavailable(str(e)) from e
     drafted = validate_brief(result.data, c, model=result.model, usage=result.usage)
-    with _WRITE_LOCK:
+    with _held():
         checks = read()
         now = _open(checks, check_id)
         made = _replace(checks, now.model_copy(update={"brief": drafted}))
@@ -529,6 +586,11 @@ def main(argv: list[str]) -> int:
     """`python -m openferment_core.checks propose` and `brief --missing`,
     which the nightly job runs in that order."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # The nightly job's environment holds no key; it lives in core/.env, read
+    # here as extract and intake read it (§5.5).
+    from dotenv import load_dotenv
+
+    load_dotenv(ENV_FILE, override=False)
     if argv[:1] == ["propose"]:
         made = propose(None)
         print(f"{len(made)} check(s) proposed")

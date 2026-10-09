@@ -40,6 +40,8 @@ def _files(monkeypatch, tmp_path):
     monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
     monkeypatch.setattr(checks, "PATH", tmp_path / "checks.json")
     monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
+    # Never the real core/.env: a key there would make the nightly path call the model.
+    monkeypatch.setattr(checks, "ENV_FILE", tmp_path / ".env")
 
 
 # ── the ranking, against the reference ─────────────────────────────────
@@ -60,11 +62,14 @@ def _cases():
 def test_every_pair_and_proposal_matches_the_reference():
     compared = 0
     for case, ledger, skills in _cases():
-        pairs = checks.rank_pairs(ledger, skills, case["today"])
+        cover = set(case.get("covered") or [])
+        pairs = checks.rank_pairs(ledger, skills, case["today"], cover)
         assert pairs == case["pairs"], f"{case['name']}: pairs differ"
-        assert checks.propose_from(ledger, skills, case["today"]) == case["proposals"], f"{case['name']}: proposals differ"
+        assert checks.propose_from(ledger, skills, case["today"], cover) == case["proposals"], f"{case['name']}: proposals differ"
         compared += len(pairs)
     assert compared > 50
+    names = {case["name"] for case, _, _ in _cases()}
+    assert {"sample, two pairs covered", "awkward, a stricter lead, someone gone"} <= names, "the fixture tries a covered pair, an inactive person and a stricter rate"
 
 
 def test_a_covered_pair_is_not_proposed_again():
@@ -186,12 +191,23 @@ def test_one_criterion_needing_work_fails_the_skill(team):
     assert e.outcome == "fail"
 
 
-def test_the_ledger_takes_a_witnessed_entry_from_an_open_check_of_that_person_only(team):
+def test_an_entry_from_a_check_comes_only_from_running_it(team):
+    """§5.5: a witnessed entry naming a check is refused at the ledger's front
+    door, so it cannot skip the criteria and leave the check open but stuck."""
     (c,) = checks.propose(None)
     src = EvidenceSource(kind="check", ref=c.id)
+    direct = entry("e-direct-1", "p-patrick", "witnessed", TODAY, source=src)
+    with pytest.raises(guild.GuildRefused) as caught:
+        guild.write_evidence(direct)
+    assert caught.value.rule == "source"
+    with pytest.raises(guild.GuildRefused):
+        guild.write_evidence(direct, dry_run=True)
+    r = TestClient(app).post("/api/guild/evidence", json=direct.model_dump(), headers={"Host": "127.0.0.1:8000"})
+    assert r.status_code == 422 and r.json()["detail"].startswith("source: ")
 
     def write(eid, **kw):
-        return guild.write_evidence(entry(eid, kw.pop("pid", "p-patrick"), "witnessed", TODAY, source=kw.pop("source", src), **kw))
+        e = entry(eid, kw.pop("pid", "p-patrick"), "witnessed", TODAY, source=kw.pop("source", src), **kw)
+        return guild.write_check_entries([e], e.source.ref)
 
     for kw, rule in [
         ({"source": EvidenceSource(kind="check", ref="ck-nope")}, "source"),
@@ -202,10 +218,83 @@ def test_the_ledger_takes_a_witnessed_entry_from_an_open_check_of_that_person_on
         with pytest.raises(guild.GuildRefused) as caught:
             write(f"e-try-{rule}-{len(kw)}{list(kw)[0]}", **kw)
         assert caught.value.rule == rule, (kw, caught.value)
-    write("e-direct-1")
     with pytest.raises(guild.GuildRefused) as caught:
-        write("e-direct-2")
-    assert caught.value.rule == "duplicate"
+        guild.write_check_entries([entry("e-direct-2", "p-patrick", "witnessed", TODAY, source=src)], "ck-another")
+    assert caught.value.rule == "source", "an entry names the check that is writing it"
+    done = checks.record(c.id, all_ok(c.id))
+    assert done.state == "done", "nothing written around the run leaves it stuck"
+
+
+def test_a_run_lands_whole_or_not_at_all(team, monkeypatch):
+    guild.write_evidence(entry("e-desig-eric-dcw", "p-eric", "designation", TODAY, skill="SK-DCW", observer="p-sean"))
+    guild.write_evidence(entry("e-pat-dcw", "p-patrick", "knowledge", TODAY, skill="SK-DCW"))
+    c = checks.request(CheckRequest(personId="p-patrick", skillIds=["SK-OD", "SK-DCW"], by="p-patrick"))
+    known = guild.skills()
+    rec = CheckRecord(
+        by="p-eric",
+        at=TODAY,
+        results=[CheckResult(skillId=k, criterion=i, meets=True) for k in c.skillIds for i in range(len(known[k]["mastery"]))],
+        notes=[CheckNote(skillId=k, text="Watched it through") for k in c.skillIds],
+    )
+    before = len(guild.read().evidence)
+    real = guild._admit
+
+    def second_refused(entry, day, ledger, people, known, batch):
+        if batch:
+            raise guild.GuildRefused("person", "refused for the test")
+        return real(entry, day, ledger, people, known, batch)
+
+    monkeypatch.setattr(guild, "_admit", second_refused)
+    with pytest.raises(guild.GuildRefused):
+        checks.record(c.id, rec)
+    assert len(guild.read().evidence) == before, "the first skill's entry did not land without the second"
+    assert checks.get(c.id).state == "proposed"
+    monkeypatch.setattr(guild, "_admit", real)
+    done = checks.record(c.id, rec)
+    assert done.state == "done" and len(done.evidenceIds) == 2
+
+
+def test_a_run_on_the_ledger_with_its_check_still_open_is_closed_from_the_ledger(team):
+    (c,) = checks.propose(None)
+    rec = all_ok(c.id)
+    # As if the service stopped between the ledger's write and the check's.
+    landed = guild.write_check_entries(
+        [entry("e-landed", "p-patrick", "witnessed", TODAY, source=EvidenceSource(kind="check", ref=c.id))], c.id
+    )
+    assert checks.get(c.id).state == "proposed"
+    done = checks.record(c.id, rec)
+    assert done.state == "done" and done.evidenceIds == [landed[0].id]
+    assert sum(1 for e in guild.read().evidence if e.source.kind == "check") == 1, "closed from the ledger, nothing written twice"
+
+
+def test_a_run_is_dated_on_or_after_its_proposal(team):
+    (c,) = checks.propose(None)
+    early = (date.today() - timedelta(days=5)).isoformat()
+    refused("date", checks.record, c.id, all_ok(c.id).model_copy(update={"at": early}))
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    assert checks.record(c.id, all_ok(c.id).model_copy(update={"at": yesterday})).state == "done", "a day of slack for the bench's calendar"
+
+
+def test_a_check_on_someone_no_longer_active_can_only_be_dismissed(team):
+    (c,) = checks.propose(None)
+    pat = next(p for p in guild.read().people if p.id == "p-patrick")
+    guild.write_person(pat.model_copy(update={"active": False, "updatedBy": "p-sean"}))
+    refused("person", checks.schedule, c.id, CheckSchedule(by="p-eric", scheduledFor=TODAY))
+    refused("person", checks.record, c.id, all_ok(c.id))
+    refused("person", lambda: checks.brief(c.id, "p-eric", ask=stand_in(BRIEF)))
+    assert checks.dismiss(c.id, CheckDismiss(by="p-sean", reason="Left the team")).state == "dismissed"
+
+
+def test_the_queue_is_held_against_another_process(team):
+    import fcntl
+
+    with checks._held():
+        with open(checks.PATH.with_name(checks.PATH.name + ".lock"), "a") as other:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with open(checks.PATH.with_name(checks.PATH.name + ".lock"), "a") as other:
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(other.fileno(), fcntl.LOCK_UN)
 
 
 def test_the_endpoints(team):
@@ -246,13 +335,19 @@ def stand_in(data, calls=None):
 
 
 def test_a_brief_is_kept_on_the_check_and_names_nobody(team):
+    # Notes are people's own words, and name people (§5.5).
+    guild.write_evidence(
+        entry("e-named", "p-patrick", "supervised", TODAY).model_copy(update={"raw": "Patrick talked me through it; Mugisha's blank was right, Eric watched"})
+    )
     (c,) = checks.propose(None)
     calls: list = []
     made = checks.brief(c.id, "p-eric", ask=stand_in(BRIEF, calls))
     assert made.brief and [s.stepId for s in made.brief.steps] == ["o3", "o4"] and made.brief.criteria[1].index == 2
     assert checks.get(c.id).brief == made.brief and made.brief.usage.costUsd == 0.01
     user = calls[0]["user"]
-    assert "Patrick" not in user and "p-patrick" not in user, "the model is never told who is checked"
+    assert "talked me through it" in user, "the note itself still goes"
+    for name in ("Patrick", "Mugisha", "Eric", "Habimana", "p-patrick"):
+        assert name not in user, f"the model is never told who is checked, or who watched ({name})"
     assert "NEVER WRITE A NUMBER" in calls[0]["system"]
 
 
@@ -298,6 +393,15 @@ def test_no_model_is_unavailable_and_the_nightly_job_waits_without_a_key(team, m
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert checks.main(["brief", "--missing"]) == 0
     assert "wait" in capsys.readouterr().out
+    # The nightly job's environment has no key of its own; main reads core/.env (§5.5).
+    checks.ENV_FILE.write_text("ANTHROPIC_API_KEY=sk-test-from-the-file\n")
+    drafted: list[str] = []
+    real_brief = checks.brief
+    monkeypatch.setattr(checks, "brief", lambda cid, by: drafted.append(cid) or checks.get(cid))
+    assert checks.main(["brief", "--missing"]) == 0
+    assert drafted == [c.id], "a key in core/.env is found by the nightly job"
+    monkeypatch.setattr(checks, "brief", real_brief)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     client = TestClient(app)
     monkeypatch.setattr(llm, "call", down)
     r = client.post(f"/api/guild/checks/{c.id}/brief", json={"by": "p-eric"}, headers={"Host": "127.0.0.1:8000"})

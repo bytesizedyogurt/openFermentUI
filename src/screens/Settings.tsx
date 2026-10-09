@@ -34,7 +34,7 @@ import {
 import { DataTable, type Column } from '@/components/DataTable';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import type { FieldId, GateMode, ParameterDef } from '@/data/types';
+import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types';
 import { convert, fmt, toSI } from '@/engine/units';
 import { DISCLOSURE, exportCSV } from '@/lib/csv';
 
@@ -157,9 +157,16 @@ function GuildPolicySection() {
   const sample = useStore((s) => s.guildSample !== null);
   const save = useStore((s) => s.guildSetPolicy);
   const current = policyOf(ledger);
-  const [routineGate, setRoutine] = useState<GateMode>(current.routineGate);
-  const [criticalGate, setCritical] = useState<GateMode>(current.criticalGate);
-  const [checksPerQuarter, setRate] = useState<number>(current.checksPerQuarter);
+  // Only what the lead has changed is held here; every other field reads the
+  // stored policy, so a ledger that arrives after this mounts is shown as it
+  // is, and a save never sends back a default nobody chose (§5.5).
+  const [edits, setEdits] = useState<Partial<Pick<GuildPolicy, 'routineGate' | 'criticalGate' | 'checksPerQuarter'>>>({});
+  const routineGate = edits.routineGate ?? current.routineGate;
+  const criticalGate = edits.criticalGate ?? current.criticalGate;
+  const checksPerQuarter = edits.checksPerQuarter ?? current.checksPerQuarter;
+  const setRoutine = (v: GateMode) => setEdits((e) => ({ ...e, routineGate: v }));
+  const setCritical = (v: GateMode) => setEdits((e) => ({ ...e, criticalGate: v }));
+  const setRate = (v: number) => setEdits((e) => ({ ...e, checksPerQuarter: v }));
   const lead = ledger.people.find((p) => p.id === actingId && p.active && p.role === 'lead') ?? null;
   const by = ledger.people.find((p) => p.id === current.updatedBy)?.name;
   const changed =
@@ -206,7 +213,9 @@ function GuildPolicySection() {
         <p className="text-caption text-ink-soft mt-1">Fewer than this puts the holder in the assessors&rsquo; queue of proposed checks.</p>
       </section>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" disabled={!lead || !changed} onClick={() => void save({ routineGate, criticalGate, checksPerQuarter })}>
+        <Button variant="primary" disabled={!lead || !changed} onClick={async () => {
+            if (await save({ routineGate, criticalGate, checksPerQuarter })) setEdits({});
+          }}>
           Save the policy
         </Button>
         <span className="text-caption text-ink-soft">

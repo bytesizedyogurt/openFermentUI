@@ -731,6 +731,13 @@ async function main() {
       const held = page.locator('button:has-text("Waits for a cosigner")');
       if ((await held.count()) !== 1 || !(await held.isDisabled()))
         problems.push('a Supervised operator on a critical skill is not held for a cosigner in enforce mode');
+      // §5.5 — a held step can be skipped, and the skip says it goes on the record.
+      await page.locator('footer button:has-text("Skip")').click();
+      await page.waitForTimeout(150);
+      if (!/Skipping it is kept with the run, and goes on the operator’s ledger as a deviation/.test(await page.locator('[role="dialog"]').innerText()))
+        problems.push('skipping a held step does not say it goes on the record');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(150);
       await page.locator('button:has-text("Record cosigner")').click();
       await page.locator('button:has-text("Eric Habimana")').first().click();
       await page.waitForTimeout(200);
@@ -798,8 +805,8 @@ async function main() {
       await card.locator('a:has-text("Run now at the bench")').click();
       await page.waitForTimeout(400);
       if ((await page.locator('nav').count()) !== 0) problems.push('the bench check is not a full-screen takeover');
-      // The bench's own buttons; a toast from earlier in the flow is the shell's, as it is in Deposition.
-      const short = await page.locator('header button, main button').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
+      // The bench's own targets, buttons and links alike; a toast from earlier in the flow is the shell's, as it is in Deposition.
+      const short = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
       if (short.length) problems.push(`bench buttons under 44px: ${short.join(', ')}`);
       await page.locator('button:has-text("Begin with the first criterion")').click();
       let calls = 0;
@@ -815,6 +822,8 @@ async function main() {
         await page.waitForTimeout(60);
       }
       if (!/1 need work[\s\S]*every criterion met/.test(await page.locator('main').innerText())) problems.push('the sign step does not sum up each skill');
+      const shortSign = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
+      if (shortSign.length) problems.push(`sign-step targets under 44px: ${shortSign.join(', ')}`);
       await page.locator('button:has-text("Sign as Eric Habimana")').click();
       await page.waitForTimeout(400);
       if (!/Signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('signing the check did not finish it');

@@ -86,7 +86,7 @@ import {
 import { sampleGuild } from '@/data/guildSample';
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
-import { proposeChecks, type Proposal } from '@/engine/checks';
+import { mayQueue, proposeChecks, type Proposal } from '@/engine/checks';
 import { competenceOf, isAssessor, localToday, mayCosign, statusOf } from '@/engine/competence';
 import { SKILL_BY_ID } from '@/data/skills';
 
@@ -576,6 +576,13 @@ export interface OFState {
    * the level it needs. Returns how many deviations it wrote.
    */
   recordStepForGuild: (runId: string, stepId: string) => Promise<number>;
+  /**
+   * A step the gate holds was skipped (OF-BLD-013 §5.5). The skip stands,
+   * with its reason, and goes on the operator's ledger as a deviation on each
+   * skill the step needs, so an assessor sees a held step that was passed
+   * over. Returns how many deviations it wrote.
+   */
+  recordHeldSkipForGuild: (runId: string, stepId: string, reason: string, hold: string) => Promise<number>;
   /**
    * A lesson's checkpoint was just passed (OF-BLD-013 §3.2). Writes one
    * knowledge entry per skill the lesson counts toward, for whoever is
@@ -2697,20 +2704,25 @@ export const useStore = create<OFState>()((set, get) => ({
     set({ checks: await loadChecksFromService() });
   },
 
+  // `made` counts only the checks the proposer may see: one that names them
+  // stays out of the count as it stays out of the queue.
   checksPropose: async () => {
     const s = get();
     const by = actingIdOf(s);
+    if (!by) return { why: 'Choose who you are with Acting as: the ranking is run by an assessor or the lead.' };
     if (s.guildSample) {
+      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
+      const me = s.guildSample.people.find((p) => p.id === by) ?? null;
+      if (!mayQueue(me, map)) return { why: 'The ranking is run by an assessor or the lead.' };
       const open = s.guildSampleChecks ?? [];
       const made = proposeChecks(s.guildSample, SKILL_BY_ID, localToday(), coveredBy(open)).map((p, i) => sampleCheck(p, open.length + i));
       set({ guildSampleChecks: [...open, ...made] });
-      return { made: made.length };
+      return { made: made.filter((c) => c.personId !== by).length };
     }
-    if (!by) return { why: 'Choose who you are with Acting as: the ranking is run by an assessor or the lead.' };
     try {
       const made = await postPropose(by);
       await get().loadChecks();
-      return { made: made.length };
+      return { made: made.filter((c) => c.personId !== by).length };
     } catch (e) {
       return { why: whyNot(e) };
     }
@@ -2725,6 +2737,10 @@ export const useStore = create<OFState>()((set, get) => ({
     // check that names them before it is run.
     const own = by === personId;
     if (s.guildSample) {
+      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
+      const them = s.guildSample.people.find((p) => p.id === personId);
+      if (!them || !them.active || them.role === 'auditor') return 'A check is for an active person who can hold skills.';
+      if (!own && !skillIds.some((k) => isAssessor(map, by, k))) return 'A check is asked for by the person, or by an assessor on one of its skills.';
       const open = s.guildSampleChecks ?? [];
       const cover = coveredBy(open);
       const fresh = skillIds.filter((k) => !cover.has(`${personId}|${k}`));
@@ -2749,7 +2765,8 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   checksSchedule: async (checkId, day) =>
-    checkMove(set, get, checkId, (c, by, map) => {
+    checkMove(set, get, checkId, (c, by, map, ledger) => {
+      if (!ledger.people.some((p) => p.id === c.personId && p.active)) return 'The person checked is no longer active; the check can be dismissed.';
       if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Scheduled by an assessor on every one of its skills, never by the person checked.';
       return { ...c, state: 'scheduled', assessorId: by, scheduledFor: day };
     }, (by) => postSchedule(checkId, { by, scheduledFor: day })),
@@ -2966,6 +2983,34 @@ export const useStore = create<OFState>()((set, get) => ({
       }
     }
     return deviations;
+  },
+
+  recordHeldSkipForGuild: async (runId, stepId, reason, hold) => {
+    const s = get();
+    const run = s.runs[runId];
+    if (!run || run.guildRecorded?.[stepId]) return 0;
+    const operatorId = run.operatorId ?? null;
+    const ledger = guildView(s);
+    if (!operatorId || !ledger.people.some((p) => p.id === operatorId && p.active && p.role !== 'auditor')) return 0;
+    const protocol = s.protocols.find((p) => p.id === run.protocolId);
+    const tags = protocol?.versions.find((v) => v.version === run.version)?.steps.find((x) => x.id === stepId)?.skills ?? [];
+    if (!protocol || tags.length === 0) return 0;
+    set((x) => ({
+      runs: { ...x.runs, [runId]: { ...x.runs[runId], guildRecorded: { ...(x.runs[runId].guildRecorded ?? {}), [stepId]: true } } },
+    }));
+    const where = `${run.depositionId ? `Deposition ${run.depositionId}` : `Run ${runId}`}, step ${stepId}`;
+    for (const skillId of tags)
+      await get().guildRecord({
+        personId: operatorId,
+        skillId,
+        kind: 'deviation',
+        outcome: 'pass',
+        at: localToday(),
+        observerId: null,
+        source: { kind: 'deposition', ref: protocol.id, stepId },
+        raw: `${where}: skipped while held (${hold}); the reason given was \u201c${reason}\u201d`,
+      });
+    return tags.length;
   },
 
   recordLessonForGuild: async (lessonId) => {

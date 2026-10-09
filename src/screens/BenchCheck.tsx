@@ -117,6 +117,8 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
   const [busy, setBusy] = useState(false);
   const [why, setWhy] = useState<string | null>(null);
   const [signed, setSigned] = useState<{ by: string; day: string } | null>(null);
+  // Whose calls these are: set at Begin, and a different assessor beginning starts afresh (§5.5).
+  const [startedBy, setStartedBy] = useState<string | null>(null);
 
   const key = (k: string, i: number) => `${k}#${i}`;
   const assessor = ctx.acting;
@@ -135,8 +137,9 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
         ? 'Sign the check'
         : '';
 
+  // Until an assessor who may run it is chosen, the bench names nobody and shows no reason or brief.
   const shell = (children: React.ReactNode) => (
-    <Shell title={`Witnessed check · ${person}`} sub={skillsLine} onExit={exit}>
+    <Shell title={mayRun || signed ? `Witnessed check · ${person}` : 'Witnessed check'} sub={mayRun || signed ? skillsLine : undefined} onExit={exit}>
       <div className="sr-only" aria-live="polite">
         {announce}
       </div>
@@ -217,29 +220,55 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
           </div>
         </div>
 
-        <div>
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Checking</div>
-          <p className="text-ink text-reading">
-            {person}, on {skillsLine}: <span className="font-num">{criteriaTotal}</span> criteria, one at a time.
-          </p>
-          <ul className="list-disc pl-5 mt-2 text-body text-ink">
-            {check.reasons.map((r, i) => (
-              <li key={i}>
-                <span className="font-medium">{SKILL_BY_ID[r.skillId]?.name ?? r.skillId}:</span> {r.text}
-              </li>
-            ))}
-          </ul>
-        </div>
+        {mayRun ? (
+          <>
+            <div>
+              <div className="text-caption uppercase tracking-wide text-ink mb-1">Checking</div>
+              <p className="text-ink text-reading">
+                {person}, on {skillsLine}: <span className="font-num">{criteriaTotal}</span> criteria, one at a time.
+              </p>
+              <ul className="list-disc pl-5 mt-2 text-body text-ink">
+                {check.reasons.map((r, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{SKILL_BY_ID[r.skillId]?.name ?? r.skillId}:</span> {r.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-        {check.brief && (
-          <div className="card p-4">
-            <div className="text-caption uppercase tracking-wide text-ink-soft mb-2">Brief</div>
-            <BriefView brief={check.brief} large />
-          </div>
+            {check.brief && (
+              <div className="card p-4">
+                <div className="text-caption uppercase tracking-wide text-ink mb-2">Brief</div>
+                <BriefView brief={check.brief} large />
+              </div>
+            )}
+
+            {startedBy && startedBy !== assessor!.id && (
+              <p className="text-reading text-ink border-l-4 border-signal-warn pl-3">
+                The calls so far were {nameOf(ctx, startedBy)}&rsquo;s. Beginning as {assessor!.name} starts the check afresh.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-body text-ink">Who is checked, why, and the brief show once an assessor on every one of its skills is chosen.</p>
         )}
 
-        <Button style={BIG} variant="primary" className="w-full justify-center" disabled={!mayRun} onClick={() => setAt(0)}>
-          Begin with the first criterion <ArrowRight size={18} />
+        <Button
+          style={BIG}
+          variant="primary"
+          className="w-full justify-center"
+          disabled={!mayRun}
+          onClick={() => {
+            if (startedBy && startedBy !== assessor!.id) {
+              setCalls({});
+              setNotes({});
+              setWords({});
+            }
+            setStartedBy(assessor!.id);
+            setAt(0);
+          }}
+        >
+          {startedBy === assessor?.id ? 'Back to the criteria' : 'Begin with the first criterion'} <ArrowRight size={18} />
         </Button>
       </div>,
     );
@@ -252,6 +281,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
       .filter((i): i is Extract<Item, { kind: 'criterion' }> => i.kind === 'criterion')
       .map((i) => ({ skillId: i.skillId, criterion: i.index, meets: calls[key(i.skillId, i.index)], note: (notes[key(i.skillId, i.index)] ?? '').trim() }));
     const complete = results.every((r) => typeof r.meets === 'boolean');
+    const own = !!assessor && assessor.id === startedBy;
     return shell(
       <div className="space-y-5">
         <p className="text-ink font-medium" style={{ fontSize: 21, lineHeight: '31px' }}>
@@ -264,7 +294,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
             <div key={k} className="card p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-ink text-reading">{SKILL_BY_ID[k]?.name ?? k}</span>
-                <span className={cx('chip', met ? 'text-accent border-accent/40' : 'text-signal-error border-signal-error/40')}>
+                <span className={cx('chip text-ink border-2', met ? 'border-accent' : 'border-signal-error')}>
                   {met ? 'every criterion met' : `${mine.filter((r) => !r.meets).length} need work`}
                 </span>
               </div>
@@ -280,8 +310,14 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
         <p className="text-body text-ink">
           Dated <span className="font-num">{day}</span>, signed as {assessor?.name ?? 'nobody'}.
         </p>
+        {!own && assessor && startedBy && (
+          <p className="text-reading text-ink border-l-4 border-signal-warn pl-3">
+            The calls are {nameOf(ctx, startedBy)}&rsquo;s, and are signed by them. Choose {nameOf(ctx, startedBy)} again, or begin afresh as{' '}
+            {assessor.name} from the start.
+          </p>
+        )}
         {why && (
-          <p role="alert" className="text-reading text-signal-error">
+          <p role="alert" className="text-reading text-ink border-l-4 border-signal-error pl-3">
             {why}
           </p>
         )}
@@ -293,7 +329,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
             style={BIG}
             variant="primary"
             className="flex-1 justify-center"
-            disabled={!mayRun || !complete || busy}
+            disabled={!mayRun || !own || !complete || busy}
             onClick={async () => {
               setBusy(true);
               setWhy(null);
@@ -387,7 +423,7 @@ function Run({ ctx, check }: { ctx: GuildContext; check: Check }) {
               .filter((i): i is Extract<Item, { kind: 'criterion' }> => i.kind === 'criterion' && i.skillId === item.skillId)
               .map((i) => (
                 <li key={i.index} className="text-body text-ink flex gap-2">
-                  <span className={cx('chip shrink-0', calls[key(i.skillId, i.index)] ? 'text-accent border-accent/40' : 'text-signal-error border-signal-error/40')}>
+                  <span className={cx('chip shrink-0 text-ink border-2', calls[key(i.skillId, i.index)] ? 'border-accent' : 'border-signal-error')}>
                     {calls[key(i.skillId, i.index)] ? 'Meets' : 'Needs work'}
                   </span>
                   <span>{skill?.mastery[i.index]}</span>

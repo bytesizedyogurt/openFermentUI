@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 try:
@@ -77,3 +79,25 @@ def write_text(path: Path, text: str) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+@contextmanager
+def held(path: Path) -> Iterator[None]:
+    """Hold `path` for a read-modify-write against other processes too.
+
+    A threading lock keeps two requests in the service apart; the nightly job
+    is another process, and a change made in the service while it ran would
+    be lost to whichever wrote second (OF-BLD-013 §5.5). This takes an
+    exclusive advisory lock on a file beside `path` (`<name>.lock`, kept out
+    of git with the file it guards) and waits for it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if fcntl is None:  # pragma: no cover
+        yield
+        return
+    with open(path.with_name(path.name + ".lock"), "a", encoding="utf-8") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)

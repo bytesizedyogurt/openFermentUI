@@ -318,11 +318,24 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
 
     `dry_run` is what `POST /api/guild/check` asks before the assessor signs:
     every rule runs and nothing is written, so asking and deciding are the
-    same code.
+    same code. An entry with a check as its source is refused here: it is
+    written by running the check (`checks.record`), which calls every
+    criterion first (OF-BLD-013 §5.5).
     """
+    return _write_entries([entry], dry_run=dry_run, from_check=None)[0]
+
+
+def write_check_entries(entries: list[GuildEvidence], check_id: str, *, dry_run: bool = False) -> list[GuildEvidence]:
+    """A check's run: one witnessed entry per skill, every one asked against
+    the same ledger and written in one write, so the run lands whole or not
+    at all. Only `checks.record` calls this."""
+    return _write_entries(entries, dry_run=dry_run, from_check=check_id)
+
+
+def _precheck(entry: GuildEvidence, known: dict[str, dict[str, Any]], from_check: str | None) -> date:
+    """Every rule that needs no ledger. Returns the entry's day."""
     if not EVIDENCE_ID.match(entry.id):
         raise GuildRefused("duplicate", f"{entry.id!r} is not an entry id (e- and 4 to 64 letters, digits or hyphens)")
-    known = skills()
     if entry.skillId not in known:
         raise GuildRefused("skill", f"{entry.skillId!r} is not a skill in src/data/skills.ts")
 
@@ -361,6 +374,9 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
     if src == "check":
         from . import checks  # checks writes through here; imported late to keep the two apart
 
+        if from_check != entry.source.ref:
+            raise GuildRefused("source", "an entry from a check is written by running the check at the bench, which calls every criterion")
+
         ck = checks.get(entry.source.ref)
         if ck is None:
             raise GuildRefused("source", f"{entry.source.ref!r} is not a check")
@@ -390,95 +406,120 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
         raise GuildRefused("date", f"{entry.at!r} is not a date")
     if day > date.today() + timedelta(days=1):
         raise GuildRefused("date", f"{entry.at} is in the future; a sign-off records something already seen")
+    return day
 
+
+def _write_entries(entries: list[GuildEvidence], *, dry_run: bool, from_check: str | None) -> list[GuildEvidence]:
+    known = skills()
+    days = [_precheck(e, known, from_check) for e in entries]
     with _WRITE_LOCK:
         ledger = read()
         people = _people(ledger)
-        if any(e.id == entry.id for e in ledger.evidence):
-            raise GuildRefused("duplicate", f"{entry.id} is already on the ledger")
-        if src == "scenario" and any(
-            e.source.kind == "scenario" and e.source.ref == entry.source.ref and not e.withdrawnAt for e in ledger.evidence
-        ):
-            raise GuildRefused("duplicate", f"practice session {entry.source.ref} is already on the ledger")
-        if src == "check" and any(
-            e.source.kind == "check" and e.source.ref == entry.source.ref and e.skillId == entry.skillId and not e.withdrawnAt
-            for e in ledger.evidence
-        ):
-            raise GuildRefused("duplicate", f"check {entry.source.ref} is already on the ledger for {entry.skillId}")
-        person = people.get(entry.personId)
-        if person is None or not person.active:
-            raise GuildRefused("person", f"{entry.personId!r} is not an active person on the ledger")
-        if person.role == "auditor":
-            raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
-        skill_name = known[entry.skillId]["name"]
-
-        def holds(person_id: str) -> bool:
-            # Judged on the day the step was run, from what the ledger held
-            # by then: a run recorded offline and posted days later is held
-            # to the level its operator and cosigner had when they did it.
-            on = day.isoformat()
-            seen = [e for e in ledger.evidence if e.at[:10] <= on]
-            return Competence(seen, known, on).holds(person_id, entry.skillId)
-
-        if src in ("lesson", "scenario"):
-            # Primer records it as the learner passes the checkpoint, or as a
-            # tutor session closes; no person watched, and the entry says so
-            # by naming nobody.
-            if entry.observerId is not None:
-                raise GuildRefused(
-                    "observer",
-                    f"a {'lesson passed' if src == 'lesson' else 'practice session'} is recorded by Primer and names no observer; "
-                    "an assessor's briefing is a training sign-off",
-                )
-        elif kind in ("independent", "deviation"):
-            # The operator's own record of a run: nobody else's name on it.
-            if entry.observerId is not None:
-                raise GuildRefused(
-                    "observer",
-                    f"a {kind} entry is the operator's own record and names no observer; "
-                    "a run with someone beside them is a supervised run",
-                )
-            if kind == "independent" and not holds(person.id):
-                raise GuildRefused(
-                    "authority",
-                    f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
-                    "or a supervised run with a cosigner",
-                )
-        else:
-            observer = people.get(entry.observerId or "")
-            if observer is None or not observer.active:
-                raise GuildRefused("observer", f"a {kind} entry needs an observer who is an active person on the ledger")
-            if observer.id == person.id:
-                raise GuildRefused("observer", "nobody signs off their own work")
-            if observer.role == "auditor":
-                raise GuildRefused(
-                    "authority",
-                    f"{observer.name} is an auditor; an auditor reads the ledger and signs nothing, "
-                    "whatever entries they held before",
-                )
-            if kind == "designation":
-                if observer.role != "lead":
-                    raise GuildRefused("authority", f"{observer.name} is not the lead; only the lead designates assessors")
-            elif src == "deposition":
-                if not holds(observer.id):
-                    raise GuildRefused(
-                        "authority",
-                        f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
-                    )
-            elif not _assessor_on(ledger, observer.id, entry.skillId):
-                raise GuildRefused(
-                    "authority",
-                    f"{observer.name} holds no assessor designation on {skill_name}, so cannot sign it off",
-                )
-
-        stored = entry.model_copy(
-            update={"raw": entry.raw.strip(), "recordedAt": _now(), "withdrawnAt": None, "withdrawnBy": None, "withdrawReason": None}
-        )
+        stored_all: list[GuildEvidence] = []
+        for entry, day in zip(entries, days):
+            stored_all.append(_admit(entry, day, ledger, people, known, stored_all))
         if dry_run:
-            return stored
-        ledger.evidence.append(stored)
+            return stored_all
+        ledger.evidence.extend(stored_all)
         _persist(ledger)
-    log.info("guild: %s %s on %s for %s by %s", stored.kind, stored.outcome, stored.skillId, stored.personId, stored.observerId)
+    for stored in stored_all:
+        log.info("guild: %s %s on %s for %s by %s", stored.kind, stored.outcome, stored.skillId, stored.personId, stored.observerId)
+    return stored_all
+
+
+def _admit(
+    entry: GuildEvidence,
+    day: date,
+    ledger: Guild,
+    people: dict[str, GuildPerson],
+    known: dict[str, dict[str, Any]],
+    batch: list[GuildEvidence],
+) -> GuildEvidence:
+    """Every rule that reads the ledger, with `batch` the entries already
+    admitted beside this one in the same write."""
+    src = entry.source.kind
+    kind = entry.kind
+    held = ledger.evidence + batch
+    if any(e.id == entry.id for e in held):
+        raise GuildRefused("duplicate", f"{entry.id} is already on the ledger")
+    if src == "scenario" and any(
+        e.source.kind == "scenario" and e.source.ref == entry.source.ref and not e.withdrawnAt for e in held
+    ):
+        raise GuildRefused("duplicate", f"practice session {entry.source.ref} is already on the ledger")
+    if src == "check" and any(
+        e.source.kind == "check" and e.source.ref == entry.source.ref and e.skillId == entry.skillId and not e.withdrawnAt
+        for e in held
+    ):
+        raise GuildRefused("duplicate", f"check {entry.source.ref} is already on the ledger for {entry.skillId}")
+    person = people.get(entry.personId)
+    if person is None or not person.active:
+        raise GuildRefused("person", f"{entry.personId!r} is not an active person on the ledger")
+    if person.role == "auditor":
+        raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
+    skill_name = known[entry.skillId]["name"]
+
+    def holds(person_id: str) -> bool:
+        # Judged on the day the step was run, from what the ledger held
+        # by then: a run recorded offline and posted days later is held
+        # to the level its operator and cosigner had when they did it.
+        on = day.isoformat()
+        seen = [e for e in ledger.evidence if e.at[:10] <= on]
+        return Competence(seen, known, on).holds(person_id, entry.skillId)
+
+    if src in ("lesson", "scenario"):
+        # Primer records it as the learner passes the checkpoint, or as a
+        # tutor session closes; no person watched, and the entry says so
+        # by naming nobody.
+        if entry.observerId is not None:
+            raise GuildRefused(
+                "observer",
+                f"a {'lesson passed' if src == 'lesson' else 'practice session'} is recorded by Primer and names no observer; "
+                "an assessor's briefing is a training sign-off",
+            )
+    elif kind in ("independent", "deviation"):
+        # The operator's own record of a run: nobody else's name on it.
+        if entry.observerId is not None:
+            raise GuildRefused(
+                "observer",
+                f"a {kind} entry is the operator's own record and names no observer; "
+                "a run with someone beside them is a supervised run",
+            )
+        if kind == "independent" and not holds(person.id):
+            raise GuildRefused(
+                "authority",
+                f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
+                "or a supervised run with a cosigner",
+            )
+    else:
+        observer = people.get(entry.observerId or "")
+        if observer is None or not observer.active:
+            raise GuildRefused("observer", f"a {kind} entry needs an observer who is an active person on the ledger")
+        if observer.id == person.id:
+            raise GuildRefused("observer", "nobody signs off their own work")
+        if observer.role == "auditor":
+            raise GuildRefused(
+                "authority",
+                f"{observer.name} is an auditor; an auditor reads the ledger and signs nothing, "
+                "whatever entries they held before",
+            )
+        if kind == "designation":
+            if observer.role != "lead":
+                raise GuildRefused("authority", f"{observer.name} is not the lead; only the lead designates assessors")
+        elif src == "deposition":
+            if not holds(observer.id):
+                raise GuildRefused(
+                    "authority",
+                    f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
+                )
+        elif not _assessor_on(ledger, observer.id, entry.skillId):
+            raise GuildRefused(
+                "authority",
+                f"{observer.name} holds no assessor designation on {skill_name}, so cannot sign it off",
+            )
+
+    stored = entry.model_copy(
+        update={"raw": entry.raw.strip(), "recordedAt": _now(), "withdrawnAt": None, "withdrawnBy": None, "withdrawReason": None}
+    )
     return stored
 
 
