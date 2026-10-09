@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openferment_core import guild
+from openferment_core import guild, practice
 from openferment_core.api import app
 from openferment_core.models import EvidenceSource, GuildEvidence, GuildPerson, GuildWithdrawal
 
@@ -27,6 +27,7 @@ TODAY = date.today().isoformat()
 @pytest.fixture(autouse=True)
 def _ledger(monkeypatch, tmp_path):
     monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
+    monkeypatch.setattr(practice, "PATH", tmp_path / "practice.json")
 
 
 def person(pid: str, name: str, role: str = "member", added_by: str | None = "p-sean", **extra) -> GuildPerson:
@@ -147,10 +148,11 @@ def test_an_auditor_holds_no_skills():
     refused("role", guild.write_evidence, entry("e-try-1", "p-qa"))
 
 
-def test_practice_waits_for_its_screen():
+def test_practice_comes_from_a_practice_session():
     team()
-    why = refused("source", guild.write_evidence, entry("e-later-scenario", "p-patrick", kind="scenario"))
-    assert "does not write to the ledger yet" in why
+    refused("source", guild.write_evidence, entry("e-try-scenario", "p-patrick", kind="scenario"))
+    refused("source", guild.write_evidence, entry("e-try-scenario2", "p-patrick", kind="scenario", observer=None,
+                                                  source=EvidenceSource(kind="scenario", ref="pt-nope")))
 
 
 def test_a_kind_comes_from_its_own_source():

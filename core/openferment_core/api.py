@@ -43,6 +43,8 @@ from .models import (
     Practice,
     PracticeDraftRequest,
     PracticeScenario,
+    PracticeSession,
+    PracticeTurnRequest,
     ReviewDecision,
     Usage,
 )
@@ -372,6 +374,21 @@ def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
         return practice.draft(request)
     except practice.PracticeRefused as e:
         log.warning("practice refused a draft for %s — %s ($%.4f spent)", request.skillId, e, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/practice/turn", response_model=PracticeSession)
+def practice_turn(request: PracticeTurnRequest) -> PracticeSession:
+    """The trainee's answer and the tutor's reply, kept together or not at all.
+    The session that closes for a person on the ledger puts practice on it."""
+    try:
+        return practice.turn(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a turn on %s — %s ($%.4f spent)", request.scenarioId, e, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
     except practice.PracticeUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e)) from e

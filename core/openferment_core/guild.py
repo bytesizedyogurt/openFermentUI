@@ -28,12 +28,13 @@ The rules, by name:
   skill       an entry names a skill the projection does not hold
   source      an entry pairs a kind with a source that does not produce it,
               comes from a run without naming its step, names a protocol
-              step that does not carry the skill, or names a lesson that does
-              not count toward it
+              step that does not carry the skill, names a lesson that does
+              not count toward it, or names a practice session that is not a
+              closed session of this person on this skill
   observer    a sign-off, designation or cosigned run has no observer, an
               observer who is not an active person, or the person themselves;
-              or an operator's own record of a run, or a lesson passed, names
-              one
+              or an operator's own record of a run, a lesson passed or a
+              practice session names one
   authority   a sign-off by someone with no assessor designation on the skill,
               a cosign by someone who does not hold it, a run alone by someone
               who does not hold it (both judged on the day of the run), any
@@ -92,8 +93,8 @@ RULES = (
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
 # §1, §2, §3). A sign-off is an assessor's; a designation is the lead's; a run
 # is Deposition's, recorded as the operator completes a step; a lesson passed
-# is Primer's, recorded as the learner answers its last checkpoint question.
-# Practice joins when Primer's player does.
+# is Primer's, recorded as the learner answers its last checkpoint question;
+# practice is Primer's too, recorded as a tutor session closes.
 ACCEPTED: dict[str, frozenset[str]] = {
     "knowledge": frozenset({"signoff", "lesson"}),
     "supervised": frozenset({"signoff", "deposition"}),
@@ -101,9 +102,7 @@ ACCEPTED: dict[str, frozenset[str]] = {
     "designation": frozenset({"lead"}),
     "independent": frozenset({"deposition"}),
     "deviation": frozenset({"deposition"}),
-}
-LATER: dict[str, str] = {
-    "scenario": "Primer practice",
+    "scenario": frozenset({"scenario"}),
 }
 
 # Only a witnessed check can fail; a failed one is what suspends a skill.
@@ -305,8 +304,6 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
         raise GuildRefused("skill", f"{entry.skillId!r} is not a skill in src/data/skills.ts")
 
     kind = entry.kind
-    if kind in LATER:
-        raise GuildRefused("source", f"{kind} entries arrive from {LATER[kind]}, which does not write to the ledger yet")
     src = entry.source.kind
     if src not in ACCEPTED.get(kind, frozenset()):
         raise GuildRefused(
@@ -338,6 +335,16 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
                 f"lesson {entry.source.ref} does not count toward {entry.skillId}; it counts toward "
                 + (", ".join(counts) or "no skill"),
             )
+    if src == "scenario":
+        from . import practice  # practice writes through here; imported late to keep the two apart
+
+        held = practice.session(entry.source.ref)
+        if held is None:
+            raise GuildRefused("source", f"{entry.source.ref!r} is not a practice session")
+        if held.closedAt is None:
+            raise GuildRefused("source", f"practice session {held.id} is still open")
+        if held.personId != entry.personId or held.skillId != entry.skillId:
+            raise GuildRefused("source", f"practice session {held.id} is someone else's, or on another skill")
 
     if entry.outcome == "fail" and kind not in CAN_FAIL:
         raise GuildRefused("outcome", f"a {kind} entry records something that happened; only a witnessed check can fail")
@@ -369,13 +376,14 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
             seen = [e for e in ledger.evidence if e.at[:10] <= on]
             return Competence(seen, known, on).holds(person_id, entry.skillId)
 
-        if src == "lesson":
-            # Primer records it as the learner passes the checkpoint; nobody
-            # watched, and the entry says so by naming nobody.
+        if src in ("lesson", "scenario"):
+            # Primer records it as the learner passes the checkpoint, or as a
+            # tutor session closes; no person watched, and the entry says so
+            # by naming nobody.
             if entry.observerId is not None:
                 raise GuildRefused(
                     "observer",
-                    "a lesson passed is recorded by Primer and names no observer; "
+                    f"a {'lesson passed' if src == 'lesson' else 'practice session'} is recorded by Primer and names no observer; "
                     "an assessor's briefing is a training sign-off",
                 )
         elif kind in ("independent", "deviation"):

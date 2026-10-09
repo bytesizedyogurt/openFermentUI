@@ -16,6 +16,7 @@ from openferment_core.models import (
     PracticeDepositionEntry,
     PracticeDepositionObservation,
     PracticeDraftRequest,
+    PracticeTurnRequest,
 )
 
 pytestmark = pytest.mark.live
@@ -53,3 +54,26 @@ def test_a_real_draft_passes_every_rule():
     print(f"  situation: {s.situation}\n  prompt: {s.prompt}")
     assert s.evidence and all(v.label for v in s.evidence)
     assert any(st.stepId in {"o3", "o4", "s7", "s8", "s12"} for st in s.steps)
+
+
+@needs_key
+def test_a_real_tutor_questions_and_then_closes():
+    """Three answers, as a trainee who is half right might give them. The tutor
+    has to stay clear of numbers throughout and close on the last."""
+    s = practice.draft(PracticeDraftRequest(skillId="SK-OD", depositions=[bench_run()]))
+    answers = [
+        "I would record it as it is and add a note that it looked high.",
+        "Because the reading was what the instrument showed, so it is the measurement.",
+        "Maybe dilute it first so it is in the range, then read again.",
+    ]
+    held = None
+    for a in answers:
+        try:
+            held = practice.turn(PracticeTurnRequest(scenarioId=s.id, sessionId=held.id if held else None, answer=a))
+        except practice.PracticeRefused as e:
+            pytest.fail(f"the tutor's reply was refused on {e.rule}: {e.why}")
+        print(f"\n  trainee: {a}\n  tutor ({held.turns[-1].move}): {held.turns[-1].text}")
+    assert held is not None and held.closedAt and held.observed
+    for o in held.observed:
+        print(f"  observed: {o.text}")
+    print(f"  session {held.id}: ${held.usage.costUsd:.4f} for the tutor, ${s.usage.costUsd:.4f} for the draft")

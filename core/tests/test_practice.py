@@ -228,3 +228,199 @@ def test_the_endpoints(monkeypatch):
     monkeypatch.setattr(llm, "call", down)
     r = client.post("/api/practice/draft", json=body, headers=host)
     assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+
+# ── the tutor (§4.2) ───────────────────────────────────────────────────
+
+from datetime import date  # noqa: E402
+
+from openferment_core import guild  # noqa: E402
+from openferment_core.competence import Competence  # noqa: E402
+from openferment_core.models import GuildPerson, PracticeTurnRequest  # noqa: E402
+
+
+@pytest.fixture()
+def team(monkeypatch, tmp_path):
+    monkeypatch.setattr(guild, "PATH", tmp_path / "guild.json")
+    person = lambda pid, name, role="member", by="p-sean": GuildPerson(  # noqa: E731
+        id=pid, name=name, role=role, joinedAt="2026-06-01", addedBy=by, addedAt="2026-06-01T00:00:00Z"
+    )
+    guild.write_person(person("p-sean", "Sean Creighton", "lead", None))
+    guild.write_person(person("p-olivier", "Olivier Ndayisaba"))
+    guild.write_person(person("p-qa", "Client QA", "auditor"))
+
+
+def reply(move: str, text: str = "Why would that change what the reading means?", **extra) -> dict[str, Any]:
+    return {"move": move, "text": text, "steps": extra.pop("steps", ["PR-OD-01:o4"]), "observed": extra.pop("observed", []), **extra}
+
+
+CLOSE = reply(
+    "close",
+    "Look again at why step o4 dilutes into spent medium.",
+    observed=[
+        {"text": "Saw that the reading at [v1] was above the linear range and chose to dilute.", "steps": ["PR-OD-01:o4"]},
+        {"text": "Was unsure why the diluent has to be spent medium.", "steps": ["PR-OD-01:o4"]},
+    ],
+)
+
+
+def drafted():
+    return practice.draft(request(), ask=stand_in(GOOD))
+
+
+def answer(sc, text: str = "Dilute it and read again", session=None, person="p-olivier", ask=None):
+    return practice.turn(
+        PracticeTurnRequest(scenarioId=sc.id, sessionId=session.id if session else None, personId=person, answer=text),
+        ask=ask or stand_in(reply("why")),
+    )
+
+
+def turn_refused(rule: str, sc, data, session=None, person="p-olivier") -> str:
+    with pytest.raises(practice.PracticeRefused) as caught:
+        answer(sc, session=session, person=person, ask=stand_in(data))
+    assert caught.value.rule == rule, f"expected {rule!r}, got {caught.value.rule!r}: {caught.value.why}"
+    return caught.value.why
+
+
+def test_a_turn_keeps_the_answer_and_the_reply_together(team):
+    sc = drafted()
+    held = answer(sc)
+    assert held.id.startswith("pt-") and held.personId == "p-olivier" and held.skillId == "SK-OD"
+    assert [(t.role, t.move) for t in held.turns] == [("trainee", None), ("tutor", "why")]
+    assert held.turns[0].text == "Dilute it and read again" and held.closedAt is None
+    assert practice.session(held.id) == held
+
+
+def test_the_tutor_sees_the_scenario_the_conversation_and_what_a_sound_answer_reaches(team):
+    sc = drafted()
+    held = answer(sc)
+    ask = stand_in(reply("change"))
+    answer(sc, "Because above the range it stops tracking biomass", session=held, ask=ask)
+    user = ask.calls[0]["user"]  # type: ignore[attr-defined]
+    assert "Dilute it and read again" in user and "stops tracking biomass" in user
+    assert "soundAnswerReaches" in user and "[v1]" in user and "NEVER WRITE A NUMBER" in ask.calls[0]["system"]  # type: ignore[attr-defined]
+    assert user.startswith("Choose your move")
+
+
+def test_the_last_answer_closes_the_session_and_puts_practice_on_the_ledger(team):
+    sc = drafted()
+    held = answer(sc)
+    held = answer(sc, "Spent medium, from the same culture", session=held, ask=stand_in(reply("change")))
+    why = turn_refused("move", sc, reply("next"), session=held)
+    assert "did not close" in why
+    assert len(practice.session(held.id).turns) == 4, "a refused reply keeps nothing, the answer included"
+    ask = stand_in(CLOSE)
+    held = answer(sc, "I would read it again after diluting", session=held, ask=ask)
+    assert ask.calls[0]["user"].startswith("That was the trainee's last answer")  # type: ignore[attr-defined]
+    assert held.closedAt and [o.text for o in held.observed][1].startswith("Was unsure")
+    entry = next(e for e in guild.read().evidence if e.id == held.evidenceId)
+    assert (entry.kind, entry.personId, entry.skillId, entry.observerId) == ("scenario", "p-olivier", "SK-OD", None)
+    assert entry.source.kind == "scenario" and entry.source.ref == held.id and "Was unsure" in entry.raw
+    level = Competence(guild.read().evidence, guild.skills(), date.today().isoformat()).level("p-olivier", "SK-OD")
+    assert level == 1, "practice is Learning, and no more"
+    turn_refused("closed", sc, reply("why"), session=held)
+
+
+def test_a_reply_with_a_number_keeps_nothing(team):
+    sc = drafted()
+    turn_refused("quantity", sc, reply("why", "Would you dilute it tenfold?"))
+    turn_refused("quantity", sc, reply("change", "Suppose it read 0.9 instead; what then?"))
+    assert practice.read().sessions == []
+
+
+def test_what_the_tutor_cites_has_to_resolve(team):
+    sc = drafted()
+    turn_refused("unresolved", sc, reply("why", "Why does [v7] matter here?"))
+    turn_refused("steps", sc, reply("why", steps=["PR-OD-01:o99"]))
+
+
+def test_closing_says_what_was_observed(team):
+    sc = drafted()
+    turn_refused("move", sc, reply("close", observed=[]))
+    turn_refused("quantity", sc, reply("close", observed=[{"text": "Got two of the three points", "steps": []}]))
+    turn_refused("move", sc, reply("guess"))
+    turn_refused("move", sc, None)
+
+
+def test_who_may_practise_and_on_which_session(team):
+    sc = drafted()
+    turn_refused("session", sc, reply("why"), person="p-qa")
+    turn_refused("session", sc, reply("why"), person="p-nobody")
+    held = answer(sc)
+    turn_refused("session", sc, reply("why"), session=held, person=None)
+    with pytest.raises(practice.PracticeRefused) as caught:
+        answer(sc, " ")
+    assert caught.value.rule == "answer"
+    with pytest.raises(practice.PracticeRefused) as caught:
+        practice.turn(PracticeTurnRequest(scenarioId="ps-nope", answer="Dilute it"), ask=stand_in(reply("why")))
+    assert caught.value.rule == "scenario"
+
+
+def test_a_session_nobody_is_named_on_closes_with_nothing_on_the_ledger(team):
+    sc = drafted()
+    held = answer(sc, person=None)
+    held = answer(sc, "Spent medium", session=held, person=None, ask=stand_in(CLOSE))
+    assert held.closedAt and held.personId is None and held.evidenceId is None
+    assert not any(e.kind == "scenario" for e in guild.read().evidence)
+
+
+def test_an_answer_that_lost_the_race_keeps_nothing(team):
+    sc = drafted()
+    held = answer(sc)
+
+    def meanwhile(**kwargs):
+        # Another tab answers the same session while this one waits for the tutor.
+        with practice._WRITE_LOCK:
+            p = practice.read()
+            s = next(x for x in p.sessions if x.id == held.id)
+            s.turns.append(s.turns[0])
+            practice._persist(p)
+        return stand_in(reply("why"))(**kwargs)
+
+    why = turn_refused_with(sc, held, meanwhile)
+    assert "first" in why
+
+
+def turn_refused_with(sc, held, ask) -> str:
+    with pytest.raises(practice.PracticeRefused) as caught:
+        answer(sc, "Read it again", session=held, ask=ask)
+    assert caught.value.rule == "session"
+    return caught.value.why
+
+
+def test_the_ledger_takes_practice_only_from_a_closed_session_of_that_person(team):
+    from openferment_core.models import EvidenceSource, GuildEvidence
+
+    sc = drafted()
+    held = answer(sc)
+
+    def entry(eid: str, ref: str, person: str = "p-olivier", skill: str = "SK-OD") -> GuildEvidence:
+        return GuildEvidence(id=eid, personId=person, skillId=skill, kind="scenario", at=date.today().isoformat(),
+                             source=EvidenceSource(kind="scenario", ref=ref), raw="Practice")
+
+    for e, why in [(entry("e-prac-open", held.id), "still open"), (entry("e-prac-none", "pt-nope"), "not a practice session")]:
+        with pytest.raises(guild.GuildRefused) as caught:
+            guild.write_evidence(e)
+        assert caught.value.rule == "source" and why in caught.value.why
+    held = answer(sc, "Spent medium", session=held, ask=stand_in(CLOSE))
+    for e in [entry("e-prac-skill", held.id, skill="SK-DCW"), entry("e-prac-who", held.id, person="p-sean")]:
+        with pytest.raises(guild.GuildRefused) as caught:
+            guild.write_evidence(e)
+        assert caught.value.rule == "source"
+    observed = entry("e-prac-obs", held.id).model_copy(update={"observerId": "p-sean"})
+    with pytest.raises(guild.GuildRefused) as caught:
+        guild.write_evidence(observed)
+    assert caught.value.rule == "observer"
+
+
+def test_the_turn_endpoint(team, monkeypatch):
+    client = TestClient(app)
+    host = {"Host": "127.0.0.1:8000"}
+    sc = drafted()
+    monkeypatch.setattr(llm, "call", stand_in(reply("why")))
+    r = client.post("/api/practice/turn", json={"scenarioId": sc.id, "personId": "p-olivier", "answer": "Dilute it"}, headers=host)
+    assert r.status_code == 200, r.text
+    assert [t["role"] for t in r.json()["turns"]] == ["trainee", "tutor"]
+    monkeypatch.setattr(llm, "call", stand_in(reply("why", "Is that the first thing you would do?")))
+    r = client.post("/api/practice/turn", json={"scenarioId": sc.id, "sessionId": r.json()["id"], "personId": "p-olivier", "answer": "Yes"}, headers=host)
+    assert r.status_code == 422 and r.json()["detail"].startswith("quantity: ")

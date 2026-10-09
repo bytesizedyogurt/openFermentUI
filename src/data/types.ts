@@ -1475,9 +1475,8 @@ export type GuildRole = 'member' | 'lead' | 'auditor';
 /**
  * Every kind the ledger will hold. Sign-offs and designations come from Guild;
  * runs alone, cosigned runs and deviations from Deposition as the operator
- * completes a step; a lesson passed from Primer, as knowledge nobody signed.
- * Practice arrives with Primer's player, and the service refuses it until
- * then.
+ * completes a step; a lesson passed and a practice session from Primer, each
+ * with nobody watching.
  */
 export type EvidenceKind =
   | 'witnessed'

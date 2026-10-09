@@ -1,5 +1,5 @@
 """Practice — scenarios drafted from the bench, and a tutor that questions the
-trainee's reasoning (OF-BLD-013 §4).
+trainee's reasoning (OF-BLD-013 §4.1, §4.2).
 
 The model drafts a short situation from the steps that need a skill, the
 protocol's materials, and what was recorded at those steps in real runs. The
@@ -36,12 +36,18 @@ from typing import Any, Callable
 
 from . import atomic, guild, intake, llm
 from .models import (
+    EvidenceSource,
+    GuildEvidence,
     Practice,
     PracticeDeposition,
     PracticeDraftRequest,
+    PracticeObservation,
     PracticeScenario,
+    PracticeSession,
     PracticeSource,
     PracticeStepRef,
+    PracticeTurn,
+    PracticeTurnRequest,
     PracticeValue,
     Usage,
 )
@@ -418,3 +424,244 @@ def draft(request: PracticeDraftRequest, *, ask: Ask | None = None) -> PracticeS
         scenario.id, scenario.skillId, len(scenario.evidence), scenario.usage.costUsd,
     )
     return scenario
+
+
+# ── the tutor (§4.2) ───────────────────────────────────────────────────
+#
+# A session is held here, turn by turn: the trainee's answer and the tutor's
+# reply are kept together or not at all. A reply is refused, and the answer
+# with it, when:
+#
+#   scenario    the scenario does not exist
+#   session     the session does not exist, is another scenario's or another
+#               person's, the person cannot hold skills, or another answer
+#               reached it first
+#   closed      the session has closed
+#   answer      the trainee's answer is empty or too long to read
+#   move        the tutor did not close when the last answer was in, or closed
+#               without saying what it observed
+#   quantity    the tutor wrote a number, as for drafts
+#   unresolved  the tutor marked a [vN] past the evidence pane
+#   steps       the tutor named a step that does not exist
+#
+# When a session closes for a person on Guild's ledger, guild.write_evidence
+# records it as practice on their skill: no observer, and the session's id as
+# its source, so an assessor can read every word of it.
+
+MAX_ANSWERS = 3
+MAX_ANSWER_CHARS = 2000
+TURN_TOKENS = 4000
+
+TUTOR_SYSTEM = """You are the tutor in openFerment's Primer. A trainee \
+operator in a bioprocess lab is working through a practice scenario on one \
+skill. You see the scenario, the evidence pane with the values the trainee \
+sees, the points a sound answer would reach, the protocol steps involved, and \
+the conversation so far, ending with the trainee's latest answer.
+
+Your job is to make the trainee's reasoning visible, in short turns. Choose \
+one move:
+  why     ask them to explain the reason behind what they said
+  change  change one condition in the situation and ask what follows
+  next    ask what they would check or do next
+  close   end the session
+Write one or two sentences and ask one question. While the session is open, \
+keep the answer to yourself: when the trainee is wrong, a question that \
+exposes the gap teaches more than a correction.
+
+When you close, write what you observed in `observed`: plain sentences an \
+assessor can read, each naming the protocol steps it bears on, saying what \
+the trainee reasoned soundly and what they missed or were unsure of. In the \
+closing `text`, tell the trainee briefly what to look at again. There is no \
+score and no pass or fail: describe what you saw.
+
+NEVER WRITE A NUMBER. No digits, no number words (one, two, first, second, \
+once, twice, half, double, dozen), no "twofold", no "an order of magnitude". \
+Refer to an item of the evidence pane as [v1], [v2] and so on. The trainee may \
+write numbers; you never repeat them. Identifiers with digits are fine: OD750, \
+PR-OD-01, step c12. A reply with a number in it is discarded whole.
+
+`steps` names the protocol steps your turn bears on, as "PROTOCOL:step"."""
+
+TURN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "move": {"type": "string", "enum": ["why", "change", "next", "close"]},
+        "text": {"type": "string", "description": "One or two sentences to the trainee. No number."},
+        "steps": {"type": "array", "items": {"type": "string"}, "description": 'Steps as "PROTOCOL:step".'},
+        "observed": {
+            "type": "array",
+            "description": "Only when closing: what you observed, for an assessor. Empty otherwise.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "One plain sentence. No number."},
+                    "steps": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["text", "steps"],
+            },
+        },
+    },
+    "required": ["move", "text", "steps", "observed"],
+}
+
+
+def scenario(scenario_id: str) -> PracticeScenario | None:
+    return next((s for s in read().scenarios if s.id == scenario_id), None)
+
+
+def session(session_id: str) -> PracticeSession | None:
+    return next((s for s in read().sessions if s.id == session_id), None)
+
+
+def _learner(person_id: str | None) -> None:
+    if person_id is None:
+        return
+    p = next((x for x in guild.read().people if x.id == person_id), None)
+    if p is None or not p.active or p.role == "auditor":
+        raise PracticeRefused("session", f"{person_id!r} is not an active person on Guild's ledger who can hold skills")
+
+
+def _tutor_payload(sc: PracticeScenario, held: PracticeSession, answer: str, last: bool) -> str:
+    steps = []
+    for ref in sc.steps:
+        text = next(
+            (st["text"] for p in _protocols() if p["protocolId"] == ref.protocolId for st in p["steps"] if st["stepId"] == ref.stepId),
+            "",
+        )
+        steps.append({"ref": f"{ref.protocolId}:{ref.stepId}", "text": text})
+    skill = guild.skills()[sc.skillId]
+    payload = {
+        "skill": {"id": sc.skillId, "name": skill["name"], "assessorWatchesFor": skill["mastery"]},
+        "scenario": {
+            "title": sc.title,
+            "situation": sc.situation,
+            "prompt": sc.prompt,
+            "evidence": [
+                {"marker": f"[{v.id}]", "label": v.label, "text": v.text, "value": v.value, "unit": v.unit} for v in sc.evidence
+            ],
+            "soundAnswerReaches": sc.watchFor,
+            "steps": steps,
+        },
+        "conversation": [{"role": t.role, "text": t.text, **({"move": t.move} if t.move else {})} for t in held.turns],
+        "latestAnswer": answer,
+    }
+    told = (
+        "That was the trainee's last answer: close the session now."
+        if last
+        else "Choose your move. Close early only if the trainee has already shown their reasoning in full."
+    )
+    return told + "\n\n" + json.dumps(payload, ensure_ascii=False)
+
+
+def validate_turn(
+    raw: dict[str, Any] | None, sc: PracticeScenario, *, last: bool, usage: Usage
+) -> tuple[PracticeTurn, list[PracticeObservation]]:
+    if not isinstance(raw, dict):
+        raise PracticeRefused("move", "the tutor returned no reply in the expected form", usage)
+    move = raw.get("move")
+    if move not in ("why", "change", "next", "close"):
+        raise PracticeRefused("move", f"{move!r} is not a move the tutor makes", usage)
+    if last and move != "close":
+        raise PracticeRefused("move", "the trainee's last answer was in, and the tutor did not close", usage)
+    text = str(raw.get("text") or "").strip()
+    if not text:
+        raise PracticeRefused("move", "the tutor's reply is empty", usage)
+    n = len(sc.evidence)
+    check_text("tutor's reply", text, n, usage)
+    steps = check_steps([str(s) for s in raw.get("steps") or []], sc.skillId, usage, need_one=False)
+    observed: list[PracticeObservation] = []
+    if move == "close":
+        for o in raw.get("observed") or []:
+            said = str(o.get("text") or "").strip()
+            if not said:
+                continue
+            check_text("tutor's observation", said, n, usage)
+            observed.append(PracticeObservation(text=said, steps=check_steps([str(s) for s in o.get("steps") or []], sc.skillId, usage, need_one=False)))
+        if not observed:
+            raise PracticeRefused("move", "the tutor closed without saying what it observed", usage)
+    return PracticeTurn(role="tutor", text=text, move=move, steps=steps, at=_now()), observed
+
+
+def _record(held: PracticeSession, sc: PracticeScenario) -> str | None:
+    """Practice on the learner's ledger, when there is a learner. The id of the
+    entry, or None when there is none or the ledger refused it."""
+    if held.personId is None:
+        return None
+    raw = f"Practice, “{sc.title}”. The tutor observed: " + " ".join(o.text for o in held.observed)
+    entry = GuildEvidence(
+        id=f"e-{_id('pt')[3:]}",
+        personId=held.personId,
+        skillId=held.skillId,
+        kind="scenario",
+        outcome="pass",
+        at=held.closedAt[:10] if held.closedAt else _now()[:10],
+        observerId=None,
+        source=EvidenceSource(kind="scenario", ref=held.id),
+        raw=raw,
+    )
+    try:
+        return guild.write_evidence(entry).id
+    except guild.GuildRefused as e:
+        log.warning("practice: %s closed, and the ledger kept nothing (%s)", held.id, e)
+        return None
+
+
+def turn(request: PracticeTurnRequest, *, ask: Ask | None = None) -> PracticeSession:
+    """The trainee's answer and the tutor's reply, kept together, or refused."""
+    sc = scenario(request.scenarioId)
+    if sc is None:
+        raise PracticeRefused("scenario", f"{request.scenarioId!r} is not a practice scenario")
+    answer = request.answer.strip()
+    if len(answer) < 2:
+        raise PracticeRefused("answer", "write an answer before the tutor can question it")
+    if len(answer) > MAX_ANSWER_CHARS:
+        raise PracticeRefused("answer", "the answer is too long to read in one turn; say it in fewer words")
+    _learner(request.personId)
+    if request.sessionId:
+        held = session(request.sessionId)
+        if held is None or held.scenarioId != sc.id:
+            raise PracticeRefused("session", f"{request.sessionId!r} is not a session on this scenario")
+        if held.personId != request.personId:
+            raise PracticeRefused("session", "this session is someone else's")
+        if held.closedAt:
+            raise PracticeRefused("closed", f"{held.id} closed at {held.closedAt}")
+    else:
+        held = PracticeSession(id=_id("pt"), scenarioId=sc.id, skillId=sc.skillId, personId=request.personId, startedAt=_now())
+    answered = sum(1 for t in held.turns if t.role == "trainee")
+    last = answered + 1 >= MAX_ANSWERS
+    result = _call(
+        ask,
+        system=TUTOR_SYSTEM,
+        user=_tutor_payload(sc, held, answer, last),
+        schema=TURN_SCHEMA,
+        max_tokens=TURN_TOKENS,
+        label="practice tutor: ",
+    )
+    reply, observed = validate_turn(result.data, sc, last=last, usage=result.usage)
+
+    with _WRITE_LOCK:
+        practice = read()
+        stored = next((s for s in practice.sessions if s.id == held.id), None)
+        if stored is not None and len(stored.turns) != len(held.turns):
+            raise PracticeRefused("session", "another answer reached this session first; reload it", result.usage)
+        held = held.model_copy(
+            update={
+                "turns": [*held.turns, PracticeTurn(role="trainee", text=answer, at=_now()), reply],
+                "usage": llm.add(held.usage, result.usage),
+            }
+        )
+        if reply.move == "close":
+            held = held.model_copy(update={"observed": observed, "closedAt": _now()})
+        practice.sessions = [s for s in practice.sessions if s.id != held.id] + [held]
+        _persist(practice)
+
+    if held.closedAt:
+        evidence_id = _record(held, sc)
+        if evidence_id:
+            with _WRITE_LOCK:
+                practice = read()
+                held = held.model_copy(update={"evidenceId": evidence_id})
+                practice.sessions = [held if s.id == held.id else s for s in practice.sessions]
+                _persist(practice)
+    log.info("practice: %s %s on %s, $%.4f", held.id, reply.move, sc.id, result.usage.costUsd)
+    return held
