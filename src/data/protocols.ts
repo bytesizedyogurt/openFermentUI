@@ -530,28 +530,33 @@ export const PROTOCOLS: Protocol[] = [
         steps: [
           {
             id: 's1',
+            skills: ['SK-ENV'],
             text: 'Day 1. Set and verify the shaker before any medium is dispensed: 22 °C in the enclosure, continuous illumination measured with the quantum sensor at the working liquid depth, and a shaking speed you have recorded. Record all three on the batch sheet.',
             refs: ['M1'],
             note: 'OF-COR-001 §14 records standard cultivation for this organism as liquid or agar-solidified TAP at 22 °C under continuous light at 50–100 µE m⁻² s⁻¹, mixotrophic. Set the flux inside that band and write down the number you measured, not the number you intended.',
           },
           {
             id: 's2',
+            skills: ['SK-ENV'],
             text: 'Choose the shaking speed for the geometry you are running and keep it modest. Wall-deficient strains are much more susceptible to shear and osmotic stress than the walled wild type, and a seed train is the cheapest place in the process to discover that. Record the speed; it is a process parameter, not a preference.',
             refs: ['B5'],
           },
           {
             id: 's3',
+            skills: ['SK-ASEP'],
             text: 'Dispense {{qty:TAP medium — stage 1 charge}} of TAP medium into the {{qty:250 mL baffled flask with silicone foam plug}} 250 mL baffled flask, plug it, and equilibrate it on the running shaker.',
             timerSec: 3600,
             timerLabel: 'Equilibrate stage 1 medium to 22 °C',
           },
           {
             id: 's4',
+            skills: ['SK-ASEP'],
             text: 'Select one well-isolated green colony 1–2 mm across from the TAP agar plate carrying single colonies ({{qty:TAP agar plate with single colonies}} for this seed train).',
             note: 'Avoid colonies at the plate edge and any colony inside a confluent streak. Both carry a different light and nutrient history from the plate interior, and that history shows up as a longer lag.',
           },
           {
             id: 's5',
+            skills: ['SK-ASEP'],
             text: 'Lift the colony with a sterile loop and swirl the loop in the stage 1 medium until no visible green remains on the plastic. Return the flask to the shaker and note the clock time as the start of stage 1.',
           },
           {
@@ -563,19 +568,23 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 's7',
+            skills: ['SK-OD'],
             text: 'Day 3. Read the OD750 of the stage 1 culture against a TAP medium blank, diluting into the linear range of your instrument and multiplying back. Record the reading; the stage 2 inoculum volume is computed from it.',
           },
           {
             id: 's8',
+            skills: ['SK-OD'],
             text: 'Compute the stage 2 inoculum volume from your measured OD and your chosen starting OD: V_seed (mL) = OD_target × 400 / OD_seed. Reduce the stage 2 medium charge by that volume so the working volume stays at 400 mL.',
             note: 'Pick OD_target from your own growth curve and keep it constant across a campaign. Inoculating high to save a day does not work: above the point where the flask becomes light-limited the culture enters that regime before it has finished its lag, and the fitted growth rate falls.',
           },
           {
             id: 's9',
+            skills: ['SK-ASEP'],
             text: 'Dispense {{qty:TAP medium — stage 2 charge}} of TAP medium, less the computed inoculum volume, into the {{qty:2 L baffled flask with silicone foam plug}} 2 L baffled flask using the {{qty:Sterile 10 mL serological pipettes}} sterile serological pipettes.',
           },
           {
             id: 's10',
+            skills: ['SK-ASEP'],
             text: 'Transfer the computed volume of stage 1 culture into the stage 2 flask, working within 150 mm of the burner. Swirl once, reseat the foam plug and return the flask to the shaker at the recorded speed.',
           },
           {
@@ -586,16 +595,19 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 's12',
+            skills: ['SK-OD'],
             text: 'Day 4. Read OD750 at intervals short enough to place the harvest point on your own curve, and harvest at the OD750 your curve puts in mid-exponential. Do not use a number from this protocol: there isn’t one.',
             refs: ['r-M7-1'],
             note: 'For sampling-interval planning only: the corpus’s single specific-growth-rate record is 0.087 h⁻¹, measured on the walled strain cc124 in TAP with a 0 % CO₂ feed (r-M7-1). It is a different strain in a different flask and it is a planning aid, not a prediction for cw15. Sample at least four times an estimated doubling.',
           },
           {
             id: 's13',
+            skills: ['SK-FACTOR'],
             text: 'Convert the harvest OD to dry cell weight only if you have determined the factor yourself under PR-OD-01. There is no literature factor to fall back on for this strain, so an unconverted OD with its wavelength stated is a more honest seed record than a converted one with a borrowed factor.',
           },
           {
             id: 's14',
+            skills: ['SK-LOG'],
             text: 'Deliver the seed to the production vessel within 30 min of the final reading, at ambient temperature and without centrifugation. Record the harvest OD750, the elapsed time from colony pick, the flask identifier and the measured photon flux on the batch sheet.',
             refs: ['B5'],
             note: 'Do not centrifuge a wall-deficient seed to concentrate it before inoculation. The strain’s shear and osmotic fragility is exactly the property that makes it attractive downstream, and it is a liability here.',
@@ -929,6 +941,7 @@ export const PROTOCOLS: Protocol[] = [
         steps: [
           {
             id: 'o1',
+            skills: ['SK-DCW'],
             text: 'Dry {{qty:Pre-washed 0.7 µm glass-fibre filters}} glass-fibre filters at 105 °C for 2 h, cool them in a desiccator for 30 min and weigh each to 0.1 mg. Record every tare against the filter position in the rack.',
             timerSec: 7200,
             timerLabel: 'Pre-dry filters, 2 h',
@@ -936,47 +949,57 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'o2',
+            skills: ['SK-DCW'],
             text: 'Reserve four tared filters as blanks. They receive the identical wash and dry cycle without sample, and their mean mass change is subtracted from every gravimetric result in the run.',
           },
           {
             id: 'o3',
+            skills: ['SK-OD'],
             text: 'Invert each culture sample three times immediately before reading. Settled cells re-suspend completely, but a sample read well after mixing has already lost absorbance to sedimentation.',
           },
           {
             id: 'o4',
+            skills: ['SK-OD'],
             text: 'Read OD750 in a 10 mm cuvette against {{qty:Spent cell-free medium}} of spent cell-free medium as the blank. Establish the top of your instrument’s linear range once, with a dilution series, and dilute every sample that exceeds it into the same spent medium before reading.',
             note: 'Blank against spent medium from the same culture, not against fresh medium. Above the linear limit, multiple scattering bends the response and the reading stops being proportional to biomass — which is why the dilution is mandatory rather than optional.',
           },
           {
             id: 'o5',
+            skills: ['SK-DCW'],
             text: 'Filter 10 mL of each sample onto its tared filter under 40 kPa of vacuum. Do not let the bed run dry between the sample and the wash, or the retained salt crystallises into the mat and cannot be washed out.',
           },
           {
             id: 'o6',
+            skills: ['SK-DCW'],
             text: 'Wash each filter twice with 10 mL of ammonium formate isotonic with the medium; a full run consumes {{qty:Ammonium formate wash solution}}. Ammonium formate removes medium salts and volatilises in the oven, whereas a deionised water wash lyses wall-deficient cells and loses soluble solids.',
           },
           {
             id: 'o7',
+            skills: ['SK-DCW'],
             text: 'Dry the loaded filters and the blanks at 105 °C for 4 h, then re-weigh after a further hour to confirm the mass has stopped falling.',
             timerSec: 14400,
             timerLabel: 'Dry to constant mass, 4 h',
           },
           {
             id: 'o8',
+            skills: ['SK-DCW'],
             text: 'Compute dry cell weight as (loaded mass − tare − mean blank drift) / 0.010 L. Report in g L⁻¹ to three significant figures and carry the standard deviation of the replicates through to the growth-rate fit.',
           },
           {
             id: 'o9',
+            skills: ['SK-DCW'],
             text: 'Sanity-check the magnitude before you trust it. A mixotrophic TAP batch of walled wild-type CC-137c reached a maximum density of 1.23 ± 0.13 g L⁻¹ within 96 h, and a nutrient-optimised culture 1.68 g L⁻¹; heterotrophic microalgal cultures reach 50–100 g L⁻¹ and autotrophic ones around 30 g L⁻¹. A flask result far outside the low single digits is a weighing artefact until it is repeated.',
             refs: ['r-M5-1', 'r-M8-4', 'r-M8-7', 'r-M8-8'],
           },
           {
             id: 'o10',
+            skills: ['SK-FACTOR'],
             text: 'Regress dry cell weight on OD750 through the origin, over the range in which the residuals show no curvature. Report the slope with its confidence interval, the strain, the wavelength, the growth phase and the number of points behind it, and re-determine it whenever any of those change.',
             note: 'OF-COR-001 holds no OD-to-dry-weight factor for cw15, UVM4 or any other C. reinhardtii strain, so there is no literature default and no fallback. Do not carry a factor across wavelengths either: pigment absorbance inflates the optical reading at 680 nm relative to 750 nm, and the two are not interconvertible by a constant.',
           },
           {
             id: 'o11',
+            skills: ['SK-FACTOR', 'SK-LOG'],
             text: 'Enter the factor in the platform as a user measurement, with the run identifier attached. It is your number, not a literature value, and anything computed from it inherits that provenance.',
           },
         ],
@@ -1999,6 +2022,7 @@ export const PROTOCOLS: Protocol[] = [
         steps: [
           {
             id: 'c1',
+            skills: ['SK-ISOL', 'SK-PRESS'],
             text: 'Isolate the vessel and drain it. Work through the isolation checklist before touching a single fitting.',
             multiCheck: [
               'Controller in manual, all control loops off',
@@ -2011,6 +2035,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c2',
+            skills: ['SK-ASSY'],
             text: 'Strip the vessel. Remove every wetted part and lay it out on a clean tray in the order it came off.',
             multiCheck: [
               'pH and dissolved-oxygen probes removed, rinsed and stored in their keeper solutions',
@@ -2023,17 +2048,20 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c3',
+            skills: ['SK-CIP'],
             text: 'Pre-rinse the vessel body and all removed parts with deionised water at ambient temperature until the effluent runs clear. Budget roughly half of the {{qty:Deionised water for rinsing}} allocated for this cycle to the pre-rinse and the post-rinse together.',
             note: 'Pre-rinse cold. Hot water bakes protein onto the glass and the headplate underside, and no subsequent caustic step fully recovers a baked film.',
           },
           {
             id: 'c4',
+            skills: ['SK-CIP', 'SK-CAUSTIC'],
             text: 'Make up the cleaning solution from {{qty:Alkaline CIP detergent concentrate}} of alkaline detergent concentrate in 5 L of deionised water, heat it to 60 °C and recirculate it through the spray ball and every dead leg for 20 min.',
             timerSec: 1200,
             timerLabel: 'Recirculate alkaline detergent, 20 min',
           },
           {
             id: 'c5',
+            skills: ['SK-CIP', 'SK-CAUSTIC'],
             text: 'Drain the detergent to the neutralisation tank and rinse to neutral. Confirm the rinse is complete before any acid enters the vessel.',
             multiCheck: [
               'Effluent pH within 0.5 units of the incoming deionised water',
@@ -2044,6 +2072,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c6',
+            skills: ['SK-CIP', 'SK-CAUSTIC'],
             text: 'Recirculate {{qty:Phosphoric acid rinse, 1 % v/v}} of 1 % phosphoric acid for 10 min to remove mineral scale from the sparger and the probe ports, then rinse to neutral again with deionised water.',
             timerSec: 600,
             timerLabel: 'Acid rinse, 10 min',
@@ -2051,6 +2080,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c7',
+            skills: ['SK-ASSY'],
             text: 'Inspect and replace the elastomers, drawing on the {{qty:Headplate O-ring set, silicone}} headplate O-ring set and the {{qty:Triclamp gasket set, 25 mm}} triclamp gasket set. Every seal below is replaced on a fixed cycle, not on appearance.',
             multiCheck: [
               'Headplate O-ring replaced and seated square in its groove',
@@ -2063,28 +2093,33 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c8',
+            skills: ['SK-ASSY'],
             text: 'Reassemble in reverse order. Apply {{qty:Silicone grease, food grade}} of food-grade silicone grease sparingly to the probe port threads only, then torque the headplate bolts in a diagonal sequence to the manufacturer figure.',
             note: 'Grease on an O-ring face, rather than on the thread, is a leak path and a contamination site. A trace on the thread is what stops galling on the next disassembly.',
           },
           {
             id: 'c9',
+            skills: ['SK-ASSY', 'SK-LOG'],
             text: 'Refit the impeller and sparger to the configuration recorded for the line this vessel serves, and record which configuration was fitted.',
             refs: ['B5'],
             note: 'For the algal line this is not housekeeping. Cell-wall-deficient strains are much more susceptible to shear than walled strains, so a high-shear impeller left in from a fermentation run is a process change that nobody logged.',
           },
           {
             id: 'c10',
+            skills: ['SK-PROBE'],
             text: 'Service the probes: calibrate the pH electrode with the {{qty:pH calibration buffer sachets, 4.01 and 7.00}} buffer sachets and install it; charge the dissolved-oxygen electrode with {{qty:Dissolved-oxygen probe electrolyte}} of fresh electrolyte, fit a new membrane and install it. Record the pH slope on the vessel log.',
             note: 'A slope that has dropped more than three points since the previous cycle predicts a mid-run pH failure. Replace the electrode now rather than after it has cost a batch.',
           },
           {
             id: 'c11',
+            skills: ['SK-STER', 'SK-PRESS'],
             text: 'Fit the {{qty:0.2 µm inlet air filter}} inlet filter and the {{qty:0.2 µm exhaust filter}} exhaust filter, charge the vessel with 1 L of deionised water, place the {{qty:Biological indicator spore strip}} biological indicator spore strip in the vessel, mark the headplate with {{qty:Autoclave indicator tape}} of indicator tape, and sterilise at 121 °C for 45 min with the vent open.',
             timerSec: 2700,
             timerLabel: 'Sterilise 121 °C, 45 min',
           },
           {
             id: 'c12',
+            skills: ['SK-HOLD'],
             text: 'Cool in the closed chamber to below 80 °C, then hold the sterilised vessel at 30 °C for 24 h as a sterility hold. Incubate the spore strip at 55 °C for 48 h and read it. Release the vessel only when the hold water is clear, the spore strip is negative, and both results are on the vessel log.',
             timerSec: 3600,
             timerLabel: 'Cool below 80 °C',
@@ -2092,6 +2127,7 @@ export const PROTOCOLS: Protocol[] = [
           },
           {
             id: 'c13',
+            skills: ['SK-LOG'],
             text: 'Sign the cycle off on the vessel log: date, operator, detergent lot, elastomer lot, probe slopes, sterilisation cycle number, spore strip result and the configuration fitted at step c9.',
             refs: ['N3'],
             note: 'Keep this log as if it will be read by an assessor, because for a food application it will be. EFSA could not establish the safety of a C. reinhardtii novel food after identifying data gaps across identity, production process, composition and specifications and receiving no reply to repeated requests — a procedural failure, not a finding of harm, and exactly the kind of gap a signed cycle record closes.',

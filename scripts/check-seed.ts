@@ -30,6 +30,7 @@ import {
   UNIT_OPERATIONS,
 } from '../src/data/vocabulary';
 import { PROTOCOLS } from '../src/data/protocols';
+import { FAMILIES, SKILLS, SKILL_BY_ID } from '../src/data/skills';
 import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
@@ -601,6 +602,54 @@ for (const r of RUNBOOKS) {
     fail('lock hash: dropping the measurement schema produced the same digest');
 }
 
+// ── 6e. skills and the steps that need them (OF-BLD-013 §1.1) ──────────
+//
+// Guild's ledger stores skill ids, and the run-mode gate reads a step's tags to
+// decide who may perform it. A tag naming no skill would gate on nothing and
+// say nothing; a prerequisite cycle would hold every skill in it at Learning
+// forever. Both fail here, before anyone's record depends on them.
+{
+  const familyIds = new Set(FAMILIES.map((f) => f.id));
+  const seenSkill = new Set<string>();
+  for (const sk of SKILLS) {
+    if (!/^SK-[A-Z]+$/.test(sk.id)) fail(`skill ${sk.id}: id must be SK- followed by capitals`);
+    if (seenSkill.has(sk.id)) fail(`skill ${sk.id}: duplicate id`);
+    seenSkill.add(sk.id);
+    if (!familyIds.has(sk.family)) fail(`skill ${sk.id}: family "${sk.family}" is not one of the six`);
+    if (!sk.name.trim() || !sk.summary.trim()) fail(`skill ${sk.id}: needs a name and a one-line summary`);
+    if (sk.mastery.length === 0) fail(`skill ${sk.id}: no mastery criteria — an assessor would have nothing to watch for`);
+    for (const m of sk.mastery) if (!m.trim()) fail(`skill ${sk.id}: an empty mastery criterion`);
+    if (!Number.isInteger(sk.recencyDays) || sk.recencyDays < 14)
+      fail(`skill ${sk.id}: recencyDays ${sk.recencyDays} must be a whole number of days, at least 14`);
+    if (!Number.isInteger(sk.supervisedRuns) || sk.supervisedRuns < 0)
+      fail(`skill ${sk.id}: supervisedRuns ${sk.supervisedRuns} must be a whole number, zero or more`);
+    for (const pre of sk.prerequisites) {
+      if (pre === sk.id) fail(`skill ${sk.id}: lists itself as a prerequisite`);
+      else if (!SKILL_BY_ID[pre]) fail(`skill ${sk.id}: prerequisite ${pre} does not resolve`);
+    }
+  }
+  // Prerequisites form a forest: walk each chain and fail on a revisit.
+  const visit = (id: string, path: string[]): void => {
+    if (path.includes(id)) {
+      fail(`skills: prerequisite cycle ${[...path, id].join(' → ')}`);
+      return;
+    }
+    for (const pre of SKILL_BY_ID[id]?.prerequisites ?? []) visit(pre, [...path, id]);
+  };
+  for (const sk of SKILLS) visit(sk.id, []);
+
+  const tagged = new Set<string>();
+  for (const p of PROTOCOLS)
+    for (const v of p.versions)
+      for (const st of v.steps)
+        for (const tag of st.skills ?? []) {
+          if (!SKILL_BY_ID[tag]) fail(`${p.id}@${v.version} step ${st.id}: skill tag ${tag} does not resolve`);
+          tagged.add(tag);
+        }
+  for (const sk of SKILLS)
+    if (!tagged.has(sk.id)) warn(`skill ${sk.id}: no protocol step needs it, so nobody can be gated on it`);
+}
+
 // ── 7. authored clearance findings (OF-BLD-005 §8) ─────────────────────
 //
 // Jurisdiction cells are populated ONLY from this list; everything else reads
@@ -921,6 +970,7 @@ console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) 
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);
 console.log(`  chat flows        ${FLOWS.length}`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
+console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
 
 
 if (warnings.length) {

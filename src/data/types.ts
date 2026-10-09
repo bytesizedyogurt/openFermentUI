@@ -405,6 +405,15 @@ export interface Step {
   multiCheck?: string[];
   note?: string;
   refs?: string[]; // record or paper ids
+  /**
+   * The skills a person needs to perform this step (OF-BLD-013 §1.1), as ids
+   * from `src/data/skills.ts`. Guild's Matrix reads these to say who can run
+   * a protocol, and the run-mode gate reads them to decide whether a step
+   * needs a cosigner. A step with no skills needs no qualification. Versioned
+   * with the protocol, so a new version that changes a step can change what
+   * it asks of the person doing it.
+   */
+  skills?: string[];
 }
 
 export interface ProtocolVersion {
@@ -1382,4 +1391,44 @@ export interface ReviewDecision {
   at: string;
   quote?: string;
   sectionId?: string;
+}
+
+// ── Guild: skills and competence (OF-BLD-013) ──────────────────────────
+//
+// The workforce layer. A Skill is reference data, like a protocol: it lives
+// in src/data/skills.ts and changes by commit. Protocol steps name the skills
+// they need (`Step.skills`). Everything a person has done to earn a skill is
+// an entry in Guild's ledger, and their level on that skill is computed from
+// those entries by `src/engine/competence.ts`. Nothing stores a level.
+
+/** The six trunk families. Working names until the skills content pass. */
+export type SkillFamilyId = 'contamination' | 'vessel' | 'monitoring' | 'qc' | 'records' | 'safety';
+
+export interface SkillFamily {
+  id: SkillFamilyId;
+  name: string;
+  /** Column-header form for the Matrix. */
+  short: string;
+}
+
+export interface Skill {
+  /** `SK-` followed by capitals, stable forever once a ledger names it. */
+  id: string;
+  name: string;
+  family: SkillFamilyId;
+  /** One line on what the skill is, in plain words. */
+  summary: string;
+  /**
+   * What an assessor watches for, each one a behaviour that can be seen at
+   * the bench. A criterion nobody can observe cannot be signed off.
+   */
+  mastery: string[];
+  /** A critical skill is one where a mistake hurts a person or loses a batch. */
+  criticality: 'routine' | 'critical';
+  /** How long a qualification stands without anyone seeing the person perform. */
+  recencyDays: number;
+  /** Cosigned performances needed before a witnessed check can qualify. */
+  supervisedRuns: number;
+  /** Skills that must be at Supervised or above before this one moves past Learning. */
+  prerequisites: string[];
 }
