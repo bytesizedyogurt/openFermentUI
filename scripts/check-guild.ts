@@ -309,6 +309,49 @@ async function main() {
   check('a step that needs no skill writes nothing', s().guild.evidence.length === untagged);
   check('every run entry is one the service would accept, as far as the browser can tell', s().guild.evidence.filter((e) => e.source.kind === 'deposition').every((e) => offlineRefusal(e, s().guild) === null));
 
+  // ── 5. a lesson passed writes to the ledger (OF-BLD-013 §3.2) ───────
+  useStore.setState({
+    serviceUp: false,
+    guild: { version: 1, people: [person('p-lead', 'lead'), person('p-ann'), person('p-tom'), person('p-qa', 'auditor')], evidence: [] },
+    guildPending: [],
+    guildActingId: 'p-tom',
+    learnProgress: {},
+  });
+  const bench = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length >= 2);
+  const plain = s().modules.flatMap((m) => m.lessons).find((l) => (l.skills ?? []).length === 0);
+  check('the seed has a lesson that counts toward skills, and one that counts toward none', !!bench && !!plain);
+  const wrote = await s().recordLessonForGuild(bench!.id);
+  const lessonEntries = () => s().guild.evidence.filter((e) => e.source.kind === 'lesson');
+  check(
+    'a lesson passed writes one knowledge entry per skill, for whoever is learning, with no observer',
+    wrote?.personId === 'p-tom' &&
+      wrote.skills.join() === bench!.skills!.join() &&
+      lessonEntries().length === bench!.skills!.length &&
+      lessonEntries().every((e) => e.kind === 'knowledge' && e.personId === 'p-tom' && e.observerId === null && e.source.ref === bench!.id),
+    lessonEntries().map((e) => [e.skillId, e.kind, e.observerId]),
+  );
+  check('the entries wait for the service like any other write', lessonEntries().every((e) => s().guildPending.includes(e.id)));
+  const after5 = competenceOf(s().guild.evidence, s().guild.people, SKILL_BY_ID, TODAY);
+  check('and put the learner at Learning on each skill, no further', bench!.skills!.every((sk) => statusOf(after5, 'p-tom', sk).level === 1));
+  const both = await Promise.all([s().recordLessonForGuild(bench!.id), s().recordLessonForGuild(bench!.id)]);
+  check('passing it again writes nothing, however the calls overlap', lessonEntries().length === bench!.skills!.length && both.every((r) => r?.skills.length === 0));
+  check('a lesson that counts toward no skill writes nothing', (await s().recordLessonForGuild(plain!.id)) === null);
+  s().guildSetActing('p-qa');
+  check('an auditor learning writes nothing', (await s().recordLessonForGuild(bench!.id)) === null);
+  s().guildSetActing(null);
+  check('nobody chosen writes nothing', (await s().recordLessonForGuild(bench!.id)) === null);
+  s().guildSetActing('p-ann');
+  await s().recordLessonForGuild(bench!.id);
+  check('the next learner gets entries of their own', lessonEntries().filter((e) => e.personId === 'p-ann').length === bench!.skills!.length);
+  check('every lesson entry is one the service would accept, as far as the browser can tell', lessonEntries().every((e) => offlineRefusal(e, s().guild) === null));
+  s().guildLoadSample();
+  const real = s().guild;
+  await s().recordLessonForGuild(bench!.id);
+  check('with the sample shown, a lesson writes to the sample alone', s().guild === real && s().guildSample!.evidence.some((e) => e.source.kind === 'lesson' && e.personId === 'p-sample-eric'));
+  s().guildClearSample();
+  s().completeLesson(bench!.id);
+  check('completing a lesson marks it finished in this browser', s().learnProgress[bench!.id] === true);
+
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);
 }

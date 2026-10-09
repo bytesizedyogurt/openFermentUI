@@ -11,8 +11,9 @@
 //
 //   Reference  papers, protocols, products, vocabulary — never mutated, so
 //              there is nothing to persist. Reloading gets them from source.
-//   Durable    depositions, review decisions, runbook locks, and this
-//              browser's copy of Guild's ledger — must survive.
+//   Durable    depositions, review decisions, runbook locks, this browser's
+//              copy of Guild's ledger, and the lessons finished here — must
+//              survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -107,6 +108,13 @@ export interface DurableSnapshot {
     withdrawals: GuildWithdrawal[];
     actingId: string | null;
   };
+  /**
+   * Lessons finished in this browser, by id (OF-BLD-013 §3.2). Optional for
+   * the same reason as `guild`. What a lesson counts toward a person's skills
+   * lives on the ledger; this only keeps the module map honest across a
+   * refresh.
+   */
+  learnProgress?: Record<string, true>;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

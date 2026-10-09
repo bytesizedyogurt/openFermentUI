@@ -201,8 +201,8 @@ function DemoBanner() {
       <span className="text-signal-warn font-medium">Real literature · modeled economics</span>
       <span className="text-ink-soft hidden sm:inline">
         — papers and values are real and citable. Simulation outputs are illustrative models,
-        not validated economics. Depositions and review decisions survive a refresh; everything
-        else resets.
+        not validated economics. Depositions, review decisions, Guild&rsquo;s ledger and finished
+        lessons survive a refresh; everything else resets.
       </span>
       <a href="#/settings/about" className="text-accent hover:underline hidden md:inline">
         Read the colophon

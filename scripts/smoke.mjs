@@ -619,6 +619,27 @@ async function main() {
       const ledger = await page.locator('body').innerText();
       if (!/Supervised run[\s\S]{0,200}PR-OD-01 · step o1 · cosigned by Eric Habimana/.test(ledger))
         problems.push('completing a cosigned step did not write a supervised run to the ledger');
+      // §3 — a lesson passed in Primer moves its learner from Not started to Learning.
+      await page.evaluate(() => (location.hash = '#/primer/l6-3'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#lesson-learning-as', 'p-sample-olivier');
+      for (const answer of [
+        'Step c2: strip the vessel and find the ingress point',
+        'Clear hold water, a negative spore strip, and both results on the vessel log',
+        'A biological indicator spore strip',
+      ]) {
+        await page.locator('button', { hasText: answer }).first().click();
+        await page.getByRole('button', { name: 'Check answer' }).first().click();
+        await page.waitForTimeout(150);
+      }
+      if (!/On Olivier Ndayisaba’s ledger as a lesson passed/.test(await page.locator('main').innerText()))
+        problems.push('a passed lesson does not say it is on the learner’s ledger');
+      await page.evaluate(() => (location.hash = '#/guild/matrix'));
+      await page.waitForTimeout(400);
+      await page.selectOption('#matrix-protocol', 'PR-CIP-01');
+      await page.waitForTimeout(200);
+      if ((await page.locator('button[aria-label="Olivier Ndayisaba, Vessel sterilisation: Learning"]').count()) !== 1)
+        problems.push('a passed lesson did not move its learner to Learning on the Matrix');
       await page.locator('button:has-text("Hide the sample")').click();
       await page.waitForTimeout(200);
       await page.evaluate(() => (location.hash = '#/guild/matrix'));
@@ -642,7 +663,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -656,7 +677,7 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, first person, reload`);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson, first person, reload`);
   if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 

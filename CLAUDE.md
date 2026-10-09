@@ -203,15 +203,23 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   step complete. Completing a step writes one entry per skill it needs, once
   per step: a run alone, a cosigned run or a deviation
   (`recordStepForGuild` in `src/store.ts`). Holding a step waits for Phase 5.
+- **A lesson passed is Learning, and goes no further.** A lesson that names
+  skills (`Lesson.skills`) writes one knowledge entry per skill, with no
+  observer, for whoever is learning when its checkpoint is passed
+  (`recordLessonForGuild`). Supervised needs an assessor's training sign-off
+  (`source.kind === 'signoff'`), in `competence.ts` and its mirror alike. Such
+  a lesson states no quantity of its own: its numbers arrive through the
+  `skill-steps` embed, read live from the protocols, and `check:seed` holds
+  its prose and questions to that.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.
 
 ## Persistence tiers
 
-- The **Durable** tier persists depositions, review decisions, runbook locks
-  and this browser's copy of Guild's ledger with what it still owes the
-  service across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+- The **Durable** tier persists depositions, review decisions, runbook locks,
+  this browser's copy of Guild's ledger with what it still owes the service,
+  and the lessons finished here across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —

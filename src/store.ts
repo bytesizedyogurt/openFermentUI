@@ -522,6 +522,13 @@ export interface OFState {
    * the level it needs. Returns how many deviations it wrote.
    */
   recordStepForGuild: (runId: string, stepId: string) => Promise<number>;
+  /**
+   * A lesson's checkpoint was just passed (OF-BLD-013 §3.2). Writes one
+   * knowledge entry per skill the lesson counts toward, for whoever is
+   * signing in Guild, once per person, lesson and skill. Null when the lesson
+   * counts toward no skill or nobody who can hold skills is signing.
+   */
+  recordLessonForGuild: (lessonId: string) => Promise<{ personId: string; skills: string[] } | null>;
   guildLoadSample: () => void;
   guildClearSample: () => void;
   /** Post what this browser made offline, then take the service's ledger as the truth. */
@@ -2088,6 +2095,10 @@ export const useStore = create<OFState>()((set, get) => ({
     })),
 
   // ── learn ────────────────────────────────────────────────────────────
+  // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
+  // remembers which lessons were finished here across a refresh. Whether a
+  // person has passed one is the ledger's question, answered by
+  // `recordLessonForGuild` at the moment the checkpoint is passed.
   completeLesson: (lessonId) =>
     set((s) => ({ learnProgress: { ...s.learnProgress, [lessonId]: true } })),
 
@@ -2235,6 +2246,9 @@ export const useStore = create<OFState>()((set, get) => ({
         guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
         guildActingId: snap.guild?.actingId ?? s.guildActingId,
         guildHydrated: true,
+        // §3.2 — lessons finished in this browser. Anything finished since the
+        // page loaded is kept beside what the snapshot remembers.
+        learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2653,6 +2667,43 @@ export const useStore = create<OFState>()((set, get) => ({
     return deviations;
   },
 
+  recordLessonForGuild: async (lessonId) => {
+    const s = get();
+    const lesson = s.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
+    const counts = lesson?.skills ?? [];
+    const personId = runOperatorDefault(s);
+    if (!lesson || counts.length === 0 || !personId) return null;
+    const ledger = guildView(s);
+    const missing = counts.filter(
+      (skillId) =>
+        !ledger.evidence.some(
+          (e) =>
+            e.personId === personId &&
+            e.skillId === skillId &&
+            e.kind === 'knowledge' &&
+            e.source.kind === 'lesson' &&
+            e.source.ref === lessonId &&
+            !e.withdrawnAt,
+        ),
+    );
+    // Every entry is applied before the first post is awaited, so a second
+    // call made meanwhile finds them and writes nothing.
+    const writes = missing.map((skillId) =>
+      get().guildRecord({
+        personId,
+        skillId,
+        kind: 'knowledge',
+        outcome: 'pass',
+        at: localToday(),
+        observerId: null,
+        source: { kind: 'lesson', ref: lessonId },
+        raw: `Primer lesson ${lessonId}, \u201c${lesson.title}\u201d: every checkpoint question answered correctly`,
+      }),
+    );
+    await Promise.all(writes);
+    return { personId, skills: missing };
+  },
+
   syncGuild: async () => {
     if (guildSyncing) return;
     guildSyncing = true;
@@ -2841,6 +2892,7 @@ function snapshotOf(s: OFState): DurableSnapshot {
       withdrawals: s.guildPendingWithdrawals,
       actingId: s.guildActingId,
     },
+    learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
   };
 }
 
@@ -2855,7 +2907,8 @@ if (durableAvailable()) {
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
-      s.guildActingId === prev.guildActingId
+      s.guildActingId === prev.guildActingId &&
+      s.learnProgress === prev.learnProgress
     )
       return;
     saveDurable(snapshotOf(s));

@@ -794,9 +794,10 @@ function CorpusSection() {
         <p className="text-body mt-2">
           This also clears the durable store in this browser, so{' '}
           <span className="font-num">{depositions.length}</span> deposition
-          {depositions.length === 1 ? '' : 's'}, every review decision, and every runbook lock are
-          discarded — including the ones that would otherwise survive a refresh. A reset that left
-          them behind would restore itself on the next reload.
+          {depositions.length === 1 ? '' : 's'}, every review decision, every runbook lock, every
+          lesson finished here, and any Guild entry the service has not yet stored are discarded —
+          including the ones that would otherwise survive a refresh. A reset that left them behind
+          would restore itself on the next reload.
         </p>
         <div className="text-caption text-ink-soft mt-2">
           Currently in session: <span className="font-num">{records.length}</span> records,{' '}

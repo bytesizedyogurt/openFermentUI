@@ -58,16 +58,17 @@ export function nameOf(ctx: Pick<GuildContext, 'personById'>, id: string | null 
 
 // ── header ─────────────────────────────────────────────────────────────
 
-function ActingAs({ id }: { id: string }) {
+/** Who is signing, or learning: one choice shared by Guild, run mode and Primer. */
+export function ActingAs({ id, label = 'Acting as' }: { id: string; label?: string }) {
   const { guild, actingId } = useGuild();
   const setActing = useStore((s) => s.guildSetActing);
   if (guild.people.length === 0) return null;
   return (
     <label className="flex items-center gap-2 text-caption text-ink-soft">
-      <span className="hidden sm:inline">Acting as</span>
+      <span className="hidden sm:inline">{label}</span>
       <select
         id={id}
-        aria-label="Acting as"
+        aria-label={label}
         className="input py-1 max-w-[240px]"
         value={actingId ?? ''}
         onChange={(e) => setActing(e.target.value || null)}

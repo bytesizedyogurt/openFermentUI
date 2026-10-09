@@ -1104,12 +1104,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'Under PR-OD-01, what is an OD750 reading blanked against?',
             kind: 'mc',
             options: [
-              'Spent cell-free medium from the same culture',
               'Fresh medium from the same batch',
+              'Spent cell-free medium from the same culture',
               'Deionised water',
               'An empty cuvette',
             ],
-            answerIndex: 0,
+            answerIndex: 1,
             explanation:
               'Step o4 names spent cell-free medium from the same culture, and its note rules out fresh medium. A sample that needs diluting goes into that same spent medium, so the blank and the diluent match.',
           },
@@ -1118,12 +1118,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'A sample reads above the top of your instrument’s linear range. What does PR-OD-01 ask for?',
             kind: 'mc',
             options: [
-              'Dilute it into the same spent medium and read it again',
               'Record the reading with a note that it is high',
               'Read it at a different wavelength',
+              'Dilute it into the same spent medium and read it again',
               'Subtract the blank a second time',
             ],
-            answerIndex: 0,
+            answerIndex: 2,
             explanation:
               'Above the linear limit, multiple scattering bends the response and the reading stops being proportional to biomass. Step o4 makes the dilution mandatory for that reason.',
           },
@@ -1146,12 +1146,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'What are the tared blank filters in step o2 for?',
             kind: 'mc',
             options: [
-              'Their mean mass change is subtracted from every gravimetric result in the run',
               'They replace any filter that tears during filtration',
               'They calibrate the balance before weighing',
               'They hold the wash solution between samples',
+              'Their mean mass change is subtracted from every gravimetric result in the run',
             ],
-            answerIndex: 0,
+            answerIndex: 3,
             explanation:
               'The blanks go through the identical wash and dry cycle with no sample on them. The mass they gain or lose is drift every filter shares, and step o8 subtracts it.',
           },
@@ -1177,12 +1177,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'Why is the pre-rinse in step c3 done with water at ambient temperature?',
             kind: 'mc',
             options: [
-              'Hot water bakes protein onto the glass and the headplate, and no caustic step fully recovers a baked film',
               'Hot water would damage the spray ball',
               'Cold water uses less deionised water',
+              'Hot water bakes protein onto the glass and the headplate, and no caustic step fully recovers a baked film',
               'The detergent works only on a cold vessel',
             ],
-            answerIndex: 0,
+            answerIndex: 2,
             explanation:
               'The note on step c3 says it plainly: pre-rinse cold. A baked protein film survives every step that follows it.',
           },
@@ -1191,12 +1191,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'What must be confirmed before any acid enters the vessel?',
             kind: 'mc',
             options: [
-              'The rinse after the detergent has reached neutral',
               'The probes have been calibrated',
+              'The rinse after the detergent has reached neutral',
               'The vessel has cooled to room temperature',
               'The elastomers have been replaced',
             ],
-            answerIndex: 0,
+            answerIndex: 1,
             explanation:
               'Step c5 drains the detergent and rinses to neutral, and asks you to confirm the rinse is complete before any acid enters. Alkaline detergent and acid meeting in the vessel is the hazard that confirmation prevents.',
           },
@@ -1205,12 +1205,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'When may the phosphoric acid rinse in step c6 be skipped?',
             kind: 'mc',
             options: [
-              'Only when the last run was a photobioreactor batch on TAP',
               'Whenever the vessel looks clean after the detergent',
               'After any mineral-salts fermentation',
               'When the detergent cycle ran longer than planned',
+              'Only when the last run was a photobioreactor batch on TAP',
             ],
-            answerIndex: 0,
+            answerIndex: 3,
             explanation:
               'The note on step c6 allows the skip after a photobioreactor batch on TAP and forbids it after a mineral-salts fermentation, where calcium and magnesium sulfate scale forms under the sparger within one campaign.',
           },
@@ -1236,12 +1236,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'A vessel fails its sterility hold after a passing spore strip. Where does it go back to?',
             kind: 'mc',
             options: [
-              'Step c2: strip the vessel and find the ingress point',
               'Step c11: sterilise it again',
+              'Step c2: strip the vessel and find the ingress point',
               'Step c12: extend the hold',
               'Nowhere: the spore strip result releases it',
             ],
-            answerIndex: 0,
+            answerIndex: 1,
             explanation:
               'A failed hold after a passing spore strip means something got in after sterilisation. Sterilising again would pass again while the ingress point remains, so the note on step c12 sends the vessel back to c2.',
           },
@@ -1250,12 +1250,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             prompt: 'What releases the vessel at step c12?',
             kind: 'mc',
             options: [
-              'Clear hold water, a negative spore strip, and both results on the vessel log',
               'A completed sterilisation cycle',
               'Indicator tape that has changed colour',
+              'Clear hold water, a negative spore strip, and both results on the vessel log',
               'A negative spore strip on its own',
             ],
-            answerIndex: 0,
+            answerIndex: 2,
             explanation:
               'Step c12 asks for all three. The tape and a finished cycle say the cycle ran; the hold and the spore strip are the two results the release rests on, and the log is where an assessor will look for them.',
           },
@@ -1263,7 +1263,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
             id: 'c6-3-3',
             prompt: 'What goes into the vessel with the water charge at step c11 so the cycle can be judged afterwards?',
             kind: 'mc',
-            options: ['A biological indicator spore strip', 'The pH electrode', 'The impeller', 'A sample of detergent'],
+            options: [
+              'A biological indicator spore strip',
+              'The pH electrode',
+              'The impeller',
+              'A sample of detergent',
+            ],
             answerIndex: 0,
             explanation:
               'The spore strip rides through the cycle inside the vessel and is incubated and read at step c12, where its result is one of the two the release rests on.',
