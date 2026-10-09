@@ -107,9 +107,9 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Nineteen stages, in order: check:secrets → typecheck → check:plan →
+  green.** Twenty stages, in order: check:secrets → typecheck → check:plan →
   check:reference → test:core → check:seed → check:biorepo → test:export →
-  check:anchors → check:store → check:lock → check:capture → build →
+  check:anchors → check:store → check:guild → check:lock → check:capture → build →
   test:durable → test:deposition → test:reconcile → test:smoke → test:golden →
   test:deep. Live tests are `pnpm test:live` and never in verify.
 - `check:biorepo` brings its OWN export (OF-BLD-012.1 F5): it runs
@@ -177,10 +177,30 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   settled by the later `at`, compared as moments. `test_merge_biorepo` runs
   all of it through real git.
 
+## Guild's ledger (OF-BLD-013)
+
+- **A level is computed, never stored.** `competenceOf` in
+  `src/engine/competence.ts` derives every person's level on every skill from
+  the ledger's entries, with `today` passed in. No screen, service field or
+  model output holds a level. `pnpm check:guild` holds the ladder still.
+- **The rules live in `guild.py`, and the browser asks them.** Every write to
+  `core/data/guild.json` goes through `write_person`, `write_evidence` or
+  `withdraw`; `POST /api/guild/check` runs the entry rules and writes nothing.
+  `offlineRefusal` in `src/lib/guild.ts` is the OFFLINE FALLBACK and says so;
+  do not grow it into a second copy of the rules.
+- **`core/data/guild.json` never enters git.** It is personnel data and the
+  repository is public. Skills and step tags are TypeScript seed
+  (`src/data/skills.ts`, `Step.skills`) and reach Python as `skills.json`,
+  written beside `corpus.json` by `pnpm export:corpus`.
+- **The sample team is invented and stays in the browser.** `guildSample` is
+  shown in place of the ledger while loaded; nothing in it is posted, written
+  to `guild.json` or kept in the Durable tier.
+
 ## Persistence tiers
 
-- The **Durable** tier persists depositions, review decisions and runbook
-  locks across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+- The **Durable** tier persists depositions, review decisions, runbook locks
+  and this browser's copy of Guild's ledger with what it still owes the
+  service across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —

@@ -20,7 +20,8 @@ const PORT = 4319;
  * the seed. Serving both here exercises the real hydration path on every
  * route, with an overlay fixture whose B5 text is the structural JATS
  * document the Python parser is tested against — a made-up article shape, not
- * a paper, labelled as such in the file. Nothing else under /api exists.
+ * a paper, labelled as such in the file. Guild's endpoints (OF-BLD-013) are a
+ * double that stores and echoes. Nothing else under /api exists.
  */
 const OVERLAY_FIXTURE = join(process.cwd(), 'core/tests/fixtures/overlay-smoke.json');
 const HEALTH = JSON.stringify({
@@ -39,6 +40,14 @@ const REVIEWER = 'Sam Okonkwo';
 const decisions = [];
 /** Questions the double received on POST /api/biorepo/check (OF-BLD-012.1 F1.5). */
 const checks = [];
+/**
+ * Guild's ledger as the double holds it (OF-BLD-013). It stores what it is
+ * sent and echoes it back with the stamps the service adds; the rules are
+ * guild.py's, tested in core/tests/test_guild.py, so the double refuses
+ * nothing. `guildPosts` is what the browser sent, in order.
+ */
+const guildLedger = { version: 1, people: [], evidence: [] };
+const guildPosts = [];
 
 const server = createServer(async (req, res) => {
   try {
@@ -74,6 +83,32 @@ const server = createServer(async (req, res) => {
         : { ok: true, rule: null, why: null };
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(refused));
+    }
+    if (url === '/api/guild' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(guildLedger));
+    }
+    if (url.startsWith('/api/guild/') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const sent = JSON.parse(body);
+      guildPosts.push({ url, body: sent });
+      let stored = sent;
+      if (url === '/api/guild/people') {
+        stored = { ...sent, addedAt: new Date().toISOString() };
+        guildLedger.people = [...guildLedger.people.filter((p) => p.id !== sent.id), stored];
+      } else if (url === '/api/guild/evidence') {
+        stored = { ...sent, recordedAt: new Date().toISOString() };
+        guildLedger.evidence.push(stored);
+      } else if (url === '/api/guild/withdraw') {
+        const e = guildLedger.evidence.find((x) => x.id === sent.evidenceId);
+        stored = { ...e, withdrawnAt: sent.at, withdrawnBy: sent.by, withdrawReason: sent.reason };
+        guildLedger.evidence = guildLedger.evidence.map((x) => (x.id === sent.evidenceId ? stored : x));
+      } else if (url === '/api/guild/check') {
+        stored = { ok: true, rule: null, why: null };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(stored));
     }
     if (url === '/api/biorepo/overlay') {
       // Answered late on purpose: a screen mounted before the overlay arrives

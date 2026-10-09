@@ -32,6 +32,10 @@ import type {
   TimerState,
   Overlay,
   FetchResult,
+  Guild,
+  GuildEvidence,
+  GuildPerson,
+  GuildWithdrawal,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -60,6 +64,18 @@ import {
 import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
 import { postdocHealth } from '@/lib/postdoc';
+import {
+  EMPTY_GUILD,
+  GuildRefused,
+  loadGuild,
+  newEvidenceId,
+  personIdFor,
+  postEvidence,
+  postPerson,
+  postWithdrawal,
+} from '@/lib/guild';
+import { sampleGuild } from '@/data/guildSample';
+import { localToday } from '@/engine/competence';
 
 export type Theme = 'bench' | 'night';
 export type Density = 'comfortable' | 'dense';
@@ -468,6 +484,37 @@ export interface OFState {
   /** Post every decision this browser made that the service lacks or has an older one of (§7.3). */
   syncDecisions: () => Promise<void>;
 
+  // ── Guild: the competence ledger (OF-BLD-013 §1.3) ────────────────────
+  /**
+   * The ledger as this browser knows it: the service's when it answers,
+   * otherwise what the Durable tier kept. Levels are computed from it by
+   * `competenceOf` wherever a screen needs them; nothing here stores one.
+   */
+  guild: Guild;
+  /** People and entries made here that the service has not stored yet, by id. */
+  guildPending: string[];
+  /** Withdrawals made here that the service has not stored yet. */
+  guildPendingWithdrawals: GuildWithdrawal[];
+  /** Who is signing, as chosen in Guild's header. A claim, until there is sign-in. */
+  guildActingId: string | null;
+  /**
+   * The invented sample team, shown in place of the ledger while set. Never
+   * posted, never in the Durable tier; a reload drops it.
+   */
+  guildSample: Guild | null;
+  guildSampleActingId: string | null;
+  /** Whether the Durable tier's copy of the ledger has been read this session. */
+  guildHydrated: boolean;
+  guildAddPerson: (input: Pick<GuildPerson, 'name' | 'title' | 'role' | 'joinedAt'>) => Promise<GuildPerson | null>;
+  guildUpdatePerson: (person: GuildPerson) => Promise<GuildPerson | null>;
+  guildRecord: (entry: Omit<GuildEvidence, 'id' | 'recordedAt'>) => Promise<GuildEvidence | null>;
+  guildWithdraw: (evidenceId: string, reason: string) => Promise<boolean>;
+  guildSetActing: (id: string | null) => void;
+  guildLoadSample: () => void;
+  guildClearSample: () => void;
+  /** Post what this browser made offline, then take the service's ledger as the truth. */
+  syncGuild: () => Promise<void>;
+
   // misc
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
@@ -654,6 +701,14 @@ export const useStore = create<OFState>()((set, get) => ({
 
   reviewer: '',
   setReviewerName: (name) => set({ reviewer: name }),
+
+  guild: EMPTY_GUILD,
+  guildPending: [] as string[],
+  guildPendingWithdrawals: [] as GuildWithdrawal[],
+  guildActingId: null as string | null,
+  guildSample: null as Guild | null,
+  guildSampleActingId: null as string | null,
+  guildHydrated: false,
 
   toast: (t) => {
     const id = nextId('toast');
@@ -2117,7 +2172,8 @@ export const useStore = create<OFState>()((set, get) => ({
   hydrateDurable: async () => {
     const snap = await loadDurable();
     if (!snap) {
-      set({ durableReady: durableAvailable() });
+      set({ durableReady: durableAvailable(), guildHydrated: true });
+      if (get().serviceUp) void get().syncGuild();
       return;
     }
     set((s) => {
@@ -2155,8 +2211,16 @@ export const useStore = create<OFState>()((set, get) => ({
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
         reviewer: snap.reviewerName ?? '',
+        // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
+        // it still owes the service. Older snapshots predate the field.
+        guild: snap.guild?.ledger ?? s.guild,
+        guildPending: snap.guild?.pending ?? [],
+        guildPendingWithdrawals: snap.guild?.withdrawals ?? [],
+        guildActingId: snap.guild?.actingId ?? s.guildActingId,
+        guildHydrated: true,
       };
     });
+    if (get().serviceUp) void get().syncGuild();
     // Both sides are known once the overlay is in too; whichever hydrate
     // finishes second pushes the browser's later decisions to the service.
     if (get().serviceUp && get().overlay) void get().syncDecisions();
@@ -2294,6 +2358,7 @@ export const useStore = create<OFState>()((set, get) => ({
     set({ serviceUp: true });
     get().applyOverlay(overlay);
     if (get().durableReview) void get().syncDecisions();
+    if (get().guildHydrated) void get().syncGuild();
   },
 
   focusReview: (recordId) => {
@@ -2390,6 +2455,169 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
+  // ── Guild (OF-BLD-013 §1.3) ─────────────────────────────────────────
+  //
+  // Every write is applied here first, then posted. The service stores it or
+  // refuses it with a rule: a refusal takes the write back out and says why;
+  // no service keeps it, marked pending, for `syncGuild` to post later. While
+  // the sample team is shown, writes touch the sample and nothing else.
+
+  guildAddPerson: async (input) => {
+    const s = get();
+    const ledger = s.guildSample ?? s.guild;
+    const person: GuildPerson = {
+      id: personIdFor(input.name, ledger.people.map((p) => p.id)),
+      name: input.name.trim(),
+      title: input.title.trim(),
+      role: input.role,
+      joinedAt: input.joinedAt,
+      active: true,
+      addedBy: ledger.people.length === 0 ? null : actingIdOf(s),
+      addedAt: new Date().toISOString(),
+    };
+    if (s.guildSample) {
+      set({ guildSample: { ...s.guildSample, people: [...s.guildSample.people, person] } });
+      return person;
+    }
+    set({ guild: { ...s.guild, people: [...s.guild.people, person] } });
+    if (ledger.people.length === 0 && !s.guildActingId) set({ guildActingId: person.id });
+    return guildPost(set, get, person.id, () => postPerson(person), (stored) => ({
+      guild: { ...get().guild, people: get().guild.people.map((p) => (p.id === person.id ? stored : p)) },
+    }), () => ({ guild: { ...get().guild, people: get().guild.people.filter((p) => p.id !== person.id) } }), person);
+  },
+
+  guildUpdatePerson: async (person) => {
+    const s = get();
+    const changed: GuildPerson = { ...person, updatedBy: actingIdOf(s), updatedAt: new Date().toISOString() };
+    if (s.guildSample) {
+      set({ guildSample: { ...s.guildSample, people: s.guildSample.people.map((p) => (p.id === person.id ? changed : p)) } });
+      return changed;
+    }
+    const before = s.guild.people.find((p) => p.id === person.id);
+    set({ guild: { ...s.guild, people: s.guild.people.map((p) => (p.id === person.id ? changed : p)) } });
+    return guildPost(set, get, person.id, () => postPerson(changed), (stored) => ({
+      guild: { ...get().guild, people: get().guild.people.map((p) => (p.id === person.id ? stored : p)) },
+    }), () => ({
+      guild: { ...get().guild, people: get().guild.people.map((p) => (p.id === person.id && before ? before : p)) },
+    }), changed);
+  },
+
+  guildRecord: async (input) => {
+    const s = get();
+    const entry: GuildEvidence = { ...input, id: newEvidenceId(), recordedAt: null };
+    if (s.guildSample) {
+      set({ guildSample: { ...s.guildSample, evidence: [...s.guildSample.evidence, entry] } });
+      return entry;
+    }
+    set({ guild: { ...s.guild, evidence: [...s.guild.evidence, entry] } });
+    return guildPost(set, get, entry.id, () => postEvidence(entry), (stored) => ({
+      guild: { ...get().guild, evidence: get().guild.evidence.map((e) => (e.id === entry.id ? stored : e)) },
+    }), () => ({ guild: { ...get().guild, evidence: get().guild.evidence.filter((e) => e.id !== entry.id) } }), entry);
+  },
+
+  guildWithdraw: async (evidenceId, reason) => {
+    const s = get();
+    const by = actingIdOf(s);
+    if (!by) {
+      get().toast({ text: 'Choose who you are with Acting as before withdrawing an entry.', kind: 'error' });
+      return false;
+    }
+    const w: GuildWithdrawal = { evidenceId, by, at: localToday(), reason: reason.trim() };
+    const mark = (e: GuildEvidence): GuildEvidence =>
+      e.id === evidenceId ? { ...e, withdrawnAt: w.at, withdrawnBy: by, withdrawReason: w.reason } : e;
+    if (s.guildSample) {
+      set({ guildSample: { ...s.guildSample, evidence: s.guildSample.evidence.map(mark) } });
+      return true;
+    }
+    const before = s.guild.evidence.find((e) => e.id === evidenceId);
+    set({ guild: { ...s.guild, evidence: s.guild.evidence.map(mark) } });
+    const unmark = () => ({
+      guild: { ...get().guild, evidence: get().guild.evidence.map((e) => (e.id === evidenceId && before ? before : e)) },
+    });
+    if (!s.serviceUp) {
+      set((x) => ({ guildPendingWithdrawals: [...x.guildPendingWithdrawals, w] }));
+      return true;
+    }
+    try {
+      const stored = await postWithdrawal(w);
+      set((x) => ({ guild: { ...x.guild, evidence: x.guild.evidence.map((e) => (e.id === evidenceId ? stored : e)) } }));
+      return true;
+    } catch (e) {
+      if (e instanceof GuildRefused) {
+        set(unmark());
+        get().toast({ text: `The service kept that entry (${e.rule}): ${e.why}`, kind: 'error' });
+        return false;
+      }
+      if (e instanceof IntakeDown) {
+        set((x) => ({ serviceUp: false, guildPendingWithdrawals: [...x.guildPendingWithdrawals, w] }));
+        get().toast({ text: 'The service stopped answering. The withdrawal is kept in this browser and sent when it is back.', kind: 'warn' });
+        return true;
+      }
+      throw e;
+    }
+  },
+
+  guildSetActing: (id) => set((s) => (s.guildSample ? { guildSampleActingId: id } : { guildActingId: id })),
+
+  guildLoadSample: () =>
+    set({ guildSample: sampleGuild(localToday()), guildSampleActingId: 'p-sample-eric' }),
+
+  guildClearSample: () => set({ guildSample: null, guildSampleActingId: null }),
+
+  syncGuild: async () => {
+    if (guildSyncing) return;
+    guildSyncing = true;
+    try {
+      if (!get().serviceUp) return;
+      const server = await loadGuild();
+      if (!server) return;
+      const s = get();
+      const pending = new Set(s.guildPending);
+      const refused: string[] = [];
+      let posted = 0;
+      const attempt = async (label: string, post: () => Promise<unknown>): Promise<boolean> => {
+        try {
+          await post();
+          posted += 1;
+          return true;
+        } catch (e) {
+          if (e instanceof GuildRefused) {
+            refused.push(`${label} (${e.rule}: ${e.why})`);
+            return true;
+          }
+          if (e instanceof IntakeDown) {
+            set({ serviceUp: false });
+            return false;
+          }
+          throw e;
+        }
+      };
+      // People first, then entries, then withdrawals: each may name the one before.
+      for (const p of s.guild.people)
+        if (pending.has(p.id) && !(await attempt(p.name, () => postPerson(p)))) return;
+      for (const e of s.guild.evidence)
+        if (pending.has(e.id) && !(await attempt(`${e.kind} on ${e.skillId}`, () => postEvidence(e)))) return;
+      for (const w of s.guildPendingWithdrawals)
+        if (!(await attempt(`withdrawal of ${w.evidenceId}`, () => postWithdrawal(w)))) return;
+      const fresh = (await loadGuild()) ?? server;
+      set({ guild: fresh, guildPending: [], guildPendingWithdrawals: [] });
+      if (posted || refused.length)
+        get().logActivity({
+          at: stamp(),
+          icon: 'upload',
+          text:
+            `${posted} Guild change${posted === 1 ? '' : 's'} made offline sent to the service` +
+            (refused.length ? `; refused and dropped: ${refused.join('; ')}` : ''),
+          href: '#/guild/people',
+          provenance: 'user',
+        });
+      if (refused.length)
+        get().toast({ text: `The service refused ${refused.length} Guild change${refused.length === 1 ? '' : 's'} made offline: ${refused[0]}`, kind: 'error' });
+    } finally {
+      guildSyncing = false;
+    }
+  },
+
   resetDemo: () => {
     // Clear persistence as well as memory. A reset that leaves a durable
     // snapshot behind would restore itself on the next reload, which is the
@@ -2401,12 +2629,78 @@ export const useStore = create<OFState>()((set, get) => ({
     const serviceUp = get().serviceUp;
     set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
     if (overlay) get().applyOverlay(overlay);
+    // Guild's ledger is the service's when there is one, and survives a reset
+    // the way the overlay does; what was only ever in this browser goes.
+    set({
+      guild: serviceUp ? get().guild : EMPTY_GUILD,
+      guildPending: [],
+      guildPendingWithdrawals: [],
+      guildActingId: serviceUp ? get().guildActingId : null,
+      guildSample: null,
+      guildSampleActingId: null,
+    });
+    if (serviceUp) void get().syncGuild();
     get().toast({
       text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
       kind: 'info',
     });
   },
 }));
+
+// ── Guild helpers (OF-BLD-013 §1.3) ────────────────────────────────────
+
+/** The ledger every Guild screen reads: the sample team while it is shown. */
+export function guildView(s: Pick<OFState, 'guild' | 'guildSample'>): Guild {
+  return s.guildSample ?? s.guild;
+}
+
+/** Who is signing: the sample's acting person while the sample is shown. */
+export function actingIdOf(s: Pick<OFState, 'guildSample' | 'guildActingId' | 'guildSampleActingId'>): string | null {
+  return s.guildSample ? s.guildSampleActingId : s.guildActingId;
+}
+
+let guildSyncing = false;
+
+type StoreSet = (partial: Partial<OFState> | ((s: OFState) => Partial<OFState>)) => void;
+
+/**
+ * Post one write that is already applied locally. Stored: replace it with what
+ * the service kept. Refused: take it back out and say which rule. No service:
+ * keep it, pending, for `syncGuild`.
+ */
+async function guildPost<T>(
+  set: StoreSet,
+  get: () => OFState,
+  id: string,
+  post: () => Promise<T>,
+  onStored: (stored: T) => Partial<OFState>,
+  onRefused: () => Partial<OFState>,
+  local: T,
+): Promise<T | null> {
+  const pend = () => set((x) => ({ guildPending: x.guildPending.includes(id) ? x.guildPending : [...x.guildPending, id] }));
+  if (!get().serviceUp) {
+    pend();
+    return local;
+  }
+  try {
+    const stored = await post();
+    set(onStored(stored));
+    return stored;
+  } catch (e) {
+    if (e instanceof GuildRefused) {
+      set(onRefused());
+      get().toast({ text: `The service refused this (${e.rule}): ${e.why}`, kind: 'error' });
+      return null;
+    }
+    if (e instanceof IntakeDown) {
+      set({ serviceUp: false });
+      pend();
+      get().toast({ text: 'The service stopped answering. This is kept in this browser and sent when it is back.', kind: 'warn' });
+      return local;
+    }
+    throw e;
+  }
+}
 
 // ── durable persistence (OF-BLD-006 §4.6) ──────────────────────────────
 //
@@ -2445,6 +2739,12 @@ function snapshotOf(s: OFState): DurableSnapshot {
     reviewDecisions,
     runbookLocks,
     reviewerName: s.reviewer,
+    guild: {
+      ledger: s.guild,
+      pending: s.guildPending,
+      withdrawals: s.guildPendingWithdrawals,
+      actingId: s.guildActingId,
+    },
   };
 }
 
@@ -2455,7 +2755,11 @@ if (durableAvailable()) {
       s.records === prev.records &&
       s.runbooks === prev.runbooks &&
       s.measuredEvidence === prev.measuredEvidence &&
-      s.reviewer === prev.reviewer
+      s.reviewer === prev.reviewer &&
+      s.guild === prev.guild &&
+      s.guildPending === prev.guildPending &&
+      s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
+      s.guildActingId === prev.guildActingId
     )
       return;
     saveDurable(snapshotOf(s));
