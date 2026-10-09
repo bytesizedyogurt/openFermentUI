@@ -192,6 +192,11 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   repository is public. Skills and step tags are TypeScript seed
   (`src/data/skills.ts`, `Step.skills`) and reach Python as `skills.json`,
   written beside `corpus.json` by `pnpm export:corpus`.
+- **The service's one use for a level is mirrored.** Whether a cosigner, or
+  an operator recording a run alone, holds the skill today is decided by
+  `core/openferment_core/competence.py`, a mirror of `competence.ts` held to
+  it by a fixture (`pnpm export:competence-fixtures`, run by `test:core`).
+  When the two disagree, the TypeScript side is right and the mirror is fixed.
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.

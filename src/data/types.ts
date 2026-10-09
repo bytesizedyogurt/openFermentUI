@@ -1442,9 +1442,10 @@ export interface Skill {
 export type GuildRole = 'member' | 'lead' | 'auditor';
 
 /**
- * Every kind the ledger will hold. Phase 1 writes the sign-off kinds and the
- * lead's designation; runs, deviations, lessons and practice arrive with the
- * screens that produce them, and the service refuses them until then.
+ * Every kind the ledger will hold. Sign-offs and designations come from Guild;
+ * runs alone, cosigned runs and deviations from Deposition as the operator
+ * completes a step. Practice arrives with Primer's player, and the service
+ * refuses it until then.
  */
 export type EvidenceKind =
   | 'witnessed'

@@ -422,10 +422,10 @@ class ExtractResponse(BaseModel):
 
 GuildRole = Literal["member", "lead", "auditor"]
 
-# Every kind the ledger will ever hold. Phase 1 writes the sign-off kinds and
-# the lead's designation; the rest arrive with the screens that produce them
-# (Deposition for runs and deviations, Primer for lessons and practice), and
-# `guild.write_evidence` refuses them until then.
+# Every kind the ledger will ever hold. Sign-offs and designations come from
+# Guild; runs alone, cosigned runs and deviations from Deposition as a step is
+# completed. Practice arrives with Primer's player, and `guild.write_evidence`
+# refuses it until then.
 EvidenceKind = Literal[
     "witnessed",
     "supervised",

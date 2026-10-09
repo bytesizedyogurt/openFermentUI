@@ -105,12 +105,19 @@ export function offlineRefusal(e: GuildEvidence, ledger: Guild): { rule: string;
   const person = people.get(e.personId);
   if (!person || !person.active) return { rule: 'person', why: 'pick someone who is active on the ledger' };
   if (person.role === 'auditor') return { rule: 'role', why: `${person.name} is an auditor and holds no skills` };
+  if (e.source.kind === 'deposition' && (e.kind === 'independent' || e.kind === 'deviation')) {
+    // The operator's own record of a run. Whether they hold the skill is the
+    // service's question; the gate only writes `independent` when they do.
+    return e.observerId ? { rule: 'observer', why: 'an operator\u2019s own record of a run names no observer' } : null;
+  }
   const observer = people.get(e.observerId ?? '');
   if (!observer || !observer.active)
     return { rule: 'observer', why: 'choose who you are with Acting as; a sign-off needs a named observer' };
   if (observer.id === person.id) return { rule: 'observer', why: 'nobody signs off their own work' };
   if (e.kind === 'designation') {
     if (observer.role !== 'lead') return { rule: 'authority', why: 'only the lead designates assessors' };
+  } else if (e.source.kind === 'deposition') {
+    // A cosigner: whether they hold the skill today is the service's question.
   } else {
     const designated = ledger.evidence.some(
       (x) =>

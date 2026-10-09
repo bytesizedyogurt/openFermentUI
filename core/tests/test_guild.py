@@ -146,11 +146,10 @@ def test_an_auditor_holds_no_skills():
     refused("role", guild.write_evidence, entry("e-try-1", "p-qa"))
 
 
-def test_kinds_from_later_phases_wait_for_their_screens():
+def test_practice_waits_for_its_screen():
     team()
-    for kind in ("independent", "deviation", "scenario"):
-        why = refused("source", guild.write_evidence, entry(f"e-later-{kind}", "p-patrick", kind=kind))
-        assert "does not write to the ledger yet" in why
+    why = refused("source", guild.write_evidence, entry("e-later-scenario", "p-patrick", kind="scenario"))
+    assert "does not write to the ledger yet" in why
 
 
 def test_a_kind_comes_from_its_own_source():
@@ -292,3 +291,77 @@ def test_the_endpoints():
     ledger = client.get("/api/guild").json()
     assert [p["id"] for p in ledger["people"]] == ["p-sean", "p-eric", "p-patrick"]
     assert [e["id"] for e in ledger["evidence"]] == ["e-desig-eric-od", "e-check-1"]
+
+
+# ── runs from Deposition (OF-BLD-013 §2) ───────────────────────────────
+
+
+def run(eid: str, person_id: str, kind: str, observer: str | None = None, step: str = "o4", **extra) -> GuildEvidence:
+    return entry(
+        eid, person_id, kind=kind, observer=observer,
+        source=EvidenceSource(kind="deposition", ref="PR-OD-01", stepId=step),
+        raw=extra.pop("raw", f"Run dep-1: step {step}"), **extra,
+    )
+
+
+def qualify(person_id: str) -> None:
+    """Train, supervise three times and check someone on OD750, all signed by Eric."""
+    guild.write_evidence(entry(f"e-q-{person_id}-k", person_id, kind="knowledge", raw="Briefed"))
+    for i in range(3):
+        guild.write_evidence(entry(f"e-q-{person_id}-s{i}", person_id, kind="supervised", raw="Beside them"))
+    guild.write_evidence(entry(f"e-q-{person_id}-w", person_id, kind="witnessed"))
+
+
+def test_a_run_alone_needs_the_operator_to_hold_the_skill():
+    team()
+    why = refused("authority", guild.write_evidence, run("e-run-0001", "p-patrick", "independent"))
+    assert "deviation" in why
+    qualify("p-patrick")
+    stored = guild.write_evidence(run("e-run-0002", "p-patrick", "independent"))
+    assert stored.observerId is None and stored.source.kind == "deposition"
+
+
+def test_an_assessor_holds_the_skill_they_assess():
+    team()
+    guild.write_evidence(run("e-run-0001", "p-eric", "independent"))
+
+
+def test_the_operators_own_record_names_no_observer():
+    team()
+    refused("observer", guild.write_evidence, run("e-run-0001", "p-eric", "independent", observer="p-sean"))
+    refused("observer", guild.write_evidence, run("e-run-0002", "p-patrick", "deviation", observer="p-eric"))
+
+
+def test_a_deviation_is_kept_whoever_ran_the_step():
+    team()
+    stored = guild.write_evidence(run("e-run-0001", "p-patrick", "deviation", raw="Ran o4 without a cosigner"))
+    assert stored.kind == "deviation"
+
+
+def test_a_cosigner_has_to_hold_the_skill():
+    team()
+    guild.write_person(person("p-grace", "Grace Ingabire"))
+    refused("authority", guild.write_evidence, run("e-run-0001", "p-patrick", "supervised", observer="p-grace"))
+    qualify("p-grace")
+    guild.write_evidence(run("e-run-0002", "p-patrick", "supervised", observer="p-grace"))
+    refused("observer", guild.write_evidence, run("e-run-0003", "p-grace", "supervised", observer="p-grace"))
+
+
+def test_a_lapsed_cosigner_does_not_hold_the_skill():
+    team()
+    guild.write_person(person("p-grace", "Grace Ingabire"))
+    long_ago = (date.today() - timedelta(days=200)).isoformat()
+    guild.write_evidence(entry("e-old-k", "p-grace", kind="knowledge", raw="Briefed", at=long_ago))
+    for i in range(3):
+        guild.write_evidence(entry(f"e-old-s{i}", "p-grace", kind="supervised", raw="Beside them", at=long_ago))
+    guild.write_evidence(entry("e-old-w", "p-grace", kind="witnessed", at=long_ago))
+    why = refused("authority", guild.write_evidence, run("e-run-0001", "p-patrick", "supervised", observer="p-grace"))
+    assert "does not hold" in why
+
+
+def test_a_run_names_its_step_and_the_step_needs_the_skill():
+    team()
+    refused("source", guild.write_evidence, entry("e-run-0001", "p-eric", kind="independent", observer=None,
+                                                  source=EvidenceSource(kind="deposition", ref="PR-OD-01")))
+    refused("source", guild.write_evidence, run("e-run-0002", "p-eric", "independent", step="o1"))
+    refused("source", guild.write_evidence, entry("e-run-0003", "p-eric", kind="independent", observer=None))

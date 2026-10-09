@@ -1,4 +1,4 @@
-"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2).
+"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1).
 
 core/data/guild.json holds the people on the team and every entry recorded
 about them: a training briefing, a supervised run, a witnessed check, the
@@ -26,14 +26,16 @@ The rules, by name:
   duplicate   an entry id or a new person id is already on the ledger
   person      an entry names a person who is not on the ledger, or not active
   skill       an entry names a skill the projection does not hold
-  source      an entry arrives from a source this phase does not accept, pairs
-              a kind with the wrong source, or names a protocol step that does
-              not carry the skill
-  observer    a sign-off or designation has no observer, an observer who is not
-              an active person, or the person themselves
+  source      an entry pairs a kind with a source that does not produce it,
+              comes from a run without naming its step, or names a protocol
+              step that does not carry the skill
+  observer    a sign-off, designation or cosigned run has no observer, an
+              observer who is not an active person, or the person themselves;
+              or an operator's own record of a run names one
   authority   a sign-off by someone with no assessor designation on the skill,
-              a designation by anyone but the lead, or a withdrawal by anyone
-              but the entry's observer or the lead
+              a cosign by someone who does not hold it, a run alone by someone
+              who does not hold it, a designation by anyone but the lead, or a
+              withdrawal by anyone but the entry's observer or the lead
   outcome     a failed entry of a kind that cannot fail
   note        an entry or a withdrawal with no words to audit
   date        `at` that is not a date, or is later than tomorrow
@@ -57,6 +59,7 @@ from typing import Any
 
 from . import atomic, intake
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
+from .competence import Competence
 from .models import Guild, GuildEvidence, GuildPerson, GuildWithdrawal
 
 log = logging.getLogger("openferment.guild")
@@ -82,17 +85,19 @@ RULES = (
     "evidence",
 )
 
-# What this phase writes (OF-BLD-013 §1). Each kind arrives from exactly one
-# kind of source; the others join this table when their screens do.
-ACCEPTED: dict[str, str] = {
-    "knowledge": "signoff",
-    "supervised": "signoff",
-    "witnessed": "signoff",
-    "designation": "lead",
+# What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
+# §1, §2). A sign-off is an assessor's; a designation is the lead's; a run is
+# Deposition's, recorded as the operator completes a step. Practice joins
+# when Primer's player does.
+ACCEPTED: dict[str, frozenset[str]] = {
+    "knowledge": frozenset({"signoff"}),
+    "supervised": frozenset({"signoff", "deposition"}),
+    "witnessed": frozenset({"signoff"}),
+    "designation": frozenset({"lead"}),
+    "independent": frozenset({"deposition"}),
+    "deviation": frozenset({"deposition"}),
 }
 LATER: dict[str, str] = {
-    "independent": "Deposition run mode",
-    "deviation": "Deposition run mode",
     "scenario": "Primer practice",
 }
 
@@ -289,13 +294,17 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
     kind = entry.kind
     if kind in LATER:
         raise GuildRefused("source", f"{kind} entries arrive from {LATER[kind]}, which does not write to the ledger yet")
-    if ACCEPTED.get(kind) != entry.source.kind:
+    src = entry.source.kind
+    if src not in ACCEPTED.get(kind, frozenset()):
         raise GuildRefused(
             "source",
-            f"a {kind} entry comes from a {ACCEPTED.get(kind, 'different')} source; this one says {entry.source.kind!r}",
+            f"a {kind} entry comes from {' or '.join(sorted(ACCEPTED.get(kind, {'another source'})))}; "
+            f"this one says {src!r}",
         )
     if not entry.source.ref.strip():
         raise GuildRefused("source", "a sign-off names what it rests on: a protocol id or a training record")
+    if src == "deposition" and not entry.source.stepId:
+        raise GuildRefused("source", "an entry from a run names the protocol step it was recorded at")
     if entry.source.stepId:
         tags = step_skills(entry.source.ref, entry.source.stepId)
         if tags is None:
@@ -327,20 +336,45 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
             raise GuildRefused("person", f"{entry.personId!r} is not an active person on the ledger")
         if person.role == "auditor":
             raise GuildRefused("role", f"{person.name} is an auditor; an auditor reads the ledger and holds no skills")
-        observer = people.get(entry.observerId or "")
-        if observer is None or not observer.active:
-            raise GuildRefused("observer", f"a {kind} entry needs an observer who is an active person on the ledger")
-        if observer.id == person.id:
-            raise GuildRefused("observer", "nobody signs off their own work")
-        if kind == "designation":
-            if observer.role != "lead":
-                raise GuildRefused("authority", f"{observer.name} is not the lead; only the lead designates assessors")
-        elif not _assessor_on(ledger, observer.id, entry.skillId):
-            raise GuildRefused(
-                "authority",
-                f"{observer.name} holds no assessor designation on {known[entry.skillId]['name']}, "
-                "so cannot sign it off",
-            )
+        skill_name = known[entry.skillId]["name"]
+
+        def holds(person_id: str) -> bool:
+            return Competence(ledger.evidence, known, date.today().isoformat()).holds(person_id, entry.skillId)
+
+        if kind in ("independent", "deviation"):
+            # The operator's own record of a run: nobody else's name on it.
+            if entry.observerId is not None:
+                raise GuildRefused(
+                    "observer",
+                    f"a {kind} entry is the operator's own record and names no observer; "
+                    "a run with someone beside them is a supervised run",
+                )
+            if kind == "independent" and not holds(person.id):
+                raise GuildRefused(
+                    "authority",
+                    f"{person.name} does not hold {skill_name} today, so a run of it alone is a deviation, "
+                    "or a supervised run with a cosigner",
+                )
+        else:
+            observer = people.get(entry.observerId or "")
+            if observer is None or not observer.active:
+                raise GuildRefused("observer", f"a {kind} entry needs an observer who is an active person on the ledger")
+            if observer.id == person.id:
+                raise GuildRefused("observer", "nobody signs off their own work")
+            if kind == "designation":
+                if observer.role != "lead":
+                    raise GuildRefused("authority", f"{observer.name} is not the lead; only the lead designates assessors")
+            elif src == "deposition":
+                if not holds(observer.id):
+                    raise GuildRefused(
+                        "authority",
+                        f"{observer.name} does not hold {skill_name} today, so cannot cosign it",
+                    )
+            elif not _assessor_on(ledger, observer.id, entry.skillId):
+                raise GuildRefused(
+                    "authority",
+                    f"{observer.name} holds no assessor designation on {skill_name}, so cannot sign it off",
+                )
 
         stored = entry.model_copy(
             update={"raw": entry.raw.strip(), "recordedAt": _now(), "withdrawnAt": None, "withdrawnBy": None, "withdrawReason": None}
