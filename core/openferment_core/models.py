@@ -424,8 +424,9 @@ GuildRole = Literal["member", "lead", "auditor"]
 
 # Every kind the ledger will ever hold. Sign-offs and designations come from
 # Guild; runs alone, cosigned runs and deviations from Deposition as a step is
-# completed. Practice arrives with Primer's player, and `guild.write_evidence`
-# refuses it until then.
+# completed; a lesson passed from Primer, as knowledge nobody signed. Practice
+# arrives with Primer's player, and `guild.write_evidence` refuses it until
+# then.
 EvidenceKind = Literal[
     "witnessed",
     "supervised",

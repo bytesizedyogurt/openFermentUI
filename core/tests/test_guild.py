@@ -1,4 +1,4 @@
-"""guild.py — the competence ledger and its rules (OF-BLD-013 §1.2).
+"""guild.py — the competence ledger and its rules (OF-BLD-013 §1.2, §2.1, §3.1).
 
 Every rule that keeps a bad write off the ledger has a test that presents
 that write and reads the refusal's rule. Then what a good write leaves behind:
@@ -365,3 +365,53 @@ def test_a_run_names_its_step_and_the_step_needs_the_skill():
                                                   source=EvidenceSource(kind="deposition", ref="PR-OD-01")))
     refused("source", guild.write_evidence, run("e-run-0002", "p-eric", "independent", step="o1"))
     refused("source", guild.write_evidence, entry("e-run-0003", "p-eric", kind="independent", observer=None))
+
+
+# ── lessons from Primer (OF-BLD-013 §3.1) ──────────────────────────────
+
+
+def lesson(eid: str, person_id: str, skill: str = "SK-OD", ref: str = "l6-1", **extra) -> GuildEvidence:
+    return entry(
+        eid, person_id, skill=skill, kind="knowledge", observer=extra.pop("observer", None),
+        source=EvidenceSource(kind="lesson", ref=ref),
+        raw=extra.pop("raw", f"Lesson {ref}: every checkpoint question answered correctly"), **extra,
+    )
+
+
+def test_the_projection_says_which_lessons_count_toward_which_skills():
+    assert guild.lesson_skills("l6-1") == ["SK-OD", "SK-DCW"]
+    assert guild.lesson_skills("l0-1") == []
+    assert guild.lesson_skills("nope") is None
+
+
+def test_a_lesson_passed_is_knowledge_with_nobody_watching():
+    team()
+    stored = guild.write_evidence(lesson("e-les-0001", "p-patrick"))
+    assert stored.observerId is None and stored.source.kind == "lesson" and stored.recordedAt
+    why = refused("observer", guild.write_evidence, lesson("e-les-0002", "p-patrick", observer="p-eric"))
+    assert "training sign-off" in why
+
+
+def test_a_lesson_counts_only_toward_the_skills_it_names():
+    team()
+    refused("source", guild.write_evidence, lesson("e-les-0001", "p-patrick", skill="SK-CIP"))
+    refused("source", guild.write_evidence, lesson("e-les-0002", "p-patrick", ref="l0-1"))
+    why = refused("source", guild.write_evidence, lesson("e-les-0003", "p-patrick", ref="l9-9"))
+    assert "no lesson" in why
+
+
+def test_a_lesson_writes_knowledge_and_nothing_else():
+    team()
+    passed = lesson("e-les-0001", "p-patrick")
+    refused("source", guild.write_evidence, passed.model_copy(update={"kind": "supervised"}))
+    refused("source", guild.write_evidence, passed.model_copy(update={"kind": "witnessed"}))
+    refused("outcome", guild.write_evidence, passed.model_copy(update={"outcome": "fail"}))
+
+
+def test_a_lesson_puts_someone_at_learning_and_no_further():
+    team()
+    guild.write_evidence(lesson("e-les-0001", "p-patrick"))
+    level = lambda: guild.Competence(guild.read().evidence, guild.skills(), TODAY).level("p-patrick", "SK-OD")  # noqa: E731
+    assert level() == 1
+    guild.write_evidence(entry("e-brief-0001", "p-patrick", kind="knowledge", raw="Talked the steps back"))
+    assert level() == 2

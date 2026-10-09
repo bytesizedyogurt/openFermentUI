@@ -13,6 +13,11 @@
 //   Learning     anything at all on the ledger for this skill
 //   Not started  nothing
 //
+// "Knowledge signed off" means a training sign-off by an assessor. A lesson
+// passed in Primer is a knowledge entry too, recorded by the machine with
+// nobody watching (OF-BLD-013 §3.1): it puts the person at Learning and
+// leaves the step to Supervised with the assessor who hears them talk it back.
+//
 // Two overlays on Qualified, both of which make the gate treat the person as
 // Supervised until an assessor sees them again:
 //
@@ -56,6 +61,7 @@ export interface CompetenceStatus {
   lastPerformedAt: string | null;
   lapsesAt: string | null;
   supervisedCount: number;
+  /** A training sign-off stands. Lessons passed do not set it; they are counted where they are shown. */
   knowledgeComplete: boolean;
   /** Prerequisites still below Supervised, which hold this skill at Learning. */
   blockedBy: string[];
@@ -98,6 +104,10 @@ export function byWhen(a: GuildEvidence, b: GuildEvidence): number {
 
 const PERFORMED = new Set(['witnessed', 'supervised', 'independent']);
 
+/** Knowledge an assessor signed off. A lesson passed counts toward Learning only. */
+const signedOff = (ev: GuildEvidence[]) =>
+  ev.some((e) => e.kind === 'knowledge' && e.outcome === 'pass' && e.source.kind === 'signoff');
+
 /**
  * Every person's status on every skill. `people` decides who is computed (an
  * auditor holds no skills and is left out); `skills` is the seed.
@@ -128,7 +138,7 @@ export function competenceOf(
     visiting.add(k);
     const ev = byKey.get(k) ?? [];
     const pass = (kind: string) => ev.some((e) => e.kind === kind && e.outcome === 'pass');
-    const knowledge = pass('knowledge');
+    const knowledge = signedOff(ev);
     const supervised = ev.filter((e) => e.kind === 'supervised' && e.outcome === 'pass').length;
     const prereqOK = skill.prerequisites.every((p) => levelOf(personId, p) >= 2);
     let level: Level = 0;
@@ -148,7 +158,7 @@ export function competenceOf(
       const k = key(person.id, skill.id);
       const ev = byKey.get(k) ?? [];
       const level = levelOf(person.id, skill.id);
-      const knowledgeComplete = ev.some((e) => e.kind === 'knowledge' && e.outcome === 'pass');
+      const knowledgeComplete = signedOff(ev);
       const supervisedCount = ev.filter((e) => e.kind === 'supervised' && e.outcome === 'pass').length;
       const performed = ev.filter((e) => PERFORMED.has(e.kind) && e.outcome === 'pass');
       const lastPerformedAt = performed.length ? performed[performed.length - 1].at.slice(0, 10) : null;

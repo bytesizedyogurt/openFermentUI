@@ -25,6 +25,7 @@ import { ONTOLOGY, fieldName } from '../src/data/ontology';
 import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
 import { SKILLS } from '../src/data/skills';
+import { MODULES } from '../src/data/learn';
 import { PROTOCOLS } from '../src/data/protocols';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
@@ -216,11 +217,11 @@ writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2)
 
 /**
  * Guild's projection (OF-BLD-013 §1.2), written beside the corpus as
- * skills.json. `guild.write_evidence` needs to know which skills exist, who an
- * entry may name, and which protocol steps carry which tag; all three live in
- * the TypeScript seed, and this is the same arrangement the corpus uses. It
- * is separate from corpus.json because Postdoc retrieves over the corpus, and
- * a skill definition is no evidence about anything.
+ * skills.json. `guild.write_evidence` needs to know which skills exist, which
+ * protocol steps carry which tag, and which lessons count toward which skill;
+ * all three live in the TypeScript seed, and this is the same arrangement the
+ * corpus uses. It is separate from corpus.json because Postdoc retrieves over
+ * the corpus, and a skill definition is no evidence about anything.
  */
 const guildProjection = {
   skills: SKILLS,
@@ -229,6 +230,9 @@ const guildProjection = {
       v.steps.map((st) => ({ protocolId: p.id, version: v.version, stepId: st.id, skills: st.skills ?? [] })),
     ),
   ),
+  // §3.1 — which lessons count toward which skills, so a knowledge entry
+  // from a lesson names one that does.
+  lessons: MODULES.flatMap((m) => m.lessons.map((l) => ({ lessonId: l.id, skills: l.skills ?? [] }))),
 };
 writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection, null, 2) + '\n');
 

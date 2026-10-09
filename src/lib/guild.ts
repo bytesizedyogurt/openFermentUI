@@ -105,6 +105,11 @@ export function offlineRefusal(e: GuildEvidence, ledger: Guild): { rule: string;
   const person = people.get(e.personId);
   if (!person || !person.active) return { rule: 'person', why: 'pick someone who is active on the ledger' };
   if (person.role === 'auditor') return { rule: 'role', why: `${person.name} is an auditor and holds no skills` };
+  if (e.source.kind === 'lesson') {
+    // Primer's own record of a lesson passed; which lessons count toward
+    // which skills is the service's question.
+    return e.observerId ? { rule: 'observer', why: 'a lesson passed is recorded by Primer and names no observer' } : null;
+  }
   if (e.source.kind === 'deposition' && (e.kind === 'independent' || e.kind === 'deviation')) {
     // The operator's own record of a run. Whether they hold the skill is the
     // service's question; the gate only writes `independent` when they do.

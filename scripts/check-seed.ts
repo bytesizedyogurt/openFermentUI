@@ -648,6 +648,53 @@ for (const r of RUNBOOKS) {
         }
   for (const sk of SKILLS)
     if (!tagged.has(sk.id)) warn(`skill ${sk.id}: no protocol step needs it, so nobody can be gated on it`);
+
+  // §3.1 — lessons that count toward a skill. A passed checkpoint writes a
+  // knowledge entry for each skill the lesson names, so a name that resolves
+  // to nothing would put a person at Learning on a skill that does not exist,
+  // and a lesson with no checkpoint could never be passed. Teaching material
+  // is held to Rule 1 the way claim text is: a lesson that counts toward a
+  // skill states no quantity of its own. Its numbers arrive through the
+  // `skill-steps` and `protocol-card` embeds, read live from the protocols,
+  // so a token carrying a digit must be an identifier (letters first, like
+  // OD750, PR-CIP-01 or c12).
+  const RESERVED_LESSON_IDS = new Set(['path', 'practice']);
+  const lessonIds = new Set<string>();
+  const quantity = (text: string): string | null => {
+    for (const raw of text.match(/\S*\d\S*/g) ?? []) {
+      const token = raw.replace(/^[^\p{L}\d]+/u, '');
+      if (!/^\p{L}/u.test(token)) return raw;
+    }
+    return null;
+  };
+  for (const mod of MODULES)
+    for (const lesson of mod.lessons) {
+      const where = `${mod.id}/${lesson.id}`;
+      if (RESERVED_LESSON_IDS.has(lesson.id))
+        fail(`${where}: "${lesson.id}" is a Primer view (/primer/${lesson.id}), so no lesson may take it as an id`);
+      if (lessonIds.has(lesson.id)) fail(`${where}: lesson id ${lesson.id} is used twice; /primer/<id> must name one lesson`);
+      lessonIds.add(lesson.id);
+      for (const b of lesson.blocks)
+        if (b.kind === 'embed' && b.embed === 'skill-steps' && !SKILL_BY_ID[b.arg ?? ''])
+          fail(`${where}: skill-steps embed names ${b.arg ?? 'nothing'}, which is not a skill`);
+      const skills = lesson.skills ?? [];
+      if (skills.length === 0) continue;
+      if (new Set(skills).size !== skills.length) fail(`${where}: a skill is named twice`);
+      for (const sk of skills) if (!SKILL_BY_ID[sk]) fail(`${where}: skill ${sk} does not resolve`);
+      if (lesson.checkpoint.length === 0)
+        fail(`${where}: counts toward ${skills.join(', ')} but has no checkpoint, so nobody could pass it`);
+      const texts: [string, string][] = [];
+      for (const b of lesson.blocks) if (b.kind === 'prose') texts.push(['prose', b.md]);
+      for (const q of lesson.checkpoint) {
+        texts.push([`${q.id} prompt`, q.prompt], [`${q.id} explanation`, q.explanation]);
+        for (const o of q.options ?? []) texts.push([`${q.id} option`, o]);
+        if (q.kind === 'numeric') fail(`${where}/${q.id}: a lesson that counts toward a skill asks no numeric question of its own`);
+      }
+      for (const [part, text] of texts) {
+        const hit = quantity(text);
+        if (hit) fail(`${where} ${part}: "${hit}" is a quantity in a lesson that counts toward a skill; show it through the protocol instead`);
+      }
+    }
 }
 
 // ── 7. authored clearance findings (OF-BLD-005 §8) ─────────────────────
@@ -971,6 +1018,7 @@ console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} 
 console.log(`  chat flows        ${FLOWS.length}`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
+console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);
 
 
 if (warnings.length) {

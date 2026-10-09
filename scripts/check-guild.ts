@@ -131,6 +131,17 @@ check('a prerequisite below Supervised holds a skill at Learning', held.level ==
 F.push(ev('p-ann', 'SK-OD', 'knowledge', '2026-09-01'), ev('p-ann', 'SK-DCW', 'knowledge', '2026-09-01'));
 check('with both prerequisites at Supervised it moves up', level(F, 'p-ann', 'SK-FACTOR').level === 2);
 
+// §3.1 — a lesson passed is knowledge nobody signed.
+const lessonPassed = (personId: string, skillId: string, ref: string) =>
+  ev(personId, skillId, 'knowledge', '2026-09-03', { observerId: null, source: { kind: 'lesson', ref } });
+const K: GuildEvidence[] = [lessonPassed('p-tom', 'SK-DCW', 'l6-1')];
+const learnt = level(K, 'p-tom', 'SK-DCW');
+check('a lesson passed is Learning, and leaves the training sign-off undone', learnt.level === 1 && !learnt.knowledgeComplete, learnt.level);
+K.push(lessonPassed('p-tom', 'SK-OD', 'l6-1'), ev('p-tom', 'SK-FACTOR', 'knowledge', '2026-09-04'));
+check('lessons passed never satisfy a prerequisite', level(K, 'p-tom', 'SK-FACTOR').blockedBy.join() === 'SK-OD,SK-DCW');
+K.push(ev('p-tom', 'SK-DCW', 'knowledge', '2026-09-05'));
+check('the training sign-off beside it is what makes Supervised', level(K, 'p-tom', 'SK-DCW').level === 2);
+
 // Designation.
 const D: GuildEvidence[] = [ev('p-ann', 'SK-CIP', 'designation', '2026-02-01')];
 const map = competenceOf(D, PEOPLE, SKILLS_MAP, TODAY);

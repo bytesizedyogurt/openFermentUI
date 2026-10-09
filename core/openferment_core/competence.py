@@ -43,6 +43,12 @@ def _when(e: GuildEvidence) -> tuple[str, str, str]:
     return (_day(e.at), e.recordedAt or "", e.id)
 
 
+def _signed_off(ev: list[GuildEvidence]) -> bool:
+    """Knowledge an assessor signed off. A lesson passed is knowledge too, and
+    puts the person at Learning; only the sign-off moves them to Supervised."""
+    return any(e.kind == "knowledge" and e.outcome == "pass" and e.source.kind == "signoff" for e in ev)
+
+
 def _add_days(day: str, n: int) -> str:
     return (date.fromisoformat(day) + timedelta(days=n)).isoformat()
 
@@ -75,7 +81,7 @@ class Competence:
         def passed(kind: str) -> bool:
             return any(e.kind == kind and e.outcome == "pass" for e in ev)
 
-        knowledge = passed("knowledge")
+        knowledge = _signed_off(ev)
         supervised = sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass")
         prereq_ok = all(self.level(person_id, p) >= 2 for p in skill["prerequisites"])
         if passed("designation"):
@@ -109,7 +115,7 @@ class Competence:
             suspended=suspended,
             lapsesAt=lapses_at,
             supervisedCount=sum(1 for e in ev if e.kind == "supervised" and e.outcome == "pass"),
-            knowledgeComplete=any(e.kind == "knowledge" and e.outcome == "pass" for e in ev),
+            knowledgeComplete=_signed_off(ev),
         )
 
     def holds(self, person_id: str, skill_id: str) -> bool:

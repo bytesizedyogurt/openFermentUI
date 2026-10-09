@@ -142,9 +142,15 @@ export const KIND_LABEL: Record<GuildEvidence['kind'], string> = {
   scenario: 'Practice',
 };
 
-/** Strongest tick for what an assessor watched, lightest for a briefing. */
+/** What an entry is called: a lesson passed is knowledge nobody signed. */
+export function kindLabel(e: Pick<GuildEvidence, 'kind' | 'source'>): string {
+  return e.kind === 'knowledge' && e.source.kind === 'lesson' ? 'Lesson passed' : KIND_LABEL[e.kind];
+}
+
+/** Strongest tick for what an assessor watched, lightest for a briefing; a lesson is self-recorded. */
 function tickFor(e: GuildEvidence): string {
   if (e.withdrawnAt) return 'tick tick-unverified';
+  if (e.source.kind === 'lesson') return 'tick tick-user';
   if (e.kind === 'witnessed') return e.outcome === 'fail' ? 'tick tick-rejected' : 'tick tick-measured';
   if (e.kind === 'designation') return 'tick tick-gold';
   if (e.kind === 'supervised' || e.kind === 'independent') return 'tick tick-verified';
@@ -168,12 +174,23 @@ export function EvidenceRow({
   const [reason, setReason] = useState('');
   const mayWithdraw =
     !e.withdrawnAt && !!ctx.acting && (ctx.acting.id === e.observerId || (ctx.acting.role === 'lead' && ctx.acting.active));
-  const src = e.source.kind === 'lead' ? 'Lead' : e.source.stepId ? `${e.source.ref} · step ${e.source.stepId}` : e.source.ref;
+  const src =
+    e.source.kind === 'lead' ? (
+      'Lead'
+    ) : e.source.kind === 'lesson' ? (
+      <a className="text-accent hover:underline" href={href(`/primer/${e.source.ref}`)}>
+        Primer lesson {e.source.ref}
+      </a>
+    ) : e.source.stepId ? (
+      `${e.source.ref} · step ${e.source.stepId}`
+    ) : (
+      e.source.ref
+    );
   return (
     <div className={cx(tickFor(e), 'py-2')}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="font-num text-caption text-ink-soft">{e.at.slice(0, 10)}</span>
-        <span className={cx('font-medium', e.withdrawnAt && 'line-through text-ink-soft')}>{KIND_LABEL[e.kind]}</span>
+        <span className={cx('font-medium', e.withdrawnAt && 'line-through text-ink-soft')}>{kindLabel(e)}</span>
         {e.outcome === 'fail' && <span className="chip text-signal-error border-signal-error/40">not met</span>}
         {showSkill && (
           <a className="chip" href={href(`/guild/skills/${e.skillId}`)}>
@@ -682,7 +699,7 @@ export function exportLedger(ctx: GuildContext, personId: string) {
     .map((e) => [
       e.at.slice(0, 10),
       SKILL_BY_ID[e.skillId]?.name ?? e.skillId,
-      KIND_LABEL[e.kind],
+      kindLabel(e),
       e.outcome,
       nameOf(ctx, e.observerId),
       e.source.stepId ? `${e.source.ref} ${e.source.stepId}` : e.source.ref,

@@ -1,8 +1,8 @@
-"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1).
+"""Guild — the competence ledger, and the only functions that write it (OF-BLD-013 §1.2, §2.1, §3.1).
 
 core/data/guild.json holds the people on the team and every entry recorded
-about them: a training briefing, a supervised run, a witnessed check, the
-lead's designation of an assessor. A person's level on a skill is never
+about them: a passed lesson, a training briefing, a supervised run, a run
+alone, a deviation, a witnessed check, the lead's designation of an assessor. A person's level on a skill is never
 stored. The browser computes it from these entries (src/engine/competence.ts),
 so the ledger only has to be right about what happened and who saw it.
 
@@ -27,11 +27,13 @@ The rules, by name:
   person      an entry names a person who is not on the ledger, or not active
   skill       an entry names a skill the projection does not hold
   source      an entry pairs a kind with a source that does not produce it,
-              comes from a run without naming its step, or names a protocol
-              step that does not carry the skill
+              comes from a run without naming its step, names a protocol
+              step that does not carry the skill, or names a lesson that does
+              not count toward it
   observer    a sign-off, designation or cosigned run has no observer, an
               observer who is not an active person, or the person themselves;
-              or an operator's own record of a run names one
+              or an operator's own record of a run, or a lesson passed, names
+              one
   authority   a sign-off by someone with no assessor designation on the skill,
               a cosign by someone who does not hold it, a run alone by someone
               who does not hold it, a designation by anyone but the lead, or a
@@ -42,9 +44,9 @@ The rules, by name:
   evidence    a withdrawal naming an entry that does not exist or is already
               withdrawn
 
-Nothing is repaired on the way through. The skills and the protocol steps
-that need them live in TypeScript and arrive as skills.json, written by
-`pnpm export:corpus` beside the corpus.
+Nothing is repaired on the way through. The skills, the protocol steps that
+need them and the lessons that count toward them live in TypeScript and
+arrive as skills.json, written by `pnpm export:corpus` beside the corpus.
 """
 from __future__ import annotations
 
@@ -86,11 +88,12 @@ RULES = (
 )
 
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
-# §1, §2). A sign-off is an assessor's; a designation is the lead's; a run is
-# Deposition's, recorded as the operator completes a step. Practice joins
-# when Primer's player does.
+# §1, §2, §3). A sign-off is an assessor's; a designation is the lead's; a run
+# is Deposition's, recorded as the operator completes a step; a lesson passed
+# is Primer's, recorded as the learner answers its last checkpoint question.
+# Practice joins when Primer's player does.
 ACCEPTED: dict[str, frozenset[str]] = {
-    "knowledge": frozenset({"signoff"}),
+    "knowledge": frozenset({"signoff", "lesson"}),
     "supervised": frozenset({"signoff", "deposition"}),
     "witnessed": frozenset({"signoff"}),
     "designation": frozenset({"lead"}),
@@ -148,6 +151,14 @@ def step_skills(protocol_id: str, step_id: str) -> list[str] | None:
         if st["protocolId"] == protocol_id and st["stepId"] == step_id:
             found = (found or []) + [s for s in st["skills"] if s not in (found or [])]
     return found
+
+
+def lesson_skills(lesson_id: str) -> list[str] | None:
+    """The skills a lesson counts toward, or None when Primer has no such lesson."""
+    for lesson in projection().get("lessons", []):
+        if lesson["lessonId"] == lesson_id:
+            return list(lesson["skills"])
+    return None
 
 
 def protocol_ids() -> set[str]:
@@ -315,6 +326,16 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
                 f"{entry.source.ref} step {entry.source.stepId} does not need {entry.skillId}; it needs "
                 + (", ".join(tags) or "no skill"),
             )
+    if src == "lesson":
+        counts = lesson_skills(entry.source.ref)
+        if counts is None:
+            raise GuildRefused("source", f"Primer has no lesson {entry.source.ref}")
+        if entry.skillId not in counts:
+            raise GuildRefused(
+                "source",
+                f"lesson {entry.source.ref} does not count toward {entry.skillId}; it counts toward "
+                + (", ".join(counts) or "no skill"),
+            )
 
     if entry.outcome == "fail" and kind not in CAN_FAIL:
         raise GuildRefused("outcome", f"a {kind} entry records something that happened; only a witnessed check can fail")
@@ -341,7 +362,16 @@ def write_evidence(entry: GuildEvidence, *, dry_run: bool = False) -> GuildEvide
         def holds(person_id: str) -> bool:
             return Competence(ledger.evidence, known, date.today().isoformat()).holds(person_id, entry.skillId)
 
-        if kind in ("independent", "deviation"):
+        if src == "lesson":
+            # Primer records it as the learner passes the checkpoint; nobody
+            # watched, and the entry says so by naming nobody.
+            if entry.observerId is not None:
+                raise GuildRefused(
+                    "observer",
+                    "a lesson passed is recorded by Primer and names no observer; "
+                    "an assessor's briefing is a training sign-off",
+                )
+        elif kind in ("independent", "deviation"):
             # The operator's own record of a run: nobody else's name on it.
             if entry.observerId is not None:
                 raise GuildRefused(

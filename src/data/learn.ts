@@ -1061,4 +1061,221 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
       'Evaluating an agentic pipeline end to end',
     ],
   },
+  // ── OF-BLD-013 §3.1: the bench track ────────────────────────────────
+  //
+  // PLACEHOLDER CONTENT. These lessons exist so a passed checkpoint has a
+  // skill to count toward while the skills content pass is still to come.
+  // They teach from the protocols themselves: the `skill-steps` embed reads
+  // each step live, so every quantity a learner sees is the protocol's own,
+  // and the prose, questions and explanations here carry no number at all
+  // (check:seed holds a lesson that declares skills to that).
+  {
+    id: 'm6',
+    index: 6,
+    title: 'Bench track: the trunk skills (placeholder)',
+    blurb:
+      'Working lessons for the skills Guild tracks, taught from the protocols’ own steps until the skills content pass writes the real ones. A passed checkpoint puts you at Learning on its skills; a training sign-off from an assessor, at the bench, is what moves you to Supervised.',
+    lessons: [
+      {
+        id: 'l6-1',
+        title: 'OD750 and dry cell weight',
+        minutes: 12,
+        skills: ['SK-OD', 'SK-DCW'],
+        blocks: [
+          {
+            kind: 'prose',
+            md: '*Placeholder lesson, to be replaced by the skills content pass.* Until then the lesson is the protocol: every step below is read live from PR-OD-01 and the seed train, so the numbers you see are the protocol’s own.\n\nAn optical density reading takes seconds and estimates biomass from scattered light. A dry cell weight takes most of a day and weighs the biomass itself. A run needs both, because the factor that links them is measured in your lab, on your strain.',
+          },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-OD' },
+          {
+            kind: 'prose',
+            md: 'Two habits carry most of the OD750 steps. Mix each sample right before it is read, because cells settle. Keep every reading inside the instrument’s linear range by diluting into the same spent medium used as the blank.',
+          },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-DCW' },
+          {
+            kind: 'prose',
+            md: 'The dry weight steps protect a small signal. Each filter keeps its own tare, the blanks travel through every wash and dry, and the wash removes salts the oven would otherwise weigh as cells.',
+          },
+          { kind: 'embed', embed: 'protocol-card', arg: 'PR-OD-01' },
+        ],
+        checkpoint: [
+          {
+            id: 'c6-1-1',
+            prompt: 'Under PR-OD-01, what is an OD750 reading blanked against?',
+            kind: 'mc',
+            options: [
+              'Spent cell-free medium from the same culture',
+              'Fresh medium from the same batch',
+              'Deionised water',
+              'An empty cuvette',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Step o4 names spent cell-free medium from the same culture, and its note rules out fresh medium. A sample that needs diluting goes into that same spent medium, so the blank and the diluent match.',
+          },
+          {
+            id: 'c6-1-2',
+            prompt: 'A sample reads above the top of your instrument’s linear range. What does PR-OD-01 ask for?',
+            kind: 'mc',
+            options: [
+              'Dilute it into the same spent medium and read it again',
+              'Record the reading with a note that it is high',
+              'Read it at a different wavelength',
+              'Subtract the blank a second time',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Above the linear limit, multiple scattering bends the response and the reading stops being proportional to biomass. Step o4 makes the dilution mandatory for that reason.',
+          },
+          {
+            id: 'c6-1-3',
+            prompt: 'Why does PR-OD-01 wash the filters with ammonium formate?',
+            kind: 'mc',
+            options: [
+              'It removes medium salts and volatilises in the oven, and it keeps wall-deficient cells intact',
+              'It sterilises the filter before weighing',
+              'It dries faster than water does',
+              'It stains the cells so the filter bed is visible',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Step o6 gives both reasons: the salts would be weighed as cells if they stayed, and a deionised water wash lyses wall-deficient cells and loses soluble solids.',
+          },
+          {
+            id: 'c6-1-4',
+            prompt: 'What are the tared blank filters in step o2 for?',
+            kind: 'mc',
+            options: [
+              'Their mean mass change is subtracted from every gravimetric result in the run',
+              'They replace any filter that tears during filtration',
+              'They calibrate the balance before weighing',
+              'They hold the wash solution between samples',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The blanks go through the identical wash and dry cycle with no sample on them. The mass they gain or lose is drift every filter shares, and step o8 subtracts it.',
+          },
+        ],
+      },
+      {
+        id: 'l6-2',
+        title: 'Clean-in-place and the caustic steps',
+        minutes: 10,
+        skills: ['SK-CIP', 'SK-CAUSTIC'],
+        blocks: [
+          {
+            kind: 'prose',
+            md: '*Placeholder lesson, to be replaced by the skills content pass.* The steps below are read live from PR-CIP-01.\n\nA clean-in-place cycle removes what the last run left behind, in an order that matters: water at ambient temperature first, then hot alkaline detergent, a rinse to neutral, acid for mineral scale, and neutral again. The detergent and the acid carry their own hazards, so each rinse is confirmed before the next chemical goes in.',
+          },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-CIP' },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-CAUSTIC' },
+          { kind: 'embed', embed: 'protocol-card', arg: 'PR-CIP-01' },
+        ],
+        checkpoint: [
+          {
+            id: 'c6-2-1',
+            prompt: 'Why is the pre-rinse in step c3 done with water at ambient temperature?',
+            kind: 'mc',
+            options: [
+              'Hot water bakes protein onto the glass and the headplate, and no caustic step fully recovers a baked film',
+              'Hot water would damage the spray ball',
+              'Cold water uses less deionised water',
+              'The detergent works only on a cold vessel',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The note on step c3 says it plainly: pre-rinse cold. A baked protein film survives every step that follows it.',
+          },
+          {
+            id: 'c6-2-2',
+            prompt: 'What must be confirmed before any acid enters the vessel?',
+            kind: 'mc',
+            options: [
+              'The rinse after the detergent has reached neutral',
+              'The probes have been calibrated',
+              'The vessel has cooled to room temperature',
+              'The elastomers have been replaced',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Step c5 drains the detergent and rinses to neutral, and asks you to confirm the rinse is complete before any acid enters. Alkaline detergent and acid meeting in the vessel is the hazard that confirmation prevents.',
+          },
+          {
+            id: 'c6-2-3',
+            prompt: 'When may the phosphoric acid rinse in step c6 be skipped?',
+            kind: 'mc',
+            options: [
+              'Only when the last run was a photobioreactor batch on TAP',
+              'Whenever the vessel looks clean after the detergent',
+              'After any mineral-salts fermentation',
+              'When the detergent cycle ran longer than planned',
+            ],
+            answerIndex: 0,
+            explanation:
+              'The note on step c6 allows the skip after a photobioreactor batch on TAP and forbids it after a mineral-salts fermentation, where calcium and magnesium sulfate scale forms under the sparger within one campaign.',
+          },
+        ],
+      },
+      {
+        id: 'l6-3',
+        title: 'Sterilising and releasing a vessel',
+        minutes: 10,
+        skills: ['SK-STER', 'SK-HOLD'],
+        blocks: [
+          {
+            kind: 'prose',
+            md: '*Placeholder lesson, to be replaced by the skills content pass.* The steps below are read live from PR-CIP-01.\n\nSterilising a vessel and releasing it are two skills. The first runs the cycle. The second decides whether the vessel may be used, from a sterility hold and a spore strip, and the release needs both results on the vessel log.',
+          },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-STER' },
+          { kind: 'embed', embed: 'skill-steps', arg: 'SK-HOLD' },
+          { kind: 'embed', embed: 'protocol-card', arg: 'PR-CIP-01' },
+        ],
+        checkpoint: [
+          {
+            id: 'c6-3-1',
+            prompt: 'A vessel fails its sterility hold after a passing spore strip. Where does it go back to?',
+            kind: 'mc',
+            options: [
+              'Step c2: strip the vessel and find the ingress point',
+              'Step c11: sterilise it again',
+              'Step c12: extend the hold',
+              'Nowhere: the spore strip result releases it',
+            ],
+            answerIndex: 0,
+            explanation:
+              'A failed hold after a passing spore strip means something got in after sterilisation. Sterilising again would pass again while the ingress point remains, so the note on step c12 sends the vessel back to c2.',
+          },
+          {
+            id: 'c6-3-2',
+            prompt: 'What releases the vessel at step c12?',
+            kind: 'mc',
+            options: [
+              'Clear hold water, a negative spore strip, and both results on the vessel log',
+              'A completed sterilisation cycle',
+              'Indicator tape that has changed colour',
+              'A negative spore strip on its own',
+            ],
+            answerIndex: 0,
+            explanation:
+              'Step c12 asks for all three. The tape and a finished cycle say the cycle ran; the hold and the spore strip are the two results the release rests on, and the log is where an assessor will look for them.',
+          },
+          {
+            id: 'c6-3-3',
+            prompt: 'What goes into the vessel with the water charge at step c11 so the cycle can be judged afterwards?',
+            kind: 'mc',
+            options: ['A biological indicator spore strip', 'The pH electrode', 'The impeller', 'A sample of detergent'],
+            answerIndex: 0,
+            explanation:
+              'The spore strip rides through the cycle inside the vessel and is incubated and read at step c12, where its result is one of the two the release rests on.',
+          },
+        ],
+      },
+    ],
+    outline: [
+      'Aseptic transfer at the burner',
+      'Isolation before any fitting is touched',
+      'Probe service and the pH slope',
+      'The vessel log as an assessor will read it',
+    ],
+  },
 ];

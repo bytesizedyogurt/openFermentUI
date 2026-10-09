@@ -11,8 +11,9 @@
  * THE LEDGERS ARE CHOSEN TO BE AWKWARD. The sample team, read on three days,
  * covers every level, a suspension and lapses; a second ledger adds withdrawn
  * entries, a failed check followed by a passed one, entries recorded on the
- * same day in an order their ids do not follow, a prerequisite chain, and a
- * qualification whose recency window closes on the very day it is read.
+ * same day in an order their ids do not follow, a prerequisite chain, a
+ * qualification whose recency window closes on the very day it is read, and
+ * lessons passed, alone, beside a sign-off and under a prerequisite.
  *
  * Emits core/tests/fixtures/competence.json, gitignored like units.json.
  */
@@ -60,6 +61,13 @@ const awkward: Guild = {
     ev('p-c', 'SK-OD', 'knowledge', '2026-07-01'),
     ...[1, 2, 3].map((k) => ev('p-c', 'SK-OD', 'supervised', `2026-07-0${k + 1}`)),
     ev('p-c', 'SK-OD', 'witnessed', addDays(DAY, -60)),
+    // §3.1: a lesson passed is knowledge recorded with nobody watching. On
+    // its own it makes Learning; beside a sign-off it changes nothing; and it
+    // never satisfies a prerequisite.
+    ev('p-c', 'SK-DCW', 'knowledge', '2026-08-05', { observerId: null, source: { kind: 'lesson', ref: 'l6-1' } }),
+    ev('p-c', 'SK-CAUSTIC', 'knowledge', '2026-08-05', { observerId: null, source: { kind: 'lesson', ref: 'l6-2' } }),
+    ev('p-c', 'SK-CIP', 'knowledge', '2026-08-06'),
+    ev('p-b', 'SK-STER', 'knowledge', '2026-08-06', { observerId: null, source: { kind: 'lesson', ref: 'l6-3' } }),
   ],
 };
 

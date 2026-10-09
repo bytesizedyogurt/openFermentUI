@@ -10,6 +10,9 @@ import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { computeRunMetrics } from '@/engine/metrics';
 import { evaluateGrid } from '@/engine/grids';
+import { renderStepText } from '@/engine/scale';
+import { SKILL_BY_ID } from '@/data/skills';
+import { href } from '@/router';
 import { Card, Button, cx, Callout } from './ui';
 import { CitationChip } from './Chip';
 import { QuantityField } from './QuantityField';
@@ -426,6 +429,62 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
   );
 }
 
+/**
+ * The steps a skill is needed for, read live from the protocols, with what an
+ * assessor watches for (OF-BLD-013 §3.1). Every number the learner sees here
+ * is the protocol's own, rendered by the same code run mode uses, so a lesson
+ * built on this embed carries no quantity of its own.
+ */
+function SkillSteps({ skillId }: { skillId: string }) {
+  const protocols = useStore((s) => s.protocols);
+  const skill = SKILL_BY_ID[skillId];
+  if (!skill) {
+    return (
+      <Frame label="Skill">
+        <p className="text-body text-ink-soft">{skillId} is not a skill in src/data/skills.ts.</p>
+      </Frame>
+    );
+  }
+  const uses = protocols.flatMap((p) => {
+    const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
+    return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, v, st }));
+  });
+  return (
+    <Frame label={`Where ${skill.name} is used`}>
+      <p className="text-body text-ink-soft mb-2">
+        {skill.summary}{' '}
+        <a className="text-accent hover:underline" href={href(`/guild/skills/${skill.id}`)}>
+          The skill in Guild
+        </a>
+      </p>
+      <ol className="space-y-2.5">
+        {uses.map(({ p, v, st }) => (
+          <li key={p.id + st.id} className="border-l-2 border-line pl-3">
+            <div className="text-caption text-ink-soft">
+              <a className="text-accent hover:underline" href={href(`/runbooks/protocols/${p.id}`)}>
+                {p.id}
+              </a>{' '}
+              · step <span className="font-num">{st.id}</span>
+            </div>
+            <div className="text-body">{renderStepText(st, v, 1)}</div>
+            {st.note && <div className="text-caption text-ink-soft mt-0.5">Why: {st.note}</div>}
+          </li>
+        ))}
+      </ol>
+      <div className="mt-3 pt-2 border-t border-line">
+        <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">What an assessor watches for</div>
+        <ul className="list-disc pl-5 space-y-0.5">
+          {skill.mastery.map((m) => (
+            <li key={m} className="text-body">
+              {m}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Frame>
+  );
+}
+
 function AskPrompt({ question }: { question: string }) {
   return (
     <Frame label="Try it">
@@ -517,6 +576,8 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
       return <ProtocolCard protocolId={arg ?? 'PR-TAP-01'} />;
     case 'ask-prompt':
       return <AskPrompt question={arg ?? 'What growth rates are reported for cw15 in TAP'} />;
+    case 'skill-steps':
+      return <SkillSteps skillId={arg ?? ''} />;
     case 'scenario-widget':
       return <ScenarioWidget scenarioId={arg ?? 'sc-s1'} />;
     default:
