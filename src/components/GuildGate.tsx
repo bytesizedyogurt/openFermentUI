@@ -3,16 +3,30 @@
 // targets of 44 px and more, every word on `ink` for 7:1 at arm's length,
 // nothing that appears only on hover.
 //
-// ADVISE MODE. The gate says what the step asks of the person performing it
-// and never holds the step: completing it writes what happened to Guild's
-// ledger, and a step done without the level it needs is written as a
-// deviation. Holding a step waits for checks that can back it (Phase 5).
-import { useState } from 'react';
+// ADVISE AND ENFORCE (OF-BLD-013 §2, §5.1). The gate says what the step asks
+// of the person performing it. On a skill the lead set to advise, the step
+// can always be completed, and a step done without the level it needs is
+// written as a deviation. On a skill set to enforce (critical skills, by
+// default) the step is held: until someone is named as performing it, until
+// a cosigner who holds the skill is recorded beside a Supervised, lapsed or
+// suspended operator, or until someone qualified takes over from an operator
+// below Supervised. `useGateHold` is what Deposition asks before completing.
+import { useMemo, useState } from 'react';
 import { ShieldAlert, ShieldCheck, UserCheck } from 'lucide-react';
 import type { Step } from '@/data/types';
 import { useStore, guildView } from '@/store';
 import { SKILL_BY_ID } from '@/data/skills';
-import { competenceOf, gateFor, localToday, mayCosign, statusOf, type StatusMap } from '@/engine/competence';
+import {
+  competenceOf,
+  gateFor,
+  holdFor,
+  localToday,
+  mayCosign,
+  policyOf,
+  statusOf,
+  type Hold,
+  type StatusMap,
+} from '@/engine/competence';
 import { Button, cx } from '@/components/ui';
 
 const names = (ids: string[]) => ids.map((s) => SKILL_BY_ID[s]?.name ?? s).join(', ');
@@ -30,6 +44,27 @@ function cosignReason(map: StatusMap, personId: string, skills: string[]): strin
     .join('; ');
 }
 
+/** What holds this step in enforce mode, or null. */
+export function useGateHold(runId: string, step: Step | undefined): Hold | null {
+  const run = useStore((s) => s.runs[runId]);
+  const ledger = useStore((s) => guildView(s));
+  return useMemo(() => {
+    if (!run || !step) return null;
+    const people = ledger.people.filter((p) => p.active && p.role !== 'auditor');
+    const named = (id: string | null | undefined) => (id && people.some((p) => p.id === id) ? id : null);
+    const map = competenceOf(ledger.evidence, ledger.people, SKILL_BY_ID, localToday());
+    return holdFor(step, named(run.operatorId), named(run.cosigned?.[step.id]), map, SKILL_BY_ID, policyOf(ledger), people.length > 0);
+  }, [run, step, ledger]);
+}
+
+/** The hold in words, for the button and for a screen reader. */
+export function holdText(hold: Hold): string {
+  const which = names(hold.skills);
+  if (hold.kind === 'operator') return `Held: name who is performing this step first (${which} is enforced).`;
+  if (hold.kind === 'qualified') return `Held: ${which} needs someone qualified. Hand over to complete it.`;
+  return `Held: ${which} needs a cosigner beside the operator. Record one to complete it.`;
+}
+
 export function GuildGate({ runId, step }: { runId: string; step: Step | undefined }) {
   const run = useStore((s) => s.runs[runId]);
   const ledger = useStore((s) => guildView(s));
@@ -37,6 +72,7 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
   const setCosigner = useStore((s) => s.setRunCosigner);
   const [choosing, setChoosing] = useState(false);
   const [pickingCosigner, setPickingCosigner] = useState(false);
+  const hold = useGateHold(runId, step);
 
   if (!run || !step || ledger.people.length === 0) return null;
   const today = localToday();
@@ -148,7 +184,9 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
           )}
           {!cosigner && (
             <p className="text-body text-ink">
-              Completing it without one records a deviation on {operator.name}&rsquo;s ledger.
+              {hold?.kind === 'cosigner'
+                ? `The lead set ${names(hold.skills)} to enforce, so this step waits for a cosigner.`
+                : `Completing it without one records a deviation on ${operator.name}\u2019s ledger.`}
             </p>
           )}
         </div>
@@ -174,7 +212,11 @@ export function GuildGate({ runId, step }: { runId: string; step: Step | undefin
               ))}
             </div>
           )}
-          <p className="text-body text-ink">Completing it anyway records a deviation on {operator.name}&rsquo;s ledger.</p>
+          <p className="text-body text-ink">
+            {hold?.kind === 'qualified'
+              ? `The lead set ${names(hold.skills)} to enforce, so this step waits for someone qualified to take over.`
+              : `Completing it anyway records a deviation on ${operator.name}\u2019s ledger.`}
+          </p>
         </div>
       )}
 

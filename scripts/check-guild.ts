@@ -30,9 +30,12 @@ import { sampleGuild, SAMPLE_LEAD } from '../src/data/guildSample';
 import { offlineRefusal } from '../src/lib/guild';
 import { REFRESH_WINDOW, pathOf } from '../src/engine/path';
 import {
+  DEFAULT_POLICY,
   addDays,
   competenceOf,
   gateFor,
+  holdFor,
+  policyOf,
   isAssessor,
   readyForCheck,
   statusOf,
@@ -537,6 +540,52 @@ async function main() {
   server7.evidence.push({ ...ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-2' } }), id: 'e-practice-from-service', recordedAt: `${TODAY}T09:21:00Z` });
   await s().practiceClosed({ ...closedSession('p-tom', 'e-practice-from-service'), id: 'pt-check-2' }, 'A reading above the range');
   check('a session the service put on the ledger is fetched back', s().guild.evidence.some((e) => e.id === 'e-practice-from-service'));
+
+  // ── 9. enforce mode (OF-BLD-013 §5.1) ───────────────────────────────
+  const CIP = SKILL_BY_ID['SK-CIP'];
+  check('SK-CIP is critical and SK-OD routine, as this part assumes', CIP.criticality === 'critical' && SKILL_BY_ID['SK-OD'].criticality === 'routine');
+  check('a ledger with no policy reads with the default: routine advised, critical enforced', JSON.stringify(policyOf({})) === JSON.stringify(DEFAULT_POLICY) && DEFAULT_POLICY.criticalGate === 'enforce' && DEFAULT_POLICY.routineGate === 'advise');
+  const H: GuildEvidence[] = [
+    ev('p-ann', 'SK-CIP', 'designation', '2026-02-01'),
+    ev('p-ann', 'SK-CAUSTIC', 'designation', '2026-02-01'),
+    ev('p-tom', 'SK-CAUSTIC', 'knowledge', '2026-08-01'),
+    ev('p-tom', 'SK-CIP', 'knowledge', '2026-08-01'),
+  ];
+  const hmap = (entries: GuildEvidence[], today = TODAY) => competenceOf(entries, PEOPLE, SKILLS_MAP, today);
+  const cipStep = { skills: ['SK-CIP'] };
+  const odStep = { skills: ['SK-OD'] };
+  const hold = (st: { skills: string[] }, op: string | null, co: string | null, entries = H, policy = DEFAULT_POLICY, today = TODAY) =>
+    holdFor(st, op, co, hmap(entries, today), SKILLS_MAP, policy, true);
+  check('a Supervised operator on an enforced skill is held for a cosigner', hold(cipStep, 'p-tom', null)?.kind === 'cosigner');
+  check('a cosigner who holds it releases the step', hold(cipStep, 'p-tom', 'p-ann') === null);
+  check('a cosigner who does not hold it releases nothing', hold(cipStep, 'p-tom', 'p-lead')?.kind === 'cosigner');
+  check('nor does naming the operator as their own cosigner', hold(cipStep, 'p-tom', 'p-tom')?.kind === 'cosigner');
+  const lapsedCIP: GuildEvidence[] = [
+    ...H,
+    ...[1, 2, 3].map((k) => ev('p-tom', 'SK-CIP', 'supervised', `2026-03-0${k}`)),
+    ev('p-tom', 'SK-CIP', 'witnessed', '2026-03-10'),
+  ];
+  const tomCIP = statusOf(hmap(lapsedCIP), 'p-tom', 'SK-CIP');
+  check('the fixture makes a lapsed Qualified operator', tomCIP.level === 3 && tomCIP.lapsed, [tomCIP.level, tomCIP.lapsesAt]);
+  check('in enforce mode a lapsed skill holds a step until a cosigner is recorded', hold(cipStep, 'p-tom', null, lapsedCIP)?.kind === 'cosigner' && hold(cipStep, 'p-tom', 'p-ann', lapsedCIP) === null);
+  check('below Supervised waits for someone qualified, cosigner or not', hold(cipStep, 'p-lead', 'p-ann')?.kind === 'qualified');
+  check('nobody named as operator is held for one', hold(cipStep, null, null)?.kind === 'operator');
+  check('a routine skill in advise mode is never held', hold(odStep, null, null) === null && hold(odStep, 'p-lead', null) === null);
+  check('with everything advised nothing is held', hold(cipStep, 'p-lead', null, H, { ...DEFAULT_POLICY, criticalGate: 'advise' }) === null);
+  check('routine set to enforce holds a routine skill', hold(odStep, 'p-lead', null, H, { ...DEFAULT_POLICY, routineGate: 'enforce' })?.kind === 'qualified');
+  check('with nobody on the ledger nothing is held', holdFor(cipStep, null, null, hmap(H), SKILLS_MAP, DEFAULT_POLICY, false) === null);
+  reset7({ guildActingId: 'p-ann' });
+  check('only the lead sets the policy', (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'enforce', checksPerQuarter: 2 })) === false);
+  s().guildLoadSample();
+  s().guildSetActing(SAMPLE_LEAD);
+  const realPolicy = s().guild.policy;
+  check(
+    'with the sample shown, the lead sets the sample\u2019s policy alone',
+    (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'advise', checksPerQuarter: 3 })) === true &&
+      s().guildSample!.policy?.checksPerQuarter === 3 &&
+      s().guild.policy === realPolicy,
+  );
+  s().guildClearSample();
 
   const audited = { ...ev('p-tom', 'SK-OD', 'witnessed', TODAY), observerId: 'p-qa' };
   check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, { version: 1, people: R_PEOPLE, evidence: [] })?.rule === 'authority');

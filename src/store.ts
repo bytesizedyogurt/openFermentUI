@@ -35,6 +35,7 @@ import type {
   Guild,
   GuildEvidence,
   GuildPerson,
+  GuildPolicy,
   GuildWithdrawal,
   Practice,
   PracticeScenario,
@@ -76,6 +77,7 @@ import {
   postEvidence,
   postPerson,
   postWithdrawal,
+  postPolicy,
 } from '@/lib/guild';
 import { sampleGuild } from '@/data/guildSample';
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
@@ -535,6 +537,12 @@ export interface OFState {
   guildUpdatePerson: (person: GuildPerson) => Promise<GuildPerson | null>;
   guildRecord: (entry: Omit<GuildEvidence, 'id' | 'recordedAt'>) => Promise<GuildEvidence | null>;
   guildWithdraw: (evidenceId: string, reason: string) => Promise<boolean>;
+  /**
+   * The lead's gate modes and check rate (OF-BLD-013 §5.1). Needs the
+   * service, which holds them for every device; with the sample shown it
+   * changes the sample alone. False when nothing changed, and a toast says why.
+   */
+  guildSetPolicy: (policy: Pick<GuildPolicy, 'routineGate' | 'criticalGate' | 'checksPerQuarter'>) => Promise<boolean>;
   guildSetActing: (id: string | null) => void;
   /** Who is performing this run's steps (OF-BLD-013 §2). A handover is a change of operator. */
   setRunOperator: (runId: string, personId: string | null) => void;
@@ -2618,6 +2626,34 @@ export const useStore = create<OFState>()((set, get) => ({
   },
 
   guildSetActing: (id) => set((s) => (s.guildSample ? { guildSampleActingId: id } : { guildActingId: id })),
+
+  guildSetPolicy: async (choice) => {
+    const s = get();
+    const by = actingIdOf(s);
+    const ledger = guildView(s);
+    const lead = ledger.people.find((p) => p.id === by && p.active && p.role === 'lead');
+    if (!lead) {
+      get().toast({ text: 'Only the lead changes the gate and the check rate. Choose who you are with Acting as.', kind: 'error' });
+      return false;
+    }
+    const policy: GuildPolicy = { ...choice, updatedBy: lead.id, updatedAt: new Date().toISOString() };
+    if (s.guildSample) {
+      set({ guildSample: { ...s.guildSample, policy } });
+      return true;
+    }
+    if (!s.serviceUp) {
+      get().toast({ text: 'The gate and the check rate are kept by the service, which is not answering here.', kind: 'error' });
+      return false;
+    }
+    try {
+      const stored = await postPolicy(policy);
+      set((x) => ({ guild: { ...x.guild, policy: stored } }));
+      return true;
+    } catch (e) {
+      get().toast({ text: e instanceof GuildRefused ? `The service kept the old policy (${e.rule}): ${e.why}` : String(e), kind: 'error' });
+      return false;
+    }
+  },
 
   guildLoadSample: () =>
     set({ guildSample: sampleGuild(localToday()), guildSampleActingId: 'p-sample-eric' }),

@@ -496,12 +496,31 @@ class GuildWithdrawal(BaseModel):
     reason: str
 
 
+GateMode = Literal["advise", "enforce"]
+
+
+class GuildPolicy(BaseModel):
+    """The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+    run-mode gate warns and records a deviation; in enforce mode it holds the
+    step until a cosigner is recorded, or someone qualified takes over. Set
+    per criticality: a routine skill and a critical one can differ."""
+
+    routineGate: GateMode = "advise"
+    criticalGate: GateMode = "enforce"
+    # The witnessed checks each holder of a critical skill gets at least,
+    # every quarter. Fewer puts them in the assessors' queue.
+    checksPerQuarter: int = 1
+    updatedBy: str | None = None
+    updatedAt: str | None = None
+
+
 class Guild(BaseModel):
     """core/data/guild.json — the people and everything recorded about them."""
 
     version: Literal[1] = 1
     people: list[GuildPerson] = Field(default_factory=list)
     evidence: list[GuildEvidence] = Field(default_factory=list)
+    policy: GuildPolicy = Field(default_factory=GuildPolicy)
 
 
 # ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────

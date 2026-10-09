@@ -711,6 +711,24 @@ async function main() {
       const ledger = await page.locator('body').innerText();
       if (!/Supervised run[\s\S]{0,200}PR-OD-01 · step o1 · cosigned by Eric Habimana/.test(ledger))
         problems.push('completing a cosigned step did not write a supervised run to the ledger');
+      // §5.1 — enforce mode: a critical skill holds the step until a cosigner is recorded.
+      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-CIP-01'));
+      await page.waitForTimeout(400);
+      await page.locator('button:has-text("Start run at")').first().click();
+      await page.waitForTimeout(500);
+      await page.locator('button:has-text("Hand over")').click();
+      await page.locator('button:has-text("Grace Ingabire")').first().click();
+      await page.waitForTimeout(200);
+      for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Next step' }).click();
+      await page.waitForTimeout(300);
+      const held = page.locator('button:has-text("Waits for a cosigner")');
+      if ((await held.count()) !== 1 || !(await held.isDisabled()))
+        problems.push('a Supervised operator on a critical skill is not held for a cosigner in enforce mode');
+      await page.locator('button:has-text("Record cosigner")').click();
+      await page.locator('button:has-text("Eric Habimana")').first().click();
+      await page.waitForTimeout(200);
+      if ((await page.locator('button:has-text("Mark step complete")').count()) !== 1)
+        problems.push('recording a cosigner does not release the held step');
       // §3 — a lesson passed in Primer moves its learner from Not started to Learning.
       await page.evaluate(() => (location.hash = '#/primer/l6-3'));
       await page.waitForTimeout(400);
@@ -786,7 +804,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a critical skill holds its step until a cosigner is recorded; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }

@@ -31,7 +31,7 @@
 // true. That is the same rule `guild.write_evidence` applies when it asks
 // whether an observer may sign, so the screen and the service agree on who
 // is an assessor without either computing the other's answer.
-import type { GuildEvidence, GuildPerson, Skill, Step } from '@/data/types';
+import type { GateMode, GuildEvidence, GuildPerson, GuildPolicy, Skill, Step } from '@/data/types';
 
 export type Level = 0 | 1 | 2 | 3 | 4;
 
@@ -262,6 +262,57 @@ export function gateFor(
     else if (e === 2) cosign.push(s);
   }
   return { state: blocked.length ? 'blocked' : cosign.length ? 'cosign' : 'clear', cosign, blocked };
+}
+
+// ── enforce mode (OF-BLD-013 §5.1) ─────────────────────────────────────
+
+export const DEFAULT_POLICY: GuildPolicy = { routineGate: 'advise', criticalGate: 'enforce', checksPerQuarter: 1 };
+
+/** The ledger's policy, or the default for a ledger written before there was one. */
+export function policyOf(ledger: { policy?: GuildPolicy }): GuildPolicy {
+  return { ...DEFAULT_POLICY, ...(ledger.policy ?? {}) };
+}
+
+/** Whether the gate holds or only warns on this skill. */
+export function modeFor(skill: Pick<Skill, 'criticality'> | undefined, policy: GuildPolicy): GateMode {
+  return skill?.criticality === 'critical' ? policy.criticalGate : policy.routineGate;
+}
+
+/**
+ * What holds a step in enforce mode, or null when it may be completed.
+ *
+ *   operator   nobody is named as performing the steps
+ *   cosigner   the operator is Supervised, lapsed or suspended on an enforced
+ *              skill, and nobody who holds it is recorded beside them
+ *   qualified  the operator is below Supervised on an enforced skill; only a
+ *              handover to someone who holds it releases the step
+ *
+ * A step that needs no enforced skill is never held, and neither is any step
+ * while nobody who can hold skills is on the ledger.
+ */
+export interface Hold {
+  kind: 'operator' | 'cosigner' | 'qualified';
+  skills: string[];
+}
+
+export function holdFor(
+  step: Pick<Step, 'skills'>,
+  operatorId: string | null,
+  cosignerId: string | null,
+  map: StatusMap,
+  skills: Record<string, Skill>,
+  policy: GuildPolicy,
+  anyoneOnLedger: boolean,
+): Hold | null {
+  const enforced = (step.skills ?? []).filter((s) => modeFor(skills[s], policy) === 'enforce');
+  if (enforced.length === 0 || !anyoneOnLedger) return null;
+  if (!operatorId) return { kind: 'operator', skills: enforced };
+  const gate = gateFor(step, operatorId, map);
+  const below = gate.blocked.filter((s) => enforced.includes(s));
+  if (below.length) return { kind: 'qualified', skills: below };
+  const needs = gate.cosign.filter((s) => enforced.includes(s));
+  if (needs.length && !(cosignerId && cosignerId !== operatorId && mayCosign(map, cosignerId, needs))) return { kind: 'cosigner', skills: needs };
+  return null;
 }
 
 /** Who can run every step of a set of steps alone, needs a cosigner somewhere, or cannot run it yet. */

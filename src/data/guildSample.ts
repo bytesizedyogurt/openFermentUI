@@ -15,7 +15,7 @@
 import type { Guild, GuildEvidence, GuildPerson } from './types';
 import { SKILLS, SKILL_BY_ID } from './skills';
 import { PROTOCOLS } from './protocols';
-import { addDays } from '@/engine/competence';
+import { DEFAULT_POLICY, addDays } from '@/engine/competence';
 
 export const SAMPLE_LEAD = 'p-sample-lead';
 
@@ -170,5 +170,5 @@ export function sampleGuild(today: string): Guild {
     if (!evidence.some((e) => e.kind === 'designation' && e.skillId === sk.id))
       add('p-sample-diane', sk.id, 'designation', daysInOf('p-sample-diane') * 0.98, SAMPLE_LEAD, 'Founding assessor');
 
-  return { version: 1, people, evidence };
+  return { version: 1, people, evidence, policy: { ...DEFAULT_POLICY, updatedBy: SAMPLE_LEAD } };
 }

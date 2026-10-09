@@ -1537,10 +1537,28 @@ export interface GuildWithdrawal {
   reason: string;
 }
 
+export type GateMode = 'advise' | 'enforce';
+
+/**
+ * The lead's choices for the team (OF-BLD-013 §5.1). In advise mode the
+ * run-mode gate warns and records a deviation; in enforce mode it holds the
+ * step until a cosigner is recorded, or someone qualified takes over.
+ */
+export interface GuildPolicy {
+  routineGate: GateMode;
+  criticalGate: GateMode;
+  /** The witnessed checks each holder of a critical skill gets at least, every quarter. */
+  checksPerQuarter: number;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface Guild {
   version: 1;
   people: GuildPerson[];
   evidence: GuildEvidence[];
+  /** Absent in a ledger written before Phase 5; `policyOf` supplies the default. */
+  policy?: GuildPolicy;
 }
 
 // ── Practice (OF-BLD-013 §4) ───────────────────────────────────────────

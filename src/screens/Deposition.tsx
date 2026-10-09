@@ -41,7 +41,7 @@ import { Button, Modal, cx, EmptyState, Callout } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { DepositionPanel } from '@/components/DepositionPanel';
 import { ComponentTag } from '@/components/ComponentTag';
-import { GuildGate } from '@/components/GuildGate';
+import { GuildGate, holdText, useGateHold } from '@/components/GuildGate';
 
 const SKIP_REASONS = [
   'Not applicable to this batch',
@@ -168,8 +168,16 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
     setRunStep(runId, Math.max(0, Math.min(steps.length - 1, run.currentStep + delta)));
   };
 
+  // OF-BLD-013 §5.1 — on a skill the lead set to enforce, the gate holds the
+  // step; the button says why and the space bar is refused the same way.
+  const hold = useGateHold(runId, step);
+
   const markComplete = () => {
     if (!run || !step) return;
+    if (hold) {
+      toast({ text: holdText(hold), kind: 'warn' });
+      return;
+    }
     void recordStepForGuild(runId, step.id).then((deviations) => {
       if (deviations > 0)
         toast({
@@ -885,13 +893,26 @@ export default function Deposition({ protocolId, runId }: { protocolId: string; 
           className="btn btn-primary flex-1 justify-center"
           style={{ minHeight: 56, fontSize: 17 }}
           onClick={markComplete}
+          disabled={!!hold}
+          aria-describedby={hold ? 'gate-hold' : undefined}
         >
           <Check size={20} />
-          {run.currentStep === steps.length - 1 && !allResolved
-            ? 'Complete final step'
-            : 'Mark step complete'}
+          {hold
+            ? hold.kind === 'cosigner'
+              ? 'Waits for a cosigner'
+              : hold.kind === 'qualified'
+                ? 'Waits for a qualified operator'
+                : 'Waits for an operator'
+            : run.currentStep === steps.length - 1 && !allResolved
+              ? 'Complete final step'
+              : 'Mark step complete'}
           <span className="kbd ml-2">space</span>
         </button>
+        {hold && (
+          <span id="gate-hold" className="sr-only">
+            {holdText(hold)}
+          </span>
+        )}
         <Button style={{ minHeight: 56 }} onClick={() => setSkipOpen(true)}>
           <SkipForward size={17} /> Skip
         </Button>

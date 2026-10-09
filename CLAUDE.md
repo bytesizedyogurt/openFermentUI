@@ -197,12 +197,16 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
   `core/openferment_core/competence.py`, a mirror of `competence.ts` held to
   it by a fixture (`pnpm export:competence-fixtures`, run by `test:core`).
   When the two disagree, the TypeScript side is right and the mirror is fixed.
-- **Run mode writes to the ledger, in advise mode.** `GuildGate` in
-  Deposition names the operator, asks for a cosigner when they are
-  Supervised, lapsed or suspended on a skill the step needs, and lets every
-  step complete. Completing a step writes one entry per skill it needs, once
-  per step: a run alone, a cosigned run or a deviation
-  (`recordStepForGuild` in `src/store.ts`). Holding a step waits for Phase 5.
+- **Run mode writes to the ledger, and holds on enforced skills.**
+  `GuildGate` in Deposition names the operator and asks for a cosigner when
+  they are Supervised, lapsed or suspended on a skill the step needs.
+  Completing a step writes one entry per skill it needs, once per step: a run
+  alone, a cosigned run or a deviation (`recordStepForGuild` in
+  `src/store.ts`). The lead's `GuildPolicy` (in `guild.json`, set through
+  `write_policy`, Settings → Guild policy) makes each criticality advise or
+  enforce; on an enforced skill `holdFor` in `competence.ts` holds the step
+  until an operator is named, a cosigner who holds the skill is recorded, or
+  someone qualified takes over. Critical skills are enforced by default.
 - **A lesson passed is Learning, and goes no further.** A lesson that names
   skills (`Lesson.skills`) writes one knowledge entry per skill, with no
   observer, for whoever is learning when its checkpoint is passed

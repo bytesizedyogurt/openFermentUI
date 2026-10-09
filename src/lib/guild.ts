@@ -10,7 +10,7 @@
 // screen needs to grey out a button it already knows the service would
 // refuse. It is not a second copy of the rules, and it never decides what is
 // stored. While the service is up, the sign-off sheet asks /api/guild/check.
-import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildWithdrawal } from '@/data/types';
+import type { DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal } from '@/data/types';
 import { IntakeDown } from './intake';
 
 /** The service stored nothing and said which rule held. Not an outage. */
@@ -67,6 +67,7 @@ export const postEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<Gui
 export const postWithdrawal = (w: GuildWithdrawal, signal?: AbortSignal) =>
   call<GuildEvidence>('/api/guild/withdraw', w, signal);
 export const checkEvidence = (e: GuildEvidence, signal?: AbortSignal) => call<DecisionCheck>('/api/guild/check', e, signal);
+export const postPolicy = (p: GuildPolicy) => call<GuildPolicy>('/api/guild/policy', p);
 
 // ── ids ────────────────────────────────────────────────────────────────
 

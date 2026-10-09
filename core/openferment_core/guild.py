@@ -6,13 +6,14 @@ alone, a deviation, a witnessed check, the lead's designation of an assessor. A 
 stored. The browser computes it from these entries (src/engine/competence.ts),
 so the ledger only has to be right about what happened and who saw it.
 
-Three writes, each a read-modify-write under one lock, each refusing with the
+Four writes, each a read-modify-write under one lock, each refusing with the
 rule that failed and the reason in words, each with a `dry_run` that runs
 every rule and writes nothing:
 
   write_person      add someone, or change their title, role or active flag
   write_evidence    append one entry
   withdraw          mark one entry withdrawn, keeping it for the audit trail
+  write_policy      the lead's gate modes and check rate (§5.1)
 
 The rules, by name:
 
@@ -47,6 +48,7 @@ The rules, by name:
   date        `at` that is not a date, or is later than tomorrow
   evidence    a withdrawal naming an entry that does not exist or is already
               withdrawn
+  policy      a check rate outside none to twelve a quarter
 
 Nothing is repaired on the way through. The skills, the protocol steps that
 need them and the lessons that count toward them live in TypeScript and
@@ -66,7 +68,7 @@ from typing import Any
 from . import atomic, intake
 from .biorepo import MIN_REVIEWER_CHARS, PLACEHOLDER_REVIEWERS
 from .competence import Competence
-from .models import Guild, GuildEvidence, GuildPerson, GuildWithdrawal
+from .models import Guild, GuildEvidence, GuildPerson, GuildPolicy, GuildWithdrawal
 
 log = logging.getLogger("openferment.guild")
 
@@ -89,6 +91,7 @@ RULES = (
     "note",
     "date",
     "evidence",
+    "policy",
 )
 
 # What the ledger accepts, kind by kind, and from which sources (OF-BLD-013
@@ -225,6 +228,24 @@ def _check_name(name: str) -> None:
 
 
 # ── people ─────────────────────────────────────────────────────────────
+
+
+def write_policy(policy: GuildPolicy, *, dry_run: bool = False) -> GuildPolicy:
+    """The lead's choices for the team, or a refusal. Only an active lead
+    changes them, and the change names who made it."""
+    if not 0 <= policy.checksPerQuarter <= 12:
+        raise GuildRefused("policy", "checks per quarter is a whole number from none to twelve")
+    with _WRITE_LOCK:
+        ledger = read()
+        if not _active_lead(ledger, policy.updatedBy):
+            raise GuildRefused("authority", "only an active lead changes the team's gate and check rate")
+        stored = policy.model_copy(update={"updatedAt": _now()})
+        if dry_run:
+            return stored
+        ledger.policy = stored
+        _persist(ledger)
+    log.info("guild: policy %s/%s, %d checks a quarter, by %s", stored.routineGate, stored.criticalGate, stored.checksPerQuarter, stored.updatedBy)
+    return stored
 
 
 def write_person(person: GuildPerson, *, dry_run: bool = False) -> GuildPerson:

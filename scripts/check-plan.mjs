@@ -88,6 +88,7 @@ const PAIRS = [
   ['GuildEvidence', 'GuildEvidence'],
   ['GuildWithdrawal', 'GuildWithdrawal'],
   ['Guild', 'Guild'],
+  ['GuildPolicy', 'GuildPolicy'],
   // OF-BLD-013 §4 — Practice.
   ['PracticeStepRef', 'PracticeStepRef'],
   ['PracticeSource', 'PracticeSource'],

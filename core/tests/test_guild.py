@@ -266,7 +266,9 @@ def test_concurrent_writes_all_land():
 
 def test_the_endpoints():
     client = TestClient(app)
-    assert client.get("/api/guild").json() == {"version": 1, "people": [], "evidence": []}
+    empty = client.get("/api/guild").json()
+    assert (empty["version"], empty["people"], empty["evidence"]) == (1, [], [])
+    assert empty["policy"]["criticalGate"] == "enforce", "a fresh ledger carries the default policy"
 
     lead = person("p-sean", "Sean Creighton", role="lead", added_by=None).model_dump()
     assert client.post("/api/guild/people", json=lead).status_code == 200
@@ -461,3 +463,35 @@ def test_the_sample_team_passes_the_service_rules():
     for e in sorted(case["evidence"], key=lambda e: (e["at"][:10], e["kind"] != "designation", e["id"])):
         guild.write_evidence(GuildEvidence.model_validate(e))
     assert len(guild.read().evidence) == len(case["evidence"])
+
+
+# ── the lead's policy (OF-BLD-013 §5.1) ────────────────────────────────
+
+from openferment_core.models import GuildPolicy  # noqa: E402
+
+
+def test_a_ledger_without_a_policy_reads_with_the_default():
+    team()
+    p = guild.read().policy
+    assert (p.routineGate, p.criticalGate, p.checksPerQuarter) == ("advise", "enforce", 1)
+
+
+def test_only_an_active_lead_sets_the_policy():
+    team()
+    refused("authority", guild.write_policy, GuildPolicy(routineGate="enforce", updatedBy="p-eric"))
+    refused("authority", guild.write_policy, GuildPolicy(routineGate="enforce", updatedBy=None))
+    refused("policy", guild.write_policy, GuildPolicy(checksPerQuarter=13, updatedBy="p-sean"))
+    stored = guild.write_policy(GuildPolicy(routineGate="enforce", criticalGate="enforce", checksPerQuarter=2, updatedBy="p-sean"))
+    assert stored.updatedAt and guild.read().policy.checksPerQuarter == 2
+    assert guild.read().people and guild.read().evidence, "setting the policy keeps everything else"
+
+
+def test_the_policy_endpoint():
+    team()
+    client = TestClient(app)
+    host = {"Host": "127.0.0.1:8000"}
+    r = client.post("/api/guild/policy", json={"routineGate": "advise", "criticalGate": "advise", "checksPerQuarter": 0, "updatedBy": "p-sean"}, headers=host)
+    assert r.status_code == 200 and r.json()["criticalGate"] == "advise"
+    r = client.post("/api/guild/policy", json={"routineGate": "advise", "criticalGate": "enforce", "checksPerQuarter": 1, "updatedBy": "p-patrick"}, headers=host)
+    assert r.status_code == 422 and r.json()["detail"].startswith("authority: ")
+    assert client.get("/api/guild").json()["policy"]["criticalGate"] == "advise"

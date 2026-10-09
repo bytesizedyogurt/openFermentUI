@@ -38,6 +38,7 @@ from .models import (
     Guild,
     GuildEvidence,
     GuildPerson,
+    GuildPolicy,
     GuildWithdrawal,
     IntakeStatus,
     Overlay,
@@ -346,6 +347,14 @@ def guild_check(entry: GuildEvidence) -> DecisionCheck:
         return DecisionCheck(ok=False, rule=e.rule, why=e.why)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/policy", response_model=GuildPolicy)
+def guild_policy(policy: GuildPolicy) -> GuildPolicy:
+    try:
+        return guild.write_policy(policy)
+    except guild.GuildRefused as e:
+        raise _refused(e, "policy") from e
 
 
 @app.post("/api/guild/withdraw", response_model=GuildEvidence)
