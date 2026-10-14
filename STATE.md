@@ -8,7 +8,7 @@ transcript; this file is the index a later session reads first.
 
 LIVE steps built offline whose run waits on a need this machine lacked, one line each: `- §n.m — needs <what> — <the command to run>` (OF-BLD-014 A.4).
 
-- §1.5, the rest — needs the key (Europe PMC answers since 2026-10-14) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
+- §1.5, the rest — needs the key (Europe PMC answers since 2026-10-14), and Sean's decision on the parser defects in `docs/build/JATS-AUDIT.md`, which alter numbers in the fetched text (run nothing that extracts before he answers) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
 
 ## Live runs
 
