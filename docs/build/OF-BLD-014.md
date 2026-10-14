@@ -1,7 +1,7 @@
 # openFerment — The working prototype
 
-**Document:** OF-BLD-014 · **Version:** 1.0 · **Date:** 13 October 2026
-**Repo:** `bytesizedyogurt/openFermentUI` · `guild-primer-phase1` @ `90cb31d` and `main` @ `3458f1b` (both measured 13 Oct 2026)
+**Document:** OF-BLD-014 · **Version:** 1.1 · **Date:** 14 October 2026 (v1.0 on 13 October)
+**Repo:** `bytesizedyogurt/openFermentUI` · work branch `claude/of-bld-014-prototype` @ `eebe63f` (measured 14 Oct 2026, 22:00 UTC) · base `guild-primer-phase1` @ `90cb31d` · `main` @ `3458f1b`
 **Builds on:** OF-BLD-012 and 012.1 (Intake, merged to `main`) and OF-BLD-013 (Guild and Primer, on its own branch)
 **Absorbs:** the September document "From 10 % to 20 %". It also carried the number 013 and was never executed. This document cites it as **013-S**.
 **Executor:** Claude Opus 5.5 in Claude Code at extra-high effort. One phase per session. Sean says "next phase".
@@ -25,6 +25,24 @@ Ten phases. At the end you have:
 Each "next phase" runs one phase. The four heaviest (4, 5, 6 and 8) will probably need a second session each, and the same two words resume them. Plan for about fourteen sessions; that figure is an estimate.
 
 Your part is small and listed in Appendix 5: placing this document where a session can read it, a key with a spend cap, one environment setting, approving the PHA paper list, about thirty review decisions in Guild, and typing the assumptions you can defend in Proforma.
+
+---
+
+## v1.1 — what the first day measured, and what changed
+
+The first session ran on 14 October. This version records what it found and adjusts the steps it touches. Nothing else moved.
+
+**What landed.** Phase 1 whole: §1.1 to §1.5, §1.R (ten defects found, nine fixed with a failing test first), §1.T. Then §2.1. The log holds these ids: `§1.1 §1.2 §1.3 §1.4 §1.5 §1.R §1.T §2.1`, so A.1 resumes at **§2.2**, after A.4 pays what §1.5 still owes.
+
+**What §1.5 measured.** `pnpm intake:fetch --all` returned full text for **31 of the 59** papers that carry an identifier: 25 of the 27 with a PMCID, 6 found by DOI or PMID. 26 have no open-access text on Europe PMC. B1 and D1 answered 500 twice and are asked again on each run. Licences: 26 CC BY 4.0, and five others, each recorded on the paper. The extraction itself has yet to run: no key reached the session, so `pnpm ready` read lane `none`, and the step is owed under `## Live owed` with the exact command.
+
+**What the session did that this document had not asked for.** It read the 31 fetched articles against the parser and found that `split_jats` dropped empty table cells, ignored `colspan` and `rowspan`, lost powers of two and negative exponents, skipped `<floats-group>`, dropped table footnotes and treated back matter as prose. Every cause was fixed with a failing test first, the 31 papers were fetched again, and a second audit checked 8,632 numbers against the XML, of which 8,629 were intact. `docs/build/JATS-AUDIT.md` holds both audits. This document absorbs that work under §1.5 and keeps the audit (§10.4).
+
+**One measured fact that changes two later steps.** Of the 46 curated records on fetched papers, **3** quote a sentence the fetched text holds. The curators wrote most quotes from notes, so a seed record's quote seldom anchors in the paper. §4.3's K and F question sets and §1.5's Witness numbers are adjusted below; anchored candidates, whose quotes are verbatim by construction, carry those sets.
+
+**Why it stopped, and the rule that follows.** The session stopped at the point where the next command needed the key. Whatever a session says when it reaches that point, the answer is the same: the key goes on the cloud environment as `OPENFERMENT_API_KEY` (Appendix 5, step 2), `session-start.sh` writes it to `core/.env`, and the next "next phase" pays the owed run. A key is never pasted into a chat; A.4 now says so.
+
+**Also measured:** verify is twenty-one stages and green in 437 s; 680 Python tests offline; `pnpm session:start` 8.7 s warm; `pnpm prototype:up` 24 s warm; the data branch `openferment-data` exists and holds no data yet. No screenshots were committed for Phase 1; §2.T takes them for both phases.
 
 ---
 
@@ -87,6 +105,7 @@ Rules:
 - Every LIVE run ends with `pnpm data:push` (E.10), so the next session and Sean's own machine start from what this one produced.
 - §1.1 adds the two headings, `## Live owed` and `## Live runs`, to `STATE.md`.
 - Print the cost after each batch. When one batch costs more than three times its estimate in Appendix 7, stop and report.
+- **The key is never typed into a chat.** When a step needs the key and the lane is `none`, write one line in the report, `FOR SEAN: set OPENFERMENT_API_KEY on the cloud environment (Appendix 5, step 2)`, owe the step, and go on. A session never asks for the key's value, and never accepts one pasted into the conversation; a key that has been in a chat is a key to rotate.
 
 ## A.5 Stop conditions
 
@@ -178,6 +197,22 @@ Everything below was measured on 13 October 2026. A.2 step 5 asks you to confirm
 | Licence | neither branch holds a licence file, and neither `package.json` nor `core/pyproject.toml` declares one |
 | Installed licences | the production tree includes `OFL-1.1` on three font packages and the expression `MIT AND ISC`. `rank-bm25` spells its licence `Apache2.0`. `openferment-core` carries no licence metadata |
 | API | 26 routes in `core/openferment_core/api.py` |
+
+**Measured after Phase 1 (14 October, branch @ `eebe63f`):**
+
+| Check | Result |
+|---|---|
+| Handled step ids | `§1.1 §1.2 §1.3 §1.4 §1.5 §1.R §1.T §2.1` |
+| Verify | twenty-one stages, green in 437 s; 680 Python tests offline; smoke 58, golden path 26, deep paths 7 |
+| Fetch | 31 of 59 papers with an identifier returned full text; 26 have no open-access text on Europe PMC; B1 and D1 answer 500 |
+| Extraction | has yet to run; owed under `## Live owed` with its command. Lane was `none`: no key reached the session |
+| Curated quotes in fetched text | 3 of the 46 curated records on fetched papers quote a sentence the text holds (r-J10-1, r-O3-2, r-O3-4) |
+| Parser | `split_jats` fixed against the 31 real articles, two audits in `docs/build/JATS-AUDIT.md`; 8,629 of 8,632 checked numbers intact after the fixes |
+| Scripts in place | `session-start.sh`, `data-sync.sh`, `data-prepare.sh`, `decisions-push.sh`, `prototype-up.sh`, `shots.mjs`, `witness-numbers.ts`, `check-licences.py`; `test:core` and `test:live` run with `--all-extras` |
+| Licence ledger | 36 Python and 54 JavaScript packages against 12 allowed strings; one acceptance so far (`certifi`, MPL-2.0, Sean) |
+| `STATE.md` | has `## Live owed` and `## Live runs` |
+| Data branch | `openferment-data` exists, one commit, no data under the listed paths yet |
+| §2.1 | five polymer fields, `growth_rate_mu` to 2.5 h⁻¹ with the D9 note, `carbonSource` and `organismText` on candidates and records, `CARBON_SOURCES` and `carbonSourceId`, strain resolution at anchoring, the `REFUSALS` row |
 
 ## B.2 The machine a cloud session runs on
 
@@ -588,6 +623,11 @@ Build E.9, and begin by measuring. Run the reader over what is installed and pri
 **Numbers for `STATE.md`:** papers that returned full text, of the 59 asked; candidates anchored; rejections by rule; total cost; Witness's provisional precision and recall.
 **Commit:** `OF-BLD-014 §1.5: the first real fetch and extraction, and the demo fixtures made from it`
 
+**Status in v1.1.** The offline part and the fetch are done (31 of 59). The parser work the first session added lives under this step's id: `263d192` and `eebe63f` (the audits), `da606a7` (the fixes). The extraction, `demo:fixtures --real`, `witness:numbers` and `data:push` are owed, and the command is on the `## Live owed` line. Two notes for the session that pays it:
+
+- Witness compares `claude-1` to the curated records by value and field (`match_run`), so the 3-of-46 quote fact leaves its precision and recall meaningful. Report, beside them, how many curated records on fetched papers the run matched and how many it missed.
+- B1 and D1 answer 500. Ask them again once; when they fail a third time, leave them as fetch failures with the reason recorded, and move on.
+
 **For Sean after this phase:** open Settings and set your reviewer name. When the app runs on your own machine (`pnpm prototype:up`), make a first handful of decisions in Guild, then `pnpm decisions:push`.
 
 ## §1.R and §1.T
@@ -818,9 +858,9 @@ Add the `rag` extra with `fastembed==0.9.0`, and its licence line. `embed.py` im
 
 **Three question sets.**
 
-- **K — known items.** Built by code, free, and it grows with the corpus. For every record or candidate whose quote sits verbatim in fetched text, the question is built from the field's name, the organism and the carbon source, where the record has them. A passage is relevant when it holds an anchored quote for that field and organism.
+- **K — known items.** Built by code, free, and it grows with the corpus. For every record or candidate whose quote sits verbatim in fetched text, the question is built from the field's name, the organism and the carbon source, where the record has them. A passage is relevant when it holds an anchored quote for that field and organism. Measured on 14 October: 3 of the 46 curated records on fetched papers have such a quote, so K is carried by anchored candidates, whose quotes are verbatim by construction. The report states how many of each K holds.
 - **S — written questions.** `pnpm rag:questions --n 200` samples passages, seeded and spread across papers and kinds, and asks the `index` role for one question a bioprocess engineer would ask that the passage answers, without copying its numbers or its rare strings. A question that shares five consecutive words with its passage is discarded and counted. The sampled passage is the relevant one. Kept in `core/data/rageval/questions.jsonl`.
-- **F — the flows.** For each of the twelve authored flows that cite a record, the relevant passages hold the quotes of the records that flow expects, wherever those quotes anchor in fetched text.
+- **F — the flows.** For each of the twelve authored flows that cite a record, the relevant passages are those that hold an anchored quote of a record the flow expects. A flow none of whose records anchor is left out of F, and the report says how many flows F covers. With 3 of 46 curated quotes anchoring, F may be small; S and K carry the choice of lane, and F is reported for what it is.
 
 **Metrics,** per lane and per set: recall@5, recall@10, recall@20, MRR@10, nDCG@10, median seconds, model cost per question. `pnpm rag:eval` runs every available lane and writes `core/data/rageval/report.json` with the date, the index's manifest hash and each lane's settings. `GET /api/rag/report` serves it.
 
@@ -1373,7 +1413,7 @@ This step is the phase's T step and the document's last.
 1. Read `## Live owed` in `STATE.md` and pay what this machine can. When a line remains, stop and report, naming what Sean has to give for each (an approval, a setting, a run on his machine): the pull request waits until every run is paid.
 2. `README.md` from top to bottom: every count measured today, the gate list, the module map, a section for each of this document's phases in the file's existing voice.
 3. `COMPONENTS.md` through `components.ts`. `CLAUDE.md`: remove "The active build" and leave its standing facts in the sections where they belong. `STATE.md`: the final entry.
-4. With D1's default: move `docs/build/questions-pha.txt` to `core/tests/fixtures/`, then delete `docs/build/`.
+4. With D1's default: move `docs/build/questions-pha.txt` to `core/tests/fixtures/` and `docs/build/JATS-AUDIT.md` to `docs/JATS-AUDIT.md`, then delete `docs/build/`.
 5. `pnpm verify`. Push. Open the pull request to `main`, with the ten `STATE.md` entries as its description and a note recommending a squash merge. Leave merging to Sean.
 
 **Commit:** `OF-BLD-014 §10.4: say true things about the prototype, everywhere the repository speaks`
@@ -1811,6 +1851,7 @@ Question 4 exercises `yield_ceiling`, question 8 `selling_price`, question 10 `d
 2. **The environment,** for cloud sessions (D5). In Claude Code on the web, open the settings of the environment you use for this repository:
    - Set network access to **Custom**, keep the default allowed list, and add `www.ebi.ac.uk` (Europe PMC, where the papers come from), `huggingface.co`, `*.huggingface.co` and `*.hf.co` (one download of a small embedding model), and `api.crossref.org` (DOI look-ups). `bigg.ucsd.edu` is optional and serves stretch phase S2 alone.
    - Add the variable `OPENFERMENT_API_KEY` with the key as its value. Use that exact name. Claude Code reads a variable called `ANTHROPIC_API_KEY` for its own sign-in, and a session that finds one may bill its own work to it.
+   - This is the only way the key reaches a session. Never paste it into the chat: a session is told to decline it (A.4), and a key that has been in a chat is a key to rotate. After you add the variable, the next session's `pnpm ready` reads lane `full`, and the owed extraction runs first.
    - With D5's other choice, run Claude Code on your Mac and put the key in `core/.env` as `README.md` describes. No network setting is needed there.
 3. **The document.** Put `OF-BLD-014.md` and `PROMPT.md` where a session can read them. Any one of these works:
    - On GitHub, open the branch menu on `guild-primer-phase1`, type `claude/of-bld-014-prototype` and create the branch. Then **Add file → Upload files** and upload both files to the root of that branch.
@@ -1910,11 +1951,13 @@ The two guards in D8 sit above these: 0.75 USD for one question, 25 USD for one 
 
 **Measured or run on 13 October 2026:** the repository's two branches and their state; `pnpm verify` on a fresh cloud VM; which hosts a default cloud session reaches; every library in B.3, installed and exercised; the six ceilings and the frontiers in Appendix 2; the flowsheet and its five traps in Appendix 3; the growth fit, kinetic fit and forecast band of Phase 7 on synthetic series; the model API facts in B.4, read from the documentation.
 
+**Measured on 14 October 2026, by the first session:** Phase 1 and §2.1 as built; the fetch, 31 of 59; the parser against 31 real articles, before and after its fixes; 3 of 46 curated quotes verbatim in the text. B.1's second table holds the numbers.
+
 **Could not be measured, and what covers each:**
 
 | Unknown | What covers it |
 |---|---|
-| The live pipeline has never run. Real papers may break the fetcher or the extractor in ways fixtures did not | §1.5 is the first step that meets real papers, and it comes early. A.5 stops on a failure |
+| The extractor has never run on a real paper. The fetcher has, and the parser broke in the ways the audit lists; the extractor may hold surprises of its own | §1.5's owed run is the first extraction, and it comes before §2.2. A.5 stops on a failure |
 | Europe PMC's search response fields. Its documentation could not be read from the session that wrote this | §2.3 prints the keys of the first result and stops when a named field is missing |
 | How many open-access PHA papers the rule finds, and how many usable records they yield | §2.4 reports both. Sean approves the list |
 | How well Haiku 5.5 grades passages and writes questions | §4.3 scores every lane. The rule picks a paid lane only when it wins by the margin |
