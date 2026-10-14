@@ -38,10 +38,10 @@ question the app labels as open** rather than answering.
 | Layer | Status |
 |---|---|
 | Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
-| Full text | **Real, when fetched** — as of 2026-09-21, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
+| Full text | **Real, when fetched** — as of 2026-10-14, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them). The cloud session that measured this could not reach Europe PMC, so the first real fetch (OF-BLD-014 §1.5) is owed in `STATE.md`; the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
-| Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
+| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-14, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
+| Verified records | **0** as of 2026-10-14 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
@@ -191,6 +191,22 @@ function, signed with the reviewer name from Settings; that file is committed, `
 `candidates/` are not. A typed value — a correction, a gold value — has to sit in a sentence of
 the fetched paper like any other number, or the write is refused and Guild says which rule.
 
+### The prototype build's commands (OF-BLD-014)
+
+```bash
+pnpm prototype:up        # a fresh clone to the running prototype: session:start, a build, the service on
+                         # 127.0.0.1:8000 over core/data/, the app on 127.0.0.1:4173. Ctrl-C stops both
+pnpm session:start       # what every session runs first: core/.env from OPENFERMENT_API_KEY when the file
+                         # is missing, every extra installed, the corpus, data:pull, data:prepare, pnpm ready
+pnpm ready               # its last line is the lane: full (a key Anthropic accepts, Europe PMC
+                         # answers), model-only (that key alone) or none
+pnpm data:push           # the outputs of live runs to the orphan branch openferment-data; data:pull brings
+                         # them back. Fetched full text never travels: each machine fetches its own
+pnpm decisions:push      # commits core/data/biorepo.json alone as "Guild decisions <date>" and pushes
+pnpm witness:numbers     # the precision and recall Witness shows, read from a running service
+pnpm shots --prefix p /biorepo/witness    # photographs routes of a running app into docs/shots/
+```
+
 ### Hosting it on the Mac Mini
 
 After a `pnpm build`, the service serves the app itself at `/` beside `/api`, so
@@ -284,7 +300,7 @@ export set together.
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — twenty stages, in order:
+pnpm verify              # offline — no key, no service, no network — twenty-one stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
@@ -293,9 +309,10 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
                          #   practice.py's drafts and tutor turns against a stand-in model, and
                          #   checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs
+  pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
-  pnpm test:export       #   the decision merge, exercised on a fixture that has decisions; a bent one fails
+  pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
   pnpm check:guild       #   Guild's ladder, the sample team, the gate in both modes, what runs, lessons, practice and

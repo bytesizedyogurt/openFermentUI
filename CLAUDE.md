@@ -128,11 +128,12 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Twenty stages, in order: check:secrets → typecheck → check:plan →
-  check:reference → test:core → check:seed → check:biorepo → test:export →
-  check:anchors → check:store → check:guild → check:lock → check:capture → build →
-  test:durable → test:deposition → test:reconcile → test:smoke → test:golden →
-  test:deep. Live tests are `pnpm test:live` and never in verify.
+  green.** Twenty-one stages, in order: check:secrets → typecheck →
+  check:plan → check:reference → test:core → check:licences → check:seed →
+  check:biorepo → test:export → check:anchors → check:store → check:guild →
+  check:lock → check:capture → build → test:durable → test:deposition →
+  test:reconcile → test:smoke → test:golden → test:deep. Live tests are
+  `pnpm test:live` and never in verify.
 - `check:biorepo` brings its OWN export (OF-BLD-012.1 F5): it runs
   `export-corpus.ts` into a temp directory and checks against that, so it needs
   no prior `export:corpus` and can never call a decision unmerged when the
@@ -158,9 +159,11 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - `pnpm ready` (`core/openferment_core/ready.py`) answers "will the live loop
   work here" without spending: key, model (the free Models API, which is also
   how a retired model shows), corpus, build, data, intake counts, Europe PMC,
-  push access for the decisions backup, the running service. install.sh and
-  deploy.sh run it last. It never prints any part of the key; `test_ready`
-  holds it to that. (`pnpm doctor` and `--offline` belong to pnpm itself.)
+  huggingface.co (optional: a warning at most, never the exit code), push
+  access for the decisions backup, the running service. Its last line is the
+  lane (OF-BLD-014 A.4). install.sh and deploy.sh run it last. It never
+  prints any part of the key; `test_ready` holds it to that. (`pnpm doctor`
+  and `--offline` belong to pnpm itself.)
 - The server binds to `127.0.0.1`. The service has no login, so the bind
   address is the access control; `tailscale serve` publishes it to the owner's
   devices. Widening it (`OPENFERMENT_HOST`) is a decision for Sean, never a
@@ -286,6 +289,44 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.
+
+## Licences, sessions and data that outlive a VM (OF-BLD-014 Phase 1)
+
+- **Every dependency's licence is read and checked.** `pnpm check:licences`
+  (`scripts/check-licences.py`, after test:core in verify) reads the licence
+  metadata of every distribution in `core/.venv` that `core/uv.lock` names
+  (License, License-Expression, the licence classifiers; any one decides) and
+  of every JavaScript production dependency, against `core/licences.toml`:
+  the allowed strings in each package's own spelling, and under `[accepted]`
+  each package a named person accepted, with the date and why. It rewrites
+  `THIRD_PARTY.md` and fails while the committed copy is stale. A dependency
+  lands with its licence line; a string outside the permissive families
+  waits for Sean.
+- **A session starts with `bash scripts/session-start.sh`.** It writes
+  `core/.env` from `OPENFERMENT_API_KEY` when the file is missing (mode 600,
+  checked ignored, never printed), installs every extra, exports the corpus,
+  pulls the data branch, runs `scripts/data-prepare.sh` and `pnpm ready`.
+  `pnpm ready` ends with the lane: `full` (a key the Models API accepted, and
+  Europe PMC answering), `model-only` (that key alone), `none` otherwise, so
+  `--no-network` and fixture mode read `none`. Its `huggingface` row warns
+  and never changes the exit code.
+- **What live runs produce travels on `openferment-data`,** an orphan branch:
+  `pnpm data:push` and `data:pull` (`scripts/data-sync.sh`) copy the paths
+  E.10 lists, through a throwaway checkout under `.data-sync/`, and refuse any
+  other path by name, and any symbolic link on or under one. A pull keeps a
+  local file that differs from the branch's and names it. Fetched full text,
+  `core/.env`, spend and Guild's files never travel. `pnpm decisions:push` commits `core/data/biorepo.json` alone
+  and pushes the current branch.
+- **`pnpm prototype:up`** brings a fresh clone to the running prototype: the
+  service on 127.0.0.1:8000 over `core/data/`, the build on 127.0.0.1:4173
+  with `/api` passed through. `pnpm shots` photographs routes of a running
+  app into `docs/shots/`.
+- **The demo set follows its saved response** (`demo.py`): three
+  demonstration decisions over the hand-written stand-in, the accept of
+  `r-B5-3` alone over a real response. `pnpm test:export` exports
+  `core/tests/fixtures/export/`, the stand-in decided all four ways, which
+  `pnpm demo:fixtures` rebuilds every run. `pnpm witness:numbers` prints what
+  Witness shows, from a running service.
 
 ## Persistence tiers
 

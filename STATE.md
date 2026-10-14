@@ -231,3 +231,23 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   assessor's flag as a cause of suspension are not built; a brief has
   never been drafted by the real model here, as no key could run
   `pnpm test:live`. `pnpm verify` green.
+- **2026-10-14 · OF-BLD-014 Phase 1 (§1.1–§1.5, §1.R, §1.T)** — the base, and
+  the first real run, owed. The work branch starts from `guild-primer-phase1`
+  at `90cb31d`, whose verify measured green in **439 s**, twenty stages, **623**
+  Python tests. The build document lives in `docs/build/` (D1). A licence
+  ledger: `pnpm check:licences` reads **36** Python and **54** JavaScript
+  packages against **12** allowed strings and one acceptance (certifi,
+  MPL-2.0, Sean Creighton), and keeps `THIRD_PARTY.md` current; verify is
+  twenty-one stages. `pnpm session:start` starts every session the same way
+  (**8.7 s** warm), `pnpm ready` ends with the lane, and live-run data
+  travels on `openferment-data` (`pnpm data:push`, `data:pull`), whose
+  refusal of an unlisted path is tested through real git. `pnpm prototype:up`
+  answers in **24 s** warm; `pnpm shots` photographs a running app. Demo
+  decisions follow the saved response, `pnpm test:export` exports its own
+  stand-in set, and `pnpm witness:numbers` prints what Witness shows, checked
+  against the screen. §1.5's run is owed: lane **none** here (no key; Europe
+  PMC and huggingface.co answer ProxyError). An independent review found
+  ten defects, none high: nine are fixed in §1.R, each with a test watched
+  to fail first, and this pass corrects the stage counts. **680** Python
+  tests offline; smoke **58** routes, golden path **26**, deep paths **7**.
+  `pnpm verify` green in **437 s**, twenty-one stages.
