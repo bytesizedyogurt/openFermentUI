@@ -41,6 +41,8 @@
     "decisions:push": "bash scripts/decisions-push.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "demo:offline": "node scripts/demo-offline.mjs",
+    "prototype:up": "bash scripts/prototype-up.sh",
+    "shots": "node scripts/shots.mjs",
     "demo:fixtures": "cd core && uv run python -m openferment_core.demo",
     "check:anchors": "node scripts/check-anchors.mjs",
     "check:store": "tsx scripts/check-store.ts",
