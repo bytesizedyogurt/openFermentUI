@@ -28,7 +28,7 @@
  * real code paths. Ctrl-C stops everything.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
@@ -181,11 +181,19 @@ await new Promise((r) => web.listen(PORT, HOST, r));
 console.log('\nopenFerment — offline demo');
 console.log('──────────────────────────');
 console.log(`  service     http://127.0.0.1:${API_PORT}  fixture mode, ${health.records} records, key: ${health.hasKey ? 'PRESENT (unexpected)' : 'none'}`);
-console.log(`  data        ${DATA}  (scratch; seeded with the demo's three decisions)`);
+// What the set holds, read from it: three decisions over the hand-written
+// stand-in, one over a real response (OF-BLD-014 §1.5).
+const seeded = Object.keys(JSON.parse(readFileSync(join(DEMO, 'biorepo.json'), 'utf8')).decisions ?? {}).length;
+const standIn = readFileSync(join(DEMO, 'jats', 'PMC8471596.xml'), 'utf8').includes('THIS IS NOT THE PAPER');
+console.log(`  data        ${DATA}  (scratch; seeded with the demo's ${seeded} decision${seeded === 1 ? '' : 's'})`);
 console.log(`  fixtures    ${DEMO}`);
 console.log(`\n  open        http://${HOST === LOOPBACK ? LOOPBACK : HOST}:${PORT}/#/intake/ingest`);
 console.log('\n  The loop: fetch B5 · Extract · open Witness · open Guild · decide a record · Witness moves.');
-console.log('  B5’s text is the structural stand-in until the real JATS is saved (see the fixture).');
+console.log(
+  standIn
+    ? '  B5’s text is the structural stand-in until the real JATS is saved (see the fixture).'
+    : '  B5’s text is the real JATS, saved from Europe PMC by pnpm demo:fixtures --real.',
+);
 console.log('  Ctrl-C stops the service and the server.\n');
 
 const stop = () => {

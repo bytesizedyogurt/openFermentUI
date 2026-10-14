@@ -8,6 +8,8 @@ transcript; this file is the index a later session reads first.
 
 LIVE steps built offline whose run waits on a need this machine lacked, one line each: `- §n.m — needs <what> — <the command to run>` (OF-BLD-014 A.4).
 
+- §1.5 — needs the key and Europe PMC (`pnpm ready` reads lane full) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
+
 ## Live runs
 
 LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the step asks for>` (OF-BLD-014 A.4).

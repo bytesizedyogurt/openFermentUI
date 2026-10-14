@@ -19,5 +19,14 @@ reaches() { printf '%s\n' "$report" | grep -q "^✓ $1 "; }
 
 status=0
 
-echo "nothing to prepare yet"
+# §1.5 — the full text of every paper that carries an identifier. Intake keeps
+# what it fetched and the misses it was told, so a second run asks only for
+# what is new (intake.fetch_paper).
+if reaches europepmc; then
+  echo "full text: fetching from Europe PMC"
+  pnpm --silent intake:fetch --all || status=1
+else
+  echo "full text: Europe PMC does not answer here, so nothing is fetched (pnpm ready says why)"
+fi
+
 exit "$status"

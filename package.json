@@ -44,6 +44,7 @@
     "prototype:up": "bash scripts/prototype-up.sh",
     "shots": "node scripts/shots.mjs",
     "demo:fixtures": "cd core && uv run python -m openferment_core.demo",
+    "witness:numbers": "tsx scripts/witness-numbers.ts",
     "check:anchors": "node scripts/check-anchors.mjs",
     "check:store": "tsx scripts/check-store.ts",
     "check:guild": "tsx scripts/check-guild.ts",

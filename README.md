@@ -269,9 +269,17 @@ and `test_demo` checks that they still fit the code:
 ```bash
 pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one model call);
                               # writes jats/PMC8471596.xml, extract/B5.json and biorepo.json
-pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and the smoke overlay
-                              # fixture from whatever JATS and response are saved
+pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json, the export set and the
+                              # smoke overlay fixture from whatever JATS and response are saved
 ```
+
+The decisions follow the saved response (OF-BLD-014 §1.5). Over the hand-written stand-in they
+demonstrate the review: the titre row promoted to gold and corrected, the same row rejected as a
+colony time, and the curated `r-B5-3` accepted. Over a real response they are the accept of
+`r-B5-3` alone, and the real candidates wait for a person in Guild. `pnpm test:export` exports a
+set of its own, `core/tests/fixtures/export/`: the stand-in decided all four ways a decision can
+land, which the same command rebuilds whatever the demo set holds. Commit the demo files and the
+export set together.
 
 ### The gate
 

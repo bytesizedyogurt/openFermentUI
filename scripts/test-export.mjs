@@ -11,18 +11,20 @@
  * this stage none of that was exercised by `pnpm verify`, because the
  * committed biorepo.json is empty — the code ran over nothing and passed.
  *
- * So the demo's fixture, which HAS decisions, is exported into a temp
- * directory and read back. Then the same fixture is copied with one value
- * changed behind the exporter's back, and `check:biorepo` is pointed at it:
- * a corpus that does not reflect a decision has to fail, or the guard is
- * decoration.
+ * So a fixture that HAS decisions is exported into a temp directory and read
+ * back: core/tests/fixtures/export/, the hand-written stand-in decided all
+ * four ways a decision lands, which `pnpm demo:fixtures` rebuilds whatever
+ * the demo set holds (OF-BLD-014 §1.5). Then the same fixture is copied with
+ * one value changed behind the exporter's back, and `check:biorepo` is
+ * pointed at it: a corpus that does not reflect a decision has to fail, or
+ * the guard is decoration.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const FIXTURE = 'core/tests/fixtures/demo';
+const FIXTURE = 'core/tests/fixtures/export';
 const SHELL = process.platform === 'win32';
 
 let fails = 0;
