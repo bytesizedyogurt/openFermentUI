@@ -395,7 +395,7 @@ export const STRAINS: Strain[] = [
       {
         at: '2026-10-14',
         who: 'OF-BLD-014 §2.2',
-        text: 'Catalogued as the reference host of thread P, PHA from waste cellulosic sugars. A published genome-scale model of this strain exists, and geneOS uses it to compute yield ceilings (OF-BLD-014 §6.2). Nothing in the corpus is attributed to it until thread P papers are fetched, extracted and reviewed.',
+        text: 'Catalogued as the reference host of thread P, PHA from waste cellulosic sugars. A published genome-scale model of this strain exists; geneOS is to compute yield ceilings from it (OF-BLD-014 §6.2), and does not yet. Nothing in the corpus is attributed to it until thread P papers are fetched, extracted and reviewed.',
       },
     ],
   },

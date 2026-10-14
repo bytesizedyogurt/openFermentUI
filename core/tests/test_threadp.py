@@ -190,3 +190,57 @@ def test_europe_pmc_returns_the_fields_the_rule_reads():
     found = threadp.search()
     assert found
     threadp.check_keys(found[0])
+
+
+# ── what the Phase 2 review found (OF-BLD-014 §2.R) ────────────────────
+
+
+def test_an_include_with_no_open_text_is_catalogued_closed(tmp_path):
+    seed = tmp_path / "t.ts"
+    rows = threadp.propose([], ["PMC9999999", "31234567", "10.0000/closed"])
+    threadp.apply(rows, "Sean Creighton", seed=seed, on="2026-10-15")
+    papers = {e.paper["id"]: e.paper for e in threadp.read_seed(seed)}
+    assert all(p["openAccess"] is False for p in papers.values())
+    assert papers["P1"]["pmcid"] == "PMC9999999"
+    # A PMID is a PMID, never a DOI.
+    assert papers["P2"].get("pmid") == "31234567" and "doi" not in papers["P2"]
+    assert papers["P3"]["doi"] == "10.0000/closed"
+
+
+def test_open_access_survives_the_proposal_file():
+    rows = threadp.propose(results(), ["PMC9999999"])
+    again = threadp.from_tsv(threadp.to_tsv(rows))
+    assert again[0].openAccess is False and again[1].openAccess is True
+
+
+@pytest.mark.parametrize("name", ["Sean\nX = 1;", "Sean\rCreighton", "Sean\tCreighton", "Sean C"])
+def test_an_approver_name_is_one_line_of_text(tmp_path, name):
+    rows = approve(threadp.propose(results()), "10.0000/stand-in.1")
+    with pytest.raises(threadp.ThreadPRefused):
+        threadp.apply(rows, name, seed=tmp_path / "t.ts")
+
+
+def test_a_hand_edited_entry_is_named(tmp_path):
+    seed = tmp_path / "t.ts"
+    threadp.apply(approve(threadp.propose(results()), "10.0000/stand-in.1"), "Sean Creighton", seed=seed, on="2026-10-15")
+    assert threadp.seed_problems(threadp.read_seed(seed)) == []
+    text = seed.read_text(encoding="utf-8")
+    for before, after in [
+        ('"organisms": []', '"organisms": ["c-necator-h16"]'),
+        ('"topics": []', '"topics": ["yield"]'),
+        ('approved by Sean Creighton', 'approved by you'),
+        ('"ingest": "catalogued"', '"ingest": "complete"'),
+        ('"textSource": "curation-note"', '"textSource": "full-text"'),
+        ('"tranche": 1', '"tranche": 1, "license": "cc by"'),
+        ('No curator has read this paper.', 'A curator read this paper.'),
+    ]:
+        assert before in text
+        seed.write_text(text.replace(before, after, 1), encoding="utf-8")
+        assert threadp.seed_problems(threadp.read_seed(seed)), after
+    # And apply will not build on an edited file.
+    with pytest.raises(threadp.ThreadPRefused):
+        threadp.apply(approve(threadp.propose(results()), "10.0000/stand-in.2"), "Sean Creighton", seed=seed)
+
+
+def test_the_committed_seed_file_holds_only_what_apply_writes():
+    assert threadp.seed_problems(threadp.read_seed()) == []

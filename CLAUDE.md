@@ -112,9 +112,12 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `core/data/thread-p-proposed.tsv`; `pnpm thread:apply <file> --approved-by
   "<name>"` writes the `APPROVED` and `INCLUDE` rows, and no others, into
   `src/data/corpus/threadP.ts` — the one file there that changes — under a
-  name `biorepo.write` would accept. Its record list stays empty, and
-  `test_threadp` fails on a hand edit. The first is a DOI a person approved
-  (OF-BLD-012.1 F9): `pnpm ids:propose`
+  name `biorepo.write` would accept, on one line. Its record list stays
+  empty. `test_threadp` fails when the file holds anything apply never
+  writes — an organism, a topic, a licence, a record, another sentence, a
+  placeholder approver — and `apply` refuses to build on such a file. A
+  changed approver name that is itself acceptable is visible only in git.
+  The first is a DOI a person approved (OF-BLD-012.1 F9): `pnpm ids:propose`
   asks Crossref about every paper carrying no PMCID, DOI or PMID and writes
   `core/data/identifiers-proposed.tsv`, which is gitignored and is not the
   seed; `pnpm ids:apply <file>` writes back the rows — and only the rows —

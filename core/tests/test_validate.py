@@ -512,3 +512,34 @@ def test_no_carbon_source_is_no_drop():
     for carbon in (None, "", "   "):
         out = _with_carbon(carbon)
         assert out.accepted[0].carbonSource is None and out.field_drops == {"carbonSource": 0}
+
+
+# OF-BLD-014 §2.R: a drop counts once per candidate KEPT. An emission that
+# collapses into a duplicate, or is rejected, leaves no kept candidate to
+# have lost a field.
+
+
+def _emission(carbon, confidence, value=15):
+    return {
+        "sectionId": "s1", "field": "titer_secreted", "value": value, "unit": "mg L-1",
+        "quote": "secreted the reporter to 15 mg L-1", "carbonSource": carbon,
+        "isPrimary": True, "confidence": confidence,
+    }
+
+
+def test_a_duplicate_emission_does_not_count_its_drop_twice():
+    out = anchor_all([_emission("glucose", 0.9), _emission("glucose", 0.8)], CARBON_SECTION, paper_id="W2")
+    assert len(out.accepted) == 1 and out.duplicates == 1
+    assert out.field_drops == {"carbonSource": 1} and len(out.field_drop_details) == 1
+
+
+def test_the_count_follows_the_emission_that_is_kept():
+    out = anchor_all([_emission("glucose", 0.5), _emission("crude glycerol", 0.9)], CARBON_SECTION, paper_id="W2")
+    assert out.accepted[0].carbonSource == "crude glycerol"
+    assert out.field_drops == {"carbonSource": 0} and out.field_drop_details == []
+
+
+def test_a_rejected_emission_counts_no_field_drop():
+    out = anchor_all([_emission("glucose", 0.9, value=99)], CARBON_SECTION, paper_id="W2")
+    assert out.rejected == 1 and out.accepted == []
+    assert out.field_drops == {"carbonSource": 0}

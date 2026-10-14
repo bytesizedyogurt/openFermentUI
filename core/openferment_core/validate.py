@@ -917,14 +917,15 @@ def anchor_all(
     rejection report and the log line."""
     out = AnchorResult()
     by_id: dict[str, int] = {}
+    # The fields each kept candidate lost, beside it: a drop is counted once
+    # per candidate kept, so an emission that collapses into a duplicate or
+    # is rejected leaves no count behind (OF-BLD-014 §2.R).
+    kept_drops: list[list[tuple[str, str]]] = []
     for raw in raws:
         drops: list[tuple[str, str]] = []
         candidate, rule, detail = anchor_candidate(
             raw, sections, paper_id=paper_id, id_prefix=id_prefix, field_drops=drops
         )
-        for reason, why in drops:
-            out.field_drops[reason] = out.field_drops.get(reason, 0) + 1
-            out.field_drop_details.append(f"{reason}: {why}")
         if candidate is not None:
             # Content-addressed ids: the same sentence, field and number
             # emitted twice is one candidate, not two. The more confident
@@ -934,9 +935,11 @@ def anchor_all(
                 out.duplicates += 1
                 if candidate.confidence > out.accepted[at].confidence:
                     out.accepted[at] = candidate
+                    kept_drops[at] = drops
                 continue
             by_id[candidate.id] = len(out.accepted)
             out.accepted.append(candidate)
+            kept_drops.append(drops)
         else:
             out.rejected += 1
             out.reasons[rule or "quote"] += 1
@@ -953,4 +956,8 @@ def anchor_all(
                     detail=detail or "",
                 )
             )
+    for drops in kept_drops:
+        for reason, why in drops:
+            out.field_drops[reason] = out.field_drops.get(reason, 0) + 1
+            out.field_drop_details.append(f"{reason}: {why}")
     return out

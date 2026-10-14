@@ -620,9 +620,10 @@ export default function Home() {
           <SectionTitle
             right={
               <Explain label="What is a program?">
-                A program is one research question and the papers gathered for it. Thread P was
-                chosen by a fixed search rule and approved by a person; none of its values was
-                typed by hand. Every count here is read from the corpus as it stands now.
+                A program is one research question and the papers gathered for it. Thread P's
+                papers are proposed by a fixed search rule and enter the corpus only when a
+                person approves them; none of its values is typed by hand. Every count here is
+                read from the corpus as it stands now.
               </Explain>
             }
           >

@@ -71,7 +71,7 @@ REQUIRED_KEYS = ("pmcid", "isOpenAccess", "pubYear", "license", "citedByCount", 
 
 VERDICTS = ("PROPOSE", "REVIEW", "INCLUDE", "APPROVED")
 COLUMNS = (
-    "verdict", "id", "pmcid", "doi", "year", "journal", "title",
+    "verdict", "id", "pmcid", "doi", "pmid", "openAccess", "year", "journal", "title",
     "firstAuthor", "licence", "citations", "publicationType", "authors",
 )
 
@@ -95,6 +95,8 @@ class Row:
     id: str = ""
     pmcid: str = ""
     doi: str = ""
+    pmid: str = ""
+    openAccess: bool = False
     year: int | None = None
     journal: str = ""
     title: str = ""
@@ -171,6 +173,8 @@ def row_of(result: dict[str, Any], verdict: str) -> Row:
         verdict=verdict,
         pmcid=str(result.get("pmcid") or "").strip(),
         doi=str(result.get("doi") or "").strip(),
+        pmid=str(result.get("pmid") or "").strip(),
+        openAccess=result.get("isOpenAccess") == "Y" and bool(str(result.get("pmcid") or "").strip()),
         year=_year(result),
         journal=str(((result.get("journalInfo") or {}).get("journal") or {}).get("title") or "").strip(),
         title=_plain(str(result.get("title") or "")),
@@ -226,13 +230,20 @@ def propose(
 
     for inc in includes:
         if isinstance(inc, str):
+            # Europe PMC holds no open-access text for it: catalogued closed,
+            # under the kind of identifier it is.
             key = inc.strip()
-            row = Row(verdict="INCLUDE", pmcid=key if key.upper().startswith("PMC") else "",
-                      doi="" if key.upper().startswith("PMC") else key)
+            row = Row(verdict="INCLUDE", openAccess=False)
+            if key.upper().startswith("PMC"):
+                row.pmcid = key.upper()
+            elif key.isdigit():
+                row.pmid = key
+            else:
+                row.doi = key
         else:
             row = row_of(inc, "INCLUDE")
         rows.append(row)
-        seen.update(k.lower() for k in (row.pmcid, row.doi) if k)
+        seen.update(k.lower() for k in (row.pmcid, row.doi, row.pmid) if k)
 
     for r in kept:
         keys = {k.lower() for k in (str(r.get("pmcid") or ""), str(r.get("doi") or "")) if k}
@@ -271,7 +282,7 @@ def to_tsv(rows: Iterable[Row]) -> str:
     writer.writerow(COLUMNS)
     for r in rows:
         writer.writerow([
-            r.verdict, r.id, r.pmcid, r.doi, "" if r.year is None else r.year, r.journal, r.title,
+            r.verdict, r.id, r.pmcid, r.doi, r.pmid, "Y" if r.openAccess else "N", "" if r.year is None else r.year, r.journal, r.title,
             r.firstAuthor, r.licence, "" if r.citations is None else r.citations, r.publicationType,
             "; ".join(r.authors),
         ])
@@ -288,6 +299,8 @@ def from_tsv(text: str) -> list[Row]:
             id=cell("id"),
             pmcid=cell("pmcid"),
             doi=cell("doi"),
+            pmid=cell("pmid"),
+            openAccess=cell("openAccess").upper() == "Y",
             year=int(cell("year")) if cell("year").isdigit() else None,
             journal=cell("journal"),
             title=cell("title"),
@@ -355,7 +368,7 @@ def read_seed(path: Path = SEED_FILE) -> list[Entry]:
 def seeded_ids(entries: Sequence[Entry]) -> dict[str, str]:
     out: dict[str, str] = {}
     for e in entries:
-        for k in (e.paper.get("pmcid"), e.paper.get("doi")):
+        for k in (e.paper.get("pmcid"), e.paper.get("doi"), e.paper.get("pmid")):
             if k:
                 out[str(k).lower()] = e.paper["id"]
     return out
@@ -365,7 +378,7 @@ def paper_of(row: Row, paper_id: str, on: str) -> dict[str, Any]:
     sentence = CATALOGUED_SENTENCE.format(date=on)
     paper: dict[str, Any] = {
         "id": paper_id,
-        "title": row.title or (row.pmcid or row.doi),
+        "title": row.title or (row.pmcid or row.doi or row.pmid),
         "authors": row.authors,
         "year": row.year if row.year is not None else 0,
         "venue": row.journal,
@@ -377,20 +390,67 @@ def paper_of(row: Row, paper_id: str, on: str) -> dict[str, Any]:
         "thread": "P",
         "sourceType": "review" if row.publicationType == "review" else "journal-article",
         "textSource": "curation-note",
-        "openAccess": bool(row.pmcid),
+        "openAccess": row.openAccess,
         "tranche": 1,
     }
     if row.doi:
         paper["doi"] = row.doi
     if row.pmcid:
         paper["pmcid"] = row.pmcid
+    if row.pmid:
+        paper["pmid"] = row.pmid
     if not row.title or row.year is None or not row.authors:
         paper["verifyNeeded"] = True
     return paper
 
 
+_FIXED = {
+    "organisms": [], "topics": [], "ingest": "catalogued", "thread": "P",
+    "textSource": "curation-note", "tranche": 1,
+}
+_KEYS = {
+    "id", "title", "authors", "year", "venue", "organisms", "topics", "abstract", "sections",
+    "ingest", "thread", "sourceType", "textSource", "openAccess", "tranche",
+    "doi", "pmcid", "pmid", "verifyNeeded",
+}
+
+
+def seed_problems(entries: Sequence[Entry]) -> list[str]:
+    """What, in threadP.ts, apply could not have written. Apply writes no
+    organism, topic, licence or record, one fixed sentence dated the day of
+    its approval, and an approver `biorepo.write` would accept; anything
+    else is a hand edit (OF-BLD-014 §2.R)."""
+    out: list[str] = []
+    for n, e in enumerate(entries, 1):
+        p = e.paper
+        pid = str(p.get("id", f"entry {n}"))
+        if not re.fullmatch(r"P\d+", pid):
+            out.append(f"{pid}: an id apply does not write")
+        extra = set(p) - _KEYS
+        if extra:
+            out.append(f"{pid}: fields apply never writes ({', '.join(sorted(extra))})")
+        for k, v in _FIXED.items():
+            if p.get(k) != v:
+                out.append(f"{pid}: {k} is {p.get(k)!r}, and apply writes {v!r}")
+        sentence = CATALOGUED_SENTENCE.format(date=e.approvedOn)
+        if p.get("abstract") != sentence or p.get("sections") != [
+            {"id": f"{pid}-s1", "heading": "Catalogue note", "text": sentence}
+        ]:
+            out.append(f"{pid}: the abstract or section is not the catalogue sentence of {e.approvedOn}")
+        refusal = reviewer_refusal(e.approvedBy)
+        if refusal:
+            out.append(f"{pid}: approver {e.approvedBy!r} — {refusal}")
+        if e.verdict not in ("APPROVED", "INCLUDE"):
+            out.append(f"{pid}: verdict {e.verdict}, and apply writes APPROVED or INCLUDE")
+    return out
+
+
 def reviewer_refusal(name: str) -> str | None:
     """The reviewer-name rule `biorepo.write` applies, word for word."""
+    if any(ch.isspace() and ch != " " for ch in (name or "")) or any(not ch.isprintable() for ch in (name or "")):
+        # The name is written into a comment line of threadP.ts; a line
+        # break in it would end the comment and start code.
+        return "a name is one line of plain text"
     name = (name or "").strip()
     if not name:
         return "an approval needs a name; an empty name is nobody approving"
@@ -415,25 +475,28 @@ def apply(
         raise ThreadPRefused(refusal)
     chosen = [r for r in rows if r.verdict in ("APPROVED", "INCLUDE")]
     for r in chosen:
-        if r.verdict == "APPROVED" and not r.pmcid:
+        if r.verdict == "APPROVED" and not (r.pmcid and r.openAccess):
             raise ThreadPRefused(
                 f"row {r.doi or r.title or '(blank)'} is APPROVED with no PMCID; only an INCLUDE row "
                 "may be catalogued without open-access text"
             )
-        if not (r.pmcid or r.doi):
-            raise ThreadPRefused(f"row {r.title or '(blank)'} names neither a PMCID nor a DOI")
+        if not (r.pmcid or r.doi or r.pmid):
+            raise ThreadPRefused(f"row {r.title or '(blank)'} names no PMCID, DOI or PMID")
     on = on or date.today().isoformat()
     entries = read_seed(seed)
+    problems = seed_problems(entries)
+    if problems:
+        raise ThreadPRefused(f"{seed.name} holds what apply never writes: " + "; ".join(problems))
     known = seeded_ids(entries)
     next_n = 1 + max((int(e.paper["id"][1:]) for e in entries), default=0)
     added: list[str] = []
     for r in chosen:
-        if known.get(r.pmcid.lower()) or known.get(r.doi.lower()):
+        if any(known.get(k.lower()) for k in (r.pmcid, r.doi, r.pmid) if k):
             continue
         pid = f"P{next_n}"
         next_n += 1
         entries.append(Entry(paper_of(r, pid, on), approved_by.strip(), on, r.verdict))
-        for k in (r.pmcid, r.doi):
+        for k in (r.pmcid, r.doi, r.pmid):
             if k:
                 known[k.lower()] = pid
         added.append(f"{pid}  {r.verdict:8} {r.pmcid or r.doi}  {r.title[:70]}")
