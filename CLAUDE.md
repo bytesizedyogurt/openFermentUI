@@ -105,8 +105,16 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 ## The seed, the overlay, and offline verify
 
 - `src/data/*.ts` is the source of truth for the 132 papers and 134 records.
-  Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. The ONE sanctioned
-  exception is a DOI a person approved (OF-BLD-012.1 F9): `pnpm ids:propose`
+  Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. There are TWO
+  sanctioned exceptions, and in both a machine proposes and a person approves.
+  The second is thread P (OF-BLD-014 §2.3): `pnpm thread:propose` asks Europe
+  PMC with the fixed rule in `core/openferment_core/threadp.py` and writes
+  `core/data/thread-p-proposed.tsv`; `pnpm thread:apply <file> --approved-by
+  "<name>"` writes the `APPROVED` and `INCLUDE` rows, and no others, into
+  `src/data/corpus/threadP.ts` — the one file there that changes — under a
+  name `biorepo.write` would accept. Its record list stays empty, and
+  `test_threadp` fails on a hand edit. The first is a DOI a person approved
+  (OF-BLD-012.1 F9): `pnpm ids:propose`
   asks Crossref about every paper carrying no PMCID, DOI or PMID and writes
   `core/data/identifiers-proposed.tsv`, which is gitignored and is not the
   seed; `pnpm ids:apply <file>` writes back the rows — and only the rows —

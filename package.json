@@ -50,7 +50,9 @@
     "check:guild": "tsx scripts/check-guild.ts",
     "test:export": "node scripts/test-export.mjs",
     "ids:propose": "cd core && uv run python ../scripts/resolve-identifiers.py",
-    "ids:apply": "cd core && uv run python ../scripts/resolve-identifiers.py --apply"
+    "ids:apply": "cd core && uv run python ../scripts/resolve-identifiers.py --apply",
+    "thread:propose": "cd core && uv run python ../scripts/thread-p.py",
+    "thread:apply": "cd core && uv run python ../scripts/thread-p.py --apply"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",
