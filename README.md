@@ -10,7 +10,8 @@ full fidelity, the faculty demo, and the executable spec for the eventual produc
 
 ## The program it is built around
 
-Not a generic demo. Every screen is populated from one real research question:
+Not a generic demo. The corpus serves two real research programs. The first, threads A to O,
+was curated by hand before Intake existed, and most screens are populated from it:
 
 > **Can phosphorylated bovine β-casein be expressed in the cell-wall-deficient
 > *Chlamydomonas reinhardtii* strain cw15?**
@@ -33,12 +34,21 @@ measured on a casein or on a secreted product), secreted yields sit two to three
 β-lactoglobulin, and whether *C. reinhardtii* even has a Fam20-family kinase is an **open
 question the app labels as open** rather than answering.
 
+The second program is **PHA from waste cellulosic sugars**, thread P (OF-BLD-014 Phase 2). Its
+papers are proposed by a fixed Europe PMC search rule (`pnpm thread:propose`) and enter the
+seed only on a named person's approval (`pnpm thread:apply`). It holds no hand-curated record:
+every number on a thread P paper arrives through Intake and a Guild decision. Two hosts
+(*Cupriavidus necator* H16, *Pseudomonas putida* KT2440), two products (PHB, mcl-PHA) and five
+polymer ontology fields are in place for it. As of 2026-10-14 the thread holds **0 papers**:
+the first proposal ran, and the choice of query and the approval are owed in `STATE.md`. Home's
+**Programs** strip counts both programs live.
+
 ## What is real, and what is modeled
 
 | Layer | Status |
 |---|---|
-| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
-| Full text | **Real, when fetched** — as of 2026-10-14, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them). The cloud session that measured this could not reach Europe PMC, so the first real fetch (OF-BLD-014 §1.5) is owed in `STATE.md`; the rest show the curator's note and say so |
+| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O, and thread P empty until approved (above); 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
+| Full text | **Real, when fetched** — as of 2026-10-14, **31 of the 59** papers that carry an identifier return full text from Europe PMC (`pnpm intake:fetch --all`: 25 of the 27 with a PMCID, 6 found by DOI or PMID); 26 have no open-access text there, and B1 and D1 answer 500 and are asked again on each run. Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
 | Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-14, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
 | Verified records | **0** as of 2026-10-14 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
@@ -71,11 +81,13 @@ fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not chan
 132 papers          ingest: 'catalogued' in the seed (metadata + curator note); 27 carry a PMCID
                     and fetch as full text through the service — the reader says which it shows
 134 records         132 curated · 2 industry-estimate · 127 flagged is_primary
- 24 ontology fields  5 families: expression, ptm, functional, cultivation, downstream
+ 29 ontology fields  6 families: expression, ptm, functional, cultivation, downstream, polymer
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
- 15 strains         cw15, UVM4 and C. reinhardtii wild type; the bovine reference; and eleven comparator
+ 17 strains         cw15, UVM4 and C. reinhardtii wild type; the bovine reference; eleven comparator
                     hosts — P. pastoris GS115, T. reesei, E. coli, S. cerevisiae, Y. lipolytica, A. niger,
-                    A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila
+                    A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila; and the two thread P
+                    hosts, C. necator H16 and P. putida KT2440
+119 molecules       12 categories, 11 process families, all modeled; PHB and mcl-PHA are the two biopolymers
   9 protocols       TAP media → transformation → PEF disruption → Phos-tag → CIP
  13 chat flows       3 scenarios · 7 learn modules / 12 lessons / 42 checkpoint questions
  14 skills          6 families, tagged on 36 protocol steps across 3 protocols (placeholder
@@ -194,6 +206,8 @@ the fetched paper like any other number, or the write is refused and Guild says 
 ### The prototype build's commands (OF-BLD-014)
 
 ```bash
+pnpm thread:propose      # LIVE, no key: the thread P rule asks Europe PMC and writes core/data/thread-p-proposed.tsv
+pnpm thread:apply <tsv> --approved-by "<name>"   # writes the APPROVED and INCLUDE rows into threadP.ts
 pnpm prototype:up        # a fresh clone to the running prototype: session:start, a build, the service on
                          # 127.0.0.1:8000 over core/data/, the app on 127.0.0.1:4173. Ctrl-C stops both
 pnpm session:start       # what every session runs first: core/.env from OPENFERMENT_API_KEY when the file
@@ -437,7 +451,7 @@ catalogue views of domain objects, not components.
 
 ```
 src/data/       seed content as typed TS modules — becomes API fixtures in production
-src/data/corpus/  the 15 literature threads, A–O, one file per thread group
+src/data/corpus/  the 15 literature threads, A–O, one file per thread group; threadP.ts, written by thread:apply
 src/engine/     pure logic, unit-testable without UI, ships to production unchanged
 src/engine/geneos/  engine code a component owns outright (genus enumeration)
 src/sim/        latency model and chat flow player — two files, retired last
@@ -558,9 +572,10 @@ Recorded here because the app records them rather than papering over them:
 
 - **The seed is catalogued; full text arrives through the service.** The seed holds metadata
   and a curator note per paper, so with the service down extraction spans anchor to curator
-  prose and the reader says so. With it up, the 27 papers with a PMCID fetch as full text, the
-  extractor runs over them, and Witness scores that run (`claude-1`) provisionally against the
-  curated values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
+  prose and the reader says so. With it up, the papers Europe PMC holds open-access text for
+  fetch as full text (31 as of 2026-10-14), the extractor runs over them (waiting on a key in
+  this checkout), and Witness scores that run (`claude-1`) provisionally against the curated
+  values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
   arrives through the overlay, not the seed. The 66-record gold-set *plan* and 6 difficulty
   cases are still shown until the run exists in a checkout.
 - **49 entries are flagged `[verify]`, and they are thinner than that flag suggests.** Only 7 of

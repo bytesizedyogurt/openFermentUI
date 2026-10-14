@@ -339,6 +339,24 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `pnpm demo:fixtures` rebuilds every run. `pnpm witness:numbers` prints what
   Witness shows, from a running service.
 
+## Thread P and the polymer family (OF-BLD-014 Phase 2)
+
+- **Two programs, one corpus.** Threads A–O are the hand-curated casein
+  program; thread P is PHA from waste cellulosic sugars, proposed by rule and
+  approved by a person (see "The seed" above). The thread letters are written
+  as `[A-P]` in three places — `byEntryId` in `src/data/papers.ts`,
+  `src/sim/chat.ts` and the chip pattern in `scripts/golden-path.mjs` — and a
+  new letter changes all three. Home's Programs strip counts each program
+  live from the store.
+- **A strain alias carries the designation.** `STRAIN_ALIASES` maps `h16` and
+  `kt2440` spellings, never a species alone, so a value measured on another
+  strain of the species stays apart. Extracted values carry `organismText`
+  (the paper's words) beside `organism` (a strain id when one resolved) and a
+  `carbonSource` kept only when it stands in the cited section.
+- **A biopolymer is its own process family.** PHB and mcl-PHA are category
+  `biopolymer`, process family `P12`: they share no train with the proteins
+  and small molecules. Their bands are market framing, like every product's.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,

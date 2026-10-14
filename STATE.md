@@ -257,3 +257,24 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   to fail first, and this pass corrects the stage counts. **680** Python
   tests offline; smoke **58** routes, golden path **26**, deep paths **7**.
   `pnpm verify` green in **437 s**, twenty-one stages.
+- **2026-10-14 · OF-BLD-014 Phase 2 (§2.1–§2.4, §2.R, §2.T)** — PHA enters as
+  program two, with its papers owed. Ontology **29** fields in six families
+  (the polymer five, D9's ranges), `growth_rate_mu` to 2.5 h⁻¹, a carbon source
+  and a strain id on extracted values; `check:anchors` holds **93 of 104**.
+  Two hosts (**17** strains), PHB and mcl-PHA (**119** molecules, 12
+  categories, 11 process families: a biopolymer opens its own, P12), the
+  `phb-route` pathway, thread letter P in the three places it is written, and
+  Home's Programs strip. `pnpm thread:propose` / `thread:apply` with the rule
+  in `threadp.py`; apply writes approved rows only, under a name `biorepo.write`
+  accepts, and refuses a file holding what it never writes. The first live
+  proposal ran: the rule as written proposes **16**, mostly off-topic (the
+  query matches the full text, and "PHA" also names phytohemagglutinin);
+  held to title and abstract it proposes the full 30 and 5. §2.4 is owed:
+  Sean's choice of query, his approval, then the key. The review found nine;
+  seven fixed (five with a failing test first, two copy corrections), two
+  left as notes (process codes
+  P1–P12 read as paper ids in scripted chat; `wt%` aliases to `% CDW`
+  everywhere, as §2.1 asked). **812** Python tests offline; smoke **59**
+  routes, golden path **26**, deep paths **7**. `pnpm verify` green in
+  **467 s**, twenty-one stages (467 s again for this pass). Screenshots: `docs/shots/phase-1-*` and
+  `phase-2-*`.
