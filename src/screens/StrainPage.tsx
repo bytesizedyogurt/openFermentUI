@@ -1585,7 +1585,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             <EmptyState
               icon={<Boxes size={22} aria-hidden />}
               title="No molecule in the catalogue defaults to this host"
-              body="Nothing in the 117-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate."
+              body={`Nothing in the ${products.length}-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate.`}
               action={<LinkButton to="/dominion/molecules">Browse the catalogue</LinkButton>}
             />
           </Card>

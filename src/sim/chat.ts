@@ -242,7 +242,7 @@ export function recognizeEntities(input: string): Entities {
   const q = ' ' + norm(input) + ' ';
   const out: Entities = {};
 
-  const paper = input.match(/\b[A-O]\d{1,2}m?\b/);
+  const paper = input.match(/\b[A-P]\d{1,2}m?\b/);
   if (paper) out.paperId = paper[0].toUpperCase();
 
   const protocol = input.match(/\bPR-[A-Z]+-\d+\b/i);

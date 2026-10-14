@@ -195,6 +195,13 @@ export const PATHWAYS: Pathway[] = [
     fluxNode: 'PEP + E4P',
   },
   {
+    id: 'phb-route',
+    label: 'PHB synthesis (phaCAB)',
+    products: ['PHB', 'PHA'],
+    fluxNode: 'acetyl-CoA → acetoacetyl-CoA → (R)-3-hydroxybutyryl-CoA → PHB',
+    note: 'β-ketothiolase (phaA), acetoacetyl-CoA reductase (phaB), PHA synthase (phaC)',
+  },
+  {
     id: 'steviol',
     label: 'Steviol glycoside pathway',
     products: ['Reb M', 'Reb D'],

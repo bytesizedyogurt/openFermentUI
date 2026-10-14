@@ -40,7 +40,8 @@ import { UNIT_OPERATIONS } from '@/data/vocabulary';
 import { MODULES } from '@/data/learn';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
-import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { ProvDot, ProvenanceLegend, Tick, provMeta, type ProvKind } from '@/components/Provenance';
+import type { ExtractionRecord, Paper } from '@/data/types';
 import { WorkforceCard } from '@/components/GuildBits';
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -87,6 +88,88 @@ class TileBoundary extends React.Component<
     }
     return <>{this.props.children}</>;
   }
+}
+
+/**
+ * The research programs the corpus serves (OF-BLD-014 §2.2), each a set of
+ * thread letters. The counts on the Programs strip are read from the store,
+ * so they follow the overlay: a fetch or a decision moves them.
+ */
+const PROGRAMS: { id: string; title: ReactNode; threads: string; letters: RegExp }[] = [
+  {
+    id: 'casein',
+    title: (
+      <>
+        β-casein in <i>C. reinhardtii</i> cw15
+      </>
+    ),
+    threads: 'threads A to O',
+    letters: /^[A-O]$/,
+  },
+  {
+    id: 'pha',
+    title: 'PHA from waste cellulosic sugars',
+    threads: 'thread P',
+    letters: /^P$/,
+  },
+];
+
+function ProgramTile({
+  program,
+  papers,
+  records,
+}: {
+  program: (typeof PROGRAMS)[number];
+  papers: Paper[];
+  records: ExtractionRecord[];
+}) {
+  const mine = papers.filter((p) => program.letters.test(p.thread));
+  const ids = new Set(mine.map((p) => p.id));
+  const fullText = mine.filter((p) => p.textSource === 'full-text').length;
+  const byProv = new Map<ProvKind, number>();
+  for (const r of records) {
+    if (!ids.has(r.paperId)) continue;
+    const k = provenanceOf(r) as ProvKind;
+    byProv.set(k, (byProv.get(k) ?? 0) + 1);
+  }
+  const provs = [...byProv.entries()].sort((a, b) => b[1] - a[1]);
+  return (
+    <a
+      href={href('/intake')}
+      className="card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
+      data-program={program.id}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-serif text-section-title font-semibold leading-snug">
+            {program.title}
+          </div>
+          <div className="text-caption uppercase tracking-wide text-ink-soft">{program.threads}</div>
+        </div>
+        <ArrowUpRight size={13} className="text-ink-soft shrink-0" aria-hidden />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-body">
+        <span>
+          <span className="font-num">{mine.length}</span> papers
+        </span>
+        <span>
+          <span className="font-num">{fullText}</span> with full text
+        </span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-ink-soft">
+        {provs.length === 0 ? (
+          <span>No records yet. Values arrive through Intake and a Guild decision.</span>
+        ) : (
+          provs.map(([k, n]) => (
+            <span key={k} className="inline-flex items-center gap-1.5">
+              <ProvDot p={k} />
+              {provMeta(k).label} <span className="font-num">{n}</span>
+            </span>
+          ))
+        )}
+      </div>
+    </a>
+  );
 }
 
 function VitalTile({
@@ -529,6 +612,28 @@ export default function Home() {
 
           <div className="mt-3">
             <ProvenanceLegend />
+          </div>
+        </section>
+
+        {/* ── Band 1a · Programs (OF-BLD-014 §2.2) ────────────────────── */}
+        <section aria-labelledby="home-programs" className="mb-7">
+          <SectionTitle
+            right={
+              <Explain label="What is a program?">
+                A program is one research question and the papers gathered for it. Thread P was
+                chosen by a fixed search rule and approved by a person; none of its values was
+                typed by hand. Every count here is read from the corpus as it stands now.
+              </Explain>
+            }
+          >
+            <span id="home-programs">Programs</span>
+          </SectionTitle>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {PROGRAMS.map((program) => (
+              <TileBoundary key={program.id} label={program.threads}>
+                <ProgramTile program={program} papers={papers} records={records} />
+              </TileBoundary>
+            ))}
           </div>
         </section>
 

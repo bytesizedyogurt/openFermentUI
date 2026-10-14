@@ -163,7 +163,9 @@ export type IngestStatus =
 /** Which corpus thread an entry belongs to (OF-COR-001 §1). */
 export type CorpusThread =
   | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
-  | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O';
+  | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O'
+  /** PHA from waste cellulosic sugars, program two (OF-BLD-014 §2.2). */
+  | 'P';
 
 export type SourceType =
   | 'journal-article'
@@ -902,7 +904,9 @@ export type ProductCategory =
   | 'terpene'
   | 'glycoside'
   | 'industrial_enzyme'
-  | 'therapeutic_protein';
+  | 'therapeutic_protein'
+  /** Polymers a cell stores, PHA first (OF-BLD-014 §2.2). */
+  | 'biopolymer';
 
 /**
  * Value per kilogram, banded rather than priced. A band is defensible from

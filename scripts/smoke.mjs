@@ -239,6 +239,7 @@ const ROUTES = [
   ['/geneos/hosts/cw15', 'geneOS — strain page (cw15)'],
   ['/geneos/hosts/creinhardtii-wt', 'geneOS — strain (walled comparator)'],
   ['/geneos/hosts/bovine', 'geneOS — strain (reference molecule)'],
+  ['/geneos/hosts/c-necator-h16', 'geneOS — strain (thread P host)'],
   ['/geneos/pathway', 'geneOS — pathway vocabulary'],
   ['/fermos', 'fermOS (the emptiest of the eleven)'],
   ['/pureos', 'pureOS'],
