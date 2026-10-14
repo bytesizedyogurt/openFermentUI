@@ -1,0 +1,37 @@
+# The licence ledger (OF-BLD-014 §1.2, E.9).
+#
+# `pnpm check:licences` (scripts/check-licences.py) reads the licence metadata
+# of every distribution installed in core/.venv that core/uv.lock names, and of
+# every JavaScript production dependency, and fails on a string that is
+# neither allowed here nor accepted below. It compares text, so each string is
+# written in the spelling the package's own metadata uses: `Apache2.0` and
+# `Apache-2.0` are two strings.
+#
+# The allowed list holds permissive licences alone, each one measured on what
+# is installed, with the packages that carried it on the day it was added. A
+# licence outside the permissive families is accepted package by package,
+# under [accepted], by a named person, with the date and one line of why.
+# The project's own package, openferment-core, carries no licence metadata
+# (the repository declares no licence yet) and the check skips it by name.
+
+allowed = [
+  # Measured 2026-10-14 on core/.venv (Python 3.13) and `pnpm licenses list --prod`.
+  "MIT",                          # most packages on both sides
+  "MIT License",                  # uvloop, in its License field
+  "MIT AND ISC",                  # victory-vendor
+  "MIT OR Apache-2.0",            # sniffio
+  "ISC",                          # lucide-react, internmap, ten d3 packages
+  "BSD-2-Clause",                 # pygments
+  "BSD-3-Clause",                 # click, httpx, starlette, uvicorn and six more; d3-ease, react-transition-group
+  "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",  # numpy
+  "Apache2.0",                    # rank-bm25 spells it so
+  "Apache-2.0 OR BSD-2-Clause",   # packaging
+  "PSF-2.0",                      # typing_extensions
+  "OFL-1.1",                      # the three @fontsource font packages
+]
+
+[accepted.certifi]
+licence = "MPL-2.0"
+by = "Sean Creighton"
+date = 2026-10-14
+why = "Mozilla's bundle of trusted HTTPS certificates, read unmodified by httpx and httpcore when Intake calls Europe PMC and Crossref; MPL-2.0 binds only the files it covers."

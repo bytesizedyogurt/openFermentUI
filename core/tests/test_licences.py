@@ -1,0 +1,196 @@
+"""The licence check decides as the ledger says (OF-BLD-014 §1.2, E.9).
+
+Offline, on packages built in the test: an allowed string passes, an unknown
+one fails, an accepted one passes and names who accepted it, and the listing
+is rewritten, with the stage failing, when the committed copy is stale. The
+check over what is really installed is the verify stage `pnpm check:licences`.
+"""
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def _load():
+    spec = importlib.util.spec_from_file_location("check_licences", REPO / "scripts" / "check-licences.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses resolve their annotations through it
+    spec.loader.exec_module(module)
+    return module
+
+
+lic = _load()
+
+LEDGER = """
+allowed = ["MIT", "Apache2.0", "MIT AND ISC"]
+
+[accepted.certifi]
+licence = "MPL-2.0"
+by = "Sean Creighton"
+date = 2026-10-14
+why = "a certificate bundle, used unmodified"
+"""
+
+
+@pytest.fixture
+def policy(tmp_path):
+    path = tmp_path / "licences.toml"
+    path.write_text(LEDGER, encoding="utf-8")
+    return lic.load_policy(path)
+
+
+def package(name, strings, policy, side="python"):
+    return lic.Package(side, name, "1.0", tuple(strings), "service", lic.decide(name, strings, policy))
+
+
+# ── the decision ────────────────────────────────────────────────────────
+
+
+def test_an_allowed_string_passes(policy):
+    verdict = lic.decide("anthropic", ["MIT", "License :: OSI Approved :: MIT License"], policy)
+    assert verdict.ok and verdict.string == "MIT" and verdict.how == "allowed"
+
+
+def test_an_unknown_string_fails_and_says_which(policy):
+    verdict = lic.decide("somelib", ["GPL-3.0-only"], policy)
+    assert not verdict.ok and "GPL-3.0-only" in verdict.how and "core/licences.toml" in verdict.how
+
+
+def test_an_accepted_package_passes_and_names_who_accepted_it(policy):
+    verdict = lic.decide("certifi", ["MPL-2.0", "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)"], policy)
+    assert verdict.ok and verdict.string == "MPL-2.0"
+    assert verdict.how == "accepted by Sean Creighton on 2026-10-14"
+
+
+def test_an_acceptance_covers_its_own_string_alone(policy):
+    verdict = lic.decide("certifi", ["GPL-3.0-only"], policy)
+    assert not verdict.ok and "accepted as MPL-2.0 by Sean Creighton" in verdict.how
+
+
+def test_an_acceptance_belongs_to_its_package(policy):
+    assert not lic.decide("another-bundle", ["MPL-2.0"], policy).ok
+
+
+def test_any_of_the_three_fields_can_decide(policy):
+    # A License field holding the whole licence text matches nothing; the
+    # classifier or the expression beside it still can.
+    assert lic.decide("pkg", ["Permission is hereby granted, free of charge...", "MIT"], policy).ok
+    assert lic.decide("pkg", ["Permission is hereby granted, free of charge..."], policy).ok is False
+
+
+def test_the_spelling_is_compared_as_written(policy):
+    assert lic.decide("rank-bm25", ["Apache2.0"], policy).ok
+    assert not lic.decide("other", ["Apache-2.0"], policy).ok, "Apache-2.0 is a second string"
+    assert lic.decide("victory-vendor", ["MIT AND ISC"], policy).ok
+    assert not lic.decide("other", ["ISC"], policy).ok, "an expression allows itself, never its parts"
+
+
+def test_a_package_with_no_licence_metadata_fails(policy):
+    verdict = lic.decide("bare", [], policy)
+    assert not verdict.ok and "no licence metadata" in verdict.how
+
+
+def test_names_are_compared_in_their_canonical_spelling(policy):
+    assert lic.decide("Certifi", ["MPL-2.0"], policy).ok
+    assert lic.canonical("typing_extensions") == lic.canonical("Typing.Extensions") == "typing-extensions"
+
+
+# ── the ledger ──────────────────────────────────────────────────────────
+
+
+def test_an_acceptance_needs_a_name_a_date_and_a_reason(tmp_path):
+    path = tmp_path / "licences.toml"
+    path.write_text('allowed = ["MIT"]\n[accepted.x]\nlicence = "GPL-3.0-only"\ndate = 2026-10-14\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="lacks by, why"):
+        lic.load_policy(path)
+
+
+def test_the_committed_ledger_reads_and_every_acceptance_is_signed():
+    committed = lic.load_policy()
+    assert committed.allowed
+    for acceptance in committed.accepted.values():
+        assert acceptance.by.strip() and acceptance.date and acceptance.why.strip()
+
+
+def test_the_project_itself_is_the_one_package_skipped():
+    assert lic.SELF == "openferment-core"
+    names = {p.name for p in lic.python_side(lic.load_policy())}
+    assert lic.SELF not in {lic.canonical(n) for n in names}
+
+
+# ── which part uses it ──────────────────────────────────────────────────
+
+
+def test_the_part_follows_the_lock():
+    lock = {"package": [
+        {"name": "openferment-core", "dependencies": [{"name": "uvicorn", "extra": ["standard"]}, {"name": "rank-bm25"}],
+         "optional-dependencies": {"dev": [{"name": "pytest"}]}},
+        {"name": "uvicorn", "dependencies": [{"name": "click"}],
+         "optional-dependencies": {"standard": [{"name": "uvloop"}]}},
+        {"name": "rank-bm25", "dependencies": [{"name": "numpy"}]},
+        {"name": "numpy"}, {"name": "click"}, {"name": "uvloop"},
+        {"name": "pytest", "dependencies": [{"name": "pluggy"}]}, {"name": "pluggy"},
+    ]}
+    parts = lic.python_parts(lock)
+    assert parts["rank-bm25"] == "service"
+    assert parts["numpy"] == "service, through rank-bm25"
+    assert parts["uvloop"] == "service, through uvicorn", "an extra asked of a dependency is followed"
+    assert parts["pytest"] == "tests" and parts["pluggy"] == "tests, through pytest"
+
+
+def test_a_javascript_package_nobody_imports_says_so(tmp_path):
+    (tmp_path / "main.tsx").write_text("import { create } from 'zustand';\nimport '@fontsource/spectral/400.css';\n")
+    tree = [{"dependencies": {
+        "zustand": {"dependencies": {}},
+        "@fontsource/spectral": {},
+        "react-router-dom": {"dependencies": {"react-router": {"dependencies": {}}}},
+    }}]
+    parts = lic.javascript_parts(tree, src=tmp_path)
+    assert parts["zustand"] == "browser app"
+    assert parts["@fontsource/spectral"] == "browser app"
+    assert parts["react-router-dom"] == "listed in package.json; no file under src/ imports it"
+    assert parts["react-router"] == "through react-router-dom, which no file under src/ imports"
+
+
+# ── the stage ───────────────────────────────────────────────────────────
+
+
+def test_the_stage_passes_when_all_pass_and_the_listing_is_current(policy, tmp_path):
+    python = [package("anthropic", ["MIT"], policy), package("certifi", ["MPL-2.0"], policy)]
+    javascript = [package("victory-vendor", ["MIT AND ISC"], policy, side="javascript")]
+    listing = tmp_path / "THIRD_PARTY.md"
+    listing.write_text(lic.render(python, javascript, policy), encoding="utf-8")
+    code, report = lic.check(python, javascript, policy, listing)
+    assert code == 0, report
+    assert any("certifi 1.0 (MPL-2.0): accepted by Sean Creighton on 2026-10-14" in line for line in report)
+
+
+def test_one_failing_package_fails_the_stage_by_name(policy, tmp_path):
+    python = [package("anthropic", ["MIT"], policy), package("somelib", ["GPL-3.0-only"], policy)]
+    listing = tmp_path / "THIRD_PARTY.md"
+    listing.write_text("# the committed listing\n", encoding="utf-8")
+    code, report = lic.check(python, [], policy, listing)
+    assert code == 1
+    assert any("python somelib 1.0: GPL-3.0-only" in line for line in report)
+    assert listing.read_text(encoding="utf-8") == "# the committed listing\n", "a failing tree is never listed"
+
+
+def test_a_stale_listing_is_rewritten_and_fails_the_stage(policy, tmp_path):
+    python = [package("anthropic", ["MIT"], policy)]
+    listing = tmp_path / "THIRD_PARTY.md"
+    listing.write_text("# an older listing\n", encoding="utf-8")
+    code, report = lic.check(python, [], policy, listing)
+    assert code == 1 and any("was stale and has been rewritten" in line for line in report)
+    assert listing.read_text(encoding="utf-8") == lic.render(python, [], policy)
+    assert lic.check(python, [], policy, listing)[0] == 0, "once rewritten it is current"
+
+
+def test_the_listing_names_the_package_version_licence_and_part(policy):
+    text = lic.render([package("certifi", ["MPL-2.0"], policy)], [], policy)
+    assert "| certifi | 1.0 | MPL-2.0 | service | accepted by Sean Creighton on 2026-10-14 |" in text
+    assert "| certifi | MPL-2.0 | Sean Creighton | 2026-10-14 | a certificate bundle, used unmodified |" in text
