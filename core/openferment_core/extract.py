@@ -185,6 +185,15 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
                                 "type": "string",
                                 "description": "The strain or organism the measurement is of, if named.",
                             },
+                            # OF-BLD-014 §2.1. Anchoring keeps it only when
+                            # the words stand in the cited section.
+                            "carbonSource": {
+                                "type": "string",
+                                "description": (
+                                    "The carbon source or feedstock the measurement was made on, in "
+                                    "the words the paper uses for it. Omit it when the paper names none."
+                                ),
+                            },
                             "isPrimary": {
                                 "type": "boolean",
                                 "description": "False when the sentence reports another paper's measurement.",
@@ -524,7 +533,17 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
         notes=notes,
         calls=got.calls,
         truncatedSections=got.truncatedSections,
+        fieldDrops=dict(anchored.field_drops),
     )
+    if any(anchored.field_drops.values()):
+        # §2.1 — a field dropped from a kept candidate is counted, never
+        # repaired, and said here the way a rejection is.
+        log.warning(
+            "%s: anchoring dropped a field from %d kept candidates — %s",
+            paper_id,
+            sum(anchored.field_drops.values()),
+            "; ".join(anchored.field_drop_details),
+        )
     if anchored.rejected:
         # §2.4 — a rising rejection rate is the signal that the prompt has
         # drifted, and it is the only signal there is.

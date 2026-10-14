@@ -1,5 +1,6 @@
 // Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families,
-// replacing the 16-field synthetic ontology of OF-DES-001 Appendix C.
+// replacing the 16-field synthetic ontology of OF-DES-001 Appendix C — and
+// the polymer family OF-BLD-014 §2.1 adds for thread P: 29 fields in six.
 //
 // Two rules this literature forces and the synthetic version did not:
 //
@@ -20,7 +21,15 @@ export const FAMILY_LABEL: Record<ParameterFamily, string> = {
   functional: 'Functional performance',
   cultivation: 'Cultivation',
   downstream: 'Downstream & economics',
+  polymer: 'Polymer',
 };
+
+/**
+ * Who chose the validation ranges OF-BLD-014 §2.1 sets, and what they are
+ * for (its decision D9; OF-BLD-014 E.1). A range is a guard, not a result.
+ */
+const D9_RANGE_NOTE =
+  'Validation range proposed in OF-BLD-014 and accepted by Sean Creighton on 2026-10-14. It rejects implausible extractions and states nothing about what has been achieved.';
 
 export const ONTOLOGY: ParameterDef[] = [
   // ── Family 1 — expression performance ───────────────────────────────
@@ -234,8 +243,10 @@ export const ONTOLOGY: ParameterDef[] = [
     definition:
       'First-order rate constant of exponential biomass increase — the slope of ln(X) against time during unrestricted growth.',
     canonicalUnit: 'h⁻¹',
-    range: [0.005, 0.35],
-    notes: 'C. reinhardtii cc124 mixotrophic 0.087. Accepts d⁻¹ input.',
+    // The upper bound was set for algae; OF-BLD-014 §2.1 widened it, under
+    // D9, so a bacterium's growth rate passes.
+    range: [0.005, 2.5],
+    notes: `C. reinhardtii cc124 mixotrophic 0.087. Accepts d⁻¹ input. The upper bound was widened for bacteria under OF-BLD-014 §2.1. ${D9_RANGE_NOTE}`,
   },
   {
     id: 'final_biomass_density',
@@ -298,6 +309,71 @@ export const ONTOLOGY: ParameterDef[] = [
     range: [1, 1e5],
     notes:
       'Crude FDH 75–2,300; purified 970–99,000; biomass-fermentation protein 4–6. Currency is not auto-converted.',
+    requiresMethod: true,
+  },
+
+  // ── Family 6 — polymer (OF-BLD-014 §2.1) ────────────────────────────
+  // Thread P's polyhydroxyalkanoates. Every range here is a guard Sean
+  // Creighton accepted under D9, not a value anybody measured.
+  {
+    id: 'pha_content_cdw',
+    family: 'polymer',
+    name: 'PHA content',
+    definition: 'Mass fraction of polymer in dry cell mass.',
+    canonicalUnit: '% CDW',
+    range: [0.1, 95],
+    notes: D9_RANGE_NOTE,
+    requiresMethod: true,
+    refuseConversionTo: [
+      {
+        field: 'pha_titre',
+        because:
+          'Needs the biomass density of that culture. Without it, a share of dry cell mass cannot become a concentration.',
+      },
+    ],
+  },
+  {
+    id: 'pha_titre',
+    family: 'polymer',
+    name: 'PHA titre',
+    definition: 'Polymer mass per culture volume.',
+    canonicalUnit: 'g L⁻¹',
+    range: [0.01, 250],
+    notes: D9_RANGE_NOTE,
+    refuseConversionTo: [
+      {
+        field: 'pha_content_cdw',
+        because:
+          'Needs the biomass density of that culture. Without it, a concentration cannot become a share of dry cell mass.',
+      },
+    ],
+  },
+  {
+    id: 'pha_yield_substrate',
+    family: 'polymer',
+    name: 'PHA yield on substrate',
+    definition: 'Grams of polymer per gram of carbon source consumed.',
+    canonicalUnit: 'g g⁻¹',
+    range: [0.001, 1],
+    notes: D9_RANGE_NOTE,
+  },
+  {
+    id: 'pha_productivity',
+    family: 'polymer',
+    name: 'PHA volumetric productivity',
+    definition: 'Polymer formed per litre per hour.',
+    canonicalUnit: 'g L⁻¹ h⁻¹',
+    range: [0.001, 10],
+    notes: D9_RANGE_NOTE,
+  },
+  {
+    id: 'pha_mw',
+    family: 'polymer',
+    name: 'Polymer molecular weight',
+    definition: 'Weight-average or number-average; the quote says which.',
+    canonicalUnit: 'kDa',
+    range: [1, 10000],
+    notes: D9_RANGE_NOTE,
     requiresMethod: true,
   },
 ];

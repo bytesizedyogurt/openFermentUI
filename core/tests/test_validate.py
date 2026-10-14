@@ -356,3 +356,159 @@ def test_an_invalid_support_value_falls_back_rather_than_crashing():
         [{"id": "c1", "text": "Expression in the strain", "recordIds": ["r-A1-1"], "support": "vibes"}]
     )
     assert result.claims[0].support == "direct"
+
+
+# ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
+#
+# `core/tests/fixtures/resolvers.json` is not written by hand: `scripts/
+# export-unit-fixtures.ts` records what `normalizeStrain` and `carbonSourceId`
+# answer for a fixed set of wordings, and `pnpm test:core` regenerates it
+# before pytest runs. The mirror here must answer the same, case by case;
+# when it does not, the TypeScript side is right.
+
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from openferment_core.validate import (  # noqa: E402
+    anchor_all,
+    anchor_candidate,
+    carbon_source_id,
+    strain_id,
+)
+
+RESOLVERS = Path(__file__).parent / "fixtures" / "resolvers.json"
+
+
+def _resolvers() -> dict:
+    if not RESOLVERS.exists():
+        raise FileNotFoundError(
+            f"{RESOLVERS} not found. It is generated from the TypeScript resolvers — run "
+            "`pnpm export:unit-fixtures` from the repository root, or `pnpm test:core`, which does."
+        )
+    return json.loads(RESOLVERS.read_text())
+
+
+RX = _resolvers()
+
+
+@pytest.mark.parametrize("case", RX["strains"], ids=lambda c: repr(c["text"]))
+def test_the_strain_resolver_answers_as_the_browser_does(case):
+    assert strain_id(case["text"]) == case["id"]
+
+
+@pytest.mark.parametrize("case", RX["carbon"], ids=lambda c: repr(c["text"]))
+def test_the_carbon_source_resolver_answers_as_the_browser_does(case):
+    assert carbon_source_id(case["text"]) == case["id"]
+
+
+def test_the_resolver_fixture_covers_both_rules_and_their_refusals():
+    # The cases that make the rule a rule: an exact alias, one found as a
+    # whole word, one glued to other letters, and two ids in one wording.
+    strains = {c["text"]: c["id"] for c in RX["strains"]}
+    assert strains["cw15"] == "cw15"
+    assert strains["Chlamydomonas reinhardtii UVM4"] == "uvm4"
+    assert strains["uvm40"] is None and strains["xuvm4"] is None
+    assert strains["cw15 and UVM4 crossed"] is None
+    carbon = {c["text"]: c["id"] for c in RX["carbon"]}
+    assert carbon["crude glycerol"] == "glycerol"
+    assert carbon["glucosamine"] is None and carbon["glucose and xylose"] is None
+
+
+# One fetched section about an imaginary run, and a candidate on it whose
+# organism is the only thing each test changes. Test values, stated as such.
+WORDING_SECTION = [
+    {
+        "id": "s1",
+        "text": "In the imaginary run, Chlamydomonas reinhardtii UVM4 secreted the reporter to 15 mg L-1.",
+    }
+]
+
+
+def _anchored(organism: str):
+    raw = {
+        "sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+        "quote": "secreted the reporter to 15 mg L-1", "organism": organism,
+        "isPrimary": True, "confidence": 0.9,
+    }
+    candidate, rule, detail = anchor_candidate(raw, WORDING_SECTION, paper_id="W1")
+    assert candidate is not None, f"{rule}: {detail}"
+    return candidate
+
+
+def test_wording_that_contains_a_known_designation_resolves_to_its_strain_id():
+    c = _anchored("Chlamydomonas reinhardtii UVM4")
+    assert c.organism == "uvm4", "the strain id, which every screen matches on"
+    assert c.organismText == "Chlamydomonas reinhardtii UVM4", "the paper's wording, kept beside it"
+
+
+def test_an_exact_alias_resolves_too():
+    c = _anchored("UVM11")
+    assert c.organism == "uvm4" and c.organismText == "UVM11"
+
+
+def test_wording_that_names_the_species_alone_stays_as_written():
+    c = _anchored("Chlamydomonas reinhardtii")
+    assert c.organism == "Chlamydomonas reinhardtii"
+    assert c.organismText is None, "nothing was resolved, so organism already holds the wording"
+
+
+def test_wording_that_names_two_strains_is_not_resolved_to_either():
+    c = _anchored("UVM4 crossed with cw15")
+    assert c.organism == "UVM4 crossed with cw15" and c.organismText is None
+
+
+def test_resolving_the_organism_does_not_move_the_content_id():
+    # A decision keyed by content stays on its candidate when anchoring
+    # learns to resolve the wording it was made about.
+    assert _anchored("Chlamydomonas reinhardtii UVM4").id == _anchored("Chlamydomonas reinhardtii").id
+
+
+# ── the carbon source at anchoring ─────────────────────────────────────
+
+CARBON_SECTION = [
+    {
+        "id": "s1",
+        "text": "On crude glycerol the imaginary strain secreted the reporter to 15 mg L-1.",
+    }
+]
+
+
+def _with_carbon(carbon):
+    raw = {
+        "sectionId": "s1", "field": "titer_secreted", "value": 15, "unit": "mg L-1",
+        "quote": "secreted the reporter to 15 mg L-1", "carbonSource": carbon,
+        "isPrimary": True, "confidence": 0.9,
+    }
+    return anchor_all([raw], CARBON_SECTION, paper_id="W2")
+
+
+def test_a_carbon_source_in_the_section_is_kept_in_the_papers_words():
+    out = _with_carbon("Crude glycerol")
+    [c] = out.accepted
+    assert c.carbonSource == "Crude glycerol", "kept as written; case aside, it is in the section"
+    assert carbon_source_id(c.carbonSource) == "glycerol"
+    assert out.field_drops == {"carbonSource": 0} and out.rejected == 0
+
+
+@pytest.mark.parametrize(
+    "carbon, why",
+    [
+        ("glucose", "is not in section"),
+        ("two percent glycerol", "contains a number"),
+        ("glycerol 20", "contains a number"),
+        (5, "is not text"),
+    ],
+)
+def test_a_carbon_source_that_fails_is_dropped_and_its_candidate_kept(carbon, why):
+    out = _with_carbon(carbon)
+    [c] = out.accepted
+    assert c.carbonSource is None
+    assert out.rejected == 0 and out.reasons == {r: 0 for r in out.reasons}, "not a rejection"
+    assert out.field_drops == {"carbonSource": 1}
+    assert len(out.field_drop_details) == 1 and why in out.field_drop_details[0]
+
+
+def test_no_carbon_source_is_no_drop():
+    for carbon in (None, "", "   "):
+        out = _with_carbon(carbon)
+        assert out.accepted[0].carbonSource is None and out.field_drops == {"carbonSource": 0}

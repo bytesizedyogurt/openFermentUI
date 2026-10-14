@@ -446,3 +446,85 @@ def test_the_prompt_is_built_once_per_call(monkeypatch):
     monkeypatch.setattr(extract, "build_prompt", counting)
     extract.extract_paper("X1")
     assert calls == [len(intake.cached("X1").sections)], calls
+
+
+# ── a polymer, a bacterium's growth rate, and what the cells were fed ──
+# (OF-BLD-014 §2.1). The section is a fixture about an imaginary run; its
+# numbers are test values, not results.
+
+PHA_SECTION = (
+    "On glucose the imaginary strain accumulated poly(3-hydroxybutyrate) to 62 wt% of "
+    "the cell dry mass. Its specific growth rate was 0.41 h-1 in the batch phase."
+)
+
+
+def _pha_candidates(**over) -> dict:
+    base = [
+        {  # a polymer content written as wt%
+            "sectionId": "s1", "field": "pha_content_cdw", "value": 62, "unit": "wt%",
+            "quote": "accumulated poly(3-hydroxybutyrate) to 62 wt% of the cell dry mass",
+            "method": "GC", "isPrimary": True, "confidence": 0.9,
+            "organism": "imaginary strain", "carbonSource": over.get("content_carbon", "glucose"),
+        },
+        {  # a growth rate the old algal ceiling refused
+            "sectionId": "s1", "field": "growth_rate_mu", "value": 0.41, "unit": "h-1",
+            "quote": "Its specific growth rate was 0.41 h-1 in the batch phase",
+            "isPrimary": True, "confidence": 0.9,
+            "carbonSource": over.get("rate_carbon", "glucose"),
+        },
+    ]
+    return {"candidates": base}
+
+
+def test_a_pha_content_written_as_wt_percent_normalises_to_percent_cdw(monkeypatch):
+    fetch_saying("P1", "s1", PHA_SECTION)
+    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
+    result = extract.extract_paper("P1")
+    assert result.rejected == 0, result.rejectionDetails
+    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
+    assert content.unit == "% CDW" and content.value == 62 and content.method == "GC"
+    assert content.si.unit == "% CDW" and content.si.value == 62
+
+
+def test_a_growth_rate_the_old_bound_refused_now_anchors(monkeypatch):
+    fetch_saying("P2", "s1", PHA_SECTION)
+    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
+    result = extract.extract_paper("P2")
+    assert result.rejectionReasons["range"] == 0, result.rejectionDetails
+    rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
+    assert rate.value == 0.41 and rate.unit == "h⁻¹"
+
+
+def test_a_carbon_source_that_sits_in_the_section_is_kept(monkeypatch):
+    fetch_saying("P3", "s1", PHA_SECTION)
+    monkeypatch.setattr(extract, "call_model", lambda *_: (_pha_candidates(), extract.Usage()))
+    result = extract.extract_paper("P3")
+    assert [c.carbonSource for c in result.candidates] == ["glucose", "glucose"]
+    assert result.fieldDrops == {"carbonSource": 0}
+    # Persisted as it was answered.
+    stored = json.loads((extract.CANDIDATES_DIR / "P3.json").read_text())
+    assert stored["candidates"][0]["carbonSource"] == "glucose"
+
+
+def test_a_carbon_source_absent_from_the_section_is_dropped_and_its_candidate_kept(monkeypatch):
+    fetch_saying("P4", "s1", PHA_SECTION)
+    raw = _pha_candidates(content_carbon="xylose")
+    monkeypatch.setattr(extract, "call_model", lambda *_: (raw, extract.Usage()))
+    result = extract.extract_paper("P4")
+    assert result.rejected == 0, "a dropped field is not a rejected candidate"
+    assert len(result.candidates) == 2
+    content = next(c for c in result.candidates if c.field == "pha_content_cdw")
+    rate = next(c for c in result.candidates if c.field == "growth_rate_mu")
+    assert content.carbonSource is None, "xylose is not in the section; the field goes"
+    assert rate.carbonSource == "glucose", "the other candidate's is untouched"
+    assert result.fieldDrops == {"carbonSource": 1}
+    assert all(v == 0 for v in result.rejectionReasons.values())
+
+
+def test_the_tool_asks_for_the_carbon_source_in_the_papers_words():
+    tool = extract.build_tool(["s1"], ["pha_content_cdw"])
+    items = tool["input_schema"]["properties"]["candidates"]["items"]
+    prop = items["properties"]["carbonSource"]
+    assert prop["type"] == "string"
+    assert "words the paper uses" in prop["description"] and "names none" in prop["description"]
+    assert "carbonSource" not in items["required"], "a paper may name none"

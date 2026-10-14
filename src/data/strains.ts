@@ -41,9 +41,53 @@ export const STRAIN_ALIASES: Record<string, string> = {
   'bos taurus': 'bovine',
 };
 
-/** Normalise a strain name found in prose to a canonical id, or null. */
+/**
+ * The id a paper's wording names, by the whole-word rule (OF-BLD-014 §2.1).
+ *
+ * The wording is trimmed, its runs of whitespace collapsed and lower-cased.
+ * An exact alias wins. Otherwise every alias that stands inside the wording as
+ * a whole word — no letter or digit touching either end — is a hit, and when
+ * all the hits name ONE id that id is the answer. No hit is null, and so is
+ * hits naming two different ids: "E. coli expressing bovine β-casein" names
+ * two organisms, and choosing one would merge measurements this table exists
+ * to keep apart.
+ *
+ * `carbonSourceId` in vocabulary.ts applies the same rule, and
+ * `core/openferment_core/validate.py` mirrors it line for line, held to it by
+ * the fixture `scripts/export-unit-fixtures.ts` records from this function.
+ */
+export function matchWholeWord(text: string, aliases: Record<string, string>): string | null {
+  const wording = text.trim().replace(/\s+/g, ' ').toLowerCase();
+  if (wording === '') return null;
+  // Own keys only: 'constructor' is not an alias.
+  if (Object.prototype.hasOwnProperty.call(aliases, wording)) return aliases[wording];
+  const hits = new Set<string>();
+  for (const [alias, id] of Object.entries(aliases)) {
+    if (alias !== '' && containsWord(wording, alias)) hits.add(id);
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
+const WORD_CHAR = /[a-z0-9]/;
+
+/** Whether `needle` occurs in `haystack` with no letter or digit touching it. */
+function containsWord(haystack: string, needle: string): boolean {
+  for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + 1)) {
+    const before = at === 0 ? '' : haystack[at - 1];
+    const after = at + needle.length < haystack.length ? haystack[at + needle.length] : '';
+    if (!WORD_CHAR.test(before) && !WORD_CHAR.test(after)) return true;
+  }
+  return false;
+}
+
+/**
+ * Normalise a strain name found in prose to a canonical id, or null: an
+ * exact alias, or an alias standing in the wording as a whole word
+ * (`matchWholeWord`). "Chlamydomonas reinhardtii UVM4" is uvm4; the species
+ * alone names no strain and is null.
+ */
 export function normalizeStrain(raw: string): string | null {
-  return STRAIN_ALIASES[raw.trim().toLowerCase()] ?? null;
+  return matchWholeWord(raw, STRAIN_ALIASES);
 }
 
 export const STRAINS: Strain[] = [

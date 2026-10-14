@@ -27,12 +27,16 @@ call, so it is trusted before any model output reaches it.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from .models import Candidate, Claim, DroppedCandidate, Quantity, Range, weakest_provenance
 from .units import (
+    DATA as CORPUS_PATH,
     UnitError,
     convert,
     field as ontology_field,
@@ -557,6 +561,87 @@ def value_basis(
 # Rule codes, in rule order. The counts are keyed by these.
 ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
 
+# Fields anchoring may drop from a candidate it KEEPS (OF-BLD-014 §2.1), each
+# its own reason. A drop is not a rejection: the candidate stays, without the
+# field, and the drop is counted here rather than in ANCHOR_RULES.
+FIELD_DROP_REASONS = ("carbonSource",)
+
+
+# ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
+#
+# Two vocabularies cross the boundary inside corpus.json: the strain alias
+# table (`STRAIN_ALIASES` in src/data/strains.ts) and the carbon sources with
+# their spellings (`CARBON_SOURCES` in src/data/vocabulary.ts). The rule that
+# reads them is `matchWholeWord` in strains.ts, and this is its mirror, step
+# for step: the fixture `scripts/export-unit-fixtures.ts` records what the
+# TypeScript answers and tests/test_validate.py asserts the same here. When
+# the two disagree, the TypeScript side is right.
+#
+# Until §3.4 creates `evidence_pool`, `carbon_source_id` lives here.
+
+
+@lru_cache(maxsize=4)
+def vocabulary(path: str | None = None) -> dict[str, dict[str, str]]:
+    """The strain aliases and the carbon-source spellings, as the browser
+    exported them: two maps from a lower-case spelling to an id.
+
+    Raises when the file is missing or predates §2.1, for the reason
+    `units.tables` does: a resolver with no table would have to guess."""
+    target = Path(path) if path else CORPUS_PATH
+    if not target.exists():
+        raise FileNotFoundError(
+            f"{target} not found. Generate it with `pnpm export:corpus` from the repository root."
+        )
+    raw = json.loads(target.read_text())
+    if "strainAliases" not in raw or "carbonSources" not in raw:
+        raise ValueError(
+            f"{target} carries no `strainAliases` or `carbonSources` key. It predates "
+            "OF-BLD-014 §2.1 — regenerate it with `pnpm export:corpus`."
+        )
+    return {
+        "strains": dict(raw["strainAliases"]),
+        "carbon": {sp: c["id"] for c in raw["carbonSources"] for sp in c["spellings"]},
+    }
+
+
+_WORD_CHAR = re.compile(r"[a-z0-9]")
+
+
+def _contains_word(haystack: str, needle: str) -> bool:
+    """Whether `needle` occurs in `haystack` with no letter or digit touching it."""
+    at = haystack.find(needle)
+    while at != -1:
+        before = haystack[at - 1] if at > 0 else ""
+        end = at + len(needle)
+        after = haystack[end] if end < len(haystack) else ""
+        if not _WORD_CHAR.match(before) and not _WORD_CHAR.match(after):
+            return True
+        at = haystack.find(needle, at + 1)
+    return False
+
+
+def match_whole_word(text: str, aliases: dict[str, str]) -> str | None:
+    """`matchWholeWord`: an exact alias, or the one id every alias standing
+    in the wording as a whole word names. No hit, or hits naming two ids, is
+    None — two organisms in one wording are not resolved to either."""
+    wording = _SPACES.sub(" ", text.strip()).lower()
+    if wording == "":
+        return None
+    if wording in aliases:
+        return aliases[wording]
+    hits = {i for alias, i in aliases.items() if alias != "" and _contains_word(wording, alias)}
+    return next(iter(hits)) if len(hits) == 1 else None
+
+
+def strain_id(text: str) -> str | None:
+    """`normalizeStrain`: the strain id a paper's wording names, or None."""
+    return match_whole_word(text, vocabulary()["strains"])
+
+
+def carbon_source_id(text: str) -> str | None:
+    """`carbonSourceId`: the carbon source a paper's wording names, or None."""
+    return match_whole_word(text, vocabulary()["carbon"])
+
 
 def content_id(
     prefix: str,
@@ -603,6 +688,10 @@ class AnchorResult:
     dropped: list[DroppedCandidate] = field(default_factory=list)
     # Emissions that collapsed onto an earlier one under the same content id.
     duplicates: int = 0
+    # Fields removed from candidates that were KEPT (OF-BLD-014 §2.1), by
+    # reason, and what each removal said.
+    field_drops: dict[str, int] = field(default_factory=lambda: {r: 0 for r in FIELD_DROP_REASONS})
+    field_drop_details: list[str] = field(default_factory=list)
 
 
 def _why_not_in_quote(
@@ -636,14 +725,20 @@ def anchor_candidate(
     paper_id: str,
     candidate_id: str | None = None,
     id_prefix: str = "cl1",
+    field_drops: list[tuple[str, str]] | None = None,
 ) -> tuple[Candidate | None, str | None, str | None]:
     """One candidate against §2.4. Returns (candidate, None, None) when it
     anchors, or (None, rule, detail) naming the rule that refused it.
 
     `raw` is what the extractor emitted — sectionId, field, value, unit, quote,
-    and optionally method, organism, isPrimary, confidence. `sections` are the
-    paper's fetched sections. The ontology and unit tables come from
-    corpus.json through `units`, the same tables the browser ships.
+    and optionally method, organism, carbonSource, isPrimary, confidence.
+    `sections` are the paper's fetched sections. The ontology and unit tables
+    come from corpus.json through `units`, the same tables the browser ships.
+
+    A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
+    carbon source whose words are not in the cited section, or carry a number,
+    is dropped and the candidate kept. Each drop is appended to `field_drops`
+    as (reason, detail) when the caller passes a list to count them in.
     """
     field_id = str(raw.get("field") or "").strip()
     spec = ontology_field(field_id)
@@ -748,6 +843,32 @@ def anchor_candidate(
     except (TypeError, ValueError):
         confidence = 0.0
 
+    # OF-BLD-014 §2.1 — the organism, resolved to a strain id where the
+    # wording names one (an exact alias, or an alias standing in it as a
+    # whole word). The id is what every screen matches on; the wording stays
+    # beside it. No match leaves the wording as the paper wrote it.
+    organism_text = (str(raw["organism"]).strip() or None) if raw.get("organism") else None
+    resolved_strain = strain_id(organism_text) if organism_text else None
+
+    # OF-BLD-014 §2.1 — the carbon source, kept only when its words stand in
+    # the cited section (the quote's normalisation, case aside, as for a
+    # categorical value) and state no number (Rule 1's detector). Otherwise
+    # the field goes, the candidate stays, and the drop is counted.
+    carbon_source: str | None = None
+    carbon_raw = raw.get("carbonSource")
+    if carbon_raw is not None and not (isinstance(carbon_raw, str) and not carbon_raw.strip()):
+        why: str | None = None
+        if not isinstance(carbon_raw, str):
+            why = f"carbonSource {carbon_raw!r} is not text"
+        elif found := find_number(carbon_raw):
+            why = f"carbonSource {carbon_raw.strip()!r} contains a number ({found!r})"
+        elif normalize_text(carbon_raw).lower() not in normalize_text(str(section.get("text") or "")).lower():
+            why = f"carbonSource {carbon_raw.strip()!r} is not in section {section_id} after normalisation"
+        else:
+            carbon_source = carbon_raw.strip()
+        if why is not None and field_drops is not None:
+            field_drops.append(("carbonSource", why))
+
     anchored_value = value.strip() if categorical else number  # type: ignore[union-attr]
     # §2.4 rule 3's answer, computed here and nowhere else (OF-BLD-012.1 §7):
     # no model output and no reviewer sets it.
@@ -769,7 +890,9 @@ def anchor_candidate(
             unit=unit,
             si=si,
             confidence=confidence,
-            organism=(str(raw["organism"]).strip() or None) if raw.get("organism") else None,
+            organism=resolved_strain or organism_text,
+            organismText=organism_text if resolved_strain else None,
+            carbonSource=carbon_source,
             isPrimary=is_primary,
             method=method or None,
             valueBasis=basis,
@@ -795,7 +918,13 @@ def anchor_all(
     out = AnchorResult()
     by_id: dict[str, int] = {}
     for raw in raws:
-        candidate, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, id_prefix=id_prefix)
+        drops: list[tuple[str, str]] = []
+        candidate, rule, detail = anchor_candidate(
+            raw, sections, paper_id=paper_id, id_prefix=id_prefix, field_drops=drops
+        )
+        for reason, why in drops:
+            out.field_drops[reason] = out.field_drops.get(reason, 0) + 1
+            out.field_drop_details.append(f"{reason}: {why}")
         if candidate is not None:
             # Content-addressed ids: the same sentence, field and number
             # emitted twice is one candidate, not two. The more confident

@@ -274,7 +274,15 @@ class Candidate(BaseModel):
     confidence: float = 0.0
     status: RecordStatus = "unverified"
     provenance: Provenance = "unverified"
+    # OF-BLD-014 §2.1. `organism` is the strain id when anchoring resolved the
+    # extractor's wording to one (`validate.strain_id`), the wording otherwise;
+    # `organismText` keeps the wording when it was resolved.
     organism: str | None = None
+    organismText: str | None = None
+    # What the cells were fed, in the paper's words. Kept only when the words
+    # stand in the cited section and carry no number; dropped otherwise, with
+    # the candidate kept and the drop counted (`ExtractResponse.fieldDrops`).
+    carbonSource: str | None = None
     componentTag: str | None = None
     goldOnly: bool | None = None
     extractorRun: ExtractorRun = "claude-1"
@@ -411,6 +419,10 @@ class ExtractResponse(BaseModel):
     # extraction, rather than a silent zero.
     calls: int = 1
     truncatedSections: list[str] = Field(default_factory=list)
+    # Fields anchoring removed from a candidate it KEPT, by reason (OF-BLD-014
+    # §2.1). Not rejections, and not in `rejected`: the candidate is in
+    # `candidates` without the field. Today the one reason is `carbonSource`.
+    fieldDrops: dict[str, int] = Field(default_factory=dict)
 
 
 # ── Guild (OF-BLD-013) ───────────────────────────────────────────────────

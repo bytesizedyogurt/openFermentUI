@@ -28,6 +28,8 @@ import { SKILLS } from '../src/data/skills';
 import { MODULES } from '../src/data/learn';
 import { PROTOCOLS } from '../src/data/protocols';
 import { renderStepText } from '../src/engine/scale';
+import { STRAIN_ALIASES } from '../src/data/strains';
+import { CARBON_SOURCES } from '../src/data/vocabulary';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 /**
@@ -213,8 +215,21 @@ const ontology = ONTOLOGY.map((d) => ({
  */
 const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
 
+/**
+ * The two vocabularies anchoring resolves a paper's wording against
+ * (OF-BLD-014 §2.1), verbatim: the strain alias table, so `validate.py` can
+ * store a strain id where the extractor wrote "C. reinhardtii UVM4", and the
+ * carbon sources with their spellings. The rule that reads them is
+ * `matchWholeWord` in src/data/strains.ts, mirrored in validate.py.
+ */
+const strainAliases = STRAIN_ALIASES;
+const carbonSources = CARBON_SOURCES;
+
 mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2) + '\n');
+writeFileSync(
+  OUT,
+  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources }, null, 2) + '\n',
+);
 
 /**
  * Guild's projection (OF-BLD-013 §1.2), written beside the corpus as
@@ -268,4 +283,6 @@ console.log(`  conditions  ${withConditions} carry recorded conditions, ${record
 console.log(`  primary     ${records.length - nonPrimary} first-hand, ${nonPrimary} quoting another record`);
 console.log(`  ontology    ${ontology.length} fields, ${ontology.filter((d) => d.categorical).length} categorical, ${ontology.filter((d) => d.requiresMethod).length} require a method`);
 console.log(`  units       ${Object.keys(U).length} units in ${new Set(Object.values(U).map((u) => u.family)).size} families, ${Object.keys(ALIASES).length} aliases, ${REFUSALS.length} explained refusals`);
+console.log(`  strains     ${Object.keys(strainAliases).length} aliases to ${new Set(Object.values(strainAliases)).size} strain ids`);
+console.log(`  carbon      ${carbonSources.length} sources, ${carbonSources.reduce((n, c) => n + c.spellings.length, 0)} spellings`);
 console.log(`\n✓ ${OUT}`);

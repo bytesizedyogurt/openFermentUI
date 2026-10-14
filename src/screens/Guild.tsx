@@ -1246,10 +1246,19 @@ export default function Guild() {
             )}
           </div>
 
-          {record.organism && (
+          {(record.organism || record.carbonSource) && (
             <div className="mt-4 pt-3 border-t border-line">
               <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Context</div>
-              <div className="text-body italic">{record.organism}</div>
+              {/* OF-BLD-014 §2.1 — what the cells were fed sits beside the
+                  organism, in the paper's own words. */}
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                {record.organism && <span className="text-body italic">{record.organism}</span>}
+                {record.carbonSource && (
+                  <span className="text-caption text-ink-soft" data-testid="review-carbon-source">
+                    carbon source · <span className="text-body text-ink">{record.carbonSource}</span>
+                  </span>
+                )}
+              </div>
               {record.componentTag && (
                 <div className="text-caption text-ink-soft">component · {record.componentTag}</div>
               )}

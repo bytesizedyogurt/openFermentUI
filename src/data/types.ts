@@ -40,9 +40,14 @@ export type ParameterFamily =
   | 'ptm'
   | 'functional'
   | 'cultivation'
-  | 'downstream';
+  | 'downstream'
+  // OF-BLD-014 §2.1 — thread P's polyhydroxyalkanoates.
+  | 'polymer';
 
-/** Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families. */
+/**
+ * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — and
+ * the polymer family OF-BLD-014 §2.1 adds: twenty-nine fields in six.
+ */
 export type FieldId =
   // Family 1 — expression performance
   | 'expression_pct_tsp'
@@ -72,7 +77,13 @@ export type FieldId =
   // Family 5 — downstream and economics
   | 'disruption_protein_yield'
   | 'disruption_energy'
-  | 'minimum_selling_price';
+  | 'minimum_selling_price'
+  // Family 6 — polymer (OF-BLD-014 §2.1)
+  | 'pha_content_cdw'
+  | 'pha_titre'
+  | 'pha_yield_substrate'
+  | 'pha_productivity'
+  | 'pha_mw';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17
@@ -98,6 +109,15 @@ export type AnalysisMethod =
   | 'gravimetric'
   | 'spectrophotometric'
   | 'process model'
+  // OF-BLD-014 §2.1 — how a polymer is measured: its content (GC, GC-MS,
+  // NMR, FTIR, Nile red), its chain length (GPC) and its thermal behaviour (DSC).
+  | 'GC'
+  | 'GC-MS'
+  | 'GPC'
+  | 'NMR'
+  | 'FTIR'
+  | 'DSC'
+  | 'Nile red'
   | 'undetermined';
 
 /** Residue-numbering convention (OF-COR-001 §19, first trap). */
@@ -233,7 +253,25 @@ export interface ExtractionRecord {
    * 'industry-estimate' and never enter the gold set.
    */
   provenance: Provenance;
+  /**
+   * The strain id when the paper's wording names a known strain (OF-BLD-014
+   * §2.1), which is what every screen matches on; otherwise the wording as
+   * the paper wrote it. Seed records carry a strain id.
+   */
   organism?: string;
+  /**
+   * The paper's own wording for the organism, kept when anchoring resolved it
+   * to a strain id in `organism`. Absent when nothing was resolved, because
+   * `organism` then already holds the wording.
+   */
+  organismText?: string;
+  /**
+   * The carbon source or feedstock the value was measured on, in the paper's
+   * own words (OF-BLD-014 §2.1). Kept only when those words stand in the
+   * cited section and carry no number; `carbonSourceId` in vocabulary.ts
+   * resolves them to a name, or to nothing.
+   */
+  carbonSource?: string;
   componentTag?: string;
   gold?: { value: number | string; unit: string };
   goldOnly?: boolean;
@@ -841,6 +879,18 @@ export interface ClearanceState {
   action: string;
 }
 
+/**
+ * A carbon source a value can be measured on (OF-BLD-014 §2.1): a name and
+ * the spellings a paper uses for it, lower-case. Words only — no number, no
+ * concentration — because what is resolved is the paper's wording, not a
+ * medium. `carbonSourceId` in vocabulary.ts matches against `spellings`.
+ */
+export interface CarbonSource {
+  id: string;
+  label: string;
+  spellings: string[];
+}
+
 export type ProductCategory =
   | 'molecular_biology_enzyme'
   | 'diagnostic'
@@ -1306,6 +1356,8 @@ export interface Candidate {
   status: RecordStatus;
   provenance: Provenance;
   organism?: string;
+  organismText?: string;
+  carbonSource?: string;
   componentTag?: string;
   goldOnly?: boolean;
   extractorRun?: ExtractorRun;
@@ -1379,6 +1431,13 @@ export interface ExtractResponse {
    * silent zero Witness used to score.
    */
   truncatedSections: string[];
+  /**
+   * Fields anchoring removed from a candidate it KEPT, counted by reason
+   * (OF-BLD-014 §2.1). Not rejections: the candidate is in `candidates`
+   * without the field. Today the one reason is `carbonSource`, for words not
+   * in the cited section or carrying a number.
+   */
+  fieldDrops: Record<string, number>;
 }
 
 // `absentFromRun` joins the four review fields here: it is the browser's note

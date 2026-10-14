@@ -20,7 +20,8 @@ export interface UnitDef {
 
 // Family base units: rate=h⁻¹, time=h, massConc=g L⁻¹, mass=g, volume=L,
 // percent=%, yield=g g⁻¹, volProd=g L⁻¹ h⁻¹, specProd=mg g⁻¹ h⁻¹,
-// odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹
+// odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹,
+// percentCdw=% CDW, molarMass=g mol⁻¹
 export const U: Record<string, UnitDef> = {
   'h⁻¹': { family: 'rate', factor: 1, label: 'h⁻¹' },
   'd⁻¹': { family: 'rate', factor: 1 / 24, label: 'd⁻¹' },
@@ -98,6 +99,16 @@ export const U: Record<string, UnitDef> = {
   // and OF-COR-001 §16 carries costs in both (Acién 69 €/kg, GFI $4–6/kg).
   'USD kg⁻¹': { family: 'costUSD', factor: 1, label: 'USD kg⁻¹' },
   'EUR kg⁻¹': { family: 'costEUR', factor: 1, label: 'EUR kg⁻¹' },
+
+  // ── OF-BLD-014 §2.1 — the polymer family ───────────────────────────
+  // A polymer's share of dry cell mass. Its OWN family, not `percent`, for the
+  // reason `% TSP` has one: a share of biomass is not a concentration, and a
+  // separate family makes the engine refuse by construction.
+  '% CDW': { family: 'percentCdw', factor: 1, label: '% CDW' },
+  // Molar mass. A dalton is one gram per mole, so kg mol⁻¹ is the kDa.
+  'g mol⁻¹': { family: 'molarMass', factor: 1, label: 'g mol⁻¹' },
+  Da: { family: 'molarMass', factor: 1, label: 'Da' },
+  kDa: { family: 'molarMass', factor: 1000, label: 'kDa' },
 };
 
 /**
@@ -124,6 +135,13 @@ export const REFUSALS: { a: string; b: string; because: string }[] = [
     b: 'costEUR',
     because:
       'Currency conversion needs an exchange rate with a date attached. The engine will not invent one — record the rate and the date as an explicit assumption.',
+  },
+  {
+    // OF-BLD-014 §2.1: a PHA content and a PHA titre.
+    a: 'percentCdw',
+    b: 'massConc',
+    because:
+      'A share of dry cell mass and a concentration are not interconvertible without the biomass density of that culture. Record the dry cell weight per litre the paper reports for it and the conversion becomes possible; guessing it would fabricate a titre.',
   },
 ];
 
@@ -175,6 +193,9 @@ export const SI_UNIT: Record<string, string> = {
   vvm: 'vvm',
   rpm: 'rpm',
   length: 'm',
+  percentCdw: '% CDW',
+  // The kDa is numerically the SI kg mol⁻¹.
+  molarMass: 'kDa',
 };
 
 // Alias normalization: accept human/ASCII notations.
@@ -237,6 +258,15 @@ export const ALIASES: Record<string, string> = {
   // below cannot bridge a missing space.
   '%tsp': '% TSP',
   '%tcp': '% TCP',
+  // OF-BLD-014 §2.1. '%CDW' reaches the first through the lower-cased lookup;
+  // 'wt%' and '% (w/w)' are how PHA papers write a polymer's share of the
+  // dry cells.
+  '%cdw': '% CDW',
+  '% cdw': '% CDW',
+  'wt%': '% CDW',
+  '% (w/w)': '% CDW',
+  kda: 'kDa',
+  'kg/mol': 'kDa',
   m: 'mol L⁻¹',
   mm: 'mmol L⁻¹',
   um: 'µmol L⁻¹',
