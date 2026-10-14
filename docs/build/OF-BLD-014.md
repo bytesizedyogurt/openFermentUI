@@ -704,6 +704,7 @@ This follows the pattern `scripts/resolve-identifiers.py` set for DOIs: a machin
 
 - Query to Europe PMC's search endpoint, `resultType=core`, `pageSize=100`, `sort=CITED desc`:
   `(polyhydroxyalkanoate* OR polyhydroxybutyrate* OR "PHA" OR "PHB") AND (lignocellulos* OR hydrolysate OR "waste paper" OR "paper sludge" OR "textile waste" OR cotton OR xylose OR cellulosic) AND OPEN_ACCESS:y AND HAS_FT:y`
+  Sean's decision after the first live call (14 October): both term groups are held to title and abstract, `TITLE_ABS:(…) AND TITLE_ABS:(…)`, and every other part of the rule stands.
 - Keep a result that has a `pmcid`, `isOpenAccess` equal to `Y`, `pubYear` of 2012 or later, and a licence that starts with `cc`.
 - Order by `citedByCount`. The first thirty research articles and the first five reviews get the verdict `PROPOSE`. The rest get `REVIEW`.
 - `docs/thread-p-include.txt` holds PMCIDs or DOIs Sean wants whatever the rule says, one per line. Each is looked up and gets the verdict `INCLUDE`. One with no open-access text is catalogued with `openAccess: false`.

@@ -53,9 +53,12 @@ INCLUDE_FILE = ROOT / "docs" / "thread-p-include.txt"
 
 # ── the rule ───────────────────────────────────────────────────────────
 
+# Both term groups are held to title and abstract (Sean Creighton, 14 October
+# 2026): matched anywhere in the full text, "PHA" also names phytohemagglutinin
+# and most of what came back was off-topic (STATE.md, §2.4 the proposal).
 QUERY = (
-    '(polyhydroxyalkanoate* OR polyhydroxybutyrate* OR "PHA" OR "PHB") AND '
-    '(lignocellulos* OR hydrolysate OR "waste paper" OR "paper sludge" OR "textile waste" '
+    'TITLE_ABS:(polyhydroxyalkanoate* OR polyhydroxybutyrate* OR "PHA" OR "PHB") AND '
+    'TITLE_ABS:(lignocellulos* OR hydrolysate OR "waste paper" OR "paper sludge" OR "textile waste" '
     "OR cotton OR xylose OR cellulosic) AND OPEN_ACCESS:y AND HAS_FT:y"
 )
 PAGE_SIZE = 100

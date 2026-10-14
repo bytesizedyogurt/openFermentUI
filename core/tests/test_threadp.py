@@ -8,6 +8,7 @@ is marked live.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -33,6 +34,21 @@ def by_doi(rows):
 
 def test_the_fixture_says_what_it_is():
     assert "STAND-IN" in json.loads(FIXTURE.read_text(encoding="utf-8"))["_fixture"]
+
+
+def test_the_query_holds_both_term_groups_to_title_and_abstract():
+    """Sean's decision on the query (§2.4): each term group is held to title
+    and abstract, and the open-access and full-text filters stay as written."""
+    q = threadp.QUERY
+    assert q.startswith('TITLE_ABS:(polyhydroxyalkanoate* OR ')
+    assert ' AND TITLE_ABS:(lignocellulos* OR ' in q
+    assert q.count("TITLE_ABS:(") == 2
+    assert q.endswith(") AND OPEN_ACCESS:y AND HAS_FT:y")
+    # Every term outside the two groups is a filter; no bare term searches
+    # the full text.
+    groups = re.findall(r"TITLE_ABS:\(([^)]*)\)", q)
+    assert re.sub(r"TITLE_ABS:\([^)]*\)", "", q).split() == ["AND", "AND", "OPEN_ACCESS:y", "AND", "HAS_FT:y"]
+    assert '"PHA"' in groups[0] and "xylose" in groups[1]
 
 
 def test_the_filters_drop_what_the_rule_excludes():
