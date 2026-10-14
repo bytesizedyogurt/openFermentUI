@@ -4,6 +4,16 @@ One line per session, newest last — what landed, and the measured number that
 says it landed. The full §0.5 report for each session is in that session's
 transcript; this file is the index a later session reads first.
 
+## Live owed
+
+LIVE steps built offline whose run waits on a need this machine lacked, one line each: `- §n.m — needs <what> — <the command to run>` (OF-BLD-014 A.4).
+
+## Live runs
+
+LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the step asks for>` (OF-BLD-014 A.4).
+
+---
+
 - **2026-09-15 · OF-BLD-012.1 §6.1 (F1.1–F1.3)** — `export-corpus.ts` emits
   `range` and `negativeResult` as data instead of folding them into the
   `conditions` prose; §2.4 rule 3 reads the quote as quantities (units the

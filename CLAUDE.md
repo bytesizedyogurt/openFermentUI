@@ -4,6 +4,27 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
+## The active build (OF-BLD-014)
+
+The prototype build runs on `claude/of-bld-014-prototype`. Its document is
+`docs/build/OF-BLD-014.md`. §10.4 of that document removes this section.
+
+- **"Next phase", "continue" and "go on"** mean Part A.1 of the document: start the session
+  (`bash scripts/session-start.sh`, once §1.3 has landed), pay what `## Live owed` in `STATE.md`
+  lists and this machine can run, find the first step whose id is missing from
+  `git log --format=%s | grep -o 'OF-BLD-014 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
+  end of that step's phase.
+- **One spec is committed, for the length of this build.** A cloud session starts from a fresh
+  clone, so this build's document lives under `docs/build/` on the work branch. §10.4 deletes
+  the folder before the pull request. Every other spec stays out of git, as "Where the
+  documents live" says.
+- **The key in a cloud session** arrives as `OPENFERMENT_API_KEY`, and
+  `scripts/session-start.sh` writes it to `core/.env`. Leave `ANTHROPIC_API_KEY` unset in the
+  session's environment: Claude Code reads that name for its own sign-in.
+- **Data from live runs** travels on the branch `openferment-data` (`pnpm data:push`,
+  `pnpm data:pull`). Fetched full text stays on the machine that fetched it.
+- **Stop conditions** are Part A.5 of the document. A stated fact that turns out false is one.
+
 ## The map is closed
 
 - **Home plus eleven destinations, twelve rail entries, and the list does not
@@ -302,3 +323,7 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 - OF-BLD specs arrive as files at repo root for the session (`OF-BLD-0NN.md`,
   `PROMPT.md`) and are deleted before the final commit of that session; they
   live in Notion. Never commit them.
+- OF-BLD-014 is the one exception, for the length of its build (its decision
+  D1): `docs/build/OF-BLD-014.md` and `docs/build/PROMPT.md` are committed on
+  `claude/of-bld-014-prototype`, and its §10.4 deletes `docs/build/` before
+  the pull request.
