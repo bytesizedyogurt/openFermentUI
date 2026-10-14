@@ -104,7 +104,7 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 ## The seed, the overlay, and offline verify
 
-- `src/data/*.ts` is the source of truth for the 132 papers and 134 records.
+- `src/data/*.ts` is the source of truth for the 167 papers (132 hand-curated, 35 in thread P) and 134 records.
   Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. There are TWO
   sanctioned exceptions, and in both a machine proposes and a person approves.
   The second is thread P (OF-BLD-014 §2.3): `pnpm thread:propose` asks Europe

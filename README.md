@@ -78,8 +78,10 @@ The seed is what the app is with the service down. With it up, an overlay adds w
 fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not change.
 
 ```
-132 papers          ingest: 'catalogued' in the seed (metadata + curator note); 27 carry a PMCID
-                    and fetch as full text through the service — the reader says which it shows
+167 papers          ingest: 'catalogued' in the seed: 132 hand-curated (metadata + curator note), 27 of
+                    them with a PMCID; 35 in thread P, proposed by rule and approved by Sean Creighton,
+                    all with a PMCID. Each fetches as full text through the service — the reader says
+                    which it shows
 134 records         132 curated · 2 industry-estimate · 127 flagged is_primary
  29 ontology fields  6 families: expression, ptm, functional, cultivation, downstream, polymer
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
