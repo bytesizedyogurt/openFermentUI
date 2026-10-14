@@ -11,10 +11,12 @@ in order, through the real code paths: fixture-mode fetch and extract into a
 scratch directory, then `biorepo.write` for each decision.
 
 `--real` first saves the real B5 JATS from Europe PMC and then, with
-ANTHROPIC_API_KEY in core/.env, makes ONE call over it and saves the
-response with `extract --save-fixture`'s shape. It spends what one
-extraction of B5 costs, and prints it. Without `--real`, whatever JATS and
-response are saved are used as they are.
+ANTHROPIC_API_KEY in core/.env, runs one extraction over it (one call, or
+more when a response is cut off and the paper is split) and saves the
+response with `extract --save-fixture`'s shape, beside what anchoring gave
+for it then (`anchoredAtSave`), which test_demo holds every replay to. It
+spends what one extraction of B5 costs, and prints it. Without `--real`,
+whatever JATS and response are saved are used as they are.
 
 The decisions follow the saved response (OF-BLD-014 §1.5). Over the
 hand-written stand-in they demonstrate the review: the titre row promoted to
@@ -48,6 +50,8 @@ DEMO = FIXTURES / "demo"
 EXPORT = FIXTURES / "export"
 B5 = {"id": "B5", "pmcid": "PMC8471596"}
 AT = "2026-09-15T09:00:00Z"
+# The key, in a saved real response, of what anchoring gave when it was saved.
+ANCHORED_AT_SAVE = "anchoredAtSave"
 
 # The raw candidates the smoke overlay is built from — the same two the demo
 # response carries: a titre the seed has no B5 record for, and the same row
@@ -114,6 +118,15 @@ def _pointed_at(scratch: Path, fixtures: Path) -> Iterator[None]:
             os.environ["OPENFERMENT_FIXTURES"] = env
 
 
+def record_anchoring(path: Path, result) -> None:
+    """Write into a saved response what anchoring gave for it: the candidate
+    ids it kept and how many it rejected. A replay is held to these, so a
+    change to anchoring that moves the demo shows as a failing test."""
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    saved[ANCHORED_AT_SAVE] = {"candidates": [c.id for c in result.candidates], "rejected": result.rejected}
+    path.write_text(json.dumps(saved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def save_real(scratch: Path) -> None:
     """The real JATS from Europe PMC, and one real model response over it."""
     from . import extract, intake
@@ -139,6 +152,7 @@ def save_real(scratch: Path) -> None:
     os.environ.pop("OPENFERMENT_FIXTURES", None)
     extract.SAVE_RESPONSES = True
     result = extract.extract_paper("B5", force=True)
+    record_anchoring(extract.FIXTURE_DIR / "B5.json", result)
     print(
         f"saved {extract.FIXTURE_DIR / 'B5.json'}: {len(result.candidates)} anchored, "
         f"{result.rejected} rejected, ${result.usage.costUsd:.4f}"
@@ -159,6 +173,11 @@ def rebuild_decisions(fixtures: Path = DEMO, out: Path | None = None, note: str 
         fetched = intake.fetch_paper(B5, force=True)
         assert fetched.status == "complete", fetched.reason
         result = extract.extract_paper("B5", force=True)
+        if real and not result.candidates:
+            sys.exit(
+                f"the saved real response anchors no candidate against the saved JATS ({result.rejected} rejected): "
+                "a demo with nothing to decide shows nothing. Save another with pnpm demo:fixtures --real"
+            )
         if real:
             # §1.5 — a real response is left for a person to decide. The one
             # decision is the accept of a curated record, which decides no

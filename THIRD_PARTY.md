@@ -1,10 +1,13 @@
 # Third-party software
 
-Every package openFerment installs, with its version, the licence its own metadata
-states, and the part of openFerment that uses it. `pnpm check:licences`
-(`scripts/check-licences.py`, OF-BLD-014 §1.2) writes this file from what is installed
-and fails while the committed copy is stale. The accepted licence strings, and every
-package a person accepted, are in `core/licences.toml`.
+Every package openFerment's service and browser app run on: each Python distribution
+`core/uv.lock` installs, its extras included, and every JavaScript production
+dependency, with its version, the licence its own metadata states, and the part of
+openFerment that uses it. The JavaScript build and test tools (`devDependencies`) are
+left out. `pnpm check:licences` (`scripts/check-licences.py`, OF-BLD-014 §1.2) writes
+this file from what is installed and fails while the committed copy is stale. The
+accepted licence strings, and every package a person accepted, are in
+`core/licences.toml`.
 
 ## The service and its tests (`core/`)
 
@@ -27,7 +30,7 @@ package a person accepted, are in `core/licences.toml`.
 | idna | 3.19 | BSD-3-Clause | service, through anthropic, fastapi, httpx, uvicorn | allowed |
 | iniconfig | 2.3.0 | MIT | tests, through pytest | allowed |
 | jiter | 0.16.0 | MIT | service, through anthropic | allowed |
-| numpy | 2.5.2 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through rank-bm25 | allowed |
+| numpy | 2.4.6 or 2.5.2, by Python version | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through rank-bm25 | allowed |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | tests, through pytest | allowed |
 | pluggy | 1.6.0 | MIT | tests, through pytest | allowed |
 | pydantic | 2.13.4 | MIT | service | allowed |

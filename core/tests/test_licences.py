@@ -194,3 +194,52 @@ def test_the_listing_names_the_package_version_licence_and_part(policy):
     text = lic.render([package("certifi", ["MPL-2.0"], policy)], [], policy)
     assert "| certifi | 1.0 | MPL-2.0 | service | accepted by Sean Creighton on 2026-10-14 |" in text
     assert "| certifi | MPL-2.0 | Sean Creighton | 2026-10-14 | a certificate bundle, used unmodified |" in text
+
+
+# ── what the review of Phase 1 found (OF-BLD-014 §1.R) ──────────────────
+
+
+def _metadata(**fields):
+    from email.message import Message
+
+    m = Message()
+    for key, value in fields.items():
+        for v in value if isinstance(value, list) else [value]:
+            m[key.replace("_", "-")] = v
+    return m
+
+
+def test_a_licence_expression_decides_alone_when_a_package_states_one(policy):
+    # PEP 639: the expression is the licence; a stale License field or
+    # classifier beside it cannot carry a copyleft package past the ledger.
+    meta = _metadata(License_Expression="GPL-3.0-only", License="MIT",
+                     Classifier=["License :: OSI Approved :: MIT License"])
+    assert lic.deciding_strings(meta) == ("GPL-3.0-only",)
+    assert not lic.decide("somepkg", lic.deciding_strings(meta), policy).ok
+    # With no expression, the License field and the classifiers still decide.
+    legacy = _metadata(License="MIT License", Classifier=["License :: OSI Approved :: MIT License"])
+    assert lic.deciding_strings(legacy) == ("MIT License", "License :: OSI Approved :: MIT License")
+
+
+def test_a_package_the_lock_holds_at_two_versions_lists_both():
+    # uv.lock picks numpy by Python version, so the listing names both and
+    # reads the same on every interpreter the project supports.
+    lock = {"package": [
+        {"name": "numpy", "version": "2.4.6", "resolution-markers": ["python_full_version < '3.12'"]},
+        {"name": "numpy", "version": "2.5.2", "resolution-markers": ["python_full_version >= '3.12'"]},
+        {"name": "rank-bm25", "version": "0.2.2"},
+    ]}
+    assert lic.listed_version("numpy", "2.4.6", lock) == "2.4.6 or 2.5.2, by Python version"
+    assert lic.listed_version("numpy", "2.5.2", lock) == "2.4.6 or 2.5.2, by Python version"
+    assert lic.listed_version("rank-bm25", "0.2.2", lock) == "0.2.2"
+
+
+def test_the_listing_shows_the_listed_version(policy):
+    p = lic.Package("python", "numpy", "2.5.2", ("MIT",), "service", lic.decide("numpy", ["MIT"], policy),
+                    listed="2.4.6 or 2.5.2, by Python version")
+    assert "| numpy | 2.4.6 or 2.5.2, by Python version | MIT |" in lic.render([p], [], policy)
+
+
+def test_the_listing_says_what_it_leaves_out(policy):
+    text = lic.render([], [], policy)
+    assert "devDependencies" in text and "Every package openFerment installs" not in text

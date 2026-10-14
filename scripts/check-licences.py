@@ -5,8 +5,10 @@
 
 Two sides are read. Python: every distribution installed in core/.venv that
 core/uv.lock names, through its own metadata: the `License` field, the
-`License-Expression` field and the `License ::` classifiers. A package passes
-when any of the three matches. JavaScript: every production dependency, as
+`License-Expression` field and the `License ::` classifiers. A package that
+states an expression is decided by it alone, as PEP 639 makes the expression
+the licence; for any other package, any of the License field and the
+classifiers can decide. JavaScript: every production dependency, as
 `pnpm licenses list --json --prod` reports it.
 
 A string passes when core/licences.toml allows it, in the spelling the
@@ -82,6 +84,7 @@ class Package:
     strings: tuple[str, ...]  # every licence string its metadata carries
     part: str  # which part of openFerment uses it
     verdict: Verdict
+    listed: str = ""  # the version the listing shows, when it differs from `version`
 
 
 # ── the ledger ──────────────────────────────────────────────────────────
@@ -131,6 +134,24 @@ def python_strings(metadata) -> tuple[str, ...]:
             out.append(value)
     out += [c for c in (metadata.get_all("Classifier") or []) if c.startswith("License ::")]
     return tuple(out)
+
+
+def deciding_strings(metadata) -> tuple[str, ...]:
+    """The strings that decide a package: its License-Expression alone when it
+    states one (PEP 639), else its License field and licence classifiers."""
+    expression = (metadata.get("License-Expression") or "").strip()
+    if expression:
+        return (expression,)
+    return tuple(s for s in python_strings(metadata) if s != expression)
+
+
+def listed_version(name: str, installed: str, lock: dict) -> str:
+    """The version the listing shows. uv.lock can lock one package at two
+    versions, picked by Python version (numpy is one); the listing names both,
+    so it reads the same on every interpreter the project supports."""
+    versions = sorted({e["version"] for e in lock["package"] if canonical(e["name"]) == canonical(name) and "version" in e},
+                      key=lambda v: [int(x) if x.isdigit() else x for x in re.split(r"[.+-]", v)])
+    return f"{' or '.join(versions)}, by Python version" if len(versions) > 1 else installed
 
 
 def _closure(roots: list[dict], entries: dict[str, list[dict]]) -> dict[str, set[str]]:
@@ -193,7 +214,8 @@ def python_side(policy: Policy, lock_path: Path = LOCK) -> list[Package]:
             continue
         strings = python_strings(dist.metadata)
         found[name] = Package("python", dist.metadata["Name"], dist.version, strings,
-                              parts.get(name, "service"), decide(name, strings, policy))
+                              parts.get(name, "service"), decide(name, deciding_strings(dist.metadata), policy),
+                              listed=listed_version(name, dist.version, lock))
     return sorted(found.values(), key=lambda p: canonical(p.name))
 
 
@@ -283,18 +305,21 @@ def render(python: list[Package], javascript: list[Package], policy: Policy) -> 
     lines = [
         "# Third-party software",
         "",
-        "Every package openFerment installs, with its version, the licence its own metadata",
-        "states, and the part of openFerment that uses it. `pnpm check:licences`",
-        "(`scripts/check-licences.py`, OF-BLD-014 §1.2) writes this file from what is installed",
-        "and fails while the committed copy is stale. The accepted licence strings, and every",
-        "package a person accepted, are in `core/licences.toml`.",
+        "Every package openFerment's service and browser app run on: each Python distribution",
+        "`core/uv.lock` installs, its extras included, and every JavaScript production",
+        "dependency, with its version, the licence its own metadata states, and the part of",
+        "openFerment that uses it. The JavaScript build and test tools (`devDependencies`) are",
+        "left out. `pnpm check:licences` (`scripts/check-licences.py`, OF-BLD-014 §1.2) writes",
+        "this file from what is installed and fails while the committed copy is stale. The",
+        "accepted licence strings, and every package a person accepted, are in",
+        "`core/licences.toml`.",
         "",
         "## The service and its tests (`core/`)",
         "",
         "| Package | Version | Licence | Used by | Passes as |",
         "|---|---|---|---|---|",
     ]
-    lines += [f"| {p.name} | {p.version} | {_cell(shown_licence(p))} | {p.part} | {p.verdict.how if p.verdict.ok else 'FAILS'} |"
+    lines += [f"| {p.name} | {p.listed or p.version} | {_cell(shown_licence(p))} | {p.part} | {p.verdict.how if p.verdict.ok else 'FAILS'} |"
               for p in python]
     lines += [
         "",

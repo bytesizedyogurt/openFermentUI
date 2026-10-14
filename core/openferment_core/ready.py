@@ -13,8 +13,8 @@ is also how a retired model shows up before a real call fails; the Europe PMC
 check is one search. The key itself is never printed, in whole or in part.
 
 The last line is the lane (OF-BLD-014 A.4), what this machine can run:
-`full` with a usable key and Europe PMC answering, `model-only` with a
-usable key alone, `none` without one. The `huggingface` row is optional: a
+`full` with a key the Models API accepted and Europe PMC answering,
+`model-only` with that key alone, `none` otherwise. The `huggingface` row is optional: a
 blocked host is a warning, and it never changes the exit code.
 """
 from __future__ import annotations
@@ -278,11 +278,12 @@ def run(no_network: bool = False, port: int | None = None) -> list[Check]:
 
 def lane(checks: list[Check]) -> str:
     """What this machine can run (OF-BLD-014 A.4). The key counts when its
-    check passed or warned and the model check did not fail: a key Anthropic
-    rejects, or a model this machine cannot reach, runs nothing. Europe PMC
-    answers when its check passed."""
+    check passed or warned and the Models API accepted it: a key Anthropic
+    rejects, a model this machine cannot reach, or a model check that never
+    ran (--no-network, fixture mode) confirms nothing. Europe PMC answers when
+    its check passed."""
     marks = {c.name: c.mark for c in checks}
-    if marks.get("key") not in ("ok", "warn") or marks.get("model") == "fail":
+    if marks.get("key") not in ("ok", "warn") or marks.get("model") not in ("ok", "warn"):
         return "none"
     return "full" if marks.get("europepmc") == "ok" else "model-only"
 

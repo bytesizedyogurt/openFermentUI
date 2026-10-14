@@ -204,7 +204,8 @@ def _checks(key: str, europepmc: str, model: str = "ok") -> list:
         ("ok", "ok", "ok", "full"),
         ("warn", "ok", "ok", "full"),
         ("ok", "fail", "ok", "model-only"),
-        ("ok", "skip", "skip", "model-only"),
+        ("ok", "skip", "skip", "none"),
+        ("ok", "skip", "warn", "model-only"),
         ("fail", "ok", "skip", "none"),
         ("fail", "fail", "skip", "none"),
         ("ok", "ok", "fail", "none"),
@@ -222,8 +223,8 @@ def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none"
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
-    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: model-only", \
-        "Europe PMC unasked is Europe PMC unconfirmed"
+    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none", \
+        "a model unasked is a key unconfirmed, as Europe PMC unasked is Europe PMC unconfirmed"
 
 
 # ── what is on disk ────────────────────────────────────────────────────

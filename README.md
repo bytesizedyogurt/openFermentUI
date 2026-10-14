@@ -267,7 +267,7 @@ To make the demo real, regenerate all three fixtures together — they only make
 and `test_demo` checks that they still fit the code:
 
 ```bash
-pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one model call);
+pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one extraction of B5);
                               # writes jats/PMC8471596.xml, extract/B5.json and biorepo.json
 pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json, the export set and the
                               # smoke overlay fixture from whatever JATS and response are saved

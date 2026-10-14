@@ -239,3 +239,68 @@ def test_decisions_push_refuses_while_another_file_is_staged(work_branch):
     assert r.returncode != 0 and "other files are staged: notes.txt" in r.stderr, r.stderr
     assert git(remote, "rev-parse", "work").stdout == before, "nothing was pushed"
     assert git(first, "log", "-1", "--format=%s").stdout.strip() == "the work branch", "nothing was committed"
+
+
+# ── what the review of Phase 1 found (OF-BLD-014 §1.R) ──────────────────
+
+
+@needs_git
+def test_a_symlink_never_carries_what_its_spelling_hides(machines):
+    remote, first, _ = machines
+    fill(first)
+    (first / "core/data/candidates/ft").symlink_to("../fulltext")
+    for args in ((), ("core/data/candidates/ft",), ("core/data/candidates",)):
+        r = sync(first, "push", *args)
+        assert r.returncode != 0, args
+        assert "core/data/candidates/ft is a symbolic link" in r.stderr, r.stderr
+    assert git(remote, "branch", "--list", BRANCH).stdout.strip() == "", "nothing was pushed"
+
+
+@needs_git
+def test_a_listed_directory_that_is_a_symlink_is_refused(machines):
+    remote, first, _ = machines
+    put(first, "core/data/fulltext/P1.json", '{"paperId": "P1", "sections": []}\n')
+    (first / "core/data/candidates").symlink_to("fulltext")
+    r = sync(first, "push")
+    assert r.returncode != 0 and "core/data/candidates/ is a symbolic link" in r.stderr, r.stderr
+    assert git(remote, "branch", "--list", BRANCH).stdout.strip() == ""
+
+
+@needs_git
+def test_pull_keeps_a_local_file_that_differs_and_says_so(machines):
+    _, first, second = machines
+    put(first, "core/data/candidates/P1.json", '{"v": 1}\n')
+    assert sync(first, "push").returncode == 0
+    put(second, "core/data/candidates/P1.json", '{"v": 2}\n')
+    put(second, "core/data/thread-p-proposed.tsv", "verdict\tid\nAPPROVED\tPMC1\n")
+    r = sync(second, "pull")
+    assert r.returncode == 0, r.stderr
+    assert (second / "core/data/candidates/P1.json").read_text() == '{"v": 2}\n', "the local file stays"
+    assert "kept 1 local file(s) that differ from openferment-data" in r.stdout
+    assert "core/data/candidates/P1.json" in r.stdout
+
+
+@needs_git
+def test_a_refused_push_says_why_and_is_tried_once(machines):
+    remote, first, _ = machines
+    hook = remote / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'Permission to push denied (403)' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    fill(first)
+    r = sync(first, "push")
+    assert r.returncode != 0
+    assert "Permission to push denied (403)" in r.stderr, r.stderr
+    assert "moved while this ran" not in r.stdout + r.stderr
+
+
+@needs_git
+def test_the_data_branch_names_no_machine_and_keeps_no_finder_files(machines):
+    remote, first, _ = machines
+    fill(first)
+    put(first, "core/data/candidates/.DS_Store", "finder\n")
+    assert sync(first, "push").returncode == 0
+    message = git(remote, "log", "-1", "--format=%B", BRANCH).stdout
+    hostname = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
+    assert hostname and hostname not in message, message
+    on_branch = git(remote, "ls-tree", "-r", "--name-only", BRANCH).stdout.split()
+    assert not any(f.endswith(".DS_Store") for f in on_branch), on_branch
