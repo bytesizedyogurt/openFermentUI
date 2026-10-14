@@ -135,6 +135,17 @@ def is_research(result: dict[str, Any]) -> bool:
     return not is_review(result) and ("research-article" in types or "journal article" in types)
 
 
+def publication_type(result: dict[str, Any]) -> str:
+    """One word for the TSV: review, research-article, or the first type
+    that is not a funding note ("Research Support, …" says who paid)."""
+    if is_review(result):
+        return "review"
+    if is_research(result):
+        return "research-article"
+    types = [t for t in pub_types(result) if not t.lower().startswith("research support")]
+    return types[0] if types else ""
+
+
 def authors_of(result: dict[str, Any]) -> list[str]:
     raw = str(result.get("authorString") or "").strip().rstrip(".")
     return [a.strip() for a in raw.split(",") if a.strip()]
@@ -156,7 +167,6 @@ def _citations(result: dict[str, Any]) -> int:
 
 def row_of(result: dict[str, Any], verdict: str) -> Row:
     authors = authors_of(result)
-    types = pub_types(result)
     return Row(
         verdict=verdict,
         pmcid=str(result.get("pmcid") or "").strip(),
@@ -167,7 +177,7 @@ def row_of(result: dict[str, Any], verdict: str) -> Row:
         firstAuthor=authors[0] if authors else "",
         licence=str(result.get("license") or "").strip(),
         citations=_citations(result),
-        publicationType="review" if is_review(result) else (types[0] if types else ""),
+        publicationType=publication_type(result),
         authors=authors,
     )
 

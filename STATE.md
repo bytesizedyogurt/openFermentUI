@@ -10,12 +10,15 @@ LIVE steps built offline whose run waits on a need this machine lacked, one line
 
 - §1.5, the rest — needs the key (Europe PMC answers since 2026-10-14; the parser defects in `docs/build/JATS-AUDIT.md` are fixed and re-audited) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
 
+- §2.4 — needs Sean's choice of the thread P query and his approval of the list, then the key — after the query is settled: `pnpm thread:propose && pnpm data:push`; Sean marks rows APPROVED; `pnpm thread:apply core/data/thread-p-proposed.tsv --approved-by "Sean Creighton" && pnpm verify`; then `pnpm export:corpus && pnpm intake:fetch --all && pnpm intake:extract --all && pnpm data:push`
+
 ## Live runs
 
 LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the step asks for>` (OF-BLD-014 A.4).
 
 - §1.5, the fetch — 2026-10-14 — `pnpm intake:fetch --all`: **31 of the 59** asked returned full text (25 of the 27 with a PMCID, 6 found by DOI or PMID); 26 have no open-access text on Europe PMC; B1 and D1 answered 500 twice and are asked again on the next run. Licences: 26 CC BY 4.0, 1 CC BY stated in words, 1 Creative Commons licence named in words, 1 CC BY-NC 4.0, 1 CC BY-ND 4.0, 1 ACS AuthorChoice (CC BY-NC-ND terms). Of the 46 curated records on fetched papers, 3 quote a sentence the text holds. 0 USD; extraction owed
 - §1.5, the fetch again — 2026-10-14 — `pnpm intake:fetch --all --force` after the parser fixes: 31 of the 59 again, B1 and D1 answered 500 again. Of the 46 curated records on fetched papers, still 3 quote a sentence the text holds (r-J10-1, r-O3-2, r-O3-4). 0 USD
+- §2.4, the proposal — 2026-10-14 — `pnpm thread:propose` with the rule as OF-BLD-014 §2.3 writes it: Europe PMC counts 4,304 hits; of the first 100 by citations, 79 pass the filters and the rule proposes 16 (11 research articles, 5 reviews), because 77 of the 100 are reviews and only 11 research articles pass the filters. Every field the rule reads is present. Most proposals are off-topic: the query matches the words anywhere in the full text, and "PHA" also abbreviates phytohemagglutinin. The same query held to title and abstract (`TITLE_ABS:`) counts 120 hits, 95 of the first 100 pass the filters, and the rule fills its 30 and 5. 0 USD; pushed to `openferment-data`
 
 ---
 

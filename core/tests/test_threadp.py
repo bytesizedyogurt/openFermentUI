@@ -67,6 +67,13 @@ def test_a_row_holds_what_europe_pmc_returned_as_words():
     assert row.journal == "Journal of Stand-ins" and row.year == 2018 and row.licence == "cc by"
 
 
+def test_a_funding_note_is_not_a_publication_type():
+    r = dict(results()[0], pubTypeList={"pubType": ["Research Support, Non-U.S. Gov't", "research-article", "Journal Article"]})
+    assert threadp.publication_type(r) == "research-article"
+    r = dict(r, pubTypeList={"pubType": ["Research Support, Non-U.S. Gov't", "Retracted Publication"]})
+    assert threadp.publication_type(r) == "Retracted Publication"
+
+
 def test_a_result_missing_a_named_field_stops_the_run():
     broken = [dict(results()[0])]
     del broken[0]["citedByCount"]
