@@ -8,11 +8,13 @@ transcript; this file is the index a later session reads first.
 
 LIVE steps built offline whose run waits on a need this machine lacked, one line each: `- §n.m — needs <what> — <the command to run>` (OF-BLD-014 A.4).
 
-- §1.5 — needs the key and Europe PMC (`pnpm ready` reads lane full) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
+- §1.5, the rest — needs the key (Europe PMC answers since 2026-10-14) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`
 
 ## Live runs
 
 LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the step asks for>` (OF-BLD-014 A.4).
+
+- §1.5, the fetch — 2026-10-14 — `pnpm intake:fetch --all`: **31 of the 59** asked returned full text (25 of the 27 with a PMCID, 6 found by DOI or PMID); 26 have no open-access text on Europe PMC; B1 and D1 answered 500 twice and are asked again on the next run. Licences: 26 CC BY 4.0, 1 CC BY stated in words, 1 Creative Commons licence named in words, 1 CC BY-NC 4.0, 1 CC BY-ND 4.0, 1 ACS AuthorChoice (CC BY-NC-ND terms). Of the 46 curated records on fetched papers, 3 quote a sentence the text holds. 0 USD; extraction owed
 
 ---
 
