@@ -10,6 +10,7 @@ import plistlib
 from pathlib import Path
 
 import anthropic
+import httpx
 import pytest
 
 from openferment_core import api, biorepo, extract, intake, llm, ready
@@ -145,7 +146,84 @@ def test_network_checks_skip_in_fixture_mode(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     assert ready.check_model(True, client_factory=FakeClient).mark == "skip"
     assert ready.check_europe_pmc().mark == "skip"
+    assert ready.check_huggingface().mark == "skip"
     assert ready.check_backup().mark == "skip"
+
+
+# ── Hugging Face, the optional row (OF-BLD-014 §1.3) ───────────────────
+
+
+def _hf_answers(monkeypatch, outcome):
+    def head(url, **_):
+        assert url == ready.HUGGINGFACE
+        if isinstance(outcome, Exception):
+            raise outcome
+        return httpx.Response(outcome, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(ready.httpx, "head", head)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "mark", "says"),
+    [
+        (200, "ok", "huggingface.co answers"),
+        (403, "warn", "answered 403"),
+        (httpx.ConnectError("blocked"), "warn", "could not reach huggingface.co (ConnectError)"),
+    ],
+)
+def test_huggingface_warns_when_blocked_and_never_fails(monkeypatch, outcome, mark, says):
+    _hf_answers(monkeypatch, outcome)
+    check = ready.check_huggingface()
+    assert check.mark == mark and says in check.detail, check.detail
+
+
+def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    for name in ("check_model", "check_europe_pmc", "check_backup"):
+        row = name.removeprefix("check_").replace("_", "")
+        monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
+    _hf_answers(monkeypatch, httpx.ConnectError("blocked"))
+    assert ready.main([]) == 0
+    out = capsys.readouterr().out
+    assert "! huggingface" in out and out.rstrip().endswith("lane: full")
+
+
+# ── the lane (OF-BLD-014 A.4) ──────────────────────────────────────────
+
+
+def _checks(key: str, europepmc: str, model: str = "ok") -> list:
+    return [ready.Check("key", key, ""), ready.Check("model", model, ""), ready.Check("europepmc", europepmc, "")]
+
+
+@pytest.mark.parametrize(
+    ("key", "europepmc", "model", "lane"),
+    [
+        ("ok", "ok", "ok", "full"),
+        ("warn", "ok", "ok", "full"),
+        ("ok", "fail", "ok", "model-only"),
+        ("ok", "skip", "skip", "model-only"),
+        ("fail", "ok", "skip", "none"),
+        ("fail", "fail", "skip", "none"),
+        ("ok", "ok", "fail", "none"),
+        ("ok", "fail", "fail", "none"),
+    ],
+)
+def test_the_three_lanes(key, europepmc, model, lane):
+    assert ready.lane(_checks(key, europepmc, model)) == lane
+    assert lane in ready.LANES
+
+
+def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: model-only", \
+        "Europe PMC unasked is Europe PMC unconfirmed"
 
 
 # ── what is on disk ────────────────────────────────────────────────────

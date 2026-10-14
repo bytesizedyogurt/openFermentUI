@@ -11,6 +11,11 @@ It spends nothing. The model check asks Anthropic's Models API whether the key
 may use each model in the chain (llm.py: Opus, then Sonnet), which is free and
 is also how a retired model shows up before a real call fails; the Europe PMC
 check is one search. The key itself is never printed, in whole or in part.
+
+The last line is the lane (OF-BLD-014 A.4), what this machine can run:
+`full` with a usable key and Europe PMC answering, `model-only` with a
+usable key alone, `none` without one. The `huggingface` row is optional: a
+blocked host is a warning, and it never changes the exit code.
 """
 from __future__ import annotations
 
@@ -34,6 +39,10 @@ MARKS = {"ok": "✓", "warn": "!", "fail": "✗", "skip": "·"}
 PLACEHOLDER_KEY = "sk-ant-..."
 # A paper with a PMCID in the seed: B5's, the one the offline demo replays.
 PROBE_PMCID = "PMC8471596"
+# Where the meaning-match search lanes download their one model file from
+# (OF-BLD-014 §4.2).
+HUGGINGFACE = "https://huggingface.co"
+LANES = ("full", "model-only", "none")
 # Where api.py mounts the build from, worked out the same way and kept equal to
 # it by test_ready; importing api for it would start the app and log as it.
 DIST_DIR = intake._env_path("OPENFERMENT_DIST_DIR", REPO / "dist")
@@ -169,6 +178,21 @@ def check_europe_pmc() -> Check:
     return Check("europepmc", "ok", "Europe PMC answers")
 
 
+def check_huggingface() -> Check:
+    """Optional, so a warning at most: the two hybrid search lanes need one
+    model download from here, and the other lanes work without it."""
+    if intake.fixtures_only():
+        return Check("huggingface", "skip", "OPENFERMENT_FIXTURES is set")
+    gap = "so the two hybrid search lanes will report themselves unavailable"
+    try:
+        r = httpx.head(HUGGINGFACE, timeout=10, follow_redirects=True)
+    except httpx.HTTPError as e:
+        return Check("huggingface", "warn", f"could not reach huggingface.co ({type(e).__name__}), {gap}")
+    if r.status_code >= 400:
+        return Check("huggingface", "warn", f"huggingface.co answered {r.status_code}, {gap}")
+    return Check("huggingface", "ok", "huggingface.co answers")
+
+
 def _launchd():
     import importlib.util
 
@@ -245,11 +269,22 @@ def run(no_network: bool = False, port: int | None = None) -> list[Check]:
     have_key = key.mark in ("ok", "warn")
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
     if no_network:
-        checks += [Check(n, "skip", "--no-network") for n in ("model", "europepmc", "backup")]
+        checks += [Check(n, "skip", "--no-network") for n in ("model", "europepmc", "huggingface", "backup")]
     else:
-        checks += [check_model(have_key), check_europe_pmc(), check_backup()]
+        checks += [check_model(have_key), check_europe_pmc(), check_huggingface(), check_backup()]
     checks.append(check_service(port, have_key, host))
     return checks
+
+
+def lane(checks: list[Check]) -> str:
+    """What this machine can run (OF-BLD-014 A.4). The key counts when its
+    check passed or warned and the model check did not fail: a key Anthropic
+    rejects, or a model this machine cannot reach, runs nothing. Europe PMC
+    answers when its check passed."""
+    marks = {c.name: c.mark for c in checks}
+    if marks.get("key") not in ("ok", "warn") or marks.get("model") == "fail":
+        return "none"
+    return "full" if marks.get("europepmc") == "ok" else "model-only"
 
 
 def report(checks: list[Check]) -> str:
@@ -262,6 +297,7 @@ def report(checks: list[Check]) -> str:
         f"{failed} problem{'s' if failed != 1 else ''}. Fix the ✗ lines, then run pnpm ready again."
         if failed else "Ready."
     )
+    lines.append(f"lane: {lane(checks)}")
     return "\n".join(lines)
 
 
