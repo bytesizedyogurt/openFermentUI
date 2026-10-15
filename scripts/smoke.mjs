@@ -52,6 +52,7 @@ const ROUTES = [
   ['/proforma/scenario/sc-s1', 'Proforma — scenario S1'],
   ['/proforma/scenario/sc-s2', 'Proforma — scenario S2'],
   ['/proforma/scenario/sc-s3', 'Proforma — scenario S3 (the incumbent)'],
+  ['/proforma/scenario/sc-pha-1', 'Proforma — BioSTEAM scenario (draft PHA flowsheet)'],
   ['/runbooks', 'Runbooks'],
   ['/runbooks/rb-brazzein', 'Runbooks — complete'],
   ['/runbooks/rb-taq-kigali', 'Runbooks — running'],
@@ -241,7 +242,6 @@ async function main() {
     ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
     ['/intake', 'Intake subsystems', 'Parse status ladder'],
     ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
-    ['/proforma', 'Proforma subsystems', 'Uncertain inputs'],
   ];
   let shelfFails = 0;
   for (const [route, heading, table] of SHELVES) {
@@ -282,6 +282,8 @@ async function main() {
   const SEEDED = [
     ['/geneos/hosts', 'Chassis trade-offs', 'Hosts has no implementation'],
     ['/geneos/pathway', 'Precursor pathways', 'Pathway has no implementation'],
+    // §8.4 — Uncertainty is live: its reference stays on Proforma, off any shelf.
+    ['/proforma', 'Uncertain inputs', 'Uncertainty has no implementation'],
   ];
   let seededFails = 0;
   for (const [route, table, mustNotSay] of SEEDED) {
@@ -637,6 +639,44 @@ async function main() {
         const moved = await page.locator('button[aria-label="Aline Uwase, OD750 reading: Supervised"]').count();
         if (moved !== 1) problems.push('a training sign-off did not move the cell to Supervised');
       }
+      // OF-BLD-014 §8.4 — the BioSTEAM scenario. Four inputs arrive bound to
+      // (stand-in) records; the three that wait are typed as assumptions under
+      // the reviewer's name, kept, and posted with the run; the run draws a
+      // distribution with its infeasible count, a tornado, the sliders and the
+      // questions for a process modeller, strongest mover first.
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/An assumption carries a person's name: set yours in/.test(await page.locator('body').innerText()))
+        problems.push('an unnamed person is offered an assumption to type');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const pf = await page.locator('[data-testid="proforma-biosteam"]').innerText().catch(() => '');
+      if (!/BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only/.test(pf)) problems.push('sc-pha-1 does not carry its draft header');
+      if (!/Waiting for a source: solids recovered at harvest, price of fermentable sugar, sugar fed/.test(pf)) problems.push('the inputs waiting for a source are not named');
+      if (!(await page.getByRole('button', { name: 'Run the scenario' }).isDisabled())) problems.push('the run is offered while inputs wait for a source');
+      for (const [key, vals] of [['recovery', ['0.95', '0.9', '0.98']], ['sugarPrice', ['0.4', '0.3', '0.5']], ['sugarFeed', ['10000', '10000', '10000']]]) {
+        const form = page.locator(`[data-testid="assume-${key}"]`);
+        const boxes = form.locator('input');
+        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
+        await form.locator('button:has-text("Keep assumption")').click();
+        await page.waitForTimeout(150);
+      }
+      if ((await page.locator('[data-testid="assumption-chip"]').count()) !== 3) problems.push('three typed assumptions do not each show who made them');
+      await page.getByRole('button', { name: 'Run the scenario' }).click();
+      await page.locator('[data-testid="distribution"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="distribution-bin"]').count()) !== 20) problems.push('the distribution does not draw twenty bins');
+      if ((await page.locator('[data-testid="distribution-quantile"]').count()) !== 5) problems.push('the distribution does not draw five percentile rules');
+      if (!/490 of 500 samples ran; 10 left no sugar for respiration/.test(await page.locator('body').innerText())) problems.push('the infeasible count is not printed beside the distribution');
+      if ((await page.locator('[data-testid="tornado-row"]').count()) !== 6) problems.push('the tornado does not draw a row per varying input');
+      if (!(await page.locator('[data-testid="slider-price"]').count())) problems.push('the sliders do not read the run\'s grid');
+      const qs = await page.locator('[data-testid="modeller-questions"] li').allInnerTexts();
+      if (!/^price of fermentable sugar/.test(qs[0] ?? '')) problems.push('the questions do not lead with the input that moves the price most');
+      const posted = doubleState.proformaRuns.at(-1);
+      if (!posted || posted.assumptions?.length !== 3 || posted.assumptions.some((a) => a.by !== REVIEWER))
+        problems.push('the run did not post the three assumptions signed with the reviewer\'s name');
       // §2 — run mode reads the same ledger and writes to it as steps complete.
       await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-OD-01'));
       await page.waitForTimeout(400);

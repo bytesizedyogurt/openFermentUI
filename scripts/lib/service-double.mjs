@@ -100,6 +100,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const asks = [];
   const geneosCalls = [];
   const fermosCalls = [];
+  const proformaRuns = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -274,6 +275,19 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ artifact: null, simulator: { status: 'cold', error: null } }));
     }
+    // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
+    // and a run made through the real code with a stand-in evaluator.
+    if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype('proforma-scenarios.json')));
+    }
+    if (url === '/api/proforma/run' && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      proformaRuns.push(JSON.parse(body || '{}'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype('proforma-run.json')));
+    }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
     if (url === '/api/geneos/models' && req.method === 'GET') {
@@ -332,5 +346,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns } };
 }

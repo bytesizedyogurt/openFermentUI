@@ -22,6 +22,8 @@ import { ENCODING, NEVER_EVIDENCE, pointKey } from '../src/components/figures/en
 import { stripPoints, toTable as stripTable } from '../src/components/figures/EvidenceStrip';
 import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';
 import { toTable as frontierTable } from '../src/components/figures/Frontier';
+import { toTable as distributionTable } from '../src/components/figures/Distribution';
+import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
@@ -87,6 +89,15 @@ const frontierRows = frontierTable({ title: 't', points: f.points, growthUnit: f
 if (frontierRows !== f.points.length) problems.push(`Frontier's table has ${frontierRows} rows for ${f.points.length} points`);
 const provs = new Set(stripPoints(strip).points.map((p) => p.provenance));
 for (const p of Object.keys(ENCODING) as Provenance[]) if (!provs.has(p)) problems.push(`the sample draws no ${p} mark`);
+// §8.4 — a histogram bin or a percentile rule is a mark; so is a tornado row.
+const bins = [0, 1, 2].map((i) => ({ low: i, high: i + 1, count: i + 1 }));
+const quantiles = { p5: 0.2, p25: 0.8, p50: 1.5, p75: 2.2, p95: 2.9 };
+const distRows = distributionTable({ title: 't', quantity: 'q', unit: 'u', bins, quantiles, provenance: 'demo', samples: 6, infeasible: [] }).rows;
+if (distRows.length !== bins.length + 5) problems.push(`Distribution's table has ${distRows.length} rows for ${bins.length + 5} marks`);
+if (distRows.some((r) => r[3] !== 'demo')) problems.push("a Distribution's marks lose the run's provenance");
+const tRows = tornadoTable({ title: 't', drawn: 'd', series: ['a'], unit: 'u', provenance: 'demo', rows: [{ label: 'x', values: [0.2] }, { label: 'y', values: [-0.7] }] }).rows;
+if (tRows.length !== 2 || tRows[0][0] !== 'y') problems.push('the Tornado table is not one row per input, strongest first');
+ok.push(`tables: distribution ${distRows.length}, tornado ${tRows.length}, one row per mark, strongest input first`);
 ok.push(`tables: strip ${stripRows}, ceiling ${ceilingRows}, frontier ${frontierRows}, one row per mark; the sample draws all ${provs.size} classes`);
 
 // 4 — recharts stays where it was.

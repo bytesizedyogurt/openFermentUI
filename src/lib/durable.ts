@@ -27,7 +27,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -115,6 +115,12 @@ export interface DurableSnapshot {
    * refresh.
    */
   learnProgress?: Record<string, true>;
+  /**
+   * Proforma's typed assumptions, by scenario id (OF-BLD-014 §8.4): what a
+   * named person entered for an input no record binds. Optional for the
+   * same reason as `guild`.
+   */
+  proformaAssumptions?: Record<string, InputAssumption[]>;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

@@ -9,7 +9,7 @@ import { evaluateGrid } from '@/engine/grids';
 import { fmt } from '@/engine/units';
 import { PageHeader, Card, Button, LinkButton, cx, EmptyState } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
-import { SubsystemShelf } from '@/components/ReferenceView';
+import { SubsystemReference, SubsystemShelf } from '@/components/ReferenceView';
 import { href } from '@/router';
 import {
   BENCHMARK_EXPECTED,
@@ -164,6 +164,26 @@ export default function Proforma() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {scenarios.map((sc) => {
+            if (sc.kind === 'biosteam')
+              return (
+                <Card key={sc.id} className="p-4 flex flex-col" data-testid="biosteam-card">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="chip font-num">{sc.modelId}</span>
+                    <span className="chip">BioSTEAM</span>
+                  </div>
+                  <a href={`#/proforma/scenario/${sc.id}`} className="font-serif text-section-title font-semibold hover:text-accent leading-snug">
+                    {sc.name}
+                  </a>
+                  <p className="text-body text-ink-soft mt-1 mb-3 flex-1">{sc.description}</p>
+                  <p className="text-caption text-ink-soft mb-3">
+                    BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only. Its price is a distribution the service
+                    simulates once every input has a source.
+                  </p>
+                  <LinkButton to={`/proforma/scenario/${sc.id}`} variant="primary" className="justify-center">
+                    Open scenario
+                  </LinkButton>
+                </Card>
+              );
             const grid = grids[sc.modelId];
             const result = grid ? evaluateGrid(grid, sc.point) : null;
             const linked = sc.assumptions.filter((a) => a.recordId).length;
@@ -220,6 +240,11 @@ export default function Proforma() {
           })}
         </div>
       )}
+
+      {/* §8.4 — Uncertainty is live, so its reference sits on this view, below its own line. */}
+      <div className="mt-8">
+        <SubsystemReference id="proforma.uncertainty" />
+      </div>
 
       <SubsystemShelf owner="Proforma" />
     </div>

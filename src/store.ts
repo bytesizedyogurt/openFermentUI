@@ -3,6 +3,7 @@
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5).
 import { create } from 'zustand';
 import type {
+  InputAssumption,
   AuditEvent,
   Candidate,
   ReviewDecision,
@@ -301,6 +302,10 @@ export interface OFState {
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
   learnProgress: Record<string, boolean>;
+  /** Proforma's typed assumptions, by scenario id (§8.4). Durable. */
+  proformaAssumptions: Record<string, InputAssumption[]>;
+  setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
+  clearProformaAssumption: (scenarioId: string, key: string) => void;
   checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
@@ -757,6 +762,7 @@ const seedState = () => ({
   reviewStats: { accepted: 0, rejected: 0, edited: 0, skipped: 0, gold: 0, startedAt: Date.now() },
   undoStack: [] as UndoFrame[],
   learnProgress: {} as Record<string, boolean>,
+  proformaAssumptions: {} as Record<string, InputAssumption[]>,
   checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
 });
@@ -2256,6 +2262,24 @@ export const useStore = create<OFState>()((set, get) => ({
   completeLesson: (lessonId) =>
     set((s) => ({ learnProgress: { ...s.learnProgress, [lessonId]: true } })),
 
+  // ── Proforma's assumptions (OF-BLD-014 §8.4) ──────────────────────────
+  // A typed value carries the person and the day; the service refuses one
+  // without a name, so the screen asks for a reviewer name first.
+  setProformaAssumption: (scenarioId, a) =>
+    set((s) => ({
+      proformaAssumptions: {
+        ...s.proformaAssumptions,
+        [scenarioId]: [...(s.proformaAssumptions[scenarioId] ?? []).filter((x) => x.key !== a.key), a],
+      },
+    })),
+  clearProformaAssumption: (scenarioId, key) =>
+    set((s) => ({
+      proformaAssumptions: {
+        ...s.proformaAssumptions,
+        [scenarioId]: (s.proformaAssumptions[scenarioId] ?? []).filter((x) => x.key !== key),
+      },
+    })),
+
   recordCheckpoint: (qid, correct) =>
     set((s) => ({ checkpointAnswers: { ...s.checkpointAnswers, [qid]: correct } })),
 
@@ -2403,6 +2427,8 @@ export const useStore = create<OFState>()((set, get) => ({
         // §3.2 — lessons finished in this browser. Anything finished since the
         // page loaded is kept beside what the snapshot remembers.
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
+        // §8.4 — assumptions typed here; anything typed since load wins.
+        proformaAssumptions: { ...(snap.proformaAssumptions ?? {}), ...s.proformaAssumptions },
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -3428,6 +3454,7 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       actingId: s.guildActingId,
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
+    proformaAssumptions: s.proformaAssumptions,
   };
 }
 
@@ -3443,7 +3470,8 @@ if (durableAvailable()) {
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
-      s.learnProgress === prev.learnProgress
+      s.learnProgress === prev.learnProgress &&
+      s.proformaAssumptions === prev.proformaAssumptions
     )
       return;
     saveDurable(snapshotOf(s));

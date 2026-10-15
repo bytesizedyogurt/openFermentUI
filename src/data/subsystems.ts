@@ -174,9 +174,26 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'pureos.capture', owner: 'pureOS', label: 'Capture', status: 'stub', state: UNBUILT },
   { id: 'pureos.polish', owner: 'pureOS', label: 'Polish', status: 'stub', state: UNBUILT },
   { id: 'pureos.recovery', owner: 'pureOS', label: 'Recovery', status: 'stub', state: UNBUILT },
+  {
+    id: 'proforma.uncertainty',
+    owner: 'Proforma',
+    label: 'Uncertainty',
+    status: 'live',
+    state:
+      'Runs a BioSTEAM flowsheet over 500 seeded Latin-hypercube samples of inputs bound to records or to a named ' +
+      'person\u2019s assumption, and shows the price as a distribution, what moves it, and the infeasible share by ' +
+      'reason. One draft flowsheet so far: fermentation, harvest and drying of PHA.',
+    implementedIn: [
+      'core/openferment_core/proforma.py',
+      'core/openferment_core/flowsheets/pha_sugar_v0.py',
+      'core/openferment_core/workers/proforma_worker.py',
+      'src/screens/ProformaBiosteam.tsx',
+      'src/components/figures/Distribution.tsx',
+      'src/components/figures/Tornado.tsx',
+    ],
+  },
 
   // ── the rest, unchanged by this increment ────────────────────────────
-  { id: 'proforma.uncertainty', owner: 'Proforma', label: 'Uncertainty', status: 'stub', state: UNBUILT },
   { id: 'dominion.claims', owner: 'Dominion', label: 'Claim Workbench', status: 'stub', state: UNBUILT },
   { id: 'dominion.priority', owner: 'Dominion', label: 'Priority Engine', status: 'stub', state: UNBUILT },
   { id: 'dominion.enablement', owner: 'Dominion', label: 'Enablement', status: 'stub', state: UNBUILT },

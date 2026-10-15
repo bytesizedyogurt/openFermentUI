@@ -515,6 +515,13 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
   }
   const grid = grids[scenario.modelId];
   const dim = scenario.dims[0];
+  if (!dim) {
+    return (
+      <Frame label="Scenario">
+        <p className="text-body text-ink-soft">{scenario.name} is simulated on the service; open it in Proforma.</p>
+      </Frame>
+    );
+  }
   const value = local ?? scenario.point[dim.key];
   const result = grid ? evaluateGrid(grid, { ...scenario.point, [dim.key]: value }) : null;
 

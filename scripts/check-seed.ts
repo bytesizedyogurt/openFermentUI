@@ -31,7 +31,7 @@ import {
 } from '../src/data/vocabulary';
 import { PROTOCOLS } from '../src/data/protocols';
 import { FAMILIES, SKILLS, SKILL_BY_ID } from '../src/data/skills';
-import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
+import { SCENARIOS, COST_MODELS, BIOSTEAM_FLOWSHEETS } from '../src/data/scenarios';
 import { SUBSYSTEMS } from '../src/data/subsystems';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
@@ -117,8 +117,15 @@ for (const s of SCENARIOS) {
     if (d.paperId && !paperIds.has(d.paperId))
       fail(`${s.id}: dim ${d.key} paperId ${d.paperId} unresolved`);
   }
-  if (!COST_MODELS.some((m) => m.modelId === s.modelId))
+  // §8.4 — an authored scenario names a cost model; a BioSTEAM one names a
+  // flowsheet the service holds, and authors nothing of its own.
+  if (s.kind === 'authored' && !COST_MODELS.some((m) => m.modelId === s.modelId))
     fail(`${s.id}: modelId ${s.modelId} has no cost model`);
+  if (s.kind === 'biosteam') {
+    if (!BIOSTEAM_FLOWSHEETS.includes(s.modelId)) fail(`${s.id}: flowsheet ${s.modelId} is not one the service holds`);
+    if (s.dims.length || s.assumptions.length || Object.keys(s.point).length)
+      fail(`${s.id}: a BioSTEAM scenario authors no dims, point or assumptions; its inputs come from the service`);
+  }
 }
 
 for (const c of COLLECTIONS)

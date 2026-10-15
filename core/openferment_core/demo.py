@@ -383,6 +383,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_rag().items(),
         *prototype_geneos().items(),
         *prototype_fermos().items(),
+        *prototype_proforma().items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -606,6 +607,98 @@ def prototype_fermos() -> dict[str, Any]:
     if fc.evidence is not None:
         fc.evidence.basis.at = AT
     return {"fermos-fit.json": fit.model_dump(mode="json"), "fermos-forecast.json": fc.model_dump(mode="json")}
+
+
+# §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and
+# the run go through the real code (proforma.bind, proforma.run, the artifact
+# store in a scratch folder); the records are STAND-INs on a paper id no
+# corpus holds, and BioSTEAM is replaced by a closed-form STAND-IN evaluator,
+# so test:core needs no simulator. Not a price of anything.
+PROFORMA_STANDIN = "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+
+
+def _standin_records() -> list[dict[str, Any]]:
+    rows = [("pha_titre", "g L-1", (20.0, 45.0, 70.0)), ("pha_yield_substrate", "g g-1", (0.22, 0.3, 0.36)),
+            ("pha_content_cdw", "% CDW", (65.0, 80.0)), ("pha_productivity", "g L-1 h-1", (0.6, 1.4, 2.0))]
+    out = []
+    for field, unit, values in rows:
+        for n, v in enumerate(values):
+            out.append({"id": f"standin-{field}-{n}", "paperId": "P999", "field": field, "value": v, "unit": unit,
+                        "carbonSource": "glucose", "strainId": "c-necator-h16", "organismText": "STAND-IN organism",
+                        "provenance": "unverified", "status": "unverified", "primary": True})
+    return out
+
+
+def _standin_call(op: str, args: dict[str, Any]) -> Any:
+    import itertools
+
+    from scipy.stats import qmc
+
+    def evaluate(v: dict[str, float]) -> dict[str, Any]:
+        if v["yield"] / v["content"] > 0.5:
+            raise ValueError("carbon")
+        lines = {"media": v["sugarPrice"] / v["yield"] / v["recovery"], "utilities": 0.3 / v["productivity"],
+                 "labor": 0.1, "downstream": 2.0 / v["titre"], "other": 0.12, "capex": 4.0 / v["titre"] + 0.05}
+        return {"pricePerKgPha": sum(lines.values()), "phaKgPerH": v["sugarFeed"] * v["yield"] * v["recovery"],
+                "costLines": lines, "readBack": {"standIn": 1.0}}
+
+    def attempt(v):
+        try:
+            return evaluate(v), None
+        except ValueError as e:
+            return None, {"reason": str(e), "detail": PROFORMA_STANDIN}
+
+    def sample(spec, u):
+        if spec["kind"] == "fixed":
+            return spec["value"]
+        lo, hi = spec["low"], spec["high"]
+        if spec["kind"] == "uniform" or hi == lo:
+            return lo + u * (hi - lo)
+        c = (spec["mode"] - lo) / (hi - lo)
+        return lo + (hi - lo) * ((u * c) ** 0.5 if u < c else 1 - ((1 - u) * (1 - c)) ** 0.5)
+
+    if op == "evaluate":
+        return evaluate(args["values"])
+    if op == "grid":
+        keys = list(args["axes"])
+        cells = []
+        for combo in itertools.product(*(args["axes"][k] for k in keys)):
+            o, r = attempt({**args["base"], **dict(zip(keys, combo))})
+            cells.append({"at": dict(zip(keys, combo)), "outputs": o, "infeasible": r})
+        return {"axes": args["axes"], "base": args["base"], "cells": cells}
+    keys = list(args["specs"])
+    samples = []
+    for row in qmc.LatinHypercube(d=len(keys), seed=args["seed"]).random(args["n"]):
+        v = {**args["base"], **{k: sample(args["specs"][k], float(row[i])) for i, k in enumerate(keys)}}
+        o, r = attempt(v)
+        samples.append({"inputs": v, "outputs": o, "infeasible": r})
+    return {"n": args["n"], "seed": args["seed"], "samples": samples}
+
+
+def prototype_proforma() -> dict[str, Any]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import intake as _intake
+    from . import proforma
+    from .models import InputAssumption, ProformaRunRequest
+
+    rs = _standin_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    info = proforma.scenario(pool=pool).model_dump(mode="json")
+    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
+         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
+    saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_call
+            proforma.yield_cap = lambda: None
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
+        finally:
+            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    run.evidence.basis.at = AT
+    return {"proforma-scenarios.json": [info], "proforma-run.json": run.model_dump(mode="json")}
 
 
 def rebuild_fermos_sample(out: Path = FERMOS_SAMPLE) -> Path:

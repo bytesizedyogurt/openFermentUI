@@ -572,7 +572,10 @@ export interface ScenarioAssumption {
 
 export interface Scenario {
   id: string;
-  modelId: 'S1' | 'S2' | 'S3';
+  /** An authored cost model's id (S1–S3), or a BioSTEAM flowsheet's (§8.4). */
+  modelId: string;
+  /** 'authored': a cost surface written by hand; 'biosteam': a flowsheet the service simulates. */
+  kind: 'authored' | 'biosteam';
   name: string;
   description: string;
   product: string;

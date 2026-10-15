@@ -7,3 +7,5 @@ export { CeilingGap, CEILING_NOTES, toTable as ceilingGapTable, type CeilingGapP
 export { Frontier, toTable as frontierTable, type FrontierProps, type FrontierPoint } from './Frontier';
 export { MixLine, toTable as mixLineTable, type MixLineProps, type MixPoint } from './MixLine';
 export { TrajectoryBand, toTable as trajectoryTable, type TrajectoryBandProps, type TrajectorySeries } from './TrajectoryBand';
+export { Distribution, toTable as distributionTable, type DistributionProps } from './Distribution';
+export { Tornado, toTable as tornadoTable, sorted as tornadoSorted, type TornadoProps, type TornadoRow } from './Tornado';
