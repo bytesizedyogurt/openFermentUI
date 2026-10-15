@@ -365,4 +365,23 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   guarded with a failing test or check first. **1,045** Python tests
   offline; smoke **64** routes, golden path **30**. Screenshots:
   `docs/shots/phase-6-*`, from the running service with the real models.
+- **2026-10-15 · OF-BLD-014 Phase 7 (§7.1–§7.4, §7.R, §7.T)** — fermOS fits
+  what a run measured. A deposition's readings carry hours and a series role,
+  typed on the deposition page or attached as CSV, and survive a reload.
+  `fermos.py` fits a growth rate and a closed-form kinetic model (logistic,
+  Luedeking–Piret, substrate balance) and forecasts a run like it as a band
+  of 200 seeded draws; fits and forecasts are artifacts with the deposition
+  as source, and the sample run is invented, inline and kept nowhere.
+  Measured on synthetic runs: noiseless parameters back within 0.1 %; a
+  fresh reading inside the band in 35, 34 and 33 of 40 runs (biomass,
+  product, substrate; the spec's floor is 28); a run cut before biomass
+  levels off gives an Xmax interval more than twice as wide (median of nine).
+  No real run is fitted yet: none is deposited with timed readings. fermOS
+  is no longer the emptiest of the eleven; transport, mode, scale and
+  control stay unbuilt. `growth_forecast` is the fifth tool. The review
+  found six, two high (CSV rows placed by unit alone; the service taking
+  the browser's word for a deposition); five fixed with a failing test
+  first, the sixth stated in the basis and the screen. **1,070** Python
+  tests offline; smoke **65** routes, golden path **31**. Screenshots:
+  `docs/shots/phase-7-*`, over the sample run.
 

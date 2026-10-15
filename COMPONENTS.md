@@ -162,7 +162,7 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **This is the emptiest of the eleven, and honestly so**: there is no kinetic model, no transport calculation and no scale-up logic anywhere in the codebase.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. Transport, operating mode, scale-up and control are not built.
 
 | Subsystem | Key | State |
 |---|---|---|

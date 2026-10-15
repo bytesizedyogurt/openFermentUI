@@ -550,6 +550,31 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   shows its card; an evidence card with the `ceiling` hint draws it inline.
   `yield_ceiling` is the registry's fourth tool.
 
+## fermOS fits what a run measured (OF-BLD-014 Phase 7)
+
+- **A deposition's readings become a series.** `Deposition.sampleTimes`
+  (hours, by entry id) and `seriesRoles` (biomass, product, substrate, set by
+  a person) are optional and Durable. `seriesOf` (`src/engine/series.ts`)
+  groups timed entries by measure in time order, in the measure's unit; a
+  correction keeps its reading's time (`amendEntry`) and replaces it; an
+  untimed entry keeps its old meaning. CSV readings attach as unconfirmed
+  entries in time order, a row placed only when its measure names the
+  measure (`placeRow`), every other line kept as an observation.
+- **`fermos.py` fits, and the browser sends the series.** A growth rate over
+  the best window of four or more readings; a closed-form kinetic model
+  refined in two weighted passes, intervals from the covariance and Student's
+  t; μ and Xmax `identified` when the interval excludes zero, decided by the
+  service from the numbers. Fits and forecasts are artifacts (`growth_fit`,
+  `kinetic_fit`, `growth_forecast`) with source `deposition`; the service
+  cannot see the browser's depositions and says so in each basis. A forecast
+  is 200 seeded draws with each series' scatter added (yield is taken
+  without it), ends where the median sugar runs out, and refuses a fit whose
+  μ or Xmax is unidentified. A changed starting value is an assumption with
+  a name, so the forecast is `demo`; one equal to the run's own is no change.
+- **The sample run is invented** (`demo.py --prototype` writes
+  `src/data/fermosSample.json`), labelled, fitted and forecast inline
+  (`sample: true`) and kept nowhere. `growth_forecast` is the fifth tool.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,

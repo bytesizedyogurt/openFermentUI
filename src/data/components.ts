@@ -175,9 +175,9 @@ export const COMPONENTS: ComponentDef[] = [
     role: 'The organism as an engineered system — host, parts, pathway, model, strain design',
   },
   {
-    // OF-BLD-011 §3 — the reactor, and now the emptiest of the eleven. It got
-    // emptier on purpose: the catalogue it used to hold was never its, and
-    // what it should have held — kinetics, transport, scale — was never built.
+    // OF-BLD-011 §3 — the reactor. The catalogue it used to hold went to
+    // geneOS. OF-BLD-014 Phase 7 built its kinetics from depositions;
+    // transport, operating mode, scale and control are not built.
     name: 'fermOS',
     owner: 'fermOS',
     layer: 'Computing',

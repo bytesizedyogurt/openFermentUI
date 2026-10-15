@@ -60,6 +60,7 @@ polymer ontology fields are in place for it. As of 2026-10-15 the thread holds *
 | Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): `e_coli_core` and `iJO1366` as bundled with cobra 0.32.1, with the phaCAB route added, and the *C. necator* H16 reconstruction `RehMBEL1391`, fetched at its pinned commit and hash. As of 2026-10-15 the six values of OF-BLD-014 Appendix 2 reproduce within 0.1 % (PHB on glucose: 0.4779 g/g central carbon, 0.5931 g/g genome scale; on fructose in *C. necator*: 0.5932 g/g). A ceiling has no time axis and no vessel. No reported PHA yield is in the store yet to draw beside it: thread P's extraction waits on a key the API accepts |
 | Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling; a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **8** kept as of 2026-10-15 and pushed to `openferment-data`: r-B5-3's 17.5 d in hours (the Phase 3 screenshots), and seven geneOS ceilings, envelopes and mixes computed for the Phase 6 screenshots |
 | Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
+| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. As of 2026-10-15 no real run has been fitted: none is deposited with timed readings. The sample run is invented and labelled |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model calls in a bounded loop** — Postdoc on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`. It searches the records and the papers' passages with its tools (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, quoted sentences checked word for word against their passages, or computed values. As of 2026-10-15 the loop is tested offline against a scripted stand-in only: the key on the cloud environment is refused, so the twelve flows and the ten PHA questions (`pnpm ask:batch`) wait on a key. 13 authored flows remain as the scripted mode and the acceptance tests |
 
@@ -354,8 +355,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
                          #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
-                         #   tokens, tool turns and daily cap, the tool registry and its four tools, the worker runner,
+                         #   tokens, tool turns and daily cap, the tool registry and its five tools, the worker runner,
                          #   the geneOS worker on a toy network worked by hand and Appendix 2's bundled-model ceilings,
+                         #   fermOS's growth and kinetic fits and its forecast band on synthetic runs,
                          #   Postdoc's loop and its budget against a scripted model, the plan validator, the ask stream,
                          #   the passage cutter, the five search lanes, the scorecard's metrics and rule,
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
@@ -374,12 +376,13 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table
                          #   row per mark, recharts only where it was
   pnpm build
-  pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
+  pnpm test:durable      #   the Durable tier survives a reload, finished lessons and series times included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
   pnpm test:smoke        #   64 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
                          #   landing on its words, Postdoc live drawing its steps and quoting a sentence, the figure
-                         #   gallery, geneOS → Model and the strain card over the toy network, Guild posting, and the
+                         #   gallery, geneOS → Model and the strain card over the toy network, fermOS fitting and
+                         #   forecasting the sample run, Guild posting, and the
                          #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
                          #   a practice session, and a check run at the bench and read back
   pnpm test:golden       #   the ten-minute demo script, driven end to end, a search opening the reader,
@@ -480,9 +483,10 @@ titre is fermOS's output rather than geneOS's. **fermOS → pureOS** is the
 harvest step, which pays for a choice made back in geneOS — secreted or
 intracellular — so the handoff carries product location, not just a titre.
 
-**fermOS is the emptiest of the eleven**: five named subsystems and no code. It
-is also the one that cannot be seeded from literature, because kinetic
-parameters are fitted to real runs and come from Deposition. **pureOS** has the
+**fermOS fits what a run measured**: kinetics is built from depositions alone,
+and the other four subsystems are named and not built. It is the one that
+cannot be seeded from literature, because kinetic parameters are fitted to real
+runs and come from Deposition. **pureOS** has the
 unit-operation vocabulary and no process model. Both say so on the screen
 rather than implying otherwise, and Home shows the current state of each of the
 eleven beside its name. Putting them in the rail from day one means that when
