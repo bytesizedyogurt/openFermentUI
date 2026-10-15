@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import {
   Award,
   Beaker,
+  ChartScatter,
   Database,
   Download,
   Gauge,
@@ -32,6 +33,7 @@ import {
   cx,
 } from '@/components/ui';
 import { DataTable, type Column } from '@/components/DataTable';
+import { FiguresSection } from './SettingsFigures';
 import { QuantityField, Quantity, type QuantityValue } from '@/components/QuantityField';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
 import type { FieldId, GateMode, GuildPolicy, ParameterDef } from '@/data/types';
@@ -88,6 +90,12 @@ const SECTIONS: SectionDef[] = [
     blurb:
       'How the run-mode gate treats routine and critical skills, and how often each holder of a critical skill is checked. Set by the lead, kept by the service for every device.',
     owner: true,
+  },
+  {
+    id: 'figures',
+    label: 'Figure grammar',
+    blurb:
+      'How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Shown over a labelled sample.',
   },
   {
     id: 'export',
@@ -1470,6 +1478,7 @@ export default function Settings({ section }: { section: string }) {
                     {s.id === 'units' && <Ruler size={14} aria-hidden />}
                     {s.id === 'corpus' && <Database size={14} aria-hidden />}
                     {s.id === 'guild' && <ShieldCheck size={14} aria-hidden />}
+                    {s.id === 'figures' && <ChartScatter size={14} aria-hidden />}
                     {s.id === 'export' && <Download size={14} aria-hidden />}
                     {s.id === 'about' && <Moon size={14} aria-hidden />}
                     <span className="truncate">{s.label}</span>
@@ -1490,6 +1499,7 @@ export default function Settings({ section }: { section: string }) {
           {active === 'units' && <UnitsSection />}
           {active === 'corpus' && <CorpusSection />}
           {active === 'guild' && <GuildPolicySection />}
+          {active === 'figures' && <FiguresSection />}
           {active === 'export' && <ExportSection />}
           {active === 'about' && <AboutSection />}
         </div>

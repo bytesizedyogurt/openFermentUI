@@ -163,6 +163,15 @@ def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path):
     assert committed == sorted(p.name for p in written), "a fixture the command no longer writes is still committed"
 
 
+def test_the_figure_sample_is_what_demo_prototype_writes(tmp_path):
+    """OF-BLD-014 §6.1: the gallery's sample, said to be one in its first field."""
+    written = demo.rebuild_figure_samples(tmp_path / "figureSamples.json")
+    assert written.read_text(encoding="utf-8") == demo.FIGURE_SAMPLES.read_text(encoding="utf-8"), (
+        "figureSamples.json no longer matches the code: run python -m openferment_core.demo --prototype"
+    )
+    assert next(iter(json.loads(written.read_text()))) == "_sample"
+
+
 def test_building_a_set_leaves_the_modules_where_they_were(tmp_path):
     where = (intake.FULLTEXT_DIR, extract.CANDIDATES_DIR, biorepo.PATH, intake.FIXTURE_DIR)
     demo.rebuild_export_set(out=tmp_path / "export.json")

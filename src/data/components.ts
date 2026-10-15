@@ -147,6 +147,8 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/BioRepoSearch.tsx',
       'core/openferment_core/passages.py',
       'core/openferment_core/retrieve.py',
+      // OF-BLD-014 §6.1 — one figure grammar for drawing evidence.
+      'src/components/figures/',
     ],
     surfacedAs: 'the rail, /biorepo',
     role: 'The corpus, and everything retrieved from it',

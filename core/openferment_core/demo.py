@@ -522,12 +522,53 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
     return events
 
 
+# §6.1: the figure gallery's sample (/settings/figures). One record per
+# provenance class, so every mark of the grammar is drawn; two limits; and a
+# frontier. Invented numbers, said so in the file's first field and on the
+# page; nothing here is a result.
+FIGURE_SAMPLES = CORE.parent / "src" / "data" / "figureSamples.json"
+SAMPLE_NOTE = "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result."
+SAMPLE_CLASSES = ["measured", "gold", "verified", "curated", "unverified", "computed", "user", "industry-estimate", "demo"]
+
+
+def figure_samples() -> dict[str, Any]:
+    records = []
+    for n, prov in enumerate(SAMPLE_CLASSES):
+        records.append({
+            "id": f"sample-{n + 1}", "paperId": "sample", "sectionId": "sample", "quote": SAMPLE_NOTE,
+            "field": "pha_yield_substrate", "value": round(0.12 + 0.05 * n, 3), "unit": "g g-1",
+            "si": {"value": round(0.12 + 0.05 * n, 3), "unit": "g g-1"}, "confidence": 1,
+            "status": "verified" if prov in ("verified", "gold") else "unverified",
+            "provenance": "curated" if prov in ("verified", "gold") else prov,
+            **({"gold": {"value": round(0.12 + 0.05 * n, 3), "unit": "g g-1"}} if prov == "gold" else {}),
+            "organism": f"Sample organism {'AB'[n % 2]}", "carbonSource": "sample sugar",
+            "isPrimary": True, "audit": [],
+        })
+    records.append({**records[3], "id": "sample-10", "value": 0.2, "si": {"value": 0.2, "unit": "g g-1"},
+                    "isPrimary": False, "organism": "Sample organism B"})
+    frontier = [{"growth": round(0.08 * i, 3), "product": round(0.6 * (1 - (i / 11) ** 1.6), 4)} for i in range(12)]
+    return {
+        "_sample": SAMPLE_NOTE,
+        "strip": {"unit": "g g-1", "quantity": "PHB yield on substrate", "records": records,
+                  "rules": [{"value": 0.48, "label": "sample core model"}, {"value": 0.59, "label": "sample genome-scale model"}]},
+        "frontier": {"growthUnit": "h-1", "productUnit": "g g-1", "productLabel": "PHB yield on substrate",
+                     "model": "a sample model", "points": frontier},
+    }
+
+
+def rebuild_figure_samples(out: Path = FIGURE_SAMPLES) -> Path:
+    out.write_text(json.dumps(figure_samples(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {out}")
+    return out
+
+
 def main(argv: list[str]) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(CORE / ".env", override=False)
     if "--prototype" in argv:
         rebuild_prototype()
+        rebuild_figure_samples()
         return 0
     if "--real" in argv:
         with _scratch() as scratch, _pointed_at(scratch, DEMO):

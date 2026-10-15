@@ -85,6 +85,7 @@ const ROUTES = [
   ['/settings/appearance', 'Settings — appearance'],
   ['/settings/units', 'Settings — units'],
   ['/settings/corpus', 'Settings — corpus'],
+  ['/settings/figures', 'Settings — the figure grammar over its sample'],
   ['/settings/export', 'Settings — export'],
   ['/settings/architecture', 'Architecture — the map of the eleven'],
   ['/settings/about', 'Settings — colophon'],
@@ -434,6 +435,17 @@ async function main() {
       await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/Placeholder A \| 7 \| mg L-1/.test((await page.locator('[data-testid="quote-mark"]').innerText().catch(() => '')) ?? ''))
         problems.push('the quoted sentence did not open the reader on its words');
+      // OF-BLD-014 §6.1 — the figure gallery: the legend names all nine
+      // classes, three figures draw over the labelled sample, and a figure's
+      // table twin holds one row per mark.
+      await page.goto(`http://localhost:${PORT}/#/settings/figures`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="figure-gallery"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="encoding-legend"] li').count()) !== 9) problems.push('the figure legend does not list nine provenances');
+      if ((await page.locator('[data-testid="figure"]').count()) !== 3) problems.push('the gallery does not draw three figures');
+      if (!/SAMPLE: invented values/.test(await page.locator('body').innerText())) problems.push('the gallery does not say its values are a sample');
+      await page.locator('[data-testid="figure"]').nth(1).getByRole('button', { name: 'View as table' }).click();
+      if ((await page.locator('[data-testid="figure-table"] tbody tr').count()) !== 12) problems.push('the ceiling figure\'s table does not hold one row per mark');
+      await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
       // Back to scripted, which the live panel leaves untouched.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
       await page.getByRole('button', { name: 'Scripted' }).click();
@@ -529,7 +541,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample');
       }
     } catch (e) {
       overlayFails++;
