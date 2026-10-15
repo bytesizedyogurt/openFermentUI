@@ -195,9 +195,17 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Proforma',
     owner: 'Proforma',
     layer: 'Computing',
-    livesIn: ['src/screens/Proforma.tsx', 'src/screens/ProformaScenario.tsx', 'src/engine/grids.ts', 'src/engine/interp.ts'],
+    livesIn: [
+      'src/screens/Proforma.tsx',
+      'src/screens/ProformaScenario.tsx',
+      'src/screens/ProformaBiosteam.tsx',
+      'src/engine/grids.ts',
+      'src/engine/interp.ts',
+      'core/openferment_core/proforma.py',
+      'core/openferment_core/flowsheets/',
+    ],
     surfacedAs: 'the rail, /proforma',
-    role: 'Cost models, sweeps and scenario economics',
+    role: 'Scenario economics: three authored cost surfaces, and a draft BioSTEAM flowsheet priced as a distribution after a published benchmark reproduces',
   },
   {
     // §3 — Primer moved. It named the unit engine; it now names the Learn

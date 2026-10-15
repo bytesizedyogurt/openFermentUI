@@ -576,6 +576,33 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `src/data/fermosSample.json`), labelled, fitted and forecast inline
   (`sample: true`) and kept nowhere. `growth_forecast` is the fifth tool.
 
+## Proforma prices a flowsheet BioSTEAM ran (OF-BLD-014 Phase 8)
+
+- **BioSTEAM lives in the Proforma worker.** `biosteam` is imported in
+  `workers/proforma_worker.py` and `flowsheets/` alone (`test_workers`).
+  `proforma.py` keeps one warm `SimWorker`; `GET /api/proforma/status`
+  answers cold, starting, ready or failed, and `OPENFERMENT_WARM_PROFORMA=1`
+  starts it with the service. `pnpm test:sim` (marker `sim`) runs the real
+  worker in verify; `pnpm test:slow` (marker `slow`) holds the benchmark and
+  the PHA flowsheet, outside verify.
+- **The benchmark comes first.** `biorefineries.cornstover` with its own
+  defaults must give 1.968 USD per gallon within 0.5 % (B.3); it is an
+  artifact sourced `model`. `GET /api/proforma/benchmark` reads, POST runs.
+- **`pha_sugar_v0` holds no input value.** Sugar and its dilution water are
+  two streams, so sugar is priced on sugar alone. `tea._sales` is reset
+  before every `solve_price`: the solver starts from the last answer, and a
+  price would otherwise depend on run order. An infeasible case names its
+  reason: carbon, oxygen (BioSTEAM's own "infinite flow rate of gas"), or
+  the fermenter's balance.
+- **Every input names its source.** `proforma.bind` takes thread P records
+  of a sugar or hydrolysate feed through the aggregate gate and `units.py`,
+  or a named person's assumption (kept in the Durable tier, merged by input
+  key); an input with neither refuses the run with a 422. A run is one
+  artifact, `demo` while any assumption remains. Spearman uses averaged ranks
+  and skips an input with no spread. `selling_price` is the sixth tool and
+  never runs a scenario. The double's Proforma fixtures come from
+  `demo.py --prototype` with a STAND-IN evaluator in place of BioSTEAM.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
