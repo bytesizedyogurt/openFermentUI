@@ -1,0 +1,10 @@
+Which organisms have been shown to make PHB from hydrolysates that contain xylose, and what feedstock did each study use?
+How have waste paper and cotton textile been turned into fermentable sugar for PHA production, and which pretreatment and hydrolysis steps were used?
+How does nitrogen limitation affect PHB accumulation in Cupriavidus necator?
+What PHB yields on glucose have been reported, and how far are they from the ceiling?
+Which inhibitors in lignocellulosic hydrolysates have been reported to slow PHA producers, and what detoxification steps were tried?
+What polymer molecular weights have been reported, and by which methods were they measured?
+How does the sugar mix of a hydrolysate change the monomer composition of the polymer?
+What would PHB cost per kilogram at the titres and yields reported so far?
+What has nobody measured yet for recycled-paper reject fibre as a PHA feedstock?
+Draft a first shake-flask run to test PHB production from a mixed glucose and xylose medium.

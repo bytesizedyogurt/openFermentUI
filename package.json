@@ -43,6 +43,7 @@
     "index:build": "cd core && uv run --all-extras python -m openferment_core.passages",
     "rag:questions": "cd core && uv run --all-extras python -m openferment_core.rageval questions",
     "rag:eval": "cd core && uv run --all-extras python -m openferment_core.rageval eval",
+    "ask:batch": "cd core && uv run --all-extras python ../scripts/ask-batch.py",
     "demo:offline": "node scripts/demo-offline.mjs",
     "prototype:up": "bash scripts/prototype-up.sh",
     "shots": "node scripts/shots.mjs",

@@ -12,6 +12,7 @@ LIVE steps built offline whose run waits on a need this machine lacked, one line
 
 - §2.4, the extraction — needs a key the Models API accepts (this one is not scoped to a workspace: 400 on every call) — `pnpm intake:extract --all && pnpm data:push`; report per thread P paper and per polymer field: anchored, rejected by rule, cost, values with a strain id, values with a carbon source
 - §4.5, the rest — needs a key the Models API accepts (the API answers 400 to this one: not scoped to a workspace) — `pnpm rag:questions --n 200 && pnpm rag:eval && pnpm data:push`; report the questions discarded, and nDCG@10 and recall@10 on K and S for every lane, with the cost
+- §5.5 — needs a key the Models API accepts (`pnpm ready` on 2026-10-15: 400, not scoped to a workspace) and the index (`pnpm data:prepare`) — `pnpm test:live` (on a `model-only` lane: `cd core && uv run --all-extras pytest tests/test_flows.py -m live -s`), then `pnpm ask:batch docs/build/questions-pha.txt && pnpm data:push`; report flows passed of twelve, and across the ten questions the median cost and seconds, claims kept and dropped, and the share of kept claims that carry a record or a quote
 
 ## Live runs
 
