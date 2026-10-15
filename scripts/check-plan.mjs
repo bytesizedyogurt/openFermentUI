@@ -140,6 +140,9 @@ const PAIRS = [
   // OF-BLD-014 §4.4 — search from the browser.
   ['RagSearchRequest', 'RagSearchRequest'],
   ['RagSearchResponse', 'RagSearchResponse'],
+  // OF-BLD-014 §5.1 — a plan cites sentences and computed values.
+  ['PassageRef', 'PassageRef'],
+  ['TraceStep', 'TraceStep'],
 ];
 
 let compared = 0;

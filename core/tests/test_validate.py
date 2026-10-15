@@ -543,3 +543,107 @@ def test_a_rejected_emission_counts_no_field_drop():
     out = anchor_all([_emission("glucose", 0.9, value=99)], CARBON_SECTION, paper_id="W2")
     assert out.rejected == 1 and out.accepted == []
     assert out.field_drops == {"carbonSource": 0}
+
+
+# ── the agent's plan (OF-BLD-014 §5.1) ─────────────────────────────────
+# A stand-in pool and run: records, passages and evidence invented here.
+
+from openferment_core.models import BasisInput, BasisSource, ComputedBasis, Evidence, Passage
+from openferment_core.validate import MAX_QUOTE_CHARS, SeenSet, validate_plan
+
+
+class _Pool:
+    RECORDS = {
+        "r-X1-1": {"id": "r-X1-1", "paperId": "X1", "provenance": "verified"},
+        "r-X2-1": {"id": "r-X2-1", "paperId": "X2", "provenance": "curated"},
+        "cl1-X3-aaaaaaaa": {"id": "cl1-X3-aaaaaaaa", "paperId": "X3", "provenance": "unverified"},
+    }
+
+    def record(self, rid):
+        return self.RECORDS.get(rid)
+
+
+PASSAGE = Passage(id="X4:s1:0", paperId="X4", sectionId="s1", heading="Results", kind="prose",
+                  text="Cells fed xylose hydrolysate accumulated polyhydroxybutyrate.  The content rose over four days.", start=0, end=97)
+
+
+def _evidence(prov="computed"):
+    basis = ComputedBasis(tool="convert_units", toolVersion="v", artifactId="a" * 16, at="t",
+                          inputs=[BasisInput(name="record value", value=1.0, unit="d", source=BasisSource(kind="record", id="r-X1-1"))])
+    return Evidence(id="ev-1", label="r-X1-1 in h", value=24.0, unit="h", provenance=prov, basis=basis)
+
+
+def _seen(**kw):
+    s = SeenSet()
+    s.records = set(kw.get("records", ["r-X1-1", "r-X2-1", "cl1-X3-aaaaaaaa"]))
+    s.passages = {PASSAGE.id: PASSAGE}
+    s.evidence = {"ev-1": kw.get("evidence", _evidence())}
+    return s
+
+
+def _one(claim, seen=None):
+    return validate_plan([claim], seen or _seen(), _Pool())
+
+
+def test_plan_happy_path_keeps_every_kind_of_citation():
+    r = _one({
+        "id": "c1", "text": "Xylose-fed cells accumulated the polymer.", "support": "direct",
+        "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"],
+        "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed xylose hydrolysate accumulated polyhydroxybutyrate."}],
+        "paperIds": ["Z9"],
+    })
+    assert r.rejected == 0
+    c = r.claims[0]
+    assert c.paperIds == ["X1", "X4"], "papers come from records and passages, never the model"
+    assert c.evidenceIds == ["ev-1"] and c.passages[0].passageId == PASSAGE.id
+    assert c.provenance == "computed", "weakest of verified and computed"
+
+
+def test_plan_rule_1_a_number_drops_the_claim():
+    r = _one({"text": "The content reached 40 percent.", "recordIds": ["r-X1-1"]})
+    assert r.rejected == 1 and "number" in r.reasons[0]
+
+
+def test_plan_rule_2_a_record_that_does_not_resolve():
+    r = _one({"text": "A claim.", "recordIds": ["r-nowhere"]}, _seen(records=["r-nowhere"]))
+    assert r.rejected == 1 and "do not exist" in r.reasons[0]
+
+
+def test_plan_rule_3_a_citation_no_tool_returned():
+    for claim in (
+        {"text": "A claim.", "recordIds": ["r-X2-1"]},
+        {"text": "A claim.", "evidenceIds": ["ev-9"]},
+        {"text": "A claim.", "passages": [{"passageId": "X9:s1:0", "quote": "anything"}]},
+    ):
+        r = _one(claim, _seen(records=["r-X1-1"]))
+        assert r.rejected == 1 and "no tool returned" in r.reasons[0], claim
+
+
+def test_plan_rule_4_a_long_or_made_up_quote():
+    made_up = _one({"text": "A claim.", "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed glucose did better."}]})
+    assert made_up.rejected == 1 and "not in" in made_up.reasons[0]
+    long_p = PASSAGE.model_copy(update={"text": "word " * 200})
+    seen = _seen()
+    seen.passages = {PASSAGE.id: long_p}
+    too_long = _one({"text": "A claim.", "passages": [{"passageId": PASSAGE.id, "quote": "word " * (MAX_QUOTE_CHARS // 5 + 2)}]}, seen)
+    assert too_long.rejected == 1 and "longer than" in too_long.reasons[0]
+    spaced = _one({"text": "A claim.", "passages": [{"passageId": PASSAGE.id, "quote": "The   content rose over four days."}]})
+    assert spaced.rejected == 0, "whitespace is normalised; the words are not"
+
+
+def test_plan_rule_5_citing_nothing_needs_unsupported():
+    r = _one({"text": "Nobody has measured it in this host.", "support": "direct"})
+    assert r.rejected == 1 and "cites nothing" in r.reasons[0]
+    ok = _one({"text": "Nobody has measured it in this host.", "support": "unsupported"})
+    assert ok.rejected == 0 and ok.claims[0].provenance == "unverified"
+
+
+def test_plan_provenance_across_mixed_citations():
+    passages_only = _one({"text": "A claim.", "passages": [{"passageId": PASSAGE.id, "quote": "The content rose over four days."}]})
+    assert passages_only.claims[0].provenance == "unverified"
+    candidate = _one({"text": "A claim.", "recordIds": ["r-X1-1", "cl1-X3-aaaaaaaa"]})
+    assert candidate.claims[0].provenance == "unverified"
+    modeled = _one({"text": "A claim.", "recordIds": ["r-X1-1"], "evidenceIds": ["ev-1"]}, _seen(evidence=_evidence("demo")))
+    assert modeled.claims[0].provenance == "demo"
+    curated = _one({"text": "A claim.", "recordIds": ["r-X1-1", "r-X2-1"]})
+    assert curated.claims[0].provenance == "curated"

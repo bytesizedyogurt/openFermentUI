@@ -34,7 +34,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .models import Candidate, Claim, DroppedCandidate, Quantity, Range, weakest_provenance
+from .models import Candidate, Claim, DroppedCandidate, PassageRef, Quantity, Range, weakest_provenance
 from .units import (
     DATA as CORPUS_PATH,
     UnitError,
@@ -195,6 +195,123 @@ def validate_claims(
             )
         )
 
+    return out
+
+
+# ── the agent's plan (OF-BLD-014 §5.1) ─────────────────────────────────
+
+# The longest quote a claim may carry: a sentence, never a page. A convention.
+MAX_QUOTE_CHARS = 300
+
+
+@dataclass
+class SeenSet:
+    """What this run's tool calls returned. A claim may cite only these: a
+    record, passage or computed value the model never retrieved is one it
+    cannot have read."""
+
+    records: set[str] = field(default_factory=set)
+    passages: dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def add(self, result: Any) -> None:
+        self.records.update(getattr(result, "recordIds", None) or [])
+        for p in getattr(result, "passages", None) or []:
+            self.passages[p.id] = p
+        for e in getattr(result, "evidence", None) or []:
+            self.evidence[e.id] = e
+
+
+def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) -> ValidationResult:
+    """The agent's claims, each held to five rules; a claim that breaks one is
+    dropped whole and counted with its reason, never repaired.
+
+    1. Its text holds a number.
+    2. A record id does not resolve in the evidence pool.
+    3. A record, passage or evidence id was never returned by a tool call in
+       this run.
+    4. A quote is longer than MAX_QUOTE_CHARS, or is absent from its passage
+       after `normalize_text`.
+    5. It cites nothing, and its support is not `unsupported`.
+
+    Its provenance is the weakest of its records and computed values; a claim
+    that quotes passages alone is `unverified`. Its papers are derived from
+    its records and passages, never taken from the model.
+    """
+    out = ValidationResult()
+    for index, raw in enumerate(raw_claims):
+        if not isinstance(raw, dict):
+            out.rejected += 1
+            out.reasons.append(f"c{index + 1}: not a claim")
+            continue
+        claim_id = str(raw.get("id") or f"c{index + 1}")
+        text = str(raw.get("text") or "").strip()
+        record_ids = [str(r) for r in (raw.get("recordIds") or [])]
+        evidence_ids = [str(e) for e in (raw.get("evidenceIds") or [])]
+        refs = [r for r in (raw.get("passages") or []) if isinstance(r, dict)]
+        support = raw.get("support") or "direct"
+        if support not in ("direct", "inferred", "unsupported"):
+            support = "direct"
+
+        def reject(why: str) -> None:
+            out.rejected += 1
+            out.reasons.append(f"{claim_id}: {why}")
+
+        if not text:
+            reject("empty claim text")
+            continue
+        if found := find_number(text):
+            reject(f"claim text contains a number ({found!r}) — values come from the record")
+            continue
+        ghost = [r for r in record_ids if pool.record(r) is None]
+        if ghost:
+            reject(f"cites records that do not exist: {', '.join(ghost)}")
+            continue
+        unseen = (
+            [r for r in record_ids if r not in seen.records]
+            + [str(r.get("passageId")) for r in refs if str(r.get("passageId")) not in seen.passages]
+            + [e for e in evidence_ids if e not in seen.evidence]
+        )
+        if unseen:
+            reject(f"cites what no tool returned in this run: {', '.join(unseen)}")
+            continue
+        bad_quote = None
+        for r in refs:
+            quote = str(r.get("quote") or "")
+            passage = seen.passages[str(r.get("passageId"))]
+            if not quote.strip():
+                bad_quote = f"an empty quote of {passage.id}"
+            elif len(quote) > MAX_QUOTE_CHARS:
+                bad_quote = f"a quote of {passage.id} longer than {MAX_QUOTE_CHARS} characters"
+            elif normalize_text(quote) not in normalize_text(passage.text):
+                bad_quote = f"a quote that is not in {passage.id}"
+            if bad_quote:
+                break
+        if bad_quote:
+            reject(bad_quote)
+            continue
+        if not (record_ids or refs or evidence_ids) and support != "unsupported":
+            reject(f"cites nothing and support is '{support}', not 'unsupported'")
+            continue
+
+        classes = [pool.record(r).get("provenance", "unverified") for r in record_ids]
+        classes += [seen.evidence[e].provenance for e in evidence_ids]
+        if not classes and refs:
+            classes = ["unverified"]
+        papers = {pool.record(r)["paperId"] for r in record_ids}
+        papers |= {seen.passages[str(r.get("passageId"))].paperId for r in refs}
+        out.claims.append(
+            Claim(
+                id=claim_id,
+                text=text,
+                recordIds=record_ids,
+                paperIds=sorted(papers),
+                support=support,
+                provenance=weakest_provenance(classes) if classes else "unverified",
+                passages=[PassageRef(passageId=str(r.get("passageId")), quote=str(r.get("quote"))) for r in refs],
+                evidenceIds=evidence_ids,
+            )
+        )
     return out
 
 

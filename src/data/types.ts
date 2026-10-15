@@ -1242,6 +1242,31 @@ export interface Claim {
    * generously. A claim is worth exactly as much as its worst citation.
    */
   provenance: Provenance;
+  /** OF-BLD-014 §5.1: sentences it quotes, each checked verbatim against its passage. Absent on older plans. */
+  passages?: PassageRef[];
+  /** Computed values it rests on, by evidence id. Absent on older plans. */
+  evidenceIds?: string[];
+}
+
+/** A sentence a claim quotes, and the passage it stands in. */
+export interface PassageRef {
+  passageId: string;
+  quote: string;
+}
+
+export type TraceKind = 'tool' | 'restart' | 'final';
+export type StopReason = 'done' | 'rounds' | 'calls' | 'cost' | 'time';
+
+/** One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1). */
+export interface TraceStep {
+  n: number;
+  kind: TraceKind;
+  tool: string | null;
+  input: Record<string, unknown> | null;
+  /** One line, written by code. */
+  summary: string;
+  ms: number;
+  ok: boolean;
 }
 
 export interface AnswerPlanUsage {
@@ -1275,6 +1300,14 @@ export interface AnswerPlan {
   rejected: number;
   /** Why each was dropped. A rising rate is the signal that the prompt has drifted. */
   rejectionReasons: string[];
+  /** OF-BLD-014 §5.1: computed values the claims cite. Absent on older plans. */
+  evidence?: Evidence[];
+  /** Passages the claims quote. Absent on older plans. */
+  passages?: Passage[];
+  /** The loop's steps. Absent on older plans and in single mode. */
+  trace?: TraceStep[];
+  /** Why the loop stopped. */
+  stopped?: StopReason;
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────

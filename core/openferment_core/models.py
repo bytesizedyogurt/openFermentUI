@@ -68,6 +68,34 @@ class Claim(BaseModel):
     # Computed server-side as the weakest of the cited records, never chosen by
     # the model. A model that grades its own evidence grades it generously.
     provenance: Provenance = "unverified"
+    # OF-BLD-014 §5.1: sentences the claim quotes, each checked verbatim
+    # against its passage, and computed values it rests on, by evidence id.
+    passages: list[PassageRef] = Field(default_factory=list)
+    evidenceIds: list[str] = Field(default_factory=list)
+
+
+class PassageRef(BaseModel):
+    """A sentence a claim quotes, and the passage it stands in."""
+
+    passageId: str
+    quote: str
+
+
+TraceKind = Literal["tool", "restart", "final"]
+StopReason = Literal["done", "rounds", "calls", "cost", "time"]
+
+
+class TraceStep(BaseModel):
+    """One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1)."""
+
+    n: int
+    kind: TraceKind
+    tool: str | None = None
+    input: dict[str, Any] | None = None
+    # One line, written by code.
+    summary: str
+    ms: int
+    ok: bool
 
 
 class Usage(BaseModel):
@@ -101,6 +129,14 @@ class AnswerPlan(BaseModel):
     # count that only reaches a log file is a count nobody looks at.
     rejected: int = 0
     rejectionReasons: list[str] = Field(default_factory=list)
+
+    # OF-BLD-014 §5.1: what the agent's claims may cite beyond records — the
+    # computed values and the passages its tools returned and its claims
+    # cite — and how the loop ran and why it stopped.
+    evidence: list[Evidence] = Field(default_factory=list)
+    passages: list[Passage] = Field(default_factory=list)
+    trace: list[TraceStep] = Field(default_factory=list)
+    stopped: StopReason = "done"
 
 
 def weakest_provenance(provenances: list[str]) -> str:
@@ -1035,3 +1071,9 @@ class RagSearchResponse(BaseModel):
     costUsd: float = 0.0
     # Why another lane ran in place of the chosen one, when it did.
     note: str | None = None
+
+
+# Claim and AnswerPlan name Passage and Evidence, which are defined further
+# down; resolve the names now that every model exists.
+Claim.model_rebuild()
+AnswerPlan.model_rebuild()
