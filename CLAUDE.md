@@ -603,6 +603,41 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   never runs a scenario. The double's Proforma fixtures come from
   `demo.py --prototype` with a STAND-IN evaluator in place of BioSTEAM.
 
+## Runbooks keep score (OF-BLD-014 Phase 9)
+
+- **Three prediction kinds.** A `Prediction` with no `kind` is a point, held
+  within ten percent; an `interval` holds inside its ends; a `bound` is a
+  ceiling and holds at or below its value (no field names a side, and the
+  only bounds the service writes are ceilings). `holds` and `deltaOf` in
+  `reconcile.ts` decide all three, and nothing else does; from a zero
+  reference the sign of the reading decides.
+- **The lock covers the new fields only when present.** `canonical()` in
+  `lock.ts` appends kind, interval, artifactId and recordIds when a
+  prediction carries any of them, so a point hashes as before:
+  `scripts/fixtures/seed-lock-digests.json` holds the eight locked seed
+  digests and `check:lock` holds the seed to them. A draft from the service
+  carries those fields as null, which is part of what is hashed; never turn
+  null into undefined between lock and reload.
+- **A drafted runbook's numbers come from the service.** `draft_runbook`
+  (the seventh tool) takes ids and words; `runbook_draft.build` writes every
+  value and interval from the artifact or records an item names, accepts
+  only ids this run's tools returned (`ToolContext.seen`; a draft is never
+  served from the cache), and a measure must share its prediction's
+  dimension and records in its unit. `corpus.json` exports product and
+  strain ids for the check. The plan carries `runbookDraft`; "Turn into a
+  runbook" opens an unlocked research runbook.
+- **Adopted runbooks are Durable**, with their locks (`adoptedRunbooks`,
+  re-applied by `applyDurable`, which `hydrateDurable` calls; check:store
+  round-trips it). Their ids are time-based, because `nextId` restarts.
+- **The ledger is read, never kept.** `engine/ledger.ts` counts locked,
+  tested (the latest conclusive run), held, missed and inconclusive runs for
+  `/runbooks/ledger` and Home's Predictions card alike; a hit rate shows from
+  five tested. `ledger` is a reserved second segment under `/runbooks`.
+  `IntervalLedger` draws a runbook's predictions and a deposition's
+  reconciliation; `Dossier` draws the artifacts behind a runbook's
+  predictions as ceiling, forecast, price, keeping what loads. The double
+  replays `ask-draft-stream.jsonl` for a question that starts with "Draft".
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
