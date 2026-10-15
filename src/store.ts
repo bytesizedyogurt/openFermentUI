@@ -3393,11 +3393,14 @@ export function provenanceOf(r: ExtractionRecord): Provenance {
  * to the statistic only: the records stay visible in per-record tables and
  * plots, because they are real values, just not independent evidence.
  */
-export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'not-primary';
+export type AggregateExclusion = 'rejected' | 'industry-estimate' | 'computed' | 'not-primary';
 
 export function aggregateExclusion(r: ExtractionRecord): AggregateExclusion | null {
   if (r.status === 'rejected') return 'rejected';
   if (r.provenance === 'industry-estimate') return 'industry-estimate';
+  // A computed value is derived from inputs already counted on their own
+  // (OF-BLD-014 E.4); counting it beside them counts them twice.
+  if (r.provenance === 'computed') return 'computed';
   if (r.isPrimary === false) return 'not-primary';
   return null;
 }
@@ -3411,6 +3414,7 @@ export function isAggregatable(r: ExtractionRecord): boolean {
 export const EXCLUSION_NOTE: Record<AggregateExclusion, string> = {
   rejected: 'rejected — excluded from statistics',
   'industry-estimate': 'industry estimate — excluded from statistics',
+  computed: 'computed from other values — excluded from statistics',
   'not-primary': 'reports another study\u2019s measurement — excluded from statistics',
 };
 
@@ -3425,10 +3429,11 @@ export const PROVENANCE_RANK: Record<Provenance, number> = {
   gold: 1,
   verified: 2,
   curated: 3,
-  unverified: 4,
-  user: 5,
-  'industry-estimate': 6,
-  demo: 7,
+  computed: 4,
+  unverified: 5,
+  user: 6,
+  'industry-estimate': 7,
+  demo: 8,
 };
 
 export const tickClass = (p: Provenance | 'rejected'): string =>
@@ -3437,6 +3442,7 @@ export const tickClass = (p: Provenance | 'rejected'): string =>
     gold: 'tick tick-gold',
     verified: 'tick tick-verified',
     curated: 'tick tick-curated',
+    computed: 'tick tick-computed',
     unverified: 'tick tick-unverified',
     user: 'tick tick-user',
     'industry-estimate': 'tick tick-industry-estimate',
@@ -3449,6 +3455,7 @@ export const PROVENANCE_LABEL: Record<Provenance, string> = {
   gold: 'Curated · gold set',
   verified: 'Verified against source',
   curated: 'Curated · pending source check',
+  computed: 'Computed · basis attached',
   unverified: 'Extracted · unverified',
   user: 'User-entered',
   'industry-estimate': 'Industry estimate · not evidence',

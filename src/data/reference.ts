@@ -192,6 +192,7 @@ export const REFERENCE: Record<string, ReferenceContent> = {
           ['gold', 'Curated - gold set', 'Yes'],
           ['verified', 'Verified against source', 'Yes'],
           ['curated', 'Curated - pending source check', 'Yes'],
+          ['computed', 'Computed - basis attached', 'No'],
           ['unverified', 'Extracted - unverified', 'Yes'],
           ['user', 'User-entered', 'Yes'],
           ['industry-estimate', 'Industry estimate - not evidence', 'No'],

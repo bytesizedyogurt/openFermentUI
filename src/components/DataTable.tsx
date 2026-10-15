@@ -35,6 +35,7 @@ const TICK_BG: Record<ProvKind, string> = {
   gold: 'rgb(var(--gold))',
   verified: 'rgb(var(--accent))',
   curated: 'rgb(var(--accent) / 0.45)',
+  computed: 'rgb(var(--signal-info) / 0.7)',
   'industry-estimate': 'rgb(var(--ink-soft) / 0.6)',
   unverified: 'rgb(var(--ink-soft))',
   user: 'rgb(var(--signal-info))',

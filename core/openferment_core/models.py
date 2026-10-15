@@ -25,19 +25,26 @@ Provenance = Literal[
     "gold",
     "verified",
     "curated",
+    "computed",
     "unverified",
     "user",
     "industry-estimate",
     "demo",
 ]
 
+# The same order as PROVENANCE_RANK in src/store.ts, member for member;
+# `check:plan` parses both and fails on any difference (OF-BLD-014 §3.1, E.4).
+# `computed` follows every experimental class, because no experiment stands
+# behind it, and precedes `unverified`, because anyone can reproduce it from
+# its basis.
 PROVENANCE_ORDER: list[str] = [
     "measured",
     "gold",
     "verified",
     "curated",
-    "user",
+    "computed",
     "unverified",
+    "user",
     "industry-estimate",
     "demo",
 ]
@@ -789,3 +796,56 @@ class CheckRecord(BaseModel):
     at: str
     results: list[CheckResult]
     notes: list[CheckNote]
+
+
+# ── computed values (OF-BLD-014 §3.1, E.4) ─────────────────────────────
+#
+# A number no paper states: a converted value, a yield ceiling, a fitted rate,
+# a price. It carries the calculation that produced it, and every input names
+# where it came from. Its provenance is `basis.basis_provenance(...)`, never a
+# model's or a person's choice.
+
+BasisSourceKind = Literal["record", "deposition", "artifact", "model", "convention", "assumption"]
+
+
+class BasisSource(BaseModel):
+    kind: BasisSourceKind
+    # The record, deposition, artifact or model file the input was read from.
+    id: str | None = None
+    # What the convention is, or what the assumption rests on.
+    note: str | None = None
+    # The named person, for an assumption.
+    by: str | None = None
+
+
+class BasisInput(BaseModel):
+    name: str
+    value: float | str
+    unit: str
+    source: BasisSource
+
+
+class ComputedBasis(BaseModel):
+    tool: str
+    # Package versions and model file hash, joined.
+    toolVersion: str
+    inputs: list[BasisInput]
+    artifactId: str
+    at: str
+    # For anything sampled.
+    seed: int | None = None
+
+
+class Evidence(BaseModel):
+    """A computed value a plan may cite. Its label is built by code."""
+
+    id: str
+    label: str
+    value: float | str
+    unit: str
+    interval: Range | None = None
+    provenance: Provenance
+    basis: ComputedBasis
+    # Which figure draws this artifact: 'ceiling', 'frontier', 'trajectory',
+    # 'distribution'.
+    figure: str | None = None

@@ -1,7 +1,7 @@
 // Provenance badge (explicit) and evidence tick (ambient) — both derive from
 // one `provenance` value so they can never disagree (OF-DES-001 §7.4).
 import type { ReactNode } from 'react';
-import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp } from 'lucide-react';
+import { Award, ShieldCheck, CircleDashed, UserPen, FlaskConical, Ban, BookMarked, Microscope, TrendingUp, Calculator } from 'lucide-react';
 import type { Provenance } from '@/data/types';
 import { referenceFor } from '@/data/reference';
 import { Explain, cx } from './ui';
@@ -22,6 +22,12 @@ const META: Record<ProvKind, { label: string; Icon: typeof Award; color: string;
     Icon: BookMarked,
     color: 'text-accent/70',
     tick: 'tick-curated',
+  },
+  computed: {
+    label: 'Computed · basis attached',
+    Icon: Calculator,
+    color: 'text-signal-info',
+    tick: 'tick-computed',
   },
   'industry-estimate': {
     label: 'Industry estimate · not evidence',
@@ -92,6 +98,8 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
     gold: 'bg-gold',
     verified: 'bg-accent',
     curated: 'bg-accent/45',
+    // A computed value's point is a hollow square (OF-BLD-014 E.8).
+    computed: 'border-[1.5px] border-signal-info bg-transparent',
     'industry-estimate': 'bg-ink-soft/60',
     unverified: 'bg-ink-soft',
     user: 'bg-signal-info',
@@ -100,7 +108,7 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
   };
   return (
     <span
-      className={cx('inline-block rounded-full', bg[p])}
+      className={cx('inline-block', p === 'computed' ? 'rounded-none' : 'rounded-full', bg[p])}
       style={{ width: size, height: size }}
       aria-label={META[p].label}
     />
@@ -111,13 +119,13 @@ export function ProvDot({ p, size = 8 }: { p: ProvKind; size?: number }) {
  * The legend, and — behind a disclosure — what each level means for aggregates.
  *
  * OF-BLD-010 §5 puts the `biorepo.audit` provenance table here, because a
- * legend that names eight levels without saying which of them are held out of a
+ * legend that names nine levels without saying which of them are held out of a
  * median is telling a reader half of what the tick means. The rows come from
  * `reference.ts` so there is ONE source rather than a copy per screen, and
  * `pnpm check:reference` fails the build if that source disagrees with
  * `PROVENANCE_LABEL` or with what `aggregateExclusion()` actually does.
  *
- * Collapsed by default. Eight levels inline is the compact form eight screens
+ * Collapsed by default. Nine levels inline is the compact form eight screens
  * already rely on; the table is for the reader who stops to ask.
  */
 export function ProvenanceLegend() {
@@ -127,7 +135,7 @@ export function ProvenanceLegend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-ink-soft">
       {(
-        ['measured', 'gold', 'verified', 'curated', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
+        ['measured', 'gold', 'verified', 'curated', 'computed', 'unverified', 'industry-estimate', 'user', 'demo'] as ProvKind[]
       ).map((p) => (
         <span key={p} className="inline-flex items-center gap-1.5">
           <ProvDot p={p} />
@@ -138,9 +146,10 @@ export function ProvenanceLegend() {
         <Explain label={`${excluded.length} of these are held out of aggregates`}>
           <div className="text-body">
             <p className="mb-2 text-ink">
-              A tick says where a number came from. Two of these levels are excluded from any
-              aggregate: an industry estimate is not evidence, and a modelled value is not a
-              measurement. Counting either one would overstate what the corpus knows.
+              A tick says where a number came from. Three of these levels are excluded from any
+              aggregate: an industry estimate is not evidence, a modelled value is not a
+              measurement, and a computed value is derived from values already counted. Counting
+              any of them would overstate what the corpus knows.
             </p>
             <table className="w-full border-collapse text-body">
               <thead>

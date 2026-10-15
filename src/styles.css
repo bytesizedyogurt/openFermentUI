@@ -111,6 +111,16 @@ body {
 .tick-curated::before {
   background: rgb(var(--accent) / 0.45);
 }
+/* Computed (OF-BLD-014 E.4): a dotted rule in the info hue. A deterministic
+   calculation whose every input names a source; the dots say "derived", the
+   hue says it is neither a paper's value nor a person's. */
+.tick-computed::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(var(--signal-info)) 0 1.5px,
+    transparent 1.5px 3.5px
+  );
+}
 /* Industry estimate: dashed grey. Useful for framing, useless as evidence —
    excluded from the gold set and from aggregate statistics by default. */
 .tick-industry-estimate::before {

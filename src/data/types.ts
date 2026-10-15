@@ -30,6 +30,15 @@ export type Provenance =
   | 'gold'
   | 'verified'
   | 'curated'
+  /**
+   * A deterministic calculation whose every input names a source
+   * (OF-BLD-014 E.4): a converted value, a yield ceiling, a fitted rate, a
+   * price. No experiment stands behind it, so it follows every experimental
+   * class; anyone can reproduce it from its basis, so it precedes
+   * 'unverified'. The service sets it through `basis_provenance` and the
+   * browser shows what the service computed.
+   */
+  | 'computed'
   | 'unverified'
   | 'user'
   | 'industry-estimate'
@@ -1852,4 +1861,54 @@ export interface CheckRecord {
   at: string;
   results: CheckResult[];
   notes: CheckNote[];
+}
+
+// ── computed values (OF-BLD-014 §3.1, E.4) ─────────────────────────────
+//
+// A number no paper states: a converted value, a yield ceiling, a fitted rate,
+// a price. It carries the calculation that produced it, and every input names
+// where it came from. Its provenance is what the service's `basis_provenance`
+// computed; the browser shows it and keeps no copy of the rule.
+
+export type BasisSourceKind = 'record' | 'deposition' | 'artifact' | 'model' | 'convention' | 'assumption';
+
+export interface BasisSource {
+  kind: BasisSourceKind;
+  /** The record, deposition, artifact or model file the input was read from. */
+  id: string | null;
+  /** What the convention is, or what the assumption rests on. */
+  note: string | null;
+  /** The named person, for an assumption. */
+  by: string | null;
+}
+
+export interface BasisInput {
+  name: string;
+  value: number | string;
+  unit: string;
+  source: BasisSource;
+}
+
+export interface ComputedBasis {
+  tool: string;
+  /** Package versions and model file hash, joined. */
+  toolVersion: string;
+  inputs: BasisInput[];
+  artifactId: string;
+  at: string;
+  /** For anything sampled. */
+  seed: number | null;
+}
+
+/** A computed value a plan may cite. Its label is built by code. */
+export interface Evidence {
+  id: string;
+  label: string;
+  value: number | string;
+  unit: string;
+  interval: Range | null;
+  provenance: Provenance;
+  basis: ComputedBasis;
+  /** Which figure draws this artifact: 'ceiling', 'frontier', 'trajectory', 'distribution'. */
+  figure: string | null;
 }
