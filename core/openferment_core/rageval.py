@@ -394,17 +394,24 @@ def evaluate(
         why = retrieve.why_unavailable(lane, embedder=embedder)
         rep = RagLaneReport(lane=lane, available=why is None, why=why, paid=lane in retrieve.PAID)
         if why is None:
-            for name, questions in sets.items():
-                if not questions:
-                    continue
-                runs = []
-                for q in questions:
-                    started = time.perf_counter()
-                    detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
-                    runs.append(([h.passage.id for h in detail.hits], q.relevant, time.perf_counter() - started, detail.usage.costUsd))
-                    total += detail.usage.costUsd
-                rep.sets[name] = score_set(runs)
-            rep.score = lane_score(rep)
+            try:
+                for name, questions in sets.items():
+                    if not questions:
+                        continue
+                    runs = []
+                    for q in questions:
+                        started = time.perf_counter()
+                        detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
+                        runs.append(([h.passage.id for h in detail.hits], q.relevant, time.perf_counter() - started, detail.usage.costUsd))
+                        total += detail.usage.costUsd
+                    rep.sets[name] = score_set(runs)
+                rep.score = lane_score(rep)
+            except (llm.ModelUnavailable, llm.ModelRefused) as e:
+                # The lane looked able to run and its model said no: a
+                # refused key, a spent budget. It is scored as unavailable,
+                # with the reason, and what it spent still counts.
+                total += getattr(getattr(e, "usage", None), "costUsd", 0.0) or 0.0
+                rep.available, rep.why, rep.sets, rep.score = False, f"its helper model call failed: {e}", {}, None
         reports.append(rep)
     report = RagReport(
         date=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -452,6 +459,9 @@ def _print(report: RagReport) -> None:
 
 
 def main(argv: list[str]) -> int:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).parent.parent / ".env", override=False)
     if argv[:1] == ["questions"]:
         n = 200
         if "--n" in argv:

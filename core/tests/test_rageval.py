@@ -209,3 +209,19 @@ def test_the_report_endpoint_says_how_to_make_one(index):
     client = TestClient(api.app, base_url="http://127.0.0.1")
     r = client.get("/api/rag/report")
     assert r.status_code == 404 and "pnpm rag:eval" in r.json()["detail"]
+
+
+def test_a_lane_whose_model_refuses_is_scored_unavailable_with_the_reason(index, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
+
+    def refused(**kw):
+        raise llm.ModelUnavailable("The Anthropic API refused the request as malformed: not scoped to a workspace")
+
+    monkeypatch.setattr(rageval, "build_sets", lambda: (
+        {"K": [rageval.Question("K1", "K", "secreted titre xylose", ["X1:s1:0"])], "S": [], "F": []},
+        [],
+    ))
+    report = rageval.evaluate(ask=refused, lanes=["bm25", "bm25+expand"])
+    expand = next(l for l in report.lanes if l.lane == "bm25+expand")
+    assert not expand.available and "not scoped to a workspace" in expand.why and expand.sets == {}
+    assert report.chosenLane == "bm25"
