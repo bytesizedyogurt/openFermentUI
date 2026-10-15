@@ -60,7 +60,7 @@ polymer ontology fields are in place for it. As of 2026-10-15 the thread holds *
 | Computed values | **Computed, with a basis** — a value no paper states (a converted unit today; a yield ceiling, a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **1** kept as of 2026-10-15: r-B5-3's 17.5 d in hours, made for the Phase 3 screenshots and pushed to `openferment-data` |
 | Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
-| Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
+| Agent answer prose | **Real model calls in a bounded loop** — Postdoc on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`. It searches the records and the papers' passages with its tools (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, quoted sentences checked word for word against their passages, or computed values. As of 2026-10-15 the loop is tested offline against a scripted stand-in only: the key on the cloud environment is refused, so the twelve flows and the ten PHA questions (`pnpm ask:batch`) wait on a key. 13 authored flows remain as the scripted mode and the acceptance tests |
 
 The corpus is real literature. That is the whole point of OF-COR-001, and it is why the
 demo-labelling policy is narrow rather than blanket: only the two genuinely synthetic
@@ -109,13 +109,22 @@ which is gitignored; it never reaches the browser, and `pnpm check:secrets`
 fails the build if anything under `src/` so much as names it.
 
 ```
-browser ──POST /api/ask──▶ FastAPI
-                             ├─ BM25 retrieval over corpus.json (≤30 records)
-                             ├─ Claude Opus 5.5 (Sonnet 5.5 as fallback), one structured response
-                             ├─ Rule 1 enforcement
-                             └─ AnswerPlan
-browser ◀────────────────────┘   renders values from the cited records
+browser ──POST /api/ask/stream──▶ FastAPI
+                                    ├─ the loop: Claude Opus 5.5 calls its tools —
+                                    │    search_records, search_passages, convert_units —
+                                    │    each step streamed to the browser as it completes
+                                    ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
+                                    ├─ a refusal or outage: asked again once, on Sonnet 5.5
+                                    ├─ validate_plan: no number, nothing cited that no tool returned,
+                                    │    every quote in its passage word for word
+                                    └─ AnswerPlan, with its trace and why it stopped
+browser ◀───────────────────────────┘   renders values from the cited records and artifacts
 ```
+
+`POST /api/ask` answers with the same plan in one response, and `mode: 'single'` keeps the
+earlier path: one BM25 retrieval over `corpus.json`, one structured response. Text inside a tool
+result is evidence to weigh; a passage that tells the model to state a number changes nothing the
+validator lets through.
 
 **Claim text may not contain a number.** The model writes prose and cites a
 record; the interface renders the value from that record. This is the strongest
@@ -126,7 +135,8 @@ and counted, never repaired**: a validator that patches model output is a
 validator that hides model failure.
 
 Provenance on a claim is computed server-side as the weakest of its cited
-records. A claim resting on one gold record and one industry estimate is an
+records and computed values; a claim resting on quoted sentences alone is
+`unverified`. A claim resting on one gold record and one industry estimate is an
 industry estimate.
 
 To run it:
@@ -229,13 +239,15 @@ pnpm index:build         # the fetched papers cut into passages, under core/data
 pnpm rag:questions --n 200   # needs the key: written evaluation questions from sampled passages
 pnpm rag:eval            # every available search lane scored on K, S and F; the rule's choice goes to
                          # core/data/index/config.json, the table to Witness → Retrieval
+pnpm ask:batch docs/build/questions-pha.txt   # needs the key: each question through Postdoc's loop, the
+                         # plans under core/data/live/, one row each: kept, dropped, tools, rounds, seconds, cost
 cd core && uv run python -m openferment_core.demo --prototype   # the prototype's fixtures, made by the
                          # real code paths into core/tests/fixtures/prototype/; the smoke double serves them
 ```
 
 The service also answers `GET /api/tools` (each tool's name, description and input schema) and
-`POST /api/tools/{name}`, the same registry Postdoc's loop will call: today `search_records` and
-`convert_units`. A tool input carries ids and words; a number typed into one refuses the call.
+`POST /api/tools/{name}`, the same registry Postdoc's loop calls: today `search_records`,
+`convert_units` and `search_passages`. A tool input carries ids and words; a number typed into one refuses the call.
 Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
 a call that could pass `OPENFERMENT_DAILY_BUDGET_USD` (25 by default, `core/.env.example`).
 
@@ -339,7 +351,8 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
                          #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
-                         #   tokens, tool turns and daily cap, the tool registry and its two tools, the worker runner,
+                         #   tokens, tool turns and daily cap, the tool registry and its three tools, the worker runner,
+                         #   Postdoc's loop and its budget against a scripted model, the plan validator, the ask stream,
                          #   the passage cutter, the five search lanes, the scorecard's metrics and rule,
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
                          #   practice.py's drafts and tutor turns against a stand-in model, and
@@ -359,12 +372,13 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
   pnpm test:smoke        #   62 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
-                         #   landing on its words, Guild posting, and the
+                         #   landing on its words, Postdoc live drawing its steps and quoting a sentence, Guild posting, and the
                          #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
                          #   a practice session, and a check run at the bench and read back
-  pnpm test:golden       #   the ten-minute demo script, driven end to end, and a search opening the reader
+  pnpm test:golden       #   the ten-minute demo script, driven end to end, a search opening the reader, and
+                         #   Postdoc live beside an untouched scripted mode
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
-pnpm test:live           # the thirteen flows against the real pipeline, a real practice draft and tutor
+pnpm test:live           # the thirteen flows through Postdoc's loop, a real practice draft and tutor
                          # session, and a real check brief — needs a key, never in verify
 ```
 
@@ -553,9 +567,10 @@ One working mode. **Scripted** is offline and deterministic: it plays seeded con
 flows — the plan ticks, tool calls appear, retrieval sets render, the answer streams. Because
 every message comes from the flow object, the inspector's "trace" is the literal data that
 produced the answer, honest by construction rather than reconstructed afterward. The composer
-offers a **Live** toggle, which is not inert: with `openferment-core` running it is a real
-model call (see *Postdoc runs on Claude Opus* above), and with the service down it says so
-and the turn runs scripted. In scripted mode no language model is called.
+offers a **Live** toggle, which is not inert: with `openferment-core` running it is Postdoc's
+loop of real model calls, its steps drawn as they arrive (see *Postdoc runs on Claude Opus*
+above), and with the service down it says so and plays nothing in its place. In scripted mode
+no language model is called.
 
 When no flow matches, a fallback ladder takes over: first an **entity-lookup flow** that
 genuinely queries the seeded store and answers from live data with real chips, subject to the

@@ -103,10 +103,13 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Postdoc',
     owner: 'Postdoc',
     layer: 'The agent',
-    // OF-BLD-014 §3.4 — the tools its loop will call, and what it may cite.
+    // OF-BLD-014 §3.4 — the tools its loop calls, and what it may cite.
+    // §5.2 — the bounded loop itself, and the validator its plan answers to.
     livesIn: [
       'src/sim/chat.ts',
       'src/screens/Postdoc.tsx',
+      'core/openferment_core/postdoc_agent.py',
+      'core/openferment_core/validate.py',
       'core/openferment_core/tools/',
       'core/openferment_core/evidence_pool.py',
     ],

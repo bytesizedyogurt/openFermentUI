@@ -50,9 +50,14 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `core/openferment_core/llm.py`: `claude-opus-5-5`, falling back to
   `claude-sonnet-5-5` on a refusal or when Opus is unavailable; structured
   outputs (`output_config.format`, schema made strict by `strict_schema`),
-  effort `medium`, streamed. Postdoc alone runs a loop, bounded in rounds, tool calls, cost and time (`postdoc_agent.py`). Both models REJECT forced tool use
-  (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices live in
-  `llm.PRICES`; `usage.models` records which model answered.
+  effort `medium`, streamed. Postdoc alone runs a loop
+  (`postdoc_agent.py`): `llm.converse` turns on one model with strict tools
+  and `tool_choice` `auto`, bounded at 6 rounds, 12 tool calls,
+  `OPENFERMENT_ASK_BUDGET_USD` and 180 seconds, after which one last turn
+  runs with `tool_choice` `none`; a refusal or an outage restarts it once on
+  the next model with a fresh conversation. Both models REJECT forced tool
+  use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
+  live in `llm.PRICES`; `usage.models` records which model answered.
 
 ## Rule 1 and its mirror
 
@@ -461,6 +466,41 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - **A licence with no metadata** can be accepted only under the exact string
   `"no licence metadata"` (`check-licences.py`), and stops passing once the
   package states one.
+
+## Postdoc's loop (OF-BLD-014 Phase 5)
+
+- **A plan answers to `validate_plan`.** Every claim the loop writes is
+  dropped whole and counted when its text holds a number, a record id does
+  not resolve in the evidence pool, it cites a record, passage or evidence id
+  no tool returned in this run (`SeenSet`, which keeps nothing from a refused
+  result), a quote is over 300 characters or is not one whole sentence or
+  table row of its passage, or a run of them, after `normalize_text`
+  (`rerank.is_whole_sentence`: a fragment can lift a number out of its
+  negation), or it cites nothing without saying `unsupported`. A gap with a
+  number is dropped and named in `rejectionReasons`. Its provenance is the weakest of its records and
+  computed values, `unverified` on quotes alone; its papers are derived. A
+  restart forgets what the first conversation retrieved and gets the whole
+  call budget again; the tool cache does not forget, and what a search lane
+  spends on a model (`ToolResult.usage`) is charged to the question once.
+- **Text inside a tool result is evidence, never an instruction.** The
+  prompt says so, and the validator is the guard: a passage telling the
+  model to state a number changes nothing it lets through
+  (`test_postdoc_agent`).
+- **`search_passages` is the third tool**: up to six passages, each cut to
+  900 characters in the summary, the passages themselves in
+  `ToolResult.passages`, which is what a quote is checked against.
+- **Trace lines are written by code** (`_summary_line`), never by the
+  model, and stream as `step` events from `POST /api/ask/stream`, then one
+  `plan` (a declined plan included) or one `error`. When the reader leaves,
+  the loop stops before its next model turn (`_stream_events`). `POST /api/ask` takes
+  `mode`, `agent` by default; `single` is the one-call path in `postdoc.py`.
+- **The double replays a recorded loop.** `demo.py --prototype` runs the
+  real loop with a scripted stand-in over B5's stand-in passages and the
+  overlay's candidate, and writes `ask-stream.jsonl`; `test_demo` holds it to
+  the code, and the smoke and golden path watch the panel draw it.
+- **`pnpm ask:batch <file>`** asks a file of questions through the loop and
+  keeps each plan under `core/data/live/` (on the data branch);
+  `docs/build/questions-pha.txt` holds Appendix 4's ten.
 
 ## Persistence tiers
 

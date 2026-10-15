@@ -325,4 +325,22 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   failing test first, one left (the golden step walks the seed). **965**
   Python tests offline; smoke **62** routes, golden path **27**. Screenshots:
   `docs/shots/phase-4-*`.
+- **2026-10-15 · OF-BLD-014 Phase 5 (§5.1–§5.5, §5.R, §5.T)** — Postdoc
+  as an agent. `postdoc_agent.py` runs a bounded loop of tools on Claude Opus
+  5.5 (6 rounds, 12 tool calls, `OPENFERMENT_ASK_BUDGET_USD`, 180 seconds;
+  one last turn with `tool_choice` `none`; a refusal or outage restarts once
+  on Sonnet 5.5). `search_passages` is the third tool. `validate_plan` holds
+  every claim to five rules: no number, a record the pool holds, nothing no
+  tool returned, every quote whole sentences or rows of its passage, and a
+  citation or `unsupported`. `/api/ask` runs the loop by default (`mode:
+  'single'` keeps one call); `/api/ask/stream` sends each step as it
+  completes, and the live panel draws them, with each claim's record values,
+  quoted sentences that open the reader, computed cards and a footer that
+  says why the loop stopped. `pnpm ask:batch` and Appendix 4's ten questions
+  are in `docs/build/questions-pha.txt`. Every run is owed: the key is not
+  scoped to a workspace (`pnpm ready`: lane none). The review found nine,
+  none high, all fixed with a failing test first (two screen ones by
+  reading). **1,016** Python tests offline; smoke **62** routes, golden path
+  **29**. Screenshot: `docs/shots/phase-5-postdoc-live.png`, the live panel
+  over the service double's recorded stand-in loop.
 
