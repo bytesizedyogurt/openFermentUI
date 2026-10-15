@@ -50,7 +50,7 @@ from .models import Passage, RagLane, RagStatus
 CHUNK_TARGET = 900
 CHUNK_MAX = 1400
 # Bumped whenever the cutting changes, so every paper is cut again.
-CHUNKER_VERSION = "passages-1"
+CHUNKER_VERSION = "passages-2"
 
 
 def index_dir() -> Path:
@@ -153,12 +153,13 @@ class Cut:
 def _abstract_chunks(text: str) -> list[tuple[int, int]]:
     if len(text) <= CHUNK_MAX:
         return [(0, len(text))]
-    # Two halves, split at the sentence end nearest the middle.
+    # Two halves, at the sentence end that keeps the longer half shortest;
+    # when no cut keeps both within CHUNK_MAX, the abstract is cut as prose
+    # (§4.R: one half of P15's abstract ran to 1,524 characters).
     spans = sentence_spans(text)
-    middle = len(text) / 2
-    cut = min((e for _, e in spans[:-1]), key=lambda e: abs(e - middle), default=None)
-    if cut is None:
-        return _hard_split(text, 0, len(text), max(CHUNK_MAX, len(text) // 2 + 1))
+    cut = min((e for _, e in spans[:-1]), key=lambda e: max(e, len(text) - e), default=None)
+    if cut is None or max(cut, len(text) - cut) > CHUNK_MAX:
+        return prose_chunks(text)
     return [(0, cut), (cut, len(text))]
 
 
@@ -388,6 +389,7 @@ def status() -> RagStatus:
         passages=sum(int(p.get("passages", 0)) for p in papers.values()),
         lanes=_lanes(),
         chosenLane=chosen_lane(),
+        manifestHash=manifest_hash(),
     )
 
 

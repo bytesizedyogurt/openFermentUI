@@ -94,8 +94,9 @@ def test_every_table_chunk_starts_with_heading_and_first_row_and_keeps_rows_whol
 def test_a_figure_is_one_passage_and_a_long_abstract_two():
     fig = passages.cut_section("X1", {"id": "f1", "heading": "Figure 1", "text": _prose(30)}, "ctx")
     assert len(fig) == 1 and fig[0].passage.kind == "figure"
-    abstract = passages.cut_section("X1", {"id": "abstract", "heading": "Abstract", "text": _prose(20)}, "ctx")
-    assert len(abstract) == 2
+    # Long enough for two, short enough that both halves fit CHUNK_MAX.
+    abstract = passages.cut_section("X1", {"id": "abstract", "heading": "Abstract", "text": _prose(14)}, "ctx")
+    assert len(abstract) == 2 and all(len(c.passage.text) <= passages.CHUNK_MAX for c in abstract)
     short = passages.cut_section("X1", {"id": "abstract", "heading": "Abstract", "text": "One short abstract."}, "ctx")
     assert len(short) == 1
 

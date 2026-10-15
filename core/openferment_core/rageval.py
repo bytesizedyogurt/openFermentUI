@@ -98,12 +98,10 @@ def anchored_passages(item: dict[str, Any], by_paper: dict[str, list[tuple[str, 
 
 
 def _organism_labels(aliases: dict[str, str]) -> dict[str, str]:
-    """A strain id's longest alias, as the words a question uses."""
-    out: dict[str, str] = {}
-    for alias, sid in aliases.items():
-        if len(alias) > len(out.get(sid, "")):
-            out[sid] = alias
-    return out
+    """The words a question names a strain by: its id, spaced. An alias can
+    name something else entirely ("cell-wall-deficient" for cw15), so none
+    is used (§4.R)."""
+    return {sid: sid.replace("-", " ") for sid in set(aliases.values())}
 
 
 def _corpus_extras() -> tuple[dict[str, str], dict[str, str]]:
@@ -250,22 +248,25 @@ def write_questions(n: int, *, ask: Callable[..., llm.Result] | None = None, see
         user = "Passages:\n\n" + "\n\n".join(f"[{c.passage.id}] ({c.context})\n{c.passage.text}" for c in batch)
         result = (ask or llm.call)(system=SYSTEM_S, user=user, schema=SCHEMA_S, max_tokens=4000, label="rag:questions: ", role="index")
         usage = llm.add(usage, result.usage)
-        seen: set[str] = set()
+        # The first usable reply for each passage asked; a reply for a
+        # passage not asked, or a second one, is ignored. Each passage asked
+        # is then kept or discarded once, with one reason (§4.R).
+        first: dict[str, str] = {}
         for q in (result.data or {}).get("questions", []):
-            pid = str(q.get("passageId", "")) if isinstance(q, dict) else ""
-            text = str(q.get("question", "")).strip() if isinstance(q, dict) else ""
-            if pid not in by_id or pid in seen or not text:
-                discarded["no usable question"] = discarded.get("no usable question", 0) + 1
+            if not isinstance(q, dict):
                 continue
-            seen.add(pid)
-            why = copies_passage(text, by_id[pid].passage.text)
+            pid = str(q.get("passageId", ""))
+            text = str(q.get("question", "")).strip()
+            if pid in by_id and text and pid not in first:
+                first[pid] = text
+        for c in batch:
+            pid = c.passage.id
+            text = first.get(pid)
+            why = "no question returned" if text is None else copies_passage(text, c.passage.text)
             if why:
                 discarded[why] = discarded.get(why, 0) + 1
                 continue
-            kept.append(Question(id=f"S{len(kept) + 1}", set="S", text=text, relevant=[pid], source={"passage": pid, "kind": by_id[pid].passage.kind}))
-        missing = len(batch) - len(seen)
-        if missing > 0:
-            discarded["no question returned"] = discarded.get("no question returned", 0) + missing
+            kept.append(Question(id=f"S{len(kept) + 1}", set="S", text=text, relevant=[pid], source={"passage": pid, "kind": c.passage.kind}))
     lines = [json.dumps(q.__dict__, ensure_ascii=False) for q in kept]
     atomic.write_text(rageval_dir() / "questions.jsonl", "\n".join(lines) + ("\n" if lines else ""))
     meta = {"asked": len(chosen), "kept": len(kept), "discarded": discarded, "seed": seed, "costUsd": usage.costUsd, "manifestHash": passages.manifest_hash()}
@@ -282,6 +283,10 @@ def read_s() -> tuple[list[Question], dict[str, Any]]:
         meta = json.loads((rageval_dir() / "questions.json").read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         meta = {}
+    if meta.get("manifestHash") != passages.manifest_hash():
+        # Written for another cut of the text: a relevant id may now name
+        # other words. Set aside until written again (§4.R).
+        return [], dict(meta, stale=True)
     return qs, meta
 
 
@@ -369,7 +374,13 @@ def build_sets() -> tuple[dict[str, list[Question]], list[RagSetInfo]]:
         RagSetInfo(
             name="S",
             questions=len(s_questions),
-            note=(f"written questions: {len(s_questions)} kept of {s_meta.get('asked', 0)} asked, {discarded} discarded" if s_meta else "written questions: none yet (pnpm rag:questions needs the key)"),
+            note=(
+                "written questions: set aside, written for an older index (run pnpm rag:questions again)"
+                if s_meta.get("stale")
+                else f"written questions: {len(s_questions)} kept of {s_meta.get('asked', 0)} asked, {discarded} discarded"
+                if s_meta
+                else "written questions: none yet (pnpm rag:questions needs the key)"
+            ),
         ),
         RagSetInfo(name="F", questions=len(f_questions), note=f"flows: {len(f_questions)} of the {f_total} flows that cite records have a record that anchors"),
     ]

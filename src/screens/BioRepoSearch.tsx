@@ -61,7 +61,7 @@ export default function BioRepoSearch() {
     <div>
       <PageHeader
         title="Search the papers"
-        subtitle="Passages of the fetched papers' own text, found for a question. Every word shown is the paper's; the reader opens at the sentence."
+        subtitle="Passages of the fetched papers' own text, found for a question. Every passage shown is the paper's own words; the reader opens at the sentence."
       />
       <OwnerTabs tabs={BIOREPO_TABS} />
       {down && (
@@ -140,11 +140,12 @@ function Results({ result, titleOf }: { result: RagSearchResponse; titleOf: (id:
     <div className="space-y-3" data-testid="search-results">
       <p className="text-caption text-ink-soft">
         {result.hits.length} passages · lane {result.lane}
-        {result.phrasings.length > 0 && ` · also searched: ${result.phrasings.join('; ')}`}
+        {result.phrasings.length > 0 && ` · also searched, as phrased by a model: ${result.phrasings.join('; ')}`}
         {result.unverifiedSentences > 0 &&
           ` · ${result.unverifiedSentences} sentence${result.unverifiedSentences === 1 ? '' : 's'} the reader returned were not in their passage and were dropped`}
         {result.costUsd > 0 && ` · $${result.costUsd.toFixed(4)}`}
       </p>
+      {result.note && <Callout kind="info">{result.note}</Callout>}
       {result.hits.map((h) => (
         <Hit key={h.passage.id} hit={h} title={titleOf(h.passage.paperId)} />
       ))}

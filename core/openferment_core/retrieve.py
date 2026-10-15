@@ -110,7 +110,7 @@ def _query_embedder(model: str):
 def _dense(index: passages.Bm25Index):
     from .embed import load_dense
 
-    return load_dense([c.passage.id for c in index.cuts])
+    return load_dense([c.passage.id for c in index.cuts], [f"{c.context}\n{c.passage.text}" for c in index.cuts])
 
 
 @dataclass
@@ -121,6 +121,8 @@ class Detail:
     phrasings: list[str] = field(default_factory=list)
     # Sentences the grading reader returned that are not in their passage.
     unverifiedSentences: int = 0
+    # Why another lane ran in place of the chosen one, when it did.
+    note: str | None = None
 
 
 def search_detail(
@@ -131,7 +133,16 @@ def search_detail(
     ask: Callable[..., llm.Result] | None = None,
     embedder=None,
 ) -> Detail:
-    lane = lane or passages.chosen_lane()
+    note = None
+    if lane is None:
+        # The chosen lane travels on the data branch; what it needs (vectors,
+        # a key) may not be on this machine. A default search then runs on
+        # bm25 and says why, where a named lane is refused (§4.R).
+        lane = passages.chosen_lane()
+        why = why_unavailable(lane, embedder=embedder)
+        if why and lane != "bm25":
+            note = f"the chosen lane, {lane}, cannot run here ({why}); searched with bm25"
+            lane = "bm25"
     why = why_unavailable(lane, embedder=embedder)
     if why:
         raise LaneUnavailable(f"{lane}: {why}")
@@ -180,7 +191,7 @@ def search_detail(
         )
         for pid, score, ranks in fused[: max(k, 0)]
     ]
-    return Detail(hits=hits, lane=lane, usage=usage, phrasings=phrased, unverifiedSentences=unverified)
+    return Detail(hits=hits, lane=lane, usage=usage, phrasings=phrased, unverifiedSentences=unverified, note=note)
 
 
 def search(question: str, k: int = 8, lane: str | None = None, **kw) -> list[PassageHit]:

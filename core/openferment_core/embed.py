@@ -109,8 +109,13 @@ def _paths() -> tuple[Path, Path]:
     return index_dir() / "dense.npy", index_dir() / "dense.json"
 
 
-def ids_hash(ids: list[str]) -> str:
-    return hashlib.sha256("\n".join(ids).encode()).hexdigest()[:16]
+def ids_hash(ids: list[str], texts: list[str] | None = None) -> str:
+    """The passages the rows belong to: their ids and their words, so a text
+    that changed under the same ids is a different index (§4.R)."""
+    h = hashlib.sha256("\n".join(ids).encode())
+    for t in texts or []:
+        h.update(b"\x00" + t.encode())
+    return h.hexdigest()[:16]
 
 
 def build_dense(embedder: Embedder) -> dict:
@@ -126,7 +131,12 @@ def build_dense(embedder: Embedder) -> dict:
     tmp = npy.with_suffix(".tmp.npy")
     np.save(tmp, vectors)
     os.replace(tmp, npy)
-    info = {"model": embedder.name, "dim": int(vectors.shape[1]) if vectors.size else 0, "passageIds": ids_hash(ids), "count": len(ids)}
+    info = {
+        "model": embedder.name,
+        "dim": int(vectors.shape[1]) if vectors.size else 0,
+        "passageIds": ids_hash(ids, texts),
+        "count": len(ids),
+    }
     atomic.write_text(meta, json.dumps(info, indent=2) + "\n")
     return info
 
@@ -145,8 +155,9 @@ class DenseIndex:
         return [(self.ids[i], float(scores[i])) for i in order]
 
 
-def load_dense(current_ids: list[str]) -> tuple[DenseIndex | None, str | None]:
-    """The vectors, or None and why they cannot be used."""
+def load_dense(current_ids: list[str], current_texts: list[str]) -> tuple[DenseIndex | None, str | None]:
+    """The vectors, or None and why they cannot be used. `current_texts` are
+    what each passage is embedded from (context and text)."""
     npy, meta = _paths()
     if not npy.exists() or not meta.exists():
         return None, "no passage vectors yet: run pnpm index:build --dense on a machine that reaches huggingface.co"
@@ -155,7 +166,7 @@ def load_dense(current_ids: list[str]) -> tuple[DenseIndex | None, str | None]:
         vectors = np.load(npy)
     except (ValueError, OSError) as e:
         return None, f"the passage vectors cannot be read ({type(e).__name__}); run pnpm index:build --dense again"
-    if info.get("passageIds") != ids_hash(current_ids) or len(vectors) != len(current_ids):
+    if info.get("passageIds") != ids_hash(current_ids, current_texts) or len(vectors) != len(current_ids):
         return None, "the passage vectors belong to an older index; run pnpm index:build --dense again"
     return DenseIndex(current_ids, vectors, str(info.get("model"))), None
 

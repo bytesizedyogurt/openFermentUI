@@ -3,7 +3,7 @@
 // `pnpm rag:eval`; with none, it says so and names the command.
 import { useEffect, useState } from 'react';
 import type { RagReport } from '@/data/types';
-import { RagDown, RagRefused, ragReport } from '@/lib/rag';
+import { RagDown, RagRefused, ragReport, ragStatus } from '@/lib/rag';
 import { Callout, Card, SectionTitle, cx } from '@/components/ui';
 
 const METRICS: { key: 'recall5' | 'recall10' | 'recall20' | 'mrr10' | 'ndcg10'; label: string }[] = [
@@ -17,9 +17,11 @@ const METRICS: { key: 'recall5' | 'recall10' | 'recall20' | 'mrr10' | 'ndcg10'; 
 export function RetrievalScorecard() {
   const [report, setReport] = useState<RagReport | null>(null);
   const [said, setSaid] = useState<string | null>(null);
+  const [indexHash, setIndexHash] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
+    ragStatus(ctrl.signal).then((s) => setIndexHash(s.manifestHash), () => undefined);
     ragReport(ctrl.signal).then(setReport, (e: unknown) => {
       if (ctrl.signal.aborted) return;
       if (e instanceof RagRefused) setSaid(e.message);
@@ -47,6 +49,14 @@ export function RetrievalScorecard() {
             {report.papersIndexed} papers · in use: <strong>{report.chosenLane}</strong> ·{' '}
             {report.sets.map((s) => `${s.name}: ${s.note}`).join(' · ')}
           </p>
+          {indexHash && indexHash !== report.manifestHash && (
+            <div className="mb-2">
+              <Callout kind="warn">
+                These scores were measured on an earlier cut of the papers&rsquo; text than the index the
+                service holds now. Run pnpm rag:eval to score the current one.
+              </Callout>
+            </div>
+          )}
           <Card className="overflow-x-auto">
             <table className="w-full border-collapse text-body" data-testid="retrieval-table">
               <thead>

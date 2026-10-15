@@ -30,6 +30,7 @@
         "why": "needs the key in core/.env for its helper model calls"
       }
     ],
-    "chosenLane": "bm25"
+    "chosenLane": "bm25",
+    "manifestHash": "48f0699fba6d0f32"
   }
 }

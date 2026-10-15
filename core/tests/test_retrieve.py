@@ -190,12 +190,9 @@ def test_an_embedder_that_cannot_load_makes_the_lane_say_so(index, monkeypatch):
 def test_the_default_lane_comes_from_config(index):
     assert retrieve.search_detail("casein", k=2).lane == "bm25"
     (index / "index" / "config.json").write_text(json.dumps({"lane": "bm25+expand"}))
-    with pytest.raises(retrieve.LaneUnavailable):
-        # The chosen lane runs when none is named, and asks before it spends.
-        import os
-
-        os.environ.pop("ANTHROPIC_API_KEY", None)
-        retrieve.search("casein")
+    calls: list = []
+    detail = retrieve.search_detail("casein", k=2, ask=stand_in({"phrasings": []}, calls))
+    assert detail.lane == "bm25+expand" and len(calls) == 1, "the chosen lane runs when none is named"
 
 
 def test_status_lists_every_lane(index):

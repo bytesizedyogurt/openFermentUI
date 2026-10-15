@@ -65,7 +65,7 @@ from .models import (
     ToolResult,
     Usage,
 )
-from . import llm
+from . import llm, spend
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -596,7 +596,9 @@ def rag_search(request: RagSearchRequest) -> RagSearchResponse:
         detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane)
     except retrieve.LaneUnavailable as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
-    except llm.ModelUnavailable as e:
+    except (llm.ModelUnavailable, llm.ModelRefused, spend.BudgetSettingInvalid) as e:
+        # A key refused, a budget spent or set wrong, a request declined:
+        # the service is up and says why (§4.R).
         raise HTTPException(status_code=503, detail=str(e)) from None
     return RagSearchResponse(
         lane=detail.lane,
@@ -604,6 +606,7 @@ def rag_search(request: RagSearchRequest) -> RagSearchResponse:
         phrasings=detail.phrasings,
         unverifiedSentences=detail.unverifiedSentences,
         costUsd=detail.usage.costUsd,
+        note=detail.note,
     )
 
 

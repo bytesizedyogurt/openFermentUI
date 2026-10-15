@@ -178,7 +178,9 @@ def test_write_questions_keeps_and_discards_and_counts(index, monkeypatch):
     meta = rageval.write_questions(2, ask=ask)
     qs, saved = rageval.read_s()
     assert meta["asked"] == 2 and meta["kept"] == 1 and saved["kept"] == 1
-    assert meta["discarded"] == {"five words in a row from the passage": 1, "no usable question": 1}
+    # The reply for a passage not asked is ignored; each passage asked is
+    # kept or discarded once (§4.R).
+    assert meta["discarded"] == {"five words in a row from the passage": 1}
     assert qs[0].relevant == ["X1:s1:0"] and qs[0].set == "S"
     assert meta["costUsd"] == 0.0003
 

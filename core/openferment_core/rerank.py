@@ -2,8 +2,8 @@
 
 The top passages go to a small model, which grades each from 0 to 3 for how
 well it answers the question and copies out the sentence that answers it.
-The copy is checked: it must sit verbatim in its passage after
-`normalize_text`. A sentence that fails sets that passage's grade to 0 and
+The copy is checked: it must be one whole sentence (or table row) of its
+passage, or a run of them, word for word after `normalize_text`. A sentence that fails sets that passage's grade to 0 and
 is counted, never repaired. The order is grade, then fused rank. One
 `index`-role call per question and passage set, cached on disk.
 """
@@ -59,6 +59,34 @@ class Graded:
     usage: Usage = field(default_factory=Usage)
 
 
+def units_of(passage: Passage) -> set[str]:
+    """What the reader may copy, normalised: each whole sentence of the
+    passage, and each whole line (a table row is a unit of its own)."""
+    from .passages import sentence_spans
+
+    out: set[str] = set()
+    for line in passage.text.split("\n"):
+        if line.strip():
+            out.add(normalize_text(line))
+            for s, e in sentence_spans(line):
+                if line[s:e].strip():
+                    out.add(normalize_text(line[s:e]))
+    return out
+
+
+def is_whole_sentence(sentence: str, passage: Passage) -> bool:
+    """The copy is one sentence or row of the passage, or a run of them, word
+    for word after `normalize_text`. A fragment is not (§4.R: "c" passed)."""
+    norm = normalize_text(sentence)
+    if not norm or norm not in normalize_text(passage.text):
+        return False
+    units = units_of(passage)
+    if norm in units:
+        return True
+    # A run of whole sentences: it starts with one and ends with one.
+    return any(norm.startswith(u) for u in units) and any(norm.endswith(u) for u in units)
+
+
 def check(raw: Any, by_id: dict[str, Passage]) -> Graded:
     """The model's grades, held to the passages. Anything that is not a
     passage it was shown is ignored; a sentence not in its passage zeroes it."""
@@ -75,7 +103,7 @@ def check(raw: Any, by_id: dict[str, Passage]) -> Graded:
             grade = 0
         sentence = str(g.get("sentence") or "").strip()
         if grade > 0:
-            if not sentence or normalize_text(sentence) not in normalize_text(by_id[pid].text):
+            if not is_whole_sentence(sentence, by_id[pid]):
                 out.unverified += 1
                 grade = 0
                 sentence = ""

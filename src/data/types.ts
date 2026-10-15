@@ -2006,6 +2006,8 @@ export interface RagStatus {
   passages: number;
   lanes: RagLane[];
   chosenLane: string;
+  /** The index's manifest, so a scorecard made on another index shows it. */
+  manifestHash: string;
 }
 
 /** One passage a search returned (OF-BLD-014 §4.2). */
@@ -2081,4 +2083,6 @@ export interface RagSearchResponse {
   /** Sentences the grading reader returned that were not in their passage. */
   unverifiedSentences: number;
   costUsd: number;
+  /** Why another lane ran in place of the chosen one, when it did. */
+  note: string | null;
 }

@@ -952,6 +952,8 @@ class RagStatus(BaseModel):
     passages: int
     lanes: list[RagLane]
     chosenLane: str
+    # The index's manifest, so a scorecard made on another index shows it.
+    manifestHash: str = ""
 
 
 class PassageHit(BaseModel):
@@ -1031,3 +1033,5 @@ class RagSearchResponse(BaseModel):
     # Sentences the grading reader returned that were not in their passage.
     unverifiedSentences: int = 0
     costUsd: float = 0.0
+    # Why another lane ran in place of the chosen one, when it did.
+    note: str | None = None
