@@ -47,7 +47,8 @@ def test_case_6_carbon_dioxide_and_hydrogen():
 @needs_file
 def test_its_shape_and_its_missing_sugars():
     d = geneos.describe("RehMBEL1391")
-    assert (d["reactions"], d["metabolites"], d["genes"]) == (1538, 1348, 1350)
+    assert (d["reactions"], d["metabolites"], d["genes"]) == (1538, 1348, 1350), "the counts the file publishes"
+    assert d["added"] == ["DM_phb_c"], "the file carries no demand on phb_c; the worker adds one"
     assert d["growthReaction"] == "Biomass"
     assert d["substrates"] == {"glucose": False, "fructose": True, "xylose": False}
     assert geneos.ceiling("RehMBEL1391", "phb", "glucose", keep=False).finding == "this reconstruction has no uptake reaction for glucose"

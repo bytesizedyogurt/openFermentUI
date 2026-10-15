@@ -29,6 +29,10 @@ from .. import geneos_models as shelf
 from . import serve
 
 _LOADED: dict[str, Model] = {}
+# Each model's counts as its file publishes them, and what this worker adds
+# to it (an add-on route, a demand on the product), read at load.
+_PUBLISHED: dict[str, dict[str, int]] = {}
+_ADDED: dict[str, list[str]] = {}
 
 
 class Refused(ValueError):
@@ -101,8 +105,10 @@ def demand(model: Model, metabolite: str) -> Reaction:
 def load(model_id: str, path: str | None = None) -> Model:
     if model_id in _LOADED:
         return _LOADED[model_id]
+    added: list[str] = []
     if model_id == "toy":
         m = build_toy()
+        _PUBLISHED[model_id] = _counts(m)
     else:
         entry = shelf.SHELF.get(model_id)
         if entry is None:
@@ -113,10 +119,23 @@ def load(model_id: str, path: str | None = None) -> Model:
             if not path:
                 raise Refused(f"{model_id} is read from a fetched file, and no path was given")
             m = read_sbml_model(path)
+        _PUBLISHED[model_id] = _counts(m)
         if entry.addon:
-            apply_addon(m, shelf.ADDONS[entry.addon])
+            added += apply_addon(m, shelf.ADDONS[entry.addon])
+    # The demand on each product is added here, once, where the file lacks
+    # it. RehMBEL1391 exports PHB through PHBt and carries no DM_phb_c.
+    for prod in shelf.PRODUCTS.values():
+        rid = f"DM_{prod['metabolite']}"
+        if prod["metabolite"] in m.metabolites and rid not in m.reactions:
+            demand(m, prod["metabolite"])
+            added.append(rid)
+    _ADDED[model_id] = added
     _LOADED[model_id] = m
     return m
+
+
+def _counts(model: Model) -> dict[str, int]:
+    return {"reactions": len(model.reactions), "metabolites": len(model.metabolites), "genes": len(model.genes)}
 
 
 def growth_reaction(model: Model) -> str:
@@ -234,9 +253,12 @@ def mix(model: Model, model_id: str, product: str, a: str, b: str, uptake: float
 
 
 def describe(model: Model, model_id: str) -> dict[str, Any]:
+    published = _PUBLISHED.get(model_id) or _counts(model)
     return {
         "modelId": model_id,
-        "reactions": len(model.reactions), "metabolites": len(model.metabolites), "genes": len(model.genes),
+        # As the file publishes them; `added` names what this worker adds.
+        **published,
+        "added": _ADDED.get(model_id, []),
         "growthReaction": growth_reaction(model),
         "substrates": {s: exchange_for(model, s) is not None for s in shelf.SUBSTRATES},
         "products": {p: v["metabolite"] in model.metabolites for p, v in shelf.PRODUCTS.items()},

@@ -9,9 +9,9 @@
         "glucose"
       ],
       "finding": null,
-      "artifactId": "cda65b1f4801ff45",
+      "artifactId": "ea86d109b8913dab",
       "evidence": {
-        "id": "ev-cda65b1f4801ff45",
+        "id": "ev-ea86d109b8913dab",
         "label": "PHB against growth on glucose, toy",
         "value": 0.955727258598104,
         "unit": "g g-1",
@@ -19,7 +19,7 @@
         "provenance": "computed",
         "basis": {
           "tool": "geneos.frontier",
-          "toolVersion": "cobra 0.32.1 · worker 9e71954de867",
+          "toolVersion": "cobra 0.32.1 · worker f330bcaf4739",
           "inputs": [
             {
               "name": "model",
@@ -66,7 +66,7 @@
               }
             }
           ],
-          "artifactId": "cda65b1f4801ff45",
+          "artifactId": "ea86d109b8913dab",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         },

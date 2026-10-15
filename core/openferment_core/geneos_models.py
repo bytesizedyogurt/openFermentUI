@@ -146,7 +146,7 @@ SHELF: dict[str, ShelfModel] = {
     "RehMBEL1391": ShelfModel(
         id="RehMBEL1391", name="Cupriavidus necator H16 (RehMBEL1391)", host="c-necator-h16",
         scope="genome scale", fetched=C_NECATOR,
-        route="native: PHA synthase PHAS and phb_c, with its own demand DM_phb_c",
+        route="native: PHA synthase PHAS and phb_c; the file exports PHB through PHBt, and the worker adds the demand DM_phb_c",
         licence="GPL-3.0", feed="fructose",
         notes=["Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."],
     ),

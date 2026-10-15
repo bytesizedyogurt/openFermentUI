@@ -1651,7 +1651,7 @@ Measured on 13 October 2026 with `cobra` 0.32.1, GLPK through `swiglpk` 5.0.13, 
 
 1. Load the model: `load_model("textbook")` and `load_model("iJO1366")` for the two bundled ones, `read_sbml_model(path)` for the *C. necator* file.
 2. Apply the add-on when the shelf names one, and assert every added reaction balances.
-3. Add a demand on `phb_c`. `RehMBEL1391` already has one, `DM_phb_c`.
+3. Add a demand on `phb_c`. `RehMBEL1391` carries none (measured 2026-10-15: it exports PHB through `PHBt` to `phb_e`), so the worker adds `DM_phb_c` to all three models alike.
 4. Close carbon: set to zero the lower bound of every exchange whose metabolite contains carbon or carries no formula.
 5. Open the substrate's exchange at 10 mmol gDW⁻¹ h⁻¹.
 6. Maximise the demand. Require the status `optimal`.
