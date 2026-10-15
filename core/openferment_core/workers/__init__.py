@@ -183,12 +183,21 @@ Handler = Callable[[dict[str, Any]], Any]
 
 def serve(handlers: dict[str, Handler], *, name: str = "worker", stdin=None, stdout=None) -> None:
     """Answer requests on stdin until it closes. `ping` is answered here; an
-    unknown op or a handler that raises is an error response, and the loop
-    goes on. Only responses go to stdout; anything a library prints there
-    would corrupt the stream, so stdout is pointed at stderr while a handler
-    runs."""
+    unknown op, a handler that raises, or a result JSON cannot hold is an
+    error response, and the loop goes on.
+
+    Only responses reach the stream. Run as a process (`stdout` not given),
+    the responses go out on a duplicate of file descriptor 1, and descriptor
+    1 itself is pointed at stderr, so a library that prints, from Python or
+    from C (a solver's banner), writes to stderr (§3.R)."""
     stdin = stdin or sys.stdin
-    out = stdout or sys.stdout
+    if stdout is None:
+        sys.stdout.flush()
+        out = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
+        os.dup2(2, 1)
+        sys.stdout = sys.stderr
+    else:
+        out = stdout
     for line in stdin:
         line = line.strip()
         if not line:
@@ -210,9 +219,12 @@ def serve(handlers: dict[str, Handler], *, name: str = "worker", stdin=None, std
                     sys.stdout = saved
             else:
                 raise KeyError(f"{name} has no op {op!r}")
-            response = {"id": rid, "ok": True, "result": result}
+            body = {"id": rid, "ok": True, "result": result}
+            body["ms"] = int(round((time.perf_counter() - started) * 1000))
+            text = json.dumps(body, allow_nan=False)
         except Exception as e:  # said to the caller, and the loop goes on
-            response = {"id": rid, "ok": False, "error": f"{type(e).__name__}: {e}"}
-        response["ms"] = int(round((time.perf_counter() - started) * 1000))
-        out.write(json.dumps(response) + "\n")
+            body = {"id": rid, "ok": False, "error": f"{type(e).__name__}: {e}"}
+            body["ms"] = int(round((time.perf_counter() - started) * 1000))
+            text = json.dumps(body)
+        out.write(text + "\n")
         out.flush()

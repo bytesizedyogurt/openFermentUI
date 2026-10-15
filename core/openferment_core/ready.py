@@ -183,7 +183,10 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
         spend.ask_budget()
     except spend.BudgetSettingInvalid as e:
         return Check("roles", "fail", str(e))
-    today = f"today ${spend.total_today():.2f} of the ${cap:.2f} daily cap"
+    try:
+        today = f"today ${spend.total_today():.2f} of the ${cap:.2f} daily cap"
+    except spend.SpendFileDamaged as e:
+        return Check("roles", "fail", str(e))
     chains = {role: llm.chain(role) for role in llm.ROLES}
     named = "; ".join(f"{role}: {' → '.join(models)}" for role, models in chains.items())
     if not have_key or intake.fixtures_only():

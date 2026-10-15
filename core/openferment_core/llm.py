@@ -292,19 +292,28 @@ def worst_case_usd(model: str, request: dict[str, Any], max_tokens: int) -> floa
     return cost_usd(model, chars // CHARS_PER_TOKEN_ESTIMATE + 1, max_tokens)
 
 
-def _guard(model: str, request: dict[str, Any], max_tokens: int, spent: Usage) -> None:
-    refuse, today, cap = spend.would_pass(worst_case_usd(model, request, max_tokens))
-    if refuse:
+def _reserve(model: str, request: dict[str, Any], max_tokens: int, spent: Usage, role: str) -> str:
+    """Hold the call's worst case against the daily cap before it is sent,
+    or refuse it. The hold and the check are one step (`spend.reserve`), so
+    the service and the nightly job cannot each take the last of the day;
+    the caller settles what the call cost (§3.R)."""
+    if model not in PRICES:
         raise BudgetExhausted(
-            f"Today's model spend is ${today:.2f} of the ${cap:.2f} daily cap, and this call could pass it. "
-            f"Raise {spend.DAILY_SETTING} in core/.env, or wait for the next UTC day.",
+            f"There is no price on file for {model}, so the daily cap cannot hold for a call on it. "
+            "Add it to PRICES in core/openferment_core/llm.py, or choose a priced model in core/.env.",
             spent,
         )
-
-
-def _charge(role: str, used: Usage) -> None:
-    if used.costUsd > 0:
-        spend.charge(role, used.costUsd)
+    try:
+        return spend.reserve(role, worst_case_usd(model, request, max_tokens))
+    except spend.SpendFileDamaged as e:
+        raise BudgetExhausted(str(e), spent) from None
+    except spend.CapReached as e:
+        held = f" with ${e.reserved:.2f} held for calls in flight" if e.reserved else ""
+        raise BudgetExhausted(
+            f"Today's model spend is ${e.spent:.2f} of the ${e.cap:.2f} daily cap{held}, and this call could pass it. "
+            f"Raise {spend.DAILY_SETTING} in core/.env, or wait for the next UTC day.",
+            spent,
+        ) from None
 
 
 def strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -398,57 +407,61 @@ def call(
     for i, model in enumerate(models):
         last = i == len(models) - 1
         tried.append(model)
-        _guard(model, request, max_tokens, spent)
+        held = _reserve(model, request, max_tokens, spent, role)
+        cost = 0.0
         try:
-            with client.messages.stream(model=model, **request) as stream:
-                response = stream.get_final_message()
-        except anthropic.AuthenticationError as e:
-            raise ModelUnavailable("The Anthropic API rejected the key in core/.env.", spent) from e
-        except anthropic.APIConnectionError as e:
-            raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
-        except anthropic.BadRequestError as e:
-            raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}", spent) from e
-        except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
-            why = f"{model} is not available to this key ({e.status_code})"
-            if last:
-                raise ModelUnavailable(why, spent) from e
-            log.warning("%s%s; trying %s", label, why, models[i + 1])
-            continue
-        except (anthropic.APIError, _http.TransportError) as e:
-            # 429 after the SDK's retries, 529, 5xx, an error event inside the
-            # stream (which the SDK reports with the stream's own 200), or the
-            # connection dropping after the stream opened.
-            status = getattr(e, "status_code", None)
-            if status and status != 200:
-                why = f"{model} answered {status}"
-            else:
-                why = f"{model} stream failed ({_error_type(e)})"
-            if last:
-                raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}", spent) from e
-            log.warning("%s%s; trying %s", label, why, models[i + 1])
-            continue
+            try:
+                with client.messages.stream(model=model, **request) as stream:
+                    response = stream.get_final_message()
+            except anthropic.AuthenticationError as e:
+                raise ModelUnavailable("The Anthropic API rejected the key in core/.env.", spent) from e
+            except anthropic.APIConnectionError as e:
+                raise ModelUnavailable(f"Could not reach the Anthropic API: {e}", spent) from e
+            except anthropic.BadRequestError as e:
+                raise ModelUnavailable(f"The Anthropic API refused the request as malformed: {e.message}", spent) from e
+            except (anthropic.NotFoundError, anthropic.PermissionDeniedError) as e:
+                why = f"{model} is not available to this key ({e.status_code})"
+                if last:
+                    raise ModelUnavailable(why, spent) from e
+                log.warning("%s%s; trying %s", label, why, models[i + 1])
+                continue
+            except (anthropic.APIError, _http.TransportError) as e:
+                # 429 after the SDK's retries, 529, 5xx, an error event inside the
+                # stream (which the SDK reports with the stream's own 200), or the
+                # connection dropping after the stream opened.
+                status = getattr(e, "status_code", None)
+                if status and status != 200:
+                    why = f"{model} answered {status}"
+                else:
+                    why = f"{model} stream failed ({_error_type(e)})"
+                if last:
+                    raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}", spent) from e
+                log.warning("%s%s; trying %s", label, why, models[i + 1])
+                continue
 
-        used = usage_of(response)
-        _charge(role, used)
-        spent = add(spent, used)
-        stop = _get(response, "stop_reason")
-        if stop == "refusal":
-            details = _get(response, "stop_details")
-            refusal = _get(details, "category") or refusal
-            refused_by.append(str(_get(response, "model") or model))
-            if last or refusal in NO_FALLBACK_REFUSALS:
-                raise ModelRefused(refusal, refused_by, spent)
-            log.warning("%s%s declined (%s); trying %s", label, model, refusal or "no category", models[i + 1])
-            continue
-        served = str(_get(response, "model") or model)
-        return Result(
-            data=None if stop == "max_tokens" else _text_json(response),
-            model=served,
-            usage=spent,
-            stop_reason=stop,
-            fell_back=i > 0,
-            tried=tried,
-        )
+            used = usage_of(response)
+            cost = used.costUsd
+            spent = add(spent, used)
+            stop = _get(response, "stop_reason")
+            if stop == "refusal":
+                details = _get(response, "stop_details")
+                refusal = _get(details, "category") or refusal
+                refused_by.append(str(_get(response, "model") or model))
+                if last or refusal in NO_FALLBACK_REFUSALS:
+                    raise ModelRefused(refusal, refused_by, spent)
+                log.warning("%s%s declined (%s); trying %s", label, model, refusal or "no category", models[i + 1])
+                continue
+            served = str(_get(response, "model") or model)
+            return Result(
+                data=None if stop == "max_tokens" else _text_json(response),
+                model=served,
+                usage=spent,
+                stop_reason=stop,
+                fell_back=i > 0,
+                tried=tried,
+            )
+        finally:
+            spend.settle(held, role, cost)
     raise ModelUnavailable("no model to call")  # pragma: no cover - chain() is never empty
 
 
@@ -536,8 +549,29 @@ def converse(
     if tools:
         request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"]) for t in tools]
         request["tool_choice"] = {"type": tool_choice}
-    _guard(model, request, max_tokens, Usage())
+    held = _reserve(model, request, max_tokens, Usage(), role)
+    try:
+        response = _converse_once(request, ask, model)
+    except BaseException:
+        spend.settle(held, role, 0.0)
+        raise
+    used = usage_of(response)
+    spend.settle(held, role, used.costUsd)
+    stop = _get(response, "stop_reason")
+    served = str(_get(response, "model") or model)
+    if stop == "refusal":
+        raise ModelRefused(_get(_get(response, "stop_details"), "category"), [served], used)
+    content = [_block_dict(b) for b in (_get(response, "content") or [])]
+    calls = [
+        ToolCall(id=str(b.get("id", "")), name=str(b.get("name", "")), input=dict(b.get("input") or {}))
+        for b in content
+        if b.get("type") == "tool_use"
+    ]
+    data = None if calls or stop == "max_tokens" else _text_json(response)
+    return Turn(content=content, toolCalls=calls, data=data, stopReason=stop, usage=used, model=served)
 
+
+def _converse_once(request: dict[str, Any], ask: Callable[[dict[str, Any]], Any] | None, model: str) -> Any:
     try:
         if ask is not None:
             response = ask(request)
@@ -557,18 +591,4 @@ def converse(
         status = getattr(e, "status_code", None)
         why = f"{model} answered {status}" if status and status != 200 else f"{model} stream failed ({_error_type(e)})"
         raise ModelUnavailable(f"{why}: {getattr(e, 'message', e)}") from e
-
-    used = usage_of(response)
-    _charge(role, used)
-    stop = _get(response, "stop_reason")
-    served = str(_get(response, "model") or model)
-    if stop == "refusal":
-        raise ModelRefused(_get(_get(response, "stop_details"), "category"), [served], used)
-    content = [_block_dict(b) for b in (_get(response, "content") or [])]
-    calls = [
-        ToolCall(id=str(b.get("id", "")), name=str(b.get("name", "")), input=dict(b.get("input") or {}))
-        for b in content
-        if b.get("type") == "tool_use"
-    ]
-    data = None if calls or stop == "max_tokens" else _text_json(response)
-    return Turn(content=content, toolCalls=calls, data=data, stopReason=stop, usage=used, model=served)
+    return response

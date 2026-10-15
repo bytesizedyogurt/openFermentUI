@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -68,30 +69,72 @@ def today() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
+# How long a reservation holds before it is treated as abandoned (a process
+# that died between reserving and settling). Longer than any call this
+# service makes; a convention in E.1's sense.
+RESERVATION_TTL_S = 1800
+
+
+class SpendFileDamaged(RuntimeError):
+    """The day's spend cannot be read. The gate closes rather than starting
+    the day from zero, and the file is left for a person to look at (§3.R)."""
+
+
+class CapReached(RuntimeError):
+    def __init__(self, spent: float, reserved: float, cap: float):
+        super().__init__(f"today ${spent:.2f} spent and ${reserved:.2f} reserved of the ${cap:.2f} cap")
+        self.spent, self.reserved, self.cap = spent, reserved, cap
+
+
 def _empty(day: str) -> dict[str, Any]:
-    return {"day": day, "byRole": {r: 0.0 for r in ROLES}, "calls": 0}
+    return {"day": day, "byRole": {r: 0.0 for r in ROLES}, "calls": 0, "reservations": {}}
 
 
 def _read(day: str) -> dict[str, Any]:
+    p = path()
     try:
-        data = json.loads(path().read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError):
+        text = p.read_text(encoding="utf-8")
+    except FileNotFoundError:
         return _empty(day)
-    if not isinstance(data, dict) or data.get("day") != day:
+    try:
+        data = json.loads(text)
+        if not isinstance(data, dict) or not isinstance(data.get("byRole", {}), dict):
+            raise ValueError("not a spend record")
+    except ValueError as e:
+        raise SpendFileDamaged(
+            f"{p} cannot be read ({e}), so today's spend is unknown and no model call is made. "
+            "Look at it, then delete it to start the day from zero."
+        ) from None
+    if data.get("day") != day:
         return _empty(day)
-    by_role = data.get("byRole") if isinstance(data.get("byRole"), dict) else {}
     out = _empty(day)
-    for role, usd in by_role.items():
+    for role, usd in data.get("byRole", {}).items():
         if isinstance(usd, (int, float)):
             out["byRole"][str(role)] = float(usd)
     out["calls"] = int(data.get("calls") or 0)
+    now = datetime.now(timezone.utc).timestamp()
+    for rid, r in (data.get("reservations") or {}).items():
+        if isinstance(r, dict) and isinstance(r.get("usd"), (int, float)) and now - float(r.get("t", 0)) < RESERVATION_TTL_S:
+            out["reservations"][str(rid)] = {"usd": float(r["usd"]), "t": float(r["t"])}
     return out
 
 
+def _write(data: dict[str, Any]) -> None:
+    atomic.write_text(path(), json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+def _totals(data: dict[str, Any]) -> tuple[float, float]:
+    return (
+        round(sum(data["byRole"].values()), 6),
+        round(sum(r["usd"] for r in data["reservations"].values()), 6),
+    )
+
+
 def state() -> dict[str, Any]:
-    """Today's spend: `{"day", "byRole", "calls", "totalUsd"}`."""
+    """Today's spend: `{"day", "byRole", "calls", "reservations",
+    "totalUsd", "reservedUsd"}`. Raises SpendFileDamaged."""
     data = _read(today())
-    data["totalUsd"] = round(sum(data["byRole"].values()), 6)
+    data["totalUsd"], data["reservedUsd"] = _totals(data)
     return data
 
 
@@ -99,22 +142,50 @@ def total_today() -> float:
     return state()["totalUsd"]
 
 
-def charge(role: str, usd: float) -> float:
-    """Add `usd` to today's spend under `role`; return today's total."""
+def reserve(role: str, projected_usd: float) -> str:
+    """Hold `projected_usd` against today's cap, or raise CapReached. Check
+    and hold are one step under the lock, so two calls at once cannot each
+    see room that only one of them has (§3.R)."""
+    p = path()
+    with _LOCK, atomic.held(p):
+        data = _read(today())
+        spent, reserved = _totals(data)
+        cap = daily_budget()
+        if spent + reserved + projected_usd > cap:
+            raise CapReached(spent, reserved, cap)
+        rid = uuid.uuid4().hex[:12]
+        data["reservations"][rid] = {"usd": round(projected_usd, 6), "t": datetime.now(timezone.utc).timestamp(), "role": role}
+        _write(data)
+        return rid
+
+
+def settle(rid: str | None, role: str, usd: float) -> float:
+    """Release a reservation and charge what the call cost; today's total."""
     if usd < 0:
         raise ValueError("a charge cannot be negative")
     p = path()
     with _LOCK, atomic.held(p):
         data = _read(today())
-        data["byRole"][role] = round(data["byRole"].get(role, 0.0) + usd, 6)
-        data["calls"] += 1
-        atomic.write_text(p, json.dumps(data, indent=2, sort_keys=True) + "\n")
-        return round(sum(data["byRole"].values()), 6)
+        if rid is not None:
+            data["reservations"].pop(rid, None)
+        if usd > 0 or rid is None:
+            data["byRole"][role] = round(data["byRole"].get(role, 0.0) + usd, 6)
+            data["calls"] += 1
+        _write(data)
+        return _totals(data)[0]
+
+
+def charge(role: str, usd: float) -> float:
+    """Add `usd` to today's spend under `role`; return today's total."""
+    return settle(None, role, usd)
 
 
 def would_pass(projected_usd: float) -> tuple[bool, float, float]:
     """Whether a call that may cost `projected_usd` could take today past the
-    cap. Returns (refuse, today's total, the cap)."""
+    cap, counting what is reserved. A damaged file always would."""
     cap = daily_budget()
-    spent = total_today()
-    return spent + projected_usd > cap, spent, cap
+    try:
+        s = state()
+    except SpendFileDamaged:
+        return True, 0.0, cap
+    return s["totalUsd"] + s["reservedUsd"] + projected_usd > cap, s["totalUsd"], cap

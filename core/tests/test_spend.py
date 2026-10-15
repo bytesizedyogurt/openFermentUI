@@ -34,9 +34,13 @@ def test_the_file_is_the_one_the_setting_names(tmp_path, monkeypatch):
     assert target.is_file()
 
 
-def test_a_damaged_file_reads_as_nothing_spent_and_is_replaced():
+def test_a_damaged_file_closes_the_gate_and_is_left_for_a_person():
+    # §3.R: reading a damaged file as "nothing spent" reset the cap.
     spend.path().write_text("{not json", encoding="utf-8")
-    assert spend.total_today() == 0.0
+    with pytest.raises(spend.SpendFileDamaged, match="delete it"):
+        spend.total_today()
+    assert spend.would_pass(0.01)[0] is True
+    spend.path().unlink()
     spend.charge("answer", 0.2)
     assert spend.total_today() == 0.2
 

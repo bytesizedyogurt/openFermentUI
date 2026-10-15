@@ -80,6 +80,7 @@ core/data/rageval/
 core/data/live/
 # OF-BLD-014 E.7 — the day's model spend, kept on the machine that spent it.
 core/data/spend.json
+core/data/spend.json.lock
 # OF-BLD-014 §2.3 — thread P as proposed, a list a person approves; the data branch keeps it.
 core/data/thread-p-proposed.tsv
 # OF-BLD-014 §1.3 — data-sync.sh's throwaway checkout of the openferment-data branch.

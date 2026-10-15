@@ -538,6 +538,8 @@ def artifacts_read(artifact_id: str) -> Artifact:
         return artifacts.get(artifact_id)
     except artifacts.ArtifactNotFound:
         raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
 
 
 @app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult)
@@ -548,7 +550,7 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
         return artifacts.replay(artifact_id)
     except artifacts.ArtifactNotFound:
         raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
-    except artifacts.ToolNotRegistered as e:
+    except (artifacts.ToolNotRegistered, artifacts.ArtifactDamaged) as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
 

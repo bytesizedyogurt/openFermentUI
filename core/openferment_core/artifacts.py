@@ -49,6 +49,10 @@ class ArtifactNotFound(KeyError):
     pass
 
 
+class ArtifactDamaged(ValueError):
+    """A stored file that does not parse as an artifact."""
+
+
 class ToolNotRegistered(LookupError):
     pass
 
@@ -142,6 +146,8 @@ def get(aid: str) -> Artifact:
         return Artifact.model_validate_json(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raise ArtifactNotFound(aid) from None
+    except ValueError as e:
+        raise ArtifactDamaged(f"artifact {aid} is damaged on disk ({path.name}): {e}".splitlines()[0]) from None
 
 
 def all_artifacts() -> list[Artifact]:
@@ -193,11 +199,23 @@ def compute(
     reg = registered(tool)
     inputs = list(inputs)
     aid = artifact_id(reg.tool, reg.version, inputs, seed)
+    records = _records_for(inputs, records_by_id)
     if keep:
         try:
-            return get(aid)
+            stored = get(aid)
         except ArtifactNotFound:
-            pass
+            stored = None
+        if stored is not None:
+            # The output is the same; the provenance is what the inputs are
+            # worth now. A record demoted since the first computation demotes
+            # the value, and the stored file is brought up to date (§3.R).
+            now = basis_provenance(basis_of(stored), records, _artifacts_for(inputs))
+            if now == stored.provenance:
+                return stored
+            updated = stored.model_copy(update={"provenance": now})
+            with _LOCK, atomic.held(folder() / ".store"):
+                atomic.write_text(_path(aid), updated.model_dump_json(indent=2) + "\n")
+            return updated
 
     output, ms = _run(reg, inputs, seed)
     basis = ComputedBasis(tool=reg.tool, toolVersion=reg.version, inputs=inputs, artifactId=aid, at=_now(), seed=seed)
@@ -208,7 +226,7 @@ def compute(
         inputs=inputs,
         output=output,
         outputHash=output_hash(output),
-        provenance=basis_provenance(basis, _records_for(inputs, records_by_id), _artifacts_for(inputs)),
+        provenance=basis_provenance(basis, records, _artifacts_for(inputs)),
         createdAt=basis.at,
         durationMs=ms,
         seed=seed,
@@ -286,7 +304,20 @@ def replay(aid: str) -> ReplayResult:
     The stored file is never changed by a replay."""
     artifact = get(aid)
     reg = registered(artifact.tool)
-    output, ms = _run(reg, artifact.inputs, artifact.seed)
+    try:
+        output, ms = _run(reg, artifact.inputs, artifact.seed)
+    except Exception as e:
+        # The tool now refuses what it once computed (a unit table changed,
+        # say). That is a difference to show, not a crash (§3.R).
+        said = f"the tool refused: {type(e).__name__}: {e}"
+        return ReplayResult(
+            artifactId=aid,
+            identical=False,
+            storedHash=artifact.outputHash,
+            replayedHash="",
+            differences=[ReplayDifference(path="", stored=artifact.output, replayed=said)],
+            durationMs=0,
+        )
     replayed = output_hash(output)
     differences: list[ReplayDifference] = []
     if replayed != artifact.outputHash:

@@ -127,11 +127,13 @@ def build(
     ontology: Iterable[dict[str, Any]] | None = None,
 ) -> EvidencePool:
     """The pool from its parts, so a test can hand it a fixture."""
-    records = [r for r in corpus.records if r.get("status") != "rejected"]
-    seen = {r["id"] for r in records}
+    # A rejection counts from either side: the projection's status, or a
+    # decision made since `corpus.json` was last exported (§3.R).
     rejected_ids = {rid for rid, d in decisions.items() if d.status == "rejected"} | {
         r["id"] for r in corpus.records if r.get("status") == "rejected"
     }
+    records = [r for r in corpus.records if r["id"] not in rejected_ids]
+    seen = {r["id"] for r in records}
     labels = _field_labels(ontology)
     for c in candidates:
         if c.id in seen or c.id in rejected_ids or c.status == "rejected":

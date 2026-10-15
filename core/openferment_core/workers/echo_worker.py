@@ -35,5 +35,26 @@ def _chatter(args):
     return {"quiet": True}
 
 
+def _cwrite(args):
+    # A C library writes to file descriptor 1 directly, past sys.stdout.
+    os.write(1, b"a solver banner written to fd 1\n")
+    return {"quiet": True}
+
+
+def _unserialisable(args):
+    return {"a set": {1, 2}}
+
+
 if __name__ == "__main__":
-    serve({"echo": _echo, "sleep": _sleep, "exit": _exit, "fail": _fail, "chatter": _chatter}, name="echo")
+    serve(
+        {
+            "echo": _echo,
+            "sleep": _sleep,
+            "exit": _exit,
+            "fail": _fail,
+            "chatter": _chatter,
+            "cwrite": _cwrite,
+            "unserialisable": _unserialisable,
+        },
+        name="echo",
+    )
