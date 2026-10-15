@@ -13,6 +13,7 @@ LIVE steps built offline whose run waits on a need this machine lacked, one line
 - §2.4, the extraction — needs a key the Models API accepts (this one is not scoped to a workspace: 400 on every call) — `pnpm intake:extract --all && pnpm data:push`; report per thread P paper and per polymer field: anchored, rejected by rule, cost, values with a strain id, values with a carbon source
 - §4.5, the rest — needs a key the Models API accepts (the API answers 400 to this one: not scoped to a workspace) — `pnpm rag:questions --n 200 && pnpm rag:eval && pnpm data:push`; report the questions discarded, and nDCG@10 and recall@10 on K and S for every lane, with the cost
 - §5.5 — needs a key the Models API accepts (`pnpm ready` on 2026-10-15: 400, not scoped to a workspace) and the index (`pnpm data:prepare`) — `pnpm test:live` (on a `model-only` lane: `cd core && uv run --all-extras pytest tests/test_flows.py -m live -s`), then `pnpm ask:batch docs/build/questions-pha.txt && pnpm data:push`; report flows passed of twelve, and across the ten questions the median cost and seconds, claims kept and dropped, and the share of kept claims that carry a record or a quote
+- §8.6, the bindings — needs thread P's extracted records (§2.4's extraction, which needs the key) — `pnpm data:pull`, then with the service up `curl -s 127.0.0.1:8000/api/proforma/scenarios`; report for each input of `sc-pha-1` how many records it bound and their range, and which inputs wait for an assumption
 - §6.5, the shot — needs thread P's extracted records (§2.4's extraction, which needs the key) — `pnpm prototype:up`, then `pnpm shots --prefix phase-6 /geneos/model`; report how many reported yield records the figure drew
 
 ## Live runs
@@ -384,4 +385,4 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   first, the sixth stated in the basis and the screen. **1,070** Python
   tests offline; smoke **65** routes, golden path **31**. Screenshots:
   `docs/shots/phase-7-*`, over the sample run.
-
+- §8.6, the benchmark — 2026-10-15 — `pnpm test:slow`: **7 passed**. `biorefineries.cornstover@2.35.1` on biosteam 2.54.0 with the package's defaults: minimum ethanol selling price **1.9677** USD per gallon (B.3: 1.968; within 0.02 %), kept as artifact `35e708d122a6b4fc` and pushed to `openferment-data`. Bindings over the pool as it stands: **134** records, all seed, **0** thread P records, so each of the seven inputs of `sc-pha-1` binds **0** records and all seven wait for a source; the yield cap reads **0.593** g g-1 from a stored geneOS ceiling. The binding half is owed with §2.4's extraction. 0 USD
