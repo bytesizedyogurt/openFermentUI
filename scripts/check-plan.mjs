@@ -132,6 +132,11 @@ const PAIRS = [
   ['RagLane', 'RagLane'],
   ['RagStatus', 'RagStatus'],
   ['PassageHit', 'PassageHit'],
+  // OF-BLD-014 §4.3 — the retrieval scorecard.
+  ['RagMetrics', 'RagMetrics'],
+  ['RagLaneReport', 'RagLaneReport'],
+  ['RagSetInfo', 'RagSetInfo'],
+  ['RagReport', 'RagReport'],
 ];
 
 let compared = 0;

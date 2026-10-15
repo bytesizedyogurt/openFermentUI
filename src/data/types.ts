@@ -2020,3 +2020,47 @@ export interface PassageHit {
   /** The sentence it copied, checked verbatim against the passage. */
   sentence: string | null;
 }
+
+// ── retrieval scorecard (OF-BLD-014 §4.3) ──────────────────────────────
+
+/** One lane on one question set. */
+export interface RagMetrics {
+  questions: number;
+  recall5: number;
+  recall10: number;
+  recall20: number;
+  mrr10: number;
+  ndcg10: number;
+  medianSeconds: number;
+  costPerQuestion: number;
+}
+
+export interface RagLaneReport {
+  lane: string;
+  available: boolean;
+  why: string | null;
+  paid: boolean;
+  /** Mean nDCG@10 over K and S (the sets present); null when it did not run. */
+  score: number | null;
+  sets: Record<string, RagMetrics>;
+}
+
+export interface RagSetInfo {
+  name: string;
+  questions: number;
+  /** How the set was built and what it holds, in words. */
+  note: string;
+}
+
+export interface RagReport {
+  date: string;
+  manifestHash: string;
+  papersIndexed: number;
+  passages: number;
+  sets: RagSetInfo[];
+  lanes: RagLaneReport[];
+  chosenLane: string;
+  /** The rule that chose it, in words. */
+  rule: string;
+  totalCostUsd: number;
+}

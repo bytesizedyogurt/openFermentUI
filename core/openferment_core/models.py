@@ -966,3 +966,49 @@ class PassageHit(BaseModel):
     # sentence it copied, checked verbatim against the passage.
     grade: int | None = None
     sentence: str | None = None
+
+
+# ── retrieval scorecard (OF-BLD-014 §4.3) ──────────────────────────────
+
+
+class RagMetrics(BaseModel):
+    """One lane on one question set."""
+
+    questions: int
+    recall5: float
+    recall10: float
+    recall20: float
+    mrr10: float
+    ndcg10: float
+    medianSeconds: float
+    costPerQuestion: float
+
+
+class RagLaneReport(BaseModel):
+    lane: str
+    available: bool
+    why: str | None = None
+    paid: bool
+    # Mean nDCG@10 over K and S (the sets present); None when it did not run.
+    score: float | None = None
+    sets: dict[str, RagMetrics] = Field(default_factory=dict)
+
+
+class RagSetInfo(BaseModel):
+    name: str
+    questions: int
+    # How the set was built and what it holds, in words.
+    note: str
+
+
+class RagReport(BaseModel):
+    date: str
+    manifestHash: str
+    papersIndexed: int
+    passages: int
+    sets: list[RagSetInfo]
+    lanes: list[RagLaneReport]
+    chosenLane: str
+    # The rule that chose it, in words.
+    rule: str
+    totalCostUsd: float

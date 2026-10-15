@@ -41,6 +41,8 @@
     "decisions:push": "bash scripts/decisions-push.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "index:build": "cd core && uv run --all-extras python -m openferment_core.passages",
+    "rag:questions": "cd core && uv run --all-extras python -m openferment_core.rageval questions",
+    "rag:eval": "cd core && uv run --all-extras python -m openferment_core.rageval eval",
     "demo:offline": "node scripts/demo-offline.mjs",
     "prototype:up": "bash scripts/prototype-up.sh",
     "shots": "node scripts/shots.mjs",

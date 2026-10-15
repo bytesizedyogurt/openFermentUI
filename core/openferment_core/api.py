@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, tools, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, rageval, tools, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -55,6 +55,7 @@ from .models import (
     PracticeScenario,
     PracticeSession,
     PracticeTurnRequest,
+    RagReport,
     RagStatus,
     ReplayResult,
     ReviewDecision,
@@ -582,6 +583,15 @@ def rag_status() -> RagStatus:
     """Papers indexed, passages, the lanes and whether each can run, and the
     lane searches use when none is named."""
     return passages.status()
+
+
+@app.get("/api/rag/report", response_model=RagReport)
+def rag_report() -> RagReport:
+    """The last scorecard of every lane; 404 until `pnpm rag:eval` has run."""
+    report = rageval.read_report()
+    if report is None:
+        raise HTTPException(status_code=404, detail="no retrieval scorecard yet: run pnpm rag:eval")
+    return report
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────
