@@ -132,15 +132,20 @@ def _tool_defs() -> list[dict[str, Any]]:
     return [{"name": i.name, "description": i.description, "input_schema": i.inputSchema} for i in tools.infos()]
 
 
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
 def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     """One line in plain words, written by code."""
     if result.error:
         return f"{name} refused: {result.error[:160]}"
     if name == "search_passages":
-        return f'Searched the papers for "{inp.get("query", "")}" · {len(result.passages)} passages'
+        return f'Searched the papers for "{inp.get("query", "")}" · {_count(len(result.passages), "passage")}'
     if name == "search_records":
-        what = inp.get("field") or inp.get("query") or "records"
-        return f"Looked up records of {what} · {len(result.recordIds)} records"
+        labels = [r.get("measurement") for r in (result.summary.get("records") or []) if r.get("measurement")]
+        what = (labels[0].lower() if inp.get("field") and labels else None) or inp.get("field") or inp.get("query") or "every kind"
+        return f"Looked up records of {what} · {_count(len(result.recordIds), 'record')}"
     if name == "convert_units":
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
     return f"Ran {name}"
@@ -290,7 +295,7 @@ def ask(
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
     run.step(kind="final", tool=None, input=None,
-             summary=f"Answered: {len(result.claims)} claims kept, {result.rejected} dropped", ms=0, ok=True)
+             summary=f"Answered: {_count(len(result.claims), 'claim')} kept, {result.rejected} dropped", ms=0, ok=True)
     return AnswerPlan(
         question=question,
         claims=result.claims,

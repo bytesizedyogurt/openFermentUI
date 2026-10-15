@@ -383,8 +383,13 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_rag().items(),
     ):
         path = out / name
-        wrapped = {"_fixture": PROTOTYPE_NOTE, "response": value}
-        path.write_text(json.dumps(wrapped, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        if name.endswith(".jsonl"):
+            # One event a line, as the stream sends them; the note leads.
+            lines = [{"_fixture": PROTOTYPE_NOTE}, *value]
+            path.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines), encoding="utf-8")
+        else:
+            wrapped = {"_fixture": PROTOTYPE_NOTE, "response": value}
+            path.write_text(json.dumps(wrapped, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         written.append(path)
         print(f"wrote {path}")
     return written
@@ -432,6 +437,7 @@ def prototype_rag() -> dict[str, Any]:
                 rageval.RagSetInfo(name="F", questions=0, note="flows: none in the stand-in"),
             ]
             report = rageval.evaluate(sets={"K": k, "S": [], "F": []}, infos=infos, lanes=retrieve.LANES)
+            stream = prototype_stream(overlay)
         finally:
             _intake.DATA_DIR, _intake.FULLTEXT_DIR, passages._LOADED, passages._papers_meta = saved
             if key is not None:
@@ -444,7 +450,76 @@ def prototype_rag() -> dict[str, Any]:
         "rag-status.json": status.model_dump(mode="json"),
         "rag-search.json": search.model_dump(mode="json"),
         "rag-report.json": report.model_dump(mode="json"),
+        "ask-stream.jsonl": stream,
     }
+
+
+# §5.3: one question through the real loop (postdoc_agent.ask), the model a
+# scripted stand-in that searches the records, searches the papers, and
+# answers with one claim citing the overlay's candidate and quoting B5's table
+# row. Run inside prototype_rag's scratch, so `search_passages` reads the
+# index built there. The usage is the stand-in's, fixed, and costs nothing.
+STREAM_QUESTION = "What does the stand-in table report for placeholder A?"
+STREAM_CANDIDATE = "cl1-B5-a07dd73c"
+STREAM_QUOTE = "Placeholder A | 7 | mg L-1"
+
+
+def _stand_in_converse(turns: list[Any]):
+    from . import llm
+    from .models import Usage
+
+    def converse(**kw):
+        turn = turns.pop(0)
+        usage = Usage(models=[kw["model"]])
+        if isinstance(turn, dict):
+            return llm.Turn(content=[], toolCalls=[], data=turn, stopReason="end_turn", usage=usage, model=kw["model"])
+        calls = [llm.ToolCall(id=f"stand-in-{len(turns)}-{i}", name=n, input=inp) for i, (n, inp) in enumerate(turn)]
+        content = [{"type": "tool_use", "id": c.id, "name": c.name, "input": c.input} for c in calls]
+        return llm.Turn(content=content, toolCalls=calls, data=None, stopReason="tool_use", usage=usage, model=kw["model"])
+
+    return converse
+
+
+def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
+    from . import evidence_pool, postdoc_agent, tools
+    from .corpus import Corpus
+    from .models import Candidate
+
+    b5 = overlay["papers"]["B5"]
+    # The stand-in corpus holds B5 and no record; the overlay's candidates
+    # are everything a search of the pool can find.
+    paper = {"id": "B5", "title": "A structural stand-in article", "year": 2026, "textSource": "full-text",
+             "sections": [{"id": x["id"], "heading": x["heading"]} for x in b5["sections"]]}
+    corpus = Corpus(papers=[paper], records=[], papers_by_id={"B5": paper}, records_by_id={},
+                    _bm25=None, _order=[], _tokens={})  # type: ignore[arg-type]
+    pool = evidence_pool.build(
+        corpus,
+        [Candidate.model_validate(c) for c in overlay["candidates"]],
+        {},
+        [{"id": "titer_secreted", "name": "Secreted titer"}, {"id": "time_to_colony", "name": "Time to colony"}],
+    )
+    turns: list[Any] = [
+        [("search_records", {"query": "", "field": "titer_secreted", "organism": "", "limit": 10})],
+        [("search_passages", {"query": RAG_QUESTION, "k": 3})],
+        {
+            "claims": [{
+                "id": "c1",
+                "text": "The stand-in table reports a secreted titer for placeholder condition A.",
+                "recordIds": [STREAM_CANDIDATE], "paperIds": [], "support": "direct",
+                "passages": [{"passageId": "B5:t1:0", "quote": STREAM_QUOTE}], "evidenceIds": [],
+            }],
+            "gaps": ["The stand-in paper states no organism, so nothing here can be compared across hosts."],
+            "declined": None,
+        },
+    ]
+    events: list[dict[str, Any]] = []
+    plan = postdoc_agent.ask(
+        STREAM_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+        clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
+    )
+    assert plan.claims and not plan.rejected, f"the stand-in plan no longer passes the validator: {plan.rejectionReasons}"
+    events.append({"event": "plan", "data": plan.model_dump(mode="json")})
+    return events
 
 
 def main(argv: list[str]) -> int:

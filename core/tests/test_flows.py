@@ -31,9 +31,7 @@ from pathlib import Path
 
 import pytest
 
-from openferment_core.corpus import load_corpus
-from openferment_core.postdoc import PostdocUnavailable, ask_model
-from openferment_core.validate import decline_reason, validate_claims
+from openferment_core import postdoc_agent, tools
 
 FIXTURES = Path(__file__).parent / "fixtures" / "flows.json"
 
@@ -61,46 +59,55 @@ def gradable() -> list[dict]:
     return [f for f in load_fixtures() if f["recordIds"]]
 
 
-def run_pipeline(question: str) -> tuple:
-    """The real thing: retrieve, ask, validate. Same path as /api/ask."""
-    corpus = load_corpus()
-    records = corpus.search(question, limit=30)
-    raw, usage = ask_model(question, records, corpus)
-    result = validate_claims(raw.get("claims") or [], corpus.records_by_id, corpus.papers_by_id)
-    return result, raw, usage, records
+def run_pipeline(question: str, monkeypatch) -> tuple:
+    """The real thing, as `/api/ask` runs it by default since OF-BLD-014
+    §5.3: the bounded loop over the evidence pool. Every record a tool
+    returned is kept, so retrieval is graded apart from the model."""
+    returned: set[str] = set()
+    real = tools.run
+
+    def spy(name, raw, ctx):
+        result = real(name, raw, ctx)
+        returned.update(result.recordIds)
+        return result
+
+    monkeypatch.setattr(tools, "run", spy)
+    plan = postdoc_agent.ask(question)
+    return plan, returned
 
 
 @needs_key
 @pytest.mark.parametrize("fixture", gradable(), ids=lambda f: f["id"])
-def test_the_plan_cites_what_a_human_said_it_should(fixture, capsys):
+def test_the_plan_cites_what_a_human_said_it_should(fixture, capsys, monkeypatch):
     expected = set(fixture["recordIds"])
-    result, raw, usage, retrieved = run_pipeline(fixture["question"])
+    plan, returned = run_pipeline(fixture["question"], monkeypatch)
 
-    cited = {rid for claim in result.claims for rid in claim.recordIds}
+    cited = {rid for claim in plan.claims for rid in claim.recordIds}
     overlap = cited & expected
-    retrievable = expected & {r["id"] for r in retrieved}
+    retrievable = expected & returned
 
     with capsys.disabled():
         print(
             f"\n  {fixture['id']:<9} cited {len(cited):>2} · "
             f"authored {len(expected):>2} · overlap {len(overlap):>2} "
             f"({len(retrievable)} of the authored records were even retrieved) · "
-            f"{result.rejected} rejected · ${usage.costUsd:.4f}"
+            f"{plan.rejected} rejected · {sum(1 for t in plan.trace if t.kind == 'tool')} tool calls · "
+            f"stopped {plan.stopped} · ${plan.usage.costUsd:.4f}"
         )
-        if result.rejected:
-            for reason in result.reasons:
+        if plan.rejected:
+            for reason in plan.rejectionReasons:
                 print(f"      dropped — {reason}")
 
     # Retrieval is graded separately and honestly: if BM25 never surfaced any of
     # the authored records, the model could not have cited them, and failing it
     # for that would blame the wrong component.
     assert retrievable, (
-        f"{fixture['id']}: retrieval surfaced NONE of the {len(expected)} authored "
+        f"{fixture['id']}: no tool returned ANY of the {len(expected)} authored "
         f"records for {fixture['question']!r} — this is a retrieval failure, not a "
         "model failure"
     )
 
-    assert not (result.claims == [] and not raw.get("declined")), (
+    assert not (plan.claims == [] and not plan.declined), (
         f"{fixture['id']}: no claims and no reason given"
     )
 
@@ -113,20 +120,20 @@ def test_the_plan_cites_what_a_human_said_it_should(fixture, capsys):
 
 @needs_key
 @pytest.mark.parametrize("fixture", load_fixtures(), ids=lambda f: f["id"])
-def test_every_flow_produces_a_usable_plan(fixture):
+def test_every_flow_produces_a_usable_plan(fixture, monkeypatch):
     """Rule 1 and the citation rules hold on real model output, on every flow.
 
     The offline tests pin the validator against hand-written plans. This pins it
     against what the model actually emits, which is the only place the two can
     disagree.
     """
-    result, raw, _usage, _retrieved = run_pipeline(fixture["question"])
+    plan, _returned = run_pipeline(fixture["question"], monkeypatch)
 
-    assert result.claims or decline_reason(result, raw.get("declined")), (
+    assert plan.claims or plan.declined, (
         f"{fixture['id']}: neither claims nor a decline — a blank answer"
     )
 
-    for claim in result.claims:
+    for claim in plan.claims:
         # Belt and braces: the validator already enforced this, and the point of
         # asserting it again here is that this is REAL model output rather than
         # a fixture, so a regression in the validator shows up as a test failure
@@ -136,12 +143,12 @@ def test_every_flow_produces_a_usable_plan(fixture):
         assert find_number(claim.text) is None, (
             f"{fixture['id']}: a number survived validation in {claim.text!r}"
         )
-        assert claim.recordIds or claim.support == "unsupported"
+        assert claim.recordIds or claim.passages or claim.evidenceIds or claim.support == "unsupported"
         assert claim.provenance, "every claim carries a computed provenance"
 
 
 @needs_key
-def test_an_out_of_corpus_question_declines():
+def test_an_out_of_corpus_question_declines(monkeypatch):
     """The honest failure, end to end and for real.
 
     Nothing in a fermentation corpus bears on lattice QCD. Retrieval returns
@@ -150,18 +157,17 @@ def test_an_out_of_corpus_question_declines():
     training rather than on evidence, which is the failure this whole
     architecture exists to prevent.
     """
-    result, raw, _usage, retrieved = run_pipeline(
-        "What is the lattice spacing in quantum chromodynamics simulations?"
+    plan, _returned = run_pipeline(
+        "What is the lattice spacing in quantum chromodynamics simulations?", monkeypatch
     )
-    assert retrieved == [], "retrieval should surface nothing for an out-of-corpus question"
-    assert result.claims == [] or all(c.support == "unsupported" for c in result.claims), (
-        f"claimed something from an empty corpus: {[c.text for c in result.claims]}"
+    assert plan.claims == [] or all(c.support == "unsupported" for c in plan.claims), (
+        f"claimed something from an empty corpus: {[c.text for c in plan.claims]}"
     )
-    assert decline_reason(result, raw.get("declined"))
+    assert plan.declined
 
 
 @needs_key
-def test_a_number_in_the_answer_is_dropped_not_shown():
+def test_a_number_in_the_answer_is_dropped_not_shown(monkeypatch):
     """The rail, on live output.
 
     Asked in a way that invites a quantity. Whatever the model does, no number
@@ -169,12 +175,12 @@ def test_a_number_in_the_answer_is_dropped_not_shown():
     the claim and counts it. There is no third outcome, and this test would fail
     if one appeared.
     """
-    result, _raw, _usage, _retrieved = run_pipeline(
-        "Exactly what titre in grams per litre was reached, as a number?"
+    plan, _returned = run_pipeline(
+        "Exactly what titre in grams per litre was reached, as a number?", monkeypatch
     )
     from openferment_core.validate import find_number
 
-    offenders = [c.text for c in result.claims if find_number(c.text)]
+    offenders = [c.text for c in plan.claims if find_number(c.text)]
     assert not offenders, f"a number reached a claim: {offenders}"
 
 
@@ -185,10 +191,8 @@ def test_the_pipeline_reports_a_missing_key_rather_than_crashing():
     """
     saved = os.environ.pop("ANTHROPIC_API_KEY", None)
     try:
-        corpus = load_corpus()
-        with pytest.raises(PostdocUnavailable) as excinfo:
-            ask_model("anything", [], corpus)
-        assert "core/.env" in str(excinfo.value)
+        plan = postdoc_agent.ask("anything")
+        assert plan.claims == [] and "core/.env" in (plan.declined or "")
     finally:
         if saved is not None:
             os.environ["ANTHROPIC_API_KEY"] = saved

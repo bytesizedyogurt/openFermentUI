@@ -97,6 +97,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
 
   /** Questions the browser searched for (§4.4). */
   const ragSearches = [];
+  const asks = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -250,6 +251,26 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(await prototype('rag-search.json')));
     }
+    // OF-BLD-014 §5.3 — Postdoc's loop, replayed from the stream
+    // `demo.py --prototype` recorded through the real loop. Each step is held
+    // back a moment, so the panel is seen drawing steps as they arrive.
+    if ((url === '/api/ask/stream' || url === '/api/ask') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      asks.push({ path: url, ...JSON.parse(body || '{}') });
+      const lines = (await readFile(join(PROTOTYPE, 'ask-stream.jsonl'), 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
+      const events = lines.filter((l) => l.event);
+      if (url === '/api/ask') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(events.find((e) => e.event === 'plan').data));
+      }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+      for (const e of events) {
+        await new Promise((r) => setTimeout(r, 250));
+        res.write(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`);
+      }
+      return res.end();
+    }
     if (url === '/api/biorepo/overlay') {
         // Answered late on purpose: a screen mounted before the overlay arrives
         // has to cope with it arriving — Guild's queue in particular (§7.3) —
@@ -268,5 +289,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks } };
 }

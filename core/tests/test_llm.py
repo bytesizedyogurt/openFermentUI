@@ -358,7 +358,7 @@ def test_a_plan_that_failed_after_a_billed_refusal_still_shows_the_cost(monkeypa
     assert e.value.usage == spent
 
     monkeypatch.setattr(api, "load_corpus", lambda: SimpleNamespace(search=lambda q, limit: []))
-    plan = api.ask(AskRequest(question="what is the titre"))
+    plan = api.ask(AskRequest(question="what is the titre", mode="single"))
     assert "529" in plan.declined and plan.usage == spent
 
 

@@ -159,7 +159,7 @@ def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path):
         assert path.read_text(encoding="utf-8") == committed.read_text(encoding="utf-8"), (
             f"{path.name} no longer matches the code: run python -m openferment_core.demo --prototype"
         )
-    committed = sorted(p.name for p in demo.PROTOTYPE.glob("*.json"))
+    committed = sorted(p.name for p in demo.PROTOTYPE.glob("*.json*"))
     assert committed == sorted(p.name for p in written), "a fixture the command no longer writes is still committed"
 
 

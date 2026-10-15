@@ -16,18 +16,21 @@ The browser never sees a key and never renders model prose. It renders a plan.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import queue
+import threading
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -122,9 +125,28 @@ def health() -> dict:
     }
 
 
+CORPUS_MISSING = (
+    "The corpus has not been generated. Run `pnpm export:corpus` from "
+    "the repository root and restart the service."
+)
+
+
+def _ask_agent(question: str, on_step=None) -> AnswerPlan:
+    """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands."""
+    ctx = tools.ToolContext()
+    try:
+        ctx.pool  # loaded now, so a missing corpus declines in words
+    except FileNotFoundError as e:
+        log.error("corpus missing: %s", e)
+        return AnswerPlan(question=question, declined=CORPUS_MISSING)
+    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step)
+
+
 @app.post("/api/ask", response_model=AnswerPlan)
 def ask(request: AskRequest) -> AnswerPlan:
-    """One question in, one AnswerPlan out. One retrieval, one call, no loop.
+    """One question in, one AnswerPlan out. `mode: 'agent'` (the default) runs
+    the bounded loop of tools (OF-BLD-014 §5.2); `mode: 'single'` is one
+    retrieval and one call.
 
     Every failure below returns a plan with `declined` set rather than an HTTP
     error, because a declined plan is a thing the UI already knows how to
@@ -135,18 +157,14 @@ def ask(request: AskRequest) -> AnswerPlan:
     question = request.question.strip()
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
+    if request.mode == "agent":
+        return _ask_agent(question)
 
     try:
         corpus = load_corpus()
     except FileNotFoundError as e:
         log.error("corpus missing: %s", e)
-        return AnswerPlan(
-            question=question,
-            declined=(
-                "The corpus has not been generated. Run `pnpm export:corpus` from "
-                "the repository root and restart the service."
-            ),
-        )
+        return AnswerPlan(question=question, declined=CORPUS_MISSING)
 
     limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
     records = corpus.search(question, limit=limit)
@@ -190,6 +208,41 @@ def ask(request: AskRequest) -> AnswerPlan:
         rejected=result.rejected,
         rejectionReasons=result.reasons,
     )
+
+
+def _sse(event: str, data: Any) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/ask/stream")
+def ask_stream(request: AskRequest) -> StreamingResponse:
+    """The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
+    events: `step` (a TraceStep), then `plan` (the validated AnswerPlan), or
+    `error` when the service itself failed. A declined plan is a `plan`. In
+    `single` mode there are no steps, and the plan is the only event."""
+    events: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        try:
+            question = request.question.strip()
+            if request.mode == "single" or not question:
+                plan = ask(request)
+            else:
+                plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))))
+            events.put(("plan", plan.model_dump(mode="json")))
+        except Exception as e:  # the stream must end in words, never hang
+            log.exception("ask stream failed")
+            events.put(("error", {"message": f"Postdoc failed while answering: {type(e).__name__}. The service log names what went wrong."}))
+        finally:
+            events.put(None)
+
+    threading.Thread(target=work, name="ask-stream", daemon=True).start()
+
+    def body():
+        while (item := events.get()) is not None:
+            yield _sse(*item)
+
+    return StreamingResponse(body(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────

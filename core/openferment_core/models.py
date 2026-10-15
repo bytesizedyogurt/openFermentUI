@@ -164,6 +164,9 @@ class AskRequest(BaseModel):
     # §6 caps evidence at 30 records. A caller asking for more is clamped rather
     # than refused — the cap is a token-budget contract, not a permission.
     maxEvidence: int = 30
+    # OF-BLD-014 §5.3: `agent` is the bounded loop (postdoc_agent.py), the
+    # default; `single` is one retrieval and one call (postdoc.py).
+    mode: Literal["agent", "single"] = "agent"
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
