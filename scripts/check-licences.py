@@ -107,6 +107,10 @@ def load_policy(path: Path = POLICY) -> Policy:
     return Policy(frozenset(allowed), accepted)
 
 
+# What an acceptance names for a package whose metadata states no licence.
+NO_METADATA = "no licence metadata"
+
+
 def decide(package: str, strings: list[str] | tuple[str, ...], policy: Policy) -> Verdict:
     """Whether one package passes. `strings` are every licence string its
     metadata carries, and any one of them can decide it."""
@@ -115,6 +119,10 @@ def decide(package: str, strings: list[str] | tuple[str, ...], policy: Policy) -
             return Verdict(True, s, "allowed")
     acceptance = policy.accepted.get(canonical(package))
     if acceptance is not None:
+        # A package whose metadata states no licence can be accepted only
+        # under this exact string, and stops passing once it states one.
+        if not strings and acceptance.licence == NO_METADATA:
+            return Verdict(True, NO_METADATA, f"accepted by {acceptance.by} on {acceptance.date}")
         if acceptance.licence in strings:
             return Verdict(True, acceptance.licence, f"accepted by {acceptance.by} on {acceptance.date}")
         return Verdict(False, None, f"accepted as {acceptance.licence} by {acceptance.by}, and its metadata "

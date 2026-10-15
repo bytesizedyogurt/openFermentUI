@@ -374,13 +374,19 @@ def chosen_lane() -> str:
     return lane if isinstance(lane, str) and lane else "bm25"
 
 
+def _lanes() -> list[RagLane]:
+    from . import retrieve
+
+    return retrieve.lanes()
+
+
 def status() -> RagStatus:
     manifest = read_manifest()
     papers = manifest.get("papers", {}) if manifest.get("chunker") == CHUNKER_VERSION else {}
     return RagStatus(
         papersIndexed=len(papers),
         passages=sum(int(p.get("passages", 0)) for p in papers.values()),
-        lanes=[RagLane(name="bm25", available=bool(papers), why=None if papers else "no index yet: run pnpm index:build")],
+        lanes=_lanes(),
         chosenLane=chosen_lane(),
     )
 

@@ -131,6 +131,7 @@ const PAIRS = [
   ['Passage', 'Passage'],
   ['RagLane', 'RagLane'],
   ['RagStatus', 'RagStatus'],
+  ['PassageHit', 'PassageHit'],
 ];
 
 let compared = 0;

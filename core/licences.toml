@@ -28,6 +28,13 @@ allowed = [
   "Apache-2.0 OR BSD-2-Clause",   # packaging
   "PSF-2.0",                      # typing_extensions
   "OFL-1.1",                      # the three @fontsource font packages
+  # Added 2026-10-15 with the rag extra (OF-BLD-014 §4.2, fastembed 0.9.0).
+  "Apache-2.0",                   # fastembed, hf-xet, huggingface_hub, requests
+  "Apache 2.0",                   # flatbuffers spells it so
+  "License :: OSI Approved :: Apache Software License",  # tokenizers, by classifier alone
+  "License :: OSI Approved :: MIT License",              # loguru and mmh3, by classifier
+  "MIT-CMU",                      # pillow: the historical PIL licence, MIT-style
+  "3-Clause BSD License",         # protobuf spells it so
 ]
 
 [accepted.certifi]
@@ -35,3 +42,15 @@ licence = "MPL-2.0"
 by = "Sean Creighton"
 date = 2026-10-14
 why = "Mozilla's bundle of trusted HTTPS certificates, read unmodified by httpx and httpcore when Intake calls Europe PMC and Crossref; MPL-2.0 binds only the files it covers."
+
+[accepted.tqdm]
+licence = "MPL-2.0 AND MIT"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The progress bar fastembed and huggingface_hub show while a model file downloads, used unmodified in the rag extra; MPL-2.0 binds only the files it covers."
+
+[accepted.py-rust-stemmers]
+licence = "no licence metadata"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "fastembed's word stemmer for its sparse models, used unmodified in the rag extra; its metadata states no licence, and its repository (github.com/qdrant/py-rust-stemmers) carries an MIT LICENSE, read 2026-10-15."

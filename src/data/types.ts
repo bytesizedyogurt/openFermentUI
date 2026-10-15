@@ -2007,3 +2007,16 @@ export interface RagStatus {
   lanes: RagLane[];
   chosenLane: string;
 }
+
+/** One passage a search returned (OF-BLD-014 §4.2). */
+export interface PassageHit {
+  passage: Passage;
+  /** The fused score: the sum over lanes of 1 / (60 + rank). */
+  score: number;
+  /** Where each lane ranked it, 1 for first: "bm25", "dense", "phrasing-1", … */
+  lanes: Record<string, number>;
+  /** The grading reader's grade, when a rerank lane ran. */
+  grade: number | null;
+  /** The sentence it copied, checked verbatim against the passage. */
+  sentence: string | null;
+}

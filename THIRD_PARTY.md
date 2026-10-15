@@ -18,21 +18,34 @@ accepted licence strings, and every package a person accepted, are in
 | anthropic | 1.0.0 | MIT | service | allowed |
 | anyio | 4.14.2 | MIT | service, through anthropic, fastapi, httpx, uvicorn | allowed |
 | certifi | 2026.7.22 | MPL-2.0 | service, through httpx | accepted by Sean Creighton on 2026-10-14 |
+| charset-normalizer | 3.5.2 | MIT | extra rag, through fastembed | allowed |
 | click | 8.4.2 | BSD-3-Clause | service, through uvicorn | allowed |
 | docstring_parser | 0.18.0 | MIT | service, through anthropic | allowed |
 | fastapi | 0.141.1 | MIT | service | allowed |
+| fastembed | 0.9.0 | Apache-2.0 | extra rag | allowed |
+| filelock | 4.2.0 | MIT | extra rag, through fastembed | allowed |
+| flatbuffers | 25.12.19 | Apache 2.0 | extra rag, through fastembed | allowed |
+| fsspec | 2026.9.0 | BSD-3-Clause | extra rag, through fastembed | allowed |
 | h11 | 0.16.0 | MIT | service, through anthropic, httpx, uvicorn | allowed |
+| hf-xet | 1.7.0 | Apache-2.0 | extra rag, through fastembed | allowed |
 | httpcore | 1.0.9 | BSD-3-Clause | service, through httpx | allowed |
 | httpcore2 | 2.12.0 | BSD-3-Clause | service, through anthropic | allowed |
 | httptools | 0.8.0 | MIT | service, through uvicorn | allowed |
 | httpx | 0.28.1 | BSD-3-Clause | service | allowed |
 | httpx2 | 2.12.0 | BSD-3-Clause | service, through anthropic | allowed |
+| huggingface_hub | 1.33.0 | Apache-2.0 | extra rag, through fastembed | allowed |
 | idna | 3.19 | BSD-3-Clause | service, through anthropic, fastapi, httpx, uvicorn | allowed |
 | iniconfig | 2.3.0 | MIT | tests, through pytest | allowed |
 | jiter | 0.16.0 | MIT | service, through anthropic | allowed |
+| loguru | 0.7.3 | License :: OSI Approved :: MIT License | extra rag, through fastembed | allowed |
+| mmh3 | 5.3.1 | License :: OSI Approved :: MIT License | extra rag, through fastembed | allowed |
 | numpy | 2.4.6 or 2.5.2, by Python version | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | service, through rank-bm25 | allowed |
-| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | tests, through pytest | allowed |
+| onnxruntime | 1.31.0 | MIT License | extra rag, through fastembed | allowed |
+| packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | tests, through pytest; extra rag, through fastembed | allowed |
+| pillow | 12.3.0 | MIT-CMU | extra rag, through fastembed | allowed |
 | pluggy | 1.6.0 | MIT | tests, through pytest | allowed |
+| protobuf | 7.36.2 | 3-Clause BSD License | extra rag, through fastembed | allowed |
+| py_rust_stemmers | 0.1.8 | no licence metadata | extra rag, through fastembed | accepted by Sean Creighton on 2026-10-15 |
 | pydantic | 2.13.4 | MIT | service | allowed |
 | pydantic_core | 2.46.4 | MIT | service, through anthropic, fastapi, pydantic | allowed |
 | Pygments | 2.21.0 | BSD-2-Clause | tests, through pytest | allowed |
@@ -40,11 +53,15 @@ accepted licence strings, and every package a person accepted, are in
 | python-dotenv | 1.2.3 | BSD-3-Clause | service | allowed |
 | PyYAML | 6.0.3 | MIT | service, through uvicorn | allowed |
 | rank-bm25 | 0.2.2 | Apache2.0 | service | allowed |
+| requests | 2.34.2 | Apache-2.0 | extra rag, through fastembed | allowed |
 | sniffio | 1.3.1 | MIT OR Apache-2.0 | service, through anthropic | allowed |
 | starlette | 1.6.0 | BSD-3-Clause | service, through fastapi | allowed |
+| tokenizers | 0.23.3 | License :: OSI Approved :: Apache Software License | extra rag, through fastembed | allowed |
+| tqdm | 4.70.1 | MPL-2.0 AND MIT | extra rag, through fastembed | accepted by Sean Creighton on 2026-10-15 |
 | truststore | 0.10.4 | MIT | service, through anthropic | allowed |
 | typing_extensions | 4.16.0 | PSF-2.0 | service, through anthropic, fastapi, httpx, pydantic, uvicorn | allowed |
 | typing-inspection | 0.4.4 | MIT | service, through anthropic, fastapi, pydantic | allowed |
+| urllib3 | 2.8.0 | MIT | extra rag, through fastembed | allowed |
 | uvicorn | 0.52.4 | BSD-3-Clause | service | allowed |
 | uvloop | 0.22.1 | MIT License | service, through uvicorn | allowed |
 | watchfiles | 1.2.0 | MIT | service, through uvicorn | allowed |
@@ -116,3 +133,5 @@ accepted licence strings, and every package a person accepted, are in
 | Package | Licence | Accepted by | Date | Why |
 |---|---|---|---|---|
 | certifi | MPL-2.0 | Sean Creighton | 2026-10-14 | Mozilla's bundle of trusted HTTPS certificates, read unmodified by httpx and httpcore when Intake calls Europe PMC and Crossref; MPL-2.0 binds only the files it covers. |
+| py-rust-stemmers | no licence metadata | Sean Creighton | 2026-10-15 | fastembed's word stemmer for its sparse models, used unmodified in the rag extra; its metadata states no licence, and its repository (github.com/qdrant/py-rust-stemmers) carries an MIT LICENSE, read 2026-10-15. |
+| tqdm | MPL-2.0 AND MIT | Sean Creighton | 2026-10-15 | The progress bar fastembed and huggingface_hub show while a model file downloads, used unmodified in the rag extra; MPL-2.0 binds only the files it covers. |

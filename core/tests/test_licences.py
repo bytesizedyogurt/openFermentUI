@@ -34,6 +34,12 @@ licence = "MPL-2.0"
 by = "Sean Creighton"
 date = 2026-10-14
 why = "a certificate bundle, used unmodified"
+
+[accepted.py-rust-stemmers]
+licence = "no licence metadata"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "a stemmer whose repository carries an MIT licence"
 """
 
 
@@ -243,3 +249,12 @@ def test_the_listing_shows_the_listed_version(policy):
 def test_the_listing_says_what_it_leaves_out(policy):
     text = lic.render([], [], policy)
     assert "devDependencies" in text and "Every package openFerment installs" not in text
+
+
+def test_a_package_with_no_licence_metadata_passes_only_on_its_named_acceptance(policy):
+    # OF-BLD-014 §4.2: py_rust_stemmers states no licence in its metadata.
+    ok = lic.decide("py_rust_stemmers", [], policy)
+    assert ok.ok and "Sean Creighton" in ok.how
+    assert not lic.decide("other_package", [], policy).ok, "no metadata and no acceptance fails"
+    later = lic.decide("py_rust_stemmers", ["GPL-3.0-only"], policy)
+    assert not later.ok, "once it states a licence, the acceptance of none no longer covers it"

@@ -952,3 +952,17 @@ class RagStatus(BaseModel):
     passages: int
     lanes: list[RagLane]
     chosenLane: str
+
+
+class PassageHit(BaseModel):
+    """One passage a search returned (OF-BLD-014 §4.2)."""
+
+    passage: Passage
+    # The fused score: the sum over lanes of 1 / (60 + rank).
+    score: float
+    # Where each lane ranked it, 1 for first: "bm25", "dense", "phrasing-1", …
+    lanes: dict[str, int] = Field(default_factory=dict)
+    # From the grading reader, when a rerank lane ran: its grade, and the
+    # sentence it copied, checked verbatim against the passage.
+    grade: int | None = None
+    sentence: str | None = None
