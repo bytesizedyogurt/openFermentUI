@@ -14,9 +14,10 @@
 // AND IT IS NOT SEEDED FROM LITERATURE (§3, D6). Kinetic parameters are fitted
 // to real runs in a specific vessel; mu_max copied out of a paper about a
 // different strain in a different reactor is a number with no owner. No
-// parameter from a paper enters fermOS: every value on this screen was fitted
-// to a run deposited here, or belongs to the invented sample run, which is
-// labelled, computed inline and kept nowhere. The only route from here to a
+// parameter from a paper enters fermOS: the screen sends only a deposition's
+// own series, or the invented sample run, which is labelled, computed inline
+// and kept nowhere. The service cannot see the browser's depositions, so it
+// takes the readings as sent, and each fit's basis says so (§7.R). The only route from here to a
 // kinetic model runs through Deposition.
 //
 // This screen may be extended. Keep this header's reasoning with it.

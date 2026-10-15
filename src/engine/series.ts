@@ -92,7 +92,19 @@ export function parseReadingsCsv(text: string): ParsedCsv {
   return { rows, unreadable };
 }
 
-/** The measure a row names, by the capture matcher, or null. */
+const words = (text: string) => new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3));
+
+/**
+ * The measure a row names, or null. The capture matcher places the line, and
+ * the row's measure must then name that measure: its id, or a word of its
+ * label. A unit alone never places a row (§7.R): `sugar, 5, g/L` would land
+ * on whichever g/L measure came first.
+ */
 export function placeRow(row: CsvRow, schema: Measure[]): string | null {
-  return matchToSchema(`${row.measure} ${row.value} ${row.unit}`, schema)?.measureId ?? null;
+  const id = matchToSchema(`${row.measure} ${row.value} ${row.unit}`, schema)?.measureId ?? null;
+  const m = schema.find((x) => x.id === id);
+  if (!m) return null;
+  const named = words(row.measure);
+  if (row.measure.trim().toLowerCase() === m.id.toLowerCase()) return m.id;
+  return [...words(m.label)].some((w) => named.has(w)) ? m.id : null;
 }

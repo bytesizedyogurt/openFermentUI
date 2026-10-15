@@ -1061,9 +1061,9 @@
     "yieldInterval": {
       "role": "yield",
       "unit": "g L-1 per g L-1",
-      "low": 0.12248284411359515,
-      "median": 0.1263338347988267,
-      "high": 0.13000531501309182
+      "low": 0.1243969589074855,
+      "median": 0.12604466085650495,
+      "high": 0.12784207888996105
     },
     "substrateRunsOutH": null,
     "draws": 200,

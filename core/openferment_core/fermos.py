@@ -2,8 +2,10 @@
 
 The browser sends a deposition's series, the way Practice sends runs; the
 service fits them and keeps the fit as an artifact, and nothing else. No
-parameter from a paper enters fermOS (D6): every number here was measured on
-the run being fitted.
+parameter from a paper enters fermOS (D6): the browser sends a deposition's
+own readings. Depositions live in the browser's Durable tier, which the
+service cannot see, so it takes the readings as sent and says so in each
+fit's basis (§7.R).
 
 GROWTH FIT. For a biomass series of four or more readings: least squares of
 ln X on t over every contiguous window of four or more readings. Among the
@@ -271,7 +273,8 @@ def _inputs(deposition_id: str, series: list[FermosSeries]) -> list[BasisInput]:
             name=f"{s.role or 'unassigned'} series: {s.label}",
             value=json.dumps(s.model_dump(mode="json"), sort_keys=True, separators=(",", ":")),
             unit=s.unit,
-            source=BasisSource(kind="deposition", id=deposition_id),
+            source=BasisSource(kind="deposition", id=deposition_id,
+                               note="the readings as the browser sent them; the service cannot see the deposition itself"),
         )
         for s in series
     ]
@@ -348,9 +351,15 @@ WHAT_IDENTIFIES = {
 def check_forecastable(fit_: KineticFit) -> None:
     if fit_.reason or not fit_.params:
         raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+    names = [p.name for p in fit_.params]
     for name in ("mu", "Xmax"):
         p = param(fit_, name)
-        if p is None or not p.identified:
+        # Decided here from the numbers, never from a posted flag (§7.R): the
+        # interval's low end, and the covariance's own normal bound.
+        k = names.index(name) if p else -1
+        var = fit_.covariance[k][k] if p and k < len(fit_.covariance) and k < len(fit_.covariance[k]) else math.inf
+        pinned = p is not None and p.low > 0 and p.value - 1.96 * math.sqrt(max(var, 0.0)) > 0
+        if not pinned:
             raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
                              f"what would identify it is {WHAT_IDENTIFIES[name]}")
 
@@ -388,10 +397,11 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
 
     scatter = {qq.role: qq.scatter for qq in fit_.quality}
     curves: dict[str, np.ndarray] = {}
+    clean: dict[str, np.ndarray] = {}
     for role in ("biomass", "product", "substrate"):
         if role not in roles:
             continue
-        rows = []
+        rows, bare = [], []
         for q in draws:
             x, integ = logistic(times, q[0], q[1], q[2])
             if role == "biomass":
@@ -400,9 +410,11 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
                 k = names.index("P0" if role == "product" else "S0")
                 sign = 1.0 if role == "product" else -1.0
                 y = q[k] + sign * (q[k + 1] * (x - q[0]) + q[k + 2] * integ)
+            bare.append(y)
             # A band for readings: each draw carries the series' own scatter.
             rows.append(y + rng.normal(0.0, scatter.get(role, 0.0), len(times)))
         curves[role] = np.array(rows)
+        clean[role] = np.array(bare)
 
     runs_out = None
     end = len(times)
@@ -423,7 +435,9 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
 
     yield_iv = None
     if "product" in curves and "substrate" in curves and roles["product"].unit == roles["substrate"].unit and "g" in roles["product"].unit:
-        p, sub = curves["product"][:, :end], curves["substrate"][:, :end]
+        # The process, not the readings: yield is taken from the draws before
+        # any reading scatter is added (§7.R).
+        p, sub = clean["product"][:, :end], clean["substrate"][:, :end]
         made = p[:, -1] - p[:, 0]
         used = sub[:, 0] - sub[:, -1]
         ok = used > 0
@@ -489,6 +503,20 @@ def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | No
             raise FitRefused(f"there is no kept fit {fit_artifact}") from e
         if art.tool != KINETIC:
             raise FitRefused(f"{fit_artifact} is a {art.tool}, not a kinetic fit")
+    # A starting value equal to the run's own is no change, and a start for a
+    # series the run lacks is refused (§7.R).
+    source = KineticFit.model_validate(artifacts.get(fit_artifact).output) if fit_artifact else fit_inline
+    kept = {}
+    for key, role in (("X0", "biomass"), ("P0", "product"), ("S0", "substrate")):
+        v = getattr(start, key)
+        if v is None:
+            continue
+        own = param(source, key)
+        if own is None:
+            raise FitRefused(f"the fit has no {role} series, so a starting {key} has nothing to start")
+        if not math.isclose(v, own.value, rel_tol=1e-9, abs_tol=1e-12):
+            kept[key] = v
+    start = StartValues(**kept)
     inputs = _forecast_inputs(fit_artifact, fit_inline, start, changed_by, duration_h, None)
     check_forecastable(_fit_from(inputs))
     art = artifacts.compute(FORECAST, inputs, seed=SEED, keep=not sample)

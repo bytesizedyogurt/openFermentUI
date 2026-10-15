@@ -27,7 +27,7 @@
  * wondering why a record they rejected came back.
  */
 import { snapshotOf, useStore } from '../src/store';
-import { seriesOf } from '../src/engine/series';
+import { placeRow, seriesOf } from '../src/engine/series';
 import type { Candidate, Overlay } from '../src/data/types';
 
 let fails = 0;
@@ -323,6 +323,17 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
     return Object.keys(kept.sampleTimes ?? {}).length === 4 && kept.seriesRoles?.['ms-taq-od'] === 'biomass';
   })());
   useStore.setState({ depositions: s().depositions.filter((x) => x.id !== dep.id) });
+}
+
+// §7.R — a row is placed by its measure's name, never by its unit alone.
+{
+  const schema = [
+    { id: 'titre', label: 'PHB titre', unit: 'g/L', timepoint: '', predictionId: null },
+    { id: 'glc', label: 'Residual glucose', unit: 'g/L', timepoint: '', predictionId: null },
+  ];
+  const at = (measure: string) => placeRow({ line: '', time: 1, measure, value: 5, unit: 'g/L' }, schema);
+  check('a row names its measure: glucose and titre place', at('glucose') === 'glc' && at('PHB titre') === 'titre' && at('titre') === 'titre');
+  check('a row whose name matches no measure is not placed by its unit', [at('sugar'), at('biomass'), at('cdw')].every((x) => x === null), [at('sugar'), at('biomass'), at('cdw')]);
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
