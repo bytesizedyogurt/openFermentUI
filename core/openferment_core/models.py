@@ -952,6 +952,8 @@ class ToolResult(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     # Records a plan may cite.
     recordIds: list[str] = Field(default_factory=list)
+    # Passages a plan may quote (OF-BLD-014 §5.2).
+    passages: list[Passage] = Field(default_factory=list)
     # A refusal or an unavailable tool, in words.
     error: str | None = None
 
@@ -1077,3 +1079,4 @@ class RagSearchResponse(BaseModel):
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
 AnswerPlan.model_rebuild()
+ToolResult.model_rebuild()

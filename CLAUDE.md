@@ -50,7 +50,7 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `core/openferment_core/llm.py`: `claude-opus-5-5`, falling back to
   `claude-sonnet-5-5` on a refusal or when Opus is unavailable; structured
   outputs (`output_config.format`, schema made strict by `strict_schema`),
-  effort `medium`, streamed, no agent loop. Both models REJECT forced tool use
+  effort `medium`, streamed. Postdoc alone runs a loop, bounded in rounds, tool calls, cost and time (`postdoc_agent.py`). Both models REJECT forced tool use
   (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices live in
   `llm.PRICES`; `usage.models` records which model answered.
 

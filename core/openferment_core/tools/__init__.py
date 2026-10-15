@@ -147,5 +147,6 @@ def infos() -> list[ToolInfo]:
 
 
 # The tools this phase builds register on import.
+from . import passages as _passages  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401
 from . import units as _units  # noqa: E402,F401

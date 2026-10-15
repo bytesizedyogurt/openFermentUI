@@ -2005,6 +2005,8 @@ export interface ToolResult {
   evidence: Evidence[];
   /** Records a plan may cite. */
   recordIds: string[];
+  /** Passages a plan may quote (OF-BLD-014 §5.2). */
+  passages: Passage[];
   /** A refusal or an unavailable tool, in words. */
   error: string | null;
 }

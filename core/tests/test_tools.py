@@ -191,7 +191,7 @@ def test_a_summary_over_the_limit_is_replaced_by_an_error(monkeypatch, pool):
 def test_only_the_seven_names_may_register():
     with pytest.raises(ValueError):
         tools.register(tools.Tool("run_shell", "d", tools.records.SearchRecordsInput, lambda i, c: None))
-    assert [t.name for t in tools.infos()] == ["search_records", "convert_units"]
+    assert [t.name for t in tools.infos()] == ["search_records", "convert_units", "search_passages"]
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def client(pool, monkeypatch):
 
 def test_get_tools_lists_names_descriptions_and_schemas(client):
     body = client.get("/api/tools").json()
-    assert [t["name"] for t in body] == ["search_records", "convert_units"]
+    assert [t["name"] for t in body] == ["search_records", "convert_units", "search_passages"]
     assert body[0]["inputSchema"]["properties"]["query"]["type"] == "string"
     assert all(len(t["description"]) > 80 for t in body)
 

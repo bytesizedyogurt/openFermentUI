@@ -1,6 +1,9 @@
 """The Postdoc call (OF-BLD-007 §6).
 
-One retrieval, one call, no agent loop. The answer comes back as JSON that
+The single-shot path: one retrieval, one call. Since OF-BLD-014 §5.2 it is
+`mode: 'single'`; the default is the bounded loop in `postdoc_agent.py`, which
+keeps this module's system prompt and plan schema and adds tools. The answer
+comes back as JSON that
 matches the `emit_answer_plan` schema, through structured outputs (llm.py):
 the model has exactly one way to respond and the API checks the shape before
 it reaches us. The model is Claude Opus 5.5, with Claude Sonnet 5.5 when Opus
