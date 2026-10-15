@@ -1,0 +1,43 @@
+{
+  "id": "a82d9979ab6e8e62",
+  "tool": "convert_units",
+  "toolVersion": "units.py 0ffca94f3707 · tables 967ee1f1c168",
+  "inputs": [
+    {
+      "name": "record value",
+      "value": 17.5,
+      "unit": "d",
+      "source": {
+        "kind": "record",
+        "id": "r-B5-3",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "unit asked for",
+      "value": "h",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the unit the caller asked for",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "label": "r-B5-3 in h",
+    "value": 420.0,
+    "unit": "h",
+    "from": {
+      "value": 17.5,
+      "unit": "d"
+    }
+  },
+  "outputHash": "5ff483fb9b8853d10341c68368c239e2ac1e6604330feca9059baf69e2afeab7",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T01:07:36Z",
+  "durationMs": 0,
+  "seed": null
+}
