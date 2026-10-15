@@ -58,6 +58,7 @@ polymer ontology fields are in place for it. As of 2026-10-15 the thread holds *
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
 | Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
 | Computed values | **Computed, with a basis** — a value no paper states (a converted unit today; a yield ceiling, a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **1** kept as of 2026-10-15: r-B5-3's 17.5 d in hours, made for the Phase 3 screenshots and pushed to `openferment-data` |
+| Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
@@ -223,6 +224,11 @@ pnpm data:push           # the outputs of live runs to the orphan branch openfer
 pnpm decisions:push      # commits core/data/biorepo.json alone as "Guild decisions <date>" and pushes
 pnpm witness:numbers     # the precision and recall Witness shows, read from a running service
 pnpm shots --prefix p /biorepo/witness    # photographs routes of a running app into docs/shots/
+pnpm index:build         # the fetched papers cut into passages, under core/data/index/ (only changed papers);
+                         # --dense adds meaning vectors, once Hugging Face answers; --all cuts everything again
+pnpm rag:questions --n 200   # needs the key: written evaluation questions from sampled passages
+pnpm rag:eval            # every available search lane scored on K, S and F; the rule's choice goes to
+                         # core/data/index/config.json, the table to Witness → Retrieval
 cd core && uv run python -m openferment_core.demo --prototype   # the prototype's fixtures, made by the
                          # real code paths into core/tests/fixtures/prototype/; the smoke double serves them
 ```
@@ -334,6 +340,7 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
                          #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
                          #   tokens, tool turns and daily cap, the tool registry and its two tools, the worker runner,
+                         #   the passage cutter, the five search lanes, the scorecard's metrics and rule,
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
                          #   practice.py's drafts and tutor turns against a stand-in model, and
                          #   checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs
@@ -351,10 +358,11 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   61 routes headless, the overlay applied, Witness scored, an artifact replayed, Guild posting, and the
+  pnpm test:smoke        #   62 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
+                         #   landing on its words, Guild posting, and the
                          #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
                          #   a practice session, and a check run at the bench and read back
-  pnpm test:golden       #   the ten-minute demo script, driven end to end
+  pnpm test:golden       #   the ten-minute demo script, driven end to end, and a search opening the reader
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
 pnpm test:live           # the thirteen flows against the real pipeline, a real practice draft and tutor
                          # session, and a real check brief — needs a key, never in verify

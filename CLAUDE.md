@@ -418,6 +418,50 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   and `biosteam` in the Proforma worker and `flowsheets/` alone;
   `test_workers` greps for both.
 
+## Passages and search (OF-BLD-014 Phase 4)
+
+- **A passage is the paper's own words.** `passages.py` cuts every
+  `complete` fetched paper (never a curation note): prose at sentence ends to
+  about 900 characters and never past 1,400, with one sentence of overlap; a
+  table with whole rows, each chunk led by the heading and the first row; a
+  figure caption whole; an abstract as one, two, or as prose when two halves
+  cannot hold it. `start`/`end` are offsets into the section's text; the
+  `context` (title, year, heading) is indexed and never shown as the paper's
+  words. `CHUNKER_VERSION` changes cut every paper again. The index lives in
+  `core/data/index/` (gitignored, rebuilt per machine; `config.json` alone
+  travels on the data branch).
+- **Five lanes, one entry point.** `retrieve.search_detail` runs `bm25`,
+  `bm25+expand`, `hybrid`, `bm25+rerank` or `hybrid+rerank`, fused by
+  reciprocal rank (`1 / (60 + rank)`). With no lane named it uses
+  `config.json`'s, and falls back to `bm25` with a note when that lane cannot
+  run here; a named lane that cannot run is refused with why. Dense vectors
+  (`embed.py`, `fastembed` imported inside `FastEmbedder`) are refused when
+  their ids or words no longer match the index. Helper calls are `index`-role
+  `llm.call`s, cached under `core/data/index/cache/`.
+- **The grading reader is held to the passage.** Its copied sentence must be
+  a whole sentence or table row of the passage, or a run of them, word for
+  word after `normalize_text`; anything else zeroes the grade and is
+  counted, never repaired, cache included.
+- **The default lane is chosen by a number.** `rageval.choose_lane`: mean
+  nDCG@10 on K and S; `bm25` holds until a lane scores higher, and a lane
+  that calls a model per question must lead the best free lane by 0.02. K is
+  built from records and candidates whose quote sits in a passage, S is
+  model-written from sampled passages (a question sharing five words in a row
+  or a number with its passage is discarded; questions written for another
+  cut are set aside), F is the flows whose records anchor.
+- **Search reaches the browser in two places.** BioRepo → Search
+  (`/biorepo/search`, `POST /api/rag/search`) and Witness → Retrieval
+  (`GET /api/rag/report`). The reader takes `?section=…&quote=…`, marks the
+  words where span location finds them, and says so when it cannot.
+- **One service double.** `scripts/lib/service-double.mjs` answers the
+  browser tests from fixtures `demo.py --prototype` generates (with no key).
+  The smoke starts it in full; the golden path starts it `seedOnly`, leaving
+  health and the overlay to the static server so its demo script walks the
+  seed.
+- **A licence with no metadata** can be accepted only under the exact string
+  `"no licence metadata"` (`check-licences.py`), and stops passing once the
+  package states one.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,

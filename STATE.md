@@ -306,3 +306,22 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   still reaches no model: the API answers 400 because it is not scoped to a
   workspace, so §1.5's and §2.4's extractions stay owed. Screenshots:
   `docs/shots/phase-3-*`.
+- **2026-10-15 · OF-BLD-014 Phase 4 (§4.1–§4.5, §4.R, §4.T)** — passages:
+  the papers' own words, indexed and measured. `passages.py` cuts the **66**
+  fetched papers into **5,043** passages (sentence-bounded prose with one
+  sentence of overlap, whole table rows under their heading and first row,
+  captions, abstracts), and `pnpm index:build` cuts only what changed. Five
+  lanes (`bm25`, `bm25+expand`, `hybrid`, `bm25+rerank`, `hybrid+rerank`)
+  fused by reciprocal rank; the grading reader's sentence is held to its
+  passage word for word. `fastembed` 0.9.0 joins as the `rag` extra, with two
+  licences Sean accepted. `rageval.py` scores every lane on K, S and F and a
+  fixed rule picks the default: **bm25** (K nDCG@10 **0.395**, recall@10
+  **1.000**; hybrid 0.167 and 0.500; F 0.000) on 2 K questions and 3 flows,
+  so provisional. BioRepo gains **Search**; the reader lands on a sentence
+  (`?quote=`); Witness gains **Retrieval**. The service double is shared by
+  the smoke and the golden path. Owed: S and the three paid lanes, which need
+  a key the API accepts. The review found ten, none high; nine fixed with a
+  failing test first, one left (the golden step walks the seed). **965**
+  Python tests offline; smoke **62** routes, golden path **27**. Screenshots:
+  `docs/shots/phase-4-*`.
+
