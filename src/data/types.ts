@@ -1247,6 +1247,12 @@ export interface Claim {
 export interface AnswerPlanUsage {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Prompt tokens read from and written to the prompt cache (OF-BLD-014
+   * §3.3); `inputTokens` excludes both. Absent on a plan saved before them.
+   */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   /** Computed from the response's own token counts, not estimated. */
   costUsd: number;
   /**

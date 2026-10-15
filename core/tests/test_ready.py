@@ -180,7 +180,7 @@ def test_huggingface_warns_when_blocked_and_never_fails(monkeypatch, outcome, ma
 def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
     monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
-    for name in ("check_model", "check_europe_pmc", "check_backup"):
+    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup"):
         row = name.removeprefix("check_").replace("_", "")
         monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
     monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
@@ -308,3 +308,37 @@ def test_service_address_without_an_installed_job(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENFERMENT_PORT", raising=False)
     monkeypatch.delenv("OPENFERMENT_POLL_HOST", raising=False)
     assert ready.service_address() == ("127.0.0.1", 8000)
+
+
+# ── roles (OF-BLD-014 §3.3) ────────────────────────────────────────────
+
+
+class FakeRolesClient:
+    """The Models API for every model in either role's chain."""
+
+    def __init__(self, missing=()):
+        self.missing = set(missing)
+        self.models = self
+
+    def retrieve(self, model_id, **_):
+        assert any(model_id in llm.chain(r) for r in llm.ROLES)
+        if model_id in self.missing:
+            raise status_error(anthropic.NotFoundError, 404)
+        return {"id": model_id}
+
+
+def test_roles_names_each_chain_and_todays_spend(monkeypatch):
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient())
+    assert check.mark == "ok"
+    assert "index: claude-haiku-5-5 → claude-opus-5-5" in check.detail and "of the $25.00 daily cap" in check.detail
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
+    assert check.mark == "warn" and "index work runs on the answer chain" in check.detail
+    assert ready.check_roles(False).mark == "skip"
+
+
+def test_roles_fails_on_a_budget_that_is_not_dollars(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "lots")
+    check = ready.check_roles(False)
+    assert check.mark == "fail" and "OPENFERMENT_DAILY_BUDGET_USD" in check.detail

@@ -73,6 +73,10 @@ class Claim(BaseModel):
 class Usage(BaseModel):
     inputTokens: int = 0
     outputTokens: int = 0
+    # Prompt tokens read from and written to the prompt cache (OF-BLD-014
+    # §3.3). `inputTokens` excludes both, as the API reports it.
+    cacheReadTokens: int = 0
+    cacheWriteTokens: int = 0
     # Computed from the response's own token counts, not estimated. Surfaced in
     # the UI because a visible per-query cost is what makes budget gating real
     # rather than theoretical.

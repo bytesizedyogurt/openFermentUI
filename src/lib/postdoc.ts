@@ -9,7 +9,7 @@
 // everything looks like it is working and the thing you are demonstrating is
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
-import type { AnswerPlan } from '@/data/types';
+import type { AnswerPlan, AnswerPlanUsage } from '@/data/types';
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
 export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
@@ -114,4 +114,16 @@ export function formatCost(usd: number): string {
   if (usd === 0) return '$0';
   if (usd < 0.01) return `$${usd.toFixed(4)}`;
   return `$${usd.toFixed(3)}`;
+}
+
+/**
+ * The share of the prompt the cache served, as a whole percent, or null when
+ * it served none (OF-BLD-014 §3.3). The prompt is the uncached input plus the
+ * cache reads and writes, which the API counts apart.
+ */
+export function cachedShare(u: AnswerPlanUsage): number | null {
+  const read = u.cacheReadTokens ?? 0;
+  const prompt = u.inputTokens + read + (u.cacheWriteTokens ?? 0);
+  if (read <= 0 || prompt <= 0) return null;
+  return Math.round((read / prompt) * 100);
 }

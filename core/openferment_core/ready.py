@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 
 from . import biorepo, extract, intake
 from .corpus import load_corpus
-from . import llm
+from . import llm, spend
 
 CORE = Path(__file__).parent.parent
 REPO = CORE.parent
@@ -148,7 +148,7 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
         except anthropic.APIConnectionError:
             return Check("model", "fail", "could not reach api.anthropic.com")
         except anthropic.APIStatusError as e:
-            return Check("model", "fail", f"api.anthropic.com answered {e.status_code}")
+            return Check("model", "fail", f"api.anthropic.com answered {e.status_code}{_said(e)}")
         offered.append(model)
     unpriced = [m for m in offered if m not in llm.PRICES]
     if not offered:
@@ -161,6 +161,55 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
         return Check("model", "warn", f"no price on file for {', '.join(unpriced)}, so its cost shows as $0. "
                      "Add it to PRICES in core/openferment_core/llm.py")
     return Check("model", "ok", f"the key is accepted; {' then '.join(offered)}, effort {llm.effort()}")
+
+
+def _said(e: Exception) -> str:
+    """What the API said about a refused request, from its error body, cut
+    short. The body describes the request and never holds the key."""
+    body = getattr(e, "body", None)
+    inner = body.get("error") if isinstance(body, dict) else None
+    message = inner.get("message") if isinstance(inner, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        return ""
+    message = " ".join(message.split())
+    return f": {message[:200]}{'…' if len(message) > 200 else ''}"
+
+
+def check_roles(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
+    """Each role's models (OF-BLD-014 §3.3, E.7), whether the Models API lists
+    them for this key, and today's spend against the daily cap."""
+    try:
+        cap = spend.daily_budget()
+        spend.ask_budget()
+    except spend.BudgetSettingInvalid as e:
+        return Check("roles", "fail", str(e))
+    today = f"today ${spend.total_today():.2f} of the ${cap:.2f} daily cap"
+    chains = {role: llm.chain(role) for role in llm.ROLES}
+    named = "; ".join(f"{role}: {' → '.join(models)}" for role, models in chains.items())
+    if not have_key or intake.fixtures_only():
+        return Check("roles", "skip", f"{named}; {today}")
+    import anthropic
+
+    client = (client_factory or anthropic.Anthropic)()
+    listed: dict[str, bool] = {}
+    for model in dict.fromkeys(m for models in chains.values() for m in models):
+        try:
+            client.models.retrieve(model, timeout=15)
+            listed[model] = True
+        except (anthropic.PermissionDeniedError, anthropic.NotFoundError):
+            listed[model] = False
+        except (anthropic.APIConnectionError, anthropic.APIStatusError):
+            return Check("roles", "skip", f"{named}; {today}; the model row says why the models could not be asked")
+    unlisted = [m for m in listed if not listed[m]]
+    if unlisted:
+        index_first = chains["index"][0]
+        why = (
+            f"{index_first} is not listed for this key, so index work runs on the answer chain"
+            if index_first in unlisted
+            else f"{', '.join(unlisted)} not listed for this key"
+        )
+        return Check("roles", "warn", f"{named}; {why}; {today}")
+    return Check("roles", "ok", f"{named}; every model listed for this key; {today}")
 
 
 def check_europe_pmc() -> Check:
@@ -269,9 +318,9 @@ def run(no_network: bool = False, port: int | None = None) -> list[Check]:
     have_key = key.mark in ("ok", "warn")
     checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
     if no_network:
-        checks += [Check(n, "skip", "--no-network") for n in ("model", "europepmc", "huggingface", "backup")]
+        checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface", "backup")]
     else:
-        checks += [check_model(have_key), check_europe_pmc(), check_huggingface(), check_backup()]
+        checks += [check_model(have_key), check_roles(have_key), check_europe_pmc(), check_huggingface(), check_backup()]
     checks.append(check_service(port, have_key, host))
     return checks
 

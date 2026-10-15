@@ -19,7 +19,7 @@ import { fmt } from '@/engine/units';
 import { ProvenanceBadge, Tick } from './Provenance';
 import { ComponentTag } from './ComponentTag';
 import { Callout, Card } from './ui';
-import { formatCost } from '@/lib/postdoc';
+import { cachedShare, formatCost } from '@/lib/postdoc';
 
 /** The value, rendered from the record — never from the claim's text. */
 function RecordValue({ record }: { record: ExtractionRecord }) {
@@ -205,6 +205,17 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             {formatCost(plan.usage.costUsd)}
             <span className="opacity-45">·</span>
             {plan.usage.inputTokens.toLocaleString()} in / {plan.usage.outputTokens.toLocaleString()} out
+            {/* OF-BLD-014 §3.3 — how much of the prompt the cache served. */}
+            {cachedShare(plan.usage) !== null && (
+              <>
+                <span className="opacity-45">·</span>
+                <span
+                  title={`${(plan.usage.cacheReadTokens ?? 0).toLocaleString()} prompt tokens read from the cache, ${(plan.usage.cacheWriteTokens ?? 0).toLocaleString()} written to it`}
+                >
+                  {cachedShare(plan.usage)}% of the prompt cached
+                </span>
+              </>
+            )}
             {plan.usage.models && plan.usage.models.length > 0 && (
               <>
                 <span className="opacity-45">·</span>
