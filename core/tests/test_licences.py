@@ -116,6 +116,20 @@ def test_an_acceptance_needs_a_name_a_date_and_a_reason(tmp_path):
         lic.load_policy(path)
 
 
+def test_a_model_file_names_its_source_revision_hash_and_who_accepted_it(tmp_path):
+    path = tmp_path / "licences.toml"
+    path.write_text('allowed = ["MIT"]\n[data.m]\nlicence = "GPL-3.0"\nsource = "s"\nrevision = "r"\nby = "Sean Creighton"\ndate = 2026-10-15\nwhy = "w"\n')
+    with pytest.raises(ValueError, match="sha256"):
+        lic.load_policy(path)
+
+
+def test_the_model_files_are_listed_with_their_hash():
+    committed = lic.load_policy()
+    by_id = {d.id: d for d in committed.data}
+    assert by_id["RehMBEL1391"].sha256 == "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
+    assert "| RehMBEL1391 | GPL-3.0 |" in lic.render([], [], committed)
+
+
 def test_the_committed_ledger_reads_and_every_acceptance_is_signed():
     committed = lic.load_policy()
     assert committed.allowed

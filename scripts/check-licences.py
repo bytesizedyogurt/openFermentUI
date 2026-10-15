@@ -46,7 +46,7 @@ SRC = REPO / "src"
 SELF = "openferment-core"
 # Which part of openFerment an extra serves. An extra missing here is named
 # as itself.
-EXTRA_PART = {"dev": "tests"}
+EXTRA_PART = {"dev": "tests", "sim": "the geneOS worker"}
 
 
 def canonical(name: str) -> str:
@@ -64,9 +64,28 @@ class Acceptance:
 
 
 @dataclass(frozen=True)
+class DataFile:
+    """A model file read as data (E.9): where it comes from, the revision and
+    hash it is pinned to, its licence, and who accepted it."""
+
+    id: str
+    licence: str
+    source: str
+    revision: str
+    sha256: str
+    by: str
+    date: str
+    why: str
+
+
+DATA_FIELDS = ("licence", "source", "revision", "sha256", "by", "date", "why")
+
+
+@dataclass(frozen=True)
 class Policy:
     allowed: frozenset[str]
     accepted: dict[str, Acceptance]  # canonical package name → its acceptance
+    data: tuple[DataFile, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,7 +123,14 @@ def load_policy(path: Path = POLICY) -> Policy:
         accepted[canonical(name)] = Acceptance(
             name, str(entry["licence"]), str(entry["by"]), str(entry["date"]), str(entry["why"])
         )
-    return Policy(frozenset(allowed), accepted)
+    data = []
+    for name, entry in (raw.get("data") or {}).items():
+        missing = [k for k in DATA_FIELDS if not str(entry.get(k, "")).strip()]
+        if missing:
+            raise ValueError(f"{path.name}: [data.{name}] lacks {', '.join(missing)}; "
+                             "a model file names its licence, source, revision, hash, who accepted it, the date and why")
+        data.append(DataFile(name, *(str(entry[k]) for k in DATA_FIELDS)))
+    return Policy(frozenset(allowed), accepted, tuple(sorted(data, key=lambda d: d.id)))
 
 
 # What an acceptance names for a package whose metadata states no licence.
@@ -350,6 +376,19 @@ def render(python: list[Package], javascript: list[Package], policy: Policy) -> 
         ]
         lines += [f"| {a.package} | {a.licence} | {a.by} | {a.date} | {_cell(a.why)} |"
                   for a in sorted(policy.accepted.values(), key=lambda a: canonical(a.package))]
+    if policy.data:
+        lines += [
+            "",
+            "## Model files read as data",
+            "",
+            "Downloaded into `core/data/models/`, which git ignores, or shipped inside a package; read by the",
+            "geneOS worker alone (OF-BLD-014 E.9).",
+            "",
+            "| File | Licence | Source | Revision | sha256 | Accepted by | Date | Why |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        lines += [f"| {d.id} | {d.licence} | {_cell(d.source)} | {d.revision} | {d.sha256} | {d.by} | {d.date} | {_cell(d.why)} |"
+                  for d in policy.data]
     return "\n".join(lines) + "\n"
 
 
@@ -387,6 +426,7 @@ def check(python: list[Package], javascript: list[Package], policy: Policy,
     report += [f"  accepted     {p.name} {p.version} ({p.verdict.string}): {p.verdict.how}" for p in accepted]
     report += [f"  accepted     {a.package} ({a.licence}): not installed here"
                for key, a in sorted(policy.accepted.items()) if key not in installed]
+    report += [f"  data         {d.id} ({d.licence}): accepted by {d.by} on {d.date}" for d in policy.data]
     report.append(f"  listing      {listing.name} " + (
         "is current" if not stale else "left as it was while a package fails" if failed
         else "was stale and has been rewritten"))

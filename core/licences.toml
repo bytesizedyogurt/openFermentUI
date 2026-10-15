@@ -35,6 +35,8 @@ allowed = [
   "License :: OSI Approved :: MIT License",              # loguru and mmh3, by classifier
   "MIT-CMU",                      # pillow: the historical PIL licence, MIT-style
   "3-Clause BSD License",         # protobuf spells it so
+  # Added 2026-10-15 with the sim extra (OF-BLD-014 §6.2).
+  "License :: OSI Approved :: BSD License",  # scipy, pandas, sympy, mpmath, by classifier
 ]
 
 [accepted.certifi]
@@ -54,3 +56,55 @@ licence = "no licence metadata"
 by = "Sean Creighton"
 date = 2026-10-15
 why = "fastembed's word stemmer for its sparse models, used unmodified in the rag extra; its metadata states no licence, and its repository (github.com/qdrant/py-rust-stemmers) carries an MIT LICENSE, read 2026-10-15."
+
+# OF-BLD-014 §6.2, under D4: three copyleft libraries for flux balance
+# analysis. They run in the geneOS worker process alone
+# (openferment_core/workers/geneos_worker.py), behind a JSON contract.
+# Revisit before any hosted or commercial use.
+
+[accepted.cobra]
+licence = "LGPL-2.0-or-later OR GPL-2.0-or-later"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "Flux balance analysis for geneOS's yield ceilings, imported in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+[accepted.swiglpk]
+licence = "GPL v3"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "GLPK, cobra's default linear-programming solver, loaded in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+[accepted.python-libsbml]
+licence = "LGPL"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "Reads SBML model files for cobra in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+# Model files are data (E.9): read by the geneOS worker, never imported.
+
+[data.RehMBEL1391]
+licence = "GPL-3.0"
+source = "github.com/m-jahn/genome-scale-models, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml"
+revision = "00c70c5"
+sha256 = "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype."
+
+[data.iJO1366]
+licence = "as BiGG publishes it; ships inside cobra 0.32.1"
+source = "BiGG Models, bundled with cobra as iJO1366"
+revision = "cobra 0.32.1"
+sha256 = "inside the cobra package"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The genome-scale E. coli K-12 MG1655 model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
+
+[data.e_coli_core]
+licence = "as BiGG publishes it; ships inside cobra 0.32.1"
+source = "BiGG Models, bundled with cobra as textbook"
+revision = "cobra 0.32.1"
+sha256 = "inside the cobra package"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."

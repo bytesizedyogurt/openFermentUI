@@ -34,4 +34,13 @@ fi
 echo "passage index: building"
 pnpm --silent index:build || status=1
 
+# §6.2 — the published C. necator reconstruction, at its pinned commit and
+# checked against its hash. GitHub answers on every lane; a mismatch fails.
+if [ -f core/data/models/genome-scale-models/Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml ]; then
+  echo "geneOS models: RehMBEL1391 already here"
+else
+  echo "geneOS models: fetching RehMBEL1391"
+  pnpm --silent geneos:fetch || status=1
+fi
+
 exit "$status"

@@ -42,6 +42,7 @@
     "decisions:push": "bash scripts/decisions-push.sh",
     "intake:extract": "cd core && uv run python -m openferment_core.extract",
     "index:build": "cd core && uv run --all-extras python -m openferment_core.passages",
+    "geneos:fetch": "cd core && uv run --all-extras python -m openferment_core.geneos fetch",
     "rag:questions": "cd core && uv run --all-extras python -m openferment_core.rageval questions",
     "rag:eval": "cd core && uv run --all-extras python -m openferment_core.rageval eval",
     "ask:batch": "cd core && uv run --all-extras python ../scripts/ask-batch.py",

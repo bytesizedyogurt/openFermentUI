@@ -19,6 +19,9 @@ dependencies = [
 dev = ["pytest>=8.3"]
 # OF-BLD-014 §4.2 — the meaning lane: passage vectors, computed on this machine.
 rag = ["fastembed==0.9.0"]
+# OF-BLD-014 §6.2 — flux balance analysis, in the geneOS worker alone; scipy
+# also serves fermOS's fits (§7.2).
+sim = ["cobra==0.32.1", "scipy"]
 
 [build-system]
 requires = ["hatchling"]
