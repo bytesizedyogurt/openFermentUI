@@ -678,6 +678,28 @@ async function main() {
       const posted = doubleState.proformaRuns.at(-1);
       if (!posted || posted.assumptions?.length !== 3 || posted.assumptions.some((a) => a.by !== REVIEWER))
         problems.push('the run did not post the three assumptions signed with the reviewer\'s name');
+      // OF-BLD-014 §9.2 and §9.4 — Postdoc drafts a runbook from a forecast,
+      // a price and a record; the service wrote every number; adopting it
+      // opens an unlocked research runbook whose page draws its predictions
+      // and the chain behind them, forecast then price, with the seam between.
+      await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+      await page.locator('textarea[aria-label="Ask a question"]').fill('Draft a runbook for the stand-in run.');
+      await page.locator('textarea[aria-label="Ask a question"]').press('Enter');
+      await page.locator('[data-testid="runbook-draft"]').waitFor({ timeout: 10000 }).catch(() => {});
+      const draftCard = await page.locator('[data-testid="runbook-draft"]').innerText().catch(() => '');
+      if (!/The stand-in run, forecast and priced/.test(draftCard) || !/Range of 1 reported value: cl1-B5-a07dd73c/.test(draftCard))
+        problems.push('the plan does not show the drafted runbook with the basis the service wrote');
+      await page.getByRole('button', { name: 'Turn into a runbook' }).click();
+      await page.locator('[data-testid="dossier-link"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+      if (!/#\/runbooks\/rb-draft-/.test(page.url())) problems.push('adopting the draft did not open its runbook');
+      if (!/not yet locked/.test(await page.locator('body').innerText())) problems.push('an adopted draft is not unlocked');
+      if ((await page.locator('[data-testid="ledger-row"]').count()) !== 3) problems.push('the adopted runbook does not draw its three predictions');
+      const tools = await page.locator('[data-testid="dossier-link"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tool')).join());
+      if (tools !== 'growth_forecast,proforma.run') problems.push(`the dossier does not draw the forecast then the price: ${tools}`);
+      if (!/harvest step/.test(await page.locator('[data-testid="dossier-seam"]').innerText().catch(() => ''))) problems.push('the seam between forecast and price is missing');
+      if (!/Stands behind the prediction Final product/.test(await page.locator('[data-testid="dossier"]').innerText().catch(() => '')))
+        problems.push('a dossier figure does not name the prediction it stands behind');
       // §2 — run mode reads the same ledger and writes to it as steps complete.
       await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-OD-01'));
       await page.waitForTimeout(400);

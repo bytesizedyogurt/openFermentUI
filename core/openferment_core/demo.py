@@ -372,13 +372,16 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     from . import artifacts
 
     art = prototype_artifact()
+    overlay = json.loads((FIXTURES / "overlay-smoke.json").read_text(encoding="utf-8"))
+    draft_stream, draft_artifacts = prototype_draft_stream(overlay)
     replay = artifacts.ReplayResult(
         artifactId=art.id, identical=True, storedHash=art.outputHash, replayedHash=art.outputHash, durationMs=0
     )
     out.mkdir(parents=True, exist_ok=True)
     written = []
     for name, value in (
-        ("artifacts.json", [art.model_dump(mode="json")]),
+        ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts)]),
+        ("ask-draft-stream.jsonl", draft_stream),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
@@ -483,8 +486,8 @@ def _stand_in_converse(turns: list[Any]):
     return converse
 
 
-def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
-    from . import evidence_pool, postdoc_agent, tools
+def _stream_pool(overlay: dict[str, Any]):
+    from . import evidence_pool
     from .corpus import Corpus
     from .models import Candidate
 
@@ -495,12 +498,18 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
              "sections": [{"id": x["id"], "heading": x["heading"]} for x in b5["sections"]]}
     corpus = Corpus(papers=[paper], records=[], papers_by_id={"B5": paper}, records_by_id={},
                     _bm25=None, _order=[], _tokens={})  # type: ignore[arg-type]
-    pool = evidence_pool.build(
+    return evidence_pool.build(
         corpus,
         [Candidate.model_validate(c) for c in overlay["candidates"]],
         {},
         [{"id": "titer_secreted", "name": "Secreted titer"}, {"id": "time_to_colony", "name": "Time to colony"}],
     )
+
+
+def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
+    from . import postdoc_agent, tools
+
+    pool = _stream_pool(overlay)
     turns: list[Any] = [
         [("search_records", {"query": "", "field": "titer_secreted", "organism": "", "limit": 10})],
         [("search_passages", {"query": RAG_QUESTION, "k": 3})],
@@ -523,6 +532,71 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
     assert plan.claims and not plan.rejected, f"the stand-in plan no longer passes the validator: {plan.rejectionReasons}"
     events.append({"event": "plan", "data": plan.model_dump(mode="json")})
     return events
+
+
+# §9.4: a second recorded loop, in which the stand-in asks for a forecast and
+# a price and drafts a runbook from them and from the overlay's candidate.
+# The forecast is of the invented sample series treated as a STAND-IN
+# deposition, the price is the stand-in Proforma run (prototype_proforma's
+# evaluator), both computed by the real code in a scratch store; the
+# artifacts are returned for artifacts.json so the double can serve them.
+DRAFT_QUESTION = "Draft a runbook for the stand-in run."
+DRAFT_DEPOSITION = "dep-standin"
+
+
+def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]], list[Any]]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, fermos, postdoc_agent, proforma, tools
+    from . import intake as _intake
+    from .models import FermosSeries, InputAssumption, ProformaRunRequest
+
+    pool = _stream_pool(overlay)
+    saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_call
+            proforma.yield_cap = lambda: None
+            fit = fermos.fit(DRAFT_DEPOSITION, [FermosSeries.model_validate(x) for x in fermos_sample_series()])
+            fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
+            rs = _standin_records()
+            a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
+                 for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a),
+                               pool=SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
+            draft = {"title": "The stand-in run, forecast and priced", "productId": "taq-dna-polymerase",
+                     "strainId": "c-necator-h16",
+                     "items": [
+                         {"label": "Final product", "evidenceId": fc.evidence.id, "field": "", "recordIds": []},
+                         {"label": "Minimum selling price", "evidenceId": run.evidence.id, "field": "", "recordIds": []},
+                         {"label": "Secreted titer", "evidenceId": "", "field": "titer_secreted", "recordIds": [STREAM_CANDIDATE]},
+                     ],
+                     "measures": [{"label": "Product at harvest", "unit": "g/L", "timepoint": "harvest", "itemLabel": "Final product"}]}
+            turns: list[Any] = [
+                [("search_records", {"query": "", "field": "titer_secreted", "organism": "", "limit": 10})],
+                [("growth_forecast", {"fitArtifactId": fit.kineticArtifactId})],
+                [("selling_price", {"scenarioId": proforma.SCENARIO_ID})],
+                [("draft_runbook", draft)],
+                {"claims": [{"id": "c1", "text": "The stand-in table reports a secreted titer for placeholder condition A.",
+                             "recordIds": [STREAM_CANDIDATE], "paperIds": [], "support": "direct", "passages": [], "evidenceIds": []}],
+                 "gaps": [], "declined": None},
+            ]
+            events: list[dict[str, Any]] = []
+            plan = postdoc_agent.ask(
+                DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+                clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
+            )
+            assert plan.runbookDraft is not None and len(plan.runbookDraft.predictions) == 3, "the stand-in draft no longer assembles"
+            for e in plan.evidence:
+                e.basis.at = AT
+            events.append({"event": "plan", "data": plan.model_dump(mode="json")})
+            kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0})
+                    for i in (fit.kineticArtifactId, fc.artifactId, run.artifactId)]
+        finally:
+            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    return events, kept
 
 
 # §6.4: geneOS's Model view over the toy network the worker builds, a

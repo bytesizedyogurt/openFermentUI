@@ -314,8 +314,11 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     if ((url === '/api/ask/stream' || url === '/api/ask') && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) body += chunk;
-      asks.push({ path: url, ...JSON.parse(body || '{}') });
-      const lines = (await readFile(join(PROTOTYPE, 'ask-stream.jsonl'), 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
+      const asked = JSON.parse(body || '{}');
+      asks.push({ path: url, ...asked });
+      // §9.4 — a question that asks for a draft replays the drafting loop.
+      const recording = /^draft\b/i.test(String(asked.question ?? '').trim()) ? 'ask-draft-stream.jsonl' : 'ask-stream.jsonl';
+      const lines = (await readFile(join(PROTOTYPE, recording), 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
       const events = lines.filter((l) => l.event);
       if (url === '/api/ask') {
         res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -38,6 +38,7 @@ import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/
 import { lockIntact } from '@/engine/lock';
 import { ledgerRows } from '@/engine/ledger';
 import { IntervalLedger } from '@/components/figures';
+import { Dossier } from '@/components/Dossier';
 import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
   ClearanceChip,
@@ -904,6 +905,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           quietly move a prediction toward a result it has already seen.
         </p>
         {runbook.predictions.length > 0 && <RunbookLedgerFigure runbook={runbook} />}
+        <Dossier runbook={runbook} />
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
           <PredictionPanel runbook={runbook} />
           <StartDeposition runbook={runbook} />
