@@ -172,6 +172,13 @@ def test_the_figure_sample_is_what_demo_prototype_writes(tmp_path):
     assert next(iter(json.loads(written.read_text()))) == "_sample"
 
 
+def test_the_fermos_sample_is_what_demo_prototype_writes(tmp_path):
+    """OF-BLD-014 §7.4: the browser's sample run, said to be one in its first field."""
+    written = demo.rebuild_fermos_sample(tmp_path / "fermosSample.json")
+    assert written.read_text(encoding="utf-8") == demo.FERMOS_SAMPLE.read_text(encoding="utf-8")
+    assert next(iter(json.loads(written.read_text()))) == "_sample"
+
+
 def test_building_a_set_leaves_the_modules_where_they_were(tmp_path):
     where = (intake.FULLTEXT_DIR, extract.CANDIDATES_DIR, biorepo.PATH, intake.FIXTURE_DIR)
     demo.rebuild_export_set(out=tmp_path / "export.json")

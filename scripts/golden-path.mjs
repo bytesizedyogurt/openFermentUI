@@ -324,6 +324,13 @@ async function main() {
   const rules = await page.locator('[data-testid="strip-rule"]').count();
   check('geneOS → Model draws a computed ceiling and the envelope', rules === 1 && (await page.locator('[data-testid="frontier"]').count()) === 1, `${rules} rules`);
 
+  // ── 10d. fermOS fits the sample run and forecasts from it ───────────
+  await go('/fermos');
+  await page.getByRole('button', { name: 'Load a sample run' }).click();
+  await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const fitted = await page.locator('[data-testid="trajectory-fit"]').count();
+  check('fermOS fits a curve through the sample run', fitted === 3, `${fitted} curves`);
+
   // ── 11. Command palette navigates ───────────────────────────────────
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);

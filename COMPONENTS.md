@@ -174,7 +174,7 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx` |
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` |
 
 ### pureOS
 
@@ -265,7 +265,7 @@ for the ones with a rail entry.
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |

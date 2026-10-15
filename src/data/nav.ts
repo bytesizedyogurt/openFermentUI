@@ -289,6 +289,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'geneOS',
   },
   {
+    label: 'Forecast',
+    to: '/fermos/forecast',
+    descriptor: 'a band for the next run, drawn from a fitted one',
+    aliases: ['forecast', 'kinetic fit', 'growth rate', 'mu max', 'luedeking piret', 'logistic', 'time series'],
+    icon: FlaskConical,
+    owner: 'fermOS',
+  },
+  {
     label: 'Molecules',
     to: '/dominion/molecules',
     descriptor: 'targets and markets',

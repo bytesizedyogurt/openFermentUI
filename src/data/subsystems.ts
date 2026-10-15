@@ -148,7 +148,22 @@ export const SUBSYSTEMS: Subsystem[] = [
   // All five. This makes fermOS the emptiest of the eleven, and honestly so:
   // there is no kinetic model, no transport calculation and no scale-up logic
   // anywhere in this codebase.
-  { id: 'fermos.kinetics', owner: 'fermOS', label: 'Kinetics', status: 'stub', state: UNBUILT },
+  {
+    id: 'fermos.kinetics',
+    owner: 'fermOS',
+    label: 'Kinetics',
+    status: 'live',
+    state:
+      'Fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate ' +
+      'balance) to a deposited run’s time series, keeps each fit as an artifact, and forecasts a run like it as a ' +
+      'band. Fitted from depositions alone; one run says nothing of run-to-run variation.',
+    implementedIn: [
+      'core/openferment_core/fermos.py',
+      'src/engine/series.ts',
+      'src/screens/FermOS.tsx',
+      'src/screens/FermOSForecast.tsx',
+    ],
+  },
   { id: 'fermos.transport', owner: 'fermOS', label: 'Transport', status: 'stub', state: UNBUILT },
   { id: 'fermos.mode', owner: 'fermOS', label: 'Operating mode', status: 'stub', state: UNBUILT },
   { id: 'fermos.scale', owner: 'fermOS', label: 'Scale', status: 'stub', state: UNBUILT },

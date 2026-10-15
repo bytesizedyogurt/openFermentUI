@@ -181,7 +181,13 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'fermOS',
     owner: 'fermOS',
     layer: 'Computing',
-    livesIn: ['src/screens/FermOS.tsx'],
+    // OF-BLD-014 Phase 7 — fits and forecasts from depositions.
+    livesIn: [
+      'src/screens/FermOS.tsx',
+      'src/screens/FermOSForecast.tsx',
+      'src/engine/series.ts',
+      'core/openferment_core/fermos.py',
+    ],
     surfacedAs: 'the rail, /fermos',
     role: 'The reactor — kinetics, transport, operating mode, scale, control. None of it built',
   },

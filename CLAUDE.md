@@ -36,8 +36,9 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   question is which one owns it — never whether to add a twelfth.
 - The three OS components are the three stages of making something: geneOS the
   organism (stoichiometry), fermOS the reactor (dynamics), pureOS downstream
-  (separation). fermOS cannot be seeded from literature; kinetic parameters
-  arrive through Deposition. `src/screens/FermOS.tsx` is not to be touched.
+  (separation). fermOS computes from depositions: no parameter from a paper
+  enters it. `src/screens/FermOS.tsx` may be extended, and its header keeps
+  the reasoning.
 
 ## Stack rules that are not negotiable
 

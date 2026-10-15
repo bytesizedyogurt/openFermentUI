@@ -99,6 +99,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const ragSearches = [];
   const asks = [];
   const geneosCalls = [];
+  const fermosCalls = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -252,6 +253,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(await prototype('rag-search.json')));
     }
+    // OF-BLD-014 §7.4 — fermOS's fit and forecast of the sample run, made
+    // through the real code by demo.py --prototype.
+    if ((url === '/api/fermos/fit' || url === '/api/fermos/forecast') && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const asked = JSON.parse(body || '{}');
+      fermosCalls.push({ path: url, ...asked });
+      const fixture = await prototype(url.endsWith('fit') ? 'fermos-fit.json' : 'fermos-forecast.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(fixture));
+    }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
     if (url === '/api/geneos/models' && req.method === 'GET') {
@@ -310,5 +322,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls } };
 }

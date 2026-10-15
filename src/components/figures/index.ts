@@ -6,3 +6,4 @@ export { EvidenceStrip, stripPoints, median, toTable as evidenceStripTable, type
 export { CeilingGap, CEILING_NOTES, toTable as ceilingGapTable, type CeilingGapProps, type Ceiling } from './CeilingGap';
 export { Frontier, toTable as frontierTable, type FrontierProps, type FrontierPoint } from './Frontier';
 export { MixLine, toTable as mixLineTable, type MixLineProps, type MixPoint } from './MixLine';
+export { TrajectoryBand, toTable as trajectoryTable, type TrajectoryBandProps, type TrajectorySeries } from './TrajectoryBand';

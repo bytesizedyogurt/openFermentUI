@@ -10,6 +10,7 @@ import type { Deposition, Runbook, SeriesRole } from '@/data/types';
 import { useStore } from '@/store';
 import { seriesOf } from '@/engine/series';
 import { Button } from './ui';
+import { TrajectoryBand } from './figures';
 
 const ROLES: (SeriesRole | '')[] = ['', 'biomass', 'product', 'substrate'];
 
@@ -25,6 +26,13 @@ export function TimeSeriesPanel({ deposition, runbook }: { deposition: Depositio
 
   return (
     <div className="space-y-4" data-testid="time-series">
+      {series.length > 0 && (
+        <TrajectoryBand
+          title="What did this run measure, over time?"
+          series={series.map((x) => ({ role: x.role ?? x.measureId, label: x.label, unit: x.unit, readings: x.points.map((p) => ({ t: p.t, value: p.value })) }))}
+          csvName={`series-${deposition.id}`}
+        />
+      )}
       {measures.length === 0 && <p className="text-body text-ink-soft">No reading yet. Type them in run mode, or attach them below.</p>}
       {measures.map((m) => {
         const s = series.find((x) => x.measureId === m.id);

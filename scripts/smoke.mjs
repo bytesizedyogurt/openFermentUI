@@ -45,7 +45,8 @@ const ROUTES = [
   ['/geneos/hosts/c-necator-h16', 'geneOS — strain (thread P host)'],
   ['/geneos/pathway', 'geneOS — pathway vocabulary'],
   ['/geneos/model', 'geneOS — Model: the ceiling beside what was reported'],
-  ['/fermos', 'fermOS (the emptiest of the eleven)'],
+  ['/fermos', 'fermOS — Fits'],
+  ['/fermos/forecast', 'fermOS — Forecast'],
   ['/pureos', 'pureOS'],
   ['/proforma', 'Proforma'],
   ['/proforma/scenario/sc-s1', 'Proforma — scenario S1'],
@@ -236,7 +237,7 @@ async function main() {
   const SHELVES = [
     ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
     ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
-    ['/fermos', 'fermOS subsystems', 'Kinetic models'],
+    ['/fermos', 'fermOS subsystems', 'Oxygen transfer'],
     ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
     ['/intake', 'Intake subsystems', 'Parse status ladder'],
     ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
@@ -469,6 +470,25 @@ async function main() {
       await page.locator('[data-testid="host-ceiling"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/not on this machine: run pnpm geneos:fetch/.test(await page.locator('[data-testid="host-ceiling"]').innerText().catch(() => '')))
         problems.push("the C. necator strain page has no ceiling card saying its file is not here");
+      // OF-BLD-014 §7.4 — fermOS over the sample run: it loads labelled, the
+      // fit draws through the points with its parameter table, and Forecast
+      // draws a band from that fit; both are asked of the service as sample.
+      await page.goto(`http://localhost:${PORT}/#/fermos`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Load a sample run' }).click();
+      await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
+      const fits = await page.locator('[data-testid="fermos-fits"]').innerText().catch(() => '');
+      if (!/SAMPLE: an invented time course/.test(fits)) problems.push('the sample run is not labelled as sample');
+      if ((await page.locator('[data-testid="fit-params"] tbody tr').count()) !== 9) problems.push('the fit does not list nine parameters');
+      if ((await page.locator('[data-testid="trajectory-fit"]').count()) !== 3) problems.push('the fit does not draw a curve through each of the three series');
+      if (!/constant amount/.test(fits)) problems.push('the fit does not state its noise assumption');
+      if (!doubleState.fermosCalls.some((c) => c.path === '/api/fermos/fit' && c.sample === true)) problems.push('the sample fit was not asked of the service as sample');
+      await page.goto(`http://localhost:${PORT}/#/fermos/forecast`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Forecast', exact: true }).click();
+      await page.locator('[data-testid="trajectory-forecast"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+      if ((await page.locator('[data-testid="trajectory-forecast"]').count()) !== 3) problems.push('the forecast does not draw a band for each series');
+      const fc = await page.locator('[data-testid="fermos-forecast"]').innerText().catch(() => '');
+      if (!/Variation from run to run is absent/.test(fc)) problems.push('the forecast does not say run-to-run variation is absent');
+      if (!/Final biomass/.test(fc)) problems.push('the forecast does not give final values as intervals');
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
       // Back to scripted, which the live panel leaves untouched.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
@@ -565,7 +585,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported; fermOS fits and forecasts the sample run');
       }
     } catch (e) {
       overlayFails++;

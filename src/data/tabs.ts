@@ -54,3 +54,10 @@ export const GUILD_TABS: OwnerTab[] = [
   { label: 'Skills', to: '/guild/skills' },
   { label: 'Checks', to: '/guild/checks' },
 ];
+
+// OF-BLD-014 §7.4 — fermOS's first tab set: fits of deposited runs, and
+// forecasts from those fits.
+export const FERMOS_TABS: OwnerTab[] = [
+  { label: 'Fits', to: '/fermos' },
+  { label: 'Forecast', to: '/fermos/forecast' },
+];

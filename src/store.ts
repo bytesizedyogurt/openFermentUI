@@ -25,6 +25,7 @@ import type {
   ResultGrid,
   Runbook,
   SeriesRole,
+  FermosFitResponse,
   RunbookStage,
   RunOutput,
   RunState,
@@ -527,6 +528,16 @@ export interface OFState {
    * posted, never in the Durable tier; a reload drops it.
    */
   guildSample: Guild | null;
+  /**
+   * OF-BLD-014 §7.4 — fermOS's fits made in this session, by deposition id,
+   * so Forecast can offer them; and whether the invented sample run is
+   * loaded. Ephemeral: a fit is kept by the service as an artifact, and the
+   * sample is kept nowhere.
+   */
+  fermosFits: Record<string, FermosFitResponse>;
+  fermosSampleLoaded: boolean;
+  keepFermosFit: (fit: FermosFitResponse) => void;
+  setFermosSample: (loaded: boolean) => void;
   guildSampleActingId: string | null;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
@@ -799,6 +810,10 @@ export const useStore = create<OFState>()((set, get) => ({
   guildPendingWithdrawals: [] as GuildWithdrawal[],
   guildActingId: null as string | null,
   guildSample: null as Guild | null,
+  fermosFits: {} as Record<string, FermosFitResponse>,
+  fermosSampleLoaded: false,
+  keepFermosFit: (fit: FermosFitResponse) => set((s) => ({ fermosFits: { ...s.fermosFits, [fit.depositionId]: fit } })),
+  setFermosSample: (loaded: boolean) => set({ fermosSampleLoaded: loaded }),
   guildSampleActingId: null as string | null,
   guildHydrated: false,
   practice: null as Practice | null,

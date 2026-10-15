@@ -382,6 +382,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
+        *prototype_fermos().items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -562,6 +563,57 @@ def prototype_geneos() -> dict[str, Any]:
     }
 
 
+# §7.4: fermOS's sample run. INVENTED: a logistic time course with a fixed
+# scatter, written to src/data/fermosSample.json for the browser, and fitted
+# and forecast here through the real code (inline, kept nowhere) for the
+# smoke double. Not a measurement.
+FERMOS_SAMPLE = CORE.parent / "src" / "data" / "fermosSample.json"
+FERMOS_SAMPLE_NOTE = "SAMPLE: an invented time course, made to show what fermOS does with a run. Not a measurement."
+_SHAPE = {"x0": 0.12, "mu": 0.3, "xmax": 9.0, "p0": 0.05, "alpha": 0.35, "beta": 0.015, "s0": 60.0, "gamma": 4.2, "delta": 0.04}
+
+
+def fermos_sample_series() -> list[dict[str, Any]]:
+    import math
+
+    def at(t: float) -> tuple[float, float, float]:
+        c = _SHAPE
+        denom = c["x0"] + (c["xmax"] - c["x0"]) * math.exp(-c["mu"] * t)
+        x = c["x0"] * c["xmax"] / denom
+        integral = c["xmax"] * t + (c["xmax"] / c["mu"]) * math.log(denom / c["xmax"])
+        return x, c["p0"] + c["alpha"] * (x - c["x0"]) + c["beta"] * integral, c["s0"] - c["gamma"] * (x - c["x0"]) - c["delta"] * integral
+
+    def jitter(i: int, scale: float) -> float:
+        u = math.sin(i * 12.9898 + 78.233) * 43758.5453
+        return (u - math.floor(u) - 0.5) * 2 * scale
+
+    hours = [i * 2.5 for i in range(14)]
+    out = []
+    for k, (role, label, scale) in enumerate((("biomass", "Dry cell weight (sample)", 0.15), ("product", "Polymer (sample)", 0.08),
+                                             ("substrate", "Sugar (sample)", 0.6))):
+        out.append({"measureId": f"sample-{role}", "label": label, "unit": "g L-1", "role": role, "points": [
+            {"t": t, "value": round(max(0.0, at(t)[k] + jitter(i + 31 * (k + 1), scale)), 3), "entryId": f"sample-{role}-{i}", "confirmed": True}
+            for i, t in enumerate(hours)]})
+    return out
+
+
+def prototype_fermos() -> dict[str, Any]:
+    from . import fermos
+    from .models import FermosSeries
+
+    series = [FermosSeries.model_validate(s) for s in fermos_sample_series()]
+    fit = fermos.fit("sample-run", series, sample=True)
+    fc = fermos.forecast_run(fit_inline=fit.kinetic, sample=True)
+    if fc.evidence is not None:
+        fc.evidence.basis.at = AT
+    return {"fermos-fit.json": fit.model_dump(mode="json"), "fermos-forecast.json": fc.model_dump(mode="json")}
+
+
+def rebuild_fermos_sample(out: Path = FERMOS_SAMPLE) -> Path:
+    out.write_text(json.dumps({"_sample": FERMOS_SAMPLE_NOTE, "series": fermos_sample_series()}, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {out}")
+    return out
+
+
 # §6.1: the figure gallery's sample (/settings/figures). One record per
 # provenance class, so every mark of the grammar is drawn; two limits; and a
 # frontier. Invented numbers, said so in the file's first field and on the
@@ -609,6 +661,7 @@ def main(argv: list[str]) -> int:
     if "--prototype" in argv:
         rebuild_prototype()
         rebuild_figure_samples()
+        rebuild_fermos_sample()
         return 0
     if "--real" in argv:
         with _scratch() as scratch, _pointed_at(scratch, DEMO):
