@@ -170,7 +170,8 @@ export function Mark({ p, x, y, size = 5, faint = false, flagged = false }: { p:
   return (
     <g opacity={faint ? 0.35 : 1} data-provenance={p}>
       {m.ring && <circle cx={x} cy={y} r={s + 3} fill="none" stroke={color} strokeWidth={1} />}
-      {flagged && <circle cx={x} cy={y} r={s + 5} fill="none" stroke="rgb(var(--signal-warn))" strokeWidth={1.5} />}
+      {/* Dashed, so in greyscale it stays apart from gold's solid ring (§6.R). */}
+      {flagged && <circle cx={x} cy={y} r={s + 5} fill="none" stroke="rgb(var(--signal-warn))" strokeWidth={1.5} strokeDasharray="2 2" data-flag="above" />}
       {shape}
     </g>
   );

@@ -4,7 +4,8 @@
 // service computes and keeps each as an artifact; with it down this says so,
 // and nothing stands in for a result (E.2). Shares lib/rag.ts's call, so the
 // two failures are the same two: down, or refused in words.
-import type { GeneosModelInfo, GeneosResult } from '@/data/types';
+import type { ExtractionRecord, GeneosModelInfo, GeneosResult } from '@/data/types';
+import { carbonSourceId } from '@/data/vocabulary';
 import { RagDown, RagRefused, call } from './rag';
 
 export { RagDown as GeneosDown, RagRefused as GeneosRefused };
@@ -38,4 +39,16 @@ export interface MixPointOut {
   uptakeB: number;
   flux: number;
   gPerG: number;
+}
+
+/**
+ * The reported PHA yields a ceiling on `sugar` can be held against: those
+ * whose carbon source, in the paper's words, resolves to that sugar. The rest
+ * (another feed, or none stated) are counted and not drawn, so a yield on oil
+ * or glycerol is never ringed as above a glucose ceiling (§6.R).
+ */
+export function yieldsOnSugar(records: ExtractionRecord[], sugar: string): { on: ExtractionRecord[]; elsewhere: number } {
+  const yields = records.filter((r) => r.field === 'pha_yield_substrate');
+  const on = yields.filter((r) => r.carbonSource && carbonSourceId(r.carbonSource) === sugar);
+  return { on, elsewhere: yields.length - on.length };
 }

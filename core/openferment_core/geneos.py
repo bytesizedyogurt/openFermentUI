@@ -44,10 +44,16 @@ class GeneosUnavailable(RuntimeError):
     """The model cannot be loaded here, in words."""
 
 
-def model_args(model_id: str) -> dict[str, Any]:
-    """The worker's arguments for a model: its id, and its file when fetched."""
-    if model_id == "toy":
-        return {"modelId": "toy"}
+TOY = "toy"
+
+
+def model_args(model_id: str, *, allow_toy: bool = False) -> dict[str, Any]:
+    """The worker's arguments for a model: its id, and its file when fetched.
+    The toy network is a STAND-IN for tests and fixtures: the API and the
+    tool never pass `allow_toy`, so it is refused there like any model not
+    on the shelf (§6.R)."""
+    if model_id == TOY and allow_toy:
+        return {"modelId": TOY}
     entry = shelf.SHELF.get(model_id)
     if entry is None:
         raise GeneosUnavailable(f"there is no model {model_id} on the shelf; it holds {', '.join(shelf.SHELF)}")
@@ -60,8 +66,8 @@ def model_args(model_id: str) -> dict[str, Any]:
     return args
 
 
-def describe(model_id: str) -> dict[str, Any]:
-    return worker().call("describe", model_args(model_id))
+def describe(model_id: str, *, allow_toy: bool = False) -> dict[str, Any]:
+    return worker().call("describe", model_args(model_id, allow_toy=allow_toy))
 
 
 # ── the ceiling, the frontier and the sugar mix (§6.3) ─────────────────
@@ -85,9 +91,12 @@ def version() -> str:
 
 
 def _model_input(model_id: str) -> BasisInput:
-    if model_id == "toy":
+    if model_id == TOY:
+        # An assumption, so whatever is computed on it is modeled (demo),
+        # never computed evidence (basis_provenance; §6.R).
         return BasisInput(name="model", value="toy", unit="", source=BasisSource(
-            kind="model", id="toy", note="the STAND-IN toy network built in the geneOS worker for tests and fixtures"))
+            kind="assumption", id=TOY, by="openFerment test fixture",
+            note="the STAND-IN toy network built in the geneOS worker for tests and fixtures; not a published model"))
     entry = shelf.SHELF[model_id]
     if entry.fetched:
         f = entry.fetched
@@ -136,17 +145,17 @@ def _model_id(inputs: list[BasisInput]) -> str:
 
 
 def _run_ceiling(inputs, seed):
-    return worker().call("ceiling", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+    return worker().call("ceiling", {**model_args(_model_id(inputs), allow_toy=True), "product": _value(inputs, "product"),
                                      "substrate": _value(inputs, "substrate")})
 
 
 def _run_frontier(inputs, seed):
-    return worker().call("frontier", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+    return worker().call("frontier", {**model_args(_model_id(inputs), allow_toy=True), "product": _value(inputs, "product"),
                                       "substrate": _value(inputs, "substrate")})
 
 
 def _run_mix(inputs, seed):
-    return worker().call("mix", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+    return worker().call("mix", {**model_args(_model_id(inputs), allow_toy=True), "product": _value(inputs, "product"),
                                  "a": _value(inputs, "substrate a"), "b": _value(inputs, "substrate b")})
 
 
@@ -161,7 +170,7 @@ for _name in (CEILING, FRONTIER, MIX):
     artifacts.register_lazy(_name, _register)
 
 
-def _check(model_id: str, product: str, substrates: list[str]) -> str | None:
+def _check(model_id: str, product: str, substrates: list[str], allow_toy: bool = False) -> str | None:
     """A finding in words when the model cannot make this product from these
     sugars; None when it can. Raises GeneosUnavailable for a bad request."""
     if product not in shelf.PRODUCTS:
@@ -169,7 +178,7 @@ def _check(model_id: str, product: str, substrates: list[str]) -> str | None:
     for sub in substrates:
         if sub not in shelf.SUBSTRATES:
             raise GeneosUnavailable(f"there is no substrate {sub}; the shelf knows {', '.join(shelf.SUBSTRATES)}")
-    d = describe(model_id)
+    d = describe(model_id, allow_toy=allow_toy)
     if not d["products"].get(product):
         return f"this reconstruction has no route to {shelf.PRODUCTS[product]['name']}"
     for sub in substrates:
@@ -183,8 +192,8 @@ def _label(model_id: str, what: str) -> str:
     return f"{what}, {entry.name if entry else model_id}{f' ({entry.scope})' if entry else ''}"
 
 
-def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True) -> GeneosResult:
-    finding = _check(model_id, product, [substrate])
+def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True, allow_toy: bool = False) -> GeneosResult:
+    finding = _check(model_id, product, [substrate], allow_toy)
     if finding:
         return GeneosResult(kind="ceiling", modelId=model_id, product=product, substrates=[substrate], finding=finding)
     art = artifacts.compute(CEILING, _inputs(model_id, product, [substrate]), keep=keep)
@@ -197,8 +206,8 @@ def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True) -
                         artifactId=art.id, evidence=ev, output=out)
 
 
-def frontier(model_id: str, product: str, substrate: str, *, keep: bool = True) -> GeneosResult:
-    finding = _check(model_id, product, [substrate])
+def frontier(model_id: str, product: str, substrate: str, *, keep: bool = True, allow_toy: bool = False) -> GeneosResult:
+    finding = _check(model_id, product, [substrate], allow_toy)
     if finding:
         return GeneosResult(kind="frontier", modelId=model_id, product=product, substrates=[substrate], finding=finding)
     art = artifacts.compute(FRONTIER, _inputs(model_id, product, [substrate]), keep=keep)
@@ -211,13 +220,22 @@ def frontier(model_id: str, product: str, substrate: str, *, keep: bool = True) 
                         artifactId=art.id, evidence=ev, output=art.output)
 
 
-def mix(model_id: str, product: str, a: str, b: str, *, keep: bool = True) -> GeneosResult:
-    finding = _check(model_id, product, [a, b])
+def mix(model_id: str, product: str, a: str, b: str, *, keep: bool = True, allow_toy: bool = False) -> GeneosResult:
+    if a == b:
+        raise GeneosUnavailable(f"a mix is of two different sugars; {a} was named twice")
+    finding = _check(model_id, product, [a, b], allow_toy)
     if finding:
         return GeneosResult(kind="mix", modelId=model_id, product=product, substrates=[a, b], finding=finding)
     art = artifacts.compute(MIX, _inputs(model_id, product, [a, b]), keep=keep)
+    # The line's lowest point, as the value a plan may cite; the basis travels
+    # with it to the figure (§6.R).
+    low = min(art.output["points"], key=lambda p: p["gPerG"])
+    ev = Evidence(
+        id=f"ev-{art.id}", label=_label(model_id, f"lowest {product.upper()} ceiling across mixtures of {a} and {b}"),
+        value=low["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="mix",
+    )
     return GeneosResult(kind="mix", modelId=model_id, product=product, substrates=[a, b],
-                        artifactId=art.id, output=art.output)
+                        artifactId=art.id, evidence=ev, output=art.output)
 
 
 def models() -> list[GeneosModelInfo]:
@@ -248,6 +266,8 @@ def fetch(model: shelf.ShelfModel = shelf.SHELF["RehMBEL1391"], *, run=subproces
     verify its hash. Returns the file's path; raises on a mismatch."""
     f = model.fetched
     assert f is not None, f"{model.id} is not a fetched model"
+    if f.local.is_file() and sha256_of(f.local) == f.sha256:
+        return f.local  # present and the pinned file: nothing to fetch
     clone = f.local.parents[len(Path(f.path).parts) - 1]
     if not (clone / ".git").is_dir():
         clone.parent.mkdir(parents=True, exist_ok=True)

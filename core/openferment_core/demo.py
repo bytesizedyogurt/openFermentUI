@@ -556,9 +556,9 @@ def prototype_geneos() -> dict[str, Any]:
     subs = list(shelf.SUBSTRATES)
     return {
         "geneos-models.json": [m.model_dump(mode="json") for m in models],
-        "geneos-ceiling.json": {s: _fixed(geneos.ceiling("toy", "phb", s, keep=False)) for s in subs},
-        "geneos-frontier.json": {s: _fixed(geneos.frontier("toy", "phb", s, keep=False)) for s in subs},
-        "geneos-mix.json": _fixed(geneos.mix("toy", "phb", "glucose", "xylose", keep=False)),
+        "geneos-ceiling.json": {s: _fixed(geneos.ceiling("toy", "phb", s, keep=False, allow_toy=True)) for s in subs},
+        "geneos-frontier.json": {s: _fixed(geneos.frontier("toy", "phb", s, keep=False, allow_toy=True)) for s in subs},
+        "geneos-mix.json": _fixed(geneos.mix("toy", "phb", "glucose", "xylose", keep=False, allow_toy=True)),
     }
 
 

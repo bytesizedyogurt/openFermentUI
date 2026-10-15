@@ -78,13 +78,15 @@ export function stripPoints(props: EvidenceStripProps): { points: StripPoint[]; 
       continue;
     }
     const excl = aggregateExclusion(r);
+    const prov = provenanceOf(r);
     const overRule = props.flagAbove && props.rules ? props.rules.filter((rule) => value! > rule.value) : [];
     points.push({
       record: r,
       group: groupOf(r, props.groupBy),
       value,
-      provenance: provenanceOf(r),
-      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : null,
+      provenance: prov,
+      // A modeled value is never evidence (E.8), so it stays out of the median.
+      heldOut: excl ? EXCLUSION_WORDS[excl] ?? excl : prov === 'demo' ? 'modeled, never evidence' : null,
       above: lowest !== null && overRule.length ? `above ${overRule.map((x) => x.label).join(', ')}` : null,
     });
   }

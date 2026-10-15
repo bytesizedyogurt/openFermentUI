@@ -16,9 +16,8 @@ import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState } from '@/components/ui';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { CeilingGap, Frontier, MixLine, stripPoints, type Ceiling } from '@/components/figures';
-import { GeneosDown, GeneosRefused, SUBSTRATES, geneosCeiling, geneosFrontier, geneosMix, geneosModels, type FrontierPointOut, type MixPointOut } from '@/lib/geneos';
+import { GeneosDown, GeneosRefused, SUBSTRATES, yieldsOnSugar, geneosCeiling, geneosFrontier, geneosMix, geneosModels, type FrontierPointOut, type MixPointOut } from '@/lib/geneos';
 
-const FIELD = 'pha_yield_substrate';
 const UNIT = 'g g⁻¹';
 const QUANTITY = 'PHB yield on substrate';
 
@@ -64,6 +63,8 @@ export default function GeneOSModel() {
     const ctrl = new AbortController();
     setBusy(true);
     setRefused(null);
+    // The last sugar's answers never stand under this sugar's titles (§6.R).
+    setLoaded(null);
     const other = substrate === 'xylose' ? 'glucose' : 'xylose';
     Promise.all([
       Promise.all(usable.map((m) => geneosCeiling(m.id, substrate, 'phb', ctrl.signal))),
@@ -73,6 +74,7 @@ export default function GeneOSModel() {
       .then(([ceilings, frontier, mix]) => setLoaded({ ceilings, frontier, mix }))
       .catch((e: unknown) => {
         if (ctrl.signal.aborted) return;
+        setLoaded(null);
         if (e instanceof GeneosRefused) setRefused(e.message);
         else if (e instanceof GeneosDown) setDown(`${e.message} ${e.remedy}`);
         else setRefused(String(e));
@@ -81,13 +83,15 @@ export default function GeneOSModel() {
     return () => ctrl.abort();
   }, [shelf, chosen?.id, substrate, usable]);
 
-  const yields = useMemo(() => records.filter((r) => r.field === FIELD) as ExtractionRecord[], [records]);
+  // Only the yields measured on this sugar are held against its ceilings.
+  const { on: yields, elsewhere } = useMemo(() => yieldsOnSugar(records as ExtractionRecord[], substrate), [records, substrate]);
   const ceilings: Ceiling[] = (loaded?.ceilings ?? [])
     .filter((c) => c.evidence)
     .map((c) => ({
       value: Number(c.evidence!.value),
       model: `${c.modelId} ceiling`,
       basis: c.evidence!.basis,
+      provenance: c.evidence!.provenance,
     }));
   const findings = [
     ...(loaded?.ceilings ?? []).filter((c) => c.finding).map((c) => `${c.modelId}: ${c.finding}`),
@@ -148,6 +152,14 @@ export default function GeneOSModel() {
         />
       )}
 
+      {shelf && (
+        <p className="text-caption text-ink-soft" data-testid="yields-elsewhere">
+          The ceilings are for PHB; the records are PHA yields the papers reported on {substrate}, as written.
+          {elsewhere > 0 &&
+            ` ${elsewhere} PHA yield record${elsewhere === 1 ? '' : 's'} on another feed, or with no feed stated, ${elsewhere === 1 ? 'is' : 'are'} not drawn here.`}
+        </p>
+      )}
+
       {flagged.length > 0 && (
         <section aria-label="Yields above a ceiling" className="space-y-1.5" data-testid="above-ceiling">
           <h3 className="font-medium text-reading">Reported above a ceiling: check the basis</h3>
@@ -187,6 +199,7 @@ export default function GeneOSModel() {
           quantity={QUANTITY}
           model={chosen.name}
           csvName={`sugar-mix-${chosen.id}`}
+          basis={loaded.mix.evidence?.basis}
         />
       )}
 

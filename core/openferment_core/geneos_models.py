@@ -153,8 +153,33 @@ SHELF: dict[str, ShelfModel] = {
 }
 
 
+# A file's hash, remembered against its size and modification time, so a
+# file is hashed once and again only when it changes.
+_HASHED: dict[str, tuple[int, int, str]] = {}
+
+
+def file_sha256(path: Path) -> str:
+    import hashlib
+
+    st = path.stat()
+    seen = _HASHED.get(str(path))
+    if seen and seen[:2] == (st.st_size, st.st_mtime_ns):
+        return seen[2]
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    _HASHED[str(path)] = (st.st_size, st.st_mtime_ns, h.hexdigest())
+    return h.hexdigest()
+
+
 def available(model: ShelfModel) -> str | None:
-    """Why the model cannot be loaded here, or None when it can."""
-    if model.fetched and not model.fetched.local.is_file():
+    """Why the model cannot be loaded here, or None when it can. A fetched
+    file is checked against its pinned hash every time it is used (§6.R)."""
+    if not model.fetched:
+        return None
+    if not model.fetched.local.is_file():
         return f"{model.id}'s file is not on this machine: run pnpm geneos:fetch"
+    if file_sha256(model.fetched.local) != model.fetched.sha256:
+        return f"{model.id}'s file does not match its pinned sha256: run pnpm geneos:fetch, which fetches it again"
     return None

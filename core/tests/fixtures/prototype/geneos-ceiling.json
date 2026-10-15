@@ -9,27 +9,27 @@
         "glucose"
       ],
       "finding": null,
-      "artifactId": "f53a126edb8f1178",
+      "artifactId": "d9f046970a805bfb",
       "evidence": {
-        "id": "ev-f53a126edb8f1178",
+        "id": "ev-d9f046970a805bfb",
         "label": "most PHB from glucose, toy",
         "value": 0.955727258598104,
         "unit": "g g-1",
         "interval": null,
-        "provenance": "computed",
+        "provenance": "demo",
         "basis": {
           "tool": "geneos.ceiling",
-          "toolVersion": "cobra 0.32.1 · worker f330bcaf4739",
+          "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
           "inputs": [
             {
               "name": "model",
               "value": "toy",
               "unit": "",
               "source": {
-                "kind": "model",
+                "kind": "assumption",
                 "id": "toy",
-                "note": "the STAND-IN toy network built in the geneOS worker for tests and fixtures",
-                "by": null
+                "note": "the STAND-IN toy network built in the geneOS worker for tests and fixtures; not a published model",
+                "by": "openFerment test fixture"
               }
             },
             {
@@ -66,7 +66,7 @@
               }
             }
           ],
-          "artifactId": "f53a126edb8f1178",
+          "artifactId": "d9f046970a805bfb",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         },

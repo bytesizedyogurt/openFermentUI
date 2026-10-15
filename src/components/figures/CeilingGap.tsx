@@ -4,7 +4,7 @@
 // the rules is the figure's whole message, so it prints no derived
 // percentage. A point above a rule is ringed, for a reviewer to check its
 // basis.
-import type { ComputedBasis, ExtractionRecord } from '@/data/types';
+import type { ComputedBasis, ExtractionRecord, Provenance } from '@/data/types';
 import { EvidenceStrip, toTable as stripTable, type EvidenceStripProps } from './EvidenceStrip';
 import type { FigureTable } from './FigureFrame';
 
@@ -19,6 +19,8 @@ export interface Ceiling {
   /** The model that made it. */
   model: string;
   basis?: ComputedBasis;
+  /** Its own provenance: computed, or demo for a stand-in network. */
+  provenance?: Provenance;
 }
 
 export interface CeilingGapProps {
@@ -38,7 +40,7 @@ function asStrip(props: CeilingGapProps): EvidenceStripProps {
     unit: props.unit,
     quantity: props.quantity,
     groupBy: props.groupBy ?? 'organism',
-    rules: props.ceilings.map((c) => ({ value: c.value, label: c.model, provenance: 'computed' })),
+    rules: props.ceilings.map((c) => ({ value: c.value, label: c.model, provenance: c.provenance ?? 'computed' })),
     flagAbove: true,
     basis: props.ceilings.map((c) => c.basis).filter((b): b is ComputedBasis => Boolean(b)),
     csvName: props.csvName ?? 'ceiling-gap',
