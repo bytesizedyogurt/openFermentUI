@@ -332,6 +332,24 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@app.get("/api/proforma/status")
+def proforma_status() -> dict:
+    """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
+    from . import proforma
+
+    return proforma.status()
+
+
+def _warm_proforma() -> None:
+    from . import proforma
+
+    if proforma.warm_on_start():
+        proforma.start(background=True)
+
+
+_warm_proforma()
+
+
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────
 
 

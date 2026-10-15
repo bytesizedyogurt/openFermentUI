@@ -146,12 +146,13 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Twenty-two stages, in order: check:secrets → typecheck →
-  check:plan → check:reference → test:core → check:licences → check:seed →
+  green.** Twenty-three stages, in order: check:secrets → typecheck →
+  check:plan → check:reference → test:core → test:sim → check:licences → check:seed →
   check:biorepo → test:export → check:anchors → check:store → check:guild →
   check:lock → check:capture → check:figures → build → test:durable → test:deposition →
   test:reconcile → test:smoke → test:golden → test:deep. Live tests are
-  `pnpm test:live` and never in verify.
+  `pnpm test:live` and never in verify. `test:sim` starts the real BioSTEAM
+  worker (pytest marker `sim`); `slow` runs are `pnpm test:slow`, outside verify.
 - `check:biorepo` brings its OWN export (OF-BLD-012.1 F5): it runs
   `export-corpus.ts` into a temp directory and checks against that, so it needs
   no prior `export:corpus` and can never call a decision unmerged when the

@@ -37,6 +37,13 @@ allowed = [
   "3-Clause BSD License",         # protobuf spells it so
   # Added 2026-10-15 with the sim extra (OF-BLD-014 §6.2).
   "License :: OSI Approved :: BSD License",  # scipy, pandas, sympy, mpmath, by classifier
+  # Added 2026-10-15 with BioSTEAM in the sim extra (OF-BLD-014 §8.1).
+  "License :: OSI Approved :: University of Illinois/NCSA Open Source License",  # biosteam, thermosteam
+  "MIT license",                  # chaospy spells it so
+  "BSD-2-Clause AND Apache-2.0 WITH LLVM-exception",  # llvmlite
+  "License :: OSI Approved :: Python Software Foundation License",  # matplotlib, by classifier
+  "ISC license",                  # pexpect
+  "License :: OSI Approved :: ISC License (ISCL)",  # pexpect, ptyprocess, by classifier
 ]
 
 [accepted.certifi]
@@ -108,3 +115,9 @@ sha256 = "inside the cobra package"
 by = "Sean Creighton"
 date = 2026-10-15
 why = "The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
+
+[accepted.pyglet]
+licence = "no licence metadata"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "thermosteam's dependency, pulled in by BioSTEAM in the sim extra and loaded in the Proforma worker; its metadata states no licence, and its repository (github.com/pyglet/pyglet) carries a BSD 3-clause LICENSE, read 2026-10-15."
