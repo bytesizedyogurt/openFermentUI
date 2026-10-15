@@ -301,6 +301,22 @@ async function main() {
     /17 bacterial|Kiverdi|no algal/i.test(f6),
   );
 
+  // ── 10b. Live mode shows the loop's work; Scripted is untouched ─────
+  // OF-BLD-014 §5.4. The double replays the stream the real loop recorded.
+  await go('/postdoc');
+  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+  const live = page.locator('textarea[aria-label="Ask a question"]');
+  await live.fill('What does the stand-in table report for placeholder A?');
+  await live.press('Enter');
+  await page.locator('[data-testid="passage-quote"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+  const traced = await page.locator('[data-testid="trace-step"]').count();
+  const quoted = await page.locator('[data-testid="passage-quote"]').count();
+  check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
+  await page.getByRole('button', { name: 'Scripted' }).click();
+  await page.locator('button', { hasText: /titers have been achieved/i }).first().click();
+  await page.waitForTimeout(2500);
+  check('Scripted mode still plays its flow', /500 mg\/L|15–18|1\.45/.test(await page.locator('body').innerText()));
+
   // ── 11. Command palette navigates ───────────────────────────────────
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);

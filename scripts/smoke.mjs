@@ -402,6 +402,42 @@ async function main() {
       const card = (await page.locator('[data-testid="retrieval-scorecard"]').innerText().catch(() => '')) ?? '';
       if (!/in use: bm25/.test(card) || !/hybrid/.test(card)) problems.push('Witness does not show the retrieval scorecard');
 
+      // OF-BLD-014 §5.4 — Postdoc live: the steps draw as the double replays
+      // the stream the real loop recorded, the claim shows its record's value
+      // and its quoted sentence, the footer says why the loop stopped, and
+      // the quote opens the reader on the paper's words.
+      await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+      await page.locator('textarea[aria-label="Ask a question"]').fill('What does the stand-in table report for placeholder A?');
+      await page.locator('textarea[aria-label="Ask a question"]').press('Enter');
+      await page.locator('[data-testid="trace-step"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const early = await page.locator('[data-testid="trace-step"]').count();
+      await page.locator('[data-testid="passage-quote"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (early < 1 || early >= 3) problems.push(`the trace did not draw step by step (saw ${early} steps before the answer)`);
+      if (!doubleState.asks.some((a) => a.path === '/api/ask/stream' && a.mode === 'agent'))
+        problems.push('Postdoc live did not ask the stream in agent mode');
+      const steps = await page.locator('[data-testid="trace-step"]').allInnerTexts();
+      if (steps.length !== 3) problems.push(`the trace shows ${steps.length} steps, not 3`);
+      if (!/Looked up records of secreted titer · 1 record/.test(steps[0] ?? '')) problems.push('the first trace line is not the record search in plain words');
+      if (!/Searched the papers for "placeholder rows in the table" · 2 passages/.test(steps[1] ?? '')) problems.push('the second trace line is not the passage search');
+      await page.locator('[data-testid="trace-step"] summary').nth(1).click();
+      if (!/"query": "placeholder rows in the table"/.test(await page.locator('[data-testid="trace-input"]').nth(1).innerText().catch(() => '')))
+        problems.push('a trace line does not open to its exact input');
+      const answer = await page.locator('body').innerText();
+      if (!/The stand-in table reports a secreted titer for placeholder condition A\./.test(answer)) problems.push('the live claim is missing');
+      if (!/cl1-B5-a07dd73c/.test(answer)) problems.push("the live claim does not render its record's value");
+      if (!/Placeholder A \| 7 \| mg L-1/.test(await page.locator('[data-testid="passage-quote"]').innerText()))
+        problems.push('the live claim does not show its quoted sentence');
+      const footer = (await page.locator('[data-testid="plan-footer"]').innerText().catch(() => '')) ?? '';
+      if (!/2 tool calls; answered when it had what it needed/.test(footer)) problems.push(`the footer does not say why the loop stopped: ${footer}`);
+      await page.locator('[data-testid="quote-in-reader"]').click();
+      await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/Placeholder A \| 7 \| mg L-1/.test((await page.locator('[data-testid="quote-mark"]').innerText().catch(() => '')) ?? ''))
+        problems.push('the quoted sentence did not open the reader on its words');
+      // Back to scripted, which the live panel leaves untouched.
+      await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Scripted' }).click();
+
       // §7.3 — the review card. The new candidate is in the queue, labelled;
       // accepting it posts a decision to the service. The curated record on
       // the same fetched paper shows the extractor's disagreeing span, and
@@ -493,7 +529,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it');
       }
     } catch (e) {
       overlayFails++;
