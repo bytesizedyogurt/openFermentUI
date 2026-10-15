@@ -124,6 +124,9 @@ const PAIRS = [
   ['Artifact', 'Artifact'],
   ['ReplayDifference', 'ReplayDifference'],
   ['ReplayResult', 'ReplayResult'],
+  // OF-BLD-014 §3.4 — the tool registry.
+  ['ToolInfo', 'ToolInfo'],
+  ['ToolResult', 'ToolResult'],
 ];
 
 let compared = 0;

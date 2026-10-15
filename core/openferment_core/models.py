@@ -893,3 +893,28 @@ class ReplayResult(BaseModel):
     replayedHash: str
     differences: list[ReplayDifference] = Field(default_factory=list)
     durationMs: int
+
+
+# ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────
+
+
+class ToolInfo(BaseModel):
+    """One tool as `GET /api/tools` lists it."""
+
+    name: str
+    description: str
+    inputSchema: dict[str, Any]
+
+
+class ToolResult(BaseModel):
+    """What a tool returns to whoever called it: Postdoc's loop, the HTTP
+    endpoint or the MCP server (E.6)."""
+
+    # What the model reads; at most 9,000 characters as JSON.
+    summary: dict[str, Any] = Field(default_factory=dict)
+    # Computed values a plan may cite.
+    evidence: list[Evidence] = Field(default_factory=list)
+    # Records a plan may cite.
+    recordIds: list[str] = Field(default_factory=list)
+    # A refusal or an unavailable tool, in words.
+    error: str | None = None

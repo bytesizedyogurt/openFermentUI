@@ -1954,3 +1954,24 @@ export interface ReplayResult {
   differences: ReplayDifference[];
   durationMs: number;
 }
+
+// ── tools (OF-BLD-014 §3.4, E.6) ───────────────────────────────────────
+
+/** One tool as `GET /api/tools` lists it. */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** What a tool returns: to Postdoc's loop, the HTTP endpoint or the MCP server. */
+export interface ToolResult {
+  /** What the model reads; at most 9,000 characters as JSON. */
+  summary: Record<string, unknown>;
+  /** Computed values a plan may cite. */
+  evidence: Evidence[];
+  /** Records a plan may cite. */
+  recordIds: string[];
+  /** A refusal or an unavailable tool, in words. */
+  error: string | null;
+}

@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -26,7 +27,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, practice, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, practice, tools, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -56,6 +57,8 @@ from .models import (
     PracticeTurnRequest,
     ReplayResult,
     ReviewDecision,
+    ToolInfo,
+    ToolResult,
     Usage,
 )
 from . import llm
@@ -547,6 +550,25 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
         raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
     except artifacts.ToolNotRegistered as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+# ── Tools (OF-BLD-014 §3.4, E.6) ─────────────────────────────────────────
+
+
+@app.get("/api/tools", response_model=list[ToolInfo])
+def tools_list() -> list[ToolInfo]:
+    """Each tool's name, description and input schema."""
+    return tools.infos()
+
+
+@app.post("/api/tools/{name}", response_model=ToolResult)
+def tools_run(name: str, body: dict[str, Any]) -> ToolResult:
+    """Run one tool through the registry, the same path Postdoc's loop and
+    the MCP server take. A refusal is a result with `error` set; an unknown
+    tool is a 404."""
+    if name not in tools.REGISTRY:
+        raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
+    return tools.run(name, body)
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

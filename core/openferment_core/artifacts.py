@@ -61,6 +61,9 @@ class Registered:
 
 
 _REGISTRY: dict[str, Registered] = {}
+# A tool whose version cannot be known at import (it reads a file that may not
+# exist yet) registers a function that registers it, run on first use.
+_LAZY: dict[str, Callable[[], None]] = {}
 _LOCK = threading.Lock()
 
 
@@ -76,7 +79,15 @@ def register(tool: str, version: str, fn: ToolFn) -> None:
     _REGISTRY[tool] = Registered(tool, version, fn)
 
 
+def register_lazy(tool: str, registrar: Callable[[], None]) -> None:
+    """`registrar()` calls `register(tool, ...)` the first time `tool` is
+    computed or replayed."""
+    _LAZY[tool] = registrar
+
+
 def registered(tool: str) -> Registered:
+    if tool not in _REGISTRY and tool in _LAZY:
+        _LAZY[tool]()
     try:
         return _REGISTRY[tool]
     except KeyError:
@@ -205,7 +216,8 @@ def compute(
     if not keep:
         return artifact
     path = _path(aid)
-    with _LOCK, atomic.held(path):
+    # One lock for the store, held across processes, beside the files.
+    with _LOCK, atomic.held(folder() / ".store"):
         # Two callers may have computed the same thing at once. The first to
         # write wins and both return its file, so there is one artifact.
         if path.exists():
