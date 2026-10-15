@@ -46,7 +46,10 @@ def evaluate(name: str, values: dict[str, float]) -> dict[str, float]:
     unknown = sorted(set(values) - set(module.INPUTS))
     if unknown:
         raise Refused(f"{name} has no input {', '.join(unknown)}; it takes {', '.join(module.INPUTS)}")
-    return module.evaluate(system, values)
+    try:
+        return module.evaluate(system, values)
+    except ValueError as e:  # an input outside what the flowsheet takes, in its words
+        raise Refused(str(e)) from e
 
 
 def grid(name: str, axes: dict[str, list[float]], base: dict[str, float]) -> dict[str, Any]:
@@ -56,7 +59,8 @@ def grid(name: str, axes: dict[str, list[float]], base: dict[str, float]) -> dic
     cells = []
     for combo in itertools.product(*(axes[k] for k in keys)):
         values = {**base, **dict(zip(keys, combo))}
-        cells.append({"at": dict(zip(keys, combo)), "outputs": evaluate(name, values)})
+        outputs, reason = _attempt(name, values)
+        cells.append({"at": dict(zip(keys, combo)), "outputs": outputs, "infeasible": reason})
     return {"axes": axes, "base": base, "cells": cells}
 
 
@@ -76,18 +80,26 @@ def _sample(spec: dict[str, Any], u: float) -> float:
     raise Refused(f"there is no distribution {kind}")
 
 
+def _attempt(name: str, values: dict[str, float]) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+    """One case. A case the flowsheet cannot hold is a result, named: its
+    reason key (a flowsheet's `Infeasible.reason`, else `error`) and words."""
+    try:
+        return evaluate(name, values), None
+    except Refused:
+        raise
+    except Exception as e:
+        reason = getattr(e, "reason", None) or "error"
+        return None, {"reason": str(reason), "detail": str(e) if reason != "error" else f"{type(e).__name__}: {e}"}
+
+
 def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, base: dict[str, float]) -> dict[str, Any]:
     keys = list(specs)
     lhs = qmc.LatinHypercube(d=max(1, len(keys)), seed=seed).random(n)
     samples = []
     for row in lhs:
         values = {**base, **{k: _sample(specs[k], float(row[i])) for i, k in enumerate(keys)}}
-        try:
-            samples.append({"inputs": values, "outputs": evaluate(name, values), "infeasible": None})
-        except Refused as e:
-            samples.append({"inputs": values, "outputs": None, "infeasible": str(e)})
-        except Exception as e:  # a case the simulator cannot close is a result, named
-            samples.append({"inputs": values, "outputs": None, "infeasible": f"{type(e).__name__}: {e}"})
+        outputs, reason = _attempt(name, values)
+        samples.append({"inputs": values, "outputs": outputs, "infeasible": reason})
     return {"n": n, "seed": seed, "samples": samples}
 
 

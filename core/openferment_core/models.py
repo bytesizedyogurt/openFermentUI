@@ -1263,6 +1263,115 @@ class RagSearchResponse(BaseModel):
     note: str | None = None
 
 
+# ── Proforma's BioSTEAM scenario (OF-BLD-014 §8.3) ──────────────────────
+
+
+class BoundRecord(BaseModel):
+    """One record an input was bound to, in the input's unit."""
+
+    id: str
+    paperId: str
+    value: float
+    organism: str | None = None
+    carbonSource: str | None = None
+    provenance: Provenance
+
+
+class ScenarioInput(BaseModel):
+    key: str
+    label: str
+    unit: str
+    # 'records': the median and range of bound records; 'assumption': a named
+    # person typed it; 'waiting': neither yet, so the scenario cannot run.
+    binding: Literal["records", "assumption", "waiting"]
+    value: float | None = None
+    low: float | None = None
+    high: float | None = None
+    # 'triangular' over min, median, max; 'uniform' over a pair or an
+    # assumption's range; 'fixed' for a single source.
+    sampling: Literal["triangular", "uniform", "fixed"] | None = None
+    source: BasisSource | None = None
+    recordIds: list[str] = Field(default_factory=list)
+    records: list[BoundRecord] = Field(default_factory=list)
+    # Records of the field left out because they name no carbon source, or
+    # one that is not a sugar or a hydrolysate.
+    leftOutNoCarbon: int = 0
+    leftOutOtherCarbon: int = 0
+    # Words the inputs table prints: 'single source', a clip to the ceiling,
+    # a refused conversion.
+    flags: list[str] = Field(default_factory=list)
+
+
+class InputAssumption(BaseModel):
+    key: str
+    value: float
+    low: float
+    high: float
+    by: str
+    at: str
+    note: str | None = None
+
+
+class ProformaScenarioInfo(BaseModel):
+    id: str
+    name: str
+    product: str
+    flowsheet: str
+    host: str | None = None
+    hosts: list[str] = Field(default_factory=list)
+    inputs: list[ScenarioInput]
+    waiting: list[str] = Field(default_factory=list)
+    leavesOut: list[str] = Field(default_factory=list)
+    priceBasis: str
+
+
+class ProformaRunRequest(BaseModel):
+    scenarioId: str
+    assumptions: list[InputAssumption] = Field(default_factory=list)
+    host: str | None = None
+    seed: int = 0
+
+
+class HistogramBin(BaseModel):
+    low: float
+    high: float
+    count: int
+
+
+class InputSensitivity(BaseModel):
+    key: str
+    rho: float
+    sourceKind: str
+
+
+class ProformaGrid(BaseModel):
+    dims: list[dict[str, Any]]
+    msp: list[float | None]
+    costLines: dict[str, list[float | None]]
+    infeasible: int
+
+
+class ProformaRunResult(BaseModel):
+    scenarioId: str
+    artifactId: str
+    provenance: Provenance
+    inputs: list[ScenarioInput]
+    basePrice: float | None
+    baseCostLines: dict[str, float] | None
+    baseInfeasible: str | None = None
+    quantiles: dict[str, float]
+    histogram: list[HistogramBin]
+    sensitivity: list[InputSensitivity]
+    samples: int
+    feasible: int
+    infeasible: dict[str, int]
+    grid: ProformaGrid
+    readBack: dict[str, float]
+    leavesOut: list[str]
+    priceBasis: str
+    evidence: Evidence
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()

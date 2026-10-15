@@ -159,6 +159,15 @@ const PAIRS = [
   ['Band', 'Band'],
   ['Interval', 'Interval'],
   ['ForecastResult', 'ForecastResult'],
+  ['BoundRecord', 'BoundRecord'],
+  ['ScenarioInput', 'ScenarioInput'],
+  ['InputAssumption', 'InputAssumption'],
+  ['ProformaScenarioInfo', 'ProformaScenarioInfo'],
+  ['ProformaRunRequest', 'ProformaRunRequest'],
+  ['HistogramBin', 'HistogramBin'],
+  ['InputSensitivity', 'InputSensitivity'],
+  ['ProformaGrid', 'ProformaGrid'],
+  ['ProformaRunResult', 'ProformaRunResult'],
   ['TraceStep', 'TraceStep'],
 ];
 

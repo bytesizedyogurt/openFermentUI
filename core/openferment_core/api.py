@@ -50,6 +50,7 @@ from .models import (
     FermosFitResponse,
     FetchResult,
     ForecastRequest,
+    ProformaRunRequest,
     ForecastResult,
     GeneosModelInfo,
     GeneosResult,
@@ -361,6 +362,29 @@ def proforma_benchmark_run() -> dict:
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the benchmark: {e}") from e
     return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
+
+
+@app.get("/api/proforma/scenarios")
+def proforma_scenarios(host: str | None = None) -> list[dict]:
+    """The BioSTEAM scenario with its inputs bound to records (§8.3). A read:
+    it starts no simulator."""
+    from . import proforma
+
+    return [proforma.scenario(host=host).model_dump(mode="json")]
+
+
+@app.post("/api/proforma/run")
+def proforma_run(req: ProformaRunRequest) -> dict:
+    """Run the scenario: 422 listing every input waiting for a source."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return proforma.run(req).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
 
 
 def _warm_proforma() -> None:

@@ -17,7 +17,7 @@ from __future__ import annotations
 from importlib import import_module
 from types import ModuleType
 
-KNOWN = ("toy",)
+KNOWN = ("toy", "pha_sugar_v0")
 
 
 def load(name: str) -> ModuleType:

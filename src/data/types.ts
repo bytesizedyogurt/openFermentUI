@@ -2295,3 +2295,105 @@ export interface RagSearchResponse {
   /** Why another lane ran in place of the chosen one, when it did. */
   note: string | null;
 }
+
+// ── Proforma's BioSTEAM scenario (OF-BLD-014 §8.3) ──────────────────────
+// Mirrors of core/openferment_core/models.py; check:plan diffs the fields.
+
+/** One record an input was bound to, in the input's unit. */
+export interface BoundRecord {
+  id: string;
+  paperId: string;
+  value: number;
+  organism: string | null;
+  carbonSource: string | null;
+  provenance: Provenance;
+}
+
+export interface ScenarioInput {
+  key: string;
+  label: string;
+  unit: string;
+  /** 'records': bound records; 'assumption': a named person typed it; 'waiting': neither, so the run is refused. */
+  binding: 'records' | 'assumption' | 'waiting';
+  value: number | null;
+  low: number | null;
+  high: number | null;
+  sampling: 'triangular' | 'uniform' | 'fixed' | null;
+  source: BasisSource | null;
+  recordIds: string[];
+  records: BoundRecord[];
+  leftOutNoCarbon: number;
+  leftOutOtherCarbon: number;
+  flags: string[];
+}
+
+/** A value a named person typed for one input, with its range. */
+export interface InputAssumption {
+  key: string;
+  value: number;
+  low: number;
+  high: number;
+  by: string;
+  at: string;
+  note: string | null;
+}
+
+export interface ProformaScenarioInfo {
+  id: string;
+  name: string;
+  product: string;
+  flowsheet: string;
+  host: string | null;
+  hosts: string[];
+  inputs: ScenarioInput[];
+  waiting: string[];
+  leavesOut: string[];
+  priceBasis: string;
+}
+
+export interface ProformaRunRequest {
+  scenarioId: string;
+  assumptions: InputAssumption[];
+  host: string | null;
+  seed: number;
+}
+
+export interface HistogramBin {
+  low: number;
+  high: number;
+  count: number;
+}
+
+export interface InputSensitivity {
+  key: string;
+  rho: number;
+  sourceKind: string;
+}
+
+export interface ProformaGrid {
+  dims: { key: string; values: number[] }[];
+  msp: (number | null)[];
+  costLines: Record<string, (number | null)[]>;
+  infeasible: number;
+}
+
+export interface ProformaRunResult {
+  scenarioId: string;
+  artifactId: string;
+  provenance: Provenance;
+  inputs: ScenarioInput[];
+  basePrice: number | null;
+  baseCostLines: Record<string, number> | null;
+  baseInfeasible: string | null;
+  quantiles: Record<string, number>;
+  histogram: HistogramBin[];
+  sensitivity: InputSensitivity[];
+  samples: number;
+  feasible: number;
+  infeasible: Record<string, number>;
+  grid: ProformaGrid;
+  readBack: Record<string, number>;
+  leavesOut: string[];
+  priceBasis: string;
+  evidence: Evidence;
+}

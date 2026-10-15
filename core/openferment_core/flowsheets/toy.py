@@ -37,6 +37,9 @@ def build() -> Any:
 
 def evaluate(system: Any, values: dict[str, float]) -> dict[str, float]:
     m, s = system.path
+    # The worker keeps several flowsheets; each sets its own thermo before it runs.
+    bst.main_flowsheet.set_flowsheet("toy")
+    bst.settings.set_thermo(["Water", "Ethanol"], cache=True)
     a, b = m.ins
     v = {k: float(values.get(k, spec[2])) for k, spec in INPUTS.items()}
     if not 0 <= v["split"] <= 1:
