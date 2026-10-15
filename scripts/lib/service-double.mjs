@@ -264,6 +264,16 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-014 §8.2 — a service whose simulator has yet to run: the
+    // Benchmark card's empty state.
+    if (url === '/api/proforma/status' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ status: 'cold', error: null }));
+    }
+    if (url === '/api/proforma/benchmark' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ artifact: null, simulator: { status: 'cold', error: null } }));
+    }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
     if (url === '/api/geneos/models' && req.method === 'GET') {

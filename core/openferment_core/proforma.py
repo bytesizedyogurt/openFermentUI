@@ -73,3 +73,69 @@ def call(op: str, args: dict[str, Any]) -> Any:
 
 def warm_on_start() -> bool:
     return os.environ.get("OPENFERMENT_WARM_PROFORMA", "").strip() == "1"
+
+
+# ── The benchmark (§8.2) ────────────────────────────────────────────────
+
+BENCHMARK = "proforma_benchmark"
+BENCHMARK_PACKAGE = "biorefineries.cornstover"
+
+
+def _installed(dist: str) -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version(dist)
+    except PackageNotFoundError:
+        return "not installed"
+
+
+def benchmark_inputs() -> list:
+    from .models import BasisInput, BasisSource
+
+    ref = f"{BENCHMARK_PACKAGE}@{_installed('biorefineries')}"
+    return [
+        BasisInput(name="model", value="biorefineries.cornstover.Biorefinery", unit="", source=BasisSource(
+            kind="model", id=ref,
+            note="the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own")),
+        BasisInput(name="simulator", value=f"biosteam {_installed('biosteam')}", unit="", source=BasisSource(
+            kind="model", id=f"biosteam@{_installed('biosteam')}", note="the process simulator the package runs on")),
+        BasisInput(name="gallon", value="ethanol_density_kggal", unit="kg gal-1", source=BasisSource(
+            kind="model", id=ref, note="the package's own ethanol density per gallon converts its price per kilogram")),
+    ]
+
+
+def _run_benchmark(inputs, seed):
+    return call("benchmark", {})
+
+
+def _register() -> None:
+    from . import artifacts
+
+    artifacts.register(BENCHMARK, f"{BENCHMARK_PACKAGE}@{_installed('biorefineries')}", _run_benchmark)
+
+
+def _register_lazy() -> None:
+    from . import artifacts
+
+    artifacts.register_lazy(BENCHMARK, _register)
+
+
+_register_lazy()
+
+
+def stored_benchmark():
+    """The benchmark this installation ran, or None. A read: it runs nothing."""
+    from . import artifacts
+
+    reg = artifacts.registered(BENCHMARK)
+    try:
+        return artifacts.get(artifacts.artifact_id(reg.tool, reg.version, benchmark_inputs()))
+    except artifacts.ArtifactNotFound:
+        return None
+
+
+def run_benchmark():
+    from . import artifacts
+
+    return artifacts.compute(BENCHMARK, benchmark_inputs())

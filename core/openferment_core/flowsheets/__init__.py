@@ -2,7 +2,8 @@
 alone: `biosteam` is imported here and in workers/proforma_worker.py and
 nowhere else in the package (E.6; test_workers greps for it).
 
-A flowsheet module exposes:
+A flowsheet module in KNOWN exposes (the benchmark, cornstover_benchmark,
+runs a published model whole and exposes `run()` alone):
 
     NAME      its id
     INPUTS    {key: (label, unit, default)} — what `evaluate` may set

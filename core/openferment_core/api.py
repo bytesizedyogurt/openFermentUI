@@ -340,6 +340,29 @@ def proforma_status() -> dict:
     return proforma.status()
 
 
+@app.get("/api/proforma/benchmark")
+def proforma_benchmark() -> dict:
+    """The benchmark this installation reproduced (§8.2), or none yet. A read:
+    it starts nothing. POST runs it."""
+    from . import proforma
+
+    art = proforma.stored_benchmark()
+    return {"artifact": art.model_dump(mode="json") if art else None, "simulator": proforma.status()}
+
+
+@app.post("/api/proforma/benchmark")
+def proforma_benchmark_run() -> dict:
+    """Run the published corn stover biorefinery and keep its price (§8.2)."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        art = proforma.run_benchmark()
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the benchmark: {e}") from e
+    return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
+
+
 def _warm_proforma() -> None:
     from . import proforma
 

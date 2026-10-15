@@ -489,6 +489,14 @@ async function main() {
       const fc = await page.locator('[data-testid="fermos-forecast"]').innerText().catch(() => '');
       if (!/Variation from run to run is absent/.test(fc)) problems.push('the forecast does not say run-to-run variation is absent');
       if (!/Final biomass/.test(fc)) problems.push('the forecast does not give final values as intervals');
+      // OF-BLD-014 §8.2 — the Benchmark card, on a service whose simulator
+      // has yet to run: it says so, names the expected price and offers a run.
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="benchmark-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const bench = await page.locator('[data-testid="benchmark-card"]').innerText().catch(() => '');
+      if (!/Not run on this service yet/.test(bench) || !/biorefineries\.cornstover@2\.35\.1/.test(bench))
+        problems.push('the Benchmark card does not show its empty state with the package it will run');
+      if (!(await page.getByRole('button', { name: 'Run the benchmark' }).count())) problems.push('the Benchmark card offers no run');
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
       // Back to scripted, which the live panel leaves untouched.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });

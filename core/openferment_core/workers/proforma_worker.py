@@ -105,7 +105,9 @@ def _op_montecarlo(args):
 
 
 def _op_benchmark(args):
-    raise Refused("the benchmark arrives in OF-BLD-014 §8.2")
+    from openferment_core.flowsheets import cornstover_benchmark
+
+    return cornstover_benchmark.run()
 
 
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark}
