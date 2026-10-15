@@ -345,4 +345,24 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   reading). **1,016** Python tests offline; smoke **62** routes, golden path
   **29**. Screenshot: `docs/shots/phase-5-postdoc-live.png`, the live panel
   over the service double's recorded stand-in loop.
+- **2026-10-15 · OF-BLD-014 Phase 6 (§6.1–§6.5, §6.R, §6.T)** — one figure
+  grammar and geneOS's first computation. `src/components/figures/` draws
+  every new chart from one table of marks (`ENCODING`, held to E.8 by
+  `pnpm check:figures`, the 22nd verify stage), each figure with a table
+  twin; Settings → Figure grammar shows them over a labelled sample. The
+  `sim` extra brings cobra 0.32.1 into one worker process, with three
+  copyleft libraries accepted under D4 and the model files listed by hash.
+  geneOS computes the most PHB a published network allows from a sugar, its
+  production envelope and a sugar-mix line, each kept as an artifact, and
+  draws them in geneOS → Model beside the reported yields measured on that
+  sugar; `yield_ceiling` is Postdoc's fourth tool. Appendix 2 reproduces
+  within 0.1 % (0.4779 g/g central carbon and 0.5931 g/g genome scale on
+  glucose; 0.5932 g/g for C. necator on fructose; the iJO1366 mix runs
+  0.5931 to 0.5881). Appendix 2 said the C. necator file carries
+  `DM_phb_c`; it carries none, and the worker adds it. The figure draws
+  **0** reported yields: thread P's extraction is owed. The review found
+  eleven, one high (the toy network reachable as `computed`), all fixed or
+  guarded with a failing test or check first. **1,045** Python tests
+  offline; smoke **64** routes, golden path **30**. Screenshots:
+  `docs/shots/phase-6-*`, from the running service with the real models.
 

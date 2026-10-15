@@ -535,10 +535,15 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   copyleft libraries accepted under D4 in `core/licences.toml`, where model
   files are listed under `[data]` with source, revision, hash and licence.
   The toy network the worker builds is a STAND-IN for tests and fixtures and
-  is never listed on the shelf.
+  is never listed on the shelf: the API and the tool refuse it, and
+  `allow_toy` (fixtures alone) gives it an `assumption` model input, so
+  anything computed on it is `demo`. A fetched file is checked against its
+  hash wherever it is used (`geneos_models.available`), and `geneos:fetch`
+  fetches again only a file that is missing or does not match.
 - **geneOS → Model** (`/geneos/model`, `geneos.model` is `live`) draws every
-  shelf model's ceiling for the chosen sugar beside every
-  `pha_yield_substrate` record, rings a record above a ceiling and asks a
+  shelf model's ceiling for the chosen sugar beside each
+  `pha_yield_substrate` record measured on that sugar (`yieldsOnSugar`; the
+  rest are counted, not drawn), rings a record above a ceiling and asks a
   reviewer to check its basis, and shows the chosen model's frontier and
   sugar-mix line and what it lacks. A strain page whose host has a model
   shows its card; an evidence card with the `ceiling` hint draws it inline.

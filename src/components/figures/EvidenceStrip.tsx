@@ -133,7 +133,9 @@ export function EvidenceStrip(props: EvidenceStripProps) {
   const hi = max === lo ? lo + 1 : max + (max - lo) * 0.08;
   const x = (v: number) => LEFT + ((v - lo) / (hi - lo)) * (W - LEFT - RIGHT);
   const H = TOP + Math.max(1, groups.length) * ROW + 34;
-  const axisY = TOP + groups.length * ROW + 6;
+  // An empty strip keeps one row, where it says what would fill it.
+  const axisY = TOP + Math.max(1, groups.length) * ROW + 6;
+  const H2 = groups.length ? H : H + ROW;
   const med = median(points.filter((p) => !p.heldOut).map((p) => p.value));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => lo + t * (hi - lo));
   const drawn =
@@ -152,7 +154,7 @@ export function EvidenceStrip(props: EvidenceStripProps) {
       notes={props.notes}
       empty={points.length === 0 && rules.length === 0 ? props.empty ?? { what: 'no record of this field.', where: 'Records arrive through Intake and are kept in BioRepo.' } : null}
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="evidence-strip">
+      <svg viewBox={`0 0 ${W} ${H2}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="evidence-strip">
         {groups.map((g, i) => (
           <g key={g}>
             <line x1={LEFT} x2={W - RIGHT} y1={TOP + i * ROW} y2={TOP + i * ROW} stroke="currentColor" strokeOpacity={0.08} />
@@ -183,8 +185,13 @@ export function EvidenceStrip(props: EvidenceStripProps) {
           </g>
         ))}
         {points.length === 0 && (
-          <text x={LEFT} y={TOP + 4} fontSize={11} fill="currentColor" opacity={0.8} data-testid="strip-no-records">
-            {props.empty?.what ? `No record yet: ${props.empty.what}` : 'No record of this field yet.'} {props.empty?.where ?? ''}
+          <text x={8} y={TOP + 2} fontSize={11} fill="currentColor" opacity={0.8} data-testid="strip-no-records">
+            <tspan x={8}>{props.empty?.what ? `No record yet: ${props.empty.what}` : 'No record of this field yet.'}</tspan>
+            {props.empty?.where && (
+              <tspan x={8} dy={14}>
+                {props.empty.where}
+              </tspan>
+            )}
           </text>
         )}
         <line x1={LEFT} x2={W - RIGHT} y1={axisY} y2={axisY} stroke="currentColor" strokeOpacity={0.4} />
