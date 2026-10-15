@@ -127,6 +127,10 @@ const PAIRS = [
   // OF-BLD-014 §3.4 — the tool registry.
   ['ToolInfo', 'ToolInfo'],
   ['ToolResult', 'ToolResult'],
+  // OF-BLD-014 §4.1 — passages.
+  ['Passage', 'Passage'],
+  ['RagLane', 'RagLane'],
+  ['RagStatus', 'RagStatus'],
 ];
 
 let compared = 0;

@@ -1975,3 +1975,35 @@ export interface ToolResult {
   /** A refusal or an unavailable tool, in words. */
   error: string | null;
 }
+
+// ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
+
+export type PassageKind = 'abstract' | 'prose' | 'table' | 'figure';
+
+/** A piece of a fetched paper's own text, as a search returns it. */
+export interface Passage {
+  /** `<paperId>:<sectionId>:<n>` */
+  id: string;
+  paperId: string;
+  sectionId: string;
+  heading: string;
+  kind: PassageKind;
+  text: string;
+  /** Offsets into the section's text. */
+  start: number;
+  end: number;
+}
+
+export interface RagLane {
+  name: string;
+  available: boolean;
+  /** Why it is unavailable, or what it needs, in words. */
+  why: string | null;
+}
+
+export interface RagStatus {
+  papersIndexed: number;
+  passages: number;
+  lanes: RagLane[];
+  chosenLane: string;
+}

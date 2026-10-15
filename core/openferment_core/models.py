@@ -918,3 +918,37 @@ class ToolResult(BaseModel):
     recordIds: list[str] = Field(default_factory=list)
     # A refusal or an unavailable tool, in words.
     error: str | None = None
+
+
+# ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
+
+PassageKind = Literal["abstract", "prose", "table", "figure"]
+
+
+class Passage(BaseModel):
+    """A piece of a fetched paper's own text, as a search returns it."""
+
+    # `<paperId>:<sectionId>:<n>`
+    id: str
+    paperId: str
+    sectionId: str
+    heading: str
+    kind: PassageKind
+    text: str
+    # Offsets into the section's text.
+    start: int
+    end: int
+
+
+class RagLane(BaseModel):
+    name: str
+    available: bool
+    # Why it is unavailable, or what it needs, in words.
+    why: str | None = None
+
+
+class RagStatus(BaseModel):
+    papersIndexed: int
+    passages: int
+    lanes: list[RagLane]
+    chosenLane: str

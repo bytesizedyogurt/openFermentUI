@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, practice, tools, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, tools, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -55,6 +55,7 @@ from .models import (
     PracticeScenario,
     PracticeSession,
     PracticeTurnRequest,
+    RagStatus,
     ReplayResult,
     ReviewDecision,
     ToolInfo,
@@ -571,6 +572,16 @@ def tools_run(name: str, body: dict[str, Any]) -> ToolResult:
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
     return tools.run(name, body)
+
+
+# ── Passage retrieval (OF-BLD-014 Phase 4) ───────────────────────────────
+
+
+@app.get("/api/rag/status", response_model=RagStatus)
+def rag_status() -> RagStatus:
+    """Papers indexed, passages, the lanes and whether each can run, and the
+    lane searches use when none is named."""
+    return passages.status()
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

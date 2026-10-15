@@ -29,4 +29,9 @@ else
   echo "full text: Europe PMC does not answer here, so nothing is fetched (pnpm ready says why)"
 fi
 
+# §4.1 — the passage index over whatever full text is here. Local work, no
+# network: it cuts only the papers whose text changed since the last build.
+echo "passage index: building"
+pnpm --silent index:build || status=1
+
 exit "$status"
