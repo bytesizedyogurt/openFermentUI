@@ -30,8 +30,9 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
 from .corpus import load_corpus
+from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
     AnswerPlan,
     Artifact,
@@ -46,6 +47,8 @@ from .models import (
     ExtractResponse,
     ExtractRun,
     FetchResult,
+    GeneosModelInfo,
+    GeneosResult,
     Guild,
     GuildEvidence,
     GuildPerson,
@@ -252,6 +255,53 @@ def _stream_events(request: AskRequest):
             yield _sse(*item)
     finally:
         gone.set()
+
+
+# ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
+
+
+class CeilingRequest(BaseModel):
+    modelId: str
+    product: str = "phb"
+    substrate: str
+
+
+class MixRequest(BaseModel):
+    modelId: str
+    product: str = "phb"
+    a: str
+    b: str
+
+
+def _geneos(fn, *args) -> GeneosResult:
+    """A model that cannot load here, or a request the worker refuses, is a
+    409 in words; a finding is a 200 that says so."""
+    try:
+        return fn(*args)
+    except geneos.GeneosUnavailable as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=409, detail=f"the geneOS worker could not compute it: {e}") from e
+
+
+@app.get("/api/geneos/models", response_model=list[GeneosModelInfo])
+def geneos_models() -> list[GeneosModelInfo]:
+    return geneos.models()
+
+
+@app.post("/api/geneos/ceiling", response_model=GeneosResult)
+def geneos_ceiling(req: CeilingRequest) -> GeneosResult:
+    return _geneos(geneos.ceiling, req.modelId, req.product, req.substrate)
+
+
+@app.post("/api/geneos/frontier", response_model=GeneosResult)
+def geneos_frontier(req: CeilingRequest) -> GeneosResult:
+    return _geneos(geneos.frontier, req.modelId, req.product, req.substrate)
+
+
+@app.post("/api/geneos/mix", response_model=GeneosResult)
+def geneos_mix(req: MixRequest) -> GeneosResult:
+    return _geneos(geneos.mix, req.modelId, req.product, req.a, req.b)
 
 
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────

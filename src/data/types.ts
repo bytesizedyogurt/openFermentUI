@@ -2013,6 +2013,41 @@ export interface ToolResult {
   usage: AnswerPlanUsage;
 }
 
+// ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
+
+/** One model on geneOS's shelf. Mirrors `GeneosModelInfo` in models.py. */
+export interface GeneosModelInfo {
+  id: string;
+  name: string;
+  /** The strain id the model describes, when the catalogue has one. */
+  host: string | null;
+  scope: string;
+  route: string;
+  licence: string;
+  source: string;
+  /** Why it cannot be loaded here (its file is not fetched), or null. */
+  unavailable: string | null;
+  notes: string[];
+}
+
+export type GeneosKind = 'ceiling' | 'frontier' | 'mix';
+
+/**
+ * A ceiling, a frontier or a sugar mix: an artifact and its evidence, or a
+ * finding in words with no number. Mirrors `GeneosResult` in models.py.
+ */
+export interface GeneosResult {
+  kind: GeneosKind;
+  modelId: string;
+  product: string;
+  substrates: string[];
+  finding: string | null;
+  artifactId: string | null;
+  evidence: Evidence | null;
+  /** The worker's output as the artifact stores it. */
+  output: Record<string, unknown>;
+}
+
 // ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 export type PassageKind = 'abstract' | 'prose' | 'table' | 'figure';

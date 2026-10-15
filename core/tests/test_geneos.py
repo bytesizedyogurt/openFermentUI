@@ -109,3 +109,115 @@ def test_a_file_whose_hash_does_not_match_is_set_aside(monkeypatch, tmp_path):
     assert not model.fetched.local.exists()
     assert model.fetched.local.with_suffix(".xml.mismatch").exists()
     assert calls[0][:2] == ["git", "clone"]
+
+
+# ── §6.3: the ceiling, the frontier and the sugar mix ──────────────────
+#
+# Appendix 2's regression constants, belonging in test files alone. Tolerance
+# 0.1 % relative.
+
+REL = 1e-3
+
+
+@pytest.fixture()
+def store(monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "model, substrate, flux, mol, gg",
+    [
+        ("e_coli_core", "glucose", 10.0000, 1.0000, 0.4779),
+        ("iJO1366", "glucose", 12.4122, 1.2412, 0.5931),
+        ("iJO1366", "xylose", 10.2383, 1.0238, 0.5871),
+    ],
+)
+def test_appendix_2_ceilings(model, substrate, flux, mol, gg):
+    r = geneos.ceiling(model, "phb", substrate, keep=False)
+    assert r.finding is None
+    assert r.output["flux"] == pytest.approx(flux, rel=REL)
+    assert r.output["molPerMol"] == pytest.approx(mol, rel=REL)
+    assert r.evidence.value == pytest.approx(gg, rel=REL)
+    assert r.output["status"] == "optimal" and r.output["solver"] == "glpk_interface"
+    assert r.evidence.provenance == "computed" and r.evidence.figure == "ceiling"
+
+
+def test_appendix_2_mix_midpoint_and_xylose_end():
+    r = geneos.mix("iJO1366", "phb", "glucose", "xylose", keep=False)
+    pts = r.output["points"]
+    assert len(pts) == shelf.MIX_POINTS
+    mid = pts[5]
+    assert (mid["uptakeA"], mid["uptakeB"]) == pytest.approx((5, 6))
+    assert mid["flux"] == pytest.approx(12.3600, rel=REL) and mid["gPerG"] == pytest.approx(0.5906, rel=REL)
+    assert pts[-1]["uptakeB"] == pytest.approx(12) and pts[-1]["flux"] == pytest.approx(12.3078, rel=REL)
+    assert pts[-1]["gPerG"] == pytest.approx(0.5881, rel=REL)
+
+
+@pytest.mark.parametrize("model, growth_max, growth_rxn", [
+    ("e_coli_core", 0.8739, "Biomass_Ecoli_core"),
+    ("iJO1366", 0.9824, "BIOMASS_Ec_iJO1366_core_53p95M"),
+])
+def test_appendix_2_frontier_ends(model, growth_max, growth_rxn):
+    r = geneos.frontier(model, "phb", "glucose", keep=False)
+    pts = r.output["points"]
+    assert len(pts) == shelf.FRONTIER_POINTS and r.output["growthReaction"] == growth_rxn
+    assert pts[-1]["growth"] == pytest.approx(growth_max, rel=REL) and pts[-1]["flux"] == pytest.approx(0, abs=1e-6)
+    ceiling = geneos.ceiling(model, "phb", "glucose", keep=False).output["flux"]
+    assert pts[0]["growth"] == pytest.approx(0, abs=1e-9) and pts[0]["flux"] == pytest.approx(ceiling, rel=REL)
+    assert r.evidence.figure == "frontier"
+
+
+def test_a_sugar_a_model_cannot_take_up_stores_no_number(store):
+    r = geneos.ceiling("e_coli_core", "phb", "xylose")
+    assert r.finding == "this reconstruction has no uptake reaction for xylose"
+    assert r.evidence is None and r.artifactId is None and r.output == {}
+    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+
+
+def test_a_ceiling_is_kept_with_its_basis_and_replays(store):
+    from openferment_core import artifacts
+
+    r = geneos.ceiling("e_coli_core", "phb", "glucose")
+    art = artifacts.get(r.artifactId)
+    kinds = {i.name: (i.source.kind, i.source.id) for i in art.inputs}
+    assert kinds["model"] == ("model", "e_coli_core")
+    assert kinds["add-on"] == ("model", "RehMBEL1391")
+    assert kinds["uptake"][0] == "convention" and kinds["substrate"][0] == "convention"
+    assert next(i for i in art.inputs if i.name == "uptake").value == shelf.UPTAKE
+    assert art.provenance == "computed"
+    again = geneos.ceiling("e_coli_core", "phb", "glucose")
+    assert again.artifactId == r.artifactId
+    assert artifacts.replay(r.artifactId).identical
+
+
+def test_the_endpoints(store):
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    shelf_ids = [m["id"] for m in c.get("/api/geneos/models").json()]
+    assert shelf_ids == ["e_coli_core", "iJO1366", "RehMBEL1391"]
+    unfetched = next(m for m in c.get("/api/geneos/models").json() if m["id"] == "RehMBEL1391")
+    assert "pnpm geneos:fetch" in unfetched["unavailable"]
+    ok = c.post("/api/geneos/ceiling", json={"modelId": "e_coli_core", "substrate": "glucose"}).json()
+    assert ok["evidence"]["value"] == pytest.approx(0.4779, rel=REL)
+    finding = c.post("/api/geneos/ceiling", json={"modelId": "e_coli_core", "substrate": "xylose"}).json()
+    assert finding["finding"] and finding["evidence"] is None
+    assert c.post("/api/geneos/ceiling", json={"modelId": "RehMBEL1391", "substrate": "fructose"}).status_code == 409
+    assert c.post("/api/geneos/ceiling", json={"modelId": "nothing", "substrate": "glucose"}).status_code == 409
+    guarded = c.post("/api/geneos/mix", json={"modelId": "iJO1366", "a": "glucose", "b": "xylose"},
+                     headers={"Origin": "https://evil.example"})
+    assert guarded.status_code == 403
+
+
+def test_yield_ceiling_takes_ids_and_words_and_returns_one_evidence(store):
+    from openferment_core import tools
+
+    r = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "glucose"})
+    assert r.error is None and len(r.evidence) == 1 and r.evidence[0].figure == "ceiling"
+    assert r.summary["evidenceId"] == r.evidence[0].id and r.summary["model"]["scope"] == "central carbon"
+    finding = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"})
+    assert finding.evidence == [] and "no uptake reaction" in finding.summary["finding"]
+    assert "a number was typed" in (tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": 10}).error or "")

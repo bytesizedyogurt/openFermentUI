@@ -142,6 +142,9 @@ const PAIRS = [
   ['RagSearchResponse', 'RagSearchResponse'],
   // OF-BLD-014 §5.1 — a plan cites sentences and computed values.
   ['PassageRef', 'PassageRef'],
+  // OF-BLD-014 §6.3 — geneOS's shelf and its results.
+  ['GeneosModelInfo', 'GeneosModelInfo'],
+  ['GeneosResult', 'GeneosResult'],
   ['TraceStep', 'TraceStep'],
 ];
 

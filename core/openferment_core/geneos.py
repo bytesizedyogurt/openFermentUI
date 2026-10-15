@@ -20,7 +20,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from . import geneos_models as shelf
+from . import artifacts, geneos_models as shelf
+from .models import BasisInput, BasisSource, Evidence, GeneosModelInfo, GeneosResult
 from .workers import SimWorker
 
 # Loading iJO1366 takes a few seconds and a frontier a little longer; the
@@ -61,6 +62,174 @@ def model_args(model_id: str) -> dict[str, Any]:
 
 def describe(model_id: str) -> dict[str, Any]:
     return worker().call("describe", model_args(model_id))
+
+
+# ── the ceiling, the frontier and the sugar mix (§6.3) ─────────────────
+#
+# Each is an artifact (E.5): a registered tool whose inputs name the model
+# file, the add-on and the uptake rate, so a repeat returns what was stored
+# and a replay recomputes it in the worker. A sugar the model cannot take up
+# is a finding, said in words, and nothing is stored.
+
+CEILING, FRONTIER, MIX = "geneos.ceiling", "geneos.frontier", "geneos.mix"
+_HERE = Path(__file__).resolve().parent
+
+
+def version() -> str:
+    """cobra's version, the worker's code and the shelf's data, hashed: a
+    change to any of them is a new version, and replay says so."""
+    from importlib.metadata import version as installed
+
+    code = (_HERE / "workers" / "geneos_worker.py").read_bytes() + (_HERE / "geneos_models.py").read_bytes()
+    return f"cobra {installed('cobra')} · worker {hashlib.sha256(code).hexdigest()[:12]}"
+
+
+def _model_input(model_id: str) -> BasisInput:
+    if model_id == "toy":
+        return BasisInput(name="model", value="toy", unit="", source=BasisSource(
+            kind="model", id="toy", note="the STAND-IN toy network built in the geneOS worker for tests and fixtures"))
+    entry = shelf.SHELF[model_id]
+    if entry.fetched:
+        f = entry.fetched
+        note = f"{f.repository} at {f.commit}, {f.path}, sha256 {f.sha256} ({f.licence})"
+    else:
+        note = f"bundled with cobra as {entry.bundled} ({entry.licence})"
+    return BasisInput(name="model", value=entry.name, unit="", source=BasisSource(kind="model", id=model_id, note=note))
+
+
+def _route_input(model_id: str) -> BasisInput | None:
+    entry = shelf.SHELF.get(model_id)
+    if entry is None or not entry.addon:
+        return None
+    addon = shelf.ADDONS[entry.addon]
+    return BasisInput(name="add-on", value=addon["id"], unit="", source=BasisSource(
+        kind="model", id=addon["source"].removeprefix("model: "),
+        note=f"{', '.join(r['id'] for r in addon['reactions'])}; the route {addon['source'].removeprefix('model: ')} carries, each reaction checked for mass balance"))
+
+
+def _conventions(product: str, substrates: list[str]) -> list[BasisInput]:
+    prod = shelf.PRODUCTS[product]
+    out = [
+        BasisInput(name="uptake", value=shelf.UPTAKE, unit=shelf.UPTAKE_UNIT, source=BasisSource(
+            kind="convention", note="the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it")),
+        BasisInput(name="product", value=product, unit="", source=BasisSource(
+            kind="convention", note=f"a demand on {prod['metabolite']}; {prod['note']}")),
+    ]
+    for i, sub in enumerate(substrates):
+        s = shelf.SUBSTRATES[sub]
+        out.append(BasisInput(name="substrate" if len(substrates) == 1 else f"substrate {'ab'[i]}", value=sub, unit="",
+                              source=BasisSource(kind="convention", note=f"through {s['exchange']}, {s['molarMass']} g mol-1, {s['carbons']} carbons")))
+    return out
+
+
+def _inputs(model_id: str, product: str, substrates: list[str]) -> list[BasisInput]:
+    route = _route_input(model_id)
+    return [_model_input(model_id), *([route] if route else []), *_conventions(product, substrates)]
+
+
+def _value(inputs: list[BasisInput], name: str) -> str:
+    return str(next(i for i in inputs if i.name == name).value)
+
+
+def _model_id(inputs: list[BasisInput]) -> str:
+    return str(next(i for i in inputs if i.name == "model").source.id)
+
+
+def _run_ceiling(inputs, seed):
+    return worker().call("ceiling", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+                                     "substrate": _value(inputs, "substrate")})
+
+
+def _run_frontier(inputs, seed):
+    return worker().call("frontier", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+                                      "substrate": _value(inputs, "substrate")})
+
+
+def _run_mix(inputs, seed):
+    return worker().call("mix", {**model_args(_model_id(inputs)), "product": _value(inputs, "product"),
+                                 "a": _value(inputs, "substrate a"), "b": _value(inputs, "substrate b")})
+
+
+def _register() -> None:
+    v = version()
+    artifacts.register(CEILING, v, _run_ceiling)
+    artifacts.register(FRONTIER, v, _run_frontier)
+    artifacts.register(MIX, v, _run_mix)
+
+
+for _name in (CEILING, FRONTIER, MIX):
+    artifacts.register_lazy(_name, _register)
+
+
+def _check(model_id: str, product: str, substrates: list[str]) -> str | None:
+    """A finding in words when the model cannot make this product from these
+    sugars; None when it can. Raises GeneosUnavailable for a bad request."""
+    if product not in shelf.PRODUCTS:
+        raise GeneosUnavailable(f"there is no product {product}; the shelf knows {', '.join(shelf.PRODUCTS)}")
+    for sub in substrates:
+        if sub not in shelf.SUBSTRATES:
+            raise GeneosUnavailable(f"there is no substrate {sub}; the shelf knows {', '.join(shelf.SUBSTRATES)}")
+    d = describe(model_id)
+    if not d["products"].get(product):
+        return f"this reconstruction has no route to {shelf.PRODUCTS[product]['name']}"
+    for sub in substrates:
+        if not d["substrates"].get(sub):
+            return f"this reconstruction has no uptake reaction for {sub}"
+    return None
+
+
+def _label(model_id: str, what: str) -> str:
+    entry = shelf.SHELF.get(model_id)
+    return f"{what}, {entry.name if entry else model_id}{f' ({entry.scope})' if entry else ''}"
+
+
+def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True) -> GeneosResult:
+    finding = _check(model_id, product, [substrate])
+    if finding:
+        return GeneosResult(kind="ceiling", modelId=model_id, product=product, substrates=[substrate], finding=finding)
+    art = artifacts.compute(CEILING, _inputs(model_id, product, [substrate]), keep=keep)
+    out = art.output
+    ev = Evidence(
+        id=f"ev-{art.id}", label=_label(model_id, f"most {product.upper()} from {substrate}"),
+        value=out["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="ceiling",
+    )
+    return GeneosResult(kind="ceiling", modelId=model_id, product=product, substrates=[substrate],
+                        artifactId=art.id, evidence=ev, output=out)
+
+
+def frontier(model_id: str, product: str, substrate: str, *, keep: bool = True) -> GeneosResult:
+    finding = _check(model_id, product, [substrate])
+    if finding:
+        return GeneosResult(kind="frontier", modelId=model_id, product=product, substrates=[substrate], finding=finding)
+    art = artifacts.compute(FRONTIER, _inputs(model_id, product, [substrate]), keep=keep)
+    top = max(art.output["points"], key=lambda p: p["gPerG"])
+    ev = Evidence(
+        id=f"ev-{art.id}", label=_label(model_id, f"{product.upper()} against growth on {substrate}"),
+        value=top["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="frontier",
+    )
+    return GeneosResult(kind="frontier", modelId=model_id, product=product, substrates=[substrate],
+                        artifactId=art.id, evidence=ev, output=art.output)
+
+
+def mix(model_id: str, product: str, a: str, b: str, *, keep: bool = True) -> GeneosResult:
+    finding = _check(model_id, product, [a, b])
+    if finding:
+        return GeneosResult(kind="mix", modelId=model_id, product=product, substrates=[a, b], finding=finding)
+    art = artifacts.compute(MIX, _inputs(model_id, product, [a, b]), keep=keep)
+    return GeneosResult(kind="mix", modelId=model_id, product=product, substrates=[a, b],
+                        artifactId=art.id, output=art.output)
+
+
+def models() -> list[GeneosModelInfo]:
+    """The shelf as the browser sees it; nothing here loads a model."""
+    out = []
+    for m in shelf.SHELF.values():
+        out.append(GeneosModelInfo(
+            id=m.id, name=m.name, host=m.host, scope=m.scope, route=m.route, licence=m.licence,
+            source=(f"{m.fetched.repository} at {m.fetched.commit}" if m.fetched else f"bundled with cobra as {m.bundled}"),
+            unavailable=shelf.available(m), notes=list(m.notes),
+        ))
+    return out
 
 
 # ── fetching the published file ────────────────────────────────────────

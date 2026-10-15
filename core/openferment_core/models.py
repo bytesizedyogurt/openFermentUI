@@ -964,6 +964,43 @@ class ToolResult(BaseModel):
     usage: Usage = Field(default_factory=Usage)
 
 
+# ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
+
+
+class GeneosModelInfo(BaseModel):
+    """One model on geneOS's shelf, as the browser lists it."""
+
+    id: str
+    name: str
+    # The strain id the model describes, when the catalogue has one.
+    host: str | None = None
+    scope: str
+    route: str
+    licence: str
+    source: str
+    # Why it cannot be loaded here (its file is not fetched), or None.
+    unavailable: str | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+GeneosKind = Literal["ceiling", "frontier", "mix"]
+
+
+class GeneosResult(BaseModel):
+    """A ceiling, a frontier or a sugar mix: an artifact and its evidence, or
+    a finding in words with no number."""
+
+    kind: GeneosKind
+    modelId: str
+    product: str
+    substrates: list[str]
+    finding: str | None = None
+    artifactId: str | None = None
+    evidence: Evidence | None = None
+    # The worker's output as the artifact stores it.
+    output: dict[str, Any] = Field(default_factory=dict)
+
+
 # ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 PassageKind = Literal["abstract", "prose", "table", "figure"]
