@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Mirrors the Provenance union in src/data/types.ts, weakest last. The order IS
 # the ranking: `weakest_provenance` walks this list, so adding a class in the
@@ -137,6 +137,9 @@ class AnswerPlan(BaseModel):
     passages: list[Passage] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
+    # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
+    # service (runbook_draft.py), for a person to adopt and lock.
+    runbookDraft: "RunbookDraft | None" = None
 
 
 def weakest_provenance(provenances: list[str]) -> str:
@@ -962,6 +965,8 @@ class ToolResult(BaseModel):
     # What the tool spent on models (a search lane that calls one), charged
     # to the question that called it (OF-BLD-014 §5.R).
     usage: Usage = Field(default_factory=Usage)
+    # A runbook draft the service assembled (OF-BLD-014 §9.2, E.6).
+    draft: "RunbookDraft | None" = None
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
@@ -1370,6 +1375,66 @@ class ProformaRunResult(BaseModel):
     leavesOut: list[str]
     priceBasis: str
     evidence: Evidence
+
+
+# ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
+
+
+class Prediction(BaseModel):
+    """Mirrors `Prediction` in src/data/types.ts (§9.1)."""
+
+    id: str
+    label: str
+    value: float
+    unit: str
+    confidence: Literal["high", "medium", "low"]
+    basis: str
+    kind: Literal["point", "interval", "bound"] | None = None
+    interval: Range | None = None
+    artifactId: str | None = None
+    recordIds: list[str] | None = None
+
+
+class Measure(BaseModel):
+    """Mirrors `Measure` in src/data/types.ts."""
+
+    id: str
+    label: str
+    unit: str
+    timepoint: str
+    predictionId: str | None = None
+
+
+DraftTimepoint = Literal["start", "mid-run", "harvest", "after recovery"]
+
+
+class DraftItem(BaseModel):
+    """One prediction the agent asks for: one computed evidence item, or
+    records of one field. The pair it leaves unused is empty."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    evidenceId: str = ""
+    field: str = ""
+    recordIds: list[str] = Field(default_factory=list)
+
+
+class DraftMeasure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    unit: str
+    timepoint: DraftTimepoint
+    itemLabel: str
+
+
+class RunbookDraft(BaseModel):
+    title: str
+    productId: str
+    strainId: str
+    predictions: list[Prediction]
+    measures: list[Measure]
 
 
 # Claim and AnswerPlan name Passage and Evidence, which are defined further

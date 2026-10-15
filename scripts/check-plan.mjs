@@ -127,6 +127,11 @@ const PAIRS = [
   // OF-BLD-014 §3.4 — the tool registry.
   ['ToolInfo', 'ToolInfo'],
   ['ToolResult', 'ToolResult'],
+  ['Prediction', 'Prediction'],
+  ['Measure', 'Measure'],
+  ['DraftItem', 'DraftItem'],
+  ['DraftMeasure', 'DraftMeasure'],
+  ['RunbookDraft', 'RunbookDraft'],
   // OF-BLD-014 §4.1 — passages.
   ['Passage', 'Passage'],
   ['RagLane', 'RagLane'],

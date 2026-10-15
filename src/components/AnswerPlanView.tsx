@@ -12,7 +12,7 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { AnswerPlan, Claim, Evidence, ExtractionRecord, Paper, Passage } from '@/data/types';
+import type { AnswerPlan, Claim, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -140,6 +140,52 @@ function ClaimRow({
   );
 }
 
+/** A runbook the agent drafted (OF-BLD-014 §9.2): its numbers were written by the service. */
+function DraftCard({ draft }: { draft: RunbookDraft }) {
+  const adopt = useStore((s) => s.adoptRunbookDraft);
+  const predictionLabel = (id: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
+  return (
+    <Card className="p-4" data-testid="runbook-draft">
+      <div className="text-caption uppercase tracking-wide text-ink-soft">Runbook draft</div>
+      <div className="font-serif text-section-title font-semibold">{draft.title}</div>
+      <p className="text-caption text-ink-soft mb-2">
+        Postdoc chose what to predict and measure; every value and interval below was written by the service from the
+        artifact or records each prediction names. Adopting it opens an unlocked research runbook for you to read and lock.
+      </p>
+      <ul className="space-y-1 text-body">
+        {draft.predictions.map((p) => (
+          <li key={p.id}>
+            <span className="font-medium">{p.label}</span>{' '}
+            <span className="font-num">
+              {p.kind === 'interval' && p.interval
+                ? `${fmt(p.interval.low)} to ${fmt(p.interval.high)}`
+                : p.kind === 'bound'
+                  ? `at most ${fmt(p.value)}`
+                  : fmt(p.value)}{' '}
+              {p.unit}
+            </span>
+            <div className="text-caption text-ink-soft">{p.basis}</div>
+          </li>
+        ))}
+      </ul>
+      {draft.measures.length > 0 && (
+        <div className="text-caption text-ink-soft mt-2">
+          Measured: {draft.measures.map((m) => `${m.label} (${m.unit}, ${m.timepoint}) for ${predictionLabel(m.predictionId)}`).join('; ')}.
+        </div>
+      )}
+      <button
+        className="btn btn-primary mt-3"
+        onClick={() => {
+          const id = adopt(draft);
+          navigate(`/runbooks/${id}`);
+        }}
+      >
+        Turn into a runbook
+      </button>
+    </Card>
+  );
+}
+
 export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
   const hasClaims = plan.claims.length > 0;
   const passages = new Map((plan.passages ?? []).map((p) => [p.id, p]));
@@ -186,6 +232,8 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
 
       {/* Gaps are a section of their own, not a footnote. Naming what is
           absent is the answer §6 asks for most often. */}
+      {plan.runbookDraft && <DraftCard draft={plan.runbookDraft} />}
+
       {plan.gaps.length > 0 && (
         <section aria-labelledby="plan-gaps">
           <div className="flex items-center gap-2 mb-1.5">

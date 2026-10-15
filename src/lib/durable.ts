@@ -27,7 +27,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -121,6 +121,11 @@ export interface DurableSnapshot {
    * same reason as `guild`.
    */
   proformaAssumptions?: Record<string, InputAssumption[]>;
+  /**
+   * Runbooks adopted from a Postdoc draft (OF-BLD-014 §9.2), as adopted. A
+   * lock on one is kept in `runbookLocks`, like a seeded runbook's.
+   */
+  adoptedRunbooks?: Runbook[];
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

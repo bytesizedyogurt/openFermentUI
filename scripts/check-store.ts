@@ -27,6 +27,7 @@
  * wondering why a record they rejected came back.
  */
 import { mergeAssumptions, snapshotOf, useStore } from '../src/store';
+import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
 import type { Candidate, Overlay } from '../src/data/types';
 
@@ -343,6 +344,31 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const merged = mergeAssumptions({ 'sc-pha-1': [a('recovery', 0.9), a('sugarPrice', 0.4)] }, { 'sc-pha-1': [a('sugarPrice', 0.5)] });
   const keys = merged['sc-pha-1'].map((x) => `${x.key}=${x.value}`).sort().join();
   check('an assumption typed before hydrate keeps the saved ones beside it', keys === 'recovery=0.9,sugarPrice=0.5', keys);
+}
+
+// §9.2 — a drafted runbook adopted here is a research runbook, unlocked,
+// with the service's predictions; it and its lock survive a reload (the
+// snapshot applied to a store that has lost it).
+{
+  const st = () => useStore.getState();
+  const draft = {
+    title: 'Secreted titre on xylose', productId: 'taq-dna-polymerase', strainId: 'c-necator-h16',
+    predictions: [{ id: 'p1', label: 'Secreted titre', value: 0.9, unit: 'g L⁻¹', confidence: 'low' as const, basis: 'Range of 2 reported values: a, b', kind: 'interval' as const, interval: { low: 0.8, high: 1 }, recordIds: ['a', 'b'] }],
+    measures: [{ id: 'm1', label: 'Titre at harvest', unit: 'g/L', timepoint: 'harvest', predictionId: 'p1' }],
+  };
+  const id = st().adoptRunbookDraft(draft);
+  const made = st().runbooks.find((r) => r.id === id)!;
+  check('an adopted draft is a research runbook, unlocked, with the service\'s predictions',
+    made.kind === 'research' && made.lockedAt === null && made.predictions[0].interval?.high === 1 && made.measurementSchema[0].predictionId === 'p1');
+  st().lockRunbook(id);
+  const hash = st().runbooks.find((r) => r.id === id)!.lockHash;
+  const snap = snapshotOf(st());
+  check('the snapshot carries the adopted runbook and its lock', snap.adoptedRunbooks?.some((r) => r.id === id) === true && snap.runbookLocks[id]?.lockHash === hash);
+  useStore.setState((s) => ({ runbooks: s.runbooks.filter((r) => r.id !== id), adoptedRunbookIds: [] }));
+  st().applyDurable(snap);
+  const back = st().runbooks.find((r) => r.id === id);
+  check('after a reload the adopted runbook is back, locked, and its content hashes to its lock',
+    !!back && back.lockHash === hash && lockIntact(back) && Object.isFrozen(back.predictions) && st().adoptedRunbookIds.includes(id));
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

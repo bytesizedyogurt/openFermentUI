@@ -1334,6 +1334,8 @@ export interface AnswerPlan {
   trace?: TraceStep[];
   /** Why the loop stopped. */
   stopped?: StopReason;
+  /** A runbook the agent drafted, its numbers written by the service (OF-BLD-014 §9.2). */
+  runbookDraft?: RunbookDraft | null;
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -2037,6 +2039,34 @@ export interface ToolResult {
   error: string | null;
   /** What the tool spent on models, charged to the question (OF-BLD-014 §5.R). */
   usage: AnswerPlanUsage;
+  /** A runbook draft the service assembled (§9.2). */
+  draft: RunbookDraft | null;
+}
+
+// ── Runbook drafts (OF-BLD-014 §9.2) ─────────────────────────────────────
+
+/** One prediction the agent asks for: one evidence id, or records of one field. */
+export interface DraftItem {
+  label: string;
+  evidenceId: string;
+  field: string;
+  recordIds: string[];
+}
+
+export interface DraftMeasure {
+  label: string;
+  unit: string;
+  timepoint: 'start' | 'mid-run' | 'harvest' | 'after recovery';
+  itemLabel: string;
+}
+
+/** Assembled by the service; a person adopts it as a research runbook and locks it. */
+export interface RunbookDraft {
+  title: string;
+  productId: string;
+  strainId: string;
+  predictions: Prediction[];
+  measures: Measure[];
 }
 
 // ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────

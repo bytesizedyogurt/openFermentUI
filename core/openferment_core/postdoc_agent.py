@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import llm, spend, tools
-from .models import AnswerPlan, ToolResult, TraceStep, Usage
+from .models import AnswerPlan, RunbookDraft, ToolResult, TraceStep, Usage
 from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
@@ -127,6 +127,7 @@ class _Run:
     spent: Usage = field(default_factory=Usage)
     calls: int = 0
     cache: dict[str, ToolResult] = field(default_factory=dict)
+    draft: RunbookDraft | None = None
     cancelled: Callable[[], bool] = lambda: False
 
     def step(self, **kw: Any) -> TraceStep:
@@ -163,7 +164,10 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     tool_result block the model reads."""
     key = json.dumps({"tool": call.name, "input": call.input}, sort_keys=True, default=str)
     started = run.clock()
-    if key in run.cache:
+    run.ctx.seen = run.seen
+    # A draft is checked against what this conversation has seen, so it is
+    # never served from the cache across a restart (§9.2).
+    if key in run.cache and call.name != "draft_runbook":
         result = run.cache[key]
     else:
         result = tools.run(call.name, call.input, run.ctx)
@@ -173,6 +177,8 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
         run.spent = llm.add(run.spent, result.usage)
     ms = int(round((run.clock() - started) * 1000))
     run.seen.add(result)
+    if result.draft is not None and result.error is None:
+        run.draft = result.draft
     run.step(kind="tool", tool=call.name, input=call.input, summary=_summary_line(call.name, call.input, result), ms=ms, ok=result.error is None)
     content = result.error if result.error else json.dumps(result.summary, ensure_ascii=False, default=str)
     block: dict[str, Any] = {"type": "tool_result", "tool_use_id": call.id, "content": content}
@@ -295,6 +301,7 @@ def ask(
             # Restart once, on the next model, with a fresh conversation. What
             # the first conversation retrieved is not what the second has read.
             run.seen = SeenSet()
+            run.draft = None
             # The second conversation gets the whole call budget; its repeats
             # come from the cache (§5.R). Time and cost run on.
             run.calls = 0
@@ -342,4 +349,5 @@ def ask(
         passages=[run.seen.passages[p] for p in sorted(cited_passages)],
         trace=run.trace,
         stopped=stopped,
+        runbookDraft=run.draft,
     )

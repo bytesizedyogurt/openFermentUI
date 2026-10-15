@@ -28,7 +28,8 @@ import { SKILLS } from '../src/data/skills';
 import { MODULES } from '../src/data/learn';
 import { PROTOCOLS } from '../src/data/protocols';
 import { renderStepText } from '../src/engine/scale';
-import { STRAIN_ALIASES } from '../src/data/strains';
+import { STRAIN_ALIASES, STRAINS } from '../src/data/strains';
+import { PRODUCTS } from '../src/data/products';
 import { CARBON_SOURCES } from '../src/data/vocabulary';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
@@ -224,11 +225,14 @@ const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
  */
 const strainAliases = STRAIN_ALIASES;
 const carbonSources = CARBON_SOURCES;
+// OF-BLD-014 §9.2 — the ids a drafted runbook's product and strain must resolve against.
+const products = PRODUCTS.map((p) => ({ id: p.id, name: p.name }));
+const strains = STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim() }));
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(
   OUT,
-  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources }, null, 2) + '\n',
+  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources, products, strains }, null, 2) + '\n',
 );
 
 /**

@@ -52,6 +52,9 @@ class ToolContext:
 
     pool_factory: Callable[[], Any] | None = None
     _pool: Any = field(default=None, repr=False)
+    # What this run's tool calls returned (validate.SeenSet), when a loop
+    # owns the run; draft_runbook accepts only ids in it (§9.2).
+    seen: Any = None
 
     @property
     def pool(self) -> Any:
@@ -157,4 +160,5 @@ from . import geneos as _geneos  # noqa: E402,F401
 from . import passages as _passages  # noqa: E402,F401
 from . import proforma as _proforma  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401
+from . import runbook as _runbook  # noqa: E402,F401
 from . import units as _units  # noqa: E402,F401

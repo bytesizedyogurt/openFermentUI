@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type {
   InputAssumption,
+  RunbookDraft,
   AuditEvent,
   Candidate,
   ReviewDecision,
@@ -302,6 +303,10 @@ export interface OFState {
   reviewStats: { accepted: number; rejected: number; edited: number; skipped: number; gold: number; startedAt: number };
   undoStack: UndoFrame[];
   learnProgress: Record<string, boolean>;
+  /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
+  adoptedRunbookIds: string[];
+  /** A research runbook, unlocked, from a draft; returns its id. */
+  adoptRunbookDraft: (draft: RunbookDraft) => string;
   /** Proforma's typed assumptions, by scenario id (§8.4). Durable. */
   proformaAssumptions: Record<string, InputAssumption[]>;
   setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
@@ -472,6 +477,7 @@ export interface OFState {
   // durable tier (OF-BLD-006 §4.6)
   /** Re-apply a persisted snapshot over the seeded state. Idempotent. */
   hydrateDurable: () => Promise<void>;
+  applyDurable: (snap: DurableSnapshot) => void;
   /** Whether this browser can persist at all — surfaced honestly in Settings. */
   durableReady: boolean;
   /**
@@ -763,6 +769,7 @@ const seedState = () => ({
   undoStack: [] as UndoFrame[],
   learnProgress: {} as Record<string, boolean>,
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  adoptedRunbookIds: [] as string[],
   checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
 });
@@ -1940,6 +1947,35 @@ export const useStore = create<OFState>()((set, get) => ({
     return true;
   },
 
+  // OF-BLD-014 §9.2 — a draft becomes a research runbook, unlocked, with the
+  // predictions and measures the service wrote. The person reads it and locks
+  // it on the runbook's page. Its id is unique across reloads, because the
+  // runbook outlives this page in the Durable tier.
+  adoptRunbookDraft: (draft) => {
+    const id = `rb-draft-${Date.now().toString(36)}-${nextId('d').slice(2)}`;
+    const runbook: Runbook = {
+      id,
+      kind: 'research',
+      title: draft.title,
+      status: 'draft',
+      stages: [],
+      note: 'Drafted by Postdoc from the evidence its tools returned; every value and interval was written by the service from the artifacts and records each prediction names. Read it, then lock it.',
+      eta: null,
+      outputs: [],
+      productId: draft.productId,
+      progressPct: 0,
+      estCostUsd: null,
+      strainId: draft.strainId,
+      predictions: structuredClone(draft.predictions),
+      measurementSchema: structuredClone(draft.measures),
+      lockedAt: null,
+      lockHash: null,
+    };
+    set((st) => ({ runbooks: [runbook, ...st.runbooks], adoptedRunbookIds: [...st.adoptedRunbookIds, id] }));
+    get().logActivity({ at: stamp(), icon: 'runbook', text: `Runbook drafted by Postdoc adopted: ${draft.title}`, href: `#/runbooks/${id}`, provenance: 'user' });
+    return id;
+  },
+
   supersedeRunbook: (runbookId) => {
     const s = get();
     const source = s.runbooks.find((x) => x.id === runbookId);
@@ -2382,6 +2418,12 @@ export const useStore = create<OFState>()((set, get) => ({
       if (get().serviceUp) void get().syncGuild();
       return;
     }
+    get().applyDurable(snap);
+  },
+
+  // The apply half of hydrate, on a snapshot already read; check:store
+  // round-trips a snapshot through it with no IndexedDB (§9.2).
+  applyDurable: (snap) => {
     set((s) => {
       // Review decisions are re-applied over the seeded records rather than
       // replacing them, so a corpus update ships new records without
@@ -2402,7 +2444,10 @@ export const useStore = create<OFState>()((set, get) => ({
       // Locks re-apply only to runbooks that still exist. A lock whose runbook
       // was created in a previous session and is not in this one is dropped —
       // a lock with nothing under it is not worth keeping.
-      const runbooks = s.runbooks.map((r) => {
+      // §9.2 — runbooks adopted from a draft come back first, then every
+      // lock (theirs included) is re-applied by id.
+      const adopted = (snap.adoptedRunbooks ?? []).filter((a) => !s.runbooks.some((r) => r.id === a.id));
+      const runbooks = [...adopted, ...s.runbooks].map((r) => {
         const l = snap.runbookLocks[r.id];
         return l ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
       });
@@ -2429,6 +2474,7 @@ export const useStore = create<OFState>()((set, get) => ({
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
         // §8.4 — assumptions typed here; anything typed since load wins.
         proformaAssumptions: mergeAssumptions(snap.proformaAssumptions ?? {}, s.proformaAssumptions),
+        adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -3471,6 +3517,10 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
     proformaAssumptions: s.proformaAssumptions,
+    // Unlocked content as adopted; a lock rides in runbookLocks like any other.
+    adoptedRunbooks: s.runbooks
+      .filter((r) => s.adoptedRunbookIds.includes(r.id))
+      .map((r) => ({ ...structuredClone({ ...r, predictions: [...r.predictions], measurementSchema: [...r.measurementSchema] }), lockedAt: null, lockHash: null })),
   };
 }
 
@@ -3487,7 +3537,8 @@ if (durableAvailable()) {
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
-      s.proformaAssumptions === prev.proformaAssumptions
+      s.proformaAssumptions === prev.proformaAssumptions &&
+      s.adoptedRunbookIds === prev.adoptedRunbookIds
     )
       return;
     saveDurable(snapshotOf(s));
