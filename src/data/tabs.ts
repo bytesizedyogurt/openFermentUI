@@ -32,6 +32,7 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Runbooks', to: '/runbooks' },
   { label: 'Protocols', to: '/runbooks/protocols' },
   { label: 'Depositions', to: '/runbooks/depositions' },
+  { label: 'Ledger', to: '/runbooks/ledger' },
 ];
 
 // OF-BLD-013 §3.3. The module map keeps /primer, so every link to it that

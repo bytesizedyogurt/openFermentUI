@@ -24,6 +24,7 @@ import { toTable as ceilingTable } from '../src/components/figures/CeilingGap';
 import { toTable as frontierTable } from '../src/components/figures/Frontier';
 import { toTable as distributionTable } from '../src/components/figures/Distribution';
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
+import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
@@ -97,6 +98,15 @@ if (distRows.length !== bins.length + 5) problems.push(`Distribution's table has
 if (distRows.some((r) => r[3] !== 'demo')) problems.push("a Distribution's marks lose the run's provenance");
 const tRows = tornadoTable({ title: 't', drawn: 'd', series: ['a'], unit: 'u', provenance: 'demo', rows: [{ label: 'x', values: [0.2] }, { label: 'y', values: [-0.7] }] }).rows;
 if (tRows.length !== 2 || tRows[0][0] !== 'y') problems.push('the Tornado table is not one row per input, strongest first');
+// §9.3 — one ledger row per prediction, each saying its kind and verdict.
+const lp = (id: string, extra: object) => ({ id, label: id, value: 5, unit: 'g L-1', confidence: 'low' as const, basis: 'b', ...extra });
+const lRows = ledgerTable({ title: 't', rows: [
+  { key: 'a', label: 'a', prediction: lp('a', {}), lockedAt: '2026-10-15', observed: { value: 5.2, unit: 'g L-1' }, held: true },
+  { key: 'b', label: 'b', prediction: lp('b', { kind: 'interval', interval: { low: 4, high: 6 } }), lockedAt: '2026-10-15', observed: { value: 7, unit: 'g L-1' }, held: false },
+  { key: 'c', label: 'c', prediction: lp('c', { kind: 'bound' }), lockedAt: null, observed: null, held: null },
+] }).rows;
+if (lRows.length !== 3 || lRows.map((r) => `${r[1]}:${r[6]}`).join() !== 'point:held,interval:missed,bound:untested')
+  problems.push(`IntervalLedger's table is not one row per prediction with its kind and verdict: ${JSON.stringify(lRows)}`);
 ok.push(`tables: distribution ${distRows.length}, tornado ${tRows.length}, one row per mark, strongest input first`);
 ok.push(`tables: strip ${stripRows}, ceiling ${ceilingRows}, frontier ${frontierRows}, one row per mark; the sample draws all ${provs.size} classes`);
 

@@ -5,6 +5,7 @@
  * browser loop in check-reconcile.mjs.
  */
 import { computeDeltas, suggestOutcome } from '../src/engine/reconcile';
+import { HIT_RATE_MIN_TESTED, ledgerCounts } from '../src/engine/ledger';
 import type { Deposition, Prediction, Runbook } from '../src/data/types';
 
 let fails = 0;
@@ -37,6 +38,27 @@ const cases: [string, Prediction, number, boolean, number][] = [
 for (const [label, p, obs, held, delta] of cases) {
   const { d, outcome } = scenario(p, obs);
   check(label, d.held === held && Math.abs(d.pctDelta - delta) < 1e-9 && outcome === (held ? 'confirmed' : 'refuted'), `held ${d.held}, delta ${d.pctDelta.toFixed(2)}, ${outcome}`);
+}
+
+// §9.3 — the ledger's counts: a locked runbook's predictions, tested by the
+// latest conclusive run; an inconclusive run counts as a run and tests nothing.
+{
+  const rb = { id: 'rb', title: 'r', lockedAt: '2026-10-01T00:00:00Z', predictions: [point, { ...interval, id: 'pi' }, { ...bound, id: 'pb' }] } as unknown as Runbook;
+  const open = { id: 'rb-open', title: 'o', lockedAt: null, predictions: [point] } as unknown as Runbook;
+  const rec = (id: string, at: string, outcome: string, deltas: [string, number][]) =>
+    ({ id, runbookId: 'rb', reconciliation: { at, outcome, note: '', deltas: deltas.map(([predictionId, observed]) => ({ predictionId, observed, predicted: 0, unit: 'u', pctDelta: 0 })) } }) as unknown as Deposition;
+  const deps = [
+    rec('d1', '2026-10-02', 'refuted', [['p', 5.1]]),
+    rec('d2', '2026-10-03', 'confirmed', [['p', 8.2]]),
+    rec('d3', '2026-10-04', 'inconclusive', [['p', 1]]),
+  ];
+  const c = ledgerCounts([rb, open], deps);
+  check('the ledger counts locked, tested, held, missed and inconclusive runs',
+    c.locked === 3 && c.tested === 1 && c.held === 1 && c.missed === 0 && c.inconclusiveRuns === 1 && c.hitRate === null, JSON.stringify(c));
+  const many = Array.from({ length: HIT_RATE_MIN_TESTED }, (_, i) => ({ ...rb, id: `rb${i}`, predictions: [point] }) as Runbook);
+  const manyDeps = many.map((r, i) => ({ ...rec(`m${i}`, '2026-10-05', 'refuted', [['p', i === 0 ? 8 : 1]]), runbookId: r.id }) as Deposition);
+  const c5 = ledgerCounts(many, manyDeps);
+  check(`a hit rate appears at ${HIT_RATE_MIN_TESTED} tested`, c5.tested === HIT_RATE_MIN_TESTED && c5.hitRate === 1 / HIT_RATE_MIN_TESTED, JSON.stringify(c5));
 }
 
 console.log(fails === 0 ? '\nTHE THREE KINDS RECONCILE' : `\n${fails} failures`);

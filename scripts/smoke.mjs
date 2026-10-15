@@ -62,6 +62,7 @@ const ROUTES = [
   ['/runbooks/protocols/PR-DISRUPT-01', 'Runbooks — protocol (PEF disruption)'],
   ['/runbooks/protocols/PR-PHOS-01', 'Runbooks — protocol (Phos-tag assay)'],
   ['/runbooks/depositions', 'Runbooks — depositions (empty in a fresh browser)'],
+  ['/runbooks/ledger', 'Runbooks — prediction ledger'],
   ['/runbooks/depositions/dep-not-in-this-session', 'Runbooks — deposition (absent here)'],
   ['/dominion', 'Dominion'],
   ['/dominion/molecules', 'Dominion — molecules'],

@@ -15,6 +15,7 @@ import { href } from '@/router';
 import { ComponentTag } from '@/components/ComponentTag';
 import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
+import { IntervalLedger } from '@/components/figures';
 import {
   computeDeltas,
   deltaLabel,
@@ -92,6 +93,19 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
         )}
       </div>
 
+      {/* §9.3 — the reconciliation drawn, above the table. */}
+      {deltas.length > 0 && (
+        <div className="mb-3">
+          <IntervalLedger
+            title="What was predicted, and what did this run measure?"
+            rows={deltas.map((d) => {
+              const p = runbook.predictions.find((x) => x.id === d.predictionId)!;
+              return { key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt, observed: { value: d.observed, unit: d.unit }, held: d.held };
+            })}
+            csvName={`reconciliation-${deposition.id}`}
+          />
+        </div>
+      )}
       {deltas.length === 0 ? (
         <EmptyState
           title="Nothing to compare"

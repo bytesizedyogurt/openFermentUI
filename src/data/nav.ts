@@ -331,6 +331,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     component: 'Deposition',
   },
   {
+    label: 'Prediction ledger',
+    to: '/runbooks/ledger',
+    descriptor: 'what was predicted, against what was measured',
+    aliases: ['ledger', 'predictions', 'hit rate', 'scorecard'],
+    icon: GitBranch,
+    owner: 'Runbooks',
+  },
+  {
     label: 'Witness',
     to: '/biorepo/witness',
     descriptor: 'does it reproduce',

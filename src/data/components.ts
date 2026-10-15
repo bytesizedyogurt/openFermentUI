@@ -320,7 +320,7 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Runbook',
     owner: 'Runbooks',
     layer: 'Assay',
-    livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts'],
+    livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts', 'src/screens/RunbookLedger.tsx', 'src/engine/ledger.ts'],
     surfacedAs: 'the rail, /runbooks',
     role: 'The outbound falsifiable claim',
   },

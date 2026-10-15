@@ -43,6 +43,7 @@ import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/
 import { ProvDot, ProvenanceLegend, Tick, provMeta, type ProvKind } from '@/components/Provenance';
 import type { ExtractionRecord, Paper } from '@/data/types';
 import { WorkforceCard } from '@/components/GuildBits';
+import { HIT_RATE_MIN_TESTED, ledgerCounts } from '@/engine/ledger';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -201,6 +202,29 @@ function VitalTile({
         {sub && <div className="text-caption text-ink-soft mt-1.5">{sub}</div>}
       </Tick>
     </a>
+  );
+}
+
+function PredictionsCard() {
+  const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
+  const c = ledgerCounts(runbooks, depositions);
+  return (
+    <Card className="p-4" data-testid="home-predictions">
+      <div className="grid grid-cols-2 gap-y-1 text-body">
+        <span>Locked</span><span className="font-num text-right">{c.locked}</span>
+        <span>Tested</span><span className="font-num text-right">{c.tested}</span>
+        <span>Held</span><span className="font-num text-right">{c.held}</span>
+        <span>Missed</span><span className="font-num text-right">{c.missed}</span>
+        <span>Inconclusive runs</span><span className="font-num text-right">{c.inconclusiveRuns}</span>
+      </div>
+      <p className="text-caption text-ink-soft mt-2">
+        {c.hitRate === null
+          ? `Too few tested for a hit rate; one is shown from ${HIT_RATE_MIN_TESTED}.`
+          : `Hit rate ${Math.round(c.hitRate * 100)} % of ${c.tested} tested.`}{' '}
+        <a className="text-accent hover:underline" href={href('/runbooks/ledger')}>Open the ledger</a>
+      </p>
+    </Card>
   );
 }
 
@@ -963,6 +987,13 @@ export default function Home() {
         </SectionTitle>
         <div className="mb-6">
           <WorkforceCard />
+        </div>
+        {/* OF-BLD-014 §9.3 — predictions, counted as the ledger counts them. */}
+        <SectionTitle>
+          <span>Predictions</span>
+        </SectionTitle>
+        <div className="mb-6">
+          <PredictionsCard />
         </div>
         <SectionTitle>
           <span id="home-activity">Recent activity</span>

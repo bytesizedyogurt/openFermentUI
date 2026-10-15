@@ -65,6 +65,7 @@ import PureOS from '@/screens/PureOS';
 import FermOS from '@/screens/FermOS';
 import Dominion from '@/screens/Dominion';
 import Depositions from '@/screens/Depositions';
+import RunbookLedger from '@/screens/RunbookLedger';
 
 function isActive(path: string, to: string) {
   if (to === '/') return path === '/';
@@ -145,6 +146,8 @@ function Screen() {
         return c ? <ProtocolDetail protocolId={c} /> : <Protocols />;
       }
       if (b === 'depositions') return c ? <DepositionDetail depositionId={c} /> : <Depositions />;
+      // OF-BLD-014 §9.3 — 'ledger' is reserved too; check:seed refuses a runbook with that id.
+      if (b === 'ledger') return <RunbookLedger />;
       return b ? <RunbookDetail runbookId={b} /> : <Runbooks />;
     case 'dominion':
       if (b === 'molecules' && c) return <MoleculeDetail productId={c} />;

@@ -389,6 +389,8 @@ for (const p of PRODUCTS) {
 }
 
 for (const r of RUNBOOKS) {
+  // §9.3 — 'ledger' is a reserved second segment under /runbooks.
+  if (r.id === 'ledger') fail(`runbook ${r.id}: the id 'ledger' is reserved for the prediction ledger`);
   // §9.1 — an interval's low is at most its high, and its value lies between them.
   for (const p of r.predictions) {
     if (p.kind === 'interval') {
