@@ -39,23 +39,25 @@ papers are proposed by a fixed Europe PMC search rule (`pnpm thread:propose`) an
 seed only on a named person's approval (`pnpm thread:apply`). It holds no hand-curated record:
 every number on a thread P paper arrives through Intake and a Guild decision. Two hosts
 (*Cupriavidus necator* H16, *Pseudomonas putida* KT2440), two products (PHB, mcl-PHA) and five
-polymer ontology fields are in place for it. As of 2026-10-14 the thread holds **0 papers**:
-the first proposal ran, and the choice of query and the approval are owed in `STATE.md`. Home's
-**Programs** strip counts both programs live.
+polymer ontology fields are in place for it. As of 2026-10-15 the thread holds **35 papers**
+(P1–P35), proposed by the rule held to title and abstract and approved by Sean Creighton on
+2026-10-14; all 35 return full text from Europe PMC, and none has been through extraction yet
+(`STATE.md`, `## Live owed`). Home's **Programs** strip counts both programs live.
 
 ## What is real, and what is modeled
 
 | Layer | Status |
 |---|---|
-| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O, and thread P empty until approved (above); 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
-| Full text | **Real, when fetched** — as of 2026-10-14, **31 of the 59** papers that carry an identifier return full text from Europe PMC (`pnpm intake:fetch --all`: 25 of the 27 with a PMCID, 6 found by DOI or PMID); 26 have no open-access text there, and B1 and D1 answer 500 and are asked again on each run. Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
+| Papers, venues, identifiers | **Real, unevenly keyed** — 167 catalogued entries: 132 in threads A–O, and 35 in thread P, approved by rule and by name (above), each with a PMCID; 94 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
+| Full text | **Real, when fetched** — as of 2026-10-15, **66 of the 94** papers that carry an identifier return full text from Europe PMC (`pnpm intake:fetch --all`): 31 of threads A–O's 59 (25 of the 27 with a PMCID, 6 found by DOI or PMID) and all 35 of thread P; 26 have no open-access text there, and B1 and D1 sit outside Europe PMC's open-access subset, where its full-text endpoint answers 500. Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-14, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
+| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-15, **0 candidates anchored, 0 rejected** in this checkout: the key on the cloud environment is not scoped to a workspace, and the API refuses every call made with it (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
 | Verified records | **0** as of 2026-10-14 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
 | Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
 | Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
+| Computed values | **Computed, with a basis** — a value no paper states (a converted unit today; a yield ceiling, a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **0** kept in this checkout as of 2026-10-15 |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
 
@@ -221,7 +223,15 @@ pnpm data:push           # the outputs of live runs to the orphan branch openfer
 pnpm decisions:push      # commits core/data/biorepo.json alone as "Guild decisions <date>" and pushes
 pnpm witness:numbers     # the precision and recall Witness shows, read from a running service
 pnpm shots --prefix p /biorepo/witness    # photographs routes of a running app into docs/shots/
+cd core && uv run python -m openferment_core.demo --prototype   # the prototype's fixtures, made by the
+                         # real code paths into core/tests/fixtures/prototype/; the smoke double serves them
 ```
+
+The service also answers `GET /api/tools` (each tool's name, description and input schema) and
+`POST /api/tools/{name}`, the same registry Postdoc's loop will call: today `search_records` and
+`convert_units`. A tool input carries ids and words; a number typed into one refuses the call.
+Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
+a call that could pass `OPENFERMENT_DAILY_BUDGET_USD` (25 by default, `core/.env.example`).
 
 ### Hosting it on the Mac Mini
 
@@ -322,6 +332,8 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
+                         #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
+                         #   tokens, tool turns and daily cap, the tool registry and its two tools, the worker runner,
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
                          #   practice.py's drafts and tutor turns against a stand-in model, and
                          #   checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs
@@ -339,7 +351,7 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   58 routes headless, the overlay applied, Witness scored, Guild posting, and the
+  pnpm test:smoke        #   61 routes headless, the overlay applied, Witness scored, an artifact replayed, Guild posting, and the
                          #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
                          #   a practice session, and a check run at the bench and read back
   pnpm test:golden       #   the ten-minute demo script, driven end to end
@@ -479,6 +491,7 @@ colored by provenance.
 | solid gold | `gold` | curated gold-set entry |
 | solid green | `verified` | checked against the source document |
 | green, 45% | `curated` | transcribed from the curation document, **not** yet checked |
+| dotted blue | `computed` | a calculation whose every input names a source — basis attached, never aggregated |
 | solid grey | `unverified` | extractor output, not reviewed |
 | solid blue | `user` | user-entered |
 | dashed grey | `industry-estimate` | vendor or market figure — no source document, never aggregated |
@@ -490,7 +503,7 @@ never be mistaken for evidence — `industry-estimate` and `demo` — are the tw
 so they are distinguishable from their neighbours without relying on hue.
 
 `isAggregatable()` is the single gate on what may enter a statistic: it excludes rejected
-records, industry estimates, and any record marked `isPrimary: false` (a paper reciting someone
+records, industry estimates, computed values (derived from values already counted), and any record marked `isPrimary: false` (a paper reciting someone
 else's measurement, which would double-count). Excluded records stay visible in per-record lists
 and plots and say why they were held out — the rule is about medians, not about hiding data.
 
