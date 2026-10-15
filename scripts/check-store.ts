@@ -26,7 +26,8 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
-import { useStore } from '../src/store';
+import { snapshotOf, useStore } from '../src/store';
+import { seriesOf } from '../src/engine/series';
 import type { Candidate, Overlay } from '../src/data/types';
 
 let fails = 0;
@@ -281,6 +282,48 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   quote: back.quote,
   sectionId: back.sectionId,
 });
+
+// ── OF-BLD-014 §7.1 — a deposition's readings become a time series ────
+{
+  const rb = s().runbooks.find((r) => r.measurementSchema.some((m) => m.id === 'ms-taq-od'))!;
+  const dep = {
+    id: 'dep-series-check', runbookId: rb.id, protocolId: 'p', operatorId: null, startedAt: '2026-10-15T00:00:00Z',
+    closedAt: null, state: 'running' as const, entries: [], observations: [], reconciliation: null,
+  };
+  useStore.setState({ depositions: [dep, ...s().depositions] });
+  // Rows out of time order, one the schema cannot place, one that is not a row.
+  const r = s().attachReadings(dep.id, [
+    'time_h, measure, value, unit',
+    '6, Cell density at harvest, 3.1, OD600',
+    '0, Cell density at harvest, 0.2, OD600',
+    '3, Titre at harvest, 0.4, g/L',
+    '2, mystery glow, 7, lumens',
+    'a note with no time',
+    '3, Cell density at harvest, 1.1, OD600',
+  ].join('\n'));
+  const d = () => s().depositions.find((x) => x.id === dep.id)!;
+  check('a CSV attaches the rows it can place, and keeps every other line as an observation', r.attached === 4 && r.kept === 2, r);
+  check('each attached row is unconfirmed, its raw the CSV line', d().entries.every((e) => !e.confirmed && e.stepId === 'attached' && /, /.test(e.raw)));
+  check('the unplaceable row is kept word for word', d().observations.some((o) => o.raw === '2, mystery glow, 7, lumens'));
+  check('rows attach in time order, so the last entry is the last reading', d().entries.filter((e) => e.measureId === 'ms-taq-od').map((e) => e.value).join() === '0.2,1.1,3.1');
+  const od = seriesOf(d(), rb).find((x) => x.measureId === 'ms-taq-od');
+  check('seriesOf orders a measure\'s readings by time', od?.points.map((p) => p.t).join() === '0,3,6', od?.points);
+  check('a measure with one reading is no series', !seriesOf(d(), rb).some((x) => x.measureId === 'ms-taq-titre'));
+  const mid = d().entries.find((e) => e.value === 1.1)!;
+  s().amendEntry(dep.id, mid.id, 1.3);
+  const after = seriesOf(d(), rb).find((x) => x.measureId === 'ms-taq-od')!;
+  check('a correction keeps its reading\'s time and replaces it in the series', after.points.map((p) => p.value).join() === '0.2,1.3,3.1', after.points);
+  s().setSampleTime(dep.id, d().entries.find((e) => e.value === 3.1)!.id, null);
+  check('a reading taken out of time leaves the series', seriesOf(d(), rb).find((x) => x.measureId === 'ms-taq-od')!.points.length === 2);
+  s().setSeriesRole(dep.id, 'ms-taq-od', 'biomass');
+  check('a person assigns a series its role', seriesOf(d(), rb).find((x) => x.measureId === 'ms-taq-od')!.role === 'biomass');
+  check('the Durable snapshot carries times and roles', (() => {
+    const snap = snapshotOf(s());
+    const kept = snap.depositions.find((x) => x.id === dep.id)!;
+    return Object.keys(kept.sampleTimes ?? {}).length === 4 && kept.seriesRoles?.['ms-taq-od'] === 'biomass';
+  })());
+  useStore.setState({ depositions: s().depositions.filter((x) => x.id !== dep.id) });
+}
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

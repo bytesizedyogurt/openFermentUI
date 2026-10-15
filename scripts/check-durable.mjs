@@ -103,6 +103,30 @@ await page.waitForTimeout(1400);
 const dens3 = await page.evaluate(() => document.documentElement.dataset.density);
 check('Ephemeral density RESET on reload', dens3 === dens1, `${dens3}`);
 
+// OF-BLD-014 §7.1 — readings' sample times and a series' role survive a reload.
+await go('/runbooks/rb-taq-kigali');
+await page.getByRole('button', { name: /Start a deposition/ }).click();
+await page.waitForTimeout(600);
+await page.locator('div[role="dialog"] button', { hasText: 'TAP medium' }).first().click();
+await page.waitForTimeout(1400);
+await page.getByRole('button', { name: /Begin recording/ }).click();
+await page.waitForTimeout(1000);
+await go('/runbooks/depositions');
+const depHref = await page.locator('a[href^="#/runbooks/depositions/"]').first().getAttribute('href').catch(() => null);
+const depId = (depHref?.match(/depositions\/([^/?#]+)/) ?? [])[1];
+check('a deposition is open for the series check', Boolean(depId), page.url());
+await go(`/runbooks/depositions/${depId}`);
+await page.locator('textarea[id^="csv-"]').fill('time_h, measure, value, unit\n0, Cell density at harvest, 0.2, OD600\n5, Cell density at harvest, 2.4, OD600');
+await page.getByRole('button', { name: 'Attach readings' }).click();
+await page.locator('select[aria-label="Series role for Cell density at harvest"]').selectOption('biomass');
+await page.waitForTimeout(1500);
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+const hours = await page.locator('[data-testid="time-series"] input[type="number"]').evaluateAll((els) => els.map((e) => e.value));
+check('sample times SURVIVED a page reload', hours.join() === '0,5', hours.join());
+check('a series role SURVIVED a page reload',
+  (await page.locator('select[aria-label="Series role for Cell density at harvest"]').inputValue()) === 'biomass');
+
 // Reset must clear the durable store, not just memory.
 await page.evaluate(() => { /* noop */ });
 await go('/settings/corpus');

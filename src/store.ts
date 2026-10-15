@@ -24,6 +24,7 @@ import type {
   RecordStatus,
   ResultGrid,
   Runbook,
+  SeriesRole,
   RunbookStage,
   RunOutput,
   RunState,
@@ -59,6 +60,7 @@ import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
 import { computeDeltas } from '@/engine/reconcile';
+import { parseReadingsCsv, placeRow } from '@/engine/series';
 import {
   type DurableReviewDecision,
   EMPTY_SNAPSHOT,
@@ -439,6 +441,16 @@ export interface OFState {
   amendEntry: (depositionId: string, entryId: string, value: number) => void;
   /** Attach a later structured reading to an observation, leaving raw alone. */
   structureObservation: (depositionId: string, observationId: string, structured: string) => void;
+  /** OF-BLD-014 §7.1 — an entry's hours into the run, or null to take it out of its series. */
+  setSampleTime: (depositionId: string, entryId: string, hours: number | null) => void;
+  /** What a measure's series is (biomass, product, substrate), or null. */
+  setSeriesRole: (depositionId: string, measureId: string, role: SeriesRole | null) => void;
+  /**
+   * Readings logged elsewhere, as CSV (`time_h, measure, value, unit`). Each
+   * placed row becomes an unconfirmed entry with its time; every other line
+   * is kept verbatim as an observation. Rows attach in time order.
+   */
+  attachReadings: (depositionId: string, csv: string) => { attached: number; kept: number };
   /** Running → closed. Append-only throughout; closing stops new entries. */
   closeDeposition: (depositionId: string) => void;
   /**
@@ -2044,13 +2056,17 @@ export const useStore = create<OFState>()((set, get) => ({
         if (d.id !== depositionId || d.state === 'closed') return d;
         const original = d.entries.find((e) => e.id === entryId);
         if (!original) return d;
+        const id = nextId('de');
+        // A correction is the same reading: it keeps the reading's time (§7.1).
+        const t = d.sampleTimes?.[entryId];
         return {
           ...d,
+          ...(t !== undefined ? { sampleTimes: { ...d.sampleTimes, [id]: t } } : {}),
           entries: [
             ...d.entries,
             {
               ...original,
-              id: nextId('de'),
+              id,
               at,
               value,
               raw: `${original.raw} → corrected to ${value} ${original.unit}`,
@@ -2060,6 +2076,63 @@ export const useStore = create<OFState>()((set, get) => ({
         };
       }),
     }));
+  },
+
+  setSampleTime: (depositionId, entryId, hours) =>
+    set((s) => ({
+      depositions: s.depositions.map((d) => {
+        if (d.id !== depositionId) return d;
+        const times = { ...(d.sampleTimes ?? {}) };
+        if (hours === null || !Number.isFinite(hours)) delete times[entryId];
+        else times[entryId] = hours;
+        return { ...d, sampleTimes: times };
+      }),
+    })),
+
+  setSeriesRole: (depositionId, measureId, role) =>
+    set((s) => ({
+      depositions: s.depositions.map((d) => {
+        if (d.id !== depositionId) return d;
+        const roles = { ...(d.seriesRoles ?? {}) };
+        if (role === null) delete roles[measureId];
+        else roles[measureId] = role;
+        return { ...d, seriesRoles: roles };
+      }),
+    })),
+
+  attachReadings: (depositionId, csv) => {
+    let attached = 0;
+    let kept = 0;
+    set((s) => ({
+      depositions: s.depositions.map((d) => {
+        if (d.id !== depositionId || d.state === 'staged') return d;
+        const rb = s.runbooks.find((r) => r.id === d.runbookId);
+        const schema = rb?.measurementSchema ?? [];
+        const { rows, unreadable } = parseReadingsCsv(csv);
+        const at = new Date().toISOString();
+        const entries = [...d.entries];
+        const observations = [...d.observations];
+        const times = { ...(d.sampleTimes ?? {}) };
+        for (const row of rows) {
+          const measureId = placeRow(row, schema);
+          if (measureId) {
+            const id = nextId('de');
+            entries.push({ id, measureId, stepId: 'attached', at, value: row.value, unit: row.unit, raw: row.line, confirmed: false });
+            times[id] = row.time;
+            attached += 1;
+          } else {
+            observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: row.line, structured: null });
+            kept += 1;
+          }
+        }
+        for (const line of unreadable) {
+          observations.push({ id: nextId('ob'), stepId: 'attached', at, raw: line, structured: null });
+          kept += 1;
+        }
+        return { ...d, entries, observations, sampleTimes: times };
+      }),
+    }));
+    return { attached, kept };
   },
 
   structureObservation: (depositionId, observationId, structured) =>
@@ -3303,7 +3376,7 @@ async function guildPost<T>(
 // collapsed panel that followed you across sessions would be a bug, not a
 // feature.
 
-function snapshotOf(s: OFState): DurableSnapshot {
+export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};
   for (const r of s.records) {
     // Only records a reviewer has actually touched. Persisting all 134 every

@@ -1133,7 +1133,18 @@ export interface Deposition {
   entries: DepositionEntry[];
   observations: Observation[];
   reconciliation: Reconciliation | null;
+  /**
+   * Hours into the run, by entry id (OF-BLD-014 §7.1). An entry with a time
+   * is a reading in a series; one without keeps its old meaning, where a
+   * later entry on the same measure corrects an earlier one. Absent on
+   * depositions saved before series.
+   */
+  sampleTimes?: Record<string, number>;
+  /** What each measure's series is, by measure id, as a person assigned it. */
+  seriesRoles?: Record<string, SeriesRole>;
 }
+
+export type SeriesRole = 'biomass' | 'product' | 'substrate';
 
 /**
  * A single falsifiable claim a runbook makes before anything is run

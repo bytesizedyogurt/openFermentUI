@@ -13,6 +13,7 @@ import type { Deposition } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { ComponentTag } from '@/components/ComponentTag';
+import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import {
   CONFIRM_BAND_PCT,
@@ -346,6 +347,20 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           )}
         </Card>
       </section>
+
+      {/* ── time series (OF-BLD-014 §7.1) ───────────────────────────────── */}
+      {runbook && (
+        <section className="mb-6" aria-labelledby="band-series">
+          <SectionTitle>
+            <span id="band-series" className="inline-flex items-center gap-2">
+              <Ruler size={15} aria-hidden /> Time series
+            </span>
+          </SectionTitle>
+          <Card className="p-4">
+            <TimeSeriesPanel deposition={deposition} runbook={runbook} />
+          </Card>
+        </section>
+      )}
 
       {/* ── observed ─────────────────────────────────────────────────────── */}
       <section className="mb-6" aria-labelledby="band-observed">
