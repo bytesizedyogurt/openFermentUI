@@ -5,3 +5,4 @@ export { FigureFrame, Mark, EncodingLegend, lineStroke, type FigureTable } from 
 export { EvidenceStrip, stripPoints, median, toTable as evidenceStripTable, type EvidenceStripProps, type StripRule } from './EvidenceStrip';
 export { CeilingGap, CEILING_NOTES, toTable as ceilingGapTable, type CeilingGapProps, type Ceiling } from './CeilingGap';
 export { Frontier, toTable as frontierTable, type FrontierProps, type FrontierPoint } from './Frontier';
+export { MixLine, toTable as mixLineTable, type MixLineProps, type MixPoint } from './MixLine';

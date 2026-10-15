@@ -980,6 +980,8 @@ class GeneosModelInfo(BaseModel):
     source: str
     # Why it cannot be loaded here (its file is not fetched), or None.
     unavailable: str | None = None
+    # The sugar a view opens on: one the model can take up.
+    feed: str
     notes: list[str] = Field(default_factory=list)
 
 

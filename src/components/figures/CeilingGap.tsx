@@ -44,8 +44,8 @@ function asStrip(props: CeilingGapProps): EvidenceStripProps {
     csvName: props.csvName ?? 'ceiling-gap',
     notes: CEILING_NOTES,
     empty: {
-      what: 'no reported yield and no ceiling for this product and feed.',
-      where: 'Reported yields arrive through Intake; ceilings are computed in geneOS → Model.',
+      what: 'no reported yield of this field in the store.',
+      where: 'Reported yields arrive through Intake and its extraction; ceilings are computed in geneOS → Model.',
     },
   };
 }

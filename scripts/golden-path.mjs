@@ -317,6 +317,13 @@ async function main() {
   await page.waitForTimeout(2500);
   check('Scripted mode still plays its flow', /500 mg\/L|15–18|1\.45/.test(await page.locator('body').innerText()));
 
+  // ── 10c. geneOS draws the ceiling beside what was reported ──────────
+  // OF-BLD-014 §6.4, over the double's toy-network fixtures.
+  await go('/geneos/model');
+  await page.locator('[data-testid="frontier"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const rules = await page.locator('[data-testid="strip-rule"]').count();
+  check('geneOS → Model draws a computed ceiling and the envelope', rules === 1 && (await page.locator('[data-testid="frontier"]').count()) === 1, `${rules} rules`);
+
   // ── 11. Command palette navigates ───────────────────────────────────
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);

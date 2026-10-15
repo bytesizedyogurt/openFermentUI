@@ -5,7 +5,9 @@
 // basis on the service, and the basis opens to every input and where each
 // came from, with a link to the stored artifact that replays it.
 import { ExternalLink } from 'lucide-react';
-import type { BasisInput, Evidence } from '@/data/types';
+import type { BasisInput, Evidence, ExtractionRecord } from '@/data/types';
+import { useStore } from '@/store';
+import { CeilingGap } from './figures';
 import { fmt } from '@/engine/units';
 import { href } from '@/router';
 import { ProvenanceBadge, Tick } from './Provenance';
@@ -14,6 +16,25 @@ function sourceWords(input: BasisInput): string {
   const s = input.source;
   const what = s.id ?? s.note ?? '';
   return [s.kind, what, s.by ? `(${s.by})` : ''].filter(Boolean).join(' ');
+}
+
+/** A ceiling drawn beside every reported PHA yield (OF-BLD-014 §6.4). */
+function InlineCeiling({ evidence }: { evidence: Evidence }) {
+  const records = useStore((s) => s.records);
+  const yields = records.filter((r) => r.field === 'pha_yield_substrate') as ExtractionRecord[];
+  const model = evidence.basis.inputs.find((i) => i.name === 'model')?.source.id ?? 'model';
+  return (
+    <div className="mt-2" data-testid="inline-ceiling">
+      <CeilingGap
+        title="The reported yields beside this ceiling"
+        records={yields}
+        unit={evidence.unit}
+        quantity="PHB yield on substrate"
+        ceilings={[{ value: Number(evidence.value), model: `${model} ceiling`, basis: evidence.basis }]}
+        csvName={`ceiling-${evidence.id}`}
+      />
+    </div>
+  );
 }
 
 export function EvidenceCard({ evidence }: { evidence: Evidence }) {
@@ -55,6 +76,7 @@ export function EvidenceCard({ evidence }: { evidence: Evidence }) {
             Artifact {b.artifactId} <ExternalLink size={10} aria-hidden />
           </a>
         </details>
+        {evidence.figure === 'ceiling' && typeof evidence.value === 'number' && <InlineCeiling evidence={evidence} />}
       </div>
     </Tick>
   );

@@ -227,7 +227,7 @@ def models() -> list[GeneosModelInfo]:
         out.append(GeneosModelInfo(
             id=m.id, name=m.name, host=m.host, scope=m.scope, route=m.route, licence=m.licence,
             source=(f"{m.fetched.repository} at {m.fetched.commit}" if m.fetched else f"bundled with cobra as {m.bundled}"),
-            unavailable=shelf.available(m), notes=list(m.notes),
+            unavailable=shelf.available(m), feed=m.feed, notes=list(m.notes),
         ))
     return out
 

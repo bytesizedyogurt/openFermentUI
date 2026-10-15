@@ -1,0 +1,171 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "glucose": {
+      "kind": "frontier",
+      "modelId": "toy",
+      "product": "phb",
+      "substrates": [
+        "glucose"
+      ],
+      "finding": null,
+      "artifactId": "cda65b1f4801ff45",
+      "evidence": {
+        "id": "ev-cda65b1f4801ff45",
+        "label": "PHB against growth on glucose, toy",
+        "value": 0.955727258598104,
+        "unit": "g g-1",
+        "interval": null,
+        "provenance": "computed",
+        "basis": {
+          "tool": "geneos.frontier",
+          "toolVersion": "cobra 0.32.1 · worker 9e71954de867",
+          "inputs": [
+            {
+              "name": "model",
+              "value": "toy",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "toy",
+                "note": "the STAND-IN toy network built in the geneOS worker for tests and fixtures",
+                "by": null
+              }
+            },
+            {
+              "name": "uptake",
+              "value": 10.0,
+              "unit": "mmol gDW-1 h-1",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+                "by": null
+              }
+            },
+            {
+              "name": "product",
+              "value": "phb",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+                "by": null
+              }
+            },
+            {
+              "name": "substrate",
+              "value": "glucose",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+                "by": null
+              }
+            }
+          ],
+          "artifactId": "cda65b1f4801ff45",
+          "at": "2026-09-15T09:00:00Z",
+          "seed": null
+        },
+        "figure": "frontier"
+      },
+      "output": {
+        "modelId": "toy",
+        "product": "phb",
+        "substrate": "glucose",
+        "exchange": "EX_glc__D_e",
+        "uptake": 10.0,
+        "growthReaction": "GROWTH",
+        "points": [
+          {
+            "growth": 0.0,
+            "flux": 20.0,
+            "gPerG": 0.955727258598104
+          },
+          {
+            "growth": 1.8181818181818181,
+            "flux": 18.181818181818183,
+            "gPerG": 0.8688429623619127
+          },
+          {
+            "growth": 3.6363636363636362,
+            "flux": 16.363636363636363,
+            "gPerG": 0.7819586661257214
+          },
+          {
+            "growth": 5.454545454545454,
+            "flux": 14.545454545454547,
+            "gPerG": 0.6950743698895302
+          },
+          {
+            "growth": 7.2727272727272725,
+            "flux": 12.727272727272727,
+            "gPerG": 0.6081900736533389
+          },
+          {
+            "growth": 9.09090909090909,
+            "flux": 10.90909090909091,
+            "gPerG": 0.5213057774171477
+          },
+          {
+            "growth": 10.909090909090908,
+            "flux": 9.090909090909092,
+            "gPerG": 0.43442148118095636
+          },
+          {
+            "growth": 12.727272727272727,
+            "flux": 7.272727272727273,
+            "gPerG": 0.3475371849447651
+          },
+          {
+            "growth": 14.545454545454545,
+            "flux": 5.454545454545455,
+            "gPerG": 0.26065288870857384
+          },
+          {
+            "growth": 16.363636363636363,
+            "flux": 3.6363636363636367,
+            "gPerG": 0.17376859247238255
+          },
+          {
+            "growth": 18.18181818181818,
+            "flux": 1.8181818181818201,
+            "gPerG": 0.08688429623619136
+          },
+          {
+            "growth": 20.0,
+            "flux": 0.0,
+            "gPerG": 0.0
+          }
+        ]
+      }
+    },
+    "fructose": {
+      "kind": "frontier",
+      "modelId": "toy",
+      "product": "phb",
+      "substrates": [
+        "fructose"
+      ],
+      "finding": "this reconstruction has no uptake reaction for fructose",
+      "artifactId": null,
+      "evidence": null,
+      "output": {}
+    },
+    "xylose": {
+      "kind": "frontier",
+      "modelId": "toy",
+      "product": "phb",
+      "substrates": [
+        "xylose"
+      ],
+      "finding": "this reconstruction has no uptake reaction for xylose",
+      "artifactId": null,
+      "evidence": null,
+      "output": {}
+    }
+  }
+}

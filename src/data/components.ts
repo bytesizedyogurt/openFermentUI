@@ -166,6 +166,10 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/Organisms.tsx',
       'src/screens/StrainPage.tsx',
       'src/engine/geneos/enumeration.ts',
+      // OF-BLD-014 §6.2–§6.4 — flux balance analysis on a shelf of published models.
+      'src/screens/GeneOSModel.tsx',
+      'core/openferment_core/geneos.py',
+      'core/openferment_core/workers/geneos_worker.py',
     ],
     surfacedAs: 'the rail, /geneos',
     role: 'The organism as an engineered system — host, parts, pathway, model, strain design',

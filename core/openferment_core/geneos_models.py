@@ -117,6 +117,8 @@ class ShelfModel:
     # How the product is made: the add-on's name, or the model's own route.
     route: str = ""
     licence: str = ""
+    # The sugar a view opens on: one the model can take up.
+    feed: str = "glucose"
     notes: list[str] = field(default_factory=list)
 
 
@@ -145,7 +147,7 @@ SHELF: dict[str, ShelfModel] = {
         id="RehMBEL1391", name="Cupriavidus necator H16 (RehMBEL1391)", host="c-necator-h16",
         scope="genome scale", fetched=C_NECATOR,
         route="native: PHA synthase PHAS and phb_c, with its own demand DM_phb_c",
-        licence="GPL-3.0",
+        licence="GPL-3.0", feed="fructose",
         notes=["Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."],
     ),
 }

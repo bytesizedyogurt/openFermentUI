@@ -28,7 +28,9 @@ export class RagRefused extends Error {
   }
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+/** A call to the service, with RagDown and RagRefused as its two failures;
+ * lib/geneos.ts shares it. */
+export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, init);

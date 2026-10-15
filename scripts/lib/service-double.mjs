@@ -98,6 +98,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   /** Questions the browser searched for (§4.4). */
   const ragSearches = [];
   const asks = [];
+  const geneosCalls = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -251,6 +252,26 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(await prototype('rag-search.json')));
     }
+    // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
+    // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
+    if (url === '/api/geneos/models' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype('geneos-models.json')));
+    }
+    if (['/api/geneos/ceiling', '/api/geneos/frontier', '/api/geneos/mix'].includes(url) && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const asked = JSON.parse(body || '{}');
+      geneosCalls.push({ path: url, ...asked });
+      const kind = url.split('/').pop();
+      if (asked.modelId !== 'toy') {
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `${asked.modelId}'s file is not on this machine: run pnpm geneos:fetch` }));
+      }
+      const fixture = await prototype(`geneos-${kind}.json`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(kind === 'mix' ? fixture : fixture[asked.substrate]));
+    }
     // OF-BLD-014 §5.3 — Postdoc's loop, replayed from the stream
     // `demo.py --prototype` recorded through the real loop. Each step is held
     // back a moment, so the panel is seen drawing steps as they arrive.
@@ -289,5 +310,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls } };
 }

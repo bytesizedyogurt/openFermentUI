@@ -4,6 +4,7 @@
 //
 // Statistics are derived from the live store, so a record verified in the
 // review queue changes the median and turns its dot green without a reload.
+import { HostCeilingCard } from './GeneOSModel';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -1229,6 +1230,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           </p>
         )}
       </section>
+
+      {/* OF-BLD-014 §6.4 — the ceiling a published model of this host allows. */}
+      <HostCeilingCard strainId={strainId} />
 
       {/* ── BAND 2 — media ─────────────────────────────────────────────── */}
       <section className="mb-6" aria-labelledby="band-media">

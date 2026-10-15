@@ -281,6 +281,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'geneOS',
   },
   {
+    label: 'Model',
+    to: '/geneos/model',
+    descriptor: 'the most product a published reaction network allows, beside what was reported',
+    aliases: ['ceiling', 'yield ceiling', 'flux balance', 'fba', 'genome-scale model', 'cobra', 'frontier', 'sugar mix'],
+    icon: Dna,
+    owner: 'geneOS',
+  },
+  {
     label: 'Molecules',
     to: '/dominion/molecules',
     descriptor: 'targets and markets',

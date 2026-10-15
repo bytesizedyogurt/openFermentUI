@@ -1,0 +1,33 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "id": "toy",
+      "name": "Toy network (STAND-IN)",
+      "host": null,
+      "scope": "central carbon",
+      "route": "SPLIT then PHAC, built in the worker",
+      "licence": "test fixture",
+      "source": "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model",
+      "unavailable": null,
+      "feed": "glucose",
+      "notes": [
+        "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model"
+      ]
+    },
+    {
+      "id": "RehMBEL1391",
+      "name": "Cupriavidus necator H16 (RehMBEL1391)",
+      "host": "c-necator-h16",
+      "scope": "genome scale",
+      "route": "native: PHA synthase PHAS and phb_c, with its own demand DM_phb_c",
+      "licence": "GPL-3.0",
+      "source": "https://github.com/m-jahn/genome-scale-models at 00c70c5",
+      "unavailable": "RehMBEL1391's file is not on this machine: run pnpm geneos:fetch",
+      "feed": "fructose",
+      "notes": [
+        "Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."
+      ]
+    }
+  ]
+}

@@ -44,6 +44,7 @@ const ROUTES = [
   ['/geneos/hosts/bovine', 'geneOS — strain (reference molecule)'],
   ['/geneos/hosts/c-necator-h16', 'geneOS — strain (thread P host)'],
   ['/geneos/pathway', 'geneOS — pathway vocabulary'],
+  ['/geneos/model', 'geneOS — Model: the ceiling beside what was reported'],
   ['/fermos', 'fermOS (the emptiest of the eleven)'],
   ['/pureos', 'pureOS'],
   ['/proforma', 'Proforma'],
@@ -445,6 +446,29 @@ async function main() {
       if (!/SAMPLE: invented values/.test(await page.locator('body').innerText())) problems.push('the gallery does not say its values are a sample');
       await page.locator('[data-testid="figure"]').nth(1).getByRole('button', { name: 'View as table' }).click();
       if ((await page.locator('[data-testid="figure-table"] tbody tr').count()) !== 12) problems.push('the ceiling figure\'s table does not hold one row per mark');
+      // OF-BLD-014 §6.4 — geneOS → Model over the toy network's fixtures: a
+      // dotted ceiling labelled with its model, the envelope, what the model
+      // lacks, a sugar it cannot take up said in words; and the C. necator
+      // strain page's card says its file is not on this machine.
+      await page.goto(`http://localhost:${PORT}/#/geneos/model`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="frontier"]').waitFor({ timeout: 10000 }).catch(() => {});
+      const modelView = await page.locator('[data-testid="geneos-model"]').innerText().catch(() => '');
+      if (!/toy ceiling/.test(modelView)) problems.push('the Model view draws no ceiling labelled with its model');
+      if ((await page.locator('[data-testid="strip-rule"]').count()) !== 1) problems.push('the Model view does not draw one rule for the one usable model');
+      if (!/Nothing on this screen predicts what a vessel will produce/.test(modelView)) problems.push('the Model view does not repeat that a ceiling is no forecast');
+      if (!/toy, for the mix: this reconstruction has no uptake reaction for xylose/.test(modelView)) problems.push('the Model view does not say the toy cannot take up xylose');
+      if (!/RehMBEL1391: RehMBEL1391's file is not on this machine/.test(modelView)) problems.push('the Model view does not say the C. necator file is not here');
+      if (!/A ceiling from flux balance analysis/.test(modelView)) problems.push('the ceiling figure lacks its fixed sentences');
+      await page.locator('select[aria-label="Sugar fed"]').selectOption('xylose');
+      await page.locator('text=toy: this reconstruction has no uptake reaction for xylose').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!doubleState.geneosCalls.some((c) => c.path === '/api/geneos/ceiling' && c.substrate === 'xylose'))
+        problems.push('choosing xylose did not ask the service for its ceiling');
+      if (!/toy: this reconstruction has no uptake reaction for xylose/.test(await page.locator('body').innerText()))
+        problems.push('a sugar the model cannot take up is not said in words');
+      await page.goto(`http://localhost:${PORT}/#/geneos/hosts/c-necator-h16`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="host-ceiling"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/not on this machine: run pnpm geneos:fetch/.test(await page.locator('[data-testid="host-ceiling"]').innerText().catch(() => '')))
+        problems.push("the C. necator strain page has no ceiling card saying its file is not here");
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
       // Back to scripted, which the live panel leaves untouched.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
@@ -541,7 +565,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported');
       }
     } catch (e) {
       overlayFails++;

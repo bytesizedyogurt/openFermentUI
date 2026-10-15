@@ -2027,6 +2027,8 @@ export interface GeneosModelInfo {
   source: string;
   /** Why it cannot be loaded here (its file is not fetched), or null. */
   unavailable: string | null;
+  /** The sugar a view opens on: one the model can take up. */
+  feed: string;
   notes: string[];
 }
 

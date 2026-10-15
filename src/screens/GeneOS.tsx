@@ -27,6 +27,7 @@ import { PATHWAYS } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
 import { href, useRoute } from '@/router';
 import { Callout, Card, PageHeader, SectionTitle, cx } from '@/components/ui';
+import GeneOSModel from './GeneOSModel';
 import { OwnerTabs, activeTab, type OwnerTab } from '@/components/OwnerTabs';
 import { ComponentTag } from '@/components/ComponentTag';
 import { SubsystemReference, SubsystemShelf } from '@/components/ReferenceView';
@@ -146,11 +147,13 @@ export default function GeneOS() {
     () => [
       { label: 'Hosts', to: '/geneos/hosts', badge: STRAINS.length },
       { label: 'Pathway', to: '/geneos/pathway', badge: PATHWAYS.length },
+      { label: 'Model', to: '/geneos/model' },
     ],
     [],
   );
   const active = activeTab(route.path, tabs);
   const onPathway = active === '/geneos/pathway';
+  const onModel = active === '/geneos/model';
 
   return (
     <>
@@ -162,7 +165,9 @@ export default function GeneOS() {
 
       <OwnerTabs tabs={tabs} />
 
-      {onPathway ? (
+      {onModel ? (
+        <GeneOSModel />
+      ) : onPathway ? (
         <PathwayView />
       ) : (
         <>

@@ -180,6 +180,11 @@ export function EvidenceStrip(props: EvidenceStripProps) {
             <Mark p={p.provenance} x={x(p.value)} y={TOP + groups.indexOf(p.group) * ROW} faint={Boolean(p.heldOut)} flagged={Boolean(p.above)} />
           </g>
         ))}
+        {points.length === 0 && (
+          <text x={LEFT} y={TOP + 4} fontSize={11} fill="currentColor" opacity={0.8} data-testid="strip-no-records">
+            {props.empty?.what ? `No record yet: ${props.empty.what}` : 'No record of this field yet.'} {props.empty?.where ?? ''}
+          </text>
+        )}
         <line x1={LEFT} x2={W - RIGHT} y1={axisY} y2={axisY} stroke="currentColor" strokeOpacity={0.4} />
         {ticks.map((t) => (
           <text key={t} x={x(t)} y={axisY + 14} textAnchor="middle" fontSize={10} fill="currentColor" opacity={0.7}>

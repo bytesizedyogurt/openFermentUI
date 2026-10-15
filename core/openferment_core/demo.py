@@ -381,6 +381,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         ("artifacts.json", [art.model_dump(mode="json")]),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
+        *prototype_geneos().items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -520,6 +521,45 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
     assert plan.claims and not plan.rejected, f"the stand-in plan no longer passes the validator: {plan.rejectionReasons}"
     events.append({"event": "plan", "data": plan.model_dump(mode="json")})
     return events
+
+
+# §6.4: geneOS's Model view over the toy network the worker builds, a
+# STAND-IN, computed by the real worker and the real artifact code and kept
+# nowhere. The shelf the double lists holds the toy, labelled, and the
+# C. necator model as a fetched file not on this machine, so a strain page
+# shows its card and says so. Dates are fixed so the files are the same on
+# every run.
+GENEOS_TOY_NOTE = "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model"
+
+
+def _fixed(result):
+    if result.evidence is not None:
+        result.evidence.basis.at = AT
+    return result.model_dump(mode="json")
+
+
+def prototype_geneos() -> dict[str, Any]:
+    from . import geneos, geneos_models as shelf
+    from .models import GeneosModelInfo
+
+    c_necator = shelf.SHELF["RehMBEL1391"]
+    models = [
+        GeneosModelInfo(id="toy", name="Toy network (STAND-IN)", host=None, scope="central carbon",
+                        route="SPLIT then PHAC, built in the worker", licence="test fixture", source=GENEOS_TOY_NOTE,
+                        unavailable=None, feed="glucose", notes=[GENEOS_TOY_NOTE]),
+        GeneosModelInfo(id=c_necator.id, name=c_necator.name, host=c_necator.host, scope=c_necator.scope,
+                        route=c_necator.route, licence=c_necator.licence,
+                        source=f"{c_necator.fetched.repository} at {c_necator.fetched.commit}",
+                        unavailable=f"{c_necator.id}'s file is not on this machine: run pnpm geneos:fetch",
+                        feed=c_necator.feed, notes=list(c_necator.notes)),
+    ]
+    subs = list(shelf.SUBSTRATES)
+    return {
+        "geneos-models.json": [m.model_dump(mode="json") for m in models],
+        "geneos-ceiling.json": {s: _fixed(geneos.ceiling("toy", "phb", s, keep=False)) for s in subs},
+        "geneos-frontier.json": {s: _fixed(geneos.frontier("toy", "phb", s, keep=False)) for s in subs},
+        "geneos-mix.json": _fixed(geneos.mix("toy", "phb", "glucose", "xylose", keep=False)),
+    }
 
 
 # §6.1: the figure gallery's sample (/settings/figures). One record per

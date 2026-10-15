@@ -125,7 +125,22 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'geneos.search', owner: 'geneOS', label: 'Sequence search', status: 'stub', state: UNBUILT },
   { id: 'geneos.structure', owner: 'geneOS', label: 'Structure', status: 'stub', state: UNBUILT },
   { id: 'geneos.function', owner: 'geneOS', label: 'Function', status: 'stub', state: UNBUILT },
-  { id: 'geneos.model', owner: 'geneOS', label: 'Model', status: 'stub', state: UNBUILT },
+  {
+    id: 'geneos.model',
+    owner: 'geneOS',
+    label: 'Model',
+    status: 'live',
+    state:
+      'Flux balance analysis on a shelf of published reaction networks: the most PHB each allows from a ' +
+      'sugar, its production envelope and a sugar-mix line, each kept as an artifact and drawn beside the ' +
+      'reported yields. No time axis and no vessel; strain design is not built.',
+    implementedIn: [
+      'core/openferment_core/geneos.py',
+      'core/openferment_core/geneos_models.py',
+      'core/openferment_core/workers/geneos_worker.py',
+      'src/screens/GeneOSModel.tsx',
+    ],
+  },
   { id: 'geneos.design', owner: 'geneOS', label: 'Strain design', status: 'stub', state: UNBUILT },
 
   // ── fermOS — the reactor (§3) ────────────────────────────────────────
