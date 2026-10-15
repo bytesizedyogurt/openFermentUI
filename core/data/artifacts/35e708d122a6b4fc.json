@@ -1,0 +1,63 @@
+{
+  "id": "35e708d122a6b4fc",
+  "tool": "proforma_benchmark",
+  "toolVersion": "biorefineries.cornstover@2.35.1",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "biorefineries.cornstover.Biorefinery",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.cornstover@2.35.1",
+        "note": "the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own",
+        "by": null
+      }
+    },
+    {
+      "name": "simulator",
+      "value": "biosteam 2.54.0",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "the process simulator the package runs on",
+        "by": null
+      }
+    },
+    {
+      "name": "gallon",
+      "value": "ethanol_density_kggal",
+      "unit": "kg gal-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.cornstover@2.35.1",
+        "note": "the package's own ethanol density per gallon converts its price per kilogram",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "package": "biorefineries.cornstover@2.35.1",
+    "biosteam": "2.54.0",
+    "mespUsdPerGal": 1.9676711216619653,
+    "mespUsdPerKg": 0.6588136420152626,
+    "ethanolDensityKgPerGal": 2.98668849,
+    "settings": {
+      "rateOfReturn": 0.1,
+      "operatingDays": 350.3999999999999,
+      "incomeTax": 0.35,
+      "startYear": 2007,
+      "endYear": 2037
+    },
+    "references": [
+      "Humbird, D. et al. Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover. NREL/TP-5100-47764, 2011. doi:10.2172/1013269",
+      "Cortes-Peña, Y.; Kumar, D.; Singh, V.; Guest, J. S. BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020. doi:10.1021/acssuschemeng.9b07040"
+    ]
+  },
+  "outputHash": "785239baf1c1e00e89eba095b8b46b8c660b6cd0e5e9a7af8353af2ae8ef792f",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T19:54:30Z",
+  "durationMs": 18830,
+  "seed": null
+}
