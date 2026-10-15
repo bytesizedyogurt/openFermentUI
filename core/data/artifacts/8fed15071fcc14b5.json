@@ -1,0 +1,137 @@
+{
+  "id": "8fed15071fcc14b5",
+  "tool": "geneos.frontier",
+  "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "E. coli K-12 central metabolism (core model)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "e_coli_core",
+        "note": "bundled with cobra as textbook (BiGG Models, bundled with cobra 0.32.1)",
+        "by": null
+      }
+    },
+    {
+      "name": "add-on",
+      "value": "phaCAB",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "RehMBEL1391",
+        "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "phb",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "e_coli_core",
+    "product": "phb",
+    "substrate": "glucose",
+    "exchange": "EX_glc__D_e",
+    "uptake": 10.0,
+    "growthReaction": "Biomass_Ecoli_core",
+    "points": [
+      {
+        "growth": 0.0,
+        "flux": 9.999999999999995,
+        "gPerG": 0.4778636292990517
+      },
+      {
+        "growth": 0.0794474097244028,
+        "flux": 9.396259271651834,
+        "gPerG": 0.44901305573864125
+      },
+      {
+        "growth": 0.1588948194488056,
+        "flux": 8.792518543303665,
+        "gPerG": 0.42016248217823027
+      },
+      {
+        "growth": 0.2383422291732084,
+        "flux": 8.188777814955495,
+        "gPerG": 0.39131190861781934
+      },
+      {
+        "growth": 0.3177896388976112,
+        "flux": 7.585037086607328,
+        "gPerG": 0.3624613350574086
+      },
+      {
+        "growth": 0.397237048622014,
+        "flux": 6.98129635825916,
+        "gPerG": 0.33361076149699764
+      },
+      {
+        "growth": 0.4766844583464168,
+        "flux": 6.0377074600930145,
+        "gPerG": 0.2885200799526009
+      },
+      {
+        "growth": 0.5561318680708196,
+        "flux": 4.910552883336038,
+        "gPerG": 0.2346574622695883
+      },
+      {
+        "growth": 0.6355792777952224,
+        "flux": 3.744218181818177,
+        "gPerG": 0.17892256892511318
+      },
+      {
+        "growth": 0.7150266875196252,
+        "flux": 2.496145454545459,
+        "gPerG": 0.11928171261674246
+      },
+      {
+        "growth": 0.794474097244028,
+        "flux": 1.2480727272727377,
+        "gPerG": 0.059640856308371626
+      },
+      {
+        "growth": 0.8739215069684307,
+        "flux": 0.0,
+        "gPerG": 0.0
+      }
+    ]
+  },
+  "outputHash": "ce61d2a345968e71e685abf9dd12d6797582f29564b0edf70e87b0b9647a438d",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T14:53:52Z",
+  "durationMs": 21,
+  "seed": null
+}

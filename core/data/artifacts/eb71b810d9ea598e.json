@@ -1,0 +1,79 @@
+{
+  "id": "eb71b810d9ea598e",
+  "tool": "geneos.ceiling",
+  "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "E. coli K-12 MG1655 (iJO1366)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "iJO1366",
+        "note": "bundled with cobra as iJO1366 (BiGG Models, bundled with cobra 0.32.1)",
+        "by": null
+      }
+    },
+    {
+      "name": "add-on",
+      "value": "phaCAB",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "RehMBEL1391",
+        "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "phb",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "iJO1366",
+    "product": "phb",
+    "substrate": "glucose",
+    "exchange": "EX_glc__D_e",
+    "uptake": 10.0,
+    "flux": 12.412173913043477,
+    "molPerMol": 1.2412173913043476,
+    "gPerG": 0.593132647357797,
+    "solver": "glpk_interface",
+    "status": "optimal"
+  },
+  "outputHash": "c9825c2c4fff05ff942dadfba027d4ba94560ac1877f1e47585e383e7472fc82",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T14:53:50Z",
+  "durationMs": 160,
+  "seed": null
+}

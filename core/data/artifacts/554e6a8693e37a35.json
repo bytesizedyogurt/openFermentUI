@@ -1,0 +1,79 @@
+{
+  "id": "554e6a8693e37a35",
+  "tool": "geneos.ceiling",
+  "toolVersion": "cobra 0.32.1 · worker 55c1e07f41e1",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "E. coli K-12 central metabolism (core model)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "e_coli_core",
+        "note": "bundled with cobra as textbook (BiGG Models, bundled with cobra 0.32.1)",
+        "by": null
+      }
+    },
+    {
+      "name": "add-on",
+      "value": "phaCAB",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "RehMBEL1391",
+        "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "phb",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "e_coli_core",
+    "product": "phb",
+    "substrate": "glucose",
+    "exchange": "EX_glc__D_e",
+    "uptake": 10.0,
+    "flux": 9.999999999999998,
+    "molPerMol": 0.9999999999999998,
+    "gPerG": 0.47786362929905185,
+    "solver": "glpk_interface",
+    "status": "optimal"
+  },
+  "outputHash": "be11c314be5cec84e78c3a9104ad24936a1a516cf9ed5c47d5a1f3cc70ad7a5c",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T13:24:53Z",
+  "durationMs": 6,
+  "seed": null
+}

@@ -1,0 +1,164 @@
+{
+  "id": "c49e2db41c6ccfbc",
+  "tool": "geneos.mix",
+  "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "E. coli K-12 MG1655 (iJO1366)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "iJO1366",
+        "note": "bundled with cobra as iJO1366 (BiGG Models, bundled with cobra 0.32.1)",
+        "by": null
+      }
+    },
+    {
+      "name": "add-on",
+      "value": "phaCAB",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "RehMBEL1391",
+        "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "phb",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate a",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate b",
+      "value": "xylose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_xyl__D_e, 150.13 g mol-1, 5 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "iJO1366",
+    "product": "phb",
+    "a": "glucose",
+    "b": "xylose",
+    "carbon": 60.0,
+    "points": [
+      {
+        "shareA": 1.0,
+        "uptakeA": 10.0,
+        "uptakeB": 0.0,
+        "flux": 12.412173913043485,
+        "gPerG": 0.5931326473577976
+      },
+      {
+        "shareA": 0.9,
+        "uptakeA": 9.0,
+        "uptakeB": 1.1999999999999997,
+        "flux": 12.401739130434844,
+        "gPerG": 0.5926340070489663
+      },
+      {
+        "shareA": 0.8,
+        "uptakeA": 8.0,
+        "uptakeB": 2.3999999999999995,
+        "flux": 12.391304347826111,
+        "gPerG": 0.5921353667401308
+      },
+      {
+        "shareA": 0.7,
+        "uptakeA": 7.0,
+        "uptakeB": 3.6000000000000005,
+        "flux": 12.380869565217433,
+        "gPerG": 0.5916367264312977
+      },
+      {
+        "shareA": 0.6,
+        "uptakeA": 6.0,
+        "uptakeB": 4.8,
+        "flux": 12.370434782608761,
+        "gPerG": 0.5911380861224651
+      },
+      {
+        "shareA": 0.5,
+        "uptakeA": 5.0,
+        "uptakeB": 6.0,
+        "flux": 12.36000000000002,
+        "gPerG": 0.5906394458136293
+      },
+      {
+        "shareA": 0.4,
+        "uptakeA": 4.0,
+        "uptakeB": 7.2,
+        "flux": 12.349565217391314,
+        "gPerG": 0.590140805504795
+      },
+      {
+        "shareA": 0.30000000000000004,
+        "uptakeA": 3.0000000000000004,
+        "uptakeB": 8.4,
+        "flux": 12.339130434782598,
+        "gPerG": 0.5896421651959601
+      },
+      {
+        "shareA": 0.19999999999999996,
+        "uptakeA": 1.9999999999999993,
+        "uptakeB": 9.6,
+        "flux": 12.328695652173913,
+        "gPerG": 0.5891435248871268
+      },
+      {
+        "shareA": 0.09999999999999998,
+        "uptakeA": 0.9999999999999997,
+        "uptakeB": 10.8,
+        "flux": 12.318260869565208,
+        "gPerG": 0.5886448845782927
+      },
+      {
+        "shareA": 0.0,
+        "uptakeA": 0.0,
+        "uptakeB": 12.0,
+        "flux": 12.3078260869565,
+        "gPerG": 0.5881462442694583
+      }
+    ]
+  },
+  "outputHash": "c0c0515a48d083b1e348c0d91c771588724eb599298f42c1b644137f0de01b4e",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T14:54:01Z",
+  "durationMs": 417,
+  "seed": null
+}

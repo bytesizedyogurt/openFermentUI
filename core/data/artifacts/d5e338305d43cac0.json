@@ -1,0 +1,68 @@
+{
+  "id": "d5e338305d43cac0",
+  "tool": "geneos.ceiling",
+  "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "Cupriavidus necator H16 (RehMBEL1391)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "RehMBEL1391",
+        "note": "https://github.com/m-jahn/genome-scale-models at 00c70c5, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml, sha256 85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89 (GPL-3.0)",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "phb",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "fructose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_fru_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "RehMBEL1391",
+    "product": "phb",
+    "substrate": "fructose",
+    "exchange": "EX_fru_e",
+    "uptake": 10.0,
+    "flux": 12.41379310344828,
+    "molPerMol": 1.2413793103448278,
+    "gPerG": 0.5932100225781337,
+    "solver": "glpk_interface",
+    "status": "optimal"
+  },
+  "outputHash": "04917b6fbf874e625985ef7594bfb77036902bdb3a2e96e8c2d4d46ce79bf9c4",
+  "provenance": "computed",
+  "createdAt": "2026-10-15T14:54:01Z",
+  "durationMs": 94,
+  "seed": null
+}
