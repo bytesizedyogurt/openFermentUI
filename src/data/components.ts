@@ -103,7 +103,13 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Postdoc',
     owner: 'Postdoc',
     layer: 'The agent',
-    livesIn: ['src/sim/chat.ts', 'src/screens/Postdoc.tsx'],
+    // OF-BLD-014 §3.4 — the tools its loop will call, and what it may cite.
+    livesIn: [
+      'src/sim/chat.ts',
+      'src/screens/Postdoc.tsx',
+      'core/openferment_core/tools/',
+      'core/openferment_core/evidence_pool.py',
+    ],
     surfacedAs: 'the rail, /postdoc',
     role: 'Plans, retrieves, and answers with its working shown',
   },
@@ -315,6 +321,13 @@ export const UNNAMED: {
     layer: 'Keeping it honest',
     livesIn: ['src/engine/units.ts', 'src/engine/scale.ts'],
     role: 'Units, conversion, scaling, and refusals that carry their reason',
+  },
+  {
+    // OF-BLD-014 §3.4 — heavy simulators run in their own processes.
+    what: 'the worker runner',
+    layer: 'Computing',
+    livesIn: ['core/openferment_core/workers/'],
+    role: 'Runs a simulator in a process of its own, kept warm, restarted on a timeout or a crash',
   },
 ];
 

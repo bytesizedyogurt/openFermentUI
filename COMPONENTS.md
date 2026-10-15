@@ -113,7 +113,7 @@ Views: [Ingest](#) `/intake/ingest`
 
 **Records, artifacts, provenance.** `/biorepo` · chord `g b`
 
-The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `claude-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7).
+The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `claude-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7). Artifacts keeps every value the service computed, with the inputs it was computed from and the source of each, and replays it on request (OF-BLD-014 §3.2); its subsystem is the first marked `live`.
 
 Views: [Witness](#) `/biorepo/witness` · [Artifacts](#) `/biorepo/artifacts` · [Compare](#) `/biorepo/compare`
 
@@ -133,7 +133,7 @@ The thing you talk to. Runs on Claude Opus 5.5, with Claude Sonnet 5.5 as fallba
 
 | Component | Implemented in |
 |---|---|
-| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` |
+| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` |
 
 ### geneOS
 
@@ -261,7 +261,7 @@ for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
-| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` | the rail, /postdoc |
+| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
@@ -287,6 +287,7 @@ Code that sits in a layer without a name of its own.
 | What | Layer | Lives in | Does |
 |---|---|---|---|
 | _the unit engine_ | Keeping it honest | `src/engine/units.ts`, `src/engine/scale.ts` | Units, conversion, scaling, and refusals that carry their reason |
+| _the worker runner_ | Computing | `core/openferment_core/workers/` | Runs a simulator in a process of its own, kept warm, restarted on a timeout or a crash |
 
 ## Reading the map
 

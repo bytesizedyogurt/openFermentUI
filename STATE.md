@@ -281,3 +281,24 @@ LIVE steps that ran, one line each: `- §n.m — <date> — <the numbers the ste
   routes, golden path **26**, deep paths **7**. `pnpm verify` green in
   **467 s**, twenty-one stages (467 s again for this pass). Screenshots: `docs/shots/phase-1-*` and
   `phase-2-*`.
+- **2026-10-15 · OF-BLD-014 Phase 3 (§3.1–§3.4, §3.R, §3.T)** — contracts for
+  computed values. `computed` joins the provenance ranking after `curated`,
+  and the two rankings are one order (`check:plan` now compares order, and
+  `user` moved below `unverified` in Python); a computed value carries a
+  `ComputedBasis` and `basis_provenance` decides its class. BioRepo keeps
+  what was computed (`artifacts.py`, three endpoints, replay) and shows it on
+  a new **Artifacts** tab, the first `live` subsystem. `llm.py` gains roles
+  (Haiku 5.5 for index work), cached-token costs (prices confirmed on the
+  page on 2026-10-15), `converse()` for tool turns, and a daily cap that
+  reserves each call's worst case in `spend.json`. One tool registry, closed
+  at seven names, refuses a number typed into a tool input; `search_records`
+  reads an evidence pool that includes unrejected candidates as
+  `unverified`, and `convert_units` stores its result as an artifact.
+  `SimWorker` runs a simulator in its own process. The review found **7**
+  defects, one high (a record rejected since the last export stayed
+  citable); all 7 fixed with a failing test first. **911** Python tests
+  offline; smoke **61** routes. One real artifact made for the screenshots
+  (r-B5-3, 17.5 d = 420 h, `computed`). The key on the cloud environment
+  still reaches no model: the API answers 400 because it is not scoped to a
+  workspace, so §1.5's and §2.4's extractions stay owed. Screenshots:
+  `docs/shots/phase-3-*`.

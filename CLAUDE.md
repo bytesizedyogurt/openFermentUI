@@ -104,7 +104,8 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 ## The seed, the overlay, and offline verify
 
-- `src/data/*.ts` is the source of truth for the 167 papers (132 hand-curated, 35 in thread P) and 134 records.
+- `src/data/*.ts` is the source of truth for the 167 papers (132 hand-curated,
+  35 in thread P) and 134 records.
   Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. There are TWO
   sanctioned exceptions, and in both a machine proposes and a person approves.
   The second is thread P (OF-BLD-014 §2.3): `pnpm thread:propose` asks Europe
@@ -356,6 +357,66 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - **A biopolymer is its own process family.** PHB and mcl-PHA are category
   `biopolymer`, process family `P12`: they share no train with the proteins
   and small molecules. Their bands are market framing, like every product's.
+
+## Computed values, tools and budgets (OF-BLD-014 Phase 3)
+
+- **`computed` is a provenance, and there is one ranking.** `measured, gold,
+  verified, curated, computed, unverified, user, industry-estimate, demo`,
+  identical in `PROVENANCE_RANK` (`src/store.ts`) and `PROVENANCE_ORDER`
+  (`models.py`); `check:plan` parses both and fails on any difference in
+  members or order. A computed value is held out of aggregates, like an
+  industry estimate: it is derived from values already counted.
+- **A computed value carries its basis, and its provenance follows from it.**
+  `ComputedBasis` names the tool, its version and every input with its
+  source (`record`, `deposition`, `artifact`, `model`, `convention`,
+  `assumption`). `basis.basis_provenance` decides: an assumption makes it
+  `demo`; otherwise the weakest of `computed`, each record's provenance,
+  `measured` for a deposition and each artifact's provenance. No model, no
+  person and no TypeScript copy sets it.
+- **What was computed is kept.** `artifacts.compute` runs a registered pure
+  function once per (tool, version, inputs, seed) and writes
+  `core/data/artifacts/<16 hex>.json` (gitignored, on the data branch) under
+  one store lock; a repeat returns the stored file with its provenance
+  recomputed from the inputs as they stand now. `replay` recomputes and
+  compares `outputHash` and never rewrites the file. BioRepo → Artifacts
+  (`/biorepo/artifacts`) shows them; `artifacts` and `search` are reserved
+  second segments under BioRepo.
+- **A subsystem can be `live`**: code behind it computes or stores at run
+  time. It names its files in `implementedIn`, and `check:seed` fails when
+  one is missing. `biorepo.artifacts` is the first.
+- **Two model roles, one daily cap.** `llm.chain("answer")` is Opus then
+  Sonnet; `llm.chain("index")` starts on `OPENFERMENT_INDEX_MODEL`
+  (`claude-haiku-5-5`) and falls back to the answer chain. Every call
+  reserves its worst case in `core/data/spend.json` (`spend.reserve`, one
+  step under a cross-process lock) and settles what it cost; a call that
+  could pass `OPENFERMENT_DAILY_BUDGET_USD`, a model with no price in
+  `llm.PRICES`, or a damaged spend file refuses the call
+  (`BudgetExhausted`, a `ModelUnavailable`). Cost counts cached tokens:
+  writes at 1.25× input, reads at 0.05× on Opus and Sonnet 5.5, 0.1×
+  otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
+  Offline tests charge a file of their own (`core/tests/conftest.py`).
+- **`converse` is one tool turn on one model.** Strict tools, `tool_choice`
+  `auto` or `none` and nothing else (anything else is refused before it is
+  sent), the answer schema in `output_config.format`, top-level
+  `cache_control`. It falls back nowhere; the loop that owns the
+  conversation decides.
+- **One tool registry, closed at seven names** (`tools/__init__.py`, E.6).
+  Postdoc's loop, `GET /api/tools` / `POST /api/tools/{name}` and the MCP
+  server all go through `tools.run`. **Tool inputs carry ids and words:** a
+  JSON number anywhere in an input outside top-level `k` and `limit` refuses
+  the call, and every refusal is a `ToolResult` with `error` set. A summary
+  over 9,000 characters is replaced by an error. Built: `search_records`
+  (over `evidence_pool`: seed and verified records plus the extractor's
+  anchored candidates no decision rejected, as `unverified`) and
+  `convert_units` (a record's own value through `units.py`, kept as an
+  artifact).
+- **Heavy libraries run in workers.** `workers.SimWorker` starts a module
+  on first use, keeps it warm, kills and restarts it on a timeout, and
+  reports the stderr tail of a crash; `workers.serve` answers on a
+  duplicate of fd 1 with fd 1 pointed at stderr, so a library's printing
+  never reaches the stream. `cobra` is imported in the geneOS worker alone
+  and `biosteam` in the Proforma worker and `flowsheets/` alone;
+  `test_workers` greps for both.
 
 ## Persistence tiers
 
