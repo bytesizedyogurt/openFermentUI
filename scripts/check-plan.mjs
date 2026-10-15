@@ -120,6 +120,10 @@ const PAIRS = [
   ['BasisInput', 'BasisInput'],
   ['ComputedBasis', 'ComputedBasis'],
   ['Evidence', 'Evidence'],
+  // OF-BLD-014 §3.2 — the artifact store.
+  ['Artifact', 'Artifact'],
+  ['ReplayDifference', 'ReplayDifference'],
+  ['ReplayResult', 'ReplayResult'],
 ];
 
 let compared = 0;

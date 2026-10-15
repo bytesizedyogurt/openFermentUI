@@ -126,7 +126,15 @@ export const COMPONENTS: ComponentDef[] = [
     owner: 'BioRepo',
     layer: 'Evidence in',
     // OF-BLD-012 §2.3 — one write function for the corpus's decisions.
-    livesIn: ['src/data/', 'src/engine/retrieval.ts', 'src/screens/BioRepo.tsx', 'core/openferment_core/biorepo.py'],
+    // OF-BLD-014 §3.2 — and what the service computed, kept and replayable.
+    livesIn: [
+      'src/data/',
+      'src/engine/retrieval.ts',
+      'src/screens/BioRepo.tsx',
+      'core/openferment_core/biorepo.py',
+      'src/screens/BioRepoArtifacts.tsx',
+      'core/openferment_core/artifacts.py',
+    ],
     surfacedAs: 'the rail, /biorepo',
     role: 'The corpus, and everything retrieved from it',
   },
@@ -188,7 +196,8 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Audit',
     owner: 'BioRepo',
     layer: 'Keeping it honest',
-    livesIn: ['src/components/Provenance.tsx', 'aggregateExclusion() in src/store.ts'],
+    // OF-BLD-014 §3.1 — a computed value's provenance follows from its basis.
+    livesIn: ['src/components/Provenance.tsx', 'aggregateExclusion() in src/store.ts', 'core/openferment_core/basis.py'],
     surfacedAs: 'provenance ticks and their labels',
     role: 'Provenance, and what is held out of aggregates',
   },

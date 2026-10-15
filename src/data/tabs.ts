@@ -17,6 +17,8 @@ export const BIOREPO_TABS: OwnerTab[] = [
   { label: 'Papers', to: '/biorepo' },
   { label: 'Compare', to: '/biorepo/compare' },
   { label: 'Witness', to: '/biorepo/witness' },
+  // OF-BLD-014 §3.2 — what the service computed, with its basis.
+  { label: 'Artifacts', to: '/biorepo/artifacts' },
 ];
 
 export const INTAKE_TABS: OwnerTab[] = [

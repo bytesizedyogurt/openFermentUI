@@ -24,6 +24,10 @@ const PORT = 4319;
  * double that stores and echoes. Nothing else under /api exists.
  */
 const OVERLAY_FIXTURE = join(process.cwd(), 'core/tests/fixtures/overlay-smoke.json');
+// OF-BLD-014 E.2 — fixtures `python -m openferment_core.demo --prototype`
+// generates through the real code, each `{_fixture, response}`.
+const PROTOTYPE = join(process.cwd(), 'core/tests/fixtures/prototype');
+const prototype = async (name) => JSON.parse(await readFile(join(PROTOTYPE, name), 'utf8')).response;
 const HEALTH = JSON.stringify({
   ok: true,
   service: 'openferment-core (smoke double)',
@@ -203,6 +207,22 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(out));
     }
+    // OF-BLD-014 §3.2 — the artifact store, from the prototype fixtures.
+    if (url === '/api/biorepo/artifacts' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype('artifacts.json')));
+    }
+    if (url.startsWith('/api/biorepo/artifacts/')) {
+      const [id, action] = url.slice('/api/biorepo/artifacts/'.length).split('/');
+      const found = (await prototype('artifacts.json')).find((a) => a.id === id);
+      if (!found) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `no artifact '${id}'` }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (action === 'replay' && req.method === 'POST') return res.end(JSON.stringify(await prototype('artifact-replay.json')));
+      return res.end(JSON.stringify(found));
+    }
     if (url === '/api/biorepo/overlay') {
       // Answered late on purpose: a screen mounted before the overlay arrives
       // has to cope with it arriving — Guild's queue in particular (§7.3) —
@@ -233,6 +253,8 @@ const ROUTES = [
   ['/biorepo/paper/B5', 'BioRepo — paper (full text from the overlay)'],
   ['/biorepo/compare', 'BioRepo — compare'],
   ['/biorepo/witness', 'BioRepo — Witness'],
+  ['/biorepo/artifacts', 'BioRepo — artifacts (what was computed)'],
+  ['/biorepo/artifacts/02aef8a9e9cbaf88', 'BioRepo — one artifact, its basis and replay'],
   ['/postdoc', 'Postdoc'],
   ['/geneos', 'geneOS — Hosts is the default view'],
   ['/geneos/hosts', 'geneOS — hosts (the strain catalogue)'],
@@ -560,6 +582,25 @@ async function main() {
       // is not gold to score the extractor against: three curated records
       // stand in, not four, and the run is not "partial".
       if (/Partial results/.test(witness)) problems.push('Witness counts the new candidate as provisional gold and calls the run partial');
+
+      // OF-BLD-014 §3.2 — the artifact the prototype fixture holds is listed
+      // with its provenance, its page shows each input's source, and Replay
+      // says it replayed identically.
+      await page.goto(`http://localhost:${PORT}/#/biorepo/artifacts`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="artifact-table"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const shelf = await page.locator('body').innerText();
+      if (!/Inputs named in this basis/.test(shelf)) problems.push('Artifacts does not list the fixture artifact');
+      if (!/Computed · basis attached/.test(shelf)) problems.push('Artifacts does not show the computed provenance');
+      await page.goto(`http://localhost:${PORT}/#/biorepo/artifacts/02aef8a9e9cbaf88`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="artifact-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="artifact-inputs"] tbody tr').count()) !== 2)
+        problems.push('the artifact page does not list its two inputs');
+      if (!/convention — TEST FIXTURE/.test(await page.locator('body').innerText()))
+        problems.push('the artifact page does not show the convention input with its note');
+      await page.getByRole('button', { name: 'Replay' }).click();
+      await page.locator('[data-testid="replay-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/Replayed identically/.test(await page.locator('body').innerText()))
+        problems.push('Replay did not say it replayed identically');
 
       // §7.3 — the review card. The new candidate is in the queue, labelled;
       // accepting it posts a decision to the service. The curated record on

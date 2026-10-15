@@ -148,6 +148,21 @@ def test_the_committed_sets_are_what_demo_fixtures_writes(tmp_path):
     assert (tmp_path / "export.json").read_text(encoding="utf-8") == (EXPORT / "biorepo.json").read_text(encoding="utf-8")
 
 
+def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path):
+    """OF-BLD-014 E.2: the smoke double serves these files, so they must be
+    what the code produces today."""
+    written = demo.rebuild_prototype(out=tmp_path)
+    assert written
+    for path in written:
+        committed = demo.PROTOTYPE / path.name
+        assert committed.is_file(), f"{committed} is missing: run python -m openferment_core.demo --prototype"
+        assert path.read_text(encoding="utf-8") == committed.read_text(encoding="utf-8"), (
+            f"{path.name} no longer matches the code: run python -m openferment_core.demo --prototype"
+        )
+    committed = sorted(p.name for p in demo.PROTOTYPE.glob("*.json"))
+    assert committed == sorted(p.name for p in written), "a fixture the command no longer writes is still committed"
+
+
 def test_building_a_set_leaves_the_modules_where_they_were(tmp_path):
     where = (intake.FULLTEXT_DIR, extract.CANDIDATES_DIR, biorepo.PATH, intake.FIXTURE_DIR)
     demo.rebuild_export_set(out=tmp_path / "export.json")

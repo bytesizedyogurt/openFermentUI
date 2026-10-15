@@ -1912,3 +1912,39 @@ export interface Evidence {
   /** Which figure draws this artifact: 'ceiling', 'frontier', 'trajectory', 'distribution'. */
   figure: string | null;
 }
+
+// ── artifacts (OF-BLD-014 §3.2, E.5) ───────────────────────────────────
+
+/** What was computed, kept so it can be read and replayed. */
+export interface Artifact {
+  /** First 16 hex of sha256 over tool, toolVersion, canonical inputs (and the seed, when there is one). */
+  id: string;
+  tool: string;
+  toolVersion: string;
+  inputs: BasisInput[];
+  /** Tool-specific; small enough to read on a page. */
+  output: Record<string, unknown>;
+  /** sha256 of the canonical output JSON. */
+  outputHash: string;
+  provenance: Provenance;
+  createdAt: string;
+  durationMs: number;
+  seed: number | null;
+}
+
+/** One place a replayed output differs from the stored one. */
+export interface ReplayDifference {
+  /** Where in the output, as `a.b[2]`; empty for the output as a whole. */
+  path: string;
+  stored: unknown;
+  replayed: unknown;
+}
+
+export interface ReplayResult {
+  artifactId: string;
+  identical: boolean;
+  storedHash: string;
+  replayedHash: string;
+  differences: ReplayDifference[];
+  durationMs: number;
+}

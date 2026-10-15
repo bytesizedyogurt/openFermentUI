@@ -849,3 +849,43 @@ class Evidence(BaseModel):
     # Which figure draws this artifact: 'ceiling', 'frontier', 'trajectory',
     # 'distribution'.
     figure: str | None = None
+
+
+# ── artifacts (OF-BLD-014 §3.2, E.5) ───────────────────────────────────
+
+
+class Artifact(BaseModel):
+    """What was computed, kept so it can be read and replayed."""
+
+    # First 16 hex of sha256 over tool, toolVersion, canonical inputs (and the
+    # seed, when there is one).
+    id: str
+    tool: str
+    toolVersion: str
+    inputs: list[BasisInput]
+    # Tool-specific; small enough to read on a page.
+    output: dict[str, Any]
+    # sha256 of the canonical output JSON.
+    outputHash: str
+    provenance: Provenance
+    createdAt: str
+    durationMs: int
+    seed: int | None = None
+
+
+class ReplayDifference(BaseModel):
+    """One place a replayed output differs from the stored one."""
+
+    # Where in the output, as `a.b[2]`; empty for the output as a whole.
+    path: str
+    stored: Any = None
+    replayed: Any = None
+
+
+class ReplayResult(BaseModel):
+    artifactId: str
+    identical: bool
+    storedHash: str
+    replayedHash: str
+    differences: list[ReplayDifference] = Field(default_factory=list)
+    durationMs: int

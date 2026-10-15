@@ -324,6 +324,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     component: 'Witness',
   },
   {
+    label: 'Artifacts',
+    to: '/biorepo/artifacts',
+    descriptor: 'what was computed, and from what',
+    aliases: ['artifacts', 'computed', 'basis', 'replay'],
+    icon: LibraryIcon,
+    owner: 'BioRepo',
+  },
+  {
     label: 'Compare',
     to: '/biorepo/compare',
     descriptor: 'scenarios side by side',

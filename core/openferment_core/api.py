@@ -26,10 +26,11 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, checks, extract, guard, guild, intake, practice, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, practice, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
+    Artifact,
     AskRequest,
     Check,
     CheckDismiss,
@@ -53,6 +54,7 @@ from .models import (
     PracticeScenario,
     PracticeSession,
     PracticeTurnRequest,
+    ReplayResult,
     ReviewDecision,
     Usage,
 )
@@ -516,6 +518,35 @@ def witness_runs() -> list[ExtractRun]:
         return witness.runs()
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Artifacts (OF-BLD-014 §3.2, E.5) ─────────────────────────────────────
+
+
+@app.get("/api/biorepo/artifacts", response_model=list[Artifact])
+def artifacts_list() -> list[Artifact]:
+    """Every value this service computed and kept, newest first."""
+    return artifacts.all_artifacts()
+
+
+@app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)
+def artifacts_read(artifact_id: str) -> Artifact:
+    try:
+        return artifacts.get(artifact_id)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+
+
+@app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult)
+def artifacts_replay(artifact_id: str) -> ReplayResult:
+    """Recompute and compare. 404 for an unknown id; 409 when the tool that
+    made it is not registered in this service, which cannot replay it."""
+    try:
+        return artifacts.replay(artifact_id)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+    except artifacts.ToolNotRegistered as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

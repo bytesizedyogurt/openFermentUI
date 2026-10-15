@@ -38,6 +38,7 @@ import GuildSkills from '@/screens/GuildSkills';
 import GuildChecks from '@/screens/GuildChecks';
 import BenchCheck from '@/screens/BenchCheck';
 import Witness from '@/screens/Witness';
+import BioRepoArtifacts from '@/screens/BioRepoArtifacts';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
 import Molecules from '@/screens/Molecules';
@@ -113,6 +114,8 @@ function Screen() {
         );
       if (b === 'compare') return <Compare />;
       if (b === 'witness') return <Witness />;
+      // 'artifacts' is a reserved second segment (OF-BLD-014 E.3).
+      if (b === 'artifacts') return <BioRepoArtifacts artifactId={c} />;
       return <BioRepo />;
     case 'postdoc':
       return <Postdoc sessionId={b} initialQuery={route.query.get('q') ?? undefined} />;

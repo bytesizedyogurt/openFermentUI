@@ -23,9 +23,12 @@
 // value against every id, which settles it — `status` below is a transcription
 // of those three tables, the same as `label` and `owner` already were.
 //
+// OF-BLD-014 §3.2 adds a third value, `live`, for a subsystem whose code
+// computes or stores at run time: Artifacts is the first.
+//
 // Two subsystems are `seeded`, and both were seeded from data this repository
 // already had: Hosts is the strain catalogue, moved here from fermOS by §7.3;
-// Pathway is the biosynthetic-pathway vocabulary. The other twenty-six are
+// Pathway is the biosynthetic-pathway vocabulary. The other twenty-five are
 // `stub` and render as a shelf, unchanged — a subsystem showing reference
 // content stays a stub (§8), because domain knowledge below the line does not
 // make code exist above it.
@@ -43,12 +46,15 @@ export type SubsystemOwner =
 
 /**
  * `seeded` — real data stands behind it, and it has a view of its own.
+ * `live`   — code behind it computes or stores from data that arrives at run
+ *            time, and its view says what it holds today (OF-BLD-014 §3.2).
  * `stub`   — named, no implementation. Renders on the owner's reference shelf.
  *
- * There is no third value on purpose. "In progress" is a status nobody can
- * check and everybody believes.
+ * There is no "in progress": a status nobody can check is one everybody
+ * believes. `live` can be checked, because it names the files that implement
+ * it in `implementedIn`, and `check:seed` fails when one of them is missing.
  */
-export type SubsystemStatus = 'seeded' | 'stub';
+export type SubsystemStatus = 'seeded' | 'live' | 'stub';
 
 export interface Subsystem {
   /** `owner.subsystem`, lowercase — the key `referenceFor()` takes. */
@@ -66,6 +72,8 @@ export interface Subsystem {
    * intent under cover of a transcription.
    */
   state: string;
+  /** For a `live` subsystem: the files whose code it is. `check:seed` holds each to existing. */
+  implementedIn?: string[];
 }
 
 const UNBUILT = 'Not built. Nothing here computes, stores or retrieves anything yet.';
@@ -77,7 +85,21 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'intake.instrument', owner: 'Intake', label: 'Instrument ingest', status: 'stub', state: UNBUILT },
 
   // ── BioRepo ──────────────────────────────────────────────────────────
-  { id: 'biorepo.artifacts', owner: 'BioRepo', label: 'Artifacts', status: 'stub', state: UNBUILT },
+  {
+    id: 'biorepo.artifacts',
+    owner: 'BioRepo',
+    label: 'Artifacts',
+    status: 'live',
+    state:
+      'Every value the service computed, kept with the inputs it was computed from and the source ' +
+      'of each, and replayable. It holds what the running service has computed; a fresh clone ' +
+      'holds none.',
+    implementedIn: [
+      'core/openferment_core/artifacts.py',
+      'core/openferment_core/basis.py',
+      'src/screens/BioRepoArtifacts.tsx',
+    ],
+  },
   { id: 'biorepo.audit', owner: 'BioRepo', label: 'Audit', status: 'stub', state: UNBUILT },
 
   // ── geneOS — the organism as an engineered system (§2) ───────────────

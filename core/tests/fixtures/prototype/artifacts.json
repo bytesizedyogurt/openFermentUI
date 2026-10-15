@@ -1,0 +1,48 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "id": "02aef8a9e9cbaf88",
+      "tool": "prototype_tally",
+      "toolVersion": "prototype-1",
+      "inputs": [
+        {
+          "name": "record read",
+          "value": "B5 titre",
+          "unit": "",
+          "source": {
+            "kind": "record",
+            "id": "r-B5-3",
+            "note": null,
+            "by": null
+          }
+        },
+        {
+          "name": "how the inputs are counted",
+          "value": "one per input",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+            "by": null
+          }
+        }
+      ],
+      "output": {
+        "label": "Inputs named in this basis",
+        "value": 2,
+        "unit": "inputs",
+        "names": [
+          "record read",
+          "how the inputs are counted"
+        ]
+      },
+      "outputHash": "ba7e82a8ad10cdfc21d32b4249cfe8e56ca5712daa5f993bdbc3994a88745cf8",
+      "provenance": "computed",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "durationMs": 0,
+      "seed": null
+    }
+  ]
+}

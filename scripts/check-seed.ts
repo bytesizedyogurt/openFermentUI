@@ -32,6 +32,7 @@ import {
 import { PROTOCOLS } from '../src/data/protocols';
 import { FAMILIES, SKILLS, SKILL_BY_ID } from '../src/data/skills';
 import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
+import { SUBSYSTEMS } from '../src/data/subsystems';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
@@ -987,6 +988,37 @@ for (const f of CLEARANCE_FINDINGS) {
   for (const u of UNNAMED)
     for (const path of u.livesIn.filter(isPath))
       if (!existsSync(path)) fail(`components: the unnamed "${u.what}" claims ${path}, which does not exist`);
+}
+
+// ── a live subsystem names its code (OF-BLD-014 §3.2) ─────────────────
+//
+// `live` is the one status a reader cannot see through to the code, so it
+// names the files that are its code, and each has to exist. A live subsystem
+// with no files, or a stub or seeded one that claims some, says something the
+// tree does not back.
+{
+  for (const sub of SUBSYSTEMS) {
+    const files = sub.implementedIn ?? [];
+    if (sub.status === 'live') {
+      if (files.length === 0) fail(`subsystem ${sub.id}: live, but names no file in implementedIn`);
+      for (const f of files) if (!existsSync(f)) fail(`subsystem ${sub.id}: implementedIn names ${f}, which does not exist`);
+    } else if (files.length > 0) {
+      fail(`subsystem ${sub.id}: ${sub.status}, yet names implementedIn files — only a live subsystem does`);
+    }
+  }
+}
+
+// ── reserved second segments (OF-BLD-014 E.3) ──────────────────────────
+//
+// These views are matched before any id lookup, so a seed id equal to one
+// would be unreachable at its own address.
+{
+  const RESERVED: Record<string, string[]> = {
+    biorepo: ['search', 'artifacts', 'paper', 'compare', 'witness'],
+  };
+  for (const p of PAPERS)
+    if (RESERVED.biorepo.includes(p.id))
+      fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
 }
 
 // ── report ─────────────────────────────────────────────────────────────
