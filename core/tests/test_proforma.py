@@ -143,3 +143,30 @@ def test_the_scenario_endpoints(store, monkeypatch):
     r = c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"})
     assert r.status_code == 422 and "wait for a source" in r.json()["detail"]
     assert c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"}, headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+# ── §8.R ───────────────────────────────────────────────────────────────
+
+
+def test_r1_a_constant_input_has_no_rank_correlation():
+    import numpy as np
+
+    flat, rising = proforma._ranks(np.full(50, 0.3)), proforma._ranks(np.arange(50.0))
+    assert proforma._spearman(flat, rising) is None
+    two_same = [rec("a", "pha_titre", 10.0, "g/L"), rec("b", "pha_titre", 10.0, "g/L")]
+    assert by_key(proforma.bind(two_same))["titre"].sampling == "fixed"
+    specs, _, _ = proforma._specs(proforma.basis_inputs(proforma.bind(two_same), None))
+    assert specs["titre"]["kind"] == "fixed"
+
+
+def test_r2_an_assumption_fills_an_input_whose_binding_stopped():
+    t = by_key(proforma.bind([rec("bad", "pha_titre", 1.0, "% CDW")], assumptions=[assume("titre", 50, 40, 60)]))["titre"]
+    assert t.binding == "assumption" and any("binding stopped" in f for f in t.flags)
+
+
+def test_r3_a_run_with_no_feasible_sample_makes_no_evidence():
+    from types import SimpleNamespace
+
+    art = SimpleNamespace(output={"quantiles": {}, "feasible": 0}, id="x")
+    with pytest.raises(proforma.ScenarioRefused, match="no sample"):
+        proforma.evidence_of(art)

@@ -256,7 +256,10 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
                                      organism=r.get("organismText") or r.get("strainId"), carbonSource=carbon,
                                      provenance=r.get("provenance") or "unverified"))
         if refused:
+            # The records cannot be used; a person's assumption still can (§8.R).
             inp.flags.append(f"the binding stopped: {refused}")
+            if key in given:
+                _assume(inp, given[key])
             out.append(inp)
             continue
         if key == "yield" and cap is not None:
@@ -270,14 +273,14 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
             inp.binding = "records"
             inp.records, inp.recordIds = bound, [b.id for b in bound]
             inp.source = BasisSource(kind="record", note=f"{len(bound)} record{'s' if len(bound) != 1 else ''} of {field_id}")
-            if len(vals) >= 3:
+            if len(vals) >= 3 and vals[0] != vals[-1]:
                 inp.value, inp.low, inp.high, inp.sampling = statistics.median(vals), vals[0], vals[-1], "triangular"
-            elif len(vals) == 2:
+            elif len(vals) == 2 and vals[0] != vals[1]:
                 inp.value, inp.low, inp.high, inp.sampling = (vals[0] + vals[1]) / 2, vals[0], vals[1], "uniform"
             else:
                 inp.value = inp.low = inp.high = vals[0]
                 inp.sampling = "fixed"
-                inp.flags.append(SINGLE)
+                inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
         elif key in given:
             _assume(inp, given[key])
         out.append(inp)
@@ -365,10 +368,10 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
     for key, vs in vals.items():
         vs = sorted(vs)
         kinds[key] = "record"
-        if len(vs) >= 3:
+        if len(vs) >= 3 and vs[0] != vs[-1]:
             specs[key] = {"kind": "triangular", "low": vs[0], "mode": statistics.median(vs), "high": vs[-1]}
             base[key] = statistics.median(vs)
-        elif len(vs) == 2:
+        elif len(vs) == 2 and vs[0] != vs[-1]:
             specs[key], base[key] = {"kind": "uniform", "low": vs[0], "high": vs[1]}, (vs[0] + vs[1]) / 2
         else:
             specs[key], base[key] = {"kind": "fixed", "value": vs[0]}, vs[0]
@@ -381,12 +384,27 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
 
 
 def _ranks(x):
+    """Average ranks, so tied values share one (§8.R: sample order broke ties)."""
     import numpy as np
 
+    x = np.asarray(x, dtype=float)
     order = np.argsort(x, kind="stable")
     r = np.empty(len(x))
-    r[order] = np.arange(len(x))
+    r[order] = np.arange(len(x), dtype=float)
+    for v in np.unique(x):
+        tied = x == v
+        if tied.sum() > 1:
+            r[tied] = r[tied].mean()
     return r
+
+
+def _spearman(xr, yr) -> float | None:
+    """Pearson over ranks; None when either side does not vary."""
+    import numpy as np
+
+    if np.ptp(xr) == 0 or np.ptp(yr) == 0:
+        return None
+    return float(np.corrcoef(xr, yr)[0, 1])
 
 
 def _run_scenario(inputs, seed):
@@ -421,7 +439,9 @@ def _run_scenario(inputs, seed):
             if spec["kind"] == "fixed" or len(prices) < 3:
                 continue
             xr = _ranks(np.array([s["inputs"][key] for s in feasible], dtype=float))
-            rho = float(np.corrcoef(xr, pr)[0, 1])
+            rho = _spearman(xr, pr)
+            if rho is None:
+                continue
             sensitivity.append({"key": key, "rho": rho, "sourceKind": kinds[key]})
         sensitivity.sort(key=lambda r: -abs(r["rho"]))
     lines = ("capex", "media", "utilities", "labor", "downstream", "other")
@@ -494,6 +514,8 @@ def evidence_of(art):
     from .models import Evidence, Range
 
     q = art.output["quantiles"]
+    if not q:
+        raise ScenarioRefused("this run has no sample the flowsheet could hold, so it has no price to cite")
     return Evidence(
         id=art.id, label=f"Minimum selling price, {SCENARIO_ID} (BioSTEAM draft flowsheet v0)",
         value=q.get("p50", float("nan")), unit=PRICE_BASIS,

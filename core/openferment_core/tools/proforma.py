@@ -33,7 +33,10 @@ def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
         waiting = [i.label for i in info.inputs if i.binding == "waiting"]
         why = f"inputs still waiting for a source: {', '.join(waiting)}" if waiting else "every input has a source, and nobody has run it"
         return ToolResult(error=f"{NAME} refused: no run of {inp.scenarioId} exists; {why}. A person runs it in Proforma.")
-    ev = proforma.evidence_of(art)
+    try:
+        ev = proforma.evidence_of(art)
+    except proforma.ScenarioRefused as e:
+        return ToolResult(error=f"{NAME} refused: {e}")
     o = art.output
     assumed = sorted({i.name.split(" ")[0] for i in art.inputs if i.source.kind == "assumption"})
     return ToolResult(

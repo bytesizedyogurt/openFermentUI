@@ -2428,7 +2428,7 @@ export const useStore = create<OFState>()((set, get) => ({
         // page loaded is kept beside what the snapshot remembers.
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
         // §8.4 — assumptions typed here; anything typed since load wins.
-        proformaAssumptions: { ...(snap.proformaAssumptions ?? {}), ...s.proformaAssumptions },
+        proformaAssumptions: mergeAssumptions(snap.proformaAssumptions ?? {}, s.proformaAssumptions),
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -3416,6 +3416,22 @@ async function guildPost<T>(
 // is nothing to save, and Ephemeral UI state is deliberately excluded — a
 // collapsed panel that followed you across sessions would be a bug, not a
 // feature.
+
+/**
+ * The snapshot's assumptions under those typed since load, merged by input
+ * key within each scenario (§8.R: merging by scenario dropped the rest).
+ */
+export function mergeAssumptions(
+  saved: Record<string, InputAssumption[]>,
+  since: Record<string, InputAssumption[]>,
+): Record<string, InputAssumption[]> {
+  const out: Record<string, InputAssumption[]> = { ...saved };
+  for (const [id, typed] of Object.entries(since)) {
+    const keys = new Set(typed.map((a) => a.key));
+    out[id] = [...(saved[id] ?? []).filter((a) => !keys.has(a.key)), ...typed];
+  }
+  return out;
+}
 
 export function snapshotOf(s: OFState): DurableSnapshot {
   const reviewDecisions: DurableSnapshot['reviewDecisions'] = {};

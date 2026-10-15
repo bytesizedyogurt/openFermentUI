@@ -26,7 +26,7 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
-import { snapshotOf, useStore } from '../src/store';
+import { mergeAssumptions, snapshotOf, useStore } from '../src/store';
 import { placeRow, seriesOf } from '../src/engine/series';
 import type { Candidate, Overlay } from '../src/data/types';
 
@@ -334,6 +334,15 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const at = (measure: string) => placeRow({ line: '', time: 1, measure, value: 5, unit: 'g/L' }, schema);
   check('a row names its measure: glucose and titre place', at('glucose') === 'glc' && at('PHB titre') === 'titre' && at('titre') === 'titre');
   check('a row whose name matches no measure is not placed by its unit', [at('sugar'), at('biomass'), at('cdw')].every((x) => x === null), [at('sugar'), at('biomass'), at('cdw')]);
+}
+
+// §8.R — Proforma's assumptions merge by input key at hydrate: one typed
+// before the snapshot loads keeps every other one the snapshot saved.
+{
+  const a = (key: string, value: number) => ({ key, value, low: value, high: value, by: 'Sean Creighton', at: '2026-10-15', note: null });
+  const merged = mergeAssumptions({ 'sc-pha-1': [a('recovery', 0.9), a('sugarPrice', 0.4)] }, { 'sc-pha-1': [a('sugarPrice', 0.5)] });
+  const keys = merged['sc-pha-1'].map((x) => `${x.key}=${x.value}`).sort().join();
+  check('an assumption typed before hydrate keeps the saved ones beside it', keys === 'recovery=0.9,sugarPrice=0.5', keys);
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
