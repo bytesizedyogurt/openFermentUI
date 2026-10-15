@@ -133,9 +133,14 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
         return ToolResult(error=f"{name} failed: {type(e).__name__}: {e}")
     size = len(json.dumps(result.summary, ensure_ascii=False, default=str))
     if size > MAX_SUMMARY_CHARS:
+        # Nothing the model never read may become citable (§5.R): the ids go
+        # with the summary. What the tool spent stays.
         return result.model_copy(
             update={
                 "summary": {},
+                "recordIds": [],
+                "passages": [],
+                "evidence": [],
                 "error": f"{name} returned a summary of {size} characters, over the {MAX_SUMMARY_CHARS} a model may read.",
             }
         )

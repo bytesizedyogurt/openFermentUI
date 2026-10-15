@@ -145,6 +145,10 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
   const passages = new Map((plan.passages ?? []).map((p) => [p.id, p]));
   const evidence = new Map((plan.evidence ?? []).map((e) => [e.id, e]));
   const toolCalls = (plan.trace ?? []).filter((t) => t.kind === 'tool').length;
+  // The loop answered only when its last step is a kept plan; a question no
+  // model answered, or an answer that was not a plan, says so (§5.R).
+  const last = plan.trace?.[plan.trace.length - 1];
+  const answered = last?.kind === 'final' && last.ok;
 
   return (
     <div className="space-y-4">
@@ -265,7 +269,8 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             <>
               <span className="opacity-45">·</span>
               <span className="font-sans">
-                {toolCalls} tool {toolCalls === 1 ? 'call' : 'calls'}; {STOPPED_WORDS[plan.stopped ?? 'done']}
+                {toolCalls} tool {toolCalls === 1 ? 'call' : 'calls'};{' '}
+                {answered ? STOPPED_WORDS[plan.stopped ?? 'done'] : 'no answer came back'}
               </span>
             </>
           )}

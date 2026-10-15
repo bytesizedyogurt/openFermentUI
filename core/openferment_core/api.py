@@ -131,7 +131,7 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands."""
     ctx = tools.ToolContext()
     try:
@@ -139,7 +139,7 @@ def _ask_agent(question: str, on_step=None) -> AnswerPlan:
     except FileNotFoundError as e:
         log.error("corpus missing: %s", e)
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
-    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step)
+    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled)
 
 
 @app.post("/api/ask", response_model=AnswerPlan)
@@ -220,7 +220,16 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
     events: `step` (a TraceStep), then `plan` (the validated AnswerPlan), or
     `error` when the service itself failed. A declined plan is a `plan`. In
     `single` mode there are no steps, and the plan is the only event."""
+    return StreamingResponse(_stream_events(request), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _stream_events(request: AskRequest):
+    """The events of one question, as text. When the reader goes, the
+    generator is closed, and the loop stops before its next model turn
+    (§5.R) rather than spending on an answer nobody will read."""
     events: queue.Queue = queue.Queue()
+    gone = threading.Event()
 
     def work() -> None:
         try:
@@ -228,7 +237,8 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
             if request.mode == "single" or not question:
                 plan = ask(request)
             else:
-                plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))))
+                plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
+                                  cancelled=gone.is_set)
             events.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
@@ -237,12 +247,11 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
             events.put(None)
 
     threading.Thread(target=work, name="ask-stream", daemon=True).start()
-
-    def body():
+    try:
         while (item := events.get()) is not None:
             yield _sse(*item)
-
-    return StreamingResponse(body(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    finally:
+        gone.set()
 
 
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────

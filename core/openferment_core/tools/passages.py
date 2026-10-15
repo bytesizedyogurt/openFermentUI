@@ -59,7 +59,7 @@ def _run(inp: SearchPassagesInput, ctx: ToolContext) -> ToolResult:
     summary = {"query": inp.query, "lane": detail.lane, "count": len(hits), "passages": hits}
     if detail.note:
         summary["note"] = detail.note
-    return ToolResult(summary=summary, passages=[h.passage for h in detail.hits], recordIds=[])
+    return ToolResult(summary=summary, passages=[h.passage for h in detail.hits], recordIds=[], usage=detail.usage)
 
 
 TOOL = register(

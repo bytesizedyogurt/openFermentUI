@@ -215,11 +215,20 @@ class SeenSet:
     evidence: dict[str, Any] = field(default_factory=dict)
 
     def add(self, result: Any) -> None:
+        # A refused result was read as a refusal: nothing in it is citable.
+        if getattr(result, "error", None):
+            return
         self.records.update(getattr(result, "recordIds", None) or [])
         for p in getattr(result, "passages", None) or []:
             self.passages[p.id] = p
         for e in getattr(result, "evidence", None) or []:
             self.evidence[e.id] = e
+
+
+def _whole_sentences(quote: str, passage: Any) -> bool:
+    from .rerank import is_whole_sentence  # rerank imports this module
+
+    return is_whole_sentence(quote, passage)
 
 
 def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) -> ValidationResult:
@@ -230,8 +239,9 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
     2. A record id does not resolve in the evidence pool.
     3. A record, passage or evidence id was never returned by a tool call in
        this run.
-    4. A quote is longer than MAX_QUOTE_CHARS, or is absent from its passage
-       after `normalize_text`.
+    4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
+       or table row of its passage, or a run of them, after `normalize_text`
+       (§5.R: a fragment can lift a number out of its negation).
     5. It cites nothing, and its support is not `unsupported`.
 
     Its provenance is the weakest of its records and computed values; a claim
@@ -283,8 +293,8 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
                 bad_quote = f"an empty quote of {passage.id}"
             elif len(quote) > MAX_QUOTE_CHARS:
                 bad_quote = f"a quote of {passage.id} longer than {MAX_QUOTE_CHARS} characters"
-            elif normalize_text(quote) not in normalize_text(passage.text):
-                bad_quote = f"a quote that is not in {passage.id}"
+            elif not _whole_sentences(quote, passage):
+                bad_quote = f"a quote that is not a whole sentence or row of {passage.id}"
             if bad_quote:
                 break
         if bad_quote:

@@ -38,7 +38,7 @@ from typing import Any, Callable
 from . import llm, spend, tools
 from .models import AnswerPlan, ToolResult, TraceStep, Usage
 from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
-from .validate import SeenSet, decline_reason, validate_plan
+from .validate import SeenSet, decline_reason, find_number, validate_plan
 
 log = logging.getLogger("openferment.postdoc_agent")
 
@@ -109,6 +109,10 @@ PLAN_SCHEMA = _plan_schema()
 Converse = Callable[..., llm.Turn]
 
 
+class Cancelled(Exception):
+    """Nobody waits for the answer any more (the stream's reader left)."""
+
+
 @dataclass
 class _Run:
     question: str
@@ -121,6 +125,7 @@ class _Run:
     spent: Usage = field(default_factory=Usage)
     calls: int = 0
     cache: dict[str, ToolResult] = field(default_factory=dict)
+    cancelled: Callable[[], bool] = lambda: False
 
     def step(self, **kw: Any) -> TraceStep:
         s = TraceStep(n=len(self.trace) + 1, **kw)
@@ -161,6 +166,9 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     else:
         result = tools.run(call.name, call.input, run.ctx)
         run.cache[key] = result
+        # A search lane that calls a model spends on this question (§5.R);
+        # a cached result was paid for once.
+        run.spent = llm.add(run.spent, result.usage)
     ms = int(round((run.clock() - started) * 1000))
     run.seen.add(result)
     run.step(kind="tool", tool=call.name, input=call.input, summary=_summary_line(call.name, call.input, result), ms=ms, ok=result.error is None)
@@ -199,6 +207,8 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
     rounds = 0
     while True:
         rounds += 1
+        if run.cancelled():
+            raise Cancelled()
         turn = run.converse(
             system=AGENT_SYSTEM, messages=messages, tools=defs, schema=PLAN_SCHEMA,
             max_tokens=MAX_TOKENS, model=model, tool_choice="auto",
@@ -235,6 +245,7 @@ def ask(
     ctx: tools.ToolContext | None = None,
     clock: Callable[[], float] = time.monotonic,
     on_step: Callable[[TraceStep], None] | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> AnswerPlan:
     """One question through the loop. Every failure is a plan with `declined`
     set, as in the single-shot path."""
@@ -243,6 +254,8 @@ def ask(
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     ctx = ctx or tools.ToolContext()
     run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock())
+    if cancelled is not None:
+        run.cancelled = cancelled
     if on_step is not None:
         original = run.step
 
@@ -266,6 +279,10 @@ def ask(
             answer, stopped = _attempt(run, model, budget_usd)
             failure = None
             break
+        except Cancelled:
+            run.step(kind="final", tool=None, input=None, summary="Stopped: nobody was waiting for the answer", ms=0, ok=False)
+            return AnswerPlan(question=question, declined="Postdoc stopped: nobody was waiting for the answer.",
+                              usage=run.spent, trace=run.trace, stopped=stopped)
         except (llm.ModelRefused, llm.ModelUnavailable) as e:
             failure = e
             used = getattr(e, "usage", None)
@@ -276,10 +293,15 @@ def ask(
             # Restart once, on the next model, with a fresh conversation. What
             # the first conversation retrieved is not what the second has read.
             run.seen = SeenSet()
+            # The second conversation gets the whole call budget; its repeats
+            # come from the cache (§5.R). Time and cost run on.
+            run.calls = 0
             why = "declined" if isinstance(e, llm.ModelRefused) else "was unavailable"
             run.step(kind="restart", tool=None, input=None, summary=f"{model} {why}; asked again on {models[i + 1]}", ms=0, ok=False)
 
     if answer is None:
+        run.step(kind="final", tool=None, input=None, summary=f"No answer: {str(failure)[:160] if failure else 'no model answered'}",
+                 ms=0, ok=False)
         return AnswerPlan(question=question, declined=str(failure) if failure else "No model answered.",
                           usage=run.spent, trace=run.trace, stopped=stopped)
     data = answer.data
@@ -292,6 +314,16 @@ def ask(
     result = validate_plan(data.get("claims") or [], run.seen, ctx.pool)
     if result.rejected:
         log.warning("agent: validator dropped %d/%d claims: %s", result.rejected, result.rejected + len(result.claims), "; ".join(result.reasons))
+    # A gap is model prose like a claim's text, and held to Rule 1 the same
+    # way: one with a number is dropped and named, never repaired (§5.R).
+    gaps: list[str] = []
+    for g in (str(g) for g in (data.get("gaps") or [])):
+        if not g.strip():
+            continue
+        if find_number(g):
+            result.reasons.append("a gap dropped: it holds a number")
+            continue
+        gaps.append(g)
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
     run.step(kind="final", tool=None, input=None,
@@ -299,7 +331,7 @@ def ask(
     return AnswerPlan(
         question=question,
         claims=result.claims,
-        gaps=[str(g) for g in (data.get("gaps") or []) if str(g).strip()],
+        gaps=gaps,
         declined=decline_reason(result, data.get("declined")),
         usage=run.spent,
         rejected=result.rejected,

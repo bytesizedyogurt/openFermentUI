@@ -82,7 +82,8 @@ def test_the_stream_sends_each_step_then_the_plan(client, monkeypatch):
 def test_a_declined_plan_is_a_plan_event(client, monkeypatch):
     script_in(monkeypatch, llm.BudgetExhausted("today's budget is spent"))
     got = events(client.post("/api/ask/stream", json={"question": "q?"}).text)
-    assert [e for e, _ in got] == ["plan"] and "budget" in got[0][1]["declined"]
+    assert [e for e, _ in got] == ["step", "plan"] and "budget" in got[1][1]["declined"]
+    assert got[0][1]["kind"] == "final" and got[0][1]["ok"] is False
 
 
 def test_a_failure_in_the_service_is_an_error_event(client, monkeypatch):

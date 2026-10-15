@@ -7,7 +7,9 @@ One question a line; blank lines and lines starting with `#` are skipped.
 Each question runs through `postdoc_agent.ask`, exactly as `/api/ask` runs it,
 and its plan is saved under `core/data/live/ask-batch-<time>/` (gitignored;
 `pnpm data:push` carries it). One row a question is printed: claims kept,
-claims dropped by rule, tool calls, rounds, seconds, cost, why it stopped.
+claims dropped by rule, tool calls, rounds (the tool-choosing turns of the
+conversation that answered, the last one included), seconds, cost, why it
+stopped.
 The last line is the total cost.
 
 A question the loop declines is a row like any other. The exit code is 1
@@ -29,7 +31,7 @@ CORE = Path(__file__).resolve().parent.parent / "core"
 ROOT = CORE.parent
 sys.path.insert(0, str(CORE))
 
-from openferment_core import intake, llm, postdoc_agent  # noqa: E402
+from openferment_core import atomic, intake, llm, postdoc_agent, tools  # noqa: E402
 from openferment_core.models import AnswerPlan  # noqa: E402
 
 
@@ -71,14 +73,18 @@ def run(
         turns = 0
 
         def counted(**kw):
+            # A fresh conversation (a restart) holds the question alone.
             nonlocal turns
-            turns += 1
+            if len(kw["messages"]) == 1:
+                turns = 0
+            if kw.get("tool_choice") == "auto":
+                turns += 1
             return base(**kw)
 
         started = clock()
         plan = ask(question, converse=counted)
         seconds = clock() - started
-        (out / f"{n:02d}.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        atomic.write_text(out / f"{n:02d}.json", plan.model_dump_json(indent=2))
         echo(row(n, plan, turns, seconds))
         rows.append({
             "n": n, "question": question, "kept": len(plan.claims), "dropped": plan.rejected,
@@ -88,9 +94,17 @@ def run(
             "keptWithRecordOrQuote": sum(1 for c in plan.claims if c.recordIds or c.passages),
         })
     total = sum(r["costUsd"] for r in rows)
-    (out / "summary.json").write_text(json.dumps({"rows": rows, "costUsd": round(total, 6)}, indent=2), encoding="utf-8")
+    atomic.write_text(out / "summary.json", json.dumps({"rows": rows, "costUsd": round(total, 6)}, indent=2))
     echo(f"total ${total:.4f} · plans in {out}")
     return rows
+
+
+def pool_or_none():
+    """The evidence pool, or None when there is no corpus to build it from."""
+    try:
+        return tools.ToolContext().pool
+    except FileNotFoundError:
+        return None
 
 
 def main(argv: list[str]) -> int:
@@ -103,9 +117,15 @@ def main(argv: list[str]) -> int:
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ask:batch needs the key in core/.env (core/.env.example names it). Nothing was asked.", file=sys.stderr)
         return 2
+    pool = pool_or_none()
+    if pool is None:
+        print("ask:batch needs the corpus: run pnpm export:corpus first. Nothing was asked.", file=sys.stderr)
+        return 2
     questions = read_questions(_path(args.file))
+    ctx = tools.ToolContext(pool_factory=lambda: pool)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    rows = run(questions, intake.DATA_DIR / "live" / f"ask-batch-{stamp}")
+    rows = run(questions, intake.DATA_DIR / "live" / f"ask-batch-{stamp}",
+               ask=lambda q, converse: postdoc_agent.ask(q, converse=converse, ctx=ctx))
     answered = [r for r in rows if r["models"]]
     return 0 if answered else 1
 

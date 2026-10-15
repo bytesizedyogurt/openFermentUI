@@ -959,6 +959,9 @@ class ToolResult(BaseModel):
     passages: list[Passage] = Field(default_factory=list)
     # A refusal or an unavailable tool, in words.
     error: str | None = None
+    # What the tool spent on models (a search lane that calls one), charged
+    # to the question that called it (OF-BLD-014 §5.R).
+    usage: Usage = Field(default_factory=Usage)
 
 
 # ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────

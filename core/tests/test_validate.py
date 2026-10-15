@@ -621,7 +621,7 @@ def test_plan_rule_3_a_citation_no_tool_returned():
 
 def test_plan_rule_4_a_long_or_made_up_quote():
     made_up = _one({"text": "A claim.", "passages": [{"passageId": PASSAGE.id, "quote": "Cells fed glucose did better."}]})
-    assert made_up.rejected == 1 and "not in" in made_up.reasons[0]
+    assert made_up.rejected == 1 and "not a whole sentence" in made_up.reasons[0]
     long_p = PASSAGE.model_copy(update={"text": "word " * 200})
     seen = _seen()
     seen.passages = {PASSAGE.id: long_p}

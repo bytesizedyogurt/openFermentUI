@@ -2009,6 +2009,8 @@ export interface ToolResult {
   passages: Passage[];
   /** A refusal or an unavailable tool, in words. */
   error: string | null;
+  /** What the tool spent on models, charged to the question (OF-BLD-014 §5.R). */
+  usage: AnswerPlanUsage;
 }
 
 // ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────

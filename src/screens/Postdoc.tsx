@@ -321,7 +321,11 @@ function LivePanel({
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
             {busy ? (
               <>
-                Working on <span className="font-num normal-case">{health?.model ?? 'the model'}</span>
+                Working on{' '}
+                <span className="font-num normal-case">
+                  {/* After a restart the second model in the chain answers (§5.R). */}
+                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
+                </span>
               </>
             ) : (
               'What Postdoc did'
