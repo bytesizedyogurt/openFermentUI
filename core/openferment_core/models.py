@@ -1092,6 +1092,60 @@ class FermosFitResponse(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class StartValues(BaseModel):
+    """A forecast's starting values; unset ones are the fitted run's own."""
+
+    X0: float | None = None
+    P0: float | None = None
+    S0: float | None = None
+
+
+class ForecastRequest(BaseModel):
+    # A kept kinetic fit, or the fit itself inline for the sample run.
+    fitArtifactId: str | None = None
+    fit: KineticFit | None = None
+    start: StartValues = Field(default_factory=StartValues)
+    # Who changed a starting value; a changed one is that person's assumption.
+    changedBy: str | None = None
+    # Hours; unset is the fitted run's own length.
+    durationH: float | None = None
+    sample: bool = False
+
+
+class Band(BaseModel):
+    """One series' band for readings: the 5th to 95th percentile, and the median."""
+
+    role: SeriesRole
+    unit: str
+    low: list[float]
+    median: list[float]
+    high: list[float]
+
+
+class Interval(BaseModel):
+    role: str
+    unit: str
+    low: float
+    median: float
+    high: float
+
+
+class ForecastResult(BaseModel):
+    times: list[float]
+    bands: list[Band]
+    finals: list[Interval]
+    # Product made per substrate used, when the two share a mass unit.
+    yieldInterval: Interval | None = None
+    # Where the median substrate curve reaches zero, the forecast ends.
+    substrateRunsOutH: float | None = None
+    draws: int
+    seed: int
+    artifactId: str | None = None
+    evidence: Evidence | None = None
+    sample: bool = False
+    notes: list[str] = Field(default_factory=list)
+
+
 # ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 PassageKind = Literal["abstract", "prose", "table", "figure"]

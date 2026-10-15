@@ -9,7 +9,7 @@ from openferment_core import fermos, intake
 from openferment_core.models import FermosPoint, FermosSeries
 
 # The generating batch: chosen here, not measured.
-TRUE = {"X0": 0.1, "mu": 0.35, "Xmax": 8.0, "P0": 0.05, "alpha": 0.4, "beta": 0.02, "S0": 40.0, "gamma": 4.5, "delta": 0.05}
+TRUE = {"X0": 0.1, "mu": 0.35, "Xmax": 8.0, "P0": 0.05, "alpha": 0.4, "beta": 0.02, "S0": 60.0, "gamma": 4.5, "delta": 0.05}
 
 
 def series(role, t, v, unit="g L-1"):
@@ -147,3 +147,85 @@ def test_the_endpoint(store):
     refused = c.post("/api/fermos/fit", json=nobio)
     assert refused.status_code == 422 and "biomass" in refused.json()["detail"]
     assert c.post("/api/fermos/fit", json=body, headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+# ── the forecast (§7.3) ────────────────────────────────────────────────
+
+T = np.linspace(0, 30, 16)
+SD = (0.15, 0.1, 0.8)
+
+
+def test_a_fresh_reading_falls_inside_the_band_in_most_runs():
+    # Forty seeded copies of one run with constant scatter: for each, fit,
+    # forecast its own conditions, and draw a fresh reading at the final time.
+    inside = {"biomass": 0, "product": 0, "substrate": 0}
+    x, i = fermos.logistic(np.array([T[-1]]), TRUE["X0"], TRUE["mu"], TRUE["Xmax"])
+    truth = {
+        "biomass": float(x[0]),
+        "product": float(TRUE["P0"] + TRUE["alpha"] * (x[0] - TRUE["X0"]) + TRUE["beta"] * i[0]),
+        "substrate": float(TRUE["S0"] - TRUE["gamma"] * (x[0] - TRUE["X0"]) - TRUE["delta"] * i[0]),
+    }
+    for seed in range(40):
+        rng = np.random.default_rng(1000 + seed)
+        k = fermos.kinetic_fit(batch(T, rng, SD))
+        out = fermos.forecast(k, seed=seed)
+        fresh = {r: truth[r] + rng.normal(0, s) for r, s in zip(("biomass", "product", "substrate"), SD)}
+        for f in out["finals"]:
+            inside[f["role"]] += f["low"] <= fresh[f["role"]] <= f["high"]
+    assert all(v >= 28 for v in inside.values()), inside
+
+
+def test_the_same_seed_gives_the_same_band():
+    k = fermos.kinetic_fit(batch(T, np.random.default_rng(5), SD))
+    assert fermos.forecast(k, seed=7) == fermos.forecast(k, seed=7)
+    assert fermos.forecast(k, seed=7) != fermos.forecast(k, seed=8)
+
+
+def test_an_unidentified_xmax_is_refused_with_what_would_identify_it():
+    k = fermos.kinetic_fit(batch(T))
+    xmax = fermos.param(k, "Xmax")
+    xmax.identified, xmax.low = False, -1.0
+    with pytest.raises(fermos.FitRefused, match="Xmax is not identified.*continues until biomass levels off"):
+        fermos.forecast(k)
+
+
+def test_a_forecast_that_exhausts_its_substrate_ends_at_that_hour():
+    k = fermos.kinetic_fit(batch(T, np.random.default_rng(2), SD))
+    out = fermos.forecast(k, duration_h=200)
+    assert out["substrateRunsOutH"] is not None and out["times"][-1] == pytest.approx(out["substrateRunsOutH"])
+    sub = next(b for b in out["bands"] if b["role"] == "substrate")
+    assert sub["median"][-1] <= 0 < sub["median"][-2]
+
+
+def test_a_kept_forecast_is_computed_and_a_changed_start_makes_it_demo(store):
+    fit = fermos.fit("dep-f", batch(T, np.random.default_rng(4), SD))
+    kept = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
+    assert kept.evidence.provenance == "computed" and kept.evidence.figure == "trajectory" and kept.artifactId
+    assert kept.yieldInterval is not None and kept.yieldInterval.low < kept.yieldInterval.median < kept.yieldInterval.high
+    with pytest.raises(fermos.FitRefused, match="needs the name"):
+        fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0))
+    changed = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, start=fermos.StartValues(S0=60.0), changed_by="Sean Creighton")
+    assert changed.evidence.provenance == "demo"
+
+
+def test_the_sample_forecast_is_inline_and_kept_nowhere(store):
+    k = fermos.kinetic_fit(batch(T, np.random.default_rng(6), SD))
+    out = fermos.forecast_run(fit_inline=k, sample=True)
+    assert out.artifactId is None and out.sample and out.evidence.provenance == "demo"
+    assert not (store / "artifacts").exists() or not list((store / "artifacts").glob("*.json"))
+
+
+def test_the_forecast_endpoint_and_the_tool(store):
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api, tools
+
+    fit = fermos.fit("dep-g", batch(T, np.random.default_rng(8), SD))
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    r = c.post("/api/fermos/forecast", json={"fitArtifactId": fit.kineticArtifactId})
+    assert r.status_code == 200 and len(r.json()["bands"]) == 3 and len(r.json()["notes"]) == 2
+    growth_id = fit.growthArtifactId
+    wrong = c.post("/api/fermos/forecast", json={"fitArtifactId": growth_id})
+    assert wrong.status_code == 422 and "not a kinetic fit" in wrong.json()["detail"]
+    t = tools.run("growth_forecast", {"fitArtifactId": fit.kineticArtifactId})
+    assert t.error is None and t.evidence[0].figure == "trajectory" and t.summary["evidenceId"] == t.evidence[0].id

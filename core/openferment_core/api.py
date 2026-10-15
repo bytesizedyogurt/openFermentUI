@@ -49,6 +49,8 @@ from .models import (
     FermosFitRequest,
     FermosFitResponse,
     FetchResult,
+    ForecastRequest,
+    ForecastResult,
     GeneosModelInfo,
     GeneosResult,
     Guild,
@@ -315,6 +317,17 @@ def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
     fits as artifacts (a sample run's are kept nowhere) and nothing else."""
     try:
         return fermos.fit(req.depositionId, req.series, sample=req.sample)
+    except fermos.FitRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/fermos/forecast", response_model=ForecastResult)
+def fermos_forecast(req: ForecastRequest) -> ForecastResult:
+    """A band for the next run from a fit (§7.3). A refusal says which
+    parameter the run did not identify, and what run would."""
+    try:
+        return fermos.forecast_run(fit_artifact=req.fitArtifactId, fit_inline=req.fit if req.sample else None,
+                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample)
     except fermos.FitRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

@@ -154,6 +154,11 @@ const PAIRS = [
   ['SeriesFitQuality', 'SeriesFitQuality'],
   ['KineticFit', 'KineticFit'],
   ['FermosFitResponse', 'FermosFitResponse'],
+  ['StartValues', 'StartValues'],
+  ['ForecastRequest', 'ForecastRequest'],
+  ['Band', 'Band'],
+  ['Interval', 'Interval'],
+  ['ForecastResult', 'ForecastResult'],
   ['TraceStep', 'TraceStep'],
 ];
 

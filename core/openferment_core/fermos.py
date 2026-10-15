@@ -46,9 +46,14 @@ from scipy.stats import t as student_t
 
 from . import artifacts
 from .models import (
+    Band,
     BasisInput,
     BasisSource,
+    Evidence,
     FermosFitResponse,
+    ForecastResult,
+    Interval,
+    StartValues,
     FermosSeries,
     FitParam,
     GrowthFit,
@@ -320,3 +325,179 @@ def param(fit_: KineticFit, name: str) -> FitParam | None:
 
 def series_by_role(fit_: KineticFit) -> dict[str, Any]:
     return {s.role: s for s in fit_.series if s.role}
+
+
+# ── the forecast (§7.3) ────────────────────────────────────────────────
+
+FORECAST = "growth_forecast"
+DRAWS = 200
+GRID = 100
+SEED = 0
+
+FORECAST_NOTES = [
+    "One run pins down that run. Variation from run to run is absent from this band until several runs are fitted together.",
+    NOTES[0],
+]
+
+WHAT_IDENTIFIES = {
+    "mu": "a run with four or more readings while biomass grows exponentially",
+    "Xmax": "a run that continues until biomass levels off",
+}
+
+
+def check_forecastable(fit_: KineticFit) -> None:
+    if fit_.reason or not fit_.params:
+        raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+    for name in ("mu", "Xmax"):
+        p = param(fit_, name)
+        if p is None or not p.identified:
+            raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
+                             f"what would identify it is {WHAT_IDENTIFIES[name]}")
+
+
+def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: float | None = None,
+             seed: int = SEED) -> dict[str, Any]:
+    """The band for readings over `duration_h`, from `DRAWS` parameter sets
+    drawn from the fit's covariance. Pure: everything it needs is passed."""
+    check_forecastable(fit_)
+    start = start or StartValues()
+    names = [p.name for p in fit_.params]
+    mean = np.array([p.value for p in fit_.params])
+    cov = np.array(fit_.covariance)
+    rng = np.random.default_rng(seed)
+    roles = series_by_role(fit_)
+    last = max(pt.t for s in fit_.series for pt in s.points)
+    duration = float(duration_h if duration_h is not None else last)
+    times = np.linspace(0.0, duration, GRID)
+    rate_ix = [names.index(n) for n in ("alpha", "beta", "gamma", "delta") if n in names]
+
+    draws: list[np.ndarray] = []
+    tries = 0
+    while len(draws) < DRAWS:
+        tries += 1
+        if tries > DRAWS * 50:
+            raise FitRefused("the fit's covariance gives almost no valid parameter set; the run cannot support a forecast")
+        q = rng.multivariate_normal(mean, cov, method="svd")
+        for k, key in (("X0", "X0"), ("P0", "P0"), ("S0", "S0")):
+            v = getattr(start, key)
+            if v is not None and k in names:
+                q[names.index(k)] = v
+        if q[0] <= 0 or q[1] <= 0 or q[2] <= 0 or any(q[i] < 0 for i in rate_ix):
+            continue
+        draws.append(q)
+
+    scatter = {qq.role: qq.scatter for qq in fit_.quality}
+    curves: dict[str, np.ndarray] = {}
+    for role in ("biomass", "product", "substrate"):
+        if role not in roles:
+            continue
+        rows = []
+        for q in draws:
+            x, integ = logistic(times, q[0], q[1], q[2])
+            if role == "biomass":
+                y = x
+            else:
+                k = names.index("P0" if role == "product" else "S0")
+                sign = 1.0 if role == "product" else -1.0
+                y = q[k] + sign * (q[k + 1] * (x - q[0]) + q[k + 2] * integ)
+            # A band for readings: each draw carries the series' own scatter.
+            rows.append(y + rng.normal(0.0, scatter.get(role, 0.0), len(times)))
+        curves[role] = np.array(rows)
+
+    runs_out = None
+    end = len(times)
+    if "substrate" in curves:
+        med = np.median(curves["substrate"], axis=0)
+        below = np.nonzero(med <= 0)[0]
+        if below.size:
+            end = int(below[0]) + 1
+            runs_out = float(times[below[0]])
+    times = times[:end]
+    bands, finals = [], []
+    for role, c in curves.items():
+        c = c[:, :end]
+        lo, md, hi = (np.percentile(c, q, axis=0) for q in (5, 50, 95))
+        unit = roles[role].unit
+        bands.append({"role": role, "unit": unit, "low": lo.tolist(), "median": md.tolist(), "high": hi.tolist()})
+        finals.append({"role": role, "unit": unit, "low": float(lo[-1]), "median": float(md[-1]), "high": float(hi[-1])})
+
+    yield_iv = None
+    if "product" in curves and "substrate" in curves and roles["product"].unit == roles["substrate"].unit and "g" in roles["product"].unit:
+        p, sub = curves["product"][:, :end], curves["substrate"][:, :end]
+        made = p[:, -1] - p[:, 0]
+        used = sub[:, 0] - sub[:, -1]
+        ok = used > 0
+        if ok.any():
+            y = made[ok] / used[ok]
+            u = roles["product"].unit
+            yield_iv = {"role": "yield", "unit": f"{u} per {u}", "low": float(np.percentile(y, 5)),
+                        "median": float(np.percentile(y, 50)), "high": float(np.percentile(y, 95))}
+    return {"times": times.tolist(), "bands": bands, "finals": finals, "yieldInterval": yield_iv,
+            "substrateRunsOutH": runs_out, "draws": DRAWS, "seed": seed}
+
+
+def _forecast_inputs(fit_artifact: str | None, fit_inline: KineticFit | None, start: StartValues,
+                     changed_by: str | None, duration_h: float | None, deposition_id: str | None) -> list[BasisInput]:
+    inputs: list[BasisInput] = []
+    if fit_artifact:
+        inputs.append(BasisInput(name="kinetic fit", value=fit_artifact, unit="", source=BasisSource(kind="artifact", id=fit_artifact)))
+    else:
+        assert fit_inline is not None
+        inputs.append(BasisInput(
+            name="kinetic fit", value=fit_inline.model_dump_json(), unit="",
+            source=BasisSource(kind="assumption", by="openFerment sample", note="the sample run's fit, an invented time course")))
+    for key in ("X0", "P0", "S0"):
+        v = getattr(start, key)
+        if v is None:
+            continue
+        if not (changed_by or "").strip():
+            raise FitRefused(f"a changed starting value ({key}) is an assumption, and needs the name of the person who set it")
+        inputs.append(BasisInput(name=f"start {key}", value=float(v), unit="",
+                                 source=BasisSource(kind="assumption", by=changed_by.strip(), note=f"{key} set on screen")))
+    if duration_h is not None:
+        inputs.append(BasisInput(name="duration", value=float(duration_h), unit="h",
+                                 source=BasisSource(kind="convention", note="how long the forecast runs, as asked")))
+    return inputs
+
+
+def _fit_from(inputs: list[BasisInput]) -> KineticFit:
+    i = next(x for x in inputs if x.name == "kinetic fit")
+    if i.source.kind == "artifact":
+        return KineticFit.model_validate(artifacts.get(str(i.value)).output)
+    return KineticFit.model_validate_json(str(i.value))
+
+
+def _run_forecast(inputs, seed):
+    start = StartValues(**{x.name.split(" ")[1]: float(x.value) for x in inputs if x.name.startswith("start ")})
+    dur = next((float(x.value) for x in inputs if x.name == "duration"), None)
+    return forecast(_fit_from(inputs), start, dur, SEED if seed is None else seed)
+
+
+artifacts.register(FORECAST, VERSION, _run_forecast)
+
+
+def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | None = None,
+                 start: StartValues | None = None, changed_by: str | None = None,
+                 duration_h: float | None = None, sample: bool = False) -> ForecastResult:
+    start = start or StartValues()
+    if not fit_artifact and fit_inline is None:
+        raise FitRefused("name a kept kinetic fit, or send the sample run's fit inline")
+    if fit_artifact:
+        try:
+            art = artifacts.get(fit_artifact)
+        except FileNotFoundError as e:
+            raise FitRefused(f"there is no kept fit {fit_artifact}") from e
+        if art.tool != KINETIC:
+            raise FitRefused(f"{fit_artifact} is a {art.tool}, not a kinetic fit")
+    inputs = _forecast_inputs(fit_artifact, fit_inline, start, changed_by, duration_h, None)
+    check_forecastable(_fit_from(inputs))
+    art = artifacts.compute(FORECAST, inputs, seed=SEED, keep=not sample)
+    out = art.output
+    lead = next((f for f in out["finals"] if f["role"] == "product"), out["finals"][0])
+    ev = Evidence(
+        id=f"ev-{art.id}", label=f"forecast final {lead['role']}, {len(out['times'])} points to {out['times'][-1]:.4g} h",
+        value=lead["median"], unit=lead["unit"],
+        interval={"low": lead["low"], "high": lead["high"]},
+        provenance=art.provenance, basis=artifacts.basis_of(art), figure="trajectory",
+    )
+    return ForecastResult(**out, artifactId=None if sample else art.id, evidence=ev, sample=sample, notes=list(FORECAST_NOTES))

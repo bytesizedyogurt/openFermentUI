@@ -2137,6 +2137,54 @@ export interface FermosFitResponse {
   notes: string[];
 }
 
+/** A forecast's starting values; unset ones are the fitted run's own. */
+export interface StartValues {
+  X0: number | null;
+  P0: number | null;
+  S0: number | null;
+}
+
+export interface ForecastRequest {
+  fitArtifactId: string | null;
+  fit: KineticFit | null;
+  start: StartValues;
+  /** Who changed a starting value; a changed one is that person's assumption. */
+  changedBy: string | null;
+  durationH: number | null;
+  sample: boolean;
+}
+
+export interface Band {
+  role: SeriesRole;
+  unit: string;
+  low: number[];
+  median: number[];
+  high: number[];
+}
+
+export interface Interval {
+  role: string;
+  unit: string;
+  low: number;
+  median: number;
+  high: number;
+}
+
+export interface ForecastResult {
+  times: number[];
+  bands: Band[];
+  finals: Interval[];
+  yieldInterval: Interval | null;
+  /** Where the median substrate curve reaches zero, the forecast ends. */
+  substrateRunsOutH: number | null;
+  draws: number;
+  seed: number;
+  artifactId: string | null;
+  evidence: Evidence | null;
+  sample: boolean;
+  notes: string[];
+}
+
 // ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 export type PassageKind = 'abstract' | 'prose' | 'table' | 'figure';
