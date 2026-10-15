@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-15T03:22:46Z",
+  "manifestHash": "4eea362886e5630f",
+  "papersIndexed": 66,
+  "passages": 5036,
+  "sets": [
+    {
+      "name": "K",
+      "questions": 2,
+      "note": "known items: 3 records and 0 anchored candidates whose quote sits in a passage"
+    },
+    {
+      "name": "S",
+      "questions": 0,
+      "note": "written questions: none yet (pnpm rag:questions needs the key)"
+    },
+    {
+      "name": "F",
+      "questions": 3,
+      "note": "flows: 3 of the 12 flows that cite records have a record that anchors"
+    }
+  ],
+  "lanes": [
+    {
+      "lane": "bm25",
+      "available": true,
+      "why": null,
+      "paid": false,
+      "score": 0.6445,
+      "sets": {
+        "K": {
+          "questions": 2,
+          "recall5": 0.5,
+          "recall10": 1.0,
+          "recall20": 1.0,
+          "mrr10": 0.55,
+          "ndcg10": 0.6445,
+          "medianSeconds": 0.0592,
+          "costPerQuestion": 0.0
+        },
+        "F": {
+          "questions": 3,
+          "recall5": 0.0,
+          "recall10": 0.0,
+          "recall20": 0.0,
+          "mrr10": 0.0,
+          "ndcg10": 0.0,
+          "medianSeconds": 0.0085,
+          "costPerQuestion": 0.0
+        }
+      }
+    },
+    {
+      "lane": "bm25+expand",
+      "available": false,
+      "why": "its helper model call failed: The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.'}, 'request_id': 'req_011Cg3JfkcF595RgKsAKzhMg'}",
+      "paid": true,
+      "score": null,
+      "sets": {}
+    },
+    {
+      "lane": "hybrid",
+      "available": true,
+      "why": null,
+      "paid": false,
+      "score": 0.5,
+      "sets": {
+        "K": {
+          "questions": 2,
+          "recall5": 0.5,
+          "recall10": 0.5,
+          "recall20": 1.0,
+          "mrr10": 0.5,
+          "ndcg10": 0.5,
+          "medianSeconds": 0.0314,
+          "costPerQuestion": 0.0
+        },
+        "F": {
+          "questions": 3,
+          "recall5": 0.0,
+          "recall10": 0.0,
+          "recall20": 0.0,
+          "mrr10": 0.0,
+          "ndcg10": 0.0,
+          "medianSeconds": 0.0397,
+          "costPerQuestion": 0.0
+        }
+      }
+    },
+    {
+      "lane": "bm25+rerank",
+      "available": false,
+      "why": "its helper model call failed: The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.'}, 'request_id': 'req_011Cg3JfmxMYukQut94YKsLq'}",
+      "paid": true,
+      "score": null,
+      "sets": {}
+    },
+    {
+      "lane": "hybrid+rerank",
+      "available": false,
+      "why": "its helper model call failed: The Anthropic API refused the request as malformed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use. Add the header, or use an API key that is scoped to a workspace.'}, 'request_id': 'req_011Cg3Jfnd3CwfdeJSDbVK8q'}",
+      "paid": true,
+      "score": null,
+      "sets": {}
+    }
+  ],
+  "chosenLane": "bm25",
+  "rule": "A lane's score is the mean of its nDCG@10 on K and on S. bm25 holds the choice until a lane scores higher; a lane that spends a model call on every question must lead the best free lane by 0.02 or more. An unavailable lane is skipped.",
+  "totalCostUsd": 0.0
+}

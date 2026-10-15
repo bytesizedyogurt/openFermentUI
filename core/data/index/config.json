@@ -1,0 +1,12 @@
+{
+  "lane": "bm25",
+  "chosenAt": "2026-10-15T03:22:46Z",
+  "scores": {
+    "bm25": 0.6445,
+    "bm25+expand": null,
+    "hybrid": 0.5,
+    "bm25+rerank": null,
+    "hybrid+rerank": null
+  },
+  "rule": "A lane's score is the mean of its nDCG@10 on K and on S. bm25 holds the choice until a lane scores higher; a lane that spends a model call on every question must lead the best free lane by 0.02 or more. An unavailable lane is skipped."
+}
