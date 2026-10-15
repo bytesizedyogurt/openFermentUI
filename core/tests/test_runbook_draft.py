@@ -103,3 +103,20 @@ def test_the_loop_puts_the_draft_on_the_plan(pool):  # noqa: F811
     assert out.runbookDraft is not None and out.runbookDraft.predictions[0].value == pytest.approx(0.9)
     unseen = ask(Script([draft_call], plan()), pool)
     assert unseen.runbookDraft is None
+
+
+# ── §9.R ───────────────────────────────────────────────────────────────
+
+
+def test_r1_a_measure_must_be_in_its_predictions_units(pool):  # noqa: F811
+    s = seen_with(ev("ev-c", 0.593, figure="ceiling"))
+    d, left = build(pool, s, [DraftItem(label="Yield ceiling", evidenceId="ev-c")],
+                    [DraftMeasure(label="Titre", unit="g/L", timepoint="harvest", itemLabel="Yield ceiling")])
+    assert d.measures == [] and any("cannot test" in x for x in left)
+
+
+def test_r1_a_measure_of_the_same_dimension_records_in_the_predictions_unit(pool):  # noqa: F811
+    f = ev("ev-f", 7.2, figure="trajectory", interval=(6.1, 8.4), unit="g L-1")
+    d, _ = build(pool, seen_with(f), [DraftItem(label="Final polymer", evidenceId="ev-f")],
+                 [DraftMeasure(label="Polymer", unit="mg/L", timepoint="harvest", itemLabel="Final polymer")])
+    assert d.measures[0].unit == "g L-1"

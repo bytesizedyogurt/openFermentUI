@@ -40,6 +40,13 @@ for (const [label, p, obs, held, delta] of cases) {
   check(label, d.held === held && Math.abs(d.pctDelta - delta) < 1e-9 && outcome === (held ? 'confirmed' : 'refuted'), `held ${d.held}, delta ${d.pctDelta.toFixed(2)}, ${outcome}`);
 }
 
+// §9.R — a value below a zero reference reads as below it, never as +100 %.
+{
+  const zero = { ...base, value: 0 };
+  const { d } = scenario(zero, -2);
+  check('a negative reading against a zero prediction has a negative delta', d.pctDelta < 0 && !d.held, `delta ${d.pctDelta}`);
+}
+
 // §9.3 — the ledger's counts: a locked runbook's predictions, tested by the
 // latest conclusive run; an inconclusive run counts as a run and tests nothing.
 {

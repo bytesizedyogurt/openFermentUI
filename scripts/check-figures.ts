@@ -25,6 +25,8 @@ import { toTable as frontierTable } from '../src/components/figures/Frontier';
 import { toTable as distributionTable } from '../src/components/figures/Distribution';
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
+import { gatherLinks } from '../src/components/Dossier';
+import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
 import { yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
@@ -135,6 +137,24 @@ const mk = (id: string, carbonSource?: string) => ({ ...records[0], id, field: '
 const sorted = yieldsOnSugar([mk('a', 'glucose'), mk('b', 'glycerol'), mk('c'), mk('d', 'D-glucose syrup')], 'glucose');
 if (sorted.on.map((r) => r.id).join() !== 'a,d' || sorted.elsewhere !== 2) problems.push(`yieldsOnSugar kept ${sorted.on.map((r) => r.id).join()} for glucose`);
 ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, a yield meets only its own sugar\'s ceiling');
+
+// §9.R — the dossier keeps what came back, in the chain's order, and names
+// what did not; one missing artifact no longer blanks the band.
+{
+  const art = (id: string, tool: string) => ({ id, tool }) as never;
+  const store: Record<string, unknown> = { p: art('p', 'proforma.run'), f: art('f', 'growth_forecast'), c: art('c', 'geneos.ceiling') };
+  const fetch = async (id: string) => {
+    if (id === 'gone') throw new ArtifactRefused(404, 'there is no artifact gone');
+    return store[id] as never;
+  };
+  const g = await gatherLinks([{ label: 'price', artifactId: 'p' }, { label: 'gone', artifactId: 'gone' }, { label: 'final', artifactId: 'f' }, { label: 'ceiling', artifactId: 'c' }], fetch);
+  const order = g.links.map((l) => l.artifact.tool).join();
+  if (order !== 'geneos.ceiling,growth_forecast,proforma.run') problems.push(`the dossier orders its chain as ${order}`);
+  if (g.failed.length !== 1 || g.failed[0].predictionLabel !== 'gone' || g.down) problems.push('a missing artifact is not named on its own');
+  const d = await gatherLinks([{ label: 'x', artifactId: 'p' }], async () => { throw new ArtifactsDown('The service is not running.'); });
+  if (!d.down || d.links.length) problems.push('a service that is down is not said');
+  ok.push('the dossier draws ceiling, forecast, price in that order, names an artifact that is missing, and says when the service is down');
+}
 
 if (problems.length) {
   for (const p of problems) console.error(`✗ ${p}`);

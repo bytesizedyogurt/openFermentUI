@@ -34,9 +34,41 @@ const basisOf = (a: Artifact): ComputedBasis => ({
   seed: a.seed,
 });
 
-interface Link {
+export interface Link {
   predictionLabel: string;
   artifact: Artifact;
+}
+
+export interface Gathered {
+  links: Link[];
+  /** Predictions whose artifact did not come back, each with why. */
+  failed: { predictionLabel: string; why: string }[];
+  /** Set when the service did not answer at all. */
+  down: string | null;
+}
+
+/**
+ * Fetch every prediction's artifact and keep what came back, in the chain's
+ * order (§9.R: one missing artifact no longer blanks the band). A prediction
+ * whose artifact failed is named with the reason; the service being down is
+ * said once.
+ */
+export async function gatherLinks(
+  pointed: { label: string; artifactId?: string }[],
+  fetch: (id: string) => Promise<Artifact>,
+): Promise<Gathered> {
+  const settled = await Promise.allSettled(pointed.map((p) => fetch(p.artifactId!)));
+  const links: Link[] = [];
+  const failed: Gathered['failed'] = [];
+  let down: string | null = null;
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') links.push({ predictionLabel: pointed[i].label, artifact: r.value });
+    else if (r.reason instanceof ArtifactsDown)
+      down = `These predictions rest on artifacts the service keeps. ${r.reason.message} ${r.reason.remedy}`;
+    else failed.push({ predictionLabel: pointed[i].label, why: r.reason instanceof Error ? r.reason.message : String(r.reason) });
+  });
+  links.sort((x, y) => DOSSIER_ORDER.indexOf(x.artifact.tool as never) - DOSSIER_ORDER.indexOf(y.artifact.tool as never));
+  return { links, failed, down };
 }
 
 function Figure({ link }: { link: Link }) {
@@ -88,24 +120,22 @@ function Figure({ link }: { link: Link }) {
 
 export function Dossier({ runbook }: { runbook: Runbook }) {
   const pointed = runbook.predictions.filter((p) => p.artifactId);
-  const [links, setLinks] = useState<Link[] | null>(null);
-  const [down, setDown] = useState<string | null>(null);
+  const [got, setGot] = useState<Gathered | null>(null);
   const key = pointed.map((p) => p.artifactId).join(',');
 
   useEffect(() => {
     if (!pointed.length) return;
     const ctrl = new AbortController();
-    Promise.all(pointed.map((p) => getArtifact(p.artifactId!, ctrl.signal).then((artifact) => ({ predictionLabel: p.label, artifact }))))
-      .then((ls) => setLinks(ls.sort((x, y) => DOSSIER_ORDER.indexOf(x.artifact.tool as never) - DOSSIER_ORDER.indexOf(y.artifact.tool as never))))
-      .catch((e: unknown) => {
-        if (ctrl.signal.aborted) return;
-        setDown(e instanceof ArtifactsDown ? `These predictions rest on artifacts the service keeps. ${e.message} ${e.remedy}` : String(e));
-      });
+    void gatherLinks(pointed, (id) => getArtifact(id, ctrl.signal)).then((g) => {
+      if (!ctrl.signal.aborted) setGot(g);
+    });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   if (!pointed.length) return null;
+  const links = got?.links ?? null;
+  const down = got?.down ?? null;
   return (
     <section className="mb-6" aria-labelledby="band-dossier" data-testid="dossier">
       <h2 id="band-dossier" className="font-serif text-section-title font-semibold mb-1">
@@ -116,6 +146,11 @@ export function Dossier({ runbook }: { runbook: Runbook }) {
         organism's network allows, what a vessel does over time, what the plant's product costs.
       </p>
       {down && <Card className="p-4 text-body text-ink-soft" data-testid="dossier-down">{down}</Card>}
+      {got?.failed.map((f) => (
+        <p key={f.predictionLabel} className="text-caption text-signal-warn" data-testid="dossier-failed">
+          The artifact behind {f.predictionLabel} could not be read: {f.why}
+        </p>
+      ))}
       {links && (
         <div className="space-y-3">
           {links.map((l, i) => {
@@ -127,7 +162,7 @@ export function Dossier({ runbook }: { runbook: Runbook }) {
                   ? SEAMS.afterForecast
                   : null;
             return (
-              <div key={l.artifact.id} data-testid="dossier-link" data-tool={l.artifact.tool}>
+              <div key={`${l.predictionLabel}:${l.artifact.id}`} data-testid="dossier-link" data-tool={l.artifact.tool}>
                 <div className="text-caption text-ink-soft mb-1">
                   Stands behind the prediction <span className="font-medium text-ink">{l.predictionLabel}</span>
                 </div>

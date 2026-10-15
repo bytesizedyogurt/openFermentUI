@@ -48,7 +48,8 @@ export function holds(p: Prediction, observed: number): boolean {
 }
 
 function pointDelta(predicted: number, observed: number): number {
-  return predicted === 0 ? (observed === 0 ? 0 : 100) : ((observed - predicted) / Math.abs(predicted)) * 100;
+  // From a zero reference a percent is undefined; the sign of the reading says which side it fell (§9.R).
+  return predicted === 0 ? Math.sign(observed) * 100 : ((observed - predicted) / Math.abs(predicted)) * 100;
 }
 
 /** The signed percent a value lies from what held it: a point's value, or the nearer edge. */

@@ -141,6 +141,13 @@ def build(title: str, product_id: str, strain_id: str, items: list[DraftItem], m
         if target is None:
             left_out.append(f"measure {m.label}: it tests {m.itemLabel!r}, which is not a prediction in this draft")
             continue
-        out_measures.append(Measure(id=f"m{n}", label=m.label, unit=m.unit, timepoint=m.timepoint, predictionId=target.id))
+        # Reconciliation compares the reading with the prediction as numbers,
+        # so they must share a unit: a measure of another dimension cannot
+        # test it, and one of the same dimension records in the prediction's
+        # unit (§9.R).
+        if not units.same_family(m.unit, target.unit):
+            left_out.append(f"measure {m.label}: {m.unit} cannot test {m.itemLabel!r}, which is in {target.unit}")
+            continue
+        out_measures.append(Measure(id=f"m{n}", label=m.label, unit=target.unit, timepoint=m.timepoint, predictionId=target.id))
     return RunbookDraft(title=title, productId=product_id, strainId=strain_id, predictions=predictions,
                         measures=out_measures), left_out
