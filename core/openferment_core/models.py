@@ -1003,6 +1003,95 @@ class GeneosResult(BaseModel):
     output: dict[str, Any] = Field(default_factory=dict)
 
 
+# ── fermOS (OF-BLD-014 §7.2) ───────────────────────────────────────────
+
+SeriesRole = Literal["biomass", "product", "substrate"]
+
+
+class FermosPoint(BaseModel):
+    # Hours into the run.
+    t: float
+    value: float
+    entryId: str
+    confirmed: bool = False
+
+
+class FermosSeries(BaseModel):
+    """One measure's readings in time order, as the browser's `seriesOf` makes them."""
+
+    measureId: str
+    label: str
+    unit: str
+    role: SeriesRole | None = None
+    points: list[FermosPoint] = Field(default_factory=list)
+
+
+class FermosFitRequest(BaseModel):
+    depositionId: str
+    series: list[FermosSeries]
+    # The sample run: computed inline, kept nowhere (§7.4).
+    sample: bool = False
+
+
+class FitParam(BaseModel):
+    """One fitted parameter, its 95 % interval and its unit."""
+
+    name: str
+    value: float
+    low: float
+    high: float
+    unit: str
+    # μ and Xmax: the interval excludes zero. A rate coefficient: the interval
+    # includes zero, so the run cannot tell it from nothing.
+    identified: bool | None = None
+    indistinguishableFromZero: bool | None = None
+
+
+class GrowthFit(BaseModel):
+    """ln X against t over the best window of four or more readings."""
+
+    measureId: str
+    unit: str
+    mu: FitParam | None = None
+    doublingTimeH: float | None = None
+    r2: float | None = None
+    window: list[float] = Field(default_factory=list)
+    points: int = 0
+    reason: str | None = None
+
+
+class SeriesFitQuality(BaseModel):
+    measureId: str
+    role: SeriesRole
+    r2: float
+    # The residual scatter, in the measure's unit, under the constant-scatter assumption.
+    scatter: float
+    residuals: list[float] = Field(default_factory=list)
+
+
+class KineticFit(BaseModel):
+    """Logistic growth, Luedeking–Piret production and the substrate balance."""
+
+    params: list[FitParam] = Field(default_factory=list)
+    quality: list[SeriesFitQuality] = Field(default_factory=list)
+    # The covariance of `params`, in their order, for a forecast to draw from.
+    covariance: list[list[float]] = Field(default_factory=list)
+    series: list[FermosSeries] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class FermosFitResponse(BaseModel):
+    depositionId: str
+    growth: GrowthFit | None = None
+    kinetic: KineticFit | None = None
+    growthArtifactId: str | None = None
+    kineticArtifactId: str | None = None
+    # The share of the readings a person confirmed.
+    confirmedShare: float
+    sample: bool = False
+    notes: list[str] = Field(default_factory=list)
+
+
 # ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 PassageKind = Literal["abstract", "prose", "table", "figure"]

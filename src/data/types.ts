@@ -2061,6 +2061,82 @@ export interface GeneosResult {
   output: Record<string, unknown>;
 }
 
+// ── fermOS (OF-BLD-014 §7.2) ───────────────────────────────────────────
+// Mirrors of the fit shapes in models.py.
+
+export interface FermosPoint {
+  /** Hours into the run. */
+  t: number;
+  value: number;
+  entryId: string;
+  confirmed: boolean;
+}
+
+export interface FermosSeries {
+  measureId: string;
+  label: string;
+  unit: string;
+  role: SeriesRole | null;
+  points: FermosPoint[];
+}
+
+export interface FermosFitRequest {
+  depositionId: string;
+  series: FermosSeries[];
+  /** The sample run: computed inline, kept nowhere. */
+  sample: boolean;
+}
+
+/** One fitted parameter, its 95 % interval and its unit. */
+export interface FitParam {
+  name: string;
+  value: number;
+  low: number;
+  high: number;
+  unit: string;
+  identified: boolean | null;
+  indistinguishableFromZero: boolean | null;
+}
+
+export interface GrowthFit {
+  measureId: string;
+  unit: string;
+  mu: FitParam | null;
+  doublingTimeH: number | null;
+  r2: number | null;
+  window: number[];
+  points: number;
+  reason: string | null;
+}
+
+export interface SeriesFitQuality {
+  measureId: string;
+  role: SeriesRole;
+  r2: number;
+  scatter: number;
+  residuals: number[];
+}
+
+export interface KineticFit {
+  params: FitParam[];
+  quality: SeriesFitQuality[];
+  covariance: number[][];
+  series: FermosSeries[];
+  reason: string | null;
+}
+
+export interface FermosFitResponse {
+  depositionId: string;
+  growth: GrowthFit | null;
+  kinetic: KineticFit | null;
+  growthArtifactId: string | null;
+  kineticArtifactId: string | null;
+  /** The share of the readings a person confirmed. */
+  confirmedShare: number;
+  sample: boolean;
+  notes: string[];
+}
+
 // ── passages (OF-BLD-014 §4.1) ─────────────────────────────────────────
 
 export type PassageKind = 'abstract' | 'prose' | 'table' | 'figure';

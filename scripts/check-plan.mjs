@@ -145,6 +145,15 @@ const PAIRS = [
   // OF-BLD-014 §6.3 — geneOS's shelf and its results.
   ['GeneosModelInfo', 'GeneosModelInfo'],
   ['GeneosResult', 'GeneosResult'],
+  // OF-BLD-014 §7.2 — fermOS's fits.
+  ['FermosPoint', 'FermosPoint'],
+  ['FermosSeries', 'FermosSeries'],
+  ['FermosFitRequest', 'FermosFitRequest'],
+  ['FitParam', 'FitParam'],
+  ['GrowthFit', 'GrowthFit'],
+  ['SeriesFitQuality', 'SeriesFitQuality'],
+  ['KineticFit', 'KineticFit'],
+  ['FermosFitResponse', 'FermosFitResponse'],
   ['TraceStep', 'TraceStep'],
 ];
 

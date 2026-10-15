@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -46,6 +46,8 @@ from .models import (
     DecisionCheck,
     ExtractResponse,
     ExtractRun,
+    FermosFitRequest,
+    FermosFitResponse,
     FetchResult,
     GeneosModelInfo,
     GeneosResult,
@@ -302,6 +304,19 @@ def geneos_frontier(req: CeilingRequest) -> GeneosResult:
 @app.post("/api/geneos/mix", response_model=GeneosResult)
 def geneos_mix(req: MixRequest) -> GeneosResult:
     return _geneos(geneos.mix, req.modelId, req.product, req.a, req.b)
+
+
+# ── fermOS (OF-BLD-014 §7.2) ───────────────────────────────────────────
+
+
+@app.post("/api/fermos/fit", response_model=FermosFitResponse)
+def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
+    """Fit a run's series. The browser sends them; the service keeps the
+    fits as artifacts (a sample run's are kept nowhere) and nothing else."""
+    try:
+        return fermos.fit(req.depositionId, req.series, sample=req.sample)
+    except fermos.FitRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────
