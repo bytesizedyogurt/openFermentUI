@@ -57,7 +57,8 @@ polymer ontology fields are in place for it. As of 2026-10-15 the thread holds *
 | Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
 | Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
-| Computed values | **Computed, with a basis** — a value no paper states (a converted unit today; a yield ceiling, a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **1** kept as of 2026-10-15: r-B5-3's 17.5 d in hours, made for the Phase 3 screenshots and pushed to `openferment-data` |
+| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): `e_coli_core` and `iJO1366` as bundled with cobra 0.32.1, with the phaCAB route added, and the *C. necator* H16 reconstruction `RehMBEL1391`, fetched at its pinned commit and hash. As of 2026-10-15 the six values of OF-BLD-014 Appendix 2 reproduce within 0.1 % (PHB on glucose: 0.4779 g/g central carbon, 0.5931 g/g genome scale; on fructose in *C. necator*: 0.5932 g/g). A ceiling has no time axis and no vessel. No reported PHA yield is in the store yet to draw beside it: thread P's extraction waits on a key the API accepts |
+| Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling; a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **1** kept as of 2026-10-15: r-B5-3's 17.5 d in hours, made for the Phase 3 screenshots and pushed to `openferment-data` |
 | Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
 | Simulation economics | **Modeled** — illustrative response surfaces, not validated |
 | Agent answer prose | **Real model calls in a bounded loop** — Postdoc on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`. It searches the records and the papers' passages with its tools (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, quoted sentences checked word for word against their passages, or computed values. As of 2026-10-15 the loop is tested offline against a scripted stand-in only: the key on the cloud environment is refused, so the twelve flows and the ten PHA questions (`pnpm ask:batch`) wait on a key. 13 authored flows remain as the scripted mode and the acceptance tests |
@@ -239,6 +240,8 @@ pnpm index:build         # the fetched papers cut into passages, under core/data
 pnpm rag:questions --n 200   # needs the key: written evaluation questions from sampled passages
 pnpm rag:eval            # every available search lane scored on K, S and F; the rule's choice goes to
                          # core/data/index/config.json, the table to Witness → Retrieval
+pnpm geneos:fetch        # the C. necator H16 reconstruction at its pinned commit into core/data/models/,
+                         # checked against its sha256; a mismatch is set aside and fails
 pnpm ask:batch docs/build/questions-pha.txt   # needs the key: each question through Postdoc's loop, the
                          # plans under core/data/live/, one row each: kept, dropped, tools, rounds, seconds, cost
 cd core && uv run python -m openferment_core.demo --prototype   # the prototype's fixtures, made by the
@@ -247,7 +250,7 @@ cd core && uv run python -m openferment_core.demo --prototype   # the prototype'
 
 The service also answers `GET /api/tools` (each tool's name, description and input schema) and
 `POST /api/tools/{name}`, the same registry Postdoc's loop calls: today `search_records`,
-`convert_units` and `search_passages`. A tool input carries ids and words; a number typed into one refuses the call.
+`convert_units`, `search_passages` and `yield_ceiling`. A tool input carries ids and words; a number typed into one refuses the call.
 Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
 a call that could pass `OPENFERMENT_DAILY_BUDGET_USD` (25 by default, `core/.env.example`).
 
@@ -344,14 +347,15 @@ export set together.
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — twenty-one stages, in order:
+pnpm verify              # offline — no key, no service, no network — twenty-two stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
                          #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
-                         #   tokens, tool turns and daily cap, the tool registry and its three tools, the worker runner,
+                         #   tokens, tool turns and daily cap, the tool registry and its four tools, the worker runner,
+                         #   the geneOS worker on a toy network worked by hand and Appendix 2's bundled-model ceilings,
                          #   Postdoc's loop and its budget against a scripted model, the plan validator, the ask stream,
                          #   the passage cutter, the five search lanes, the scorecard's metrics and rule,
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
@@ -367,19 +371,23 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   checks write to the ledger, and who may see a check
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
+  pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table
+                         #   row per mark, recharts only where it was
   pnpm build
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   62 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
-                         #   landing on its words, Postdoc live drawing its steps and quoting a sentence, Guild posting, and the
+  pnpm test:smoke        #   64 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
+                         #   landing on its words, Postdoc live drawing its steps and quoting a sentence, the figure
+                         #   gallery, geneOS → Model and the strain card over the toy network, Guild posting, and the
                          #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
                          #   a practice session, and a check run at the bench and read back
-  pnpm test:golden       #   the ten-minute demo script, driven end to end, a search opening the reader, and
-                         #   Postdoc live beside an untouched scripted mode
+  pnpm test:golden       #   the ten-minute demo script, driven end to end, a search opening the reader,
+                         #   Postdoc live beside an untouched scripted mode, and geneOS drawing a ceiling
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
 pnpm test:live           # the thirteen flows through Postdoc's loop, a real practice draft and tutor
-                         # session, and a real check brief — needs a key, never in verify
+                         # session, a real check brief (these need a key), and the C. necator model's
+                         # ceilings (needs pnpm geneos:fetch) — never in verify
 ```
 
 The test suite is not decoration. `test:golden` is what caught a markdown-renderer infinite

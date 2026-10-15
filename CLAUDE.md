@@ -502,6 +502,48 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   keeps each plan under `core/data/live/` (on the data branch);
   `docs/build/questions-pha.txt` holds Appendix 4's ten.
 
+## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
+
+- **One figure grammar.** Every chart this build adds comes from
+  `src/components/figures/`: the kind of thing decides the mark (a record a
+  point, a computed limit a rule, a computed curve a line), provenance
+  decides shape, fill and dash through `ENCODING` in `encoding.ts`, a
+  `Record` over every provenance. Each figure exports `toTable(props)`, which
+  feeds its "View as table" twin and the tests, and sits in `FigureFrame`
+  (the question as title, units, CSV, sources, the basis of anything
+  computed, and what would fill it when empty). `pnpm check:figures` holds
+  it; `recharts` stays in Compare and ProformaScenario alone. Settings →
+  Figure grammar (`/settings/figures`) is the written definition, over a
+  sample `demo.py --prototype` writes to `src/data/figureSamples.json`.
+- **geneOS computes a ceiling.** Flux balance analysis on a shelf of
+  published reaction networks (`geneos_models.py`, data only): `e_coli_core`
+  and `iJO1366` bundled with cobra plus the phaCAB add-on, each added
+  reaction checked for mass balance; and `RehMBEL1391` (*C. necator* H16),
+  which `pnpm geneos:fetch` clones at `00c70c5` into `core/data/models/`
+  (gitignored) and checks against its sha256, setting a mismatch aside. The
+  worker adds `DM_phb_c` where a file lacks it (all three do) and reports
+  each model's counts as its file publishes them. The uptake (10 mmol gDW⁻¹
+  h⁻¹), the repeat unit's formula and the sugars' molar masses are
+  conventions in every basis; every other bound stays as the file publishes
+  it. Ceiling, frontier (twelve growth rates) and sugar mix (eleven
+  proportions at equal carbon) are artifacts; a sugar a model cannot take up
+  is a finding in words and stores no number. Appendix 2's bundled-model
+  values are asserted in `test:core`, the *C. necator* ones in
+  `test_geneos_live.py`.
+- **`cobra` lives in `workers/geneos_worker.py` alone**, behind the
+  `SimWorker` JSON contract, with `swiglpk` and `python-libsbml`: three
+  copyleft libraries accepted under D4 in `core/licences.toml`, where model
+  files are listed under `[data]` with source, revision, hash and licence.
+  The toy network the worker builds is a STAND-IN for tests and fixtures and
+  is never listed on the shelf.
+- **geneOS → Model** (`/geneos/model`, `geneos.model` is `live`) draws every
+  shelf model's ceiling for the chosen sugar beside every
+  `pha_yield_substrate` record, rings a record above a ceiling and asks a
+  reviewer to check its basis, and shows the chosen model's frontier and
+  sugar-mix line and what it lacks. A strain page whose host has a model
+  shows its card; an evidence card with the `ceiling` hint draws it inline.
+  `yield_ceiling` is the registry's fourth tool.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
