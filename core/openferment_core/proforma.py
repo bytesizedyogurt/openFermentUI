@@ -466,7 +466,7 @@ _lazy_run()
 def run(req, pool=None):
     """Bind, refuse what waits for a source, and run once per basis."""
     from . import artifacts, evidence_pool
-    from .models import Evidence, ProformaGrid, ProformaRunResult, Range
+    from .models import ProformaGrid, ProformaRunResult
 
     if req.scenarioId != SCENARIO_ID:
         raise ScenarioRefused(f"there is no scenario {req.scenarioId}; the BioSTEAM scenario is {SCENARIO_ID}")
@@ -479,17 +479,26 @@ def run(req, pool=None):
     art = artifacts.compute(RUN, basis_inputs(inputs, cap), records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
-    ev = Evidence(
-        id=art.id, label=f"Minimum selling price, {SCENARIO_ID} (BioSTEAM draft flowsheet v0)",
-        value=q.get("p50", float("nan")), unit=PRICE_BASIS,
-        interval=Range(low=q["p5"], high=q["p95"]) if q else None,
-        provenance=art.provenance, basis=artifacts.basis_of(art), figure="distribution")
+    ev = evidence_of(art)
     return ProformaRunResult(
         scenarioId=SCENARIO_ID, artifactId=art.id, provenance=art.provenance, inputs=inputs,
         basePrice=o["basePrice"], baseCostLines=o["baseCostLines"], baseInfeasible=o["baseInfeasible"],
         quantiles=q, histogram=o["histogram"], sensitivity=o["sensitivity"], samples=o["samples"],
         feasible=o["feasible"], infeasible=o["infeasible"], grid=ProformaGrid(**o["grid"]), readBack=o["readBack"],
         leavesOut=LEAVES_OUT, priceBasis=PRICE_BASIS, evidence=ev)
+
+
+def evidence_of(art):
+    """A run as one Evidence: the median price with the 5th to 95th percentile."""
+    from . import artifacts
+    from .models import Evidence, Range
+
+    q = art.output["quantiles"]
+    return Evidence(
+        id=art.id, label=f"Minimum selling price, {SCENARIO_ID} (BioSTEAM draft flowsheet v0)",
+        value=q.get("p50", float("nan")), unit=PRICE_BASIS,
+        interval=Range(low=q["p5"], high=q["p95"]) if q else None,
+        provenance=art.provenance, basis=artifacts.basis_of(art), figure="distribution")
 
 
 def latest_run(scenario_id: str = SCENARIO_ID):

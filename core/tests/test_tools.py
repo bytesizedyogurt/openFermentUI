@@ -191,7 +191,7 @@ def test_a_summary_over_the_limit_is_replaced_by_an_error(monkeypatch, pool):
 def test_only_the_seven_names_may_register():
     with pytest.raises(ValueError):
         tools.register(tools.Tool("run_shell", "d", tools.records.SearchRecordsInput, lambda i, c: None))
-    assert [t.name for t in tools.infos()] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast"]
+    assert [t.name for t in tools.infos()] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price"]
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ def client(pool, monkeypatch):
 
 def test_get_tools_lists_names_descriptions_and_schemas(client):
     body = client.get("/api/tools").json()
-    assert [t["name"] for t in body] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast"]
+    assert [t["name"] for t in body] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price"]
     assert body[0]["inputSchema"]["properties"]["query"]["type"] == "string"
     assert all(len(t["description"]) > 80 for t in body)
 
@@ -223,3 +223,38 @@ def test_post_runs_a_tool_and_refuses_numbers_like_the_loop(client):
 def test_the_request_guard_covers_the_tool_endpoint(client):
     r = client.post("/api/tools/search_records", json={"query": "", "field": "", "organism": "", "limit": 1}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
+
+
+# ── selling_price (§8.5) ───────────────────────────────────────────────
+
+
+def test_selling_price_refuses_with_no_run_and_names_what_waits(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from openferment_core import intake
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[], records_by_id={}))
+    r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, ctx)
+    assert r.error and "no run of sc-pha-1 exists" in r.error and "price of fermentable sugar" in r.error
+    assert "no BioSTEAM scenario" in tools.run("selling_price", {"scenarioId": "sc-s1"}, ctx).error
+
+
+def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from openferment_core import demo, intake, proforma
+    from openferment_core.models import InputAssumption, ProformaRunRequest
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
+    rs = demo._standin_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    a = [InputAssumption(key=k, value=v, low=v, high=v, by="Sean Creighton", at="2026-10-15")
+         for k, v in (("recovery", 0.95), ("sugarPrice", 0.4), ("sugarFeed", 1000.0))]
+    run = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a), pool=pool)
+    r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, tools.ToolContext(pool_factory=lambda: pool))
+    assert r.error is None and r.evidence[0].id == run.artifactId and r.evidence[0].figure == "distribution"
+    assert r.summary["provenance"] == "demo" and r.summary["assumedInputs"] == ["recovery", "sugarFeed", "sugarPrice"]
+    assert r.evidence[0].interval.low <= r.evidence[0].value <= r.evidence[0].interval.high
