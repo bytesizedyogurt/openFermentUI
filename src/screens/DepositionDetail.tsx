@@ -16,7 +16,6 @@ import { ComponentTag } from '@/components/ComponentTag';
 import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import {
-  CONFIRM_BAND_PCT,
   computeDeltas,
   deltaLabel,
   suggestOutcome,
@@ -101,7 +100,7 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
       ) : (
         <ul className="space-y-3">
           {deltas.map((d) => {
-            const held = Math.abs(d.pctDelta) <= CONFIRM_BAND_PCT;
+            const held = d.held;
             return (
               <li key={d.predictionId}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">

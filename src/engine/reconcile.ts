@@ -18,9 +18,49 @@ export interface Delta {
   predicted: number;
   observed: number;
   unit: string;
+  /**
+   * Signed percent. For a point, from the predicted value. For an interval or
+   * a bound, from the nearer edge it was held to: zero when it held (§9.1).
+   */
   pctDelta: number;
   /** Whether the operator ever read the observed value back (§4.4). */
   confirmed: boolean;
+  /** The prediction's kind; a seeded prediction is a point. */
+  kind: PredictionKind;
+  /** Held or missed, decided by `holds` for every kind. */
+  held: boolean;
+}
+
+export type PredictionKind = 'point' | 'interval' | 'bound';
+
+export const kindOf = (p: Prediction): PredictionKind => p.kind ?? 'point';
+
+/**
+ * Whether an observed value holds a prediction (OF-BLD-014 §9.1), the one
+ * place this is decided. A point holds within `CONFIRM_BAND_PCT`; an interval
+ * holds inside its ends; a bound is a ceiling and holds at or below its value.
+ */
+export function holds(p: Prediction, observed: number): boolean {
+  const kind = kindOf(p);
+  if (kind === 'interval' && p.interval) return observed >= p.interval.low && observed <= p.interval.high;
+  if (kind === 'bound') return observed <= p.value;
+  return Math.abs(pointDelta(p.value, observed)) <= CONFIRM_BAND_PCT;
+}
+
+function pointDelta(predicted: number, observed: number): number {
+  return predicted === 0 ? (observed === 0 ? 0 : 100) : ((observed - predicted) / Math.abs(predicted)) * 100;
+}
+
+/** The signed percent a value lies from what held it: a point's value, or the nearer edge. */
+export function deltaOf(p: Prediction, observed: number): number {
+  const kind = kindOf(p);
+  if (kind === 'interval' && p.interval) {
+    if (observed < p.interval.low) return pointDelta(p.interval.low, observed);
+    if (observed > p.interval.high) return pointDelta(p.interval.high, observed);
+    return 0;
+  }
+  if (kind === 'bound') return observed <= p.value ? 0 : pointDelta(p.value, observed);
+  return pointDelta(p.value, observed);
 }
 
 /**
@@ -53,12 +93,7 @@ export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[]
     const entries = deposition.entries.filter((e) => ids.has(e.measureId));
     if (entries.length === 0) continue;
     const last = entries[entries.length - 1];
-    const pctDelta =
-      prediction.value === 0
-        ? last.value === 0
-          ? 0
-          : 100
-        : ((last.value - prediction.value) / Math.abs(prediction.value)) * 100;
+    const pctDelta = deltaOf(prediction, last.value);
     out.push({
       predictionId: prediction.id,
       label: prediction.label,
@@ -67,6 +102,8 @@ export function computeDeltas(deposition: Deposition, runbook: Runbook): Delta[]
       unit: last.unit,
       pctDelta,
       confirmed: last.confirmed,
+      kind: kindOf(prediction),
+      held: holds(prediction, last.value),
     });
   }
   return out;
@@ -114,16 +151,17 @@ export function suggestOutcome(deltas: Delta[], deviationCount: number): Outcome
       why: `${deviationCount} deviations were logged during the run — enough that the comparison may be measuring the deviations rather than the prediction.`,
     };
 
-  const missed = deltas.filter((d) => Math.abs(d.pctDelta) > CONFIRM_BAND_PCT);
+  // §9.1: held and missed are counted across the three kinds, as `holds` decided.
+  const missed = deltas.filter((d) => !d.held);
   if (missed.length === 0)
     return {
       outcome: 'confirmed',
-      why: `Every measured prediction landed within ${CONFIRM_BAND_PCT}%.`,
+      why: `Every measured prediction held: a point within ${CONFIRM_BAND_PCT}%, an interval inside its ends, a bound at or below it.`,
     };
 
   return {
     outcome: 'refuted',
-    why: `${missed.length} of ${deltas.length} predictions fell outside ${CONFIRM_BAND_PCT}% — ${missed
+    why: `${missed.length} of ${deltas.length} predictions missed — ${missed
       .map((d) => `${d.label} by ${d.pctDelta > 0 ? '+' : ''}${d.pctDelta.toFixed(0)}%`)
       .join(', ')}.`,
   };

@@ -1168,6 +1168,18 @@ export interface Prediction {
   confidence: 'high' | 'medium' | 'low';
   /** What produced it. A model, a precedent, an assumption someone made. */
   basis: string;
+  /**
+   * OF-BLD-014 §9.1. A prediction with no kind is a point, held within the
+   * ten percent band. An interval holds when the observed value lies inside
+   * `interval`. A bound is a ceiling: it holds while the observed value stays
+   * at or below `value` (the only bounds the service writes are ceilings).
+   */
+  kind?: 'point' | 'interval' | 'bound';
+  interval?: Range;
+  /** The computed evidence behind it, when there is one. */
+  artifactId?: string;
+  /** The records behind it, when it is a range of reported values. */
+  recordIds?: string[];
 }
 
 /**

@@ -389,6 +389,14 @@ for (const p of PRODUCTS) {
 }
 
 for (const r of RUNBOOKS) {
+  // §9.1 — an interval's low is at most its high, and its value lies between them.
+  for (const p of r.predictions) {
+    if (p.kind === 'interval') {
+      if (!p.interval) fail(`${r.id}/${p.id}: an interval prediction carries no interval`);
+      else if (!(p.interval.low <= p.interval.high)) fail(`${r.id}/${p.id}: interval low ${p.interval.low} is above its high ${p.interval.high}`);
+      else if (p.value < p.interval.low || p.value > p.interval.high) fail(`${r.id}/${p.id}: value ${p.value} lies outside its interval`);
+    }
+  }
   if (r.productId && !productIds.has(r.productId))
     fail(`runbook ${r.id}: productId ${r.productId} does not resolve against PRODUCTS`);
   if (r.strainId && !strainIds.has(r.strainId))
