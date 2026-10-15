@@ -202,3 +202,24 @@ def test_status_lists_every_lane(index):
     s = passages.status()
     assert [l.name for l in s.lanes] == list(retrieve.LANES)
     assert s.lanes[0].available and not s.lanes[2].available
+
+
+# ── the endpoint (§4.4) ────────────────────────────────────────────────
+
+
+def test_post_search_returns_hits_and_refuses_a_lane_that_cannot_run(index, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    client = TestClient(api.app, base_url="http://127.0.0.1")
+    ok = client.post("/api/rag/search", json={"question": "casein calcium micelles", "k": 3})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["lane"] == "bm25" and body["hits"][0]["passage"]["paperId"] == "X3"
+    assert body["hits"][0]["lanes"] == {"bm25": 1} and body["costUsd"] == 0.0
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    refused = client.post("/api/rag/search", json={"question": "casein", "k": 3, "lane": "bm25+rerank"})
+    assert refused.status_code == 409 and "needs the key" in refused.json()["detail"]
+    guarded = client.post("/api/rag/search", json={"question": "casein"}, headers={"Origin": "https://evil.example"})
+    assert guarded.status_code == 403

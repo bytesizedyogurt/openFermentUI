@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, rageval, tools, witness
+from . import artifacts, biorepo, checks, extract, guard, guild, intake, passages, practice, rageval, retrieve, tools, witness
 from .corpus import load_corpus
 from .models import (
     AnswerPlan,
@@ -56,6 +56,8 @@ from .models import (
     PracticeSession,
     PracticeTurnRequest,
     RagReport,
+    RagSearchRequest,
+    RagSearchResponse,
     RagStatus,
     ReplayResult,
     ReviewDecision,
@@ -583,6 +585,26 @@ def rag_status() -> RagStatus:
     """Papers indexed, passages, the lanes and whether each can run, and the
     lane searches use when none is named."""
     return passages.status()
+
+
+@app.post("/api/rag/search", response_model=RagSearchResponse)
+def rag_search(request: RagSearchRequest) -> RagSearchResponse:
+    """Passages for a question, on the lane named or the chosen one. A lane
+    that cannot run here is a 409 that says why; a paid lane's helper calls
+    are held to the daily cap like every model call."""
+    try:
+        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane)
+    except retrieve.LaneUnavailable as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+    except llm.ModelUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from None
+    return RagSearchResponse(
+        lane=detail.lane,
+        hits=detail.hits,
+        phrasings=detail.phrasings,
+        unverifiedSentences=detail.unverifiedSentences,
+        costUsd=detail.usage.costUsd,
+    )
 
 
 @app.get("/api/rag/report", response_model=RagReport)

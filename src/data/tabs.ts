@@ -15,6 +15,8 @@ export const BIOREPO_TABS: OwnerTab[] = [
   // a second tab pointing at the same table would be a duplicate rather than a
   // view — and duplicating a screen is the kind of feature §10 forbids.
   { label: 'Papers', to: '/biorepo' },
+  // OF-BLD-014 §4.4 — the papers' own words, searched.
+  { label: 'Search', to: '/biorepo/search' },
   { label: 'Compare', to: '/biorepo/compare' },
   { label: 'Witness', to: '/biorepo/witness' },
   // OF-BLD-014 §3.2 — what the service computed, with its basis.

@@ -2064,3 +2064,21 @@ export interface RagReport {
   rule: string;
   totalCostUsd: number;
 }
+
+export interface RagSearchRequest {
+  question: string;
+  k: number;
+  /** A lane by name, or null for the chosen one. */
+  lane: string | null;
+}
+
+/** What `POST /api/rag/search` returns (OF-BLD-014 §4.4). */
+export interface RagSearchResponse {
+  lane: string;
+  hits: PassageHit[];
+  /** The other phrasings the expand lane searched, when it ran. */
+  phrasings: string[];
+  /** Sentences the grading reader returned that were not in their passage. */
+  unverifiedSentences: number;
+  costUsd: number;
+}

@@ -140,6 +140,10 @@ export const COMPONENTS: ComponentDef[] = [
       'core/openferment_core/biorepo.py',
       'src/screens/BioRepoArtifacts.tsx',
       'core/openferment_core/artifacts.py',
+      // OF-BLD-014 §4.4 — passages, searched.
+      'src/screens/BioRepoSearch.tsx',
+      'core/openferment_core/passages.py',
+      'core/openferment_core/retrieve.py',
     ],
     surfacedAs: 'the rail, /biorepo',
     role: 'The corpus, and everything retrieved from it',
@@ -212,7 +216,13 @@ export const COMPONENTS: ComponentDef[] = [
     owner: 'BioRepo',
     layer: 'Keeping it honest',
     // OF-BLD-012 §6.2 — match_run scores the run that ran; the screen renders it.
-    livesIn: ['src/screens/Witness.tsx', 'src/engine/metrics.ts', 'core/openferment_core/witness.py'],
+    livesIn: [
+      'src/screens/Witness.tsx',
+      'src/engine/metrics.ts',
+      'core/openferment_core/witness.py',
+      'core/openferment_core/rageval.py',
+      'src/components/RetrievalScorecard.tsx',
+    ],
     surfacedAs: 'a BioRepo tab, /biorepo/witness',
     role: 'Extractor validation against the gold set',
   },

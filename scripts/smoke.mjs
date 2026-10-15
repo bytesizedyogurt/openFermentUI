@@ -5,241 +5,21 @@
  *   pnpm build && node scripts/smoke.mjs
  */
 import { chromium } from 'playwright';
-import { createServer, request as httpRequest } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { request as httpRequest } from 'node:http';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
+import { LOOPBACK } from './lib/serve-dist.mjs';
+import { createServiceDouble } from './lib/service-double.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORT = 4319;
 
-/**
- * A stand-in for openferment-core (OF-BLD-012 §5.5). The built app asks
- * /api/health at load and, when it answers, applies /api/biorepo/overlay over
- * the seed. Serving both here exercises the real hydration path on every
- * route, with an overlay fixture whose B5 text is the structural JATS
- * document the Python parser is tested against — a made-up article shape, not
- * a paper, labelled as such in the file. Guild's endpoints (OF-BLD-013) are a
- * double that stores and echoes. Nothing else under /api exists.
- */
-const OVERLAY_FIXTURE = join(process.cwd(), 'core/tests/fixtures/overlay-smoke.json');
-// OF-BLD-014 E.2 — fixtures `python -m openferment_core.demo --prototype`
-// generates through the real code, each `{_fixture, response}`.
-const PROTOTYPE = join(process.cwd(), 'core/tests/fixtures/prototype');
-const prototype = async (name) => JSON.parse(await readFile(join(PROTOTYPE, name), 'utf8')).response;
-const HEALTH = JSON.stringify({
-  ok: true,
-  service: 'openferment-core (smoke double)',
-  model: 'none',
-  hasKey: false,
-  records: 134,
-  corpusError: null,
-});
-
 /** The person the smoke reviews as. `biorepo.write` refuses a placeholder (F2). */
 const REVIEWER = 'Sam Okonkwo';
 
-/** Decisions the double received on POST /api/biorepo/decisions (§7.3). */
-const decisions = [];
-/** Questions the double received on POST /api/biorepo/check (OF-BLD-012.1 F1.5). */
-const checks = [];
-/**
- * Guild's ledger as the double holds it (OF-BLD-013). It stores what it is
- * sent and echoes it back with the stamps the service adds; the rules are
- * guild.py's, tested in core/tests/test_guild.py, so the double refuses
- * nothing. `guildPosts` is what the browser sent, in order.
- */
-const guildLedger = { version: 1, people: [], evidence: [] };
-const guildPosts = [];
-/**
- * Practice as the double holds it (OF-BLD-013 §4). A draft is a fixed
- * scenario whose values are PR-OD-01's own, and the tutor asks why twice and
- * closes on the third answer; the rules are practice.py's, tested in
- * core/tests/test_practice.py. `practicePosts` is what the browser sent.
- */
-const practiceState = { version: 1, scenarios: [], sessions: [] };
-const practicePosts = [];
-let practiceIds = 0;
-const PRACTICE_SCENARIO = (skillId) => ({
-  id: `ps-smoke-${++practiceIds}`,
-  skillId,
-  title: 'A reading above the linear range',
-  situation: 'A flask read above the top of the linear range at step o4. The step says [v1], and the blank is [v2].',
-  prompt: 'What do you do with the sample before you record it, and why?',
-  watchFor: ['Dilutes into the same spent medium and reads again'],
-  evidence: [
-    {
-      id: 'v1',
-      label: 'Step o4 of PR-OD-01',
-      source: { kind: 'step', protocolId: 'PR-OD-01', stepId: 'o4' },
-      text: 'Read OD750 in a 10 mm cuvette against 250 mL of spent cell-free medium as the blank.',
-    },
-    {
-      id: 'v2',
-      label: 'The blank medium',
-      source: { kind: 'material', protocolId: 'PR-OD-01', material: 'Spent cell-free medium' },
-      text: 'Spent cell-free medium',
-      value: 250,
-      unit: 'mL',
-    },
-  ],
-  steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }],
-  depositionIds: [],
-  model: 'smoke-double',
-  usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
-  createdAt: new Date().toISOString(),
-});
-
-const server = createServer(async (req, res) => {
-  try {
-    const url = decodeURIComponent((req.url ?? '/').split('?')[0]);
-    if (url === '/api/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(HEALTH);
-    }
-    if (url === '/api/biorepo/decisions' && req.method === 'POST') {
-      // The double stores nothing and refuses nothing: it records what the
-      // browser sent and echoes it back, so the test can read what
-      // `biorepo.write` would have been asked to store.
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      const decision = JSON.parse(body);
-      decisions.push(decision);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(decision));
-    }
-    if (url === '/api/biorepo/check' && req.method === 'POST') {
-      // What `biorepo.write` would answer for the smoke fixture, in its
-      // shape: B5's curated record is on a fetched paper, so an accept is
-      // storable, and its quote is not in that text and no extractor span
-      // agrees with it, so a gold decision refuses on rule 'quote'. The card
-      // renders its own words for a rule it also recognises; the GATE is
-      // this answer, which is the point of the endpoint.
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      const asked = JSON.parse(body);
-      checks.push(asked);
-      const refused = asked.gold
-        ? { ok: false, rule: 'quote', why: `the quote for ${asked.recordId} fails anchoring on rule 'quote'` }
-        : { ok: true, rule: null, why: null };
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(refused));
-    }
-    if (url === '/api/guild' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(guildLedger));
-    }
-    if (url === '/api/guild/checks' && req.method === 'GET') {
-      // The real ledger's queue: empty here. The flow below runs its check on the sample.
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ version: 1, checks: [] }));
-    }
-    if (url.startsWith('/api/guild/') && req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      const sent = JSON.parse(body);
-      guildPosts.push({ url, body: sent });
-      let stored = sent;
-      if (url === '/api/guild/people') {
-        stored = { ...sent, addedAt: new Date().toISOString() };
-        guildLedger.people = [...guildLedger.people.filter((p) => p.id !== sent.id), stored];
-      } else if (url === '/api/guild/evidence') {
-        stored = { ...sent, recordedAt: new Date().toISOString() };
-        guildLedger.evidence.push(stored);
-      } else if (url === '/api/guild/withdraw') {
-        const e = guildLedger.evidence.find((x) => x.id === sent.evidenceId);
-        stored = { ...e, withdrawnAt: sent.at, withdrawnBy: sent.by, withdrawReason: sent.reason };
-        guildLedger.evidence = guildLedger.evidence.map((x) => (x.id === sent.evidenceId ? stored : x));
-      } else if (url === '/api/guild/check') {
-        stored = { ok: true, rule: null, why: null };
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(stored));
-    }
-    if (url === '/api/practice' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(practiceState));
-    }
-    if (url.startsWith('/api/practice/') && req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      const sent = JSON.parse(body);
-      practicePosts.push({ url, body: sent });
-      let out;
-      const at = new Date().toISOString();
-      if (url === '/api/practice/draft') {
-        out = PRACTICE_SCENARIO(sent.skillId);
-        practiceState.scenarios.push(out);
-      } else if (url === '/api/practice/turn') {
-        const sc = practiceState.scenarios.find((x) => x.id === sent.scenarioId);
-        let held = practiceState.sessions.find((x) => x.id === sent.sessionId) ?? {
-          id: `pt-smoke-${++practiceIds}`,
-          scenarioId: sc.id,
-          skillId: sc.skillId,
-          personId: sent.personId ?? null,
-          turns: [],
-          observed: [],
-          startedAt: at,
-          closedAt: null,
-          evidenceId: null,
-          usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
-        };
-        const answered = held.turns.filter((t) => t.role === 'trainee').length + 1;
-        const close = answered >= 3;
-        held = {
-          ...held,
-          turns: [
-            ...held.turns,
-            { role: 'trainee', text: sent.answer, steps: [], at },
-            close
-              ? { role: 'tutor', move: 'close', text: 'Look again at why step o4 dilutes into [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at }
-              : { role: 'tutor', move: 'why', text: 'Why would that change what the reading means?', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }], at },
-          ],
-        };
-        if (close) {
-          held.closedAt = at;
-          held.observed = [{ text: 'Chose to dilute, and was unsure why the diluent is [v2].', steps: [{ protocolId: 'PR-OD-01', stepId: 'o4' }] }];
-        }
-        practiceState.sessions = [...practiceState.sessions.filter((x) => x.id !== held.id), held];
-        out = held;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(out));
-    }
-    // OF-BLD-014 §3.2 — the artifact store, from the prototype fixtures.
-    if (url === '/api/biorepo/artifacts' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(await prototype('artifacts.json')));
-    }
-    if (url.startsWith('/api/biorepo/artifacts/')) {
-      const [id, action] = url.slice('/api/biorepo/artifacts/'.length).split('/');
-      const found = (await prototype('artifacts.json')).find((a) => a.id === id);
-      if (!found) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ detail: `no artifact '${id}'` }));
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      if (action === 'replay' && req.method === 'POST') return res.end(JSON.stringify(await prototype('artifact-replay.json')));
-      return res.end(JSON.stringify(found));
-    }
-    if (url === '/api/biorepo/overlay') {
-      // Answered late on purpose: a screen mounted before the overlay arrives
-      // has to cope with it arriving — Guild's queue in particular (§7.3) —
-      // and a double that answered instantly would let that path go untested.
-      await new Promise((r) => setTimeout(r, 700));
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(await readFile(OVERLAY_FIXTURE));
-    }
-    if (url.startsWith('/api/')) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ detail: 'not part of the smoke double' }));
-    }
-    await serveStatic(DIST, url, res);
-  } catch (e) {
-    res.writeHead(404).end('not found');
-  }
-});
+// The service double (scripts/lib/service-double.mjs), shared with the golden path.
+const { server, state: doubleState } = createServiceDouble({ dist: DIST });
+const { decisions, checks, guildPosts, practicePosts } = doubleState;
 
 const ROUTES = [
   ['/', 'Home'],
@@ -253,6 +33,7 @@ const ROUTES = [
   ['/biorepo/paper/B5', 'BioRepo — paper (full text from the overlay)'],
   ['/biorepo/compare', 'BioRepo — compare'],
   ['/biorepo/witness', 'BioRepo — Witness'],
+  ['/biorepo/search', 'BioRepo — search the papers'],
   ['/biorepo/artifacts', 'BioRepo — artifacts (what was computed)'],
   ['/biorepo/artifacts/02aef8a9e9cbaf88', 'BioRepo — one artifact, its basis and replay'],
   ['/postdoc', 'Postdoc'],
@@ -601,6 +382,25 @@ async function main() {
       await page.locator('[data-testid="replay-result"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/Replayed identically/.test(await page.locator('body').innerText()))
         problems.push('Replay did not say it replayed identically');
+
+      // OF-BLD-014 §4.4 — search the papers, open a hit, land on its words;
+      // Witness carries the retrieval scorecard with the lane in use marked.
+      await page.goto(`http://localhost:${PORT}/#/biorepo/search`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Question"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('input[aria-label="Question"]').fill('placeholder rows in the table');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await page.locator('[data-testid="search-hit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="search-hit"]').count()) === 0) problems.push('search showed no hit');
+      if (!doubleState.ragSearches.some((q) => q.question === 'placeholder rows in the table'))
+        problems.push('search did not post the question to the service');
+      await page.locator('[data-testid="open-in-reader"]').first().click();
+      await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const marked = (await page.locator('[data-testid="quote-mark"]').innerText().catch(() => '')) ?? '';
+      if (!/Placeholder A \| 7 \| mg L-1/.test(marked)) problems.push('the reader did not mark the searched words');
+      await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="retrieval-table"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const card = (await page.locator('[data-testid="retrieval-scorecard"]').innerText().catch(() => '')) ?? '';
+      if (!/in use: bm25/.test(card) || !/hybrid/.test(card)) problems.push('Witness does not show the retrieval scorecard');
 
       // §7.3 — the review card. The new candidate is in the queue, labelled;
       // accepting it posts a decision to the service. The curated record on

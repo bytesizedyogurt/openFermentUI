@@ -7,20 +7,18 @@
  *   pnpm build && node scripts/golden-path.mjs
  */
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
+import { LOOPBACK } from './lib/serve-dist.mjs';
+import { createServiceDouble } from './lib/service-double.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORT = 4321;
-const server = createServer(async (req, res) => {
-  try {
-    await serveStatic(DIST, decodeURIComponent((req.url ?? '/').split('?')[0]), res);
-  } catch {
-    res.writeHead(404).end('nf');
-  }
-});
+// The service double the smoke uses (OF-BLD-014 §4.4): from this step on the
+// golden path walks views that need a service, and it gets the same one. It
+// leaves health and the overlay unanswered, so the demo script still drives
+// the seed, as it always has.
+const { server } = createServiceDouble({ dist: DIST, seedOnly: true });
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -330,6 +328,33 @@ async function main() {
       (page.url().split('#')[1] ?? '') === '/biorepo/witness',
       page.url().split('#')[1] ?? '',
     );
+  }
+
+  // ── OF-BLD-014 §4.4: search the papers, open a hit, see the sentence ──
+  await go('/biorepo/search');
+  const box = page.locator('input[aria-label="Question"]');
+  if (await box.count()) {
+    await box.fill('placeholder rows in the table');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.locator('[data-testid="open-in-reader"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+    const opened = await page.locator('[data-testid="open-in-reader"]').count();
+    if (opened) {
+      await page.locator('[data-testid="open-in-reader"]').first().click();
+      await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
+    }
+    // The golden path walks the seed, where B5 holds its curator's note and
+    // none of the fetched words, so the reader must say the words are not in
+    // the text shown; the smoke, over the overlay, holds the marking itself.
+    const where = page.url().split('#')[1] ?? '';
+    const marked = (await page.locator('[data-testid="quote-mark"]').count()) > 0;
+    const saysMissing = (await page.locator('[data-testid="quote-missing"]').count()) > 0;
+    check(
+      'Search opens the reader at the hit, and marks its words or says they are not there',
+      where.startsWith('/biorepo/paper/B5?') && (marked || saysMissing),
+      where.split('&')[0],
+    );
+  } else {
+    check('Search opens the reader at the hit, and marks its words or says they are not there', false, 'question box not found');
   }
 
   await browser.close();

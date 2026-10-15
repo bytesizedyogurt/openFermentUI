@@ -376,8 +376,17 @@ def build_sets() -> tuple[dict[str, list[Question]], list[RagSetInfo]]:
     return {"K": k_questions, "S": s_questions, "F": f_questions}, infos
 
 
-def evaluate(*, ask: Callable[..., llm.Result] | None = None, embedder=None, lanes: Iterable[str] = retrieve.LANES) -> RagReport:
-    sets, infos = build_sets()
+def evaluate(
+    *,
+    ask: Callable[..., llm.Result] | None = None,
+    embedder=None,
+    lanes: Iterable[str] = retrieve.LANES,
+    sets: dict[str, list[Question]] | None = None,
+    infos: list[RagSetInfo] | None = None,
+) -> RagReport:
+    if sets is None:
+        sets, infos = build_sets()
+    infos = infos or []
     status = passages.status()
     reports: list[RagLaneReport] = []
     total = 0.0

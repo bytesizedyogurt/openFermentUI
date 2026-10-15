@@ -1,0 +1,35 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "papersIndexed": 1,
+    "passages": 7,
+    "lanes": [
+      {
+        "name": "bm25",
+        "available": true,
+        "why": null
+      },
+      {
+        "name": "bm25+expand",
+        "available": false,
+        "why": "needs the key in core/.env for its helper model calls"
+      },
+      {
+        "name": "hybrid",
+        "available": false,
+        "why": "no passage vectors yet: run pnpm index:build --dense on a machine that reaches huggingface.co"
+      },
+      {
+        "name": "bm25+rerank",
+        "available": false,
+        "why": "needs the key in core/.env for its helper model calls"
+      },
+      {
+        "name": "hybrid+rerank",
+        "available": false,
+        "why": "needs the key in core/.env for its helper model calls"
+      }
+    ],
+    "chosenLane": "bm25"
+  }
+}

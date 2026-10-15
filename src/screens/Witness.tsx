@@ -43,6 +43,7 @@ import { useCategorical } from '@/lib/viz';
 import { exportCSV } from '@/lib/csv';
 import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
+import { RetrievalScorecard } from '@/components/RetrievalScorecard';
 import { BIOREPO_TABS } from '@/data/tabs';
 
 // ── run identity ───────────────────────────────────────────────────────
@@ -615,6 +616,7 @@ export default function Witness() {
             </div>
           </Card>
         </div>
+        <RetrievalScorecard />
       </>
     );
   }
@@ -1171,6 +1173,7 @@ export default function Witness() {
           />
         )}
       </Sheet>
+      <RetrievalScorecard />
     </>
   );
 }

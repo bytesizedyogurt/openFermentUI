@@ -1012,3 +1012,22 @@ class RagReport(BaseModel):
     # The rule that chose it, in words.
     rule: str
     totalCostUsd: float
+
+
+class RagSearchRequest(BaseModel):
+    question: str
+    k: int = 8
+    # A lane by name, or None for the chosen one.
+    lane: str | None = None
+
+
+class RagSearchResponse(BaseModel):
+    """What `POST /api/rag/search` returns (OF-BLD-014 §4.4)."""
+
+    lane: str
+    hits: list[PassageHit]
+    # The other phrasings the expand lane searched, when it ran.
+    phrasings: list[str] = Field(default_factory=list)
+    # Sentences the grading reader returned that were not in their passage.
+    unverifiedSentences: int = 0
+    costUsd: float = 0.0

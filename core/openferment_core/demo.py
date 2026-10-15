@@ -43,7 +43,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 CORE = Path(__file__).parent.parent
 FIXTURES = CORE / "tests" / "fixtures"
@@ -380,6 +380,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     for name, value in (
         ("artifacts.json", [art.model_dump(mode="json")]),
         ("artifact-replay.json", replay.model_dump(mode="json")),
+        *prototype_rag().items(),
     ):
         path = out / name
         wrapped = {"_fixture": PROTOTYPE_NOTE, "response": value}
@@ -387,6 +388,63 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         written.append(path)
         print(f"wrote {path}")
     return written
+
+
+# §4.4: passage search over the structural stand-in paper the smoke overlay
+# already serves as B5, through the real cutter, the bm25 lane and the
+# scorecard. Timings are zeroed and the date fixed, so the files are the same
+# on every run.
+RAG_QUESTION = "placeholder rows in the table"
+
+
+def prototype_rag() -> dict[str, Any]:
+    from . import intake as _intake
+    from . import passages, rageval, retrieve
+    from .models import FetchedSection, FetchResult, RagSearchResponse
+
+    overlay = json.loads((FIXTURES / "overlay-smoke.json").read_text(encoding="utf-8"))
+    b5 = overlay["papers"]["B5"]
+    saved = (_intake.DATA_DIR, _intake.FULLTEXT_DIR, passages._LOADED, passages._papers_meta)
+    # Generated with no key, so the paid lanes say they need one whatever this
+    # machine holds, and nothing is ever spent making a fixture.
+    key = os.environ.pop("ANTHROPIC_API_KEY", None)
+    with _scratch() as scratch:
+        try:
+            _intake.DATA_DIR = scratch
+            _intake.FULLTEXT_DIR = scratch / "fulltext"
+            _intake.FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
+            passages._LOADED = None
+            passages._papers_meta = lambda: {"B5": {"title": "A structural stand-in article", "year": 2026}}
+            fetched = FetchResult(
+                paperId="B5", pmcid=B5["pmcid"], status="complete", fetchedAt=b5["fetchedAt"],
+                sections=[FetchedSection(**x) for x in b5["sections"]],
+            )
+            (_intake.FULLTEXT_DIR / "B5.json").write_text(fetched.model_dump_json(), encoding="utf-8")
+            passages.build()
+            status = passages.status()
+            detail = retrieve.search_detail(RAG_QUESTION, k=8, lane="bm25")
+            search = RagSearchResponse(lane=detail.lane, hits=detail.hits, phrasings=[], unverifiedSentences=0, costUsd=0.0)
+            items = [dict(raw, id=f"stand-in-{n}", paperId="B5", source="candidate") for n, raw in enumerate(SMOKE_RAWS)]
+            k, counts = rageval.build_k(items, passages.read_index(), {"titer_secreted": "Secreted titer", "time_to_colony": "Time to colony"}, {})
+            infos = [
+                rageval.RagSetInfo(name="K", questions=len(k), note=f"known items: {counts['records']} records and {counts['candidates']} anchored candidates whose quote sits in a passage (stand-in)"),
+                rageval.RagSetInfo(name="S", questions=0, note="written questions: none in the stand-in"),
+                rageval.RagSetInfo(name="F", questions=0, note="flows: none in the stand-in"),
+            ]
+            report = rageval.evaluate(sets={"K": k, "S": [], "F": []}, infos=infos, lanes=retrieve.LANES)
+        finally:
+            _intake.DATA_DIR, _intake.FULLTEXT_DIR, passages._LOADED, passages._papers_meta = saved
+            if key is not None:
+                os.environ["ANTHROPIC_API_KEY"] = key
+    report.date = AT
+    for lane in report.lanes:
+        for m in lane.sets.values():
+            m.medianSeconds = 0.0
+    return {
+        "rag-status.json": status.model_dump(mode="json"),
+        "rag-search.json": search.model_dump(mode="json"),
+        "rag-report.json": report.model_dump(mode="json"),
+    }
 
 
 def main(argv: list[str]) -> int:

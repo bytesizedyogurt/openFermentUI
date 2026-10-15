@@ -324,6 +324,14 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     component: 'Witness',
   },
   {
+    label: 'Search',
+    to: '/biorepo/search',
+    descriptor: "the papers' own words, searched",
+    aliases: ['search', 'passages', 'full text search', 'find in papers'],
+    icon: LibraryIcon,
+    owner: 'BioRepo',
+  },
+  {
     label: 'Artifacts',
     to: '/biorepo/artifacts',
     descriptor: 'what was computed, and from what',

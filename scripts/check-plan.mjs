@@ -137,6 +137,9 @@ const PAIRS = [
   ['RagLaneReport', 'RagLaneReport'],
   ['RagSetInfo', 'RagSetInfo'],
   ['RagReport', 'RagReport'],
+  // OF-BLD-014 §4.4 — search from the browser.
+  ['RagSearchRequest', 'RagSearchRequest'],
+  ['RagSearchResponse', 'RagSearchResponse'],
 ];
 
 let compared = 0;

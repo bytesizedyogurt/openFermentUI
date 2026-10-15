@@ -105,12 +105,18 @@ export default function PaperReader({
   paperId,
   spanId,
   sectionId,
+  quote,
 }: {
   paperId: string;
   /** A record to select and scroll to. */
   spanId?: string;
   /** A section to scroll to — the review card's link to where the extractor read (OF-BLD-012 §7.3). */
   sectionId?: string;
+  /**
+   * A sentence to find in that section and mark — BioRepo search's link to a
+   * passage (OF-BLD-014 §4.4). Found the way span location finds a quote.
+   */
+  quote?: string;
 }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
@@ -130,6 +136,7 @@ export default function PaperReader({
   const [pulseId, setPulseId] = useState<string | null>(null);
 
   const spanRefs = useRef<Record<string, HTMLElement | null>>({});
+  const quoteRef = useRef<HTMLElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -187,14 +194,29 @@ export default function PaperReader({
       });
   }, [paper, recs, sectionSpans]);
 
+  // Deep link to a sentence (OF-BLD-014 §4.4): where it sits in its section,
+  // or null when the section's text does not hold it.
+  const quoted = useMemo(() => {
+    if (!quote || !sectionId || !paper) return null;
+    const section = paper.sections.find((s) => s.id === sectionId);
+    if (!section) return null;
+    return locateQuote(section.text, quote);
+  }, [quote, sectionId, paper]);
+
+  useEffect(() => {
+    if (!quoted || !ready) return;
+    const t = window.setTimeout(() => quoteRef.current?.scrollIntoView({ behavior, block: 'center' }), 60);
+    return () => window.clearTimeout(t);
+  }, [quoted, ready, behavior]);
+
   // Deep link to a section: scroll to its heading, nothing selected.
   useEffect(() => {
-    if (!sectionId || spanId || !ready) return;
+    if (!sectionId || spanId || quoted || !ready) return;
     const t = window.setTimeout(() => {
       sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [sectionId, spanId, ready, behavior]);
+  }, [sectionId, spanId, quoted, ready, behavior]);
 
   // Deep link: select, scroll into view, pulse once.
   useEffect(() => {
@@ -287,6 +309,33 @@ export default function PaperReader({
   const totalChars = paper.sections.reduce((n, s) => n + s.text.length, 0) || 1;
 
   // ── left pane ────────────────────────────────────────────────────────
+  /**
+   * A section's text with the searched sentence marked. Record spans that
+   * overlap it stay in the rail and are not drawn inside it; the rest draw
+   * as usual on either side.
+   */
+  const renderWithQuote = (text: string, spans: Span[], q: { start: number; end: number }): ReactNode => {
+    const before = spans.filter((sp) => sp.end <= q.start);
+    const after = spans
+      .filter((sp) => sp.start >= q.end)
+      .map((sp) => ({ ...sp, start: sp.start - q.end, end: sp.end - q.end }));
+    return [
+      <span key="before">{renderWithSpans(text.slice(0, q.start), before)}</span>,
+      <mark
+        key="quote"
+        ref={(el) => {
+          quoteRef.current = el;
+        }}
+        data-testid="quote-mark"
+        className="span-active"
+        title="The sentence the search found"
+      >
+        {text.slice(q.start, q.end)}
+      </mark>,
+      <span key="after">{renderWithSpans(text.slice(q.end), after)}</span>,
+    ];
+  };
+
   const renderWithSpans = (text: string, spans: Span[]): ReactNode => {
     if (spans.length === 0) return text;
     const out: ReactNode[] = [];
@@ -508,6 +557,13 @@ export default function PaperReader({
             </section>
           )}
 
+          {quote && sectionId && !paper.sections.some((s) => s.id === sectionId) && (
+            <p className="mt-4 text-caption text-signal-warn" data-testid="quote-missing">
+              The passage from the search is in section {sectionId} of the fetched text, which this
+              reader does not hold{fullText ? '' : ': it shows the curator\u2019s note in its place'}.
+              Fetch the paper in Intake to read it here.
+            </p>
+          )}
           {parseFailed ? (
             <section className="mt-4">
               <h2 className="font-serif text-section-title font-semibold mb-1">
@@ -533,9 +589,17 @@ export default function PaperReader({
                 className="mt-6 scroll-mt-4"
               >
                 <h2 className="font-serif text-section-title font-semibold mb-1">{s.heading}</h2>
+                {quote && s.id === sectionId && !quoted && (
+                  <p className="text-caption text-signal-warn mb-1" data-testid="quote-missing">
+                    The sentence from the search is not in this section&rsquo;s text as shown here. The
+                    section is open at its heading.
+                  </p>
+                )}
                 <div className="prose-reading">
                   <p style={{ whiteSpace: 'pre-line' }}>
-                    {renderWithSpans(s.text, sectionSpans.get(s.id) ?? [])}
+                    {quoted && s.id === sectionId
+                      ? renderWithQuote(s.text, sectionSpans.get(s.id) ?? [], quoted)
+                      : renderWithSpans(s.text, sectionSpans.get(s.id) ?? [])}
                   </p>
                 </div>
               </section>

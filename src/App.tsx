@@ -39,6 +39,7 @@ import GuildChecks from '@/screens/GuildChecks';
 import BenchCheck from '@/screens/BenchCheck';
 import Witness from '@/screens/Witness';
 import BioRepoArtifacts from '@/screens/BioRepoArtifacts';
+import BioRepoSearch from '@/screens/BioRepoSearch';
 import Organisms from '@/screens/Organisms';
 import StrainPage from '@/screens/StrainPage';
 import Molecules from '@/screens/Molecules';
@@ -110,11 +111,13 @@ function Screen() {
             paperId={c}
             spanId={route.query.get('span') ?? undefined}
             sectionId={route.query.get('section') ?? undefined}
+            quote={route.query.get('quote') ?? undefined}
           />
         );
       if (b === 'compare') return <Compare />;
       if (b === 'witness') return <Witness />;
-      // 'artifacts' is a reserved second segment (OF-BLD-014 E.3).
+      // 'search' and 'artifacts' are reserved second segments (OF-BLD-014 E.3).
+      if (b === 'search') return <BioRepoSearch />;
       if (b === 'artifacts') return <BioRepoArtifacts artifactId={c} />;
       return <BioRepo />;
     case 'postdoc':
