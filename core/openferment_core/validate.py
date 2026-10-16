@@ -92,6 +92,29 @@ _MAGNITUDE = re.compile(
 # to catch it would start admitting real quantities.
 _IDENTIFIER = re.compile(r"(?<![0-9.])[A-Za-z][A-Za-z]*(?:[-\u2013][A-Za-z]*)*\d[A-Za-z0-9-]*")
 
+# Chemistry names lead with a digit and are names all the same, so they are
+# blanked like identifiers (live test, 2026-10-16). Three forms, each held to
+# its own shape so that a quantity cannot pass as one:
+#   a monomer abbreviation: a locant, H, then a capital \u2014 3HB, 3HV, 4HB, 3HHx,
+#     inside a polymer name or not, as in P(3HB-co-3HV);
+#   a glycosidic linkage: \u03b1 or \u03b2, then two positions \u2014 \u03b12,6, \u03b21,4, \u03b1-2,3,
+#     \u03b2(1\u21924);
+#   the locants of a compound name: positions and a hyphen, then a chemistry
+#     morpheme from a closed list \u2014 4-hydroxybenzoic, 2,3-butanediol,
+#     poly(3-hydroxybutyrate). "10-mL" and "12-fold" are not in the list, so
+#     they still trip the rule.
+_LOCANT_MORPHEMES = (
+    "hydroxy methoxy ethoxy methyl ethyl propyl butyl amino keto oxo chloro "
+    "fluoro bromo iodo nitro phospho sulfo deoxy dehydro dihydro carboxy "
+    "acetyl mercapto propane butane pentane hexane heptane octane propene "
+    "butene pentene hexene"
+).split()
+_CHEMISTRY = re.compile(
+    r"(?<![\w.])\d{1,2}H[A-Z][a-z]?(?![A-Za-z0-9])"
+    r"|[\u03b1\u03b2]\s?-?\(?\d\s?(?:,|\u2192|->|-)\s?\d\)?(?!\d)"
+    r"|(?<![\w.])\d{1,2}(?:,\d{1,2})*-(?=(?i:" + "|".join(_LOCANT_MORPHEMES) + r"))",
+)
+
 
 def find_number(text: str) -> str | None:
     """The first number-like thing in the text, or None.
@@ -102,7 +125,10 @@ def find_number(text: str) -> str | None:
     """
     # Blank rather than delete, so the remaining spans keep their boundaries and
     # a word-numeral straddling an identifier cannot be created by the removal.
-    masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), text)
+    # Chemistry names first: an identifier span can start inside one
+    # ("HB-co-3HV" in P(3HB-co-3HV)) and strand its leading locant.
+    masked = _CHEMISTRY.sub(lambda m: " " * len(m.group(0)), text)
+    masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
     if m := _DIGIT.search(masked):
         return m.group(0)
     if m := _WORD_NUMBER.search(masked):
