@@ -1,0 +1,333 @@
+{
+  "question": "Which organisms have been shown to make PHB from hydrolysates that contain xylose, and what feedstock did each study use?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Recombinant Ralstonia eutropha NCIMB11599 expressing the E. coli xylAB genes produced PHB from a sunflower stalk hydrolysate, which the study describes as containing glucose, xylose, and smaller amounts of galactose and mannose.",
+      "recordIds": [],
+      "paperIds": [
+        "P6"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P6:abstract:3",
+          "quote": "Finally, recombinant R. eutorpha NCIMB11599 expressing the E. coli xylAB gene was examined for the production of P(3HB) from the hydrolysate solution of sunflower stalk."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "Cupriavidus necator was reported to accumulate PHB from a bagasse hydrolysate at low inhibitor concentrations. The passage does not state the xylose content of that hydrolysate.",
+      "recordIds": [],
+      "paperIds": [
+        "P9"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P9:s1:3",
+          "quote": "For instance, Yu and Stahl found that Cupriavidus necator can accumulate to 57% of dry cell weight (DCW) from bagasse hydrolysate in the presence of low inhibitor concentrations."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "Halomonas boliviensis produced PHB from a bakery waste hydrolysate in batch and fed-batch culture, and the hydrolysate's reported sugars were glucose and fructose; xylose appears in the paper only in a defined-medium comparison.",
+      "recordIds": [],
+      "paperIds": [
+        "P34"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P34:s17:7",
+          "quote": "Apart from glucose, fructose was found in hydrolysates by the hydrolysis of sucrose in cake rich bakery wastes."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "Cupriavidus necator strain A-04 was grown on pineapple peel and core hydrolysates for PHB production, where glucose was the major sugar released by acid hydrolysis; xylose was not established as a component in the passages retrieved.",
+      "recordIds": [],
+      "paperIds": [
+        "P9"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P9:s5:1",
+          "quote": "Glucose was the major product in all the cases."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c7",
+      "text": "In a Cupriavidus necator study, a mock sugar medium containing xylose supported growth, but the real deacetylated saccharified corn stover slurry completely inhibited growth. The passages retrieved report growth only, not PHB production.",
+      "recordIds": [],
+      "paperIds": [
+        "P25"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P25:s10:0",
+          "quote": "Cupriavidus necator did not grow in the original deacetylated saccharified slurry (Figure 1A) even in the 2-fold diluted saccharified slurry (Figure 1B) though it was able to grow in media containing the mock slurry."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "The record database returned no records for any query, so every claim rests on passage text only; no structured PHB titre, content, or yield values were retrievable for any study.",
+    "The xylose content of the bagasse hydrolysate used with Cupriavidus necator (Yu and Stahl) is not stated in the retrieved text.",
+    "Whether the pineapple hydrolysates in the Cupriavidus necator A-04 study contain any xylose, and whether PHB was measured on them, is not established by the passages retrieved.",
+    "The Halomonas boliviensis bakery-waste study lists xylose only in a defined-medium comparison; xylose in the hydrolysate itself was not confirmed.",
+    "No passage retrieved reports the xylose-containing hydrolysate PHB titre, content or yield for the Ralstonia eutropha xylAB strain beyond the abstract; the full-text results were seen only in passage fragments."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 16,
+    "outputTokens": 6520,
+    "cacheReadTokens": 65584,
+    "cacheWriteTokens": 22764,
+    "costUsd": 0.006763,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c2: claim text contains a number ('1') — values come from the record",
+    "c3: claim text contains a number ('1') — values come from the record",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P25:s10:0",
+      "paperId": "P25",
+      "sectionId": "s10",
+      "heading": "Results and discussions › Growth kinetics of C. necator in the saccharified slurry",
+      "kind": "prose",
+      "text": "Cupriavidus necator did not grow in the original deacetylated saccharified slurry (Figure 1A) even in the 2-fold diluted saccharified slurry (Figure 1B) though it was able to grow in media containing the mock slurry. The sugars provided by the mock slurry allowed C. necator for superior growth over the LB alone in both 1-fold concentration and 2-fold dilution conditions with fast growth and high final OD600nm value. This complete inhibition of growth in real slury suggests that C. necator is not tolerant to the combination of all toxic compounds present in the saccharified slurry.",
+      "start": 0,
+      "end": 587
+    },
+    {
+      "id": "P34:s17:7",
+      "paperId": "P34",
+      "sectionId": "s17",
+      "heading": "3. Results and Discussion › 3.2. Investigation of Bakery Waste Hydrolysis",
+      "kind": "prose",
+      "text": "A medium consisting of 200 g L−1 glucose, but only 100 mg L−1 FAN would facilitate PHB accumulation during fed-batch phase. At the same time, due to its high glucose concentration, the dilution effect due to increasing fermentation broth volume during fed-batch cultivation can be minimized. Apart from glucose, fructose was found in hydrolysates by the hydrolysis of sucrose in cake rich bakery wastes. Although the yields of fructose were 7 to 10 times lower compared to the yields of glucose (Table 3), it was utilized by Halomonas boliviensis and contributed to cell growth and PHB formation (Figure 1(b)). Table 3 shows that similar yields of glucose, fructose, and FAN were obtained when hydrolysis was carried out using commercial glucoamylase in seawater as solvent instead of tap water. ",
+      "start": 4362,
+      "end": 5158
+    },
+    {
+      "id": "P6:abstract:3",
+      "paperId": "P6",
+      "sectionId": "abstract",
+      "heading": "Abstract",
+      "kind": "abstract",
+      "text": "The concentration of xylose could be maintained as high as 6 g/L, which is similar to the initial concentration of xylose during the fed-batch fermentation suggesting that xylose consumption is not inhibited during fermentation. Finally, recombinant R. eutorpha NCIMB11599 expressing the E. coli xylAB gene was examined for the production of P(3HB) from the hydrolysate solution of sunflower stalk. The hydrolysate solution of sunflower stalk was prepared as a model lignocellulosic biomass, which contains 78.8 g/L of glucose, 26.9 g/L of xylose, and small amount of 4.8 g/L of galactose and mannose. ",
+      "start": 1938,
+      "end": 2540
+    },
+    {
+      "id": "P9:s1:3",
+      "paperId": "P9",
+      "sectionId": "s1",
+      "heading": "Background",
+      "kind": "prose",
+      "text": "Several studies have investigated the production of PHAs from cellulose biomass hydrolysate by a variety of microorganisms, including recombinant Escherichia coli. The direct use of hydrolysates of hemicelluloses as a mixture of sugars for PHA production without the removal of inhibitors has also been explored. For instance, Yu and Stahl found that Cupriavidus necator can accumulate to 57% of dry cell weight (DCW) from bagasse hydrolysate in the presence of low inhibitor concentrations. ",
+      "start": 2015,
+      "end": 2507
+    },
+    {
+      "id": "P9:s5:1",
+      "paperId": "P9",
+      "sectionId": "s5",
+      "heading": "Results and discussion › Effects of types and concentrations of acids on the yield of sugars and inhibitors",
+      "kind": "prose",
+      "text": "In addition, Fig. 3c illustrates the inhibitor composition resulting from the hydrolysis of pineapple core with 1, 1.5, 2, 2.5, and 3% (v/v) H2SO4, and Fig. 3d presents the inhibitor composition obtained from the hydrolysis of pineapple core with 1, 1.5, 2, 2.5, and 3% (v/v) H3PO4. For comparison, Fig. 4a presents the sugar composition obtained by the hydrolysis of pineapple peel with 1, 1.5, 2, 2.5, and 3% (v/v) H2SO4, whereas the sugar composition obtained after the hydrolysis of pineapple peel with 1, 1.5, 2, 2.5, and 3% (v/v) H3PO4 is shown in Fig. 4b. Figure 4c reveals the inhibitor composition resulting from the hydrolysis of pineapple peel with 1, 1.5, 2, 2.5, and 3% (v/v) H2SO4, and Fig. 4d shows the inhibitor composition after the hydrolysis of pineapple peel with 1, 1.5, 2, 2.5, and 3% (v/v) H3PO4. Glucose was the major product in all the cases. ",
+      "start": 403,
+      "end": 1271
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production from xylose hydrolysate lignocellulosic feedstock",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "polyhydroxybutyrate from xylose hydrolysate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"polyhydroxybutyrate from xylose hydrolysate\" · 6 passages",
+      "ms": 815,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB accumulation hydrolysate xylose",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "hemicellulose hydrolysate Paraburkholderia sacchari PHB",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"hemicellulose hydrolysate Paraburkholderia sacchari PHB\" · 4 passages",
+      "ms": 62,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "sunflower stalk hydrolysate P(3HB) recombinant xylAB",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"sunflower stalk hydrolysate P(3HB) recombinant xylAB\" · 4 passages",
+      "ms": 23,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "bagasse hydrolysate Cupriavidus necator PHB",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"bagasse hydrolysate Cupriavidus necator PHB\" · 4 passages",
+      "ms": 18,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "pineapple hydrolysate xylose sugar composition",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"pineapple hydrolysate xylose sugar composition\" · 4 passages",
+      "ms": 22,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "bakery waste hydrolysate sugars xylose glucose fructose composition",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"bakery waste hydrolysate sugars xylose glucose fructose composition\" · 4 passages",
+      "ms": 25,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "hardwood hydrolysate xylose acetate high cell density Paraburkholderia",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"hardwood hydrolysate xylose acetate high cell density Paraburkholderia\" · 4 passages",
+      "ms": 22,
+      "ok": true
+    },
+    {
+      "n": 10,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 11,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "hydrolysate",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 12,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "mock saccharified hydrolysate PHB production Cupriavidus necator lignin degradation",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"mock saccharified hydrolysate PHB production Cupriavidus necator lignin degradation\" · 4 passages",
+      "ms": 40,
+      "ok": true
+    },
+    {
+      "n": 13,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "calls",
+  "runbookDraft": null
+}

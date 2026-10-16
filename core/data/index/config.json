@@ -1,10 +1,10 @@
 {
-  "lane": "bm25",
-  "chosenAt": "2026-10-15T03:48:20Z",
+  "lane": "hybrid",
+  "chosenAt": "2026-10-16T05:31:48Z",
   "scores": {
-    "bm25": 0.3945,
+    "bm25": 0.4265,
     "bm25+expand": null,
-    "hybrid": 0.1667,
+    "hybrid": 0.4309,
     "bm25+rerank": null,
     "hybrid+rerank": null
   },

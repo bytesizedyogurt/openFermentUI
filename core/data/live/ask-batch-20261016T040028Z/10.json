@@ -1,0 +1,206 @@
+{
+  "question": "Draft a first shake-flask run to test PHB production from a mixed glucose and xylose medium.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The closest measured mixed-sugar PHA result is an mcl-PHA titre at harvest from a reconstituted Pseudomonas putida–E. coli consortium fed an equal glucose and xylose mixture in shake-flask culture, not PHB from a single strain.",
+      "recordIds": [
+        "cl1-P35-7f699adc"
+      ],
+      "paperIds": [
+        "P35"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P35:s18:2",
+          "quote": "The microbial consortium consisting of these above two engineered bacteria had good interspecies communication, and the consortium could efficiently produce an mcl-PHA titer of 1.64 g/L using a mixed carbon source consisting of 10 g/L glucose and 10 g/L xylose."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "In the engineered E. coli consortium on mixed glucose and xylose, glucose was consumed well before xylose, and raising the nitrogen source concentration delayed xylose depletion while increasing mcl-PHA accumulation.",
+      "recordIds": [],
+      "paperIds": [
+        "P35"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P35:s16:7",
+          "quote": "As shown in Figure 5C, glucose was rapidly depleted as before, but the increase of nitrogen source caused xylose to be depleted at 52 h of fermentation."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "In a Saccharomyces cerevisiae strain engineered with the C. necator PHB pathway and grown on xylose alone in shake flasks, PHB titre at harvest was low, PHB yield per xylose consumed was low, and acetate accumulated strongly.",
+      "recordIds": [
+        "cl1-P27-773555fb",
+        "cl1-P27-34de290a"
+      ],
+      "paperIds": [
+        "P27"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P27:s11:3",
+          "quote": "In contrast, unusually high NADP+-catalyzed acetate levels were observed in the shake flask experiments."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "No record in the corpus reports PHB (as opposed to mcl-PHA or PHA) titre from a glucose and xylose mixture in shake-flask culture for a single PHB-producing strain.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No record gives a PHB titre, PHB content or yield from a mixed glucose and xylose medium in shake flasks for a single strain; the closest hit is an mcl-PHA consortium result.",
+    "The xylose ceiling from the central-carbon E. coli core model could not be computed because that model has no xylose uptake reaction; the tool returned a finding without an evidence id, so no ceiling can be cited. The genome-scale models (iJO1366, RehMBEL1391) were not run for xylose.",
+    "All matched records are unverified curation notes, not checked against the source papers' tables or figures.",
+    "The user has not named a host strain, so no strain-specific record or runbook item can be matched. The records mostly concern E. coli, yeast, P. putida or C. necator, with differing pathways.",
+    "Medium composition details (sugar ratio, nitrogen source and concentration, phosphate, pH control, flask volume, temperature, sampling schedule) are not specified and are not in the corpus for this combination."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 4038,
+    "cacheReadTokens": 15294,
+    "cacheWriteTokens": 15465,
+    "costUsd": 0.004106,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: a quote that is not a whole sentence or row of P27:s11:2",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P27:s11:3",
+      "paperId": "P27",
+      "sectionId": "s11",
+      "heading": "Discussion",
+      "kind": "prose",
+      "text": "In contrast, unusually high NADP+-catalyzed acetate levels were observed in the shake flask experiments. In that case, the limited respiration may trigger higher availability of acetaldehyde precursor; this, combined with the need for additional routes for NADPH generation for biomass synthesis and for xylose utilization via the NAD(P)H-dependent xylose reductase, could explain the dramatic increase in acetate production. It may also explain why xylose consumption stopped before completion as pH decreased over time (data not shown). The accumulation of acetate also indicates that, under these conditions, PHB generation may rather be controlled by reactions downstream of acetate (Figure 4). ",
+      "start": 1697,
+      "end": 2396
+    },
+    {
+      "id": "P35:s16:7",
+      "paperId": "P35",
+      "sectionId": "s16",
+      "heading": "3 Results and discussion › 3.3 Reconstruction and optimization of the artificial microbial consortium using mixed sugars",
+      "kind": "prose",
+      "text": "In order to further improve the utilization of xylose by the engineered E. coli, the nitrogen source concentration had to be increased, but nitrogen source limitation promotes the accumulation of mcl-PHA, so exploring the appropriate nitrogen source concentration to achieve a balance between the two engineered bacteria is crucial for the production of mcl-PHA. We therefore increased the concentration of the nitrogen source (NH4Cl) to 3 g/L, while using glucose and xylose at a 1:1 ratio as the carbon source. As shown in Figure 5C, glucose was rapidly depleted as before, but the increase of nitrogen source caused xylose to be depleted at 52 h of fermentation. In addition, the two-species consortium accumulated more mcl-PHA under these conditions. As shown in Figure 5B, the mcl-PHA titer reached 1.64 g/L, which was 26.15% higher than before. ",
+      "start": 3787,
+      "end": 4638
+    },
+    {
+      "id": "P35:s18:2",
+      "paperId": "P35",
+      "sectionId": "s18",
+      "heading": "4 Conclusion",
+      "kind": "prose",
+      "text": "The microbial consortium consisting of these above two engineered bacteria had good interspecies communication, and the consortium could efficiently produce an mcl-PHA titer of 1.64 g/L using a mixed carbon source consisting of 10 g/L glucose and 10 g/L xylose. Furthermore, the consortium could accumulate 1.02 g/L of mcl-PHA using lignocellulosic hydrolysate containing 10.50 g/L glucose and 10.21 g/L xylose, which had a competitive advantage (Table 2). In all, the successful reconstruction of the microbial consortium based on the concept of “nutrient supply-detoxification” can be used as a basis for further process development to produce high value-added compounds such as mcl-PHA from lignocellulosic biomass.",
+      "start": 977,
+      "end": 1695
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production glucose xylose mixed medium shake flask",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB production glucose xylose mixed medium shake flask · 10 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB xylose glucose co-utilization shake flask",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB xylose glucose co-utilization shake flask\" · 6 passages",
+      "ms": 32,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "e_coli_core",
+        "product": "phb",
+        "substrate": "xylose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 32,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "mixed carbon source glucose and xylose PHA titer consortium",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"mixed carbon source glucose and xylose PHA titer consortium\" · 4 passages",
+      "ms": 28,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHA titre glucose xylose mixed carbon Cupriavidus necator Pseudomonas putida",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of PHA titre glucose xylose mixed carbon Cupriavidus necator Pseudomonas putida · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

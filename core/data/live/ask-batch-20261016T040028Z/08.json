@@ -1,0 +1,190 @@
+{
+  "question": "What would PHB cost per kilogram at the titres and yields reported so far?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Theoretical maximum PHB yield from glucose in the E. coli K-12 core central-carbon model with an added PHB route, from flux balance analysis, with no time axis or vessel",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-207a9865f4a8c578"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Reported PHA content in Cupriavidus necator strain A-04 on crude pineapple residue extract, at the highest-content condition, from a curation note that is not yet verified",
+      "recordIds": [
+        "cl1-P9-eef8ed6e"
+      ],
+      "paperIds": [
+        "P9"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No minimum selling price run exists for PHB. selling_price refused for scenario sc-pha-1 because no run exists. The inputs still waiting for a source are PHA yield on sugar, PHA volumetric productivity, solids recovered at harvest, price of fermentable sugar, and sugar fed. A person must run the scenario in Proforma with those inputs sourced.",
+    "No verified, paired PHB titre and yield on a single strain and sugar feed exists in the corpus. The PHA records found are curation notes marked unverified, and they come from different strains and feedstocks (bakery waste hydrolysate, pineapple residue extract).",
+    "No sugar price, downstream recovery or solids-recovery figure is in the corpus, so no cost per kilogram can be derived from the records."
+  ],
+  "declined": "Cost per kilogram of PHB cannot be established. The corpus has no completed techno-economic run and no verified titre and yield set for one strain and feed, so the requested cost figure has no support.",
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 1556,
+    "cacheReadTokens": 10164,
+    "cacheWriteTokens": 8254,
+    "costUsd": 0.001912,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [
+    {
+      "id": "ev-207a9865f4a8c578",
+      "label": "most PHB from glucose, E. coli K-12 central metabolism (core model) (central carbon)",
+      "value": 0.47786362929905185,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "E. coli K-12 central metabolism (core model)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "e_coli_core",
+              "note": "bundled with cobra as textbook (BiGG Models, bundled with cobra 0.32.1)",
+              "by": null
+            }
+          },
+          {
+            "name": "add-on",
+            "value": "phaCAB",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "RehMBEL1391",
+              "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "phb",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "207a9865f4a8c578",
+        "at": "2026-10-16T04:00:10Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB titre yield production",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "sc-pha-1"
+      },
+      "summary": "selling_price refused: selling_price refused: no run of sc-pha-1 exists; inputs still waiting for a source: PHA yield on sugar, PHA volumetric productivity, solids recovered at harves",
+      "ms": 15,
+      "ok": false
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "polyhydroxybutyrate",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of polyhydroxybutyrate · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "e_coli_core",
+        "product": "phb",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 22,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 2 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

@@ -1,0 +1,318 @@
+{
+  "question": "Which inhibitors in lignocellulosic hydrolysates have been reported to slow PHA producers, and what detoxification steps were tried?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Review-level reporting that fermentation inhibitors generated during hydrolysis of lignocellulosic biomass can hinder cell growth and PHB accumulation in Cupriavidus necator, with furfural, hydroxymethylfurfural and acetic acid named as the typical inhibitors.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s14:3",
+          "quote": "Nevertheless, the fermentation inhibitors generated in the hydrolysis process of lignocellulosic biomass could hinder microbial cell growth and PHB accumulation."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "Relative toxicity to Cupriavidus necator of hydrolysate-derived compounds, with aldehydes (furfural and hydroxymethylfurfural) reported as more toxic than acetate and lignin-derived aromatics, and furfural identified as the most toxic compound.",
+      "recordIds": [],
+      "paperIds": [
+        "P25"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P25:abstract:1",
+          "quote": "Aldehydes (e.g., furfural and HMF) were more toxic than the acetate and the lignin degradation products benzoic acid and p-coumaric acid; furfural was identified as the most toxic compound."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "Ammonium acetate, benzoic acid and p-coumaric acid were toxic to Cupriavidus necator at high concentration but could also be used by the organism with a growth-stimulating effect at lower levels.",
+      "recordIds": [],
+      "paperIds": [
+        "P25"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P25:abstract:1",
+          "quote": "Although toxic to C. necator at high concentration, ammonium acetate, benzoic acid, and p-coumaric acid could be utilized by C. necator with a stimulating effect on C. necator growth."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "In a spruce sawdust hydrolysate used for PHB production, the reported inhibitors were polyphenols, furfural, acetic acid and levulinic acid, with polyphenols attributed to partial lignin degradation during acid hydrolysis.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:1",
+          "quote": "Polyphenols are likely to be released from waste wood biomass during the partial degradation of lignin by acid hydrolysis."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "Overliming and activated charcoal detoxification of a spruce sawdust hydrolysate both lowered polyphenol concentration, and all tested detoxification methods improved biomass growth and PHB production relative to untreated hydrolysate.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:5",
+          "quote": "It is evident that both detoxification techniques significantly reduce the concentration of polyphenols in hydrolysates."
+        },
+        {
+          "passageId": "P21:abstract:1",
+          "quote": "All methods of detoxification had a positive influence on the growth of biomass and PHB production."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "Lignite was tested as a lower-cost sorbent for hydrolysate detoxification in PHB production: it removed inhibitors less completely than activated charcoal but gave overall PHB yields comparable to activated charcoal and a greater positive effect on culture growth and overall PHA productivity.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:abstract:1",
+          "quote": "Detoxification using lignite instead of activated carbon had lower inhibitor removal efficiency, but greater positive impact on growth of the bacterial culture and overall PHA productivity."
+        },
+        {
+          "passageId": "P21:s7:11",
+          "quote": "However, lignite is comparable with activated charcoal, considering the overall yields of PHB."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c9",
+      "text": "The extremely halophilic archaeon Halogeometricum borinquense strain E3 grew and accumulated PHA on crude sugarcane bagasse hydrolysate without any prior removal of inhibitors, whereas the same organism failed to make polymer on a hydrolysate lacking glucose.",
+      "recordIds": [],
+      "paperIds": [
+        "P11"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P11:s20:7",
+          "quote": "Interestingly, in the present study, isolate Hgm. borinquense strain E3 was able to grow and synthesize PHA [P(3HB-co-3HV)] from crude SCB hydrolysate without any supplementation of carbon substrate (glucose) or prior treatment of the SCB hydrolysate for the removal of inhibitors."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No curated records were returned for hydrolysate inhibitors, detoxification or PHA titre, so none of the comparisons above are backed by a measured value in the platform; the claims rest on passage text only.",
+    "No quantitative inhibitor concentrations versus PHA titre or yield for the detoxified and undetoxified arms were retrieved; the detoxification comparisons need the tables or figures of the spruce sawdust study (P21) and the pineapple study (P9).",
+    "Detoxification steps other than overliming, activated charcoal and lignite (for example ion exchange, evaporation, or enzymatic detoxification) were not found in the corpus for PHA producers.",
+    "Whether the strain-adaptation approach has been tested with PHA producers on real hydrolysates is not established; the sources only propose it.",
+    "The inhibitor sensitivity data for Cupriavidus necator (P25) come from a pretreatment slurry model, not a full hydrolysate, and the thresholds at which each compound slows growth in PHA producers were not retrieved."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 6360,
+    "cacheReadTokens": 14914,
+    "cacheWriteTokens": 15791,
+    "costUsd": 0.005304,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 3,
+  "rejectionReasons": [
+    "c7: a quote of P32:s10:1 longer than 300 characters",
+    "c8: claim text contains a number ('one') — values come from the record",
+    "c10: a quote of P35:s16:1 longer than 300 characters"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P10:s14:3",
+      "paperId": "P10",
+      "sectionId": "s14",
+      "heading": "Challenges and Future Prospects",
+      "kind": "prose",
+      "text": "Nevertheless, the fermentation inhibitors generated in the hydrolysis process of lignocellulosic biomass could hinder microbial cell growth and PHB accumulation. To solve this issue, more research can be done to develop novel C. necator strains with the ability to tolerate the typical inhibitors (i.e., furfural, 5-hydroxymethylfurfural, and acetic acid) in the hydrolysate of lignocellulosic materials. Notably, strain adaptive evolution for tolerating inhibitors coupled with selection can be a promising approach. Moreover, genetic manipulation of C. necator has been widely studied. Currently, it focuses on improving PHB production efficiency and broadening the utilizable substrate range. However, the production of by-products is another common problem in PHB production. ",
+      "start": 1841,
+      "end": 2621
+    },
+    {
+      "id": "P11:s20:7",
+      "paperId": "P11",
+      "sectionId": "s20",
+      "heading": "3. Results and Discussion › 3.6. Polymer Characterization › 3.6.5. 1H-NMR Analysis",
+      "kind": "prose",
+      "text": "However, the bacterium failed to synthesize the polymer when grown in a hydrolysate solution devoid of glucose and was also unable to utilize pentose sugars like xylose and arabinose as a sole source of carbon. Interestingly, in the present study, isolate Hgm. borinquense strain E3 was able to grow and synthesize PHA [P(3HB-co-3HV)] from crude SCB hydrolysate without any supplementation of carbon substrate (glucose) or prior treatment of the SCB hydrolysate for the removal of inhibitors. The strain E3 was also able to utilize arabinose and xylose when supplied as the sole source of carbon. Further studies should be done to investigate the cell and polymer yield after pre-treatment of the SCB hydrolysate to remove toxic substances. Also, the effect of glucose or other carbon substrates as supplements to SCB hydrolysate could be investigated with respect to increasing the PHA yield.",
+      "start": 3885,
+      "end": 4778
+    },
+    {
+      "id": "P21:abstract:1",
+      "paperId": "P21",
+      "sectionId": "abstract",
+      "heading": "Abstract",
+      "kind": "abstract",
+      "text": "All methods of detoxification had a positive influence on the growth of biomass and PHB production. Furthermore, lignite was identified as a promising alternative sorbent which can be used for detoxification of lignocellulose hydrolyzates. Detoxification using lignite instead of activated carbon had lower inhibitor removal efficiency, but greater positive impact on growth of the bacterial culture and overall PHA productivity. Moreover, lignite is a significantly less expensive adsorbent in comparison with activated charcoal and; moreover, used lignite can be simply utilized as a fuel to, at least partially, cover heat and energetic demands of fermentation, which should improve the economic feasibility of the process.",
+      "start": 818,
+      "end": 1544
+    },
+    {
+      "id": "P21:s7:1",
+      "paperId": "P21",
+      "sectionId": "s7",
+      "heading": "3. Results and Discussion",
+      "kind": "prose",
+      "text": "The only identified saccharides in WH are xylose (10.4 g L−1) and glucose (4.5 g L−1). Unfortunately, WH contains high concentrations of inhibiting substances such as polyphenols (1205 mg L−1), furfural (52.0 mg L−1), acetic acid (0.53 mg L−1), and levulinic acid (9.9 mg L−1). Polyphenols are likely to be released from waste wood biomass during the partial degradation of lignin by acid hydrolysis. Furfural is formed by degradation of reducing sugars at high pressure and low pH. Levulinic acid, the degradation product of furfural or 5-hydroxymethylfurfural, is formed in the same manner. Acetic acid is probably formed by deesterification of acetylated wood components. Moreover, the amount of ash is significant, which is a consequence of the application of sulfuric acid and subsequent neutralization by NaOH. ",
+      "start": 810,
+      "end": 1627
+    },
+    {
+      "id": "P21:s7:11",
+      "paperId": "P21",
+      "sectionId": "s7",
+      "heading": "3. Results and Discussion",
+      "kind": "prose",
+      "text": "However, lignite is comparable with activated charcoal, considering the overall yields of PHB. B. Sacchari reached markedly higher yields. These surprisingly higher yields obtained by replacing active carbon with lignite should be explained and our further experiments will be focused in this direction. We assume that, during the detoxification, lignite released substances that had a positive effect on the growth of soil bacteria. Lignite is a complex material compared to activated carbon which contains only carbon. Therefore, use of lignite could have an enriching effect on the composition of the production medium. This interesting and surprising feature could also be used in other biotechnological processes in which soil originating microorganisms are employed.",
+      "start": 7671,
+      "end": 8443
+    },
+    {
+      "id": "P21:s7:5",
+      "paperId": "P21",
+      "sectionId": "s7",
+      "heading": "3. Results and Discussion",
+      "kind": "prose",
+      "text": "In the first phase, we compared two common detoxification procedures—separation by adsorption inhibitors on activated carbon and over-liming. Theoretically, overliming is effective due to precipitation or chemical destabilization of inhibitors and activated charcoal could improve the fermentability of hydrolysate by absorbing phenolic compounds and other inhibitory substances. The effect of various methods of detoxification on the concentration of the most important inhibitors present in hydrolysates and polyphenols is demonstrated in Figure 2. It is evident that both detoxification techniques significantly reduce the concentration of polyphenols in hydrolysates. More effective is the application of activated carbon, which can adsorb and thereby remove more than 90% of polyphenols. ",
+      "start": 3480,
+      "end": 4273
+    },
+    {
+      "id": "P25:abstract:1",
+      "paperId": "P25",
+      "sectionId": "abstract",
+      "heading": "Abstract",
+      "kind": "abstract",
+      "text": "Five out of 11 compounds within the slurry were characterized as toxic to C. necator, namely ammonium acetate, furfural, hydroxymethylfurfural (HMF), benzoic acid, and p-coumaric acid. Aldehydes (e.g., furfural and HMF) were more toxic than the acetate and the lignin degradation products benzoic acid and p-coumaric acid; furfural was identified as the most toxic compound. Although toxic to C. necator at high concentration, ammonium acetate, benzoic acid, and p-coumaric acid could be utilized by C. necator with a stimulating effect on C. necator growth. Consequently, the lignin degradation pathway of C. necator was reconstructed based on genomic information and literature. The efficient conversion of intermediate catechol to downstream products of cis,cis-muconate or 2-hydroxymuconate-6-semialdehyde may help improve the robustness of C. necator to benzoic acid and p-coumaric acid as well as improve PHB productivity.",
+      "start": 1009,
+      "end": 1937
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "lignocellulosic hydrolysate inhibitors PHA production",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"lignocellulosic hydrolysate inhibitors PHA production\" · 6 passages",
+      "ms": 22,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "hydrolysate inhibitor furfural hydroxymethylfurfural acetate PHA",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "detoxification of hydrolysate overliming activated charcoal",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"detoxification of hydrolysate overliming activated charcoal\" · 6 passages",
+      "ms": 14,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "furfural hydroxymethylfurfural acetic acid phenolic compounds inhibit growth PHB",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"furfural hydroxymethylfurfural acetic acid phenolic compounds inhibit growth PHB\" · 6 passages",
+      "ms": 29,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "adaptation of strain to inhibitors hydrolysate detoxification PHA yield",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"adaptation of strain to inhibitors hydrolysate detoxification PHA yield\" · 6 passages",
+      "ms": 19,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB hydrolysate detoxified",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB hydrolysate detoxified · 0 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 7 claims kept, 3 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

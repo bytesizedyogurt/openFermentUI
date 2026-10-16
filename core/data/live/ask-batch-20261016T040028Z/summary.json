@@ -1,0 +1,165 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "Which organisms have been shown to make PHB from hydrolysates that contain xylose, and what feedstock did each study use?",
+      "kept": 5,
+      "dropped": 2,
+      "toolCalls": 12,
+      "rounds": 5,
+      "seconds": 34.6,
+      "costUsd": 0.006763,
+      "stopped": "calls",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 5
+    },
+    {
+      "n": 2,
+      "question": "How have waste paper and cotton textile been turned into fermentable sugar for PHA production, and which pretreatment and hydrolysis steps were used?",
+      "kept": 1,
+      "dropped": 3,
+      "toolCalls": 9,
+      "rounds": 4,
+      "seconds": 19.31,
+      "costUsd": 0.004913,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 3,
+      "question": "How does nitrogen limitation affect PHB accumulation in Cupriavidus necator?",
+      "kept": 6,
+      "dropped": 1,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 23.14,
+      "costUsd": 0.004006,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 6
+    },
+    {
+      "n": 4,
+      "question": "What PHB yields on glucose have been reported, and how far are they from the ceiling?",
+      "kept": 6,
+      "dropped": 0,
+      "toolCalls": 7,
+      "rounds": 4,
+      "seconds": 30.04,
+      "costUsd": 0.004601,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 4
+    },
+    {
+      "n": 5,
+      "question": "Which inhibitors in lignocellulosic hydrolysates have been reported to slow PHA producers, and what detoxification steps were tried?",
+      "kept": 7,
+      "dropped": 3,
+      "toolCalls": 6,
+      "rounds": 3,
+      "seconds": 28.09,
+      "costUsd": 0.005304,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 7
+    },
+    {
+      "n": 6,
+      "question": "What polymer molecular weights have been reported, and by which methods were they measured?",
+      "kept": 4,
+      "dropped": 2,
+      "toolCalls": 6,
+      "rounds": 4,
+      "seconds": 18.09,
+      "costUsd": 0.003745,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    },
+    {
+      "n": 7,
+      "question": "How does the sugar mix of a hydrolysate change the monomer composition of the polymer?",
+      "kept": 0,
+      "dropped": 5,
+      "toolCalls": 5,
+      "rounds": 3,
+      "seconds": 16.32,
+      "costUsd": 0.003952,
+      "stopped": "done",
+      "declined": "Postdoc produced 5 claims, none of which passed validation, so none of them are shown. This is a fault in the answer, not in the corpus \u2014 the evidence may well be there.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 8,
+      "question": "What would PHB cost per kilogram at the titres and yields reported so far?",
+      "kept": 2,
+      "dropped": 0,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 10.21,
+      "costUsd": 0.001912,
+      "stopped": "done",
+      "declined": "Cost per kilogram of PHB cannot be established. The corpus has no completed techno-economic run and no verified titre and yield set for one strain and feed, so the requested cost figure has no support.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 9,
+      "question": "What has nobody measured yet for recycled-paper reject fibre as a PHA feedstock?",
+      "kept": 2,
+      "dropped": 2,
+      "toolCalls": 5,
+      "rounds": 3,
+      "seconds": 15.9,
+      "costUsd": 0.003912,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 10,
+      "question": "Draft a first shake-flask run to test PHB production from a mixed glucose and xylose medium.",
+      "kept": 4,
+      "dropped": 1,
+      "toolCalls": 5,
+      "rounds": 3,
+      "seconds": 19.68,
+      "costUsd": 0.004106,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    }
+  ],
+  "costUsd": 0.043214
+}

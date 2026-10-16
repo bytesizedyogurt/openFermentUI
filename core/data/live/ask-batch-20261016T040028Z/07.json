@@ -1,0 +1,108 @@
+{
+  "question": "How does the sugar mix of a hydrolysate change the monomer composition of the polymer?",
+  "claims": [],
+  "gaps": [
+    "The corpus has no evidence on whether pentose sugars such as xylose alone change monomer composition, since the xylose records report titre or content only.",
+    "Most odd-carbon-acid composition evidence comes from mixed-culture VFA work, not from sugar-fed pure-culture hydrolysates; direct sugar-to-monomer data for the common hydrolysate sugars are missing."
+  ],
+  "declined": "Postdoc produced 5 claims, none of which passed validation, so none of them are shown. This is a fault in the answer, not in the corpus — the evidence may well be there.",
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3469,
+    "cacheReadTokens": 12806,
+    "cacheWriteTokens": 16707,
+    "costUsd": 0.003952,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 5,
+  "rejectionReasons": [
+    "c1: claim text contains a number ('3') — values come from the record",
+    "c2: claim text contains a number ('3') — values come from the record",
+    "c3: claim text contains a number ('3') — values come from the record",
+    "c4: claim text contains a number ('3') — values come from the record",
+    "c5: cites what no tool returned in this run: P6:s5:6",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "hydrolysate sugar mix monomer composition polymer PHA 3HV 3HB fraction",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "hydrolysate sugar mixture polymer monomer composition",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"hydrolysate sugar mixture polymer monomer composition\" · 6 passages",
+      "ms": 24,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB monomer composition glucose xylose mixed sugar",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB monomer composition glucose xylose mixed sugar · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "3-hydroxyvalerate fraction depends on carbon source glucose xylose propionate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"3-hydroxyvalerate fraction depends on carbon source glucose xylose propionate\" · 6 passages",
+      "ms": 30,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "sugar feed changed copolymer 3HV content hydrolysate lignocellulose",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"sugar feed changed copolymer 3HV content hydrolysate lignocellulose\" · 6 passages",
+      "ms": 21,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 0 claims kept, 5 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

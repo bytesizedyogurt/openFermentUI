@@ -1,0 +1,211 @@
+{
+  "question": "What polymer molecular weights have been reported, and by which methods were they measured?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Weight-average and number-average molecular weights of mixed-culture polyhydroxyalkanoate were determined by gel permeation chromatography calibrated against polystyrene standards, using chloroform as eluent.",
+      "recordIds": [],
+      "paperIds": [
+        "P31"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P31:s9:3",
+          "quote": "The weight-average molecular weight (M w) and number-average molecular weight (M n) were determined by gel permeation chromatography (GPC) relative to a polystyrene standard at 35 °C, using a 150 C GPC analysis system (Waters, USA)."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "Molecular weight of PHB and PHBV scaffolds was characterised by SEC-MALLS, which the authors used for molecular weight, molecular size and polydispersity of the PHA samples.",
+      "recordIds": [],
+      "paperIds": [
+        "P29"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P29:s7:8",
+          "quote": "SEC-MALLS was used as a general technique for the routine characterization of molecular weight, molecular size, and polydispersity of the used PHA."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "Molecular weight of biodegraded PHB films was measured by gel permeation chromatography after dissolving residual films in chloroform at elevated temperature.",
+      "recordIds": [],
+      "paperIds": [
+        "P28"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P28:s8:1",
+          "quote": "Gel permeation chromatography (Youngin Chromass, Korea) was performed to determine the molecular weight and molecular mass distribution of the degraded PHB films."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "No curated molecular weight record for any PHA produced by a strain is present in the platform's records, so no molecular weight value can be cited from a record.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No curated records of polymer molecular weight (Mw, Mn, dispersity) were returned by the record search, so the reported numeric values cannot be cited as records; they exist only in the passage text of P29 and would need to be entered as records.",
+    "Strain, carbon source and fermentation conditions for the molecular weights in P31 and P28 were not established; the passages do not tie the molecular weight to a producing strain or feed.",
+    "Molecular weights of PHA produced by a defined strain on a defined sugar, measured under matched conditions, are absent from the corpus.",
+    "Comparison of GPC (polystyrene calibration) with SEC-MALLS (absolute) values for the same polymer was not found, so the methods cannot be cross-checked for bias."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 3415,
+    "cacheReadTokens": 23234,
+    "cacheWriteTokens": 14433,
+    "costUsd": 0.003745,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c3: claim text contains a number ('scaffold') — values come from the record",
+    "c5: claim text contains a number ('scaffold') — values come from the record",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P28:s8:1",
+      "paperId": "P28",
+      "sectionId": "s8",
+      "heading": "2. Materials and Methods › 2.7. Analysis of Physical Properties",
+      "kind": "prose",
+      "text": "The samples were then coated with gold dust at 5 mA for 120 s. Back-scattered electron images were obtained using a scanning electron microscope (TM4000Plus; Hitachi, Ltd., Tokyo, Japan) at an accelerating voltage of 5 kV. The differences in the functional groups of the PHB film were detected using Fourier transform infrared spectroscopy (Nicolet 6700; Thermo Fisher Scientific, Waltham, MA, USA) in the scanning range of 4000–600 cm−1. The resolution was set to 4 cm−1, and 32 scans were recorded for each spectrum using an auto base. Gel permeation chromatography (Youngin Chromass, Korea) was performed to determine the molecular weight and molecular mass distribution of the degraded PHB films. For sample preparation, the residual PHB films were dissolved in chloroform and stirred constantly using a thermoshaker at 60 °C for 2 h. ",
+      "start": 803,
+      "end": 1642
+    },
+    {
+      "id": "P29:s7:8",
+      "paperId": "P29",
+      "sectionId": "s7",
+      "heading": "3. Results › 3.1. Production of PHBV and Properties of PHB, PHBV-1, and PHBV-2 Scaffolds",
+      "kind": "prose",
+      "text": "The bands at 1089 and 1015 cm−1 indicated pectin moieties. These were attributed to the C–O–C stretching in ethers and to the C–O stretching of primary alcohols. Furthermore, the spectrum of PHBV-2 contained a sharp and intensive absorption band at 794 cm−1 corresponding to the C–H bending in phenolic compounds. Therefore, it can be concluded that the composition of PHBV-2 was modified by these substances from grape pomace co-isolated from the biomass. SEC-MALLS was used as a general technique for the routine characterization of molecular weight, molecular size, and polydispersity of the used PHA. SEC-MALLS chromatograms are shown in Figure 3. The molecular weight values of the tested polymers were in the following order: PHBV-1 (Mw = 517 ± 11.08, Đ = 1.1) > PHB (Mw = 480 ± 4.22, Đ = 1.5) > PHBV-2 (Mw = 235 ± 5.33, Đ = 1.3). ",
+      "start": 5613,
+      "end": 6450
+    },
+    {
+      "id": "P31:s9:3",
+      "paperId": "P31",
+      "sectionId": "s9",
+      "heading": "Methods › Analytical methods",
+      "kind": "prose",
+      "text": "PHA were precipitated in ice-cold methanol, air dried overnight and stored at 4 °C in the dark. The weight-average molecular weight (M w) and number-average molecular weight (M n) were determined by gel permeation chromatography (GPC) relative to a polystyrene standard at 35 °C, using a 150 C GPC analysis system (Waters, USA). A sample concentration of 1.0 mg/mL was applied, and CHCl3 was used as the eluent at a flow rate of 1.0 mL/min. For the analysis of thermal properties (including the melting point (T m) and the glass transition temperature (T g)), Q100 differential scanning calorimetry (DSC) (TA Instruments, USA) coupled with a liquid nitrogen cooling system was adopted in the temperature range of −40 to 200 °C at heating and cooling rates of 20 °C/min under a nitrogen atmosphere.",
+      "start": 1661,
+      "end": 2458
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "polymer molecular weight PHB Mw Mn",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "molecular weight measured by gel permeation chromatography",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"molecular weight measured by gel permeation chromatography\" · 6 passages",
+      "ms": 26,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "molecular weight",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "weight-average molecular weight polyhydroxyalkanoate determined",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"weight-average molecular weight polyhydroxyalkanoate determined\" · 6 passages",
+      "ms": 24,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "SEC-MALLS molecular weight PHA",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"SEC-MALLS molecular weight PHA\" · 4 passages",
+      "ms": 32,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHA molecular weight decreased during fermentation or extraction",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"PHA molecular weight decreased during fermentation or extraction\" · 4 passages",
+      "ms": 32,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

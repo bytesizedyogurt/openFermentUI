@@ -1,0 +1,147 @@
+{
+  "question": "What has nobody measured yet for recycled-paper reject fibre as a PHA feedstock?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "No measurement of PHA production on recycled-paper reject fibre is in the corpus: no titre, content, or productivity was found for that feedstock in any strain or process.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "Glucose-rich hydrolyzate from pulp and paper mill sludge, not reject fibre, was used as the sole carbon source for PHA production by Bacillus thuringiensis in cyclic fed-batch cultivation.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s1:7",
+          "quote": "This study reports the practicality of employing Bacillus thuringiensis in a CFBF cultivation using glucose-rich hydrolyzate derived from enzymatic saccharification of pulp and paper mill sludge as the sole carbon source."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "PHA titre, PHA content and productivity measured on recycled-paper reject fibre, either as raw material or after hydrolysis, in any production host.",
+    "Composition of reject fibre (cellulose, hemicellulose, ash, plastic and coating contaminants) and how it varies between mills; the corpus has no characterisation of this stream.",
+    "Enzymatic or acid saccharification yield of reject fibre and any inhibitor profile, measured against the PHA-producing strain.",
+    "Strain-level tests of whether a PHA producer grows on reject-fibre hydrolysate, including any sugar-utilisation or toxicity data.",
+    "Mixed-culture PHA results on reject fibre; the corpus has paper mill sludge and wastewater work but none on reject fibre.",
+    "A minimum selling price or techno-economic run for a reject-fibre PHA process; none exists in the corpus.",
+    "A yield ceiling for PHA from reject-fibre sugars: the yield-ceiling tool covers only glucose, fructose and xylose and I did not run it."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3120,
+    "cacheReadTokens": 16898,
+    "cacheWriteTokens": 17454,
+    "costUsd": 0.003912,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c3: a quote of P22:s1:4 longer than 300 characters",
+    "c4: claim text contains a number ('one') — values come from the record"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P22:s1:7",
+      "paperId": "P22",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "The CFBF process entails the partial withdrawal of fermentation medium and subsequent re-filling with an equal volume of fresh fermentation medium. The chemical composition of the fermentation medium must be consistent throughout the \"empty-and-fill\" process. The CFBF strategy prevents increases in concentrations of toxic by-products and enhances cell growth to achieve high concentrations of final biomass and increased PHA yields (Ibrahim and Steinbüchel 2010; Gahlawat and Srivastava 2018). This study reports the practicality of employing Bacillus thuringiensis in a CFBF cultivation using glucose-rich hydrolyzate derived from enzymatic saccharification of pulp and paper mill sludge as the sole carbon source. Firstly, a statistical optimization study was conducted to elucidate the optimal fermentation medium to produce high cell density biomass. ",
+      "start": 4008,
+      "end": 4865
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "recycled paper reject fibre PHA feedstock",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of recycled paper reject fibre PHA feedstock · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "paper mill reject fibre polyhydroxyalkanoate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"paper mill reject fibre polyhydroxyalkanoate\" · 6 passages",
+      "ms": 26,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "waste paper hydrolysate cellulose PHA production",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"waste paper hydrolysate cellulose PHA production\" · 6 passages",
+      "ms": 20,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "deinking reject recycled paper waste enzymatic hydrolysis fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"deinking reject recycled paper waste enzymatic hydrolysis fermentation\" · 6 passages",
+      "ms": 34,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "paper mill sludge hydrolysate PHA",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of paper mill sludge hydrolysate PHA · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 2 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

@@ -1,0 +1,168 @@
+{
+  "question": "How have waste paper and cotton textile been turned into fermentable sugar for PHA production, and which pretreatment and hydrolysis steps were used?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "In the retrieved corpus, no study reports converting cotton textile waste into fermentable sugar for PHA production, so the cotton textile route cannot be described from these sources.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No record or passage in the corpus gives the pretreatment (e.g., acid, alkali, steam, or mechanical milling) or the hydrolysis enzyme loading, temperature, and time used for waste paper or cotton textile feedstocks.",
+    "No cotton textile to sugar to PHA study was found, including searches on cotton waste, cellulose hydrolysis, and PHB fermentation.",
+    "No PHA titre, content, or yield record exists for a paper-derived or textile-derived hydrolyzate in the records, so no quantitative comparison is possible.",
+    "A yield ceiling for PHB from glucose would need a yield_ceiling call on a model; none was run because the question concerns the feedstock steps rather than the theoretical yield."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 4061,
+    "cacheReadTokens": 30842,
+    "cacheWriteTokens": 20576,
+    "costUsd": 0.004913,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 3,
+  "rejectionReasons": [
+    "c2: claim text contains a number ('2') — values come from the record",
+    "c3: a quote of P22:s1:4 longer than 300 characters",
+    "c4: claim text contains a number ('4') — values come from the record",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "waste paper cotton textile hydrolysis sugar PHA production pretreatment enzymatic",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "waste paper hydrolysis glucose polyhydroxyalkanoate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"waste paper hydrolysis glucose polyhydroxyalkanoate\" · 6 passages",
+      "ms": 38,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "cotton textile waste pretreatment enzymatic hydrolysis sugars fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"cotton textile waste pretreatment enzymatic hydrolysis sugars fermentation\" · 6 passages",
+      "ms": 30,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "office paper waste hydrolysate PHB",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"office paper waste hydrolysate PHB\" · 6 passages",
+      "ms": 24,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "cotton waste cellulose hydrolysis glucose bacteria polyhydroxybutyrate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"cotton waste cellulose hydrolysis glucose bacteria polyhydroxybutyrate\" · 6 passages",
+      "ms": 19,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "waste paper hydrolysate polyhydroxybutyrate yield",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "cotton textile waste sugar PHA",
+        "field": "\"\"",
+        "organism": "\"\"",
+        "limit": 10
+      },
+      "summary": "Looked up records of \"\" · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "cotton",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"cotton\" · 6 passages",
+      "ms": 15,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "paper sludge enzymolysis recycled paper cellulase pretreatment",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"paper sludge enzymolysis recycled paper cellulase pretreatment\" · 6 passages",
+      "ms": 29,
+      "ok": true
+    },
+    {
+      "n": 10,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 1 claim kept, 3 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

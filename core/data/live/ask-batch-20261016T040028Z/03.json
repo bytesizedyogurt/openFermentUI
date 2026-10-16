@@ -1,0 +1,253 @@
+{
+  "question": "How does nitrogen limitation affect PHB accumulation in Cupriavidus necator?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "In the review of Cupriavidus necator PHB fermentation, nitrogen limitation is described as the more commonly used nutrient-limitation approach for driving PHB accumulation, with phosphorus limitation as the other common option.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s11:0",
+          "quote": "Among the nutrient limiting conditions, nitrogen limitation is the more commonly used approach."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "C. necator is described as a non-growth-associated PHB producer, so limiting a non-carbon nutrient such as nitrogen is used to suppress biomass formation and favour intracellular PHB accumulation.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s11:0",
+          "quote": "C. necator is a typical type of non-growth associated PHB-producing bacteria."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "Across the studies the review summarises, limiting nitrogen or phosphate is reported to enable PHB accumulation and to give a higher PHB content per unit of cell dry mass in C. necator.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s2:3",
+          "quote": "In many studies, it has been found that limiting non-carbon nutrients such as nitrogen and phosphate enable PHB accumulation and leads to a higher PHB content per unit of cell dry mass."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "Pushing nitrogen to full depletion or a very high C/N ratio can raise PHB accumulation in C. necator, but the review reports that this extreme condition also lowers biomass, so overall PHB content ends up low.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s11:1",
+          "quote": "Moreover, many studies have also found that although a high C/N ratio or a completely 0% nitrogen supply led to high PHB accumulation in C. necator, this extreme condition can also lead to low biomass production which resulted in an overall low PHB content."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "Removing nitrogen completely in C. necator cultures required controlling pH with NaOH instead of NH4OH, and the review notes that sodium accumulation from NaOH was reported to negatively affect PHB production.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s11:1",
+          "quote": "However, it was also proved by several studies that PHB production in C. necator could be negatively affected due to the accumulation of Na+ ions when NaOH is used."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c7",
+      "text": "In a Burkholderia sacchari fed-batch on xylose (not C. necator), PHB accumulation began only after nitrogen was nearly depleted, and nitrogen limitation reached a PHB content comparable to phosphorus limitation while needing less time.",
+      "recordIds": [
+        "cl1-P19-e713aa44"
+      ],
+      "paperIds": [
+        "P19"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P19:s10:0",
+          "quote": "Regarding nitrogen-limited fed-batches (B101-X1 and B101-X3), P(3HB) accumulation started after 24–26 h of cultivation when nitrogen concentration was almost depleted (2–12 mg/L) (Figures 2, 4)."
+        },
+        {
+          "passageId": "P19:s15:2",
+          "quote": "Although under phosphorus limitation conditions B. sacchari achieved higher P(3HB) production in g/L, P(3HB) production required more time, almost 20 h, to achieve an equal P(3HB) content [%P(3HB)] when compared to the nitrogen limitation condition."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No controlled head-to-head C. necator study in the corpus comparing nitrogen-limited and nitrogen-replete cultures on the same carbon source, with PHB content, titre and biomass reported for each arm.",
+    "The corpus records for C. necator (for example sucrose, wheat straw, kenaf and crude extract runs) do not state the nitrogen supply or C/N ratio used, so they cannot be attributed to nitrogen limitation.",
+    "No measured nitrogen-to-PHB relationship for C. necator across a range of C/N ratios, so the optimum C/N ratio for content versus titre is not established here.",
+    "The Burkholderia sacchari evidence is a different organism and cannot be transferred to C. necator without a C. necator measurement."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3780,
+    "cacheReadTokens": 15031,
+    "cacheWriteTokens": 15727,
+    "costUsd": 0.004006,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: claim text contains a number ('3') — values come from the record",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P10:s11:0",
+      "paperId": "P10",
+      "sectionId": "s11",
+      "heading": "Current Strategies Used to Enhance PHB Production Efficiencies › Fermentation Strategies › Nutrient Limitation",
+      "kind": "prose",
+      "text": "C. necator is a typical type of non-growth associated PHB-producing bacteria. Therefore, non-carbon nutrients’ limitation has been a widely used approach for C. necator to inhibit biomass production and enable intracellular PHB accumulation. In most of the studies, the nutrient limiting conditions, which generally refer to depletion of nitrogen and phosphorus, are complemented to improve the PHB production yield using C. necator. Among the nutrient limiting conditions, nitrogen limitation is the more commonly used approach. In some of the studies, researchers completely removed the nitrogen source to improve PHB accumulation. Under these extreme cases, pH control is monitored through NaOH instead of NH4OH to achieve a 0% nitrogen supply. ",
+      "start": 0,
+      "end": 748
+    },
+    {
+      "id": "P10:s11:1",
+      "paperId": "P10",
+      "sectionId": "s11",
+      "heading": "Current Strategies Used to Enhance PHB Production Efficiencies › Fermentation Strategies › Nutrient Limitation",
+      "kind": "prose",
+      "text": "Under these extreme cases, pH control is monitored through NaOH instead of NH4OH to achieve a 0% nitrogen supply. However, it was also proved by several studies that PHB production in C. necator could be negatively affected due to the accumulation of Na+ ions when NaOH is used. In addition to nitrogen limitation, phosphate limiting conditions have a similar effect to stimulate intracellular PHB accumulation. The trigger mechanism of phosphate limiting conditions can be related to the fact that phosphorus feeding influences the NADPH availability and resultant PHB accumulation kinetics. Moreover, many studies have also found that although a high C/N ratio or a completely 0% nitrogen supply led to high PHB accumulation in C. necator, this extreme condition can also lead to low biomass production which resulted in an overall low PHB content. ",
+      "start": 634,
+      "end": 1485
+    },
+    {
+      "id": "P10:s2:3",
+      "paperId": "P10",
+      "sectionId": "s2",
+      "heading": "Mechanisms of Biosynthesis Pathway for PHB Production",
+      "kind": "prose",
+      "text": "It was also found that the constituent monomers are short-chain monomers with 3–5 carbon in C. necator while those are medium-chain monomers with 6–14 carbon in Pseudomonas putida. In many studies, it has been found that limiting non-carbon nutrients such as nitrogen and phosphate enable PHB accumulation and leads to a higher PHB content per unit of cell dry mass. The underlying metabolic reason is that a shortage of nitrogen supply promotes the regeneration of NADPH. NADPH is essential for the phaB catalyst to have an effect on the 3HB-CoA formation. Under balanced nutrition conditions, the entrance of the acetyl-CoA into the tricarboxylic acid (TCA) cycle is favored. During the entrance into the TCA cycle, free CoA is released, which can inhibit the action of phaA catalyst at high concentrations. ",
+      "start": 1987,
+      "end": 2797
+    },
+    {
+      "id": "P19:s10:0",
+      "paperId": "P19",
+      "sectionId": "s10",
+      "heading": "Results › Growth Phase",
+      "kind": "prose",
+      "text": "In all experiments, P(3HB) accumulation was not detected during the growth phase (Figures 1, 2). B101-X1 and B101-X3 are replicas of nitrogen limitation condition, while B101-X2 and B101-X4 are replicas of phosphorus limitation condition. Xylose concentration in medium over time for each fed-batch is presented in Figure 3. Regarding nitrogen-limited fed-batches (B101-X1 and B101-X3), P(3HB) accumulation started after 24–26 h of cultivation when nitrogen concentration was almost depleted (2–12 mg/L) (Figures 2, 4). In these fed-batches, phosphorus quantification revealed that this nutrient was not limited during all the cultivation, although it was consumed after nitrogen depletion. Nitrogen to residual biomass yield (YXr/N) was calculated, representing around 7.5 (g/g). ",
+      "start": 0,
+      "end": 781
+    },
+    {
+      "id": "P19:s15:2",
+      "paperId": "P19",
+      "sectionId": "s15",
+      "heading": "Discussion › Poly(3-hydroxybutyrate) Accumulation Phase",
+      "kind": "prose",
+      "text": "We can note that in the accumulation phase, qP values are 1-fold reduced in phosphorus-limited experiments when compared to nitrogen limitation condition. Although under phosphorus limitation conditions B. sacchari achieved higher P(3HB) production in g/L, P(3HB) production required more time, almost 20 h, to achieve an equal P(3HB) content [%P(3HB)] when compared to the nitrogen limitation condition. A similar situation was described in a study investigating the effect of phosphorus limitation on PHA production by activated sludge biomass (Chinwetkitvanich et al., 2004). The phosphorus consumption of B. sacchari showed that this nutrient was substantially consumed after 20 h of cultivation, reaching depletion shortly after this period. The same profile was reported by Ryu and co-workers when studying PHA accumulation by R. eutropha (Ryu et al., 1997). ",
+      "start": 1467,
+      "end": 2332
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "nitrogen limitation PHB accumulation Cupriavidus necator",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of nitrogen limitation PHB accumulation Cupriavidus necator · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "nitrogen limitation polyhydroxybutyrate accumulation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"nitrogen limitation polyhydroxybutyrate accumulation\" · 6 passages",
+      "ms": 30,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Cupriavidus necator nitrogen-limited versus nitrogen-sufficient PHB content",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Cupriavidus necator nitrogen-limited versus nitrogen-sufficient PHB content\" · 6 passages",
+      "ms": 37,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "nitrogen limited PHB content cell dry weight",
+        "field": "",
+        "organism": "",
+        "limit": 10
+      },
+      "summary": "Looked up records of nitrogen limited PHB content cell dry weight · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 6 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}
