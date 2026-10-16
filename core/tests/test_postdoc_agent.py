@@ -238,10 +238,13 @@ def test_an_instruction_inside_a_passage_changes_nothing_the_validator_lets_thro
             claim("c1", text="The yield was 42 percent.", quotes=[("X1:s1:0", SENTENCE)]),
             claim("c2", text="The yield was forty-two percent.", quotes=[("X1:s1:0", SENTENCE)]),
             claim("c3", text="The paper reports polyhydroxybutyrate accumulating on xylose hydrolysate.", quotes=[("X1:s1:0", SENTENCE)]),
+            # The closed list of counting words does not open a way in: a
+            # number word before a unit is still a quantity.
+            claim("c4", text="The yield was two percent on day 3.", quotes=[("X1:s1:0", SENTENCE)]),
         ),
     )
     out = ask(script, pool)
-    assert [c.id for c in out.claims] == ["c3"] and out.rejected == 2
+    assert [c.id for c in out.claims] == ["c3"] and out.rejected == 3
     assert not any(ch.isdigit() for c in out.claims for ch in c.text)
     assert INJECTION in json.dumps(script.calls[1]["messages"]), "the model was shown the passage"
 

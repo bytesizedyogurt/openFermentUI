@@ -119,6 +119,57 @@ _CHEMISTRY = re.compile(
 )
 
 
+# Step labels and counting determiners (live test, 2026-10-16). WHY THIS LIST
+# EXISTS: a protocol names its steps with small integers ("a stage 1 culture
+# on Day 3") and prose counts the things it names ("one of the strains", "two
+# studies"); neither is a quantity from a paper, and both dropped claims and
+# practice drafts whole. The list is closed on purpose. A label is one of
+# these six words and an integer from 1 to 20; a determiner is one through
+# ten before a word. Either still fails when the next word is a unit, so
+# "3 g/L on day 3", "day 3 g/L" and "two days" keep tripping the rule.
+STEP_WORDS = ("stage", "step", "day", "phase", "round", "pass")
+DETERMINER_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+_UNIT_WORDS = frozenset(
+    "second seconds sec secs minute minutes min mins hour hours hr hrs day days week weeks month months "
+    "year years gram grams milligram milligrams microgram micrograms kilogram kilograms litre litres liter "
+    "liters millilitre millilitres milliliter milliliters mole moles percent fold times degree degrees "
+    # A score is a measure too: "two of the three points" is a grade, and a
+    # grade the tutor gives is a number of its own (test_practice).
+    "point points mark marks score scores".split()
+)
+_STEP_LABEL = re.compile(
+    r"(?<![A-Za-z])(?i:" + "|".join(STEP_WORDS) + r")\s+(?:20|1[0-9]|[1-9])(?![\d.,])(?P<rest>\s*\S*)"
+)
+_DETERMINER = re.compile(
+    r"(?<![A-Za-z-])(?i:" + "|".join(DETERMINER_WORDS) + r")(?=\s+(?P<next>[A-Za-z][A-Za-z-]*))"
+)
+
+
+def _is_unit_word(word: str) -> bool:
+    w = word.strip().strip(".,;:()").lower()
+    if not w:
+        return False
+    if w in _UNIT_WORDS:
+        return True
+    try:
+        return normalize_unit(w) is not None
+    except (FileNotFoundError, ValueError):
+        return False
+
+
+def _blank_prose_counts(text: str) -> str:
+    def label(m: re.Match) -> str:
+        if _is_unit_word(m.group("rest")):
+            return m.group(0)
+        end = m.start("rest")
+        return " " * (end - m.start()) + m.group("rest")
+
+    def determiner(m: re.Match) -> str:
+        return m.group(0) if _is_unit_word(m.group("next")) else " " * len(m.group(0))
+
+    return _DETERMINER.sub(determiner, _STEP_LABEL.sub(label, text))
+
+
 def find_number(text: str) -> str | None:
     """The first number-like thing in the text, or None.
 
@@ -132,6 +183,7 @@ def find_number(text: str) -> str | None:
     # ("HB-co-3HV" in P(3HB-co-3HV)) and strand its leading locant.
     masked = _CHEMISTRY.sub(lambda m: " " * len(m.group(0)), text)
     masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
+    masked = _blank_prose_counts(masked)
     if m := _DIGIT.search(masked):
         return m.group(0)
     if m := _WORD_NUMBER.search(masked):
