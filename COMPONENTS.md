@@ -113,15 +113,15 @@ Views: [Ingest](#) `/intake/ingest`
 
 **Records, artifacts, provenance.** `/biorepo` · chord `g b`
 
-The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `claude-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7).
+The corpus and everything retrieved from it, plus the two components whose job is to say what a record is worth: Audit ticks it, Witness measures whether the extractor reproduced the curated values on the papers it read — one run so far, `claude-1`, scored provisionally until reviewers flag gold. Review decisions are the one thing that changes a record's status, and every one of them goes through `biorepo.write` into the committed `core/data/biorepo.json` (OF-BLD-012 §2.3, §7). Artifacts keeps every value the service computed, with the inputs it was computed from and the source of each, and replays it on request (OF-BLD-014 §3.2); its subsystem is the first marked `live`.
 
-Views: [Witness](#) `/biorepo/witness` · [Compare](#) `/biorepo/compare`
+Views: [Search](#) `/biorepo/search` · [Witness](#) `/biorepo/witness` · [Artifacts](#) `/biorepo/artifacts` · [Compare](#) `/biorepo/compare`
 
 | Component | Implemented in |
 |---|---|
-| BioRepo | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py` |
-| Audit | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` |
-| Witness | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` |
+| BioRepo | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` |
+| Audit | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` |
+| Witness | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py`, `core/openferment_core/rageval.py`, `src/components/RetrievalScorecard.tsx` |
 
 Not built: Common Seal.
 
@@ -129,11 +129,11 @@ Not built: Common Seal.
 
 **Ask, plan, answer from records.** `/postdoc` · chord `g o`
 
-The thing you talk to. Runs on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; writes claims that carry no numbers of their own.
+The thing you talk to. Runs a bounded loop of tools on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`: it searches the records and the papers' passages, shows each step as it runs, and writes claims that carry no numbers of their own, each citing a record, a sentence checked word for word against its passage, or a computed value.
 
 | Component | Implemented in |
 |---|---|
-| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` |
+| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` |
 
 ### geneOS
 
@@ -156,13 +156,13 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 | Component | Implemented in |
 |---|---|
-| geneOS | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` |
+| geneOS | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` |
 
 ### fermOS
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **This is the emptiest of the eleven, and honestly so**: there is no kinetic model, no transport calculation and no scale-up logic anywhere in the codebase.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. Transport, operating mode, scale-up and control are not built.
 
 | Subsystem | Key | State |
 |---|---|---|
@@ -174,7 +174,7 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx` |
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` |
 
 ### pureOS
 
@@ -197,7 +197,7 @@ Techno-economics over authored response surfaces. Prices a process; does not cho
 
 | Component | Implemented in |
 |---|---|
-| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` |
+| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` |
 
 ### Runbooks
 
@@ -209,7 +209,7 @@ Views: [Protocols](#) `/runbooks/protocols` · [Depositions](#) `/runbooks/depos
 
 | Component | Implemented in |
 |---|---|
-| Runbook | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` |
+| Runbook | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts`, `src/screens/RunbookLedger.tsx`, `src/engine/ledger.ts` |
 | Deposition | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` |
 
 ### Dominion
@@ -230,21 +230,25 @@ Not built: Claim Workbench, Priority Engine, Enablement, Notary.
 
 **How the system works.** `/primer` · chord `g n`
 
-The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state.
+The platform taught through itself. Every embedded widget in a lesson is the real component operating on real session state. A lesson may count toward Guild's skills (OF-BLD-013): passing its checkpoint records a lesson passed on the learner's ledger, which puts them at Learning, and My path shows one person the next step on each skill, from lesson to bench. Practice drafts a scenario from the protocol steps and the bench runs that need a skill, and a tutor questions the trainee's reasoning; the model writes words and cites sources, every value is copied from its source, and a closed session goes on the learner's ledger as practice. The drafts and the tutor are model calls the service makes in `core/openferment_core/practice.py`.
+
+Views: [My path](#) `/primer/path` · [Practice](#) `/primer/practice`
 
 | Component | Implemented in |
 |---|---|
-| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` |
+| Primer | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` |
 
 ### Guild
 
 **Who may verify.** `/guild` · chord `g g`
 
-The Guild of Applied Life: review, roles, and who decided what.
+The Guild of Applied Life: who may verify a record, and who may perform, cosign and witness a protocol step. The review queue keeps `/guild`. Beside it, the competence ledger (OF-BLD-013): people, the skills protocol steps need, and every entry an assessor signs, from which each person's level on each skill is computed and never stored. The rules live in `core/openferment_core/guild.py`; the ledger is `core/data/guild.json`, which is gitignored. Checks are proposed each night by fixed rules over the ledger (`src/engine/checks.ts`, mirrored in `core/openferment_core/checks.py`), each with its reasons written out and a brief the model drafts with no number in it; an assessor schedules one, dismisses it with a reason, or runs it at the bench one criterion at a time and signs it, which writes a witnessed entry per skill. The person checked never sees a check that names them until it has been run.
+
+Views: [Matrix](#) `/guild/matrix` · [People](#) `/guild/people` · [Skills](#) `/guild/skills` · [Checks](#) `/guild/checks`
 
 | Component | Implemented in |
 |---|---|
-| Guild of Applied Life | `src/screens/Guild.tsx` |
+| Guild of Applied Life | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` |
 
 
 ## The full component map
@@ -257,23 +261,23 @@ for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
-| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx` | the rail, /postdoc |
+| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
-| BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py` | the rail, /biorepo |
-| geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx` | the rail, /fermos |
-| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts` | the rail, /proforma |
-| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx` | the rail, /primer |
-| Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts` | provenance ticks and their labels |
-| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py` | a BioRepo tab, /biorepo/witness |
+| BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
+| geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
+| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
+| Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
+| Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |
+| Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py`, `core/openferment_core/rageval.py`, `src/components/RetrievalScorecard.tsx` | a BioRepo tab, /biorepo/witness |
 | Common Seal | Keeping it honest | not built | — |
 | Claim Workbench | Patents | not built | — |
 | Priority Engine | Patents | not built | — |
 | Clearance | Patents | `src/engine/clearance.ts`, `src/data/clearanceFindings.ts`, `src/components/Clearance.tsx` | a Dominion tab, /dominion/clearance |
 | Enablement | Patents | not built | — |
 | Notary | Patents | not built | — |
-| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx` | /guild |
-| Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts` | the rail, /runbooks |
+| Guild of Applied Life | People and permissions | `src/screens/Guild.tsx`, `src/screens/GuildMatrix.tsx`, `src/screens/GuildPeople.tsx`, `src/screens/GuildSkills.tsx`, `src/screens/GuildChecks.tsx`, `src/screens/BenchCheck.tsx`, `src/engine/competence.ts`, `src/engine/checks.ts`, `core/openferment_core/guild.py`, `core/openferment_core/checks.py` | /guild |
+| Runbook | Assay | `src/screens/Runbooks.tsx`, `src/data/runbooks.ts`, `src/screens/RunbookLedger.tsx`, `src/engine/ledger.ts` | the rail, /runbooks |
 | Deposition | Assay | `src/screens/Deposition.tsx`, `src/screens/Depositions.tsx`, `src/components/DepositionPanel.tsx` | a Runbooks tab, /runbooks/depositions |
 
 ## Named nothing yet
@@ -283,6 +287,7 @@ Code that sits in a layer without a name of its own.
 | What | Layer | Lives in | Does |
 |---|---|---|---|
 | _the unit engine_ | Keeping it honest | `src/engine/units.ts`, `src/engine/scale.ts` | Units, conversion, scaling, and refusals that carry their reason |
+| _the worker runner_ | Computing | `core/openferment_core/workers/` | Runs a simulator in a process of its own, kept warm, restarted on a timeout or a crash |
 
 ## Reading the map
 

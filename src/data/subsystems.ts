@@ -23,9 +23,12 @@
 // value against every id, which settles it — `status` below is a transcription
 // of those three tables, the same as `label` and `owner` already were.
 //
+// OF-BLD-014 §3.2 adds a third value, `live`, for a subsystem whose code
+// computes or stores at run time: Artifacts is the first.
+//
 // Two subsystems are `seeded`, and both were seeded from data this repository
 // already had: Hosts is the strain catalogue, moved here from fermOS by §7.3;
-// Pathway is the biosynthetic-pathway vocabulary. The other twenty-six are
+// Pathway is the biosynthetic-pathway vocabulary. The other twenty-five are
 // `stub` and render as a shelf, unchanged — a subsystem showing reference
 // content stays a stub (§8), because domain knowledge below the line does not
 // make code exist above it.
@@ -43,12 +46,15 @@ export type SubsystemOwner =
 
 /**
  * `seeded` — real data stands behind it, and it has a view of its own.
+ * `live`   — code behind it computes or stores from data that arrives at run
+ *            time, and its view says what it holds today (OF-BLD-014 §3.2).
  * `stub`   — named, no implementation. Renders on the owner's reference shelf.
  *
- * There is no third value on purpose. "In progress" is a status nobody can
- * check and everybody believes.
+ * There is no "in progress": a status nobody can check is one everybody
+ * believes. `live` can be checked, because it names the files that implement
+ * it in `implementedIn`, and `check:seed` fails when one of them is missing.
  */
-export type SubsystemStatus = 'seeded' | 'stub';
+export type SubsystemStatus = 'seeded' | 'live' | 'stub';
 
 export interface Subsystem {
   /** `owner.subsystem`, lowercase — the key `referenceFor()` takes. */
@@ -66,6 +72,8 @@ export interface Subsystem {
    * intent under cover of a transcription.
    */
   state: string;
+  /** For a `live` subsystem: the files whose code it is. `check:seed` holds each to existing. */
+  implementedIn?: string[];
 }
 
 const UNBUILT = 'Not built. Nothing here computes, stores or retrieves anything yet.';
@@ -77,7 +85,21 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'intake.instrument', owner: 'Intake', label: 'Instrument ingest', status: 'stub', state: UNBUILT },
 
   // ── BioRepo ──────────────────────────────────────────────────────────
-  { id: 'biorepo.artifacts', owner: 'BioRepo', label: 'Artifacts', status: 'stub', state: UNBUILT },
+  {
+    id: 'biorepo.artifacts',
+    owner: 'BioRepo',
+    label: 'Artifacts',
+    status: 'live',
+    state:
+      'Every value the service computed, kept with the inputs it was computed from and the source ' +
+      'of each, and replayable. It holds what the running service has computed; a fresh clone ' +
+      'holds none.',
+    implementedIn: [
+      'core/openferment_core/artifacts.py',
+      'core/openferment_core/basis.py',
+      'src/screens/BioRepoArtifacts.tsx',
+    ],
+  },
   { id: 'biorepo.audit', owner: 'BioRepo', label: 'Audit', status: 'stub', state: UNBUILT },
 
   // ── geneOS — the organism as an engineered system (§2) ───────────────
@@ -103,7 +125,22 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'geneos.search', owner: 'geneOS', label: 'Sequence search', status: 'stub', state: UNBUILT },
   { id: 'geneos.structure', owner: 'geneOS', label: 'Structure', status: 'stub', state: UNBUILT },
   { id: 'geneos.function', owner: 'geneOS', label: 'Function', status: 'stub', state: UNBUILT },
-  { id: 'geneos.model', owner: 'geneOS', label: 'Model', status: 'stub', state: UNBUILT },
+  {
+    id: 'geneos.model',
+    owner: 'geneOS',
+    label: 'Model',
+    status: 'live',
+    state:
+      'Flux balance analysis on a shelf of published reaction networks: the most PHB each allows from a ' +
+      'sugar, its production envelope and a sugar-mix line, each kept as an artifact and drawn beside the ' +
+      'reported yields. No time axis and no vessel; strain design is not built.',
+    implementedIn: [
+      'core/openferment_core/geneos.py',
+      'core/openferment_core/geneos_models.py',
+      'core/openferment_core/workers/geneos_worker.py',
+      'src/screens/GeneOSModel.tsx',
+    ],
+  },
   { id: 'geneos.design', owner: 'geneOS', label: 'Strain design', status: 'stub', state: UNBUILT },
 
   // ── fermOS — the reactor (§3) ────────────────────────────────────────
@@ -111,7 +148,22 @@ export const SUBSYSTEMS: Subsystem[] = [
   // All five. This makes fermOS the emptiest of the eleven, and honestly so:
   // there is no kinetic model, no transport calculation and no scale-up logic
   // anywhere in this codebase.
-  { id: 'fermos.kinetics', owner: 'fermOS', label: 'Kinetics', status: 'stub', state: UNBUILT },
+  {
+    id: 'fermos.kinetics',
+    owner: 'fermOS',
+    label: 'Kinetics',
+    status: 'live',
+    state:
+      'Fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate ' +
+      'balance) to a deposited run’s time series, keeps each fit as an artifact, and forecasts a run like it as a ' +
+      'band. Fitted from depositions alone; one run says nothing of run-to-run variation.',
+    implementedIn: [
+      'core/openferment_core/fermos.py',
+      'src/engine/series.ts',
+      'src/screens/FermOS.tsx',
+      'src/screens/FermOSForecast.tsx',
+    ],
+  },
   { id: 'fermos.transport', owner: 'fermOS', label: 'Transport', status: 'stub', state: UNBUILT },
   { id: 'fermos.mode', owner: 'fermOS', label: 'Operating mode', status: 'stub', state: UNBUILT },
   { id: 'fermos.scale', owner: 'fermOS', label: 'Scale', status: 'stub', state: UNBUILT },
@@ -122,9 +174,26 @@ export const SUBSYSTEMS: Subsystem[] = [
   { id: 'pureos.capture', owner: 'pureOS', label: 'Capture', status: 'stub', state: UNBUILT },
   { id: 'pureos.polish', owner: 'pureOS', label: 'Polish', status: 'stub', state: UNBUILT },
   { id: 'pureos.recovery', owner: 'pureOS', label: 'Recovery', status: 'stub', state: UNBUILT },
+  {
+    id: 'proforma.uncertainty',
+    owner: 'Proforma',
+    label: 'Uncertainty',
+    status: 'live',
+    state:
+      'Runs a BioSTEAM flowsheet over 500 seeded Latin-hypercube samples of inputs bound to records or to a named ' +
+      'person\u2019s assumption, and shows the price as a distribution, what moves it, and the infeasible share by ' +
+      'reason. One draft flowsheet so far: fermentation, harvest and drying of PHA.',
+    implementedIn: [
+      'core/openferment_core/proforma.py',
+      'core/openferment_core/flowsheets/pha_sugar_v0.py',
+      'core/openferment_core/workers/proforma_worker.py',
+      'src/screens/ProformaBiosteam.tsx',
+      'src/components/figures/Distribution.tsx',
+      'src/components/figures/Tornado.tsx',
+    ],
+  },
 
   // ── the rest, unchanged by this increment ────────────────────────────
-  { id: 'proforma.uncertainty', owner: 'Proforma', label: 'Uncertainty', status: 'stub', state: UNBUILT },
   { id: 'dominion.claims', owner: 'Dominion', label: 'Claim Workbench', status: 'stub', state: UNBUILT },
   { id: 'dominion.priority', owner: 'Dominion', label: 'Priority Engine', status: 'stub', state: UNBUILT },
   { id: 'dominion.enablement', owner: 'Dominion', label: 'Enablement', status: 'stub', state: UNBUILT },

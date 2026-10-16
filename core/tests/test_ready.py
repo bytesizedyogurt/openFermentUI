@@ -10,6 +10,9 @@ import plistlib
 from pathlib import Path
 
 import anthropic
+import httpx
+import json
+
 import pytest
 
 from openferment_core import api, biorepo, extract, intake, llm, ready
@@ -145,7 +148,85 @@ def test_network_checks_skip_in_fixture_mode(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     assert ready.check_model(True, client_factory=FakeClient).mark == "skip"
     assert ready.check_europe_pmc().mark == "skip"
+    assert ready.check_huggingface().mark == "skip"
     assert ready.check_backup().mark == "skip"
+
+
+# ── Hugging Face, the optional row (OF-BLD-014 §1.3) ───────────────────
+
+
+def _hf_answers(monkeypatch, outcome):
+    def head(url, **_):
+        assert url == ready.HUGGINGFACE
+        if isinstance(outcome, Exception):
+            raise outcome
+        return httpx.Response(outcome, request=httpx.Request("HEAD", url))
+
+    monkeypatch.setattr(ready.httpx, "head", head)
+
+
+@pytest.mark.parametrize(
+    ("outcome", "mark", "says"),
+    [
+        (200, "ok", "huggingface.co answers"),
+        (403, "warn", "answered 403"),
+        (httpx.ConnectError("blocked"), "warn", "could not reach huggingface.co (ConnectError)"),
+    ],
+)
+def test_huggingface_warns_when_blocked_and_never_fails(monkeypatch, outcome, mark, says):
+    _hf_answers(monkeypatch, outcome)
+    check = ready.check_huggingface()
+    assert check.mark == mark and says in check.detail, check.detail
+
+
+def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup"):
+        row = name.removeprefix("check_").replace("_", "")
+        monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
+    _hf_answers(monkeypatch, httpx.ConnectError("blocked"))
+    assert ready.main([]) == 0
+    out = capsys.readouterr().out
+    assert "! huggingface" in out and out.rstrip().endswith("lane: full")
+
+
+# ── the lane (OF-BLD-014 A.4) ──────────────────────────────────────────
+
+
+def _checks(key: str, europepmc: str, model: str = "ok") -> list:
+    return [ready.Check("key", key, ""), ready.Check("model", model, ""), ready.Check("europepmc", europepmc, "")]
+
+
+@pytest.mark.parametrize(
+    ("key", "europepmc", "model", "lane"),
+    [
+        ("ok", "ok", "ok", "full"),
+        ("warn", "ok", "ok", "full"),
+        ("ok", "fail", "ok", "model-only"),
+        ("ok", "skip", "skip", "none"),
+        ("ok", "skip", "warn", "model-only"),
+        ("fail", "ok", "skip", "none"),
+        ("fail", "fail", "skip", "none"),
+        ("ok", "ok", "fail", "none"),
+        ("ok", "fail", "fail", "none"),
+    ],
+)
+def test_the_three_lanes(key, europepmc, model, lane):
+    assert ready.lane(_checks(key, europepmc, model)) == lane
+    assert lane in ready.LANES
+
+
+def test_the_lane_is_the_last_line_of_every_report(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    assert ready.report(ready.run(no_network=True, port=1)).splitlines()[-1] == "lane: none", \
+        "a model unasked is a key unconfirmed, as Europe PMC unasked is Europe PMC unconfirmed"
 
 
 # ── what is on disk ────────────────────────────────────────────────────
@@ -229,3 +310,145 @@ def test_service_address_without_an_installed_job(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENFERMENT_PORT", raising=False)
     monkeypatch.delenv("OPENFERMENT_POLL_HOST", raising=False)
     assert ready.service_address() == ("127.0.0.1", 8000)
+
+
+# ── roles (OF-BLD-014 §3.3) ────────────────────────────────────────────
+
+
+class FakeRolesClient:
+    """The Models API for every model in either role's chain."""
+
+    def __init__(self, missing=()):
+        self.missing = set(missing)
+        self.models = self
+
+    def retrieve(self, model_id, **_):
+        assert any(model_id in llm.chain(r) for r in llm.ROLES)
+        if model_id in self.missing:
+            raise status_error(anthropic.NotFoundError, 404)
+        return {"id": model_id}
+
+
+def test_roles_names_each_chain_and_todays_spend(monkeypatch):
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient())
+    assert check.mark == "ok"
+    assert "index: claude-haiku-5-5 → claude-opus-5-5" in check.detail and "of the $25.00 daily cap" in check.detail
+    check = ready.check_roles(True, client_factory=lambda: FakeRolesClient(missing={"claude-haiku-5-5"}))
+    assert check.mark == "warn" and "index work runs on the answer chain" in check.detail
+    assert ready.check_roles(False).mark == "skip"
+
+
+def test_roles_fails_on_a_budget_that_is_not_dollars(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "lots")
+    check = ready.check_roles(False)
+    assert check.mark == "fail" and "OPENFERMENT_DAILY_BUDGET_USD" in check.detail
+
+
+# ── what OF-BLD-014 added (§10.2) ──────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _no_worker_start(monkeypatch, request):
+    """A real worker takes most of a minute to start; every test but the
+    one that asks for it reads the row as skipped."""
+    if request.node.name != "test_a_worker_that_does_not_answer_is_said":
+        monkeypatch.setattr(ready, "check_workers", lambda ping=True: ready.Check("workers", "skip", "test"))
+
+
+def test_the_new_rows_are_listed_and_change_no_lane(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    checks = ready.run(no_network=True, port=1)
+    names = [c.name for c in checks]
+    for n in ("index", "models", "artifacts", "spend", "workers"):
+        assert n in names
+    assert ready.lane(checks) == "none"
+
+
+def test_index_warns_when_fewer_papers_are_indexed_than_fetched(monkeypatch):
+    from openferment_core import passages
+    from openferment_core.models import RagStatus
+
+    monkeypatch.setattr(passages, "status", lambda: RagStatus(papersIndexed=3, passages=40, lanes=[], chosenLane="bm25"))
+    monkeypatch.setattr(ready, "_fetched_complete", lambda: 5)
+    c = ready.check_index()
+    assert c.mark == "warn" and "3 papers indexed of 5 fetched" in c.detail and "lane bm25" in c.detail
+    monkeypatch.setattr(ready, "_fetched_complete", lambda: 3)
+    assert ready.check_index().mark == "ok"
+
+
+def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
+    from openferment_core import geneos_models as shelf
+
+    monkeypatch.setattr(shelf, "available", lambda m: f"{m.id}'s file is not on this machine: run pnpm geneos:fetch" if m.fetched else None)
+    c = ready.check_models()
+    assert c.mark == "warn" and "RehMBEL1391's file is not on this machine" in c.detail and "e_coli_core bundled" in c.detail
+
+
+def test_artifacts_are_counted(monkeypatch, tmp_path):
+    from openferment_core import artifacts
+
+    monkeypatch.setattr(artifacts, "folder", lambda: tmp_path)
+    (tmp_path / "a.json").write_text("{}")
+    (tmp_path / "b.json").write_text("{}")
+    assert ready.check_artifacts().detail == "2 kept"
+
+
+def test_spend_reads_today_against_the_cap_and_a_damaged_file_fails(monkeypatch, tmp_path):
+    from openferment_core import spend
+
+    f = tmp_path / "spend.json"
+    monkeypatch.setattr(spend, "path", lambda: f)
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "2")
+    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 1.5, "index": 0.25}, "calls": 3, "reservations": {}}))
+    c = ready.check_spend()
+    assert c.mark == "ok" and "$1.75 of the $2.00 daily cap" in c.detail
+    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 2.0}, "calls": 3, "reservations": {}}))
+    assert ready.check_spend().mark == "warn"
+    f.write_text("{not json")
+    assert ready.check_spend().mark == "fail"
+
+
+def test_a_worker_that_does_not_answer_is_said(monkeypatch):
+    from openferment_core import workers
+
+    class Mute:
+        def __init__(self, module, timeout_s):
+            self.module = module
+
+        def ping(self, timeout_s=None):
+            if "proforma" in self.module:
+                raise workers.WorkerTimeout("no answer in 240 s")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(workers, "SimWorker", Mute)
+    c = ready.check_workers()
+    assert c.mark == "warn" and "geneOS answers" in c.detail and "Proforma does not" in c.detail
+    assert ready.check_workers(ping=False).mark == "skip"
+
+
+def test_r2_a_row_that_crashes_reads_as_a_warning_and_the_rest_still_run(monkeypatch):
+    from openferment_core import passages
+
+    def broken():
+        raise AttributeError("'list' object has no attribute 'get'")
+
+    monkeypatch.setattr(passages, "status", broken)
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    checks = ready.run(no_network=True, port=1)
+    row = next(c for c in checks if c.name == "index")
+    assert row.mark == "warn" and "could not be checked" in row.detail and checks[-1].name == "service"
+
+
+def test_the_workspace_400_names_the_setting_that_fixes_it(monkeypatch):
+    from openferment_core import llm
+
+    monkeypatch.delenv(llm.WORKSPACE_SETTING, raising=False)
+    e = Exception("400")
+    e.body = {"error": {"message": "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header"}}
+    assert "Set OPENFERMENT_WORKSPACE_ID in core/.env" in ready._said(e)
+    monkeypatch.setenv(llm.WORKSPACE_SETTING, "wrkspc_x")
+    assert "Set OPENFERMENT_WORKSPACE_ID" not in ready._said(e)

@@ -475,7 +475,7 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
       )}
 
       <div className="mb-3">
-        <CounselCallout scope="a catalogue of 117 molecules" />
+        <CounselCallout scope={`a catalogue of ${products.length} molecules`} />
       </div>
 
       <div className="mb-3">

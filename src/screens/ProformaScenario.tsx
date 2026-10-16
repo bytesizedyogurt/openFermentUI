@@ -28,6 +28,8 @@ import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
+import { Tornado } from '@/components/figures';
+import ProformaBiosteam from './ProformaBiosteam';
 
 const CONVERGE_STAGES = ['Building flowsheet', 'Converging', 'Costing'];
 
@@ -66,7 +68,7 @@ function ChartTable({ headers, rows }: { headers: string[]; rows: (string | numb
   );
 }
 
-export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
+function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const grids = useStore((s) => s.grids);
   const setScenarioPoint = useStore((s) => s.setScenarioPoint);
@@ -213,9 +215,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
     }));
   }, [grid, primaryDim, secondaryDim, scenario.point]);
 
-  const tornado = [...grid.sensitivity]
-    .map((s) => ({ ...s, mag: Math.max(Math.abs(s.lowPct), Math.abs(s.hiPct)) }))
-    .sort((a, b) => b.mag - a.mag);
+  const tornado = grid.sensitivity;
 
   const exportAll = () => {
     const headers = ['Section', 'Item', 'Value', 'Unit', 'Provenance', 'Record', 'Note'];
@@ -514,56 +514,18 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Tornado */}
-                <Card className="p-4">
-                  <h2 className="font-serif text-section-title font-semibold mb-1">
-                    Sensitivity{' '}
-                    <Explain label="How to read a tornado">
-                      Each bar varies one assumption at a time by ±20% and plots the resulting swing
-                      in MSP. Longer bars matter more. Asymmetric bars mean the risk is one-sided,
-                      which is usually more decision-relevant than the length. One-at-a-time analysis
-                      ignores interactions between assumptions.
-                    </Explain>
-                  </h2>
-                  <p className="text-caption text-ink-soft mb-3">
-                    Precomputed per model and evaluated at the model’s reference point — not at your
-                    current slider position.
-                  </p>
-                  <div style={{ height: 220 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={tornado}
-                        layout="vertical"
-                        margin={{ top: 4, right: 12, bottom: 4, left: 8 }}
-                      >
-                        <CartesianGrid stroke={theme.grid} horizontal={false} />
-                        <XAxis
-                          type="number"
-                          tick={{ fill: theme.axis, fontSize: 11 }}
-                          tickFormatter={(v) => `${v}%`}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="assumption"
-                          tick={{ fill: theme.axis, fontSize: 10 }}
-                          width={124}
-                        />
-                        <Tooltip {...tip} formatter={(v: number) => [`${v.toFixed(1)}%`, 'MSP change']} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="lowPct" name="−20%" fill={seriesColor(0)} isAnimationActive={false} />
-                        <Bar dataKey="hiPct" name="+20%" fill={seriesColor(1)} isAnimationActive={false} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartTable
-                    headers={['Assumption', '−20%', '+20%']}
-                    rows={tornado.map((t) => [
-                      t.assumption,
-                      `${t.lowPct.toFixed(1)}%`,
-                      `${t.hiPct.toFixed(1)}%`,
-                    ])}
+                {/* Tornado (§8.4: drawn by the figure grammar's Tornado) */}
+                <div>
+                  <Tornado
+                    title="Which assumption moves the price most?"
+                    drawn="Each bar varies one assumption at a time by ±20% and plots the swing in MSP, precomputed per model at its reference point, not at your slider position. One-at-a-time analysis ignores interactions."
+                    series={['−20%', '+20%']}
+                    unit="% change in MSP"
+                    provenance="demo"
+                    rows={tornado.map((t) => ({ label: t.assumption, values: [t.lowPct, t.hiPct], tag: 'authored' }))}
+                    csvName={`${scenario.id}-tornado`}
                   />
-                </Card>
+                </div>
 
                 {/* Sweep */}
                 <Card className="p-4">
@@ -686,4 +648,10 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
       </Sheet>
     </div>
   );
+}
+
+/** An authored surface, or a BioSTEAM scenario the service simulates (§8.4). */
+export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
+  const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
+  return scenario?.kind === 'biosteam' ? <ProformaBiosteam scenario={scenario} /> : <AuthoredScenario scenarioId={scenarioId} />;
 }

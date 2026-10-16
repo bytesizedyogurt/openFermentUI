@@ -39,11 +39,65 @@ export const STRAIN_ALIASES: Record<string, string> = {
   bl21: 'ecoli',
   bovine: 'bovine',
   'bos taurus': 'bovine',
+  // Thread P hosts (OF-BLD-014 §2.2). Only spellings that carry the strain
+  // designation: "Cupriavidus necator" alone names a species, and a value
+  // measured on another strain of it stays apart.
+  h16: 'c-necator-h16',
+  'c. necator h16': 'c-necator-h16',
+  'cupriavidus necator h16': 'c-necator-h16',
+  'ralstonia eutropha h16': 'c-necator-h16',
+  kt2440: 'p-putida-kt2440',
+  'p. putida kt2440': 'p-putida-kt2440',
+  'pseudomonas putida kt2440': 'p-putida-kt2440',
 };
 
-/** Normalise a strain name found in prose to a canonical id, or null. */
+/**
+ * The id a paper's wording names, by the whole-word rule (OF-BLD-014 §2.1).
+ *
+ * The wording is trimmed, its runs of whitespace collapsed and lower-cased.
+ * An exact alias wins. Otherwise every alias that stands inside the wording as
+ * a whole word — no letter or digit touching either end — is a hit, and when
+ * all the hits name ONE id that id is the answer. No hit is null, and so is
+ * hits naming two different ids: "E. coli expressing bovine β-casein" names
+ * two organisms, and choosing one would merge measurements this table exists
+ * to keep apart.
+ *
+ * `carbonSourceId` in vocabulary.ts applies the same rule, and
+ * `core/openferment_core/validate.py` mirrors it line for line, held to it by
+ * the fixture `scripts/export-unit-fixtures.ts` records from this function.
+ */
+export function matchWholeWord(text: string, aliases: Record<string, string>): string | null {
+  const wording = text.trim().replace(/\s+/g, ' ').toLowerCase();
+  if (wording === '') return null;
+  // Own keys only: 'constructor' is not an alias.
+  if (Object.prototype.hasOwnProperty.call(aliases, wording)) return aliases[wording];
+  const hits = new Set<string>();
+  for (const [alias, id] of Object.entries(aliases)) {
+    if (alias !== '' && containsWord(wording, alias)) hits.add(id);
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
+
+const WORD_CHAR = /[a-z0-9]/;
+
+/** Whether `needle` occurs in `haystack` with no letter or digit touching it. */
+function containsWord(haystack: string, needle: string): boolean {
+  for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + 1)) {
+    const before = at === 0 ? '' : haystack[at - 1];
+    const after = at + needle.length < haystack.length ? haystack[at + needle.length] : '';
+    if (!WORD_CHAR.test(before) && !WORD_CHAR.test(after)) return true;
+  }
+  return false;
+}
+
+/**
+ * Normalise a strain name found in prose to a canonical id, or null: an
+ * exact alias, or an alias standing in the wording as a whole word
+ * (`matchWholeWord`). "Chlamydomonas reinhardtii UVM4" is uvm4; the species
+ * alone names no strain and is null.
+ */
 export function normalizeStrain(raw: string): string | null {
-  return STRAIN_ALIASES[raw.trim().toLowerCase()] ?? null;
+  return matchWholeWord(raw, STRAIN_ALIASES);
 }
 
 export const STRAINS: Strain[] = [
@@ -324,7 +378,45 @@ export const STRAINS: Strain[] = [
     badges: ['thermophilic', 'high secretion'],
     bsl: 1,
     notes: [],
-  },];
+  },
+  // PHA hosts for thread P (OF-BLD-014 §2.2). Each note says why the host is
+  // catalogued and states no process number: every quantity about them
+  // arrives through Intake and a Guild decision.
+  {
+    id: 'c-necator-h16',
+    binomial: 'Cupriavidus necator',
+    designation: 'H16',
+    taxonomy: ['Bacteria', 'Pseudomonadota', 'Betaproteobacteria', 'Burkholderiales'],
+    description:
+      'Gram-negative soil bacterium, formerly Ralstonia eutropha. The industrial polyhydroxybutyrate (PHB) organism: it stores carbon as intracellular polymer granules when a nutrient other than carbon runs short.',
+    badges: ['PHB', 'BSL-1', 'genome-scale model'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-10-14',
+        who: 'OF-BLD-014 §2.2',
+        text: 'Catalogued as the reference host of thread P, PHA from waste cellulosic sugars. A published genome-scale model of this strain exists; geneOS is to compute yield ceilings from it (OF-BLD-014 §6.2), and does not yet. Nothing in the corpus is attributed to it until thread P papers are fetched, extracted and reviewed.',
+      },
+    ],
+  },
+  {
+    id: 'p-putida-kt2440',
+    binomial: 'Pseudomonas putida',
+    designation: 'KT2440',
+    taxonomy: ['Bacteria', 'Pseudomonadota', 'Gammaproteobacteria', 'Pseudomonadales'],
+    description:
+      'Gram-negative soil bacterium with a broad catabolism and tolerance of aromatic compounds. It makes medium-chain-length PHA, a softer, more elastic polymer than PHB.',
+    badges: ['mcl-PHA', 'BSL-1', 'aromatics-tolerant'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-10-14',
+        who: 'OF-BLD-014 §2.2',
+        text: 'Catalogued as the medium-chain-length PHA host of thread P. Nothing in the corpus is attributed to it until thread P papers are fetched, extracted and reviewed.',
+      },
+    ],
+  },
+];
 
 export const STRAINS_BY_ID: Record<string, Strain> = Object.fromEntries(
   STRAINS.map((s) => [s.id, s]),

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
 import { navigate, useRoute } from '@/router';
-import type { AnswerPlan, ChatMessage, ChatRetrievalHit, ChatToolCall } from '@/data/types';
+import type { AnswerPlan, ChatMessage, ChatRetrievalHit, ChatToolCall, TraceStep } from '@/data/types';
 import { SUGGESTED_PROMPTS } from '@/data/flows';
 import { send, sendFlow } from '@/sim/chat';
 import { fieldName } from '@/data/ontology';
@@ -38,7 +38,8 @@ import { Markdown } from '@/components/Markdown';
 import { ProvDot } from '@/components/Provenance';
 import { useSeriesColor } from '@/lib/viz';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdoc, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
+import { askPostdocStream, postdocHealth, PostdocDown, type PostdocHealth, type ReplayInfo } from '@/lib/postdoc';
+import { PlanTrace } from '@/components/PlanTrace';
 
 const SLASH_HINTS = [
   { cmd: '/extract <paper>', does: 'queue an extraction job' },
@@ -259,13 +260,15 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
  * The live turn (OF-BLD-007 §8).
  *
  * Deliberately not a chat transcript. There is one question and one plan,
- * because this increment makes one retrieval and one call — no agent loop —
  * and drawing it as a conversation would imply a history the service does not
- * keep.
+ * keep. Since OF-BLD-014 §5.4 the plan comes from Postdoc's bounded loop, and
+ * its steps draw here as the service completes them: what was searched, what
+ * came back, how long it took.
  */
 function LivePanel({
   question,
   plan,
+  steps,
   down,
   busy,
   health,
@@ -273,6 +276,7 @@ function LivePanel({
 }: {
   question: string;
   plan: AnswerPlan | null;
+  steps: TraceStep[];
   down: { message: string; remedy: string } | null;
   busy: boolean;
   health: PostdocHealth | null;
@@ -312,13 +316,22 @@ function LivePanel({
         </div>
       )}
 
-      {busy && (
-        <Card className="p-4">
-          <div className="flex items-center gap-2 text-body text-ink-soft">
-            <RefreshCw size={14} className="animate-spin shrink-0" aria-hidden />
-            Retrieving over the corpus, then asking{' '}
-            <span className="font-num">{health?.model ?? 'the model'}</span>…
+      {(busy || steps.length > 0) && (
+        <Card className="px-4 py-2">
+          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
+            {busy ? (
+              <>
+                Working on{' '}
+                <span className="font-num normal-case">
+                  {/* After a restart the second model in the chain answers (§5.R). */}
+                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
+                </span>
+              </>
+            ) : (
+              'What Postdoc did'
+            )}
           </div>
+          <PlanTrace steps={plan?.trace ?? steps} running={busy} />
         </Card>
       )}
 
@@ -330,7 +343,7 @@ function LivePanel({
         <div className="pt-6">
           <EmptyState
             title="Ask the corpus a question"
-            body="Postdoc retrieves over the corpus, then writes claims that carry no numbers of their own — every value on the answer is rendered from the record it cites. A question the corpus cannot support gets an explicit decline."
+            body="Postdoc searches the records and the papers' own text with its tools, then writes claims that carry no numbers of their own: every value is rendered from the record it cites, and every quoted sentence was checked word for word against its paper. A question the corpus cannot support gets an explicit decline."
             icon={<Sparkles size={28} />}
           />
           <div className="flex flex-wrap gap-2 justify-center mt-2">
@@ -377,6 +390,8 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   // mean inventing a message shape for something that is not one, which is the
   // mistake §1 warns about — bolting the API onto the transcript shape.
   const [livePlan, setLivePlan] = useState<AnswerPlan | null>(null);
+  const [liveReplay, setLiveReplay] = useState<ReplayInfo | null>(null);
+  const [liveSteps, setLiveSteps] = useState<TraceStep[]>([]);
   const [liveQuestion, setLiveQuestion] = useState('');
   const [down, setDown] = useState<{ message: string; remedy: string } | null>(null);
   const [health, setHealth] = useState<PostdocHealth | null>(null);
@@ -465,8 +480,10 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       setDown(null);
       setLiveQuestion(text);
       setLivePlan(null);
+      setLiveSteps([]);
+      setLiveReplay(null);
       try {
-        setLivePlan(await askPostdoc(text));
+        setLivePlan(await askPostdocStream(text, (step) => setLiveSteps((prev) => [...prev, step]), { onReplay: setLiveReplay }));
       } catch (err) {
         if (err instanceof PostdocDown) setDown({ message: err.message, remedy: err.remedy });
         else if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -594,10 +611,21 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+          {chatMode === 'live' && liveReplay && (
+            <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
+              {/* §10.R: a stand-in recording's date is fixed to keep the fixture
+                  stable, so it claims none; a real recording names its day. */}
+              {liveReplay.standIn
+                ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
+                : `Replay of a run on ${liveReplay.recordedAt.slice(0, 10)}.`}{' '}
+              Nothing is being asked now.
+            </div>
+          )}
           {chatMode === 'live' ? (
             <LivePanel
               question={liveQuestion}
               plan={livePlan}
+              steps={liveSteps}
               down={down}
               busy={busy}
               health={health}

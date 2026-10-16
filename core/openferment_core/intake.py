@@ -206,65 +206,263 @@ _NOT_PROSE = {"table-wrap", "fig", "ref-list", "ack", "fn-group"}
 # Elements whose text is not the paper's argument and must not become a section
 # or leak into a parent's paragraphs.
 _DROP = _NOT_PROSE | {"sec", "title", "label"}
+# Europe PMC serves the back matter inside <body>, as <sec sec-type=...>: of
+# the first 31 real fetches (OF-BLD-014 §1.5, 2026-10-14), 18 carried
+# fn-group and ref-list sections there, 15 ack, and others the data,
+# contributor and conflict statements. They are dropped as <ack>,
+# <fn-group> and <ref-list> are, with every section below them. A
+# supplementary section stays: its figure legends can hold values stated
+# nowhere else (C4).
+_BACK_SEC_TYPES = {
+    "ack", "fn-group", "ref-list", "associated-data", "data-availability", "data-availability-statement",
+    "contrib-info", "COI-statement", "author-contributions", "glossary", "funding-information",
+    "funding-statement",
+}
+# The same statements often carry no sec-type at all, only their title (ten
+# of the 31). A title is compared whole, so 'Funding of the pilot plant' is
+# a section of the paper and 'Funding' is not.
+_BACK_TITLES = {
+    "acknowledgements", "acknowledgments", "acknowledgement", "acknowledgment",
+    "author contributions", "author contribution", "authors' contributions", "authors contributions",
+    "contributions", "credit authorship contribution statement", "author information",
+    "funding", "funding statement", "funding information", "funding sources", "sources of funding",
+    "financial support", "conflict of interest", "conflicts of interest", "conflict of interests",
+    "conflict of interest statement", "competing interests", "competing interest",
+    "declaration of competing interest", "declaration of interests", "disclosure", "disclosures",
+    "data availability", "data availability statement", "availability of data and materials",
+    "data access statement", "disclaimer", "institutional review board statement",
+    "informed consent statement", "ethics statement", "ethics approval and consent to participate",
+    "consent for publication", "declarations", "publisher's note", "abbreviations", "footnotes", "notes",
+}
+# Parts of a structured abstract that are not the abstract's argument.
+_ABSTRACT_ASIDES = {
+    "electronic supplementary material", "supplementary information", "supplementary material",
+    "graphical abstract", "keywords",
+}
+# Elements that end a run of words: the text either side of one is two runs,
+# never one word glued to the next ('Background' + 'The study').
+_BLOCK = {"p", "title", "label", "caption", "list-item", "def-item", "term", "def", "disp-quote", "license-p", "fn"}
+_MATHML = "{http://www.w3.org/1998/Math/MathML}"
+_ALI = "{http://www.niso.org/schemas/ali/1.0/}"
+
+_NUMERIC = re.compile(r"[-\u2212\u207b]?\d+")
+# Typography inside an exponent: '10<sup>− 15</sup>' is 10^-15, and a thin
+# space after the minus is as common as a plain one.
+_INNER_SPACE = re.compile(r"[\s\u00a0\u2009\u200a\u202f]+")
+# A run of reference numbers: '13,14' or '3–5'.
+_RUN = re.compile(r"\d+[\d,\s\u2013\u2212-]*[,\u2013\u2212-][\d,\s\u2013\u2212-]*")
+# What a mark's text is when it is no word: digits and their punctuation.
+_MARKISH = re.compile(r"[\d\s.,;:()\[\]\u2013\u2212-]+")
+# A linked citation outside a superscript is held between these two
+# characters while a paragraph is assembled, so `_uncite` can drop a group
+# of citations in brackets or parentheses and give any other back its text.
+_CITE_OPEN, _CITE_CLOSE = "\ue000", "\ue001"
+_CITE = "\ue000[^\ue001]*\ue001"
+_CITES = rf"(?:\[\s*{_CITE}(?:\s*[,;\u2013\u2014\u2212-]?\s*{_CITE})*\s*\]|\(\s*{_CITE}(?:\s*[,;\u2013\u2014\u2212-]?\s*{_CITE})*\s*\))"
+# A citation whose own text carries its brackets, as PLoS writes each one.
+_BRACKETED = r"\ue000\s*[\[(][\d\s,;\u2013\u2212-]+[\])]\s*\ue001"
+_UNCITE = (
+    (re.compile(rf"(?<=\()\s*{_CITES}\s*[;,]\s*"), ""),          # '([13]; Fig. 4)'
+    (re.compile(rf"(?<=[;,])\s*{_CITES}\s*[;,](?=\s)"), ""),       # '(kg−1; [13]; Fig. 4)'
+    (re.compile(rf"\s*[;,]\s*{_CITES}(?=\s*\))"), ""),            # '(kg−1; [13])'
+    (re.compile(rf"\s*{_CITES}"), ""),                               # '68% [10,56]'
+    (re.compile(rf"\s*{_BRACKETED}(?:\s*[,;\u2013\u2014\u2212-]\s*{_BRACKETED})*"), ""),  # '<xref>[12]</xref>, <xref>[16]</xref>'
+    (re.compile(r"\ue000([^\ue001]*)\ue001"), r"\1"),              # 'Lam et al. (2017)' is the sentence's words
+)
 
 
-# The base a numeric superscript is a power of: a ten that is a number of its
-# own, not the tail of '110' or '2.10'.
-_TEN = re.compile(r"(?<![\d.,])10$")
+def _local(tag: object) -> str:
+    return tag if isinstance(tag, str) else ""
 
 
-def _collect(el: ET.Element, parts: list[str], *, prose: bool) -> None:
+def _mark(el: ET.Element, parts: list[str], ref_type: str | None) -> None:
+    """A superscript that links somewhere: a citation, or a footnote mark.
+    A citation is never the paper's words and is dropped; so is a numeric
+    footnote mark, which glued to a number would change it ('0.5' plus mark
+    '1.' read as '0.51'). A footnote letter or symbol reads inline, '7.2a',
+    as it always has."""
+    inner = "".join(el.itertext()).strip()
+    if ref_type == "bibr" or not inner or _MARKISH.fullmatch(inner):
+        return
+    parts.append(inner)
+
+
+def _sup(el: ET.Element, parts: list[str], *, prose: bool, marks: frozenset[str]) -> None:
+    """What an unlinked superscript means, from what it holds and what it
+    follows. On a number, a number or a signed expression is a power ('10⁶',
+    '2⁴', '(3/5)²' read '10^6', '2^4', '(3/5)^2', and 2<sup>−ΔΔCt</sup> reads
+    '2^−ΔΔCt'), unless it is a label of a footnote under this
+    very table, which marks a cell and is dropped. On a letter it is a unit's
+    exponent and reads inline, 'L<sup>-1</sup>' as 'L-1'; after a bracket or
+    a dash it is an isotope's mass, '[α-<sup>32</sup>P]' as '[α-32P]'. A run
+    of numbers is citations. Anything else, an ordinal, a footnote letter, a
+    dagger, a charge, reads inline."""
+    inner: list[str] = []
+    _collect(el, inner, prose=prose, marks=marks)
+    raw = "".join(inner).strip()
+    exponent = _INNER_SPACE.sub("", raw)
+    before = "".join(parts).rstrip()
+    on_number = before[-1:].isdigit() or before[-1:] == ")"
+    if _NUMERIC.fullmatch(exponent):
+        if on_number and exponent.rstrip(".") in marks:
+            return
+        if on_number:
+            # Close up '10 ⁶' as well as '10⁶': the space is typography.
+            if parts and parts[-1].rstrip() != parts[-1]:
+                parts[-1] = parts[-1].rstrip()
+            parts.append("^" + exponent)
+            return
+        parts.append(exponent)
+    elif _RUN.fullmatch(raw):
+        return
+    elif on_number and exponent[:1] in "-+\u2212" and len(exponent) > 1:
+        # A signed expression on a number is a power: '2<sup>−ΔΔCt</sup>'
+        # reads 2^−ΔΔCt, never two minus ΔΔCt.
+        if parts and parts[-1].rstrip() != parts[-1]:
+            parts[-1] = parts[-1].rstrip()
+        parts.append("^" + _group(exponent))
+    else:
+        parts.append(raw)
+
+
+def _group(s: str) -> str:
+    return s if re.fullmatch(r"[\w.\u2212-]+", s) else f"({s})"
+
+
+_SPACED_OPERATORS = {"=", "+", "×", "·", "<", ">", "≤", "≥", "±", "≈", "∼", "~", "→", "−"}
+
+
+def _math(el: ET.Element) -> str:
+    """MathML written out as a line a reader can quote: a fraction as a/b,
+    a power as a^b, a subscript inline as <sub> reads, a root as √(x)."""
+    tag = _local(el.tag).replace(_MATHML, "")
+    kids = [c for c in el if _local(c.tag)]
+    rendered = [_math(c) for c in kids]
+    if tag in ("mi", "mn", "mtext", "ms"):
+        return (el.text or "").strip()
+    if tag == "mo":
+        op = (el.text or "").strip()
+        return f" {op} " if op in _SPACED_OPERATORS else op
+    if tag == "mspace":
+        return " "
+    if tag in ("annotation", "annotation-xml", "none", "mprescripts"):
+        return ""
+    if tag == "semantics":
+        return rendered[0] if rendered else ""
+    if tag == "mfrac" and len(rendered) == 2:
+        return f"{_group(rendered[0].strip())}/{_group(rendered[1].strip())}"
+    if tag == "msup" and len(rendered) == 2:
+        exponent = rendered[1].strip()
+        if exponent.startswith("^"):
+            # An msup on nothing inside an exponent: B^(^2) is B^2.
+            return f"{rendered[0]}{exponent}"
+        return f"{rendered[0]}^{_group(exponent)}"
+    if tag == "msub" and len(rendered) == 2:
+        return f"{rendered[0]}{rendered[1]}"
+    if tag == "msubsup" and len(rendered) == 3:
+        sub = rendered[1].strip()
+        if " " in sub:
+            # A limit with an operator in it, ∑ from j = 1: grouped, so its
+            # last term is not read as the base of the power after it.
+            return f"{rendered[0]}_({sub})^{_group(rendered[2].strip())}"
+        return f"{rendered[0]}{sub}^{_group(rendered[2].strip())}"
+    if tag == "msqrt":
+        return f"√({''.join(rendered).strip()})"
+    if tag == "mroot" and len(rendered) == 2:
+        return f"{_group(rendered[0].strip())}^(1/{rendered[1].strip()})"
+    if tag == "mfenced":
+        return f"{el.get('open', '(')}{el.get('separators', ',')[:1].join(rendered)}{el.get('close', ')')}"
+    return "".join(rendered)
+
+
+def _tex(el: ET.Element) -> str:
+    """A <tex-math> formula, when no MathML stands beside it: the expression
+    alone, without the LaTeX document Europe PMC wraps it in."""
+    src = "".join(el.itertext())
+    m = re.search(r"\\begin\{document\}(.*?)\\end\{document\}", src, re.S)
+    return (m.group(1) if m else src).replace("$", " ").strip()
+
+
+def _collect(el: ET.Element, parts: list[str], *, prose: bool, marks: frozenset[str] = frozenset()) -> None:
     """Text in document order. <sup> and <sub> contribute their characters
     inline, so L<sup>-1</sup> reads 'L-1' and CO<sub>2</sub> reads 'CO2', the
-    spellings §2.4's normalisation expects — except a superscript on a NUMBER,
-    which is a power of ten and reads 10<sup>6</sup> as '10^6', because '106'
-    is a different number. In prose mode, tables and figures nested anywhere
-    below are skipped: they are sections of their own, not this paragraph."""
+    spellings §2.4's normalisation expects; a superscript on a number is a
+    power, '10^6' (`_sup`); a superscript that links to a citation or a
+    footnote is a mark (`_mark`). In prose mode, tables and figures nested
+    anywhere below are skipped: they are sections of their own, not this
+    paragraph. `marks` holds the footnote labels of the table being read.
+    A linked citation is held between `_CITE_OPEN` and `_CITE_CLOSE` until
+    `_text` settles it (`_uncite`)."""
     if el.text:
         parts.append(el.text)
     for child in el:
-        if prose and child.tag in _NOT_PROSE:
-            if child.tail:
-                parts.append(child.tail)
-            continue
-        if child.tag == "sup":
-            before = "".join(parts).rstrip()
+        tag = _local(child.tag)
+        if prose and tag in _NOT_PROSE:
+            pass
+        elif tag == "alternatives":
+            # One rendering of a formula: MathML when there is one, else the TeX.
+            math = child.find(f"{_MATHML}math")
+            tex = child.find("tex-math")
+            if math is not None:
+                parts.append(_math(math))
+            elif tex is not None:
+                parts.append(_tex(tex))
+        elif tag == f"{_MATHML}math":
+            parts.append(_math(child))
+        elif tag == "tex-math":
+            parts.append(_tex(child))
+        elif tag == "xref" and child.find(".//sup") is not None:
+            _mark(child, parts, child.get("ref-type"))
+        elif tag == "sup" and child.find(".//xref") is not None:
+            _mark(child, parts, child.find(".//xref").get("ref-type"))
+        elif tag == "sup":
+            _sup(child, parts, prose=prose, marks=marks)
+        elif tag == "xref" and child.get("ref-type") == "bibr":
+            parts.append(_CITE_OPEN + "".join(child.itertext()) + _CITE_CLOSE)
+        elif tag == "sub":
+            # '(SP)<sub> n </sub>' is (SP)n: the padding is the XML's.
             inner: list[str] = []
-            _collect(child, inner, prose=prose)
-            exponent = "".join(inner).strip()
-            # A numeric superscript on a TEN is a power: '10⁶' yes. On any
-            # other NUMBER it is a reference mark — Nature-style
-            # '4.2<sup>12</sup> g/L' cites reference 12 — and is dropped:
-            # read as a power it invented 4.2^12, read inline it invented
-            # 4.212 and handed it the unit. On a letter it is a unit's
-            # exponent, 'L<sup>-1</sup>', and reads inline as before; so do
-            # '2<sup>nd</sup>' and a footnote letter '7.2<sup>a</sup>'. A
-            # run of marks, '13,14' or '3-5', is never anything but citations.
-            numeric = bool(re.fullmatch(r"[-\u2212\u207b]?\d+", exponent))
-            if numeric and _TEN.search(before):
-                # Close up '10 ⁶' as well as '10⁶': the space is typography.
-                if parts and parts[-1].rstrip() != parts[-1]:
-                    parts[-1] = parts[-1].rstrip()
-                parts.append("^" + exponent)
-            elif numeric and before and before[-1].isdigit():
-                pass  # a reference mark on a number that is not a ten
-            elif re.fullmatch(r"\d+[\d,\s\u2013-]*[,\u2013-][\d,\s\u2013-]*", exponent):
-                pass  # a run of reference marks
-            else:
-                parts.append(exponent)
+            _collect(child, inner, prose=prose, marks=marks)
+            parts.append("".join(inner).strip())
+        elif tag == "label" and _local(el.tag) == "disp-formula":
+            label = _text(child).strip("() ")
+            if label:
+                parts.append(f" ({label}) ")
+        elif tag == "disp-formula":
+            parts.append(" ")
+            _collect(child, parts, prose=prose, marks=marks)
+            parts.append(" ")
+        elif tag == "break":
+            # 'Purification/<break/>Detection' is one word pair.
+            if not (parts and parts[-1].endswith("/")):
+                parts.append(" ")
         else:
-            _collect(child, parts, prose=prose)
+            _collect(child, parts, prose=prose, marks=marks)
+            if tag in _BLOCK:
+                parts.append(" ")
         if child.tail:
             parts.append(child.tail)
 
 
-def _text(el: ET.Element | None, *, prose: bool = False) -> str:
+def _text(el: ET.Element | None, *, prose: bool = False, marks: frozenset[str] = frozenset()) -> str:
     """All text under an element, inline markup dropped, whitespace collapsed."""
     if el is None:
         return ""
     parts: list[str] = []
-    _collect(el, parts, prose=prose)
-    return _WS.sub(" ", "".join(parts)).strip()
+    _collect(el, parts, prose=prose, marks=marks)
+    return _WS.sub(" ", _uncite("".join(parts))).strip()
+
+
+def _uncite(text: str) -> str:
+    """Drop every group of linked citations in brackets or parentheses,
+    '68% [10,56]' → '68%', with the separator a dropped group leaves inside
+    a parenthesis; a citation is never the paper's words, and a quote that
+    holds '[10,56]' holds 10 and 56 as numbers beside the value. A linked
+    citation outside such a group, 'as Lam et al. (2017) found', keeps its
+    text."""
+    for pattern, replacement in _UNCITE:
+        text = pattern.sub(replacement, text)
+    return text
 
 
 def _own_paragraphs(sec: ET.Element) -> str:
@@ -283,10 +481,35 @@ def _own_paragraphs(sec: ET.Element) -> str:
     return " ".join(parts).strip()
 
 
+def _title_key(sec: ET.Element) -> str:
+    return _WS.sub(" ", _text(sec.find("title"))).strip().rstrip(".:").replace("\u2019", "'").lower()
+
+
+def _structured(abstract: ET.Element) -> str:
+    """A structured abstract, which has sections and no paragraph of its own:
+    each part's heading and its words, 'Background The study.', leaving out
+    the abstract's own title, its keywords and its supplement notes (O5)."""
+    parts: list[str] = []
+    for sec in abstract.iter("sec"):
+        if sec.get("sec-type") == "kwd-group" or _title_key(sec) in _ABSTRACT_ASIDES | _BACK_TITLES:
+            continue
+        words = " ".join(p for p in (_text(sec.find("title")), _own_paragraphs(sec)) if p)
+        if words:
+            parts.append(words)
+    return " ".join(parts)
+
+
+def _is_back_matter(sec: ET.Element) -> bool:
+    return (sec.get("sec-type") or "").strip() in _BACK_SEC_TYPES or _title_key(sec) in _BACK_TITLES
+
+
 def _walk_secs(parent: ET.Element, prefix: str, out: list[tuple[str, str]]) -> None:
     """Depth-first over <sec>, document order. Nested sections flatten to
-    their own entries with the parent heading prefixed ('Results › Growth')."""
+    their own entries with the parent heading prefixed ('Results › Growth').
+    A back-matter section is dropped with everything below it."""
     for sec in parent.findall("sec"):
+        if _is_back_matter(sec):
+            continue
         title = _text(sec.find("title")) or "Untitled section"
         heading = f"{prefix} › {title}" if prefix else title
         text = _own_paragraphs(sec)
@@ -295,17 +518,104 @@ def _walk_secs(parent: ET.Element, prefix: str, out: list[tuple[str, str]]) -> N
         _walk_secs(sec, heading, out)
 
 
-def _table_rows(wrap: ET.Element) -> str:
+def _floats(el: ET.Element, tag: str):
+    """Every <table-wrap> or <fig> below `el`, in document order, leaving out
+    those inside back matter: a dropped section, a reference list, footnotes."""
+    for child in el:
+        name = _local(child.tag)
+        if name in ("ref-list", "fn-group", "ack") or (name == "sec" and _is_back_matter(child)):
+            continue
+        if name == tag:
+            yield child
+        # Below a match too: eLife nests each figure supplement inside its
+        # figure (fig > p > fig), and `_caption` reads only its own caption.
+        yield from _floats(child, tag)
+
+
+def _span(cell: ET.Element, name: str) -> int:
+    try:
+        return min(max(int(cell.get(name) or 1), 1), 100)
+    except ValueError:
+        return 1
+
+
+def _footnotes(wrap: ET.Element) -> tuple[list[str], frozenset[str]]:
+    """The lines under a table, and the labels its cells may carry as marks."""
+    lines: list[str] = []
+    labels: set[str] = set()
+    for foot in wrap.iter("table-wrap-foot"):
+        for item in foot:
+            text = _text(item)
+            if text:
+                lines.append(text)
+            if _local(item.tag) == "fn":
+                label = _text(item.find("label"))
+                if label:
+                    labels.add(label.rstrip(".):"))
+                labels.update(_note_marks(item))
+    return lines, frozenset(labels)
+
+
+def _note_marks(fn: ET.Element) -> set[str]:
+    """The marks that open notes inside one <fn>. B5 writes two notes in one
+    paragraph, '<sup>1</sup> Same part … <sup>2</sup> Shortened …', so every
+    superscript that follows no number is a label; one that follows a number,
+    '10<sup>6</sup> cells', is a power and labels nothing."""
+    marks: set[str] = set()
+    for p in fn.iter("p"):
+        seen = p.text or ""
+        for child in p:
+            if _local(child.tag) == "sup":
+                before = seen.rstrip()[-1:]
+                mark = _text(child).rstrip(".):")
+                if mark and len(mark) <= 3 and not (before.isdigit() or before == ")"):
+                    marks.add(mark)
+            seen += "".join(child.itertext()) + (child.tail or "")
+    return marks
+
+
+def _table_rows(wrap: ET.Element, marks: frozenset[str] = frozenset()) -> list[str]:
     """One line per row, cells joined with ' | '. The row is the unit a quote
     from a table should be, because the row is what says which number goes
-    with which condition."""
+    with which condition, so the rows are laid out as the table's grid: an
+    empty cell keeps its place, a cell that spans rows is repeated in every
+    row it spans, and a header that spans columns is repeated over each of
+    them, so every value sits under its own column."""
     lines: list[str] = []
+    carried: dict[int, tuple[str, int]] = {}  # column → (text, rows still to fill)
+    # Frontiers writes every header cell as <td>; inside <thead> it is a header.
+    head = {id(tr) for thead in wrap.iter("thead") for tr in thead.iter("tr")}
     for row in wrap.iter("tr"):
-        cells = [_text(c) for c in row if c.tag in ("th", "td")]
-        cells = [c for c in cells if c]
-        if cells:
-            lines.append(" | ".join(cells))
-    return "\n".join(lines)
+        out: list[str] = []
+        cells = [c for c in row if _local(c.tag) in ("th", "td")]
+        # A lone cell across the row is a title or a note, written once (N3).
+        alone = len(cells) == 1
+
+        def take_carried() -> None:
+            while len(out) in carried:
+                text, left = carried[len(out)]
+                if left <= 1:
+                    del carried[len(out)]
+                else:
+                    carried[len(out)] = (text, left - 1)
+                out.append(text)
+
+        for cell in cells:
+            take_carried()
+            text = _text(cell, marks=marks)
+            rows = _span(cell, "rowspan")
+            header = (_local(cell.tag) == "th" or id(row) in head) and not alone
+            for k in range(_span(cell, "colspan")):
+                value = text if (k == 0 or header) else ""
+                if rows > 1:
+                    carried[len(out)] = (value, rows - 1)
+                out.append(value)
+        take_carried()
+        if any(out):
+            # No strip: a row that ends in empty cells keeps their slots, so
+            # it splits on ' | ' into as many cells as its header (F3, F4, O3).
+            lines.append(" | ".join(out))
+    return lines
 
 
 def _caption(el: ET.Element) -> str:
@@ -319,12 +629,23 @@ def _license(root: ET.Element) -> FetchLicense | None:
     if lic is None:
         return None
     href = lic.get(f"{XLINK}href") or lic.get("href")
-    # Some articles put the URL on an <ext-link> inside the licence paragraph.
+    # Some articles put the URL on an <ext-link> inside the licence paragraph,
+    # and others in <ali:license_ref>.
     if not href:
         link = lic.find(f".//ext-link[@{XLINK}href]")
         if link is not None:
             href = link.get(f"{XLINK}href")
-    text = _text(lic) or None
+    if not href:
+        ref = lic.find(f"{_ALI}license_ref")
+        if ref is not None and (ref.text or "").strip():
+            href = ref.text.strip()
+    paragraphs = [_text(p) for p in lic.findall("license-p")]
+    text = " ".join(p for p in paragraphs if p) or _text(lic) or None
+    if not href and text:
+        # I6: the URL is only in the sentence, '(http://…/by/4.0/).'
+        found = re.search(r"https?://[^\s)\]>]+", text)
+        if found:
+            href = found.group(0).rstrip(".,;")
     return FetchLicense(href=href or None, text=text)
 
 
@@ -333,9 +654,13 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
 
     Order: the abstract first as 'abstract'; then every body <sec>, depth-first,
     as 's1', 's2', … with nested headings prefixed; then every <table-wrap> as
-    't1', 't2', … one line per row; then every <fig> caption as 'f1', 'f2', ….
-    <ref-list>, <ack> and <fn-group> are dropped. The <license> element is
-    read into `license`.
+    't1', 't2', … one line per row of its grid, with its footnotes after the
+    rows; then every <fig> caption as 'f1', 'f2', …. Tables and figures are
+    found in the body, in <floats-group> and in <back>. <ref-list>, <ack> and
+    <fn-group> are dropped, and so is a <sec> whose sec-type or whole title
+    names back matter (`_BACK_SEC_TYPES`, `_BACK_TITLES`). A group of linked
+    citations in brackets or parentheses is dropped (`_uncite`). The
+    <license> element is read into `license`.
 
     A parse failure — malformed XML, or a document with no article body — is
     returned as `failed:parse` with the reason, never raised.
@@ -365,7 +690,7 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
     abstracts = article.findall(".//front/article-meta/abstract")
     plain = [a for a in abstracts if not a.get("abstract-type")] or abstracts
     if plain:
-        text = _own_paragraphs(plain[0]) or _text(plain[0])
+        text = _own_paragraphs(plain[0]) or _structured(plain[0]) or _text(plain[0])
         if text:
             sections.append(FetchedSection(id="abstract", heading="Abstract", text=text))
 
@@ -388,16 +713,28 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
     for n, (heading, text) in enumerate(walked, start=1):
         sections.append(FetchedSection(id=f"s{n}", heading=heading, text=text))
 
-    for n, wrap in enumerate(body.iter("table-wrap"), start=1):
-        rows = _table_rows(wrap)
-        if rows:
-            sections.append(
-                FetchedSection(id=f"t{n}", heading=_caption(wrap) or f"Table {n}", text=rows)
-            )
+    # Tables and figures wherever the article keeps them: in the body, in
+    # <floats-group> (where MDPI and others put every one), and in <back>.
+    holders = [el for el in (body, article.find("floats-group"), article.find("back")) if el is not None]
+    wraps = [w for holder in holders for w in _floats(holder, "table-wrap")]
+    n = 0
+    for wrap in wraps:
+        notes, marks = _footnotes(wrap)
+        caption = _caption(wrap)
+        # A table given only as an image has no rows; its caption still says
+        # what it is, and is kept as the table's text.
+        lines = _table_rows(wrap, marks) or ([caption] if caption else [])
+        if lines:
+            n += 1
+            sections.append(FetchedSection(
+                id=f"t{n}", heading=caption or f"Table {n}", text="\n".join(lines + notes),
+            ))
 
-    for n, fig in enumerate(body.iter("fig"), start=1):
+    n = 0
+    for fig in (f for holder in holders for f in _floats(holder, "fig")):
         caption = _caption(fig)
         if caption:
+            n += 1
             sections.append(FetchedSection(id=f"f{n}", heading=f"Figure {n}", text=caption))
 
     return FetchResult(

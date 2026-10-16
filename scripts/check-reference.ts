@@ -429,6 +429,11 @@ for (const cell of unjustified) {
           `${JSON.stringify(sub.state)}`,
       );
     }
+    if (sub.status === 'live' && saysUnbuilt) {
+      fail(
+        `${sub.id}: status is "live" but its sentence says it is not built. Sentence: ${JSON.stringify(sub.state)}`,
+      );
+    }
     if (sub.status === 'seeded' && saysUnbuilt) {
       fail(
         `${sub.id}: status is "seeded" but its sentence says it is not built. A seeded subsystem ` +
@@ -457,7 +462,8 @@ if (referenceFor('nothing.here') !== null) {
 console.log('\nopenFerment reference check');
 console.log('───────────────────────────');
 const seeded = SUBSYSTEMS.filter((sub) => sub.status === 'seeded').length;
-console.log(`  subsystems    ${SUBSYSTEMS.length} registered (${seeded} seeded, ${SUBSYSTEMS.length - seeded} stub), ${Object.keys(REFERENCE).length} with reference content`);
+const live = SUBSYSTEMS.filter((sub) => sub.status === 'live').length;
+console.log(`  subsystems    ${SUBSYSTEMS.length} registered (${seeded} seeded, ${live} live, ${SUBSYSTEMS.length - seeded - live} stub), ${Object.keys(REFERENCE).length} with reference content`);
 console.log(`  tables        ${tables}`);
 console.log(`  entries       ${rows} rows, ${cells.length} strings scanned`);
 console.log(`  notes         ${notes} carry a load-bearing sentence`);

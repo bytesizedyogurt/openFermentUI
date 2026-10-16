@@ -16,30 +16,67 @@ The browser never sees a key and never renders model prose. It renders a plan.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import queue
+import threading
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import biorepo, extract, guard, intake, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
 from .corpus import load_corpus
+from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
     AnswerPlan,
+    Artifact,
     AskRequest,
+    Check,
+    CheckDismiss,
+    CheckRecord,
+    CheckRequest,
+    Checks,
+    CheckSchedule,
     DecisionCheck,
     ExtractResponse,
     ExtractRun,
+    FermosFitRequest,
+    FermosFitResponse,
     FetchResult,
+    ForecastRequest,
+    ProformaRunRequest,
+    ForecastResult,
+    GeneosModelInfo,
+    GeneosResult,
+    Guild,
+    GuildEvidence,
+    GuildPerson,
+    GuildPolicy,
+    GuildWithdrawal,
     IntakeStatus,
     Overlay,
+    Practice,
+    PracticeDraftRequest,
+    PracticeScenario,
+    PracticeSession,
+    PracticeTurnRequest,
+    RagReport,
+    RagSearchRequest,
+    RagSearchResponse,
+    RagStatus,
+    ReplayResult,
     ReviewDecision,
+    ToolInfo,
+    ToolResult,
     Usage,
 )
-from . import llm
+from . import llm, spend
 from .postdoc import PostdocUnavailable, ask_model
 from .validate import decline_reason, validate_claims
 
@@ -96,9 +133,28 @@ def health() -> dict:
     }
 
 
+CORPUS_MISSING = (
+    "The corpus has not been generated. Run `pnpm export:corpus` from "
+    "the repository root and restart the service."
+)
+
+
+def _ask_agent(question: str, on_step=None, cancelled=None) -> AnswerPlan:
+    """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands."""
+    ctx = tools.ToolContext()
+    try:
+        ctx.pool  # loaded now, so a missing corpus declines in words
+    except FileNotFoundError as e:
+        log.error("corpus missing: %s", e)
+        return AnswerPlan(question=question, declined=CORPUS_MISSING)
+    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled)
+
+
 @app.post("/api/ask", response_model=AnswerPlan)
 def ask(request: AskRequest) -> AnswerPlan:
-    """One question in, one AnswerPlan out. One retrieval, one call, no loop.
+    """One question in, one AnswerPlan out. `mode: 'agent'` (the default) runs
+    the bounded loop of tools (OF-BLD-014 §5.2); `mode: 'single'` is one
+    retrieval and one call.
 
     Every failure below returns a plan with `declined` set rather than an HTTP
     error, because a declined plan is a thing the UI already knows how to
@@ -109,18 +165,14 @@ def ask(request: AskRequest) -> AnswerPlan:
     question = request.question.strip()
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
+    if request.mode == "agent":
+        return _ask_agent(question)
 
     try:
         corpus = load_corpus()
     except FileNotFoundError as e:
         log.error("corpus missing: %s", e)
-        return AnswerPlan(
-            question=question,
-            declined=(
-                "The corpus has not been generated. Run `pnpm export:corpus` from "
-                "the repository root and restart the service."
-            ),
-        )
+        return AnswerPlan(question=question, declined=CORPUS_MISSING)
 
     limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
     records = corpus.search(question, limit=limit)
@@ -164,6 +216,185 @@ def ask(request: AskRequest) -> AnswerPlan:
         rejected=result.rejected,
         rejectionReasons=result.reasons,
     )
+
+
+def _sse(event: str, data: Any) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/ask/stream")
+def ask_stream(request: AskRequest) -> StreamingResponse:
+    """The loop's steps as they complete (OF-BLD-014 §5.3), as server-sent
+    events: `step` (a TraceStep), then `plan` (the validated AnswerPlan), or
+    `error` when the service itself failed. A declined plan is a `plan`. In
+    `single` mode there are no steps, and the plan is the only event."""
+    return StreamingResponse(_stream_events(request), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _stream_events(request: AskRequest):
+    """The events of one question, as text. When the reader goes, the
+    generator is closed, and the loop stops before its next model turn
+    (§5.R) rather than spending on an answer nobody will read."""
+    events: queue.Queue = queue.Queue()
+    gone = threading.Event()
+
+    def work() -> None:
+        try:
+            question = request.question.strip()
+            if request.mode == "single" or not question:
+                plan = ask(request)
+            else:
+                plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
+                                  cancelled=gone.is_set)
+            events.put(("plan", plan.model_dump(mode="json")))
+        except Exception as e:  # the stream must end in words, never hang
+            log.exception("ask stream failed")
+            events.put(("error", {"message": f"Postdoc failed while answering: {type(e).__name__}. The service log names what went wrong."}))
+        finally:
+            events.put(None)
+
+    threading.Thread(target=work, name="ask-stream", daemon=True).start()
+    try:
+        while (item := events.get()) is not None:
+            yield _sse(*item)
+    finally:
+        gone.set()
+
+
+# ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
+
+
+class CeilingRequest(BaseModel):
+    modelId: str
+    product: str = "phb"
+    substrate: str
+
+
+class MixRequest(BaseModel):
+    modelId: str
+    product: str = "phb"
+    a: str
+    b: str
+
+
+def _geneos(fn, *args) -> GeneosResult:
+    """A model that cannot load here, or a request the worker refuses, is a
+    409 in words; a finding is a 200 that says so."""
+    try:
+        return fn(*args)
+    except geneos.GeneosUnavailable as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=409, detail=f"the geneOS worker could not compute it: {e}") from e
+
+
+@app.get("/api/geneos/models", response_model=list[GeneosModelInfo])
+def geneos_models() -> list[GeneosModelInfo]:
+    return geneos.models()
+
+
+@app.post("/api/geneos/ceiling", response_model=GeneosResult)
+def geneos_ceiling(req: CeilingRequest) -> GeneosResult:
+    return _geneos(geneos.ceiling, req.modelId, req.product, req.substrate)
+
+
+@app.post("/api/geneos/frontier", response_model=GeneosResult)
+def geneos_frontier(req: CeilingRequest) -> GeneosResult:
+    return _geneos(geneos.frontier, req.modelId, req.product, req.substrate)
+
+
+@app.post("/api/geneos/mix", response_model=GeneosResult)
+def geneos_mix(req: MixRequest) -> GeneosResult:
+    return _geneos(geneos.mix, req.modelId, req.product, req.a, req.b)
+
+
+# ── fermOS (OF-BLD-014 §7.2) ───────────────────────────────────────────
+
+
+@app.post("/api/fermos/fit", response_model=FermosFitResponse)
+def fermos_fit(req: FermosFitRequest) -> FermosFitResponse:
+    """Fit a run's series. The browser sends them; the service keeps the
+    fits as artifacts (a sample run's are kept nowhere) and nothing else."""
+    try:
+        return fermos.fit(req.depositionId, req.series, sample=req.sample)
+    except fermos.FitRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/fermos/forecast", response_model=ForecastResult)
+def fermos_forecast(req: ForecastRequest) -> ForecastResult:
+    """A band for the next run from a fit (§7.3). A refusal says which
+    parameter the run did not identify, and what run would."""
+    try:
+        return fermos.forecast_run(fit_artifact=req.fitArtifactId, fit_inline=req.fit if req.sample else None,
+                                   start=req.start, changed_by=req.changedBy, duration_h=req.durationH, sample=req.sample)
+    except fermos.FitRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/proforma/status")
+def proforma_status() -> dict:
+    """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
+    from . import proforma
+
+    return proforma.status()
+
+
+@app.get("/api/proforma/benchmark")
+def proforma_benchmark() -> dict:
+    """The benchmark this installation reproduced (§8.2), or none yet. A read:
+    it starts nothing. POST runs it."""
+    from . import proforma
+
+    art = proforma.stored_benchmark()
+    return {"artifact": art.model_dump(mode="json") if art else None, "simulator": proforma.status()}
+
+
+@app.post("/api/proforma/benchmark")
+def proforma_benchmark_run() -> dict:
+    """Run the published corn stover biorefinery and keep its price (§8.2)."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        art = proforma.run_benchmark()
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the benchmark: {e}") from e
+    return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
+
+
+@app.get("/api/proforma/scenarios")
+def proforma_scenarios(host: str | None = None) -> list[dict]:
+    """The BioSTEAM scenario with its inputs bound to records (§8.3). A read:
+    it starts no simulator."""
+    from . import proforma
+
+    return [proforma.scenario(host=host).model_dump(mode="json")]
+
+
+@app.post("/api/proforma/run")
+def proforma_run(req: ProformaRunRequest) -> dict:
+    """Run the scenario: 422 listing every input waiting for a source."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return proforma.run(req).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
+
+
+def _warm_proforma() -> None:
+    from . import proforma
+
+    if proforma.warm_on_start():
+        proforma.start(background=True)
+
+
+_warm_proforma()
 
 
 # ── Intake (OF-BLD-012 §5.2) ────────────────────────────────────────────
@@ -286,6 +517,207 @@ def biorepo_check(decision: ReviewDecision) -> DecisionCheck:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
 
+# ── Guild (OF-BLD-013 §1.2) ──────────────────────────────────────────────
+#
+# The competence ledger. Reads are open like every read here; each write goes
+# through one function in guild.py, which stores it or refuses it with the
+# rule that failed. 422 carries the rule and the reason, the same shape
+# /api/biorepo/decisions uses, and /api/guild/check answers 200 either way.
+
+
+def _refused(e: guild.GuildRefused, what: str) -> HTTPException:
+    log.warning("guild refused %s — %s", what, e)
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild", response_model=Guild)
+def guild_ledger() -> Guild:
+    """The whole ledger: people and every entry, withdrawn ones included.
+    The browser applies it at load the way it applies the overlay, and
+    computes every level from it."""
+    return guild.read()
+
+
+@app.post("/api/guild/people", response_model=GuildPerson)
+def guild_people(person: GuildPerson) -> GuildPerson:
+    try:
+        return guild.write_person(person)
+    except guild.GuildRefused as e:
+        raise _refused(e, person.id) from e
+
+
+@app.post("/api/guild/evidence", response_model=GuildEvidence)
+def guild_evidence(entry: GuildEvidence) -> GuildEvidence:
+    try:
+        return guild.write_evidence(entry)
+    except guild.GuildRefused as e:
+        raise _refused(e, entry.id) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/check", response_model=DecisionCheck)
+def guild_check(entry: GuildEvidence) -> DecisionCheck:
+    """Would `guild.write_evidence` keep this entry? Every rule runs and
+    nothing is written. A refusal is an answer, so it comes back 200."""
+    try:
+        guild.write_evidence(entry, dry_run=True)
+        return DecisionCheck(ok=True)
+    except guild.GuildRefused as e:
+        return DecisionCheck(ok=False, rule=e.rule, why=e.why)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/policy", response_model=GuildPolicy)
+def guild_policy(policy: GuildPolicy) -> GuildPolicy:
+    try:
+        return guild.write_policy(policy)
+    except guild.GuildRefused as e:
+        raise _refused(e, "policy") from e
+
+
+@app.post("/api/guild/withdraw", response_model=GuildEvidence)
+def guild_withdraw(request: GuildWithdrawal) -> GuildEvidence:
+    try:
+        return guild.withdraw(request)
+    except guild.GuildRefused as e:
+        raise _refused(e, request.evidenceId) from e
+
+
+# ── Checks (OF-BLD-013 §5.2) ────────────────────────────────────────────
+#
+# Proposed by fixed rules, asked for, scheduled, dismissed and run, each
+# through one function in checks.py; a run writes witnessed entries through
+# guild.write_evidence. 422 carries the rule and the reason.
+
+
+class ProposeRequest(BaseModel):
+    by: str
+
+
+def _check_refused(e: Exception) -> HTTPException:
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/api/guild/checks", response_model=Checks)
+def checks_read() -> Checks:
+    return checks.read()
+
+
+@app.post("/api/guild/checks/propose", response_model=list[Check])
+def checks_propose(request: ProposeRequest) -> list[Check]:
+    try:
+        return checks.propose(request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/guild/checks/request", response_model=Check)
+def checks_request(request: CheckRequest) -> Check:
+    try:
+        return checks.request(request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/schedule", response_model=Check)
+def checks_schedule(check_id: str, request: CheckSchedule) -> Check:
+    try:
+        return checks.schedule(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/dismiss", response_model=Check)
+def checks_dismiss(check_id: str, request: CheckDismiss) -> Check:
+    try:
+        return checks.dismiss(check_id, request)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+
+
+@app.post("/api/guild/checks/{check_id}/record", response_model=Check)
+def checks_record(check_id: str, request: CheckRecord) -> Check:
+    try:
+        return checks.record(check_id, request)
+    except (checks.CheckRefused, guild.GuildRefused) as e:
+        raise _check_refused(e) from e
+
+
+class BriefRequest(BaseModel):
+    by: str
+
+
+@app.post("/api/guild/checks/{check_id}/brief", response_model=Check)
+def checks_brief(check_id: str, request: BriefRequest) -> Check:
+    """One model call: what the assessor should watch, kept on the check."""
+    try:
+        return checks.brief(check_id, request.by)
+    except checks.CheckRefused as e:
+        raise _check_refused(e) from e
+    except checks.BriefUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Practice (OF-BLD-013 §4) ────────────────────────────────────────────
+#
+# Scenarios drafted by the model and checked by practice.py, which copies
+# every value from the source a draft cites and refuses a draft that states a
+# number of its own. 422 carries the rule and the reason, as Guild's do; 503
+# means no key, no network, or every model declined.
+
+
+@app.get("/api/practice", response_model=Practice)
+def practice_read() -> Practice:
+    return practice.read()
+
+
+@app.post("/api/practice/draft", response_model=PracticeScenario)
+def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
+    try:
+        return practice.draft(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.post("/api/practice/turn", response_model=PracticeSession)
+def practice_turn(request: PracticeTurnRequest) -> PracticeSession:
+    """The trainee's answer and the tutor's reply, kept together or not at all.
+    The session that closes for a person on the ledger puts practice on it."""
+    try:
+        return practice.turn(request)
+    except practice.PracticeRefused as e:
+        log.warning("practice refused a turn on %s — %s: %s ($%.4f spent)", request.scenarioId, e.rule, e.detail, e.usage.costUsd)
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except practice.PracticeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+class PracticeRecordRequest(BaseModel):
+    sessionId: str
+
+
+@app.post("/api/practice/record", response_model=PracticeSession)
+def practice_record(request: PracticeRecordRequest) -> PracticeSession:
+    """Ask the ledger again for a closed session it has no entry for."""
+    try:
+        return practice.record(request.sessionId)
+    except practice.PracticeRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
 # ── Witness (OF-BLD-012 §6.3) ────────────────────────────────────────────
 
 
@@ -298,6 +730,98 @@ def witness_runs() -> list[ExtractRun]:
         return witness.runs()
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+# ── Artifacts (OF-BLD-014 §3.2, E.5) ─────────────────────────────────────
+
+
+@app.get("/api/biorepo/artifacts", response_model=list[Artifact])
+def artifacts_list() -> list[Artifact]:
+    """Every value this service computed and kept, newest first."""
+    return artifacts.all_artifacts()
+
+
+@app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)
+def artifacts_read(artifact_id: str) -> Artifact:
+    try:
+        return artifacts.get(artifact_id)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+    except artifacts.ArtifactDamaged as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+@app.post("/api/biorepo/artifacts/{artifact_id}/replay", response_model=ReplayResult)
+def artifacts_replay(artifact_id: str) -> ReplayResult:
+    """Recompute and compare. 404 for an unknown id; 409 when the tool that
+    made it is not registered in this service, which cannot replay it."""
+    try:
+        return artifacts.replay(artifact_id)
+    except artifacts.ArtifactNotFound:
+        raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
+    except (artifacts.ToolNotRegistered, artifacts.ArtifactDamaged) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+# ── Tools (OF-BLD-014 §3.4, E.6) ─────────────────────────────────────────
+
+
+@app.get("/api/tools", response_model=list[ToolInfo])
+def tools_list() -> list[ToolInfo]:
+    """Each tool's name, description and input schema."""
+    return tools.infos()
+
+
+@app.post("/api/tools/{name}", response_model=ToolResult)
+def tools_run(name: str, body: dict[str, Any]) -> ToolResult:
+    """Run one tool through the registry, the same path Postdoc's loop and
+    the MCP server take. A refusal is a result with `error` set; an unknown
+    tool is a 404."""
+    if name not in tools.REGISTRY:
+        raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
+    return tools.run(name, body)
+
+
+# ── Passage retrieval (OF-BLD-014 Phase 4) ───────────────────────────────
+
+
+@app.get("/api/rag/status", response_model=RagStatus)
+def rag_status() -> RagStatus:
+    """Papers indexed, passages, the lanes and whether each can run, and the
+    lane searches use when none is named."""
+    return passages.status()
+
+
+@app.post("/api/rag/search", response_model=RagSearchResponse)
+def rag_search(request: RagSearchRequest) -> RagSearchResponse:
+    """Passages for a question, on the lane named or the chosen one. A lane
+    that cannot run here is a 409 that says why; a paid lane's helper calls
+    are held to the daily cap like every model call."""
+    try:
+        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane)
+    except retrieve.LaneUnavailable as e:
+        raise HTTPException(status_code=409, detail=str(e)) from None
+    except (llm.ModelUnavailable, llm.ModelRefused, spend.BudgetSettingInvalid) as e:
+        # A key refused, a budget spent or set wrong, a request declined:
+        # the service is up and says why (§4.R).
+        raise HTTPException(status_code=503, detail=str(e)) from None
+    return RagSearchResponse(
+        lane=detail.lane,
+        hits=detail.hits,
+        phrasings=detail.phrasings,
+        unverifiedSentences=detail.unverifiedSentences,
+        costUsd=detail.usage.costUsd,
+        note=detail.note,
+    )
+
+
+@app.get("/api/rag/report", response_model=RagReport)
+def rag_report() -> RagReport:
+    """The last scorecard of every lane; 404 until `pnpm rag:eval` has run."""
+    report = rageval.read_report()
+    if report is None:
+        raise HTTPException(status_code=404, detail="no retrieval scorecard yet: run pnpm rag:eval")
+    return report
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

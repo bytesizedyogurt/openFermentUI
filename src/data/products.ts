@@ -1,5 +1,6 @@
-// The molecule catalogue (OF-BLD-005 §3) — 117 products across
-// 11 categories, every one of them modeled rather than measured.
+// The molecule catalogue (OF-BLD-005 §3) — 117 products across 11 categories,
+// and two PHA products in a twelfth (OF-BLD-014 §2.2), every one of them
+// modeled rather than measured.
 //
 // Two provenance fields, both drawn from the existing `Provenance` union so
 // there is exactly one confidence vocabulary in the platform:
@@ -2808,6 +2809,46 @@ export const PRODUCTS: Product[] = [
     note: 'Do not schedule before GMP infrastructure exists. Listed so the roadmap is visible.',
     economicsProvenance: 'industry-estimate',
   },
+  // Thread P (OF-BLD-014 §2.2). A stored polymer shares no train with the
+  // proteins and small molecules above, so it opens its own process family.
+  {
+    id: 'phb',
+    name: 'Polyhydroxybutyrate (PHB)',
+    aliases: ['PHB', 'P3HB', 'poly(3-hydroxybutyrate)'],
+    category: 'biopolymer',
+    processCode: 'P12',
+    defaultStrainId: 'c-necator-h16',
+    unitOperationIds: ['centrifugation', 'homogenisation', 'lle', 'precipitation', 'spray-dry'],
+    storageIds: ['spray-ambient'],
+    regulatoryIds: [],
+    clearanceState: 'unknown',
+    scaleId: 'large-prod',
+    pathwayIds: ['phb-route'],
+    tags: ['bioplastic', 'intracellular granules', 'thread P'],
+    valueDensityBand: 'low-moderate',
+    provenance: 'demo',
+    note: 'Intracellular granules: the cells are harvested and broken, and the polymer is extracted and recovered as a solid.',
+    economicsProvenance: 'industry-estimate',
+  },
+  {
+    id: 'mcl-pha',
+    name: 'Medium-chain-length PHA',
+    aliases: ['mcl-PHA', 'PHA (mcl)'],
+    category: 'biopolymer',
+    processCode: 'P12',
+    defaultStrainId: 'p-putida-kt2440',
+    unitOperationIds: ['centrifugation', 'homogenisation', 'lle', 'precipitation'],
+    storageIds: ['spray-ambient'],
+    regulatoryIds: [],
+    clearanceState: 'unknown',
+    scaleId: 'prod',
+    pathwayIds: [],
+    tags: ['bioplastic', 'elastomer', 'intracellular granules', 'thread P'],
+    valueDensityBand: 'moderate',
+    provenance: 'demo',
+    note: 'Made from fatty-acid intermediates rather than through phaCAB, so no pathway entry is linked yet.',
+    economicsProvenance: 'industry-estimate',
+  },
 ];
 
 export const PRODUCTS_BY_ID: Record<string, Product> = Object.fromEntries(
@@ -2827,6 +2868,7 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   glycoside: 'Glycoside',
   industrial_enzyme: 'Industrial enzyme',
   therapeutic_protein: 'Therapeutic protein',
+  biopolymer: 'Biopolymer',
 };
 
 /**

@@ -87,11 +87,14 @@ def tables(path: str | None = None) -> dict[str, Any]:
 # ── normalisation ──────────────────────────────────────────────────────
 
 # The same replacements, in the same order, as `strip` in normalizeUnit().
-# Middots become the space the table keys use; unicode superscripts become
+# Middots become the space the table keys use; the minus sign papers print
+# (U+2212) and the en dash become ASCII '-'; unicode superscripts become
 # their ASCII spelling; runs of whitespace collapse; then lower-case.
 _STRIP_STEPS = (
     ("·", " "),
     ("⋅", " "),
+    ("\u2212", "-"),
+    ("\u2013", "-"),
     ("⁻¹", "-1"),
     ("⁻²", "-2"),
     ("⁻³", "-3"),

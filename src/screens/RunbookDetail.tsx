@@ -36,6 +36,9 @@ import { STRAINS_BY_ID } from '@/data/strains';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
 import { enumerationFunnel, funnelSummary, funnelWidest } from '@/engine/geneos/enumeration';
 import { lockIntact } from '@/engine/lock';
+import { ledgerRows } from '@/engine/ledger';
+import { IntervalLedger } from '@/components/figures';
+import { Dossier } from '@/components/Dossier';
 import { matrixCoverage, territorialityNote } from '@/engine/clearance';
 import {
   ClearanceChip,
@@ -603,6 +606,30 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
 
 // ── screen ─────────────────────────────────────────────────────────────
 
+/** §9.3 — this runbook's predictions drawn against what its runs measured. */
+function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
+  const depositions = useStore((s) => s.depositions);
+  const tested = new Map(
+    ledgerRows([runbook], depositions).map((r) => [r.prediction.id, r]),
+  );
+  return (
+    <div className="mb-4">
+      <IntervalLedger
+        title={`What does ${runbook.title} predict, and what was measured?`}
+        rows={runbook.predictions.map((p) => ({
+          key: p.id,
+          label: p.label,
+          prediction: p,
+          lockedAt: runbook.lockedAt,
+          observed: tested.get(p.id)?.observed ?? null,
+          held: tested.get(p.id)?.held ?? null,
+        }))}
+        csvName={`ledger-${runbook.id}`}
+      />
+    </div>
+  );
+}
+
 export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const runbooks = useStore((s) => s.runbooks);
   const products = useStore((s) => s.products);
@@ -877,6 +904,8 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           run, and the measurements that will test them — frozen together, so the platform cannot
           quietly move a prediction toward a result it has already seen.
         </p>
+        {runbook.predictions.length > 0 && <RunbookLedgerFigure runbook={runbook} />}
+        <Dossier runbook={runbook} />
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
           <PredictionPanel runbook={runbook} />
           <StartDeposition runbook={runbook} />

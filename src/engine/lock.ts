@@ -25,7 +25,14 @@ import type { Measure, Prediction } from '@/data/types';
  * properties would fire false alarms forever.
  */
 function canonical(predictions: Prediction[], schema: Measure[]): string {
-  const p = predictions.map((x) => [x.id, x.label, x.value, x.unit, x.confidence, x.basis]);
+  // §9.1: the four fields an interval or a bound carries are appended only
+  // when a prediction has one, so every point serialises exactly as before
+  // and no lock taken earlier changes (scripts/fixtures/seed-lock-digests.json).
+  const p = predictions.map((x) => {
+    const base: unknown[] = [x.id, x.label, x.value, x.unit, x.confidence, x.basis];
+    if (x.kind === undefined && x.interval === undefined && x.artifactId === undefined && x.recordIds === undefined) return base;
+    return [...base, x.kind ?? null, x.interval ? [x.interval.low, x.interval.high] : null, x.artifactId ?? null, x.recordIds ?? null];
+  });
   const m = schema.map((x) => [x.id, x.label, x.unit, x.timepoint, x.predictionId]);
   return JSON.stringify({ p, m });
 }

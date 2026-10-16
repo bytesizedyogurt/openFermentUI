@@ -7,20 +7,18 @@
  *   pnpm build && node scripts/golden-path.mjs
  */
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { LOOPBACK, serveStatic } from './lib/serve-dist.mjs';
+import { LOOPBACK } from './lib/serve-dist.mjs';
+import { createServiceDouble } from './lib/service-double.mjs';
 
 const DIST = join(process.cwd(), 'dist');
 const PORT = 4321;
-const server = createServer(async (req, res) => {
-  try {
-    await serveStatic(DIST, decodeURIComponent((req.url ?? '/').split('?')[0]), res);
-  } catch {
-    res.writeHead(404).end('nf');
-  }
-});
+// The service double the smoke uses (OF-BLD-014 §4.4): from this step on the
+// golden path walks views that need a service, and it gets the same one. It
+// leaves health and the overlay unanswered, so the demo script still drives
+// the seed, as it always has.
+const { server } = createServiceDouble({ dist: DIST, seedOnly: true });
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -73,7 +71,7 @@ async function main() {
   await page.waitForTimeout(2500);
   const askText = await page.locator('body').innerText();
   check('Postdoc plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
-  const chips = page.locator('button', { hasText: /^\[[A-O]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
+  const chips = page.locator('button', { hasText: /^\[[A-P]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
   const chipCount = await chips.count();
   check('Answer carries working citation chips', chipCount > 0, `${chipCount} chips`);
 
@@ -303,6 +301,65 @@ async function main() {
     /17 bacterial|Kiverdi|no algal/i.test(f6),
   );
 
+  // ── 10b. Live mode shows the loop's work; Scripted is untouched ─────
+  // OF-BLD-014 §5.4. The double replays the stream the real loop recorded.
+  await go('/postdoc');
+  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+  const live = page.locator('textarea[aria-label="Ask a question"]');
+  await live.fill('What does the stand-in table report for placeholder A?');
+  await live.press('Enter');
+  await page.locator('[data-testid="passage-quote"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+  const traced = await page.locator('[data-testid="trace-step"]').count();
+  const quoted = await page.locator('[data-testid="passage-quote"]').count();
+  check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
+  // OF-BLD-014 §10.3 — a replay says it is one, with its date.
+  const replay = await page.locator('[data-testid="replay-label"]').innerText().catch(() => '');
+  // §10.R: a stand-in recording claims no date (its date is fixed so the
+  // fixture stays the same); a real recording names the day it was made.
+  check('A replayed answer says it is a replay, and a stand-in one claims no date',
+    /Replay of a recorded test run, made with a scripted stand-in in place of the model/.test(replay) && !/\d{4}-\d{2}-\d{2}/.test(replay), replay.slice(0, 100));
+  await page.getByRole('button', { name: 'Scripted' }).click();
+  await page.locator('button', { hasText: /titers have been achieved/i }).first().click();
+  await page.waitForTimeout(2500);
+  check('Scripted mode still plays its flow', /500 mg\/L|15–18|1\.45/.test(await page.locator('body').innerText()));
+
+  // ── 10c. geneOS draws the ceiling beside what was reported ──────────
+  // OF-BLD-014 §6.4, over the double's toy-network fixtures.
+  await go('/geneos/model');
+  await page.locator('[data-testid="frontier"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const rules = await page.locator('[data-testid="strip-rule"]').count();
+  check('geneOS → Model draws a computed ceiling and the envelope', rules === 1 && (await page.locator('[data-testid="frontier"]').count()) === 1, `${rules} rules`);
+
+  // ── 10d. fermOS fits the sample run and forecasts from it ───────────
+  await go('/fermos');
+  await page.getByRole('button', { name: 'Load a sample run' }).click();
+  await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const fitted = await page.locator('[data-testid="trajectory-fit"]').count();
+  check('fermOS fits a curve through the sample run', fitted === 3, `${fitted} curves`);
+
+  // ── 10e. Proforma: the PHA scenario names where each input comes from ──
+  // OF-BLD-014 §10.3, the demo's beat 7, over the double's stand-in binding.
+  await go('/proforma/scenario/sc-pha-1');
+  await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const pha = await page.locator('body').innerText();
+  check('Proforma\'s PHA scenario shows each input and its source', (await page.locator('[data-testid^="input-"]').count()) === 7 && /Waiting for a source/.test(pha));
+
+  // ── 10f. Runbooks: an answer becomes a runbook that keeps score ─────
+  // The demo's beat 8: Postdoc drafts, a person adopts, the page draws the
+  // predictions and the chain behind them; the ledger counts them.
+  await go('/postdoc');
+  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+  const ask = page.locator('textarea[aria-label="Ask a question"]');
+  await ask.fill('Draft a runbook for the stand-in run.');
+  await ask.press('Enter');
+  await page.locator('[data-testid="runbook-draft"]').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.getByRole('button', { name: 'Turn into a runbook' }).click().catch(() => {});
+  await page.locator('[data-testid="dossier-link"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+  check('A drafted runbook draws its predictions and the chain behind them',
+    (await page.locator('[data-testid="ledger-row"]').count()) === 4 && (await page.locator('[data-testid="dossier-link"]').count()) === 3);
+  await go('/runbooks/ledger');
+  check('The ledger counts locked and tested predictions', /predictions locked/.test(await page.locator('[data-testid="ledger-counts"]').innerText().catch(() => '')));
+
   // ── 11. Command palette navigates ───────────────────────────────────
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);
@@ -330,6 +387,33 @@ async function main() {
       (page.url().split('#')[1] ?? '') === '/biorepo/witness',
       page.url().split('#')[1] ?? '',
     );
+  }
+
+  // ── OF-BLD-014 §4.4: search the papers, open a hit, see the sentence ──
+  await go('/biorepo/search');
+  const box = page.locator('input[aria-label="Question"]');
+  if (await box.count()) {
+    await box.fill('placeholder rows in the table');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.locator('[data-testid="open-in-reader"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+    const opened = await page.locator('[data-testid="open-in-reader"]').count();
+    if (opened) {
+      await page.locator('[data-testid="open-in-reader"]').first().click();
+      await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
+    }
+    // The golden path walks the seed, where B5 holds its curator's note and
+    // none of the fetched words, so the reader must say the words are not in
+    // the text shown; the smoke, over the overlay, holds the marking itself.
+    const where = page.url().split('#')[1] ?? '';
+    const marked = (await page.locator('[data-testid="quote-mark"]').count()) > 0;
+    const saysMissing = (await page.locator('[data-testid="quote-missing"]').count()) > 0;
+    check(
+      'Search opens the reader at the hit, and marks its words or says they are not there',
+      where.startsWith('/biorepo/paper/B5?') && (marked || saysMissing),
+      where.split('&')[0],
+    );
+  } else {
+    check('Search opens the reader at the hit, and marks its words or says they are not there', false, 'question box not found');
   }
 
   await browser.close();

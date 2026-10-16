@@ -344,6 +344,9 @@ class Gathered:
     current: list[Candidate] = field(default_factory=list)
     dropped: list[DroppedCandidate] = field(default_factory=list)
     papers: set[str] = field(default_factory=set)
+    # The models that answered, in first-seen order, from each paper's
+    # usage.models: what Witness names, never a model typed into the screen.
+    models: list[str] = field(default_factory=list)
     decisions: dict[str, ReviewDecision] = field(default_factory=dict)
 
 
@@ -365,6 +368,9 @@ def _gather() -> Gathered:
             out.candidates.append(copies.get(c.id, c))
             out.current.append(copies.get(c.id, c))
         out.dropped.extend(r.dropped)
+        for m in r.usage.models:
+            if m not in out.models:
+                out.models.append(m)
     out.candidates += [c for cid, c in copies.items() if cid not in seen]
     return out
 
@@ -372,6 +378,7 @@ def _gather() -> Gathered:
 def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
     run = match_run(g.current, seed, papers=g.papers, dropped=g.dropped)
     run.falsePositives = false_positives([c for c in g.candidates if c.paperId in g.papers], g.decisions)
+    run.models = list(g.models)
     outcomes: dict[str, int] = defaultdict(int)
     for r in run.results:
         outcomes[r.outcome] += 1

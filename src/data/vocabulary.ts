@@ -7,7 +7,9 @@
 //
 // Nothing in this file touches the corpus. These are the axes a molecule is
 // described along, not claims about the literature.
+import { matchWholeWord } from './strains';
 import type {
+  CarbonSource,
   ClearanceState,
   GeneticElement,
   Pathway,
@@ -191,6 +193,13 @@ export const PATHWAYS: Pathway[] = [
     label: 'Shikimate pathway',
     products: ['aromatics', 'vanillin', 'aromatic amino acids'],
     fluxNode: 'PEP + E4P',
+  },
+  {
+    id: 'phb-route',
+    label: 'PHB synthesis (phaCAB)',
+    products: ['PHB', 'PHA'],
+    fluxNode: 'acetyl-CoA → acetoacetyl-CoA → (R)-3-hydroxybutyryl-CoA → PHB',
+    note: 'β-ketothiolase (phaA), acetoacetyl-CoA reductase (phaB), PHA synthase (phaC)',
   },
   {
     id: 'steviol',
@@ -553,6 +562,45 @@ export const CLEARANCE_STATES: ClearanceState[] = [
     action: 'run clearance before any commitment',
   },
 ];
+
+/**
+ * What the cells were fed (OF-BLD-014 §2.1). A record's `carbonSource` keeps
+ * the paper's own words; this list is the names those words resolve to, with
+ * the spellings papers use for each. Names and spellings only — a
+ * concentration or a feed rate is a measurement, and belongs on a record.
+ *
+ * `spellings` are lower-case and include the name itself. `carbonSourceId`
+ * reads them by the whole-word rule `normalizeStrain` uses, and
+ * `scripts/export-corpus.ts` carries the list to the service, where
+ * `validate.carbon_source_id` applies the same rule.
+ */
+export const CARBON_SOURCES: CarbonSource[] = [
+  { id: 'glucose', label: 'Glucose', spellings: ['glucose', 'd-glucose', 'dextrose'] },
+  { id: 'xylose', label: 'Xylose', spellings: ['xylose', 'd-xylose'] },
+  { id: 'fructose', label: 'Fructose', spellings: ['fructose', 'd-fructose'] },
+  { id: 'glycerol', label: 'Glycerol', spellings: ['glycerol', 'glycerin', 'glycerine'] },
+  { id: 'acetate', label: 'Acetate', spellings: ['acetate', 'acetic acid'] },
+  {
+    id: 'mixed-sugars',
+    label: 'Mixed sugars',
+    spellings: ['mixed sugars', 'mixed sugar', 'sugar mixture', 'mixture of sugars'],
+  },
+  { id: 'hydrolysate', label: 'Hydrolysate', spellings: ['hydrolysate', 'hydrolyzate'] },
+];
+
+const CARBON_SPELLINGS: Record<string, string> = Object.fromEntries(
+  CARBON_SOURCES.flatMap((c) => c.spellings.map((sp) => [sp, c.id])),
+);
+
+/**
+ * The carbon source a paper's wording names, or null: an exact spelling, or
+ * spellings standing in the wording as whole words that all name one source
+ * (`matchWholeWord` in strains.ts). "Crude glycerol" is glycerol; "glucose
+ * and xylose" names two and is null, and the record keeps the words.
+ */
+export function carbonSourceId(text: string): string | null {
+  return matchWholeWord(text, CARBON_SPELLINGS);
+}
 
 // ── lookups ────────────────────────────────────────────────────────────
 

@@ -82,6 +82,98 @@ const PAIRS = [
   ['DroppedCandidate', 'DroppedCandidate'],
   ['BioRepo', 'BioRepo'],
   ['ExtractResponse', 'ExtractResponse'],
+  // OF-BLD-013 §1.2 — Guild's ledger.
+  ['GuildPerson', 'GuildPerson'],
+  ['EvidenceSource', 'EvidenceSource'],
+  ['GuildEvidence', 'GuildEvidence'],
+  ['GuildWithdrawal', 'GuildWithdrawal'],
+  ['Guild', 'Guild'],
+  ['GuildPolicy', 'GuildPolicy'],
+  // OF-BLD-013 §4 — Practice.
+  ['PracticeStepRef', 'PracticeStepRef'],
+  ['PracticeSource', 'PracticeSource'],
+  ['PracticeValue', 'PracticeValue'],
+  ['PracticeScenario', 'PracticeScenario'],
+  ['PracticeDepositionEntry', 'PracticeDepositionEntry'],
+  ['PracticeDepositionObservation', 'PracticeDepositionObservation'],
+  ['PracticeDeposition', 'PracticeDeposition'],
+  ['PracticeDraftRequest', 'PracticeDraftRequest'],
+  ['PracticeTurn', 'PracticeTurn'],
+  ['PracticeObservation', 'PracticeObservation'],
+  ['PracticeSession', 'PracticeSession'],
+  ['PracticeTurnRequest', 'PracticeTurnRequest'],
+  ['Practice', 'Practice'],
+  // OF-BLD-013 §5 — Checks.
+  ['CheckReason', 'CheckReason'],
+  ['CheckCriterion', 'CheckCriterion'],
+  ['CheckBrief', 'CheckBrief'],
+  ['CheckResult', 'CheckResult'],
+  ['Check', 'Check'],
+  ['Checks', 'Checks'],
+  ['CheckRequest', 'CheckRequest'],
+  ['CheckSchedule', 'CheckSchedule'],
+  ['CheckDismiss', 'CheckDismiss'],
+  ['CheckNote', 'CheckNote'],
+  ['CheckRecord', 'CheckRecord'],
+  // OF-BLD-014 §3.1 — computed values and their basis.
+  ['BasisSource', 'BasisSource'],
+  ['BasisInput', 'BasisInput'],
+  ['ComputedBasis', 'ComputedBasis'],
+  ['Evidence', 'Evidence'],
+  // OF-BLD-014 §3.2 — the artifact store.
+  ['Artifact', 'Artifact'],
+  ['ReplayDifference', 'ReplayDifference'],
+  ['ReplayResult', 'ReplayResult'],
+  // OF-BLD-014 §3.4 — the tool registry.
+  ['ToolInfo', 'ToolInfo'],
+  ['ToolResult', 'ToolResult'],
+  ['Prediction', 'Prediction'],
+  ['Measure', 'Measure'],
+  ['DraftItem', 'DraftItem'],
+  ['DraftMeasure', 'DraftMeasure'],
+  ['RunbookDraft', 'RunbookDraft'],
+  // OF-BLD-014 §4.1 — passages.
+  ['Passage', 'Passage'],
+  ['RagLane', 'RagLane'],
+  ['RagStatus', 'RagStatus'],
+  ['PassageHit', 'PassageHit'],
+  // OF-BLD-014 §4.3 — the retrieval scorecard.
+  ['RagMetrics', 'RagMetrics'],
+  ['RagLaneReport', 'RagLaneReport'],
+  ['RagSetInfo', 'RagSetInfo'],
+  ['RagReport', 'RagReport'],
+  // OF-BLD-014 §4.4 — search from the browser.
+  ['RagSearchRequest', 'RagSearchRequest'],
+  ['RagSearchResponse', 'RagSearchResponse'],
+  // OF-BLD-014 §5.1 — a plan cites sentences and computed values.
+  ['PassageRef', 'PassageRef'],
+  // OF-BLD-014 §6.3 — geneOS's shelf and its results.
+  ['GeneosModelInfo', 'GeneosModelInfo'],
+  ['GeneosResult', 'GeneosResult'],
+  // OF-BLD-014 §7.2 — fermOS's fits.
+  ['FermosPoint', 'FermosPoint'],
+  ['FermosSeries', 'FermosSeries'],
+  ['FermosFitRequest', 'FermosFitRequest'],
+  ['FitParam', 'FitParam'],
+  ['GrowthFit', 'GrowthFit'],
+  ['SeriesFitQuality', 'SeriesFitQuality'],
+  ['KineticFit', 'KineticFit'],
+  ['FermosFitResponse', 'FermosFitResponse'],
+  ['StartValues', 'StartValues'],
+  ['ForecastRequest', 'ForecastRequest'],
+  ['Band', 'Band'],
+  ['Interval', 'Interval'],
+  ['ForecastResult', 'ForecastResult'],
+  ['BoundRecord', 'BoundRecord'],
+  ['ScenarioInput', 'ScenarioInput'],
+  ['InputAssumption', 'InputAssumption'],
+  ['ProformaScenarioInfo', 'ProformaScenarioInfo'],
+  ['ProformaRunRequest', 'ProformaRunRequest'],
+  ['HistogramBin', 'HistogramBin'],
+  ['InputSensitivity', 'InputSensitivity'],
+  ['ProformaGrid', 'ProformaGrid'],
+  ['ProformaRunResult', 'ProformaRunResult'],
+  ['TraceStep', 'TraceStep'],
 ];
 
 let compared = 0;
@@ -110,9 +202,11 @@ const pyProv = new Set(
 // Comments are stripped first: the union is documented inline and one of those
 // comments contains an apostrophe ("somebody else's paper"), which a naive
 // quote match reads as the start of a member.
-const tsProvSource = (ts.split('export type Provenance =')[1]?.split(';')[0] ?? '')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/\/\/.*$/gm, '');
+// Stripped BEFORE the union is cut at its `;`, so a semicolon inside a
+// member's comment cannot end the union early and drop the members after it.
+const tsProvSource = (
+  ts.split('export type Provenance =')[1]?.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '') ?? ''
+).split(';')[0];
 const tsProv = new Set([...tsProvSource.matchAll(/'([^']+)'/g)].map((m) => m[1]));
 for (const p of pyProv) if (!tsProv.has(p)) fail(`provenance '${p}' is in models.py but not types.ts`);
 for (const p of tsProv) if (!pyProv.has(p)) fail(`provenance '${p}' is in types.ts but not models.py`);
@@ -131,10 +225,30 @@ if (order.indexOf('industry-estimate') < order.indexOf('unverified')) {
   fail('PROVENANCE_ORDER: an industry estimate must not outrank an unverified extraction');
 }
 
+// OF-BLD-014 §3.1, E.4 — one ranking. PROVENANCE_RANK in src/store.ts is the
+// browser's copy; it must hold the same members in the same order, so a value
+// the service calls weaker never draws as stronger. Membership alone let the
+// two disagree about `user` and `unverified` until §3.1.
+const store = readFileSync('src/store.ts', 'utf8');
+const rankBody = store.split('export const PROVENANCE_RANK: Record<Provenance, number> = {')[1]?.split('};')[0];
+if (rankBody === undefined) {
+  fail('src/store.ts: no PROVENANCE_RANK');
+} else {
+  const rank = [...rankBody.replace(/\/\/.*$/gm, '').matchAll(/^\s*'?([a-z-]+)'?\s*:\s*(\d+)\s*,?\s*$/gm)]
+    .map((m) => [m[1], Number(m[2])])
+    .sort((x, y) => x[1] - y[1]);
+  const tsOrder = rank.map(([p]) => p);
+  const ranks = rank.map(([, n]) => n);
+  if (new Set(ranks).size !== ranks.length) fail(`PROVENANCE_RANK gives two classes one rank: ${ranks.join(', ')}`);
+  if (tsOrder.join(' ') !== order.join(' ')) {
+    fail(`PROVENANCE_RANK orders ${tsOrder.join(' > ')}; PROVENANCE_ORDER orders ${order.join(' > ')}`);
+  }
+}
+
 console.log('\nopenFerment AnswerPlan shape check');
 console.log('──────────────────────────────────');
 console.log(`  fields        ${compared} compared across ${PAIRS.length} types, Python ↔ TypeScript`);
-console.log(`  provenance    ${pyProv.size} classes agree, ranked ${order.length} deep`);
+console.log(`  provenance    ${pyProv.size} classes agree, ranked ${order.length} deep in one order`);
 
 if (errors.length) {
   console.error(`\n✗ ${errors.length} error(s):`);

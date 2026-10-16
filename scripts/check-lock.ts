@@ -11,7 +11,9 @@
  *   pnpm check:lock
  */
 import { useStore } from '../src/store';
-import { lockIntact } from '../src/engine/lock';
+import { readFileSync } from 'node:fs';
+import { lockIntact, runbookLockHash } from '../src/engine/lock';
+import { RUNBOOKS } from '../src/data/runbooks';
 
 let fails = 0;
 const check = (l: string, ok: boolean, x = '') => {
@@ -65,6 +67,25 @@ check('revision is editable', s().reviseRunbookPrediction(revId, rev.predictions
 check('original still locked and unchanged',
   s().runbooks.find((r) => r.id === open.id)!.lockedAt !== null &&
   s().runbooks.find((r) => r.id === open.id)!.predictions[0].value === 42);
+
+// OF-BLD-014 §9.1 — every locked seed runbook still hashes to the digest it
+// had before canonical() learned the interval fields, and those fields are
+// covered once a prediction carries them.
+{
+  const digests = JSON.parse(readFileSync('scripts/fixtures/seed-lock-digests.json', 'utf8')) as Record<string, string>;
+  const lockedSeed = RUNBOOKS.filter((r) => r.lockedAt);
+  check('the fixture names every locked seed runbook', lockedSeed.length === 8 && lockedSeed.every((r) => r.id in digests), String(lockedSeed.length));
+  for (const r of lockedSeed)
+    check(`${r.id} hashes as it did before §9.1`, runbookLockHash(r.predictions, r.measurementSchema) === digests[r.id]);
+  const rb = lockedSeed[0];
+  const asInterval = rb.predictions.map((p, i) => (i === 0 ? { ...p, kind: 'interval' as const, interval: { low: 1, high: 2 }, artifactId: 'a1' } : p));
+  const h = runbookLockHash(asInterval, rb.measurementSchema);
+  check('adding an interval changes the digest', h !== digests[rb.id]);
+  const moved = asInterval.map((p, i) => (i === 0 ? { ...p, interval: { low: 1, high: 2.5 } } : p));
+  check('changing one end of an interval changes the digest', runbookLockHash(moved, rb.measurementSchema) !== h);
+  const other = asInterval.map((p, i) => (i === 0 ? { ...p, artifactId: 'a2' } : p));
+  check('changing an artifactId changes the digest', runbookLockHash(other, rb.measurementSchema) !== h);
+}
 
 console.log(fails === 0 ? '\nFREEZE CONTRACT HOLDS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

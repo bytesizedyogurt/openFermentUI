@@ -358,7 +358,7 @@ def test_a_plan_that_failed_after_a_billed_refusal_still_shows_the_cost(monkeypa
     assert e.value.usage == spent
 
     monkeypatch.setattr(api, "load_corpus", lambda: SimpleNamespace(search=lambda q, limit: []))
-    plan = api.ask(AskRequest(question="what is the titre"))
+    plan = api.ask(AskRequest(question="what is the titre", mode="single"))
     assert "529" in plan.declined and plan.usage == spent
 
 
@@ -529,3 +529,175 @@ def test_an_extraction_cached_by_an_earlier_run_is_extracted_again(monkeypatch, 
     current = extract.ExtractResponse(paperId="B5", run=extract.RUN, extractedAt="2026-10-08T00:00:00Z")
     (tmp_path / "B5.json").write_text(current.model_dump_json())
     assert extract.cached("B5") == current and extract.all_cached() == [current]
+
+
+# ── OF-BLD-014 §3.3: cached tokens, roles, tool turns, the daily cap ────
+
+HAIKU = "claude-haiku-5-5"
+
+
+def test_cost_with_cached_tokens_matches_the_arithmetic_by_hand():
+    # Opus 5.5: $4 in, $20 out; a cache write 1.25x input, a read 0.05x.
+    # 1000*4 + 400*4*1.25 + 2000*4*0.05 + 500*20 = 16,400 per million.
+    assert llm.cost_usd(OPUS, 1000, 500, cache_read_tokens=2000, cache_write_tokens=400) == 0.0164
+    # Sonnet 5.5 reads at 0.05x of $2: a million read tokens cost $0.10.
+    assert llm.cost_usd(SONNET, 0, 0, cache_read_tokens=1_000_000) == 0.1
+    # Haiku 5.5 reads at 0.1x. A prompt of 60,000 tokens is the short tier:
+    # 10000*0.10 + 50000*0.10*0.1 + 1000*0.50 = 2,000 per million.
+    assert llm.cost_usd(HAIKU, 10_000, 1000, cache_read_tokens=50_000) == 0.002
+    # 105,000 prompt tokens, cache reads included, is the long tier for the
+    # whole request: 10000*0.50 + 95000*0.50*0.1 + 1000*2.50 = 12,250.
+    assert llm.cost_usd(HAIKU, 10_000, 1000, cache_read_tokens=95_000) == 0.01225
+    # Without cached tokens nothing changed.
+    assert llm.cost_usd(OPUS, 1000, 500) == 0.014
+
+
+def test_usage_reads_cached_tokens_from_the_response_and_add_sums_them():
+    response = answer(OPUS, tin=1000, tout=500)
+    response.usage.cache_read_input_tokens = 2000
+    response.usage.cache_creation_input_tokens = 400
+    used = llm.usage_of(response)
+    assert (used.cacheReadTokens, used.cacheWriteTokens, used.costUsd) == (2000, 400, 0.0164)
+    both = llm.add(used, used)
+    assert (both.cacheReadTokens, both.cacheWriteTokens, both.inputTokens) == (4000, 800, 2000)
+
+
+def test_a_response_without_cache_fields_reads_as_none_cached():
+    used = llm.usage_of(answer(OPUS))
+    assert (used.cacheReadTokens, used.cacheWriteTokens) == (0, 0)
+
+
+def test_haiku_5_5_has_both_tiers_on_file():
+    assert llm.PRICES[HAIKU] == (0.10, 0.50)
+    assert llm.LONG_PROMPT_PRICES[HAIKU] == (100_000, (0.50, 2.50))
+
+
+def test_the_roles_name_their_chains(monkeypatch):
+    assert llm.chain() == llm.chain("answer") == [OPUS, SONNET]
+    assert llm.chain("index") == [HAIKU, OPUS, SONNET]
+    monkeypatch.setenv("OPENFERMENT_INDEX_MODEL", SONNET)
+    assert llm.chain("index") == [SONNET, OPUS], "no model twice"
+    with pytest.raises(ValueError):
+        llm.chain("other")
+
+
+def test_an_index_call_starts_on_the_index_model():
+    client = FakeClient({HAIKU: answer(HAIKU)})
+    result = llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, role="index")
+    assert client.asked == [HAIKU] and result.model == HAIKU
+
+
+TOOLS = [{"name": "search_records", "description": "d", "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}]
+
+
+def _turn(content, stop="end_turn", model=OPUS, tin=100, tout=50, category=None):
+    return SimpleNamespace(
+        model=model,
+        stop_reason=stop,
+        stop_details=SimpleNamespace(category=category) if stop == "refusal" else None,
+        content=content,
+        usage=SimpleNamespace(input_tokens=tin, output_tokens=tout, cache_read_input_tokens=0, cache_creation_input_tokens=0),
+    )
+
+
+def _converse(ask, **kw):
+    args = dict(system="s", messages=[{"role": "user", "content": "q"}], tools=TOOLS, schema=SCHEMA, max_tokens=500, model=OPUS, ask=ask)
+    args.update(kw)
+    return llm.converse(**args)
+
+
+def test_converse_never_sends_a_forced_tool_choice():
+    sent = []
+    for forced in ("any", "tool"):
+        with pytest.raises(ValueError):
+            _converse(lambda r: sent.append(r), tool_choice=forced)
+    assert sent == [], "a forced choice is refused before anything is sent"
+    for choice in llm.TOOL_CHOICES:
+        _converse(lambda r: sent.append(r) or _turn([SimpleNamespace(type="text", text='{"candidates": []}')]), tool_choice=choice)
+    assert [r["tool_choice"] for r in sent] == [{"type": "auto"}, {"type": "none"}]
+    for r in sent:
+        assert r["tool_choice"]["type"] not in ("any", "tool")
+
+
+def test_converse_builds_strict_tools_the_plan_schema_and_top_level_caching():
+    sent = []
+    _converse(lambda r: sent.append(r) or _turn([SimpleNamespace(type="text", text='{"candidates": []}')]))
+    r = sent[0]
+    assert r["cache_control"] == {"type": "ephemeral"}
+    assert r["tools"][0]["strict"] is True
+    assert r["tools"][0]["input_schema"]["additionalProperties"] is False
+    assert r["output_config"]["format"]["type"] == "json_schema"
+    assert r["output_config"]["format"]["schema"]["additionalProperties"] is False
+    assert r["model"] == OPUS
+
+
+def test_converse_returns_tool_calls_and_keeps_every_block_as_returned():
+    blocks = [
+        SimpleNamespace(type="thinking", thinking="…", signature="sig"),
+        SimpleNamespace(type="tool_use", id="tu_1", name="search_records", input={"query": "PHB"}),
+    ]
+    turn = _converse(lambda r: _turn(blocks, stop="tool_use"))
+    assert [(c.id, c.name, c.input) for c in turn.toolCalls] == [("tu_1", "search_records", {"query": "PHB"})]
+    assert turn.data is None and turn.stopReason == "tool_use"
+    assert turn.content[0] == {"type": "thinking", "thinking": "…", "signature": "sig"}
+    assert turn.content[1]["type"] == "tool_use"
+
+
+def test_converse_parses_the_final_answer_when_no_tool_was_called():
+    turn = _converse(lambda r: _turn([SimpleNamespace(type="text", text='{"candidates": [{"value": "x"}]}')]))
+    assert turn.data == {"candidates": [{"value": "x"}]} and turn.toolCalls == []
+    assert turn.usage.costUsd == llm.cost_usd(OPUS, 100, 50)
+
+
+def test_a_refusal_inside_a_conversation_is_model_refused_with_what_was_spent():
+    with pytest.raises(llm.ModelRefused) as e:
+        _converse(lambda r: _turn([], stop="refusal", tin=300, tout=0, category="bio"))
+    assert e.value.category == "bio"
+    assert e.value.usage.inputTokens == 300 and e.value.usage.costUsd == llm.cost_usd(OPUS, 300, 0)
+
+
+def test_converse_falls_back_nowhere():
+    asked = []
+
+    def ask(r):
+        asked.append(r["model"])
+        raise status_error(anthropic.NotFoundError, 404)
+
+    with pytest.raises(llm.ModelUnavailable):
+        _converse(ask)
+    assert asked == [OPUS]
+
+
+def test_the_daily_cap_refuses_the_call_that_would_pass_it_and_allows_the_one_before(monkeypatch):
+    from openferment_core import spend
+
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "1.00")
+    monkeypatch.setattr(llm, "worst_case_usd", lambda *a, **k: 0.10)
+    spend.charge("answer", 0.85)
+    client = FakeClient({OPUS: answer(OPUS, tin=1000, tout=500)})
+    run(client)  # 0.85 + 0.10 stays within the cap
+    assert client.asked == [OPUS]
+    assert spend.total_today() == round(0.85 + llm.cost_usd(OPUS, 1000, 500), 6), "the response was charged"
+    spend.charge("answer", 0.10)  # 0.964: the next worst case would pass 1.00
+    with pytest.raises(llm.BudgetExhausted) as e:
+        run(client)
+    assert client.asked == [OPUS], "the refused call was never sent"
+    assert "OPENFERMENT_DAILY_BUDGET_USD" in str(e.value) and "$0.96" in str(e.value)
+    assert isinstance(e.value, llm.ModelUnavailable), "every caller that reports an outage reports this"
+    with pytest.raises(llm.BudgetExhausted):
+        _converse(lambda r: pytest.fail("sent past the cap"))
+
+
+def test_the_worst_case_grows_with_what_a_call_allows():
+    small = llm.worst_case_usd(OPUS, {"messages": "x"}, 100)
+    assert llm.worst_case_usd(OPUS, {"messages": "x"}, 10_000) > small
+    assert llm.worst_case_usd(OPUS, {"messages": "x" * 10_000}, 100) > small
+
+
+def test_every_response_is_charged_to_its_role():
+    from openferment_core import spend
+
+    client = FakeClient({HAIKU: answer(HAIKU, tin=1000, tout=500)})
+    llm.call(system="s", user="u", schema=SCHEMA, max_tokens=100, client_factory=lambda: client, role="index")
+    assert spend.state()["byRole"]["index"] == llm.cost_usd(HAIKU, 1000, 500)
+    assert spend.state()["byRole"]["answer"] == 0.0

@@ -1,0 +1,281 @@
+{
+  "_sample": "SAMPLE: an invented time course, made to show what fermOS does with a run. Not a measurement.",
+  "series": [
+    {
+      "measureId": "sample-biomass",
+      "label": "Dry cell weight (sample)",
+      "unit": "g L-1",
+      "role": "biomass",
+      "points": [
+        {
+          "t": 0.0,
+          "value": 0.139,
+          "entryId": "sample-biomass-0",
+          "confirmed": true
+        },
+        {
+          "t": 2.5,
+          "value": 0.211,
+          "entryId": "sample-biomass-1",
+          "confirmed": true
+        },
+        {
+          "t": 5.0,
+          "value": 0.485,
+          "entryId": "sample-biomass-2",
+          "confirmed": true
+        },
+        {
+          "t": 7.5,
+          "value": 1.044,
+          "entryId": "sample-biomass-3",
+          "confirmed": true
+        },
+        {
+          "t": 10.0,
+          "value": 1.806,
+          "entryId": "sample-biomass-4",
+          "confirmed": true
+        },
+        {
+          "t": 12.5,
+          "value": 3.326,
+          "entryId": "sample-biomass-5",
+          "confirmed": true
+        },
+        {
+          "t": 15.0,
+          "value": 5.078,
+          "entryId": "sample-biomass-6",
+          "confirmed": true
+        },
+        {
+          "t": 17.5,
+          "value": 6.407,
+          "entryId": "sample-biomass-7",
+          "confirmed": true
+        },
+        {
+          "t": 20.0,
+          "value": 7.534,
+          "entryId": "sample-biomass-8",
+          "confirmed": true
+        },
+        {
+          "t": 22.5,
+          "value": 8.367,
+          "entryId": "sample-biomass-9",
+          "confirmed": true
+        },
+        {
+          "t": 25.0,
+          "value": 8.752,
+          "entryId": "sample-biomass-10",
+          "confirmed": true
+        },
+        {
+          "t": 27.5,
+          "value": 8.871,
+          "entryId": "sample-biomass-11",
+          "confirmed": true
+        },
+        {
+          "t": 30.0,
+          "value": 8.793,
+          "entryId": "sample-biomass-12",
+          "confirmed": true
+        },
+        {
+          "t": 32.5,
+          "value": 8.961,
+          "entryId": "sample-biomass-13",
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "measureId": "sample-product",
+      "label": "Polymer (sample)",
+      "unit": "g L-1",
+      "role": "product",
+      "points": [
+        {
+          "t": 0.0,
+          "value": 0.12,
+          "entryId": "sample-product-0",
+          "confirmed": true
+        },
+        {
+          "t": 2.5,
+          "value": 0.175,
+          "entryId": "sample-product-1",
+          "confirmed": true
+        },
+        {
+          "t": 5.0,
+          "value": 0.151,
+          "entryId": "sample-product-2",
+          "confirmed": true
+        },
+        {
+          "t": 7.5,
+          "value": 0.446,
+          "entryId": "sample-product-3",
+          "confirmed": true
+        },
+        {
+          "t": 10.0,
+          "value": 0.716,
+          "entryId": "sample-product-4",
+          "confirmed": true
+        },
+        {
+          "t": 12.5,
+          "value": 1.434,
+          "entryId": "sample-product-5",
+          "confirmed": true
+        },
+        {
+          "t": 15.0,
+          "value": 2.094,
+          "entryId": "sample-product-6",
+          "confirmed": true
+        },
+        {
+          "t": 17.5,
+          "value": 2.828,
+          "entryId": "sample-product-7",
+          "confirmed": true
+        },
+        {
+          "t": 20.0,
+          "value": 3.518,
+          "entryId": "sample-product-8",
+          "confirmed": true
+        },
+        {
+          "t": 22.5,
+          "value": 4.03,
+          "entryId": "sample-product-9",
+          "confirmed": true
+        },
+        {
+          "t": 25.0,
+          "value": 4.479,
+          "entryId": "sample-product-10",
+          "confirmed": true
+        },
+        {
+          "t": 27.5,
+          "value": 4.797,
+          "entryId": "sample-product-11",
+          "confirmed": true
+        },
+        {
+          "t": 30.0,
+          "value": 5.277,
+          "entryId": "sample-product-12",
+          "confirmed": true
+        },
+        {
+          "t": 32.5,
+          "value": 5.564,
+          "entryId": "sample-product-13",
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "measureId": "sample-substrate",
+      "label": "Sugar (sample)",
+      "unit": "g L-1",
+      "role": "substrate",
+      "points": [
+        {
+          "t": 0.0,
+          "value": 60.142,
+          "entryId": "sample-substrate-0",
+          "confirmed": true
+        },
+        {
+          "t": 2.5,
+          "value": 59.63,
+          "entryId": "sample-substrate-1",
+          "confirmed": true
+        },
+        {
+          "t": 5.0,
+          "value": 58.701,
+          "entryId": "sample-substrate-2",
+          "confirmed": true
+        },
+        {
+          "t": 7.5,
+          "value": 55.907,
+          "entryId": "sample-substrate-3",
+          "confirmed": true
+        },
+        {
+          "t": 10.0,
+          "value": 52.569,
+          "entryId": "sample-substrate-4",
+          "confirmed": true
+        },
+        {
+          "t": 12.5,
+          "value": 46.132,
+          "entryId": "sample-substrate-5",
+          "confirmed": true
+        },
+        {
+          "t": 15.0,
+          "value": 38.541,
+          "entryId": "sample-substrate-6",
+          "confirmed": true
+        },
+        {
+          "t": 17.5,
+          "value": 31.871,
+          "entryId": "sample-substrate-7",
+          "confirmed": true
+        },
+        {
+          "t": 20.0,
+          "value": 25.788,
+          "entryId": "sample-substrate-8",
+          "confirmed": true
+        },
+        {
+          "t": 22.5,
+          "value": 22.525,
+          "entryId": "sample-substrate-9",
+          "confirmed": true
+        },
+        {
+          "t": 25.0,
+          "value": 20.78,
+          "entryId": "sample-substrate-10",
+          "confirmed": true
+        },
+        {
+          "t": 27.5,
+          "value": 18.311,
+          "entryId": "sample-substrate-11",
+          "confirmed": true
+        },
+        {
+          "t": 30.0,
+          "value": 17.908,
+          "entryId": "sample-substrate-12",
+          "confirmed": true
+        },
+        {
+          "t": 32.5,
+          "value": 16.522,
+          "entryId": "sample-substrate-13",
+          "confirmed": true
+        }
+      ]
+    }
+  ]
+}

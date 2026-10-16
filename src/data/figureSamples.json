@@ -1,0 +1,279 @@
+{
+  "_sample": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+  "strip": {
+    "unit": "g g-1",
+    "quantity": "PHB yield on substrate",
+    "records": [
+      {
+        "id": "sample-1",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.12,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.12,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "measured",
+        "organism": "Sample organism A",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-2",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.17,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.17,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "verified",
+        "provenance": "curated",
+        "gold": {
+          "value": 0.17,
+          "unit": "g g-1"
+        },
+        "organism": "Sample organism B",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-3",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.22,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.22,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "verified",
+        "provenance": "curated",
+        "organism": "Sample organism A",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-4",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.27,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.27,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "curated",
+        "organism": "Sample organism B",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-5",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.32,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.32,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "unverified",
+        "organism": "Sample organism A",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-6",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.37,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.37,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "computed",
+        "organism": "Sample organism B",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-7",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.42,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.42,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "user",
+        "organism": "Sample organism A",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-8",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.47,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.47,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "industry-estimate",
+        "organism": "Sample organism B",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-9",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.52,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.52,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "demo",
+        "organism": "Sample organism A",
+        "carbonSource": "sample sugar",
+        "isPrimary": true,
+        "audit": []
+      },
+      {
+        "id": "sample-10",
+        "paperId": "sample",
+        "sectionId": "sample",
+        "quote": "SAMPLE: invented values that show every mark of the figure grammar. Not a measurement, not a result.",
+        "field": "pha_yield_substrate",
+        "value": 0.2,
+        "unit": "g g-1",
+        "si": {
+          "value": 0.2,
+          "unit": "g g-1"
+        },
+        "confidence": 1,
+        "status": "unverified",
+        "provenance": "curated",
+        "organism": "Sample organism B",
+        "carbonSource": "sample sugar",
+        "isPrimary": false,
+        "audit": []
+      }
+    ],
+    "rules": [
+      {
+        "value": 0.48,
+        "label": "sample core model"
+      },
+      {
+        "value": 0.59,
+        "label": "sample genome-scale model"
+      }
+    ]
+  },
+  "frontier": {
+    "growthUnit": "h-1",
+    "productUnit": "g g-1",
+    "productLabel": "PHB yield on substrate",
+    "model": "a sample model",
+    "points": [
+      {
+        "growth": 0.0,
+        "product": 0.6
+      },
+      {
+        "growth": 0.08,
+        "product": 0.5871
+      },
+      {
+        "growth": 0.16,
+        "product": 0.5608
+      },
+      {
+        "growth": 0.24,
+        "product": 0.525
+      },
+      {
+        "growth": 0.32,
+        "product": 0.4811
+      },
+      {
+        "growth": 0.4,
+        "product": 0.4301
+      },
+      {
+        "growth": 0.48,
+        "product": 0.3725
+      },
+      {
+        "growth": 0.56,
+        "product": 0.3089
+      },
+      {
+        "growth": 0.64,
+        "product": 0.2395
+      },
+      {
+        "growth": 0.72,
+        "product": 0.1648
+      },
+      {
+        "growth": 0.8,
+        "product": 0.0849
+      },
+      {
+        "growth": 0.88,
+        "product": 0.0
+      }
+    ]
+  }
+}

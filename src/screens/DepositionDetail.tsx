@@ -13,9 +13,10 @@ import type { Deposition } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { ComponentTag } from '@/components/ComponentTag';
+import { TimeSeriesPanel } from '@/components/TimeSeriesPanel';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
+import { IntervalLedger } from '@/components/figures';
 import {
-  CONFIRM_BAND_PCT,
   computeDeltas,
   deltaLabel,
   suggestOutcome,
@@ -92,6 +93,19 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
         )}
       </div>
 
+      {/* §9.3 — the reconciliation drawn, above the table. */}
+      {deltas.length > 0 && (
+        <div className="mb-3">
+          <IntervalLedger
+            title="What was predicted, and what did this run measure?"
+            rows={deltas.map((d) => {
+              const p = runbook.predictions.find((x) => x.id === d.predictionId)!;
+              return { key: d.predictionId, label: d.label, prediction: p, lockedAt: runbook.lockedAt, observed: { value: d.observed, unit: d.unit }, held: d.held };
+            })}
+            csvName={`reconciliation-${deposition.id}`}
+          />
+        </div>
+      )}
       {deltas.length === 0 ? (
         <EmptyState
           title="Nothing to compare"
@@ -100,7 +114,7 @@ function ReconciliationPanel({ deposition }: { deposition: Deposition }) {
       ) : (
         <ul className="space-y-3">
           {deltas.map((d) => {
-            const held = Math.abs(d.pctDelta) <= CONFIRM_BAND_PCT;
+            const held = d.held;
             return (
               <li key={d.predictionId}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -210,6 +224,8 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   }, [depositionId]);
 
   const deposition = depositions.find((d) => d.id === depositionId);
+  // The operator as Guild's ledger names them (OF-BLD-013 §2).
+  const operatorName = useStore((s) => s.guild.people.find((p) => p.id === deposition?.operatorId)?.name);
   const evidence = useStore((s) => s.measuredEvidence).filter(
     (e) => e.depositionId === depositionId,
   );
@@ -282,10 +298,14 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
             <span className="font-num">{deposition.closedAt.slice(0, 16).replace('T', ' ')}</span>
           </span>
         )}
-        {deposition.operatorId === null && (
-          <span className="chip text-ink-soft" title="Guild will populate this once people and permissions exist">
+        {deposition.operatorId === null ? (
+          <span className="chip text-ink-soft" title="Nobody on Guild’s ledger was performing the steps when this run was written">
             operator unattributed
           </span>
+        ) : (
+          <a className="chip text-ink-soft hover:text-accent" href={href(`/guild/people/${deposition.operatorId}`)}>
+            operator {operatorName ?? deposition.operatorId}
+          </a>
         )}
       </div>
 
@@ -340,6 +360,20 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
           )}
         </Card>
       </section>
+
+      {/* ── time series (OF-BLD-014 §7.1) ───────────────────────────────── */}
+      {runbook && (
+        <section className="mb-6" aria-labelledby="band-series">
+          <SectionTitle>
+            <span id="band-series" className="inline-flex items-center gap-2">
+              <Ruler size={15} aria-hidden /> Time series
+            </span>
+          </SectionTitle>
+          <Card className="p-4">
+            <TimeSeriesPanel deposition={deposition} runbook={runbook} />
+          </Card>
+        </section>
+      )}
 
       {/* ── observed ─────────────────────────────────────────────────────── */}
       <section className="mb-6" aria-labelledby="band-observed">

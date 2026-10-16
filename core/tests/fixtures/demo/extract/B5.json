@@ -1,30 +1,81 @@
 {
-  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): what fixture-mode extract.py returns for B5 instead of calling the model (claude-opus-5-5, then claude-sonnet-5-5). HAND-WRITTEN, not a model output — the sandbox this was written in had no key — in the exact shape of the emit_candidates schema, over the structural stand-in text. Both candidates anchor (§2.4): the value is in the quote, the unit is in the field's family, the converted value is in range. Regenerate with a key: OPENFERMENT_FIXTURE_DIR=core/tests/fixtures/demo pnpm intake:extract B5 --force --save-fixture",
+  "_note": "Saved response of claude-haiku-5-5 for B5, for OPENFERMENT_FIXTURES=1 replay.",
   "raw": {
     "candidates": [
       {
-        "sectionId": "t1",
-        "field": "titer_secreted",
-        "value": 7,
-        "unit": "mg L-1",
-        "quote": "Placeholder A | 7 | mg L-1",
+        "sectionId": "s9",
+        "field": "transformation_efficiency",
+        "value": 2.47,
+        "unit": "× 10^3 colonies per µg DNA",
+        "quote": "we obtained ~ 2.47 × 10^3 colonies per µg DNA",
+        "organism": "C. reinhardtii cw15",
+        "isPrimary": true,
+        "confidence": 0.85
+      },
+      {
+        "sectionId": "s9",
+        "field": "transformation_efficiency",
+        "value": 5.5,
+        "unit": "× 10^3 colonies per µg DNA",
+        "quote": "the construct with the CA1 terminator produced 5.50 × 10^3 colonies per µg DNA",
+        "organism": "C. reinhardtii cw15",
+        "isPrimary": true,
+        "confidence": 0.85
+      },
+      {
+        "sectionId": "s9",
+        "field": "fold_improvement",
+        "value": 2.2,
+        "unit": "-fold",
+        "quote": "a 2.2-fold increase over the base case that was statistically significant (p < 0.01)",
         "isPrimary": true,
         "confidence": 0.8
       },
       {
-        "sectionId": "t1",
+        "sectionId": "s7",
         "field": "time_to_colony",
-        "value": 7,
+        "value": 8.5,
         "unit": "d",
-        "quote": "Placeholder A | 7 | mg L-1",
+        "quote": "number of colonies appearing on selection plates after 7–10 days of growth for strains cw15 and UVM4",
+        "organism": "C. reinhardtii cw15 and UVM4",
         "isPrimary": true,
-        "confidence": 0.55
+        "confidence": 0.8,
+        "range": {
+          "low": 7,
+          "high": 10
+        }
+      },
+      {
+        "sectionId": "s7",
+        "field": "time_to_colony",
+        "value": 17.5,
+        "unit": "d",
+        "quote": "and 15–20 days for WT12 transformants",
+        "organism": "C. reinhardtii WT12",
+        "isPrimary": true,
+        "confidence": 0.8,
+        "range": {
+          "low": 15,
+          "high": 20
+        }
       }
     ]
   },
   "usage": {
-    "inputTokens": 0,
-    "outputTokens": 0,
-    "costUsd": 0.0
+    "inputTokens": 22660,
+    "outputTokens": 1911,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003221,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "anchoredAtSave": {
+    "candidates": [
+      "cl1-B5-2e3f5d2e",
+      "cl1-B5-6aea5b39"
+    ],
+    "rejected": 3
   }
 }

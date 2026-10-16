@@ -15,8 +15,12 @@ export const BIOREPO_TABS: OwnerTab[] = [
   // a second tab pointing at the same table would be a duplicate rather than a
   // view — and duplicating a screen is the kind of feature §10 forbids.
   { label: 'Papers', to: '/biorepo' },
+  // OF-BLD-014 §4.4 — the papers' own words, searched.
+  { label: 'Search', to: '/biorepo/search' },
   { label: 'Compare', to: '/biorepo/compare' },
   { label: 'Witness', to: '/biorepo/witness' },
+  // OF-BLD-014 §3.2 — what the service computed, with its basis.
+  { label: 'Artifacts', to: '/biorepo/artifacts' },
 ];
 
 export const INTAKE_TABS: OwnerTab[] = [
@@ -28,4 +32,33 @@ export const RUNBOOK_TABS: OwnerTab[] = [
   { label: 'Runbooks', to: '/runbooks' },
   { label: 'Protocols', to: '/runbooks/protocols' },
   { label: 'Depositions', to: '/runbooks/depositions' },
+  { label: 'Ledger', to: '/runbooks/ledger' },
+];
+
+// OF-BLD-013 §3.3. The module map keeps /primer, so every link to it that
+// exists today still lands on it; a person's path sits beside it.
+export const PRIMER_TABS: OwnerTab[] = [
+  { label: 'Lessons', to: '/primer' },
+  { label: 'My path', to: '/primer/path' },
+  { label: 'Practice', to: '/primer/practice' },
+];
+
+// OF-BLD-013 §1.4. Review keeps /guild, so every link into the queue that
+// exists today still lands on it; the workforce views sit beside it. Checks
+// (§5.4) is shown to the lead and to assessors: `GuildTabs` in
+// src/components/GuildBits.tsx is the one place that decides, for every
+// Guild view alike.
+export const GUILD_TABS: OwnerTab[] = [
+  { label: 'Review', to: '/guild' },
+  { label: 'Matrix', to: '/guild/matrix' },
+  { label: 'People', to: '/guild/people' },
+  { label: 'Skills', to: '/guild/skills' },
+  { label: 'Checks', to: '/guild/checks' },
+];
+
+// OF-BLD-014 §7.4 — fermOS's first tab set: fits of deposited runs, and
+// forecasts from those fits.
+export const FERMOS_TABS: OwnerTab[] = [
+  { label: 'Fits', to: '/fermos' },
+  { label: 'Forecast', to: '/fermos/forecast' },
 ];

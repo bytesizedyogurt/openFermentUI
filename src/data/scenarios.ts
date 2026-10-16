@@ -151,12 +151,16 @@ const S3: CostModel = {
 
 export const COST_MODELS: CostModel[] = [S1, S2, S3];
 
+/** The flowsheets `core/openferment_core/flowsheets/` holds for a scenario (§8.3). */
+export const BIOSTEAM_FLOWSHEETS = ['pha_sugar_v0'];
+
 // ── Scenarios ─────────────────────────────────────────────────────────
 
 export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s1',
     modelId: 'S1',
+    kind: 'authored',
     name: 'cw15 intracellular β-casein',
     description:
       'Mixotrophic Chlamydomonas accumulating β-casein intracellularly, recovered by mild pulsed-electric-field disruption. The reference point sits where the literature actually is today — which is the bottom-left corner of this surface.',
@@ -188,6 +192,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s2',
     modelId: 'S2',
+    kind: 'authored',
     name: 'K. phaffii secreted comparator',
     description:
       'The incumbent precision-fermentation route: a secreting yeast at fed-batch density. Anchored on the two real eukaryotic data points — Choi & Jiménez-Flores for bovine β-casein and Aro et al. for what secretion achieves at its best.',
@@ -211,6 +216,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s3',
     modelId: 'S3',
+    kind: 'authored',
     name: 'Conventional β-casein from milk',
     description:
       'The incumbent baseline. Cold microfiltration of micellar casein concentrate, exploiting β-casein’s dissociation from the micelle at low temperature. This is what any recombinant route has to beat.',
@@ -227,5 +233,22 @@ export const SCENARIOS: Scenario[] = [
       { label: 'Fractionation capital, annualised', value: 4.1, unit: 'USD kg⁻¹', provenance: 'demo', note: 'Membrane plant capital per kg of β-casein. Demo assumption.' },
       { label: 'Residual biomass co-product value', value: 0.44, unit: 'EUR kg⁻¹', provenance: 'curated', paperId: 'O6', note: 'Protein-rich residual streams are worth very little, which limits how much credit any process can claim for them.' },
     ],
+  },
+  // OF-BLD-014 §8.4 — the BioSTEAM scenario. Its inputs, grid and run live on
+  // the service (`GET /api/proforma/scenarios`, `POST /api/proforma/run`);
+  // nothing about it is authored here, so it carries no dims, point or
+  // assumptions of its own.
+  {
+    id: 'sc-pha-1',
+    modelId: 'pha_sugar_v0',
+    kind: 'biosteam',
+    name: 'PHA from cellulosic sugar — draft flowsheet',
+    description:
+      'BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only. Every input names its source: the thread P records it binds to, the reference model, or the person who typed it.',
+    product: 'PHB in dried cell mass',
+    dims: [],
+    point: {},
+    pinned: false,
+    assumptions: [],
   },
 ];

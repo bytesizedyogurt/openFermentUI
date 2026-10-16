@@ -12,14 +12,17 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { AnswerPlan, Claim, ExtractionRecord, Paper } from '@/data/types';
+import type { AnswerPlan, Claim, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
 import { ProvenanceBadge, Tick } from './Provenance';
 import { ComponentTag } from './ComponentTag';
 import { Callout, Card } from './ui';
-import { formatCost } from '@/lib/postdoc';
+import { cachedShare, formatCost } from '@/lib/postdoc';
+import { PassageQuote } from './PassageQuote';
+import { EvidenceCard } from './EvidenceCard';
+import { STOPPED_WORDS } from './PlanTrace';
 
 /** The value, rendered from the record — never from the claim's text. */
 function RecordValue({ record }: { record: ExtractionRecord }) {
@@ -54,7 +57,17 @@ const SUPPORT_NOTE: Record<Claim['support'], string | null> = {
     'Stated as an absence. No record backs this, which is the point of it — nobody has measured it.',
 };
 
-function ClaimRow({ claim, index }: { claim: Claim; index: number }) {
+function ClaimRow({
+  claim,
+  index,
+  passages,
+  evidence,
+}: {
+  claim: Claim;
+  index: number;
+  passages: Map<string, Passage>;
+  evidence: Map<string, Evidence>;
+}) {
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
   const byId = new Map(records.map((r) => [r.id, r]));
@@ -83,6 +96,27 @@ function ClaimRow({ claim, index }: { claim: Claim; index: number }) {
             </div>
           )}
 
+          {/* OF-BLD-014 §5.4 — sentences the claim quotes, checked word for
+              word against their passages, and computed values it rests on. */}
+          {(claim.passages ?? []).length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {(claim.passages ?? []).map((cite) => (
+                <PassageQuote key={`${cite.passageId}-${cite.quote}`} cite={cite} passage={passages.get(cite.passageId)} />
+              ))}
+            </div>
+          )}
+
+          {(claim.evidenceIds ?? []).length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {(claim.evidenceIds ?? [])
+                .map((id) => evidence.get(id))
+                .filter((e): e is Evidence => Boolean(e))
+                .map((e) => (
+                  <EvidenceCard key={e.id} evidence={e} />
+                ))}
+            </div>
+          )}
+
           {note && <p className="text-caption text-ink-soft mt-1.5">{note}</p>}
 
           {citedPapers.length > 0 && (
@@ -106,8 +140,61 @@ function ClaimRow({ claim, index }: { claim: Claim; index: number }) {
   );
 }
 
+/** A runbook the agent drafted (OF-BLD-014 §9.2): its numbers were written by the service. */
+function DraftCard({ draft }: { draft: RunbookDraft }) {
+  const adopt = useStore((s) => s.adoptRunbookDraft);
+  const predictionLabel = (id: string | null) => draft.predictions.find((p) => p.id === id)?.label ?? 'nothing predicted';
+  return (
+    <Card className="p-4" data-testid="runbook-draft">
+      <div className="text-caption uppercase tracking-wide text-ink-soft">Runbook draft</div>
+      <div className="font-serif text-section-title font-semibold">{draft.title}</div>
+      <p className="text-caption text-ink-soft mb-2">
+        Postdoc chose what to predict and measure; every value and interval below was written by the service from the
+        artifact or records each prediction names. Adopting it opens an unlocked research runbook for you to read and lock.
+      </p>
+      <ul className="space-y-1 text-body">
+        {draft.predictions.map((p) => (
+          <li key={p.id}>
+            <span className="font-medium">{p.label}</span>{' '}
+            <span className="font-num">
+              {p.kind === 'interval' && p.interval
+                ? `${fmt(p.interval.low)} to ${fmt(p.interval.high)}`
+                : p.kind === 'bound'
+                  ? `at most ${fmt(p.value)}`
+                  : fmt(p.value)}{' '}
+              {p.unit}
+            </span>
+            <div className="text-caption text-ink-soft">{p.basis}</div>
+          </li>
+        ))}
+      </ul>
+      {draft.measures.length > 0 && (
+        <div className="text-caption text-ink-soft mt-2">
+          Measured: {draft.measures.map((m) => `${m.label} (${m.unit}, ${m.timepoint}) for ${predictionLabel(m.predictionId)}`).join('; ')}.
+        </div>
+      )}
+      <button
+        className="btn btn-primary mt-3"
+        onClick={() => {
+          const id = adopt(draft);
+          navigate(`/runbooks/${id}`);
+        }}
+      >
+        Turn into a runbook
+      </button>
+    </Card>
+  );
+}
+
 export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
   const hasClaims = plan.claims.length > 0;
+  const passages = new Map((plan.passages ?? []).map((p) => [p.id, p]));
+  const evidence = new Map((plan.evidence ?? []).map((e) => [e.id, e]));
+  const toolCalls = (plan.trace ?? []).filter((t) => t.kind === 'tool').length;
+  // The loop answered only when its last step is a kept plan; a question no
+  // model answered, or an answer that was not a plan, says so (§5.R).
+  const last = plan.trace?.[plan.trace.length - 1];
+  const answered = last?.kind === 'final' && last.ok;
 
   return (
     <div className="space-y-4">
@@ -130,7 +217,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
         <Card className="px-4 py-1">
           <ul>
             {plan.claims.map((claim, i) => (
-              <ClaimRow key={claim.id} claim={claim} index={i} />
+              <ClaimRow key={claim.id} claim={claim} index={i} passages={passages} evidence={evidence} />
             ))}
           </ul>
         </Card>
@@ -145,6 +232,8 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
 
       {/* Gaps are a section of their own, not a footnote. Naming what is
           absent is the answer §6 asks for most often. */}
+      {plan.runbookDraft && <DraftCard draft={plan.runbookDraft} />}
+
       {plan.gaps.length > 0 && (
         <section aria-labelledby="plan-gaps">
           <div className="flex items-center gap-2 mb-1.5">
@@ -196,23 +285,44 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
           action={plan.declined ? 'declined' : `${plan.claims.length} claims`}
         />
         {/* Cost is quiet but present. A visible per-query price is what makes
-            the budget-gating story real rather than theoretical. */}
-        {plan.usage.outputTokens > 0 && (
-          <span
-            className="font-num text-caption text-ink-soft inline-flex items-center gap-1"
-            title={`${plan.usage.inputTokens} in / ${plan.usage.outputTokens} out`}
-          >
-            {formatCost(plan.usage.costUsd)}
-            <span className="opacity-45">·</span>
-            {plan.usage.inputTokens.toLocaleString()} in / {plan.usage.outputTokens.toLocaleString()} out
-            {plan.usage.models && plan.usage.models.length > 0 && (
-              <>
-                <span className="opacity-45">·</span>
-                {plan.usage.models.join(' → ')}
-              </>
-            )}
-          </span>
-        )}
+            the budget-gating story real rather than theoretical. The models,
+            the tokens with their cached share, and why the loop stopped sit
+            beside it (OF-BLD-014 §5.4). */}
+        <span
+          className="font-num text-caption text-ink-soft inline-flex flex-wrap items-center gap-x-1 gap-y-0.5"
+          data-testid="plan-footer"
+          title={`${plan.usage.inputTokens} in / ${plan.usage.outputTokens} out`}
+        >
+          {plan.usage.models && plan.usage.models.length > 0 && (
+            <>
+              {plan.usage.models.join(' → ')}
+              <span className="opacity-45">·</span>
+            </>
+          )}
+          {plan.usage.inputTokens.toLocaleString()} in / {plan.usage.outputTokens.toLocaleString()} out
+          {/* OF-BLD-014 §3.3 — how much of the prompt the cache served. */}
+          {cachedShare(plan.usage) !== null && (
+            <>
+              <span className="opacity-45">·</span>
+              <span
+                title={`${(plan.usage.cacheReadTokens ?? 0).toLocaleString()} prompt tokens read from the cache, ${(plan.usage.cacheWriteTokens ?? 0).toLocaleString()} written to it`}
+              >
+                {cachedShare(plan.usage)}% of the prompt cached
+              </span>
+            </>
+          )}
+          <span className="opacity-45">·</span>
+          {formatCost(plan.usage.costUsd)}
+          {plan.trace && plan.trace.length > 0 && (
+            <>
+              <span className="opacity-45">·</span>
+              <span className="font-sans">
+                {toolCalls} tool {toolCalls === 1 ? 'call' : 'calls'};{' '}
+                {answered ? STOPPED_WORDS[plan.stopped ?? 'done'] : 'no answer came back'}
+              </span>
+            </>
+          )}
+        </span>
       </div>
     </div>
   );

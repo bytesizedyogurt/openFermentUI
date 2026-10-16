@@ -1,0 +1,126 @@
+# The licence ledger (OF-BLD-014 §1.2, E.9).
+#
+# `pnpm check:licences` (scripts/check-licences.py) reads the licence metadata
+# of every distribution installed in core/.venv that core/uv.lock names, and of
+# every JavaScript production dependency, and fails on a string that is
+# neither allowed here nor accepted below. It compares text, so each string is
+# written in the spelling the package's own metadata uses: `Apache2.0` and
+# `Apache-2.0` are two strings.
+#
+# The allowed list holds permissive licences alone, each one measured on what
+# is installed, with the packages that carried it on the day it was added. A
+# licence outside the permissive families is accepted package by package,
+# under [accepted], by a named person, with the date and one line of why.
+# The project's own package, openferment-core, carries no licence metadata
+# (the repository declares no licence yet) and the check skips it by name.
+
+allowed = [
+  # Measured 2026-10-14 on core/.venv (Python 3.13) and `pnpm licenses list --prod`.
+  "MIT",                          # most packages on both sides
+  "MIT License",                  # uvloop, in its License field
+  "MIT AND ISC",                  # victory-vendor
+  "MIT OR Apache-2.0",            # sniffio
+  "ISC",                          # lucide-react, internmap, ten d3 packages
+  "BSD-2-Clause",                 # pygments
+  "BSD-3-Clause",                 # click, httpx, starlette, uvicorn and six more; d3-ease, react-transition-group
+  "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",  # numpy
+  "Apache2.0",                    # rank-bm25 spells it so
+  "Apache-2.0 OR BSD-2-Clause",   # packaging
+  "PSF-2.0",                      # typing_extensions
+  "OFL-1.1",                      # the three @fontsource font packages
+  # Added 2026-10-15 with the rag extra (OF-BLD-014 §4.2, fastembed 0.9.0).
+  "Apache-2.0",                   # fastembed, hf-xet, huggingface_hub, requests
+  "Apache 2.0",                   # flatbuffers spells it so
+  "License :: OSI Approved :: Apache Software License",  # tokenizers, by classifier alone
+  "License :: OSI Approved :: MIT License",              # loguru and mmh3, by classifier
+  "MIT-CMU",                      # pillow: the historical PIL licence, MIT-style
+  "3-Clause BSD License",         # protobuf spells it so
+  # Added 2026-10-15 with the sim extra (OF-BLD-014 §6.2).
+  "License :: OSI Approved :: BSD License",  # scipy, pandas, sympy, mpmath, by classifier
+  # Added 2026-10-16 with mcp in the agent extra (OF-BLD-014 §10.1).
+  "MIT-0",                         # cffi
+  "Apache-2.0 OR BSD-3-Clause",    # cryptography
+  # Added 2026-10-15 with BioSTEAM in the sim extra (OF-BLD-014 §8.1).
+  "License :: OSI Approved :: University of Illinois/NCSA Open Source License",  # biosteam, thermosteam
+  "MIT license",                  # chaospy spells it so
+  "BSD-2-Clause AND Apache-2.0 WITH LLVM-exception",  # llvmlite
+  "License :: OSI Approved :: Python Software Foundation License",  # matplotlib, by classifier
+  "ISC license",                  # pexpect
+  "License :: OSI Approved :: ISC License (ISCL)",  # pexpect, ptyprocess, by classifier
+]
+
+[accepted.certifi]
+licence = "MPL-2.0"
+by = "Sean Creighton"
+date = 2026-10-14
+why = "Mozilla's bundle of trusted HTTPS certificates, read unmodified by httpx and httpcore when Intake calls Europe PMC and Crossref; MPL-2.0 binds only the files it covers."
+
+[accepted.tqdm]
+licence = "MPL-2.0 AND MIT"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The progress bar fastembed and huggingface_hub show while a model file downloads, used unmodified in the rag extra; MPL-2.0 binds only the files it covers."
+
+[accepted.py-rust-stemmers]
+licence = "no licence metadata"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "fastembed's word stemmer for its sparse models, used unmodified in the rag extra; its metadata states no licence, and its repository (github.com/qdrant/py-rust-stemmers) carries an MIT LICENSE, read 2026-10-15."
+
+# OF-BLD-014 §6.2, under D4: three copyleft libraries for flux balance
+# analysis. They run in the geneOS worker process alone
+# (openferment_core/workers/geneos_worker.py), behind a JSON contract.
+# Revisit before any hosted or commercial use.
+
+[accepted.cobra]
+licence = "LGPL-2.0-or-later OR GPL-2.0-or-later"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "Flux balance analysis for geneOS's yield ceilings, imported in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+[accepted.swiglpk]
+licence = "GPL v3"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "GLPK, cobra's default linear-programming solver, loaded in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+[accepted.python-libsbml]
+licence = "LGPL"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "Reads SBML model files for cobra in the geneOS worker process alone; accepted under D4 for this research prototype, to revisit before hosted or commercial use."
+
+# Model files are data (E.9): read by the geneOS worker, never imported.
+
+[data.RehMBEL1391]
+licence = "GPL-3.0"
+source = "github.com/m-jahn/genome-scale-models, Ralstonia_eutropha/sbml/RehMBEL1391_sbml_L3V1.xml"
+revision = "00c70c5"
+sha256 = "85f761aa177a38d18b49dd32656875631f036f362f84571c4ee390d026b02d89"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype."
+
+[data.iJO1366]
+licence = "as BiGG publishes it; ships inside cobra 0.32.1"
+source = "BiGG Models, bundled with cobra as iJO1366"
+revision = "cobra 0.32.1"
+sha256 = "inside the cobra package"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The genome-scale E. coli K-12 MG1655 model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
+
+[data.e_coli_core]
+licence = "as BiGG publishes it; ships inside cobra 0.32.1"
+source = "BiGG Models, bundled with cobra as textbook"
+revision = "cobra 0.32.1"
+sha256 = "inside the cobra package"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "The 95-reaction E. coli core model, read from cobra's bundle. Commercial use of BiGG models is a question for Sean before any such use."
+
+[accepted.pyglet]
+licence = "no licence metadata"
+by = "Sean Creighton"
+date = 2026-10-15
+why = "thermosteam's dependency, pulled in by BioSTEAM in the sim extra and loaded in the Proforma worker; its metadata states no licence, and its repository (github.com/pyglet/pyglet) carries a BSD 3-clause LICENSE, read 2026-10-15."

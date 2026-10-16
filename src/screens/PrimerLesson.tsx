@@ -1,10 +1,20 @@
 // Lesson page (OF-DES-001 §8.14). Reading column interleaved with live embeds,
 // closing on a checkpoint whose numeric grading is unit-aware.
+//
+// A lesson that names skills (OF-BLD-013 §3.2) counts toward them: the moment
+// its checkpoint is passed, Primer writes a knowledge entry for each skill on
+// the ledger of whoever is learning, which is whoever is signing in Guild.
+// That entry puts them at Learning. Supervised waits for an assessor's
+// training sign-off at the bench, and the page says so before and after.
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, RotateCcw, X } from 'lucide-react';
 import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { href, navigate } from '@/router';
 import type { CheckpointQuestion } from '@/data/types';
+import { SKILL_BY_ID } from '@/data/skills';
+import { statusOf } from '@/engine/competence';
+import { ActingAs, useGuild } from '@/components/GuildBits';
+import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { parseQuantity, quantityEquals, fmt } from '@/engine/units';
 import { Button, Card, EmptyState, cx, Callout } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
@@ -149,7 +159,13 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   const progress = useStore((s) => s.learnProgress);
   const completeLesson = useStore((s) => s.completeLesson);
   const recordCheckpoint = useStore((s) => s.recordCheckpoint);
+  const recordLesson = useStore((s) => s.recordLessonForGuild);
+  const toast = useStore((s) => s.toast);
+  const ctx = useGuild();
   const [results, setResults] = useState<Record<string, boolean>>({});
+  // Bumped to put every question back to unanswered, for a learner who
+  // passed it before anyone was chosen and wants it to count.
+  const [attempt, setAttempt] = useState(0);
 
   const mod = modules.find((m) => m.id === moduleId);
   const lessonIndex = mod?.lessons.findIndex((l) => l.id === lessonId) ?? -1;
@@ -177,13 +193,42 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
     lesson.checkpoint.length > 0 && lesson.checkpoint.every((q) => results[q.id]);
   const isComplete = progress[lesson.id] || allCorrect;
 
+  const counts = lesson.skills ?? [];
+  const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
+  const onLedger = learner
+    ? counts.filter((sk) =>
+        ctx.guild.evidence.some(
+          (e) =>
+            e.personId === learner.id &&
+            e.skillId === sk &&
+            e.source.kind === 'lesson' &&
+            e.source.ref === lesson.id &&
+            !e.withdrawnAt,
+        ),
+      )
+    : [];
+  const skillNames = (ids: string[]) => ids.map((id) => SKILL_BY_ID[id]?.name ?? id).join(', ');
+
+  const finish = () => {
+    completeLesson(lesson.id);
+    void recordLesson(lesson.id).then((r) => {
+      if (r && r.skills.length > 0) {
+        const who = ctx.personById.get(r.personId)?.name ?? r.personId;
+        toast({ text: `On ${who}\u2019s ledger: lesson passed, Learning on ${skillNames(r.skills)}.`, kind: 'info' });
+      }
+    });
+  };
+
   const onResult = (q: CheckpointQuestion, correct: boolean) => {
     recordCheckpoint(q.id, correct);
-    setResults((r) => {
-      const nextR = { ...r, [q.id]: correct };
-      if (lesson.checkpoint.every((x) => nextR[x.id])) completeLesson(lesson.id);
-      return nextR;
-    });
+    const nextR = { ...results, [q.id]: correct };
+    setResults(nextR);
+    if (correct && lesson.checkpoint.every((x) => nextR[x.id])) finish();
+  };
+
+  const answerAgain = () => {
+    setResults({});
+    setAttempt((n) => n + 1);
   };
 
   return (
@@ -209,6 +254,51 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       </div>
       <h1 className="font-serif text-page-title font-semibold mb-5">{lesson.title}</h1>
 
+      {counts.length > 0 && (
+        <Card className="p-3 mb-6 space-y-2" aria-label="What this lesson counts toward">
+          <div className="flex flex-wrap items-center gap-2 text-body">
+            <span className="text-ink-soft">Counts toward</span>
+            {counts.map((id) => {
+              const level = learner ? statusOf(ctx.status, learner.id, id).level : 0;
+              return (
+                <a key={id} className="chip inline-flex items-center gap-1.5" href={href(`/guild/skills/${id}`)}>
+                  {learner && <LevelGlyph level={level} size={10} />}
+                  {SKILL_BY_ID[id]?.name ?? id}
+                  {learner && <span className="sr-only">: {levelLabel(statusOf(ctx.status, learner.id, id))}</span>}
+                </a>
+              );
+            })}
+          </div>
+          <p className="text-body text-ink-soft">
+            {learner ? (
+              onLedger.length === counts.length ? (
+                <>Already on {learner.name}&rsquo;s ledger as a lesson passed. A training sign-off from an assessor, at the bench, is the next step on each skill.</>
+              ) : (
+                <>
+                  Passing the checkpoint records this lesson on {learner.name}&rsquo;s ledger, which puts them at Learning on each skill. A
+                  training sign-off from an assessor, at the bench, is what moves them to Supervised.
+                </>
+              )
+            ) : ctx.guild.people.length === 0 ? (
+              <>
+                Nobody is on Guild&rsquo;s ledger yet, so passing the checkpoint records nothing.{' '}
+                <a className="text-accent hover:underline" href={href('/guild/matrix')}>
+                  Start the ledger
+                </a>
+              </>
+            ) : (
+              <>Choose who is learning to have this lesson count toward a skill.</>
+            )}
+          </p>
+          {ctx.sample && (
+            <p className="text-caption text-signal-warn">
+              Sample team: invented people. A lesson passed now is recorded on the sample alone.
+            </p>
+          )}
+          {ctx.guild.people.length > 0 && <ActingAs id="lesson-learning-as" label="Learning as" />}
+        </Card>
+      )}
+
       <div className="prose-reading">
         {lesson.blocks.map((block, i) =>
           block.kind === 'prose' ? (
@@ -231,7 +321,7 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
           </p>
           <div className="space-y-3">
             {lesson.checkpoint.map((q) => (
-              <Checkpoint key={q.id} q={q} onResult={(c) => onResult(q, c)} />
+              <Checkpoint key={`${q.id}:${attempt}`} q={q} onResult={(c) => onResult(q, c)} />
             ))}
           </div>
         </section>
@@ -240,8 +330,26 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
       {isComplete && (
         <div className="mt-5">
           <Callout kind="info" title="Lesson complete">
-            Recorded for this session. Progress lives in memory and resets on refresh — that is a
-            stated constraint of this simulation, not an oversight.
+            <p>Kept in this browser across a refresh.</p>
+            {counts.length > 0 && learner && onLedger.length === counts.length && (
+              <p className="mt-1">
+                On {learner.name}&rsquo;s ledger as a lesson passed for {skillNames(counts)}.
+              </p>
+            )}
+            {counts.length > 0 && onLedger.length < counts.length && (
+              <div className="mt-1 space-y-2">
+                <p>
+                  {learner
+                    ? `Not yet on ${learner.name}\u2019s ledger for ${skillNames(counts.filter((c) => !onLedger.includes(c)))}: the checkpoint was passed before ${learner.name} was chosen. Answer it again and it counts.`
+                    : 'Recorded for nobody, because nobody was chosen as learning when the checkpoint was passed.'}
+                </p>
+                {learner && (
+                  <Button size="sm" onClick={answerAgain}>
+                    <RotateCcw size={13} /> Answer it again
+                  </Button>
+                )}
+              </div>
+            )}
           </Callout>
         </div>
       )}

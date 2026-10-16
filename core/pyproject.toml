@@ -2,7 +2,7 @@
 name = "openferment-core"
 version = "0.1.0"
 description = "openFerment's Python service layer. Postdoc's first surface; every tool it will eventually orchestrate is Python."
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -17,6 +17,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3"]
+# OF-BLD-014 §4.2 — the meaning lane: passage vectors, computed on this machine.
+rag = ["fastembed==0.9.0"]
+# OF-BLD-014 §6.2 — flux balance analysis, in the geneOS worker alone; scipy
+# also serves fermOS's fits (§7.2).
+# OF-BLD-014 §10.1 — the MCP server that opens the tool registry to outside assistants.
+agent = ["mcp>=2.3,<3"]
+sim = ["cobra==0.32.1", "scipy", "biosteam==2.54.0", "biorefineries==2.35.1"]
 
 [build-system]
 requires = ["hatchling"]
@@ -33,4 +40,9 @@ markers = [
     # api.crossref.org. All are excluded from `pnpm verify`, which must stay
     # runnable offline with no key present.
     "live: makes a real network call (Anthropic, needing ANTHROPIC_API_KEY, or Crossref, needing none)",
+    # §8.1 — a real BioSTEAM worker: needs the sim extra and about a minute to
+    # start. `pnpm test:sim` runs these in verify; test:core leaves them out.
+    "sim: starts the BioSTEAM worker (the sim extra)",
+    # §8.6 — the published benchmark and other runs too long for verify.
+    "slow: a simulation run too long for verify (pnpm test:slow)",
 ]

@@ -12,6 +12,7 @@ import { RECORDS_H } from './corpus/threadH';
 import { RECORDS_IJ } from './corpus/threadIJ';
 import { RECORDS_KL } from './corpus/threadKL';
 import { RECORDS_MNO } from './corpus/threadMNO';
+import { THREAD_P_RECORDS } from './corpus/threadP';
 
 function normalize(r: ExtractionRecord): ExtractionRecord {
   if (typeof r.value !== 'number') return { ...r, si: { value: 0, unit: r.unit } };
@@ -27,6 +28,7 @@ export const RECORDS: ExtractionRecord[] = [
   ...RECORDS_IJ,
   ...RECORDS_KL,
   ...RECORDS_MNO,
+  ...THREAD_P_RECORDS,
 ].map(normalize);
 
 export const RECORDS_BY_ID: Record<string, ExtractionRecord> = Object.fromEntries(

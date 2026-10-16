@@ -70,6 +70,27 @@ check(
 );
 await go('/runbooks/rb-lyo-ambient');
 
+// A finished lesson is Durable (OF-BLD-013 §3.2): the module map would
+// otherwise forget, on every refresh, what a trainee has already done.
+const LESSON = '/primer/l6-3';
+const LESSON_ANSWERS = [
+  'Step c2: strip the vessel and find the ingress point',
+  'Clear hold water, a negative spore strip, and both results on the vessel log',
+  'A biological indicator spore strip',
+];
+await go(LESSON);
+for (const answer of LESSON_ANSWERS) {
+  await page.locator('button', { hasText: answer }).first().click();
+  await page.getByRole('button', { name: 'Check answer' }).first().click();
+  await page.waitForTimeout(200);
+}
+check('a passed checkpoint completes the lesson', (await body()).includes('Lesson complete'));
+await page.waitForTimeout(1000);           // let the debounced write flush
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1600);
+check('the lesson is STILL COMPLETE after a page reload', (await body()).includes('Lesson complete'));
+await go('/runbooks/rb-lyo-ambient');
+
 // Ephemeral state must NOT survive.
 await page.evaluate(() => document.documentElement.dataset.density);
 const dens1 = await page.evaluate(() => document.documentElement.dataset.density);
@@ -81,6 +102,30 @@ await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(1400);
 const dens3 = await page.evaluate(() => document.documentElement.dataset.density);
 check('Ephemeral density RESET on reload', dens3 === dens1, `${dens3}`);
+
+// OF-BLD-014 §7.1 — readings' sample times and a series' role survive a reload.
+await go('/runbooks/rb-taq-kigali');
+await page.getByRole('button', { name: /Start a deposition/ }).click();
+await page.waitForTimeout(600);
+await page.locator('div[role="dialog"] button', { hasText: 'TAP medium' }).first().click();
+await page.waitForTimeout(1400);
+await page.getByRole('button', { name: /Begin recording/ }).click();
+await page.waitForTimeout(1000);
+await go('/runbooks/depositions');
+const depHref = await page.locator('a[href^="#/runbooks/depositions/"]').first().getAttribute('href').catch(() => null);
+const depId = (depHref?.match(/depositions\/([^/?#]+)/) ?? [])[1];
+check('a deposition is open for the series check', Boolean(depId), page.url());
+await go(`/runbooks/depositions/${depId}`);
+await page.locator('textarea[id^="csv-"]').fill('time_h, measure, value, unit\n0, Cell density at harvest, 0.2, OD600\n5, Cell density at harvest, 2.4, OD600');
+await page.getByRole('button', { name: 'Attach readings' }).click();
+await page.locator('select[aria-label="Series role for Cell density at harvest"]').selectOption('biomass');
+await page.waitForTimeout(1500);
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+const hours = await page.locator('[data-testid="time-series"] input[type="number"]').evaluateAll((els) => els.map((e) => e.value));
+check('sample times SURVIVED a page reload', hours.join() === '0,5', hours.join());
+check('a series role SURVIVED a page reload',
+  (await page.locator('select[aria-label="Series role for Cell density at harvest"]').inputValue()) === 'biomass');
 
 // Reset must clear the durable store, not just memory.
 await page.evaluate(() => { /* noop */ });
@@ -108,6 +153,9 @@ if (await resetBtn.count() > 0) {
   await go('/runbooks/rb-lyo-ambient');
   check('reset cleared the durable store', (await body()).includes('not yet locked'));
 }
+
+await go(LESSON);
+check('reset cleared the finished lesson too', !(await body()).includes('Lesson complete'));
 
 console.log('\nconsole errors:', errs.length);
 if (errs.length) console.log(errs.slice(0,4).join('\n'));

@@ -40,7 +40,10 @@ import { UNIT_OPERATIONS } from '@/data/vocabulary';
 import { MODULES } from '@/data/learn';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { Bar, Card, EmptyState, Explain, PageHeader, SectionTitle, cx } from '@/components/ui';
-import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
+import { ProvDot, ProvenanceLegend, Tick, provMeta, type ProvKind } from '@/components/Provenance';
+import type { ExtractionRecord, Paper } from '@/data/types';
+import { WorkforceCard } from '@/components/GuildBits';
+import { HIT_RATE_MIN_TESTED, ledgerCounts } from '@/engine/ledger';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -88,6 +91,88 @@ class TileBoundary extends React.Component<
   }
 }
 
+/**
+ * The research programs the corpus serves (OF-BLD-014 §2.2), each a set of
+ * thread letters. The counts on the Programs strip are read from the store,
+ * so they follow the overlay: a fetch or a decision moves them.
+ */
+const PROGRAMS: { id: string; title: ReactNode; threads: string; letters: RegExp }[] = [
+  {
+    id: 'casein',
+    title: (
+      <>
+        β-casein in <i>C. reinhardtii</i> cw15
+      </>
+    ),
+    threads: 'threads A to O',
+    letters: /^[A-O]$/,
+  },
+  {
+    id: 'pha',
+    title: 'PHA from waste cellulosic sugars',
+    threads: 'thread P',
+    letters: /^P$/,
+  },
+];
+
+function ProgramTile({
+  program,
+  papers,
+  records,
+}: {
+  program: (typeof PROGRAMS)[number];
+  papers: Paper[];
+  records: ExtractionRecord[];
+}) {
+  const mine = papers.filter((p) => program.letters.test(p.thread));
+  const ids = new Set(mine.map((p) => p.id));
+  const fullText = mine.filter((p) => p.textSource === 'full-text').length;
+  const byProv = new Map<ProvKind, number>();
+  for (const r of records) {
+    if (!ids.has(r.paperId)) continue;
+    const k = provenanceOf(r) as ProvKind;
+    byProv.set(k, (byProv.get(k) ?? 0) + 1);
+  }
+  const provs = [...byProv.entries()].sort((a, b) => b[1] - a[1]);
+  return (
+    <a
+      href={href('/intake')}
+      className="card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
+      data-program={program.id}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-serif text-section-title font-semibold leading-snug">
+            {program.title}
+          </div>
+          <div className="text-caption uppercase tracking-wide text-ink-soft">{program.threads}</div>
+        </div>
+        <ArrowUpRight size={13} className="text-ink-soft shrink-0" aria-hidden />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-body">
+        <span>
+          <span className="font-num">{mine.length}</span> papers
+        </span>
+        <span>
+          <span className="font-num">{fullText}</span> with full text
+        </span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-ink-soft">
+        {provs.length === 0 ? (
+          <span>No records yet. Values arrive through Intake and a Guild decision.</span>
+        ) : (
+          provs.map(([k, n]) => (
+            <span key={k} className="inline-flex items-center gap-1.5">
+              <ProvDot p={k} />
+              {provMeta(k).label} <span className="font-num">{n}</span>
+            </span>
+          ))
+        )}
+      </div>
+    </a>
+  );
+}
+
 function VitalTile({
   to,
   label,
@@ -117,6 +202,29 @@ function VitalTile({
         {sub && <div className="text-caption text-ink-soft mt-1.5">{sub}</div>}
       </Tick>
     </a>
+  );
+}
+
+function PredictionsCard() {
+  const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
+  const c = ledgerCounts(runbooks, depositions);
+  return (
+    <Card className="p-4" data-testid="home-predictions">
+      <div className="grid grid-cols-2 gap-y-1 text-body">
+        <span>Locked</span><span className="font-num text-right">{c.locked}</span>
+        <span>Tested</span><span className="font-num text-right">{c.tested}</span>
+        <span>Held</span><span className="font-num text-right">{c.held}</span>
+        <span>Missed</span><span className="font-num text-right">{c.missed}</span>
+        <span>Inconclusive runs</span><span className="font-num text-right">{c.inconclusiveRuns}</span>
+      </div>
+      <p className="text-caption text-ink-soft mt-2">
+        {c.hitRate === null
+          ? `Too few tested for a hit rate; one is shown from ${HIT_RATE_MIN_TESTED}.`
+          : `Hit rate ${Math.round(c.hitRate * 100)} % of ${c.tested} tested.`}{' '}
+        <a className="text-accent hover:underline" href={href('/runbooks/ledger')}>Open the ledger</a>
+      </p>
+    </Card>
   );
 }
 
@@ -531,6 +639,29 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── Band 1a · Programs (OF-BLD-014 §2.2) ────────────────────── */}
+        <section aria-labelledby="home-programs" className="mb-7">
+          <SectionTitle
+            right={
+              <Explain label="What is a program?">
+                A program is one research question and the papers gathered for it. Thread P's
+                papers are proposed by a fixed search rule and enter the corpus only when a
+                person approves them; none of its values is typed by hand. Every count here is
+                read from the corpus as it stands now.
+              </Explain>
+            }
+          >
+            <span id="home-programs">Programs</span>
+          </SectionTitle>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {PROGRAMS.map((program) => (
+              <TileBoundary key={program.id} label={program.threads}>
+                <ProgramTile program={program} papers={papers} records={records} />
+              </TileBoundary>
+            ))}
+          </div>
+        </section>
+
         {/* ── Band 1b · Catalogue (OF-BLD-005) ───────────────────────── */}
         <section aria-labelledby="home-catalogue" className="mb-7">
           <SectionTitle
@@ -850,6 +981,20 @@ export default function Home() {
 
       {/* ── Right rail · recent activity ─────────────────────────────── */}
       <aside className="min-w-0" aria-labelledby="home-activity">
+        {/* OF-BLD-013 §2 — the workforce, from Guild's ledger. */}
+        <SectionTitle>
+          <span>Workforce</span>
+        </SectionTitle>
+        <div className="mb-6">
+          <WorkforceCard />
+        </div>
+        {/* OF-BLD-014 §9.3 — predictions, counted as the ledger counts them. */}
+        <SectionTitle>
+          <span>Predictions</span>
+        </SectionTitle>
+        <div className="mb-6">
+          <PredictionsCard />
+        </div>
         <SectionTitle>
           <span id="home-activity">Recent activity</span>
         </SectionTitle>

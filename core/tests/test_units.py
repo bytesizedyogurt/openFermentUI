@@ -174,3 +174,51 @@ def test_in_range_is_inclusive_at_both_ends():
     assert in_range(high, "titer_secreted")
     assert not in_range(high * 10, "titer_secreted")
     assert not in_range(low / 10, "titer_secreted")
+
+
+# ── the polymer family (OF-BLD-014 §2.1) ───────────────────────────────
+
+
+def test_a_share_of_dry_cells_refuses_a_titre_with_the_biomass_density_reason():
+    # The row crosses the boundary in corpus.json; units.explain_refusal reads
+    # it from there, and to_canonical carries it as the error's reason.
+    reason = explain_refusal("% CDW", "g/L")
+    assert reason is not None and "biomass density of that culture" in reason
+    assert explain_refusal("mg/L", "wt%") == reason
+    with pytest.raises(UnitError) as caught:
+        to_canonical(40, "% CDW", "pha_titre")
+    assert caught.value.reason == reason
+
+
+def test_the_polymer_aliases_normalise_into_their_own_families():
+    for spelling in ("% CDW", "%CDW", "% cdw", "wt%", "% (w/w)"):
+        assert normalize(spelling) == "% CDW" and family(spelling) == "percentCdw", spelling
+    for spelling in ("kDa", "kda", "kg/mol"):
+        assert normalize(spelling) == "kDa" and family(spelling) == "molarMass", spelling
+    assert family("Da") == family("g mol⁻¹") == "molarMass"
+    # Its own family, not `percent`: a share of dry cells is not % DW of a medium.
+    assert not quantity_equals((40, "% CDW"), (40, "%"))
+
+
+def test_the_ontology_carries_the_five_polymer_fields_and_their_two_refusals():
+    ontology = tables()["ontology"]
+    polymer = {k: d for k, d in ontology.items() if d["family"] == "polymer"}
+    assert set(polymer) == {
+        "pha_content_cdw", "pha_titre", "pha_yield_substrate", "pha_productivity", "pha_mw",
+    }
+    assert polymer["pha_content_cdw"]["canonicalUnit"] == "% CDW"
+    assert polymer["pha_mw"]["canonicalUnit"] == "kDa"
+    assert {k for k, d in polymer.items() if d["requiresMethod"]} == {"pha_content_cdw", "pha_mw"}
+    refused = {k: [r["field"] for r in d["refuseConversionTo"]] for k, d in polymer.items() if d["refuseConversionTo"]}
+    assert refused == {"pha_content_cdw": ["pha_titre"], "pha_titre": ["pha_content_cdw"]}
+    # Both entries' reasons are the engine's own reason, for the reader of the file.
+    for d in (polymer["pha_content_cdw"], polymer["pha_titre"]):
+        assert "biomass density of that culture" in d["refuseConversionTo"][0]["because"]
+
+
+def test_a_bacterial_growth_rate_is_inside_the_widened_range():
+    # A rate a bacterium reaches, and the old algal ceiling refused: in range
+    # now, while a value an order of magnitude past it still is not.
+    assert in_range(to_canonical(0.41, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")
+    assert in_range(to_canonical(24, "d⁻¹", "growth_rate_mu"), "growth_rate_mu")
+    assert not in_range(to_canonical(30, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")

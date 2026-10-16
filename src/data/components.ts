@@ -103,7 +103,16 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Postdoc',
     owner: 'Postdoc',
     layer: 'The agent',
-    livesIn: ['src/sim/chat.ts', 'src/screens/Postdoc.tsx'],
+    // OF-BLD-014 §3.4 — the tools its loop calls, and what it may cite.
+    // §5.2 — the bounded loop itself, and the validator its plan answers to.
+    livesIn: [
+      'src/sim/chat.ts',
+      'src/screens/Postdoc.tsx',
+      'core/openferment_core/postdoc_agent.py',
+      'core/openferment_core/validate.py',
+      'core/openferment_core/tools/',
+      'core/openferment_core/evidence_pool.py',
+    ],
     surfacedAs: 'the rail, /postdoc',
     role: 'Plans, retrieves, and answers with its working shown',
   },
@@ -126,7 +135,21 @@ export const COMPONENTS: ComponentDef[] = [
     owner: 'BioRepo',
     layer: 'Evidence in',
     // OF-BLD-012 §2.3 — one write function for the corpus's decisions.
-    livesIn: ['src/data/', 'src/engine/retrieval.ts', 'src/screens/BioRepo.tsx', 'core/openferment_core/biorepo.py'],
+    // OF-BLD-014 §3.2 — and what the service computed, kept and replayable.
+    livesIn: [
+      'src/data/',
+      'src/engine/retrieval.ts',
+      'src/screens/BioRepo.tsx',
+      'core/openferment_core/biorepo.py',
+      'src/screens/BioRepoArtifacts.tsx',
+      'core/openferment_core/artifacts.py',
+      // OF-BLD-014 §4.4 — passages, searched.
+      'src/screens/BioRepoSearch.tsx',
+      'core/openferment_core/passages.py',
+      'core/openferment_core/retrieve.py',
+      // OF-BLD-014 §6.1 — one figure grammar for drawing evidence.
+      'src/components/figures/',
+    ],
     surfacedAs: 'the rail, /biorepo',
     role: 'The corpus, and everything retrieved from it',
   },
@@ -143,18 +166,28 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/Organisms.tsx',
       'src/screens/StrainPage.tsx',
       'src/engine/geneos/enumeration.ts',
+      // OF-BLD-014 §6.2–§6.4 — flux balance analysis on a shelf of published models.
+      'src/screens/GeneOSModel.tsx',
+      'core/openferment_core/geneos.py',
+      'core/openferment_core/workers/geneos_worker.py',
     ],
     surfacedAs: 'the rail, /geneos',
     role: 'The organism as an engineered system — host, parts, pathway, model, strain design',
   },
   {
-    // OF-BLD-011 §3 — the reactor, and now the emptiest of the eleven. It got
-    // emptier on purpose: the catalogue it used to hold was never its, and
-    // what it should have held — kinetics, transport, scale — was never built.
+    // OF-BLD-011 §3 — the reactor. The catalogue it used to hold went to
+    // geneOS. OF-BLD-014 Phase 7 built its kinetics from depositions;
+    // transport, operating mode, scale and control are not built.
     name: 'fermOS',
     owner: 'fermOS',
     layer: 'Computing',
-    livesIn: ['src/screens/FermOS.tsx'],
+    // OF-BLD-014 Phase 7 — fits and forecasts from depositions.
+    livesIn: [
+      'src/screens/FermOS.tsx',
+      'src/screens/FermOSForecast.tsx',
+      'src/engine/series.ts',
+      'core/openferment_core/fermos.py',
+    ],
     surfacedAs: 'the rail, /fermos',
     role: 'The reactor — kinetics, transport, operating mode, scale, control. None of it built',
   },
@@ -162,9 +195,17 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Proforma',
     owner: 'Proforma',
     layer: 'Computing',
-    livesIn: ['src/screens/Proforma.tsx', 'src/screens/ProformaScenario.tsx', 'src/engine/grids.ts', 'src/engine/interp.ts'],
+    livesIn: [
+      'src/screens/Proforma.tsx',
+      'src/screens/ProformaScenario.tsx',
+      'src/screens/ProformaBiosteam.tsx',
+      'src/engine/grids.ts',
+      'src/engine/interp.ts',
+      'core/openferment_core/proforma.py',
+      'core/openferment_core/flowsheets/',
+    ],
     surfacedAs: 'the rail, /proforma',
-    role: 'Cost models, sweeps and scenario economics',
+    role: 'Scenario economics: three authored cost surfaces, and a draft BioSTEAM flowsheet priced as a distribution after a published benchmark reproduces',
   },
   {
     // §3 — Primer moved. It named the unit engine; it now names the Learn
@@ -174,15 +215,22 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Primer',
     owner: 'Primer',
     layer: 'Keeping it honest',
-    livesIn: ['src/screens/Primer.tsx', 'src/screens/PrimerLesson.tsx'],
+    livesIn: [
+      'src/screens/Primer.tsx',
+      'src/screens/PrimerLesson.tsx',
+      'src/screens/PrimerPath.tsx',
+      'src/screens/PrimerPractice.tsx',
+      'core/openferment_core/practice.py',
+    ],
     surfacedAs: 'the rail, /primer',
-    role: 'The introductory text: the platform taught through itself',
+    role: 'The introductory text: the platform taught through itself, and each person\u2019s path from lesson to bench',
   },
   {
     name: 'Audit',
     owner: 'BioRepo',
     layer: 'Keeping it honest',
-    livesIn: ['src/components/Provenance.tsx', 'aggregateExclusion() in src/store.ts'],
+    // OF-BLD-014 §3.1 — a computed value's provenance follows from its basis.
+    livesIn: ['src/components/Provenance.tsx', 'aggregateExclusion() in src/store.ts', 'core/openferment_core/basis.py'],
     surfacedAs: 'provenance ticks and their labels',
     role: 'Provenance, and what is held out of aggregates',
   },
@@ -191,7 +239,13 @@ export const COMPONENTS: ComponentDef[] = [
     owner: 'BioRepo',
     layer: 'Keeping it honest',
     // OF-BLD-012 §6.2 — match_run scores the run that ran; the screen renders it.
-    livesIn: ['src/screens/Witness.tsx', 'src/engine/metrics.ts', 'core/openferment_core/witness.py'],
+    livesIn: [
+      'src/screens/Witness.tsx',
+      'src/engine/metrics.ts',
+      'core/openferment_core/witness.py',
+      'core/openferment_core/rageval.py',
+      'src/components/RetrievalScorecard.tsx',
+    ],
     surfacedAs: 'a BioRepo tab, /biorepo/witness',
     role: 'Extractor validation against the gold set',
   },
@@ -247,15 +301,26 @@ export const COMPONENTS: ComponentDef[] = [
     name: 'Guild',
     owner: 'Guild',
     layer: 'People and permissions',
-    livesIn: ['src/screens/Guild.tsx'],
+    livesIn: [
+      'src/screens/Guild.tsx',
+      'src/screens/GuildMatrix.tsx',
+      'src/screens/GuildPeople.tsx',
+      'src/screens/GuildSkills.tsx',
+      'src/screens/GuildChecks.tsx',
+      'src/screens/BenchCheck.tsx',
+      'src/engine/competence.ts',
+      'src/engine/checks.ts',
+      'core/openferment_core/guild.py',
+      'core/openferment_core/checks.py',
+    ],
     surfacedAs: '/guild',
-    role: 'Review, roles, and who decided what',
+    role: 'Review, the competence ledger, and who decided what',
   },
   {
     name: 'Runbook',
     owner: 'Runbooks',
     layer: 'Assay',
-    livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts'],
+    livesIn: ['src/screens/Runbooks.tsx', 'src/data/runbooks.ts', 'src/screens/RunbookLedger.tsx', 'src/engine/ledger.ts'],
     surfacedAs: 'the rail, /runbooks',
     role: 'The outbound falsifiable claim',
   },
@@ -289,6 +354,13 @@ export const UNNAMED: {
     layer: 'Keeping it honest',
     livesIn: ['src/engine/units.ts', 'src/engine/scale.ts'],
     role: 'Units, conversion, scaling, and refusals that carry their reason',
+  },
+  {
+    // OF-BLD-014 §3.4 — heavy simulators run in their own processes.
+    what: 'the worker runner',
+    layer: 'Computing',
+    livesIn: ['core/openferment_core/workers/'],
+    role: 'Runs a simulator in a process of its own, kept warm, restarted on a timeout or a crash',
   },
 ];
 

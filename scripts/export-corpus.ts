@@ -24,6 +24,13 @@ import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
 import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
 import { provenanceOf } from '../src/store';
+import { SKILLS } from '../src/data/skills';
+import { MODULES } from '../src/data/learn';
+import { PROTOCOLS } from '../src/data/protocols';
+import { renderStepText } from '../src/engine/scale';
+import { STRAIN_ALIASES, STRAINS } from '../src/data/strains';
+import { PRODUCTS } from '../src/data/products';
+import { CARBON_SOURCES } from '../src/data/vocabulary';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 /**
@@ -209,8 +216,62 @@ const ontology = ONTOLOGY.map((d) => ({
  */
 const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
 
+/**
+ * The two vocabularies anchoring resolves a paper's wording against
+ * (OF-BLD-014 §2.1), verbatim: the strain alias table, so `validate.py` can
+ * store a strain id where the extractor wrote "C. reinhardtii UVM4", and the
+ * carbon sources with their spellings. The rule that reads them is
+ * `matchWholeWord` in src/data/strains.ts, mirrored in validate.py.
+ */
+const strainAliases = STRAIN_ALIASES;
+const carbonSources = CARBON_SOURCES;
+// OF-BLD-014 §9.2 — the ids a drafted runbook's product and strain must resolve against.
+const products = PRODUCTS.map((p) => ({ id: p.id, name: p.name }));
+const strains = STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim() }));
+
 mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify({ papers, records, ontology, units }, null, 2) + '\n');
+writeFileSync(
+  OUT,
+  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources, products, strains }, null, 2) + '\n',
+);
+
+/**
+ * Guild's projection (OF-BLD-013 §1.2), written beside the corpus as
+ * skills.json. `guild.write_evidence` needs to know which skills exist, which
+ * protocol steps carry which tag, and which lessons count toward which skill,
+ * and Practice needs the tagged protocols' own words; all of it lives in the
+ * TypeScript seed, and this is the same arrangement the corpus uses. It is separate from corpus.json because Postdoc retrieves over
+ * the corpus, and a skill definition is no evidence about anything.
+ */
+const guildProjection = {
+  skills: SKILLS,
+  steps: PROTOCOLS.flatMap((p) =>
+    p.versions.flatMap((v) =>
+      v.steps.map((st) => ({ protocolId: p.id, version: v.version, stepId: st.id, skills: st.skills ?? [] })),
+    ),
+  ),
+  // §3.1 — which lessons count toward which skills, so a knowledge entry
+  // from a lesson names one that does.
+  lessons: MODULES.flatMap((m) => m.lessons.map((l) => ({ lessonId: l.id, skills: l.skills ?? [] }))),
+  // §4.1 — what Practice may quote. The current version of every protocol a
+  // skill is tagged on, its steps rendered at the base batch by the same code
+  // run mode uses, so a value a scenario shows is the protocol's own.
+  protocols: PROTOCOLS.flatMap((p) => {
+    const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
+    if (!v.steps.some((st) => (st.skills ?? []).length > 0)) return [];
+    return [
+      {
+        protocolId: p.id,
+        version: v.version,
+        title: p.title,
+        baseBatch: `${v.baseBatch.value} ${v.baseBatch.unit} ${v.baseBatch.label}`,
+        steps: v.steps.map((st) => ({ stepId: st.id, text: renderStepText(st, v, 1), note: st.note ?? null, skills: st.skills ?? [] })),
+        materials: v.materials.map((m) => ({ name: m.name, amount: m.amount, unit: m.unit })),
+      },
+    ];
+  }),
+};
+writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection, null, 2) + '\n');
 
 const withConditions = records.filter((r) => r.conditions !== null).length;
 const nonPrimary = records.filter((r) => !r.primary).length;
@@ -226,4 +287,6 @@ console.log(`  conditions  ${withConditions} carry recorded conditions, ${record
 console.log(`  primary     ${records.length - nonPrimary} first-hand, ${nonPrimary} quoting another record`);
 console.log(`  ontology    ${ontology.length} fields, ${ontology.filter((d) => d.categorical).length} categorical, ${ontology.filter((d) => d.requiresMethod).length} require a method`);
 console.log(`  units       ${Object.keys(U).length} units in ${new Set(Object.values(U).map((u) => u.family)).size} families, ${Object.keys(ALIASES).length} aliases, ${REFUSALS.length} explained refusals`);
+console.log(`  strains     ${Object.keys(strainAliases).length} aliases to ${new Set(Object.values(strainAliases)).size} strain ids`);
+console.log(`  carbon      ${carbonSources.length} sources, ${carbonSources.reduce((n, c) => n + c.spellings.length, 0)} spellings`);
 console.log(`\n✓ ${OUT}`);

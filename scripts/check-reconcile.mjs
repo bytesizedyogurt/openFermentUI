@@ -70,6 +70,9 @@ t = await body();
 check('recorded as refuted', t.toLowerCase().includes('recorded as refuted'));
 check('evidence released to BioRepo', t.includes('Released to BioRepo') || t.includes('RELEASED TO BIOREPO'));
 check('carries measured provenance', t.includes('Measured · first-party'));
+// §9.3 — the reconciliation is drawn above its table, the miss as a miss.
+check('the deposition draws its reconciliation', (await page.locator('[data-testid="interval-ledger"]').count()) === 1 &&
+  (await page.locator('[data-testid="ledger-row"][data-verdict="missed"]').count()) === 1);
 check('conditions attached', t.toLowerCase().includes('scale') && t.toLowerCase().includes('deviation') === false || t.toLowerCase().includes('under pr-'));
 check('states it is evidence not an override', t.toLowerCase().includes('evidence, not an override'));
 
@@ -78,6 +81,17 @@ await go('/runbooks/rb-taq-kigali');
 t = await body();
 check('runbook prediction UNCHANGED at 8 g/L', t.includes('8 g/L'), 'no silent parameter override');
 check('runbook still locked', t.includes('Frozen'));
+check('the runbook draws its predictions with the one that missed', (await page.locator('[data-testid="ledger-row"][data-verdict="missed"]').count()) === 1);
+
+// §9.3 — the ledger and Home count the refuted run as one tested, one missed.
+await go('/runbooks/ledger');
+t = await body();
+check('the ledger counts one tested and one missed', /\b1 tested\b/.test(t) && /\b1 missed\b/.test(t), t.match(/\d+ predictions locked[^H]*/)?.[0] ?? '');
+check('the ledger says too few for a hit rate', t.includes('Hit rate: too few tested to state (shown from 5)'));
+await page.getByRole('button', { name: 'Untested' }).click(); await page.waitForTimeout(300);
+check('the untested filter hides the tested prediction', (await page.locator('[data-testid="ledger-row"][data-verdict="missed"]').count()) === 0);
+await go('/');
+check('Home counts it too', /Tested\s*1/.test(await body()) && /Missed\s*1/.test(await body()));
 
 console.log('\nconsole errors:', errs.length);
 if (errs.length) console.log(errs.slice(0,4).join('\n'));

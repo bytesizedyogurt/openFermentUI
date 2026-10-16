@@ -30,7 +30,9 @@ import {
   UNIT_OPERATIONS,
 } from '../src/data/vocabulary';
 import { PROTOCOLS } from '../src/data/protocols';
-import { SCENARIOS, COST_MODELS } from '../src/data/scenarios';
+import { FAMILIES, SKILLS, SKILL_BY_ID } from '../src/data/skills';
+import { SCENARIOS, COST_MODELS, BIOSTEAM_FLOWSHEETS } from '../src/data/scenarios';
+import { SUBSYSTEMS } from '../src/data/subsystems';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
@@ -115,8 +117,15 @@ for (const s of SCENARIOS) {
     if (d.paperId && !paperIds.has(d.paperId))
       fail(`${s.id}: dim ${d.key} paperId ${d.paperId} unresolved`);
   }
-  if (!COST_MODELS.some((m) => m.modelId === s.modelId))
+  // §8.4 — an authored scenario names a cost model; a BioSTEAM one names a
+  // flowsheet the service holds, and authors nothing of its own.
+  if (s.kind === 'authored' && !COST_MODELS.some((m) => m.modelId === s.modelId))
     fail(`${s.id}: modelId ${s.modelId} has no cost model`);
+  if (s.kind === 'biosteam') {
+    if (!BIOSTEAM_FLOWSHEETS.includes(s.modelId)) fail(`${s.id}: flowsheet ${s.modelId} is not one the service holds`);
+    if (s.dims.length || s.assumptions.length || Object.keys(s.point).length)
+      fail(`${s.id}: a BioSTEAM scenario authors no dims, point or assumptions; its inputs come from the service`);
+  }
 }
 
 for (const c of COLLECTIONS)
@@ -380,6 +389,16 @@ for (const p of PRODUCTS) {
 }
 
 for (const r of RUNBOOKS) {
+  // §9.3 — 'ledger' is a reserved second segment under /runbooks.
+  if (r.id === 'ledger') fail(`runbook ${r.id}: the id 'ledger' is reserved for the prediction ledger`);
+  // §9.1 — an interval's low is at most its high, and its value lies between them.
+  for (const p of r.predictions) {
+    if (p.kind === 'interval') {
+      if (!p.interval) fail(`${r.id}/${p.id}: an interval prediction carries no interval`);
+      else if (!(p.interval.low <= p.interval.high)) fail(`${r.id}/${p.id}: interval low ${p.interval.low} is above its high ${p.interval.high}`);
+      else if (p.value < p.interval.low || p.value > p.interval.high) fail(`${r.id}/${p.id}: value ${p.value} lies outside its interval`);
+    }
+  }
   if (r.productId && !productIds.has(r.productId))
     fail(`runbook ${r.id}: productId ${r.productId} does not resolve against PRODUCTS`);
   if (r.strainId && !strainIds.has(r.strainId))
@@ -599,6 +618,101 @@ for (const r of RUNBOOKS) {
 
   if (runbookLockHash(p0, m0) === runbookLockHash(p0, []))
     fail('lock hash: dropping the measurement schema produced the same digest');
+}
+
+// ── 6e. skills and the steps that need them (OF-BLD-013 §1.1) ──────────
+//
+// Guild's ledger stores skill ids, and the run-mode gate reads a step's tags to
+// decide who may perform it. A tag naming no skill would gate on nothing and
+// say nothing; a prerequisite cycle would hold every skill in it at Learning
+// forever. Both fail here, before anyone's record depends on them.
+{
+  const familyIds = new Set(FAMILIES.map((f) => f.id));
+  const seenSkill = new Set<string>();
+  for (const sk of SKILLS) {
+    if (!/^SK-[A-Z]+$/.test(sk.id)) fail(`skill ${sk.id}: id must be SK- followed by capitals`);
+    if (seenSkill.has(sk.id)) fail(`skill ${sk.id}: duplicate id`);
+    seenSkill.add(sk.id);
+    if (!familyIds.has(sk.family)) fail(`skill ${sk.id}: family "${sk.family}" is not one of the six`);
+    if (!sk.name.trim() || !sk.summary.trim()) fail(`skill ${sk.id}: needs a name and a one-line summary`);
+    if (sk.mastery.length === 0) fail(`skill ${sk.id}: no mastery criteria — an assessor would have nothing to watch for`);
+    for (const m of sk.mastery) if (!m.trim()) fail(`skill ${sk.id}: an empty mastery criterion`);
+    if (!Number.isInteger(sk.recencyDays) || sk.recencyDays < 14)
+      fail(`skill ${sk.id}: recencyDays ${sk.recencyDays} must be a whole number of days, at least 14`);
+    if (!Number.isInteger(sk.supervisedRuns) || sk.supervisedRuns < 0)
+      fail(`skill ${sk.id}: supervisedRuns ${sk.supervisedRuns} must be a whole number, zero or more`);
+    for (const pre of sk.prerequisites) {
+      if (pre === sk.id) fail(`skill ${sk.id}: lists itself as a prerequisite`);
+      else if (!SKILL_BY_ID[pre]) fail(`skill ${sk.id}: prerequisite ${pre} does not resolve`);
+    }
+  }
+  // Prerequisites form a forest: walk each chain and fail on a revisit.
+  const visit = (id: string, path: string[]): void => {
+    if (path.includes(id)) {
+      fail(`skills: prerequisite cycle ${[...path, id].join(' → ')}`);
+      return;
+    }
+    for (const pre of SKILL_BY_ID[id]?.prerequisites ?? []) visit(pre, [...path, id]);
+  };
+  for (const sk of SKILLS) visit(sk.id, []);
+
+  const tagged = new Set<string>();
+  for (const p of PROTOCOLS)
+    for (const v of p.versions)
+      for (const st of v.steps)
+        for (const tag of st.skills ?? []) {
+          if (!SKILL_BY_ID[tag]) fail(`${p.id}@${v.version} step ${st.id}: skill tag ${tag} does not resolve`);
+          tagged.add(tag);
+        }
+  for (const sk of SKILLS)
+    if (!tagged.has(sk.id)) warn(`skill ${sk.id}: no protocol step needs it, so nobody can be gated on it`);
+
+  // §3.1 — lessons that count toward a skill. A passed checkpoint writes a
+  // knowledge entry for each skill the lesson names, so a name that resolves
+  // to nothing would put a person at Learning on a skill that does not exist,
+  // and a lesson with no checkpoint could never be passed. Teaching material
+  // is held to Rule 1 the way claim text is: a lesson that counts toward a
+  // skill states no quantity of its own. Its numbers arrive through the
+  // `skill-steps` and `protocol-card` embeds, read live from the protocols,
+  // so a token carrying a digit must be an identifier (letters first, like
+  // OD750, PR-CIP-01 or c12).
+  const RESERVED_LESSON_IDS = new Set(['path', 'practice']);
+  const lessonIds = new Set<string>();
+  const quantity = (text: string): string | null => {
+    for (const raw of text.match(/\S*\d\S*/g) ?? []) {
+      const token = raw.replace(/^[^\p{L}\d]+/u, '');
+      if (!/^\p{L}/u.test(token)) return raw;
+    }
+    return null;
+  };
+  for (const mod of MODULES)
+    for (const lesson of mod.lessons) {
+      const where = `${mod.id}/${lesson.id}`;
+      if (RESERVED_LESSON_IDS.has(lesson.id))
+        fail(`${where}: "${lesson.id}" is a Primer view (/primer/${lesson.id}), so no lesson may take it as an id`);
+      if (lessonIds.has(lesson.id)) fail(`${where}: lesson id ${lesson.id} is used twice; /primer/<id> must name one lesson`);
+      lessonIds.add(lesson.id);
+      for (const b of lesson.blocks)
+        if (b.kind === 'embed' && b.embed === 'skill-steps' && !SKILL_BY_ID[b.arg ?? ''])
+          fail(`${where}: skill-steps embed names ${b.arg ?? 'nothing'}, which is not a skill`);
+      const skills = lesson.skills ?? [];
+      if (skills.length === 0) continue;
+      if (new Set(skills).size !== skills.length) fail(`${where}: a skill is named twice`);
+      for (const sk of skills) if (!SKILL_BY_ID[sk]) fail(`${where}: skill ${sk} does not resolve`);
+      if (lesson.checkpoint.length === 0)
+        fail(`${where}: counts toward ${skills.join(', ')} but has no checkpoint, so nobody could pass it`);
+      const texts: [string, string][] = [];
+      for (const b of lesson.blocks) if (b.kind === 'prose') texts.push(['prose', b.md]);
+      for (const q of lesson.checkpoint) {
+        texts.push([`${q.id} prompt`, q.prompt], [`${q.id} explanation`, q.explanation]);
+        for (const o of q.options ?? []) texts.push([`${q.id} option`, o]);
+        if (q.kind === 'numeric') fail(`${where}/${q.id}: a lesson that counts toward a skill asks no numeric question of its own`);
+      }
+      for (const [part, text] of texts) {
+        const hit = quantity(text);
+        if (hit) fail(`${where} ${part}: "${hit}" is a quantity in a lesson that counts toward a skill; show it through the protocol instead`);
+      }
+    }
 }
 
 // ── 7. authored clearance findings (OF-BLD-005 §8) ─────────────────────
@@ -893,6 +1007,37 @@ for (const f of CLEARANCE_FINDINGS) {
       if (!existsSync(path)) fail(`components: the unnamed "${u.what}" claims ${path}, which does not exist`);
 }
 
+// ── a live subsystem names its code (OF-BLD-014 §3.2) ─────────────────
+//
+// `live` is the one status a reader cannot see through to the code, so it
+// names the files that are its code, and each has to exist. A live subsystem
+// with no files, or a stub or seeded one that claims some, says something the
+// tree does not back.
+{
+  for (const sub of SUBSYSTEMS) {
+    const files = sub.implementedIn ?? [];
+    if (sub.status === 'live') {
+      if (files.length === 0) fail(`subsystem ${sub.id}: live, but names no file in implementedIn`);
+      for (const f of files) if (!existsSync(f)) fail(`subsystem ${sub.id}: implementedIn names ${f}, which does not exist`);
+    } else if (files.length > 0) {
+      fail(`subsystem ${sub.id}: ${sub.status}, yet names implementedIn files — only a live subsystem does`);
+    }
+  }
+}
+
+// ── reserved second segments (OF-BLD-014 E.3) ──────────────────────────
+//
+// These views are matched before any id lookup, so a seed id equal to one
+// would be unreachable at its own address.
+{
+  const RESERVED: Record<string, string[]> = {
+    biorepo: ['search', 'artifacts', 'paper', 'compare', 'witness'],
+  };
+  for (const p of PAPERS)
+    if (RESERVED.biorepo.includes(p.id))
+      fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -921,6 +1066,8 @@ console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) 
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);
 console.log(`  chat flows        ${FLOWS.length}`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
+console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
+console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);
 
 
 if (warnings.length) {

@@ -9,11 +9,12 @@ import { PAPERS_H } from './corpus/threadH';
 import { PAPERS_IJ } from './corpus/threadIJ';
 import { PAPERS_KL } from './corpus/threadKL';
 import { PAPERS_MNO } from './corpus/threadMNO';
+import { THREAD_P_PAPERS } from './corpus/threadP';
 
 /** Sort by thread letter then numeric index, so H2 precedes H10. */
 function byEntryId(a: Paper, b: Paper): number {
-  const pa = a.id.match(/^([A-O])(\d+)(\w*)$/);
-  const pb = b.id.match(/^([A-O])(\d+)(\w*)$/);
+  const pa = a.id.match(/^([A-P])(\d+)(\w*)$/);
+  const pb = b.id.match(/^([A-P])(\d+)(\w*)$/);
   if (!pa || !pb) return a.id.localeCompare(b.id);
   if (pa[1] !== pb[1]) return pa[1].localeCompare(pb[1]);
   if (Number(pa[2]) !== Number(pb[2])) return Number(pa[2]) - Number(pb[2]);
@@ -29,6 +30,7 @@ export const PAPERS: Paper[] = [
   ...PAPERS_IJ,
   ...PAPERS_KL,
   ...PAPERS_MNO,
+  ...THREAD_P_PAPERS,
 ].sort(byEntryId);
 
 export const PAPERS_BY_ID: Record<string, Paper> = Object.fromEntries(

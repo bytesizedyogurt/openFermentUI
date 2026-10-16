@@ -27,12 +27,16 @@ call, so it is trusted before any model output reaches it.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from .models import Candidate, Claim, DroppedCandidate, Quantity, Range, weakest_provenance
+from .models import Candidate, Claim, DroppedCandidate, PassageRef, Quantity, Range, weakest_provenance
 from .units import (
+    DATA as CORPUS_PATH,
     UnitError,
     convert,
     field as ontology_field,
@@ -65,9 +69,12 @@ _WORD_NUMBER = re.compile(
 
 # Ranges and comparisons written without digits are quantities too: "roughly
 # an order of magnitude higher" is a number wearing a coat.
+# "-fold" is a count only after a count: a number word, or several, many,
+# multi, n or x. Scaffold, manifold, unfold and billfold are words.
+_FOLD_COUNTS = (*_WORD_NUMBERS, "several", "many", "multi", "n", "x")
 _MAGNITUDE = re.compile(
     r"(?<![a-z])(an?\s+order\s+of\s+magnitude|orders\s+of\s+magnitude|"
-    r"[a-z]+-?fold)(?![a-z])",
+    r"(?:" + "|".join(_FOLD_COUNTS) + r")-?fold)(?![a-z])",
     re.IGNORECASE,
 )
 
@@ -88,6 +95,80 @@ _MAGNITUDE = re.compile(
 # to catch it would start admitting real quantities.
 _IDENTIFIER = re.compile(r"(?<![0-9.])[A-Za-z][A-Za-z]*(?:[-\u2013][A-Za-z]*)*\d[A-Za-z0-9-]*")
 
+# Chemistry names lead with a digit and are names all the same, so they are
+# blanked like identifiers (live test, 2026-10-16). Three forms, each held to
+# its own shape so that a quantity cannot pass as one:
+#   a monomer abbreviation: a locant, H, then a capital \u2014 3HB, 3HV, 4HB, 3HHx,
+#     inside a polymer name or not, as in P(3HB-co-3HV);
+#   a glycosidic linkage: \u03b1 or \u03b2, then two positions \u2014 \u03b12,6, \u03b21,4, \u03b1-2,3,
+#     \u03b2(1\u21924);
+#   the locants of a compound name: positions and a hyphen, then a chemistry
+#     morpheme from a closed list \u2014 4-hydroxybenzoic, 2,3-butanediol,
+#     poly(3-hydroxybutyrate). "10-mL" and "12-fold" are not in the list, so
+#     they still trip the rule.
+_LOCANT_MORPHEMES = (
+    "hydroxy methoxy ethoxy methyl ethyl propyl butyl amino keto oxo chloro "
+    "fluoro bromo iodo nitro phospho sulfo deoxy dehydro dihydro carboxy "
+    "acetyl mercapto propane butane pentane hexane heptane octane propene "
+    "butene pentene hexene"
+).split()
+_CHEMISTRY = re.compile(
+    r"(?<![\w.])\d{1,2}H[A-Z][a-z]?(?![A-Za-z0-9])"
+    r"|[\u03b1\u03b2]\s?-?\(?\d\s?(?:,|\u2192|->|-)\s?\d\)?(?!\d)"
+    r"|(?<![\w.])\d{1,2}(?:,\d{1,2})*-(?=(?i:" + "|".join(_LOCANT_MORPHEMES) + r"))",
+)
+
+
+# Step labels and counting determiners (live test, 2026-10-16). WHY THIS LIST
+# EXISTS: a protocol names its steps with small integers ("a stage 1 culture
+# on Day 3") and prose counts the things it names ("one of the strains", "two
+# studies"); neither is a quantity from a paper, and both dropped claims and
+# practice drafts whole. The list is closed on purpose. A label is one of
+# these six words and an integer from 1 to 20; a determiner is one through
+# ten before a word. Either still fails when the next word is a unit, so
+# "3 g/L on day 3", "day 3 g/L" and "two days" keep tripping the rule.
+STEP_WORDS = ("stage", "step", "day", "phase", "round", "pass")
+DETERMINER_WORDS = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+_UNIT_WORDS = frozenset(
+    "second seconds sec secs minute minutes min mins hour hours hr hrs day days week weeks month months "
+    "year years gram grams milligram milligrams microgram micrograms kilogram kilograms litre litres liter "
+    "liters millilitre millilitres milliliter milliliters mole moles percent fold times degree degrees "
+    # A score is a measure too: "two of the three points" is a grade, and a
+    # grade the tutor gives is a number of its own (test_practice).
+    "point points mark marks score scores".split()
+)
+_STEP_LABEL = re.compile(
+    r"(?<![A-Za-z])(?i:" + "|".join(STEP_WORDS) + r")\s+(?:20|1[0-9]|[1-9])(?![\d.,])(?P<rest>\s*\S*)"
+)
+_DETERMINER = re.compile(
+    r"(?<![A-Za-z-])(?i:" + "|".join(DETERMINER_WORDS) + r")(?=\s+(?P<next>[A-Za-z][A-Za-z-]*))"
+)
+
+
+def _is_unit_word(word: str) -> bool:
+    w = word.strip().strip(".,;:()").lower()
+    if not w:
+        return False
+    if w in _UNIT_WORDS:
+        return True
+    try:
+        return normalize_unit(w) is not None
+    except (FileNotFoundError, ValueError):
+        return False
+
+
+def _blank_prose_counts(text: str) -> str:
+    def label(m: re.Match) -> str:
+        if _is_unit_word(m.group("rest")):
+            return m.group(0)
+        end = m.start("rest")
+        return " " * (end - m.start()) + m.group("rest")
+
+    def determiner(m: re.Match) -> str:
+        return m.group(0) if _is_unit_word(m.group("next")) else " " * len(m.group(0))
+
+    return _DETERMINER.sub(determiner, _STEP_LABEL.sub(label, text))
+
 
 def find_number(text: str) -> str | None:
     """The first number-like thing in the text, or None.
@@ -98,7 +179,11 @@ def find_number(text: str) -> str | None:
     """
     # Blank rather than delete, so the remaining spans keep their boundaries and
     # a word-numeral straddling an identifier cannot be created by the removal.
-    masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), text)
+    # Chemistry names first: an identifier span can start inside one
+    # ("HB-co-3HV" in P(3HB-co-3HV)) and strand its leading locant.
+    masked = _CHEMISTRY.sub(lambda m: " " * len(m.group(0)), text)
+    masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
+    masked = _blank_prose_counts(masked)
     if m := _DIGIT.search(masked):
         return m.group(0)
     if m := _WORD_NUMBER.search(masked):
@@ -191,6 +276,133 @@ def validate_claims(
             )
         )
 
+    return out
+
+
+# ── the agent's plan (OF-BLD-014 §5.1) ─────────────────────────────────
+
+# The longest quote a claim may carry: a sentence, never a page. A convention.
+MAX_QUOTE_CHARS = 300
+
+
+@dataclass
+class SeenSet:
+    """What this run's tool calls returned. A claim may cite only these: a
+    record, passage or computed value the model never retrieved is one it
+    cannot have read."""
+
+    records: set[str] = field(default_factory=set)
+    passages: dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def add(self, result: Any) -> None:
+        # A refused result was read as a refusal: nothing in it is citable.
+        if getattr(result, "error", None):
+            return
+        self.records.update(getattr(result, "recordIds", None) or [])
+        for p in getattr(result, "passages", None) or []:
+            self.passages[p.id] = p
+        for e in getattr(result, "evidence", None) or []:
+            self.evidence[e.id] = e
+
+
+def _whole_sentences(quote: str, passage: Any) -> bool:
+    from .rerank import is_whole_sentence  # rerank imports this module
+
+    return is_whole_sentence(quote, passage)
+
+
+def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) -> ValidationResult:
+    """The agent's claims, each held to five rules; a claim that breaks one is
+    dropped whole and counted with its reason, never repaired.
+
+    1. Its text holds a number.
+    2. A record id does not resolve in the evidence pool.
+    3. A record, passage or evidence id was never returned by a tool call in
+       this run.
+    4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
+       or table row of its passage, or a run of them, after `normalize_text`
+       (§5.R: a fragment can lift a number out of its negation).
+    5. It cites nothing, and its support is not `unsupported`.
+
+    Its provenance is the weakest of its records and computed values; a claim
+    that quotes passages alone is `unverified`. Its papers are derived from
+    its records and passages, never taken from the model.
+    """
+    out = ValidationResult()
+    for index, raw in enumerate(raw_claims):
+        if not isinstance(raw, dict):
+            out.rejected += 1
+            out.reasons.append(f"c{index + 1}: not a claim")
+            continue
+        claim_id = str(raw.get("id") or f"c{index + 1}")
+        text = str(raw.get("text") or "").strip()
+        record_ids = [str(r) for r in (raw.get("recordIds") or [])]
+        evidence_ids = [str(e) for e in (raw.get("evidenceIds") or [])]
+        refs = [r for r in (raw.get("passages") or []) if isinstance(r, dict)]
+        support = raw.get("support") or "direct"
+        if support not in ("direct", "inferred", "unsupported"):
+            support = "direct"
+
+        def reject(why: str) -> None:
+            out.rejected += 1
+            out.reasons.append(f"{claim_id}: {why}")
+
+        if not text:
+            reject("empty claim text")
+            continue
+        if found := find_number(text):
+            reject(f"claim text contains a number ({found!r}) — values come from the record")
+            continue
+        ghost = [r for r in record_ids if pool.record(r) is None]
+        if ghost:
+            reject(f"cites records that do not exist: {', '.join(ghost)}")
+            continue
+        unseen = (
+            [r for r in record_ids if r not in seen.records]
+            + [str(r.get("passageId")) for r in refs if str(r.get("passageId")) not in seen.passages]
+            + [e for e in evidence_ids if e not in seen.evidence]
+        )
+        if unseen:
+            reject(f"cites what no tool returned in this run: {', '.join(unseen)}")
+            continue
+        bad_quote = None
+        for r in refs:
+            quote = str(r.get("quote") or "")
+            passage = seen.passages[str(r.get("passageId"))]
+            if not quote.strip():
+                bad_quote = f"an empty quote of {passage.id}"
+            elif len(quote) > MAX_QUOTE_CHARS:
+                bad_quote = f"a quote of {passage.id} longer than {MAX_QUOTE_CHARS} characters"
+            elif not _whole_sentences(quote, passage):
+                bad_quote = f"a quote that is not a whole sentence or row of {passage.id}"
+            if bad_quote:
+                break
+        if bad_quote:
+            reject(bad_quote)
+            continue
+        if not (record_ids or refs or evidence_ids) and support != "unsupported":
+            reject(f"cites nothing and support is '{support}', not 'unsupported'")
+            continue
+
+        classes = [pool.record(r).get("provenance", "unverified") for r in record_ids]
+        classes += [seen.evidence[e].provenance for e in evidence_ids]
+        if not classes and refs:
+            classes = ["unverified"]
+        papers = {pool.record(r)["paperId"] for r in record_ids}
+        papers |= {seen.passages[str(r.get("passageId"))].paperId for r in refs}
+        out.claims.append(
+            Claim(
+                id=claim_id,
+                text=text,
+                recordIds=record_ids,
+                paperIds=sorted(papers),
+                support=support,
+                provenance=weakest_provenance(classes) if classes else "unverified",
+                passages=[PassageRef(passageId=str(r.get("passageId")), quote=str(r.get("quote"))) for r in refs],
+                evidenceIds=evidence_ids,
+            )
+        )
     return out
 
 
@@ -557,6 +769,87 @@ def value_basis(
 # Rule codes, in rule order. The counts are keyed by these.
 ANCHOR_RULES = ("field", "section", "quote", "value", "unit", "range", "method")
 
+# Fields anchoring may drop from a candidate it KEEPS (OF-BLD-014 §2.1), each
+# its own reason. A drop is not a rejection: the candidate stays, without the
+# field, and the drop is counted here rather than in ANCHOR_RULES.
+FIELD_DROP_REASONS = ("carbonSource",)
+
+
+# ── the paper's wording, resolved (OF-BLD-014 §2.1) ────────────────────
+#
+# Two vocabularies cross the boundary inside corpus.json: the strain alias
+# table (`STRAIN_ALIASES` in src/data/strains.ts) and the carbon sources with
+# their spellings (`CARBON_SOURCES` in src/data/vocabulary.ts). The rule that
+# reads them is `matchWholeWord` in strains.ts, and this is its mirror, step
+# for step: the fixture `scripts/export-unit-fixtures.ts` records what the
+# TypeScript answers and tests/test_validate.py asserts the same here. When
+# the two disagree, the TypeScript side is right.
+#
+# Until §3.4 creates `evidence_pool`, `carbon_source_id` lives here.
+
+
+@lru_cache(maxsize=4)
+def vocabulary(path: str | None = None) -> dict[str, dict[str, str]]:
+    """The strain aliases and the carbon-source spellings, as the browser
+    exported them: two maps from a lower-case spelling to an id.
+
+    Raises when the file is missing or predates §2.1, for the reason
+    `units.tables` does: a resolver with no table would have to guess."""
+    target = Path(path) if path else CORPUS_PATH
+    if not target.exists():
+        raise FileNotFoundError(
+            f"{target} not found. Generate it with `pnpm export:corpus` from the repository root."
+        )
+    raw = json.loads(target.read_text())
+    if "strainAliases" not in raw or "carbonSources" not in raw:
+        raise ValueError(
+            f"{target} carries no `strainAliases` or `carbonSources` key. It predates "
+            "OF-BLD-014 §2.1 — regenerate it with `pnpm export:corpus`."
+        )
+    return {
+        "strains": dict(raw["strainAliases"]),
+        "carbon": {sp: c["id"] for c in raw["carbonSources"] for sp in c["spellings"]},
+    }
+
+
+_WORD_CHAR = re.compile(r"[a-z0-9]")
+
+
+def _contains_word(haystack: str, needle: str) -> bool:
+    """Whether `needle` occurs in `haystack` with no letter or digit touching it."""
+    at = haystack.find(needle)
+    while at != -1:
+        before = haystack[at - 1] if at > 0 else ""
+        end = at + len(needle)
+        after = haystack[end] if end < len(haystack) else ""
+        if not _WORD_CHAR.match(before) and not _WORD_CHAR.match(after):
+            return True
+        at = haystack.find(needle, at + 1)
+    return False
+
+
+def match_whole_word(text: str, aliases: dict[str, str]) -> str | None:
+    """`matchWholeWord`: an exact alias, or the one id every alias standing
+    in the wording as a whole word names. No hit, or hits naming two ids, is
+    None — two organisms in one wording are not resolved to either."""
+    wording = _SPACES.sub(" ", text.strip()).lower()
+    if wording == "":
+        return None
+    if wording in aliases:
+        return aliases[wording]
+    hits = {i for alias, i in aliases.items() if alias != "" and _contains_word(wording, alias)}
+    return next(iter(hits)) if len(hits) == 1 else None
+
+
+def strain_id(text: str) -> str | None:
+    """`normalizeStrain`: the strain id a paper's wording names, or None."""
+    return match_whole_word(text, vocabulary()["strains"])
+
+
+def carbon_source_id(text: str) -> str | None:
+    """`carbonSourceId`: the carbon source a paper's wording names, or None."""
+    return match_whole_word(text, vocabulary()["carbon"])
+
 
 def content_id(
     prefix: str,
@@ -603,6 +896,10 @@ class AnchorResult:
     dropped: list[DroppedCandidate] = field(default_factory=list)
     # Emissions that collapsed onto an earlier one under the same content id.
     duplicates: int = 0
+    # Fields removed from candidates that were KEPT (OF-BLD-014 §2.1), by
+    # reason, and what each removal said.
+    field_drops: dict[str, int] = field(default_factory=lambda: {r: 0 for r in FIELD_DROP_REASONS})
+    field_drop_details: list[str] = field(default_factory=list)
 
 
 def _why_not_in_quote(
@@ -636,14 +933,20 @@ def anchor_candidate(
     paper_id: str,
     candidate_id: str | None = None,
     id_prefix: str = "cl1",
+    field_drops: list[tuple[str, str]] | None = None,
 ) -> tuple[Candidate | None, str | None, str | None]:
     """One candidate against §2.4. Returns (candidate, None, None) when it
     anchors, or (None, rule, detail) naming the rule that refused it.
 
     `raw` is what the extractor emitted — sectionId, field, value, unit, quote,
-    and optionally method, organism, isPrimary, confidence. `sections` are the
-    paper's fetched sections. The ontology and unit tables come from
-    corpus.json through `units`, the same tables the browser ships.
+    and optionally method, organism, carbonSource, isPrimary, confidence.
+    `sections` are the paper's fetched sections. The ontology and unit tables
+    come from corpus.json through `units`, the same tables the browser ships.
+
+    A candidate that anchors may still lose a field (OF-BLD-014 §2.1): a
+    carbon source whose words are not in the cited section, or carry a number,
+    is dropped and the candidate kept. Each drop is appended to `field_drops`
+    as (reason, detail) when the caller passes a list to count them in.
     """
     field_id = str(raw.get("field") or "").strip()
     spec = ontology_field(field_id)
@@ -748,6 +1051,32 @@ def anchor_candidate(
     except (TypeError, ValueError):
         confidence = 0.0
 
+    # OF-BLD-014 §2.1 — the organism, resolved to a strain id where the
+    # wording names one (an exact alias, or an alias standing in it as a
+    # whole word). The id is what every screen matches on; the wording stays
+    # beside it. No match leaves the wording as the paper wrote it.
+    organism_text = (str(raw["organism"]).strip() or None) if raw.get("organism") else None
+    resolved_strain = strain_id(organism_text) if organism_text else None
+
+    # OF-BLD-014 §2.1 — the carbon source, kept only when its words stand in
+    # the cited section (the quote's normalisation, case aside, as for a
+    # categorical value) and state no number (Rule 1's detector). Otherwise
+    # the field goes, the candidate stays, and the drop is counted.
+    carbon_source: str | None = None
+    carbon_raw = raw.get("carbonSource")
+    if carbon_raw is not None and not (isinstance(carbon_raw, str) and not carbon_raw.strip()):
+        why: str | None = None
+        if not isinstance(carbon_raw, str):
+            why = f"carbonSource {carbon_raw!r} is not text"
+        elif found := find_number(carbon_raw):
+            why = f"carbonSource {carbon_raw.strip()!r} contains a number ({found!r})"
+        elif normalize_text(carbon_raw).lower() not in normalize_text(str(section.get("text") or "")).lower():
+            why = f"carbonSource {carbon_raw.strip()!r} is not in section {section_id} after normalisation"
+        else:
+            carbon_source = carbon_raw.strip()
+        if why is not None and field_drops is not None:
+            field_drops.append(("carbonSource", why))
+
     anchored_value = value.strip() if categorical else number  # type: ignore[union-attr]
     # §2.4 rule 3's answer, computed here and nowhere else (OF-BLD-012.1 §7):
     # no model output and no reviewer sets it.
@@ -769,7 +1098,9 @@ def anchor_candidate(
             unit=unit,
             si=si,
             confidence=confidence,
-            organism=(str(raw["organism"]).strip() or None) if raw.get("organism") else None,
+            organism=resolved_strain or organism_text,
+            organismText=organism_text if resolved_strain else None,
+            carbonSource=carbon_source,
             isPrimary=is_primary,
             method=method or None,
             valueBasis=basis,
@@ -794,8 +1125,15 @@ def anchor_all(
     rejection report and the log line."""
     out = AnchorResult()
     by_id: dict[str, int] = {}
+    # The fields each kept candidate lost, beside it: a drop is counted once
+    # per candidate kept, so an emission that collapses into a duplicate or
+    # is rejected leaves no count behind (OF-BLD-014 §2.R).
+    kept_drops: list[list[tuple[str, str]]] = []
     for raw in raws:
-        candidate, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, id_prefix=id_prefix)
+        drops: list[tuple[str, str]] = []
+        candidate, rule, detail = anchor_candidate(
+            raw, sections, paper_id=paper_id, id_prefix=id_prefix, field_drops=drops
+        )
         if candidate is not None:
             # Content-addressed ids: the same sentence, field and number
             # emitted twice is one candidate, not two. The more confident
@@ -805,9 +1143,11 @@ def anchor_all(
                 out.duplicates += 1
                 if candidate.confidence > out.accepted[at].confidence:
                     out.accepted[at] = candidate
+                    kept_drops[at] = drops
                 continue
             by_id[candidate.id] = len(out.accepted)
             out.accepted.append(candidate)
+            kept_drops.append(drops)
         else:
             out.rejected += 1
             out.reasons[rule or "quote"] += 1
@@ -824,4 +1164,8 @@ def anchor_all(
                     detail=detail or "",
                 )
             )
+    for drops in kept_drops:
+        for reason, why in drops:
+            out.field_drops[reason] = out.field_drops.get(reason, 0) + 1
+            out.field_drop_details.append(f"{reason}: {why}")
     return out

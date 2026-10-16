@@ -10,7 +10,8 @@ full fidelity, the faculty demo, and the executable spec for the eventual produc
 
 ## The program it is built around
 
-Not a generic demo. Every screen is populated from one real research question:
+Not a generic demo. The corpus serves two real research programs. The first, threads A to O,
+was curated by hand before Intake existed, and most screens are populated from it:
 
 > **Can phosphorylated bovine β-casein be expressed in the cell-wall-deficient
 > *Chlamydomonas reinhardtii* strain cw15?**
@@ -33,18 +34,37 @@ measured on a casein or on a secreted product), secreted yields sit two to three
 β-lactoglobulin, and whether *C. reinhardtii* even has a Fam20-family kinase is an **open
 question the app labels as open** rather than answering.
 
+The second program is **PHA from waste cellulosic sugars**, thread P (OF-BLD-014 Phase 2). Its
+papers are proposed by a fixed Europe PMC search rule (`pnpm thread:propose`) and enter the
+seed only on a named person's approval (`pnpm thread:apply`). It holds no hand-curated record:
+every number on a thread P paper arrives through Intake and a Guild decision. Two hosts
+(*Cupriavidus necator* H16, *Pseudomonas putida* KT2440), two products (PHB, mcl-PHA) and five
+polymer ontology fields are in place for it. As of 2026-10-15 the thread holds **35 papers**
+(P1–P35), proposed by the rule held to title and abstract and approved by Sean Creighton on
+2026-10-14; all 35 return full text from Europe PMC, and none has been through extraction yet
+(`STATE.md`, `## Live owed`). Home's **Programs** strip counts both programs live.
+
 ## What is real, and what is modeled
 
 | Layer | Status |
 |---|---|
-| Papers, venues, identifiers | **Real, unevenly keyed** — 132 catalogued entries, threads A–O; 59 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
-| Full text | **Real, when fetched** — as of 2026-09-21, **0 of 132** papers fetched from Europe PMC in this checkout (the open-access subset is the 27 with a PMCID; `pnpm intake:fetch --all` fetches them); the rest show the curator's note and say so |
+| Papers, venues, identifiers | **Real, unevenly keyed** — 167 catalogued entries: 132 in threads A–O, and 35 in thread P, approved by rule and by name (above), each with a PMCID; 94 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
+| Full text | **Real, when fetched** — as of 2026-10-15, **66 of the 94** papers that carry an identifier return full text from Europe PMC (`pnpm intake:fetch --all`): 31 of threads A–O's 59 (25 of the 27 with a PMCID, 6 found by DOI or PMID) and all 35 of thread P; 26 have no open-access text there, and B1 and D1 sit outside Europe PMC's open-access subset, where its full-text endpoint answers 500. Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
 | Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-09-21, **0 candidates anchored, 0 rejected** in this checkout (`pnpm intake:extract --all`; reasons in Witness) |
-| Verified records | **0** as of 2026-09-21 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
+| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-15, **0 candidates anchored, 0 rejected** in this checkout: the key on the cloud environment is not scoped to a workspace, and the API refuses every call made with it (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
+| Verified records | **0** as of 2026-10-14 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
 | Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
-| Simulation economics | **Modeled** — illustrative response surfaces, not validated |
-| Agent answer prose | **Real model call** — Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 as fallback, through `openferment-core`; claims carry no numbers of their own, and 13 authored flows remain as the scripted mode and the acceptance tests |
+| Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
+| Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
+| Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
+| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): `e_coli_core` and `iJO1366` as bundled with cobra 0.32.1, with the phaCAB route added, and the *C. necator* H16 reconstruction `RehMBEL1391`, fetched at its pinned commit and hash. As of 2026-10-15 the six values of OF-BLD-014 Appendix 2 reproduce within 0.1 % (PHB on glucose: 0.4779 g/g central carbon, 0.5931 g/g genome scale; on fructose in *C. necator*: 0.5932 g/g). A ceiling has no time axis and no vessel. No reported PHA yield is in the store yet to draw beside it: thread P's extraction waits on a key the API accepts |
+| Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling; a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **8** kept as of 2026-10-15 and pushed to `openferment-data`: r-B5-3's 17.5 d in hours (the Phase 3 screenshots), and seven geneOS ceilings, envelopes and mixes computed for the Phase 6 screenshots |
+| Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
+| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. As of 2026-10-15 no real run has been fitted: none is deposited with timed readings. The sample run is invented and labelled |
+| Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. As of 2026-10-15 the seed locks 24 predictions and no run has tested one. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
+| Simulation economics, authored | **Modeled** — the three scenarios S1–S3 are illustrative cost surfaces written by hand, not validated, and labelled so |
+| Simulation economics, BioSTEAM | **Simulated, draft** — `sc-pha-1` runs a BioSTEAM flowsheet (fermentation, harvest and drying of PHA; pretreatment, extraction, wastewater and co-products left out) over 500 seeded samples and shows the price as a distribution with what moves it. Its finance and properties are the published corn stover biorefinery's; that benchmark reproduces here at **1.9677** USD per gallon against 1.968 for `biorefineries` 2.35.1 (2026-10-15). Every input names its source: thread P records or a named person's assumption, which makes the run demo. As of 2026-10-15 no thread P record exists to bind (the extraction waits on a key), so all seven inputs wait |
+| Agent answer prose | **Real model calls in a bounded loop** — Postdoc on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`. It searches the records and the papers' passages with its tools (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, quoted sentences checked word for word against their passages, or computed values. As of 2026-10-15 the loop is tested offline against a scripted stand-in only: the key on the cloud environment is refused, so the twelve flows and the ten PHA questions (`pnpm ask:batch`) wait on a key. 13 authored flows remain as the scripted mode and the acceptance tests |
 
 The corpus is real literature. That is the whole point of OF-COR-001, and it is why the
 demo-labelling policy is narrow rather than blanket: only the two genuinely synthetic
@@ -65,16 +85,23 @@ The seed is what the app is with the service down. With it up, an overlay adds w
 fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not change.
 
 ```
-132 papers          ingest: 'catalogued' in the seed (metadata + curator note); 27 carry a PMCID
-                    and fetch as full text through the service — the reader says which it shows
+167 papers          ingest: 'catalogued' in the seed: 132 hand-curated (metadata + curator note), 27 of
+                    them with a PMCID; 35 in thread P, proposed by rule and approved by Sean Creighton,
+                    all with a PMCID. Each fetches as full text through the service — the reader says
+                    which it shows
 134 records         132 curated · 2 industry-estimate · 127 flagged is_primary
- 24 ontology fields  5 families: expression, ptm, functional, cultivation, downstream
+ 29 ontology fields  6 families: expression, ptm, functional, cultivation, downstream, polymer
   8 ontology gaps   real values the v1 ontology cannot express, recorded rather than dropped
- 15 strains         cw15, UVM4 and C. reinhardtii wild type; the bovine reference; and eleven comparator
+ 17 strains         cw15, UVM4 and C. reinhardtii wild type; the bovine reference; eleven comparator
                     hosts — P. pastoris GS115, T. reesei, E. coli, S. cerevisiae, Y. lipolytica, A. niger,
-                    A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila
+                    A. oryzae, B. subtilis, C. glutamicum, K. lactis, M. thermophila; and the two thread P
+                    hosts, C. necator H16 and P. putida KT2440
+119 molecules       12 categories, 11 process families, all modeled; PHB and mcl-PHA are the two biopolymers
   9 protocols       TAP media → transformation → PEF disruption → Phos-tag → CIP
- 13 chat flows       3 scenarios · 6 learn modules / 9 lessons
+ 13 chat flows       3 scenarios · 7 learn modules / 12 lessons / 42 checkpoint questions
+ 14 skills          6 families, tagged on 36 protocol steps across 3 protocols (placeholder
+                    definitions until the skills content pass); 3 placeholder bench lessons
+                    count toward 6 of them
 ```
 
 ## Postdoc runs on Claude Opus
@@ -86,13 +113,22 @@ which is gitignored; it never reaches the browser, and `pnpm check:secrets`
 fails the build if anything under `src/` so much as names it.
 
 ```
-browser ──POST /api/ask──▶ FastAPI
-                             ├─ BM25 retrieval over corpus.json (≤30 records)
-                             ├─ Claude Opus 5.5 (Sonnet 5.5 as fallback), one structured response
-                             ├─ Rule 1 enforcement
-                             └─ AnswerPlan
-browser ◀────────────────────┘   renders values from the cited records
+browser ──POST /api/ask/stream──▶ FastAPI
+                                    ├─ the loop: Claude Opus 5.5 calls its tools —
+                                    │    search_records, search_passages, convert_units —
+                                    │    each step streamed to the browser as it completes
+                                    ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
+                                    ├─ a refusal or outage: asked again once, on Sonnet 5.5
+                                    ├─ validate_plan: no number, nothing cited that no tool returned,
+                                    │    every quote in its passage word for word
+                                    └─ AnswerPlan, with its trace and why it stopped
+browser ◀───────────────────────────┘   renders values from the cited records and artifacts
 ```
+
+`POST /api/ask` answers with the same plan in one response, and `mode: 'single'` keeps the
+earlier path: one BM25 retrieval over `corpus.json`, one structured response. Text inside a tool
+result is evidence to weigh; a passage that tells the model to state a number changes nothing the
+validator lets through.
 
 **Claim text may not contain a number.** The model writes prose and cites a
 record; the interface renders the value from that record. This is the strongest
@@ -103,7 +139,8 @@ and counted, never repaired**: a validator that patches model output is a
 validator that hides model failure.
 
 Provenance on a claim is computed server-side as the weakest of its cited
-records. A claim resting on one gold record and one industry estimate is an
+records and computed values; a claim resting on quoted sentences alone is
+`unverified`. A claim resting on one gold record and one industry estimate is an
 industry estimate.
 
 To run it:
@@ -114,6 +151,11 @@ pnpm export:corpus                  # project the TS seed to core/.../corpus.jso
 cd core && uv run uvicorn openferment_core.api:app --reload
 pnpm dev                            # /api proxies to localhost:8000
 ```
+
+A key that is not scoped to a workspace is refused with a 400 that asks for the
+workspace's id. Put the id in `core/.env` as `OPENFERMENT_WORKSPACE_ID`; every
+client sends it as the `anthropic-workspace-id` header, and `pnpm ready` names
+the setting when the 400 comes back.
 
 Then switch Postdoc to **Live**. If the service is not running the screen says
 so and tells you what to type — it never falls back to the scripted flows. A
@@ -144,6 +186,33 @@ Expect a few cents a question at 30 records on Opus (thinking included), less wh
 Sonnet answers; the plan shows the exact cost. Set a spend limit in the Anthropic
 console first, not because the volume is risky, but because a cap turns a runaway
 loop from a bill into a bug report.
+
+### The same tools, from an assistant outside the app
+
+`core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
+seven tools Postdoc uses, with the registry's own schemas, and two more:
+`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`. The
+registry's rules hold there as everywhere: a number typed into an input is
+refused. No tool writes to BioRepo, to Guild's ledger or to anything a person
+signs.
+
+A Claude Code session in this repository picks it up from `.mcp.json`. For
+Claude Desktop, add this to `claude_desktop_config.json`, with the path to your
+checkout:
+
+```json
+{
+  "mcpServers": {
+    "openferment": {
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/openfermentui/core", "--all-extras",
+               "python", "-m", "openferment_core.mcp_server"]
+    }
+  }
+}
+```
+
+`ask_postdoc` spends like a question asked in the app, under the same caps.
 
 ## Running it
 
@@ -185,6 +254,41 @@ function, signed with the reviewer name from Settings; that file is committed, `
 `candidates/` are not. A typed value — a correction, a gold value — has to sit in a sentence of
 the fetched paper like any other number, or the write is refused and Guild says which rule.
 
+### The prototype build's commands (OF-BLD-014)
+
+```bash
+pnpm thread:propose      # LIVE, no key: the thread P rule asks Europe PMC and writes core/data/thread-p-proposed.tsv
+pnpm thread:apply <tsv> --approved-by "<name>"   # writes the APPROVED and INCLUDE rows into threadP.ts
+pnpm prototype:up        # a fresh clone to the running prototype: session:start, a build, the service on
+                         # 127.0.0.1:8000 over core/data/, the app on 127.0.0.1:4173. Ctrl-C stops both
+pnpm session:start       # what every session runs first: core/.env from OPENFERMENT_API_KEY when the file
+                         # is missing, every extra installed, the corpus, data:pull, data:prepare, pnpm ready
+pnpm ready               # its last line is the lane: full (a key Anthropic accepts, Europe PMC
+                         # answers), model-only (that key alone) or none
+pnpm data:push           # the outputs of live runs to the orphan branch openferment-data; data:pull brings
+                         # them back. Fetched full text never travels: each machine fetches its own
+pnpm decisions:push      # commits core/data/biorepo.json alone as "Guild decisions <date>" and pushes
+pnpm witness:numbers     # the precision and recall Witness shows, read from a running service
+pnpm shots --prefix p /biorepo/witness    # photographs routes of a running app into docs/shots/
+pnpm index:build         # the fetched papers cut into passages, under core/data/index/ (only changed papers);
+                         # --dense adds meaning vectors, once Hugging Face answers; --all cuts everything again
+pnpm rag:questions --n 200   # needs the key: written evaluation questions from sampled passages
+pnpm rag:eval            # every available search lane scored on K, S and F; the rule's choice goes to
+                         # core/data/index/config.json, the table to Witness → Retrieval
+pnpm geneos:fetch        # the C. necator H16 reconstruction at its pinned commit into core/data/models/,
+                         # checked against its sha256; a mismatch is set aside and fails
+pnpm ask:batch docs/build/questions-pha.txt   # needs the key: each question through Postdoc's loop, the
+                         # plans under core/data/live/, one row each: kept, dropped, tools, rounds, seconds, cost
+cd core && uv run python -m openferment_core.demo --prototype   # the prototype's fixtures, made by the
+                         # real code paths into core/tests/fixtures/prototype/; the smoke double serves them
+```
+
+The service also answers `GET /api/tools` (each tool's name, description and input schema) and
+`POST /api/tools/{name}`, the same registry Postdoc's loop calls: today `search_records`,
+`convert_units`, `search_passages` and `yield_ceiling`. A tool input carries ids and words; a number typed into one refuses the call.
+Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
+a call that could pass `OPENFERMENT_DAILY_BUDGET_USD` (25 by default, `core/.env.example`).
+
 ### Hosting it on the Mac Mini
 
 After a `pnpm build`, the service serves the app itself at `/` beside `/api`, so
@@ -211,7 +315,8 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
 
 - **Two LaunchDaemons** (macOS's service manager, at the system level): the server, which starts at
   power-on before anyone logs in, restarts if it stops, and runs as you rather than root; and a
-  03:00 job that fetches from Europe PMC and extracts from whatever arrived. A miss older than a
+  03:00 job that fetches from Europe PMC, extracts from whatever arrived, proposes the night's
+  witnessed checks, and drafts a brief for each check that has none. A miss older than a
   week is asked again, since papers become open access later. Logs: `~/Library/Logs/openferment/`.
 - **The server listens on loopback only.** The service has no login of its own, so the bind address
   is the access control. `install.sh` runs `tailscale serve`, which publishes the port over HTTPS to
@@ -244,7 +349,8 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
 ### The offline demo
 
 ```bash
-pnpm demo:offline   # no key, no network: the service in fixture mode + the built app on :4173
+pnpm demo:offline   # no key, no network: all nine demo beats replayed from saved fixtures, on :4317
+pnpm demo:offline:intake  # the intake loop with the real service in fixture mode, on :4173
 ```
 
 Replays the loop from saved responses: open Intake, fetch B5, Extract, open Witness, open Guild,
@@ -260,36 +366,66 @@ To make the demo real, regenerate all three fixtures together — they only make
 and `test_demo` checks that they still fit the code:
 
 ```bash
-pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one model call);
+pnpm demo:fixtures --real     # needs network (Europe PMC for the JATS) and a key (one extraction of B5);
                               # writes jats/PMC8471596.xml, extract/B5.json and biorepo.json
-pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json and the smoke overlay
-                              # fixture from whatever JATS and response are saved
+pnpm demo:fixtures            # no key, no network: rebuilds biorepo.json, the export set and the
+                              # smoke overlay fixture from whatever JATS and response are saved
 ```
+
+The decisions follow the saved response (OF-BLD-014 §1.5). Over the hand-written stand-in they
+demonstrate the review: the titre row promoted to gold and corrected, the same row rejected as a
+colony time, and the curated `r-B5-3` accepted. Over a real response they are the accept of
+`r-B5-3` alone, and the real candidates wait for a person in Guild. `pnpm test:export` exports a
+set of its own, `core/tests/fixtures/export/`: the stand-in decided all four ways a decision can
+land, which the same command rebuilds whatever the demo set holds. Commit the demo files and the
+export set together.
 
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — nineteen stages, in order:
+pnpm verify              # offline — no key, no service, no network — twenty-two stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
   pnpm check:reference   #   reference content is domain knowledge, never a result
-  pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write
+  pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
+                         #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
+                         #   tokens, tool turns and daily cap, the tool registry and its five tools, the worker runner,
+                         #   the geneOS worker on a toy network worked by hand and Appendix 2's bundled-model ceilings,
+                         #   fermOS's growth and kinetic fits and its forecast band on synthetic runs,
+                         #   Postdoc's loop and its budget against a scripted model, the plan validator, the ask stream,
+                         #   the passage cutter, the five search lanes, the scorecard's metrics and rule,
+                         #   guild.py's rules, the competence mirror replayed from competence.ts, and
+                         #   practice.py's drafts and tutor turns against a stand-in model, and
+                         #   checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs
+  pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
-  pnpm test:export       #   the decision merge, exercised on a fixture that has decisions; a bent one fails
+  pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
-  pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as
+  pnpm check:guild       #   Guild's ladder, the sample team, the gate in both modes, what runs, lessons, practice and
+                         #   checks write to the ledger, and who may see a check
+  pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as, the eight seed digests included
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
+  pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table
+                         #   row per mark, recharts only where it was
   pnpm build
-  pnpm test:durable      #   the Durable tier survives a reload
+  pnpm test:durable      #   the Durable tier survives a reload, finished lessons and series times included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
-  pnpm test:smoke        #   48 routes headless, the overlay applied, Witness scored, Guild posting
-  pnpm test:golden       #   the ten-minute demo script, driven end to end
+  pnpm test:smoke        #   64 routes headless, the overlay applied, Witness scored, an artifact replayed, a search
+                         #   landing on its words, Postdoc live drawing its steps and quoting a sentence, the figure
+                         #   gallery, geneOS → Model and the strain card over the toy network, fermOS fitting and
+                         #   forecasting the sample run, Guild posting, and the
+                         #   workforce flow: a sign-off, a cosigned run, a held step, a lesson passed, My path,
+                         #   a practice session, and a check run at the bench and read back
+  pnpm test:golden       #   the ten-minute demo script, driven end to end, a search opening the reader,
+                         #   Postdoc live beside an untouched scripted mode, and geneOS drawing a ceiling
   pnpm test:deep         #   ingest failure, protocol version diff, scenario compare
-pnpm test:live           # the thirteen flows against the real pipeline — needs a key, never in verify
+pnpm test:live           # the thirteen flows through Postdoc's loop, a real practice draft and tutor
+                         # session, a real check brief (these need a key), and the C. necator model's
+                         # ceilings (needs pnpm geneos:fetch) — never in verify
 ```
 
 The test suite is not decoration. `test:golden` is what caught a markdown-renderer infinite
@@ -328,6 +464,7 @@ The simulation holds itself to eight conditions (design §11):
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
 | 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/runbooks/depositions` |
+| 6 | Workforce | Who may perform a step is recorded, computed and checked at the bench | `/guild/matrix`, `/guild/people`, `/guild/skills`, `/guild/checks`, `/primer/path`, `/primer/practice`, run mode |
 
 ## The eleven
 
@@ -381,9 +518,10 @@ titre is fermOS's output rather than geneOS's. **fermOS → pureOS** is the
 harvest step, which pays for a choice made back in geneOS — secreted or
 intracellular — so the handoff carries product location, not just a titre.
 
-**fermOS is the emptiest of the eleven**: five named subsystems and no code. It
-is also the one that cannot be seeded from literature, because kinetic
-parameters are fitted to real runs and come from Deposition. **pureOS** has the
+**fermOS fits what a run measured**: kinetics is built from depositions alone,
+and the other four subsystems are named and not built. It is the one that
+cannot be seeded from literature, because kinetic parameters are fitted to real
+runs and come from Deposition. **pureOS** has the
 unit-operation vocabulary and no process model. Both say so on the screen
 rather than implying otherwise, and Home shows the current state of each of the
 eleven beside its name. Putting them in the rail from day one means that when
@@ -396,7 +534,7 @@ catalogue views of domain objects, not components.
 
 ```
 src/data/       seed content as typed TS modules — becomes API fixtures in production
-src/data/corpus/  the 15 literature threads, A–O, one file per thread group
+src/data/corpus/  the 15 literature threads, A–O, one file per thread group; threadP.ts, written by thread:apply
 src/engine/     pure logic, unit-testable without UI, ships to production unchanged
 src/engine/geneos/  engine code a component owns outright (genus enumeration)
 src/sim/        latency model and chat flow player — two files, retired last
@@ -422,6 +560,7 @@ colored by provenance.
 | solid gold | `gold` | curated gold-set entry |
 | solid green | `verified` | checked against the source document |
 | green, 45% | `curated` | transcribed from the curation document, **not** yet checked |
+| dotted blue | `computed` | a calculation whose every input names a source — basis attached, never aggregated |
 | solid grey | `unverified` | extractor output, not reviewed |
 | solid blue | `user` | user-entered |
 | dashed grey | `industry-estimate` | vendor or market figure — no source document, never aggregated |
@@ -433,7 +572,7 @@ never be mistaken for evidence — `industry-estimate` and `demo` — are the tw
 so they are distinguishable from their neighbours without relying on hue.
 
 `isAggregatable()` is the single gate on what may enter a statistic: it excludes rejected
-records, industry estimates, and any record marked `isPrimary: false` (a paper reciting someone
+records, industry estimates, computed values (derived from values already counted), and any record marked `isPrimary: false` (a paper reciting someone
 else's measurement, which would double-count). Excluded records stay visible in per-record lists
 and plots and say why they were held out — the rule is about medians, not about hiding data.
 
@@ -475,9 +614,10 @@ One working mode. **Scripted** is offline and deterministic: it plays seeded con
 flows — the plan ticks, tool calls appear, retrieval sets render, the answer streams. Because
 every message comes from the flow object, the inspector's "trace" is the literal data that
 produced the answer, honest by construction rather than reconstructed afterward. The composer
-offers a **Live** toggle, which is not inert: with `openferment-core` running it is a real
-model call (see *Postdoc runs on Claude Opus* above), and with the service down it says so
-and the turn runs scripted. In scripted mode no language model is called.
+offers a **Live** toggle, which is not inert: with `openferment-core` running it is Postdoc's
+loop of real model calls, its steps drawn as they arrive (see *Postdoc runs on Claude Opus*
+above), and with the service down it says so and plays nothing in its place. In scripted mode
+no language model is called.
 
 When no flow matches, a fallback ladder takes over: first an **entity-lookup flow** that
 genuinely queries the seeded store and answers from live data with real chips, subject to the
@@ -517,9 +657,10 @@ Recorded here because the app records them rather than papering over them:
 
 - **The seed is catalogued; full text arrives through the service.** The seed holds metadata
   and a curator note per paper, so with the service down extraction spans anchor to curator
-  prose and the reader says so. With it up, the 27 papers with a PMCID fetch as full text, the
-  extractor runs over them, and Witness scores that run (`claude-1`) provisionally against the
-  curated values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
+  prose and the reader says so. With it up, the papers Europe PMC holds open-access text for
+  fetch as full text (31 as of 2026-10-14), the extractor runs over them (waiting on a key in
+  this checkout), and Witness scores that run (`claude-1`) provisionally against the curated
+  values until reviewers flag gold. `RUN_OUTPUTS` stays empty on purpose: the run
   arrives through the overlay, not the seed. The 66-record gold-set *plan* and 6 difficulty
   cases are still shown until the run exists in a checkout.
 - **49 entries are flagged `[verify]`, and they are thinner than that flag suggests.** Only 7 of
