@@ -1,32 +1,7 @@
 {
-  "_note": "pnpm demo:offline (OF-BLD-012 §8.1): a biorepo.json with three decisions, copied into the demo's scratch data directory at start so Guild and Witness open with something decided. Written by `pnpm demo:fixtures` through biorepo.write against the demo fixtures — the titre row promoted to gold and corrected into canonical units, the same row rejected where it was read as a colony time (Witness's false positive), and one accept of a curated B5 record. Not the committed core/data/biorepo.json, which the demo never touches.",
+  "_note": "pnpm demo:offline (OF-BLD-012 §8.1, OF-BLD-014 §1.5): a biorepo.json with one decision, copied into the demo's scratch data directory at start. Written by `pnpm demo:fixtures` through biorepo.write against the demo fixtures, which hold B5's real text and a real model response: the accept of the curated r-B5-3. The real candidates are left undecided, for a person to decide in Guild. Not the committed core/data/biorepo.json, which the demo never touches.",
   "version": 1,
   "decisions": {
-    "cl1-B5-a07dd73c": {
-      "status": "verified",
-      "provenance": "gold",
-      "gold": {
-        "value": 7.0,
-        "unit": "mg L⁻¹"
-      },
-      "corrected": {
-        "value": 0.007,
-        "unit": "g L⁻¹"
-      },
-      "reviewer": "sean",
-      "recordId": "cl1-B5-a07dd73c",
-      "at": "2026-09-15T09:00:00Z",
-      "quote": "Placeholder A | 7 | mg L-1",
-      "sectionId": "t1"
-    },
-    "cl1-B5-95f64ef4": {
-      "status": "rejected",
-      "provenance": "unverified",
-      "rejectReason": "wrong span — a row of titres read as a colony time",
-      "reviewer": "sean",
-      "recordId": "cl1-B5-95f64ef4",
-      "at": "2026-09-15T09:00:00Z"
-    },
     "r-B5-3": {
       "status": "verified",
       "provenance": "curated",
@@ -35,44 +10,5 @@
       "at": "2026-09-15T09:00:00Z"
     }
   },
-  "records": [
-    {
-      "id": "cl1-B5-a07dd73c",
-      "paperId": "B5",
-      "sectionId": "t1",
-      "quote": "Placeholder A | 7 | mg L-1",
-      "field": "titer_secreted",
-      "value": 7.0,
-      "unit": "mg L⁻¹",
-      "si": {
-        "value": 0.007,
-        "unit": "kg m⁻³"
-      },
-      "confidence": 0.8,
-      "status": "unverified",
-      "provenance": "unverified",
-      "extractorRun": "claude-1",
-      "isPrimary": true,
-      "valueBasis": "exact"
-    },
-    {
-      "id": "cl1-B5-95f64ef4",
-      "paperId": "B5",
-      "sectionId": "t1",
-      "quote": "Placeholder A | 7 | mg L-1",
-      "field": "time_to_colony",
-      "value": 7.0,
-      "unit": "d",
-      "si": {
-        "value": 168.0,
-        "unit": "h"
-      },
-      "confidence": 0.55,
-      "status": "unverified",
-      "provenance": "unverified",
-      "extractorRun": "claude-1",
-      "isPrimary": true,
-      "valueBasis": "converted"
-    }
-  ]
+  "records": []
 }
