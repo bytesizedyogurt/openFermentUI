@@ -129,6 +129,17 @@ def record_anchoring(path: Path, result) -> None:
     path.write_text(json.dumps(saved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def real_note(pmcid: str) -> str:
+    """The comment a saved paper carries. It names the command in words: two
+    hyphens may not appear inside an XML comment, and the flag spelled with
+    them broke the saved file (live test, 2026-10-16)."""
+    return (
+        "<!--\n  pnpm demo:fixtures, real mode: Saved from Europe PMC, "
+        f"{pmcid} (B5), for the offline demo (OF-BLD-012 §8.1).\n"
+        "  The licence element inside says under what terms.\n-->\n"
+    )
+
+
 def with_note(xml: str, note: str) -> str:
     """The JATS with `note` (a comment) after the XML declaration and before
     everything else. The declaration ends at its own `?>`, never at the first
@@ -146,11 +157,7 @@ def save_real(scratch: Path) -> None:
 
     os.environ.pop("OPENFERMENT_FIXTURES", None)
     xml = intake.fetch_fulltext(B5["pmcid"])
-    note = (
-        "<!--\n  pnpm demo:fixtures --real: Saved from Europe PMC, "
-        f"{B5['pmcid']} (B5), for the offline demo (OF-BLD-012 §8.1).\n"
-        "  The licence element inside says under what terms.\n-->\n"
-    )
+    note = real_note(B5["pmcid"])
     (DEMO / "jats").mkdir(parents=True, exist_ok=True)
     (DEMO / "jats" / f"{B5['pmcid']}.xml").write_text(with_note(xml, note), encoding="utf-8")
     print(f"saved {DEMO / 'jats' / (B5['pmcid'] + '.xml')}")

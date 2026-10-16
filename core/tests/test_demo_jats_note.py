@@ -34,3 +34,13 @@ def test_the_note_sits_before_the_article_and_the_file_parses(xml):
     if xml.startswith("<?xml"):
         assert out.startswith(DECL)
     assert ARTICLE in out
+
+
+def test_the_note_save_real_writes_is_a_comment_xml_accepts():
+    # "--" may not appear inside an XML comment; the note named the command
+    # by its flag, "--real", and the saved file failed to parse at that spot.
+    from openferment_core.demo import real_note
+
+    out = with_note(DECL + ARTICLE, real_note("PMC8471596"))
+    ET.fromstring(out.encode("utf-8"))
+    assert "PMC8471596" in out
