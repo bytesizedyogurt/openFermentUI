@@ -397,9 +397,9 @@ def status() -> RagStatus:
 
 
 def main(argv: list[str]) -> int:
-    unknown = [a for a in argv if a not in ("--all", "--dense")]
+    unknown = [a for a in argv if a not in ("--all", "--dense", "--dense-if-stale")]
     if unknown:
-        print("usage: python -m openferment_core.passages [--all] [--dense]")
+        print("usage: python -m openferment_core.passages [--all] [--dense | --dense-if-stale]")
         return 2
     did = build(everything="--all" in argv)
     print(
@@ -412,6 +412,18 @@ def main(argv: list[str]) -> int:
         except ImportError:
             print("dense vectors: not built here; the meaning lane arrives with OF-BLD-014 §4.2")
             return 0
+        return embed.main_dense()
+    if "--dense-if-stale" in argv:
+        try:
+            from . import embed
+        except ImportError:
+            print("dense vectors: not built here; the meaning lane arrives with OF-BLD-014 §4.2")
+            return 0
+        why = embed.dense_stale()
+        if why is None:
+            print("dense vectors: current for this index; left as they are")
+            return 0
+        print(f"dense vectors: building ({why})")
         return embed.main_dense()
     return 0
 

@@ -435,8 +435,9 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   cannot hold it. `start`/`end` are offsets into the section's text; the
   `context` (title, year, heading) is indexed and never shown as the paper's
   words. `CHUNKER_VERSION` changes cut every paper again. The index lives in
-  `core/data/index/` (gitignored, rebuilt per machine; `config.json` alone
-  travels on the data branch).
+  `core/data/index/` (gitignored, rebuilt per machine; `config.json` and the
+  vectors, `dense.npy` and `dense.json`, travel on the data branch, and
+  `data-prepare.sh` builds the vectors only when they are missing or stale).
 - **Five lanes, one entry point.** `retrieve.search_detail` runs `bm25`,
   `bm25+expand`, `hybrid`, `bm25+rerank` or `hybrid+rerank`, fused by
   reciprocal rank (`1 / (60 + rank)`). With no lane named it uses

@@ -34,6 +34,15 @@ fi
 echo "passage index: building"
 pnpm --silent index:build || status=1
 
+# §4.2 — the passage vectors, for the hybrid lanes. They travel on the data
+# branch; built here only when they are missing or belong to an older index,
+# and only where huggingface.co answers (the embedding model comes from it).
+if reaches huggingface; then
+  pnpm --silent index:build --dense-if-stale || status=1
+else
+  echo "dense vectors: huggingface.co does not answer here, so they are not built (pnpm ready says why)"
+fi
+
 # §6.2 — the published C. necator reconstruction, at its pinned commit and
 # checked against its hash. GitHub answers on every lane; a mismatch fails.
 # geneos:fetch checks a file already here against the hash, and fetches it

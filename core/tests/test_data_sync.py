@@ -21,6 +21,8 @@ LISTED = [
     "core/data/artifacts",
     "core/data/rageval",
     "core/data/index/config.json",
+    "core/data/index/dense.npy",
+    "core/data/index/dense.json",
     "core/data/live",
     "core/data/thread-p-proposed.tsv",
 ]
@@ -85,6 +87,8 @@ def fill(where: Path) -> None:
     put(where, "core/data/artifacts/0a1b2c3d4e5f6a7b.json", '{"tool": "test"}\n')
     put(where, "core/data/rageval/scores.json", "{}\n")
     put(where, "core/data/index/config.json", '{"lane": "bm25"}\n')
+    put(where, "core/data/index/dense.npy", "vectors\n")
+    put(where, "core/data/index/dense.json", '{"count": 0}\n')
     put(where, "core/data/live/2026-10-14.json", "{}\n")
     put(where, "core/data/thread-p-proposed.tsv", "verdict\tid\nPROPOSE\tPMC1\n")
     # What never leaves the machine that made it.
@@ -105,7 +109,7 @@ def test_what_one_machine_pushes_another_pulls(machines):
     assert pulled.returncode == 0, pulled.stderr + pulled.stdout
     for rel in LISTED:
         assert files(second, rel) == files(first, rel), rel
-    assert "pulled 7 file(s)" in pulled.stdout
+    assert "pulled 9 file(s)" in pulled.stdout
 
 
 @needs_git

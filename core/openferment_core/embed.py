@@ -171,6 +171,17 @@ def load_dense(current_ids: list[str], current_texts: list[str]) -> tuple[DenseI
     return DenseIndex(current_ids, vectors, str(info.get("model"))), None
 
 
+def dense_stale() -> str | None:
+    """Why the vectors on disk cannot serve the current index, or None when
+    they can. Vectors travel on the data branch, so a fresh clone may hold
+    current ones; a session start builds them only when this says so."""
+    from .passages import read_index
+
+    cuts = read_index()
+    _, why = load_dense([c.passage.id for c in cuts], [f"{c.context}\n{c.passage.text}" for c in cuts])
+    return why
+
+
 def main_dense() -> int:
     try:
         embedder = FastEmbedder()

@@ -220,3 +220,17 @@ def test_post_search_returns_hits_and_refuses_a_lane_that_cannot_run(index, monk
     assert refused.status_code == 409 and "needs the key" in refused.json()["detail"]
     guarded = client.post("/api/rag/search", json={"question": "casein"}, headers={"Origin": "https://evil.example"})
     assert guarded.status_code == 403
+
+
+def test_dense_if_stale_builds_only_when_the_vectors_are_missing_or_old(index, monkeypatch):
+    # Live test, 2026-10-16: a fresh clone had no vectors and the hybrid lane
+    # went unscored. A session start now builds them when they are missing or
+    # belong to another index, and leaves current ones alone.
+    built = []
+    monkeypatch.setattr(embed, "main_dense", lambda: built.append("built") or 0)
+    assert passages.main(["--dense-if-stale"]) == 0 and built == ["built"], "missing: built"
+    embed.build_dense(embed.HashEmbedder(64))
+    built.clear()
+    assert passages.main(["--dense-if-stale"]) == 0 and built == [], "current: left alone"
+    (index / "fulltext" / "X4.json").unlink()
+    assert passages.main(["--dense-if-stale"]) == 0 and built == ["built"], "older index: built"

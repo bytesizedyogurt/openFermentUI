@@ -28,6 +28,8 @@ PATHS=(
   core/data/artifacts/
   core/data/rageval/
   core/data/index/config.json
+  core/data/index/dense.npy
+  core/data/index/dense.json
   core/data/live/
   core/data/thread-p-proposed.tsv
 )
