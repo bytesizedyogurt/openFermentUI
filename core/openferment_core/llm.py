@@ -370,13 +370,31 @@ def _error_type(e: Exception) -> str:
     return str(_get(inner, "type") or type(e).__name__) if inner else type(e).__name__
 
 
+# A key not scoped to a workspace is accepted only with the workspace named
+# on each request; the API's own 400 says so. The id is not a secret, and
+# with it unset nothing extra is sent.
+WORKSPACE_SETTING = "OPENFERMENT_WORKSPACE_ID"
+
+
+def client_headers() -> dict[str, str]:
+    workspace = os.environ.get(WORKSPACE_SETTING, "").strip()
+    return {"anthropic-workspace-id": workspace} if workspace else {}
+
+
+def make_client(**kwargs: Any) -> Any:
+    """Every Anthropic client the service builds, so the workspace header
+    reaches the model calls and `pnpm ready`'s checks alike."""
+    headers = {**client_headers(), **kwargs.pop("default_headers", {})}
+    return anthropic.Anthropic(default_headers=headers or None, **kwargs)
+
+
 def _default_client() -> Any:
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise ModelUnavailable(
             "ANTHROPIC_API_KEY is not set. Put it in core/.env (gitignored) and restart the service."
         )
-    return anthropic.Anthropic(api_key=key)
+    return make_client(api_key=key)
 
 
 def call(

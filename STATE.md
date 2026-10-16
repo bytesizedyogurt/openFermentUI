@@ -8,6 +8,8 @@ transcript; this file is the index a later session reads first.
 
 LIVE steps built offline whose run waits on a need this machine lacked, one line each: `- §n.m — needs <what> — <the command to run>` (OF-BLD-014 A.4).
 
+Every line below waits on one thing: a key the API accepts. The key in the cloud environment is not scoped to a workspace, and the API answers 400 asking for the workspace by id. Either set a key scoped to a workspace as `OPENFERMENT_API_KEY`, or keep this key and set the workspace's id as `OPENFERMENT_WORKSPACE_ID` (since 2026-10-16 every client sends it as `anthropic-workspace-id`). Then `pnpm ready` reads `full`, and §2.4 runs first, because §6.5 and §8.6 wait on its records.
+
 - §1.5, the rest — needs a key the Models API accepts (since 2026-10-14 the key reaches the session, but api.anthropic.com answers 400: the key is not scoped to a workspace, and a request with it must name one in `anthropic-workspace-id`; Europe PMC answers; the parser defects in `docs/build/JATS-AUDIT.md` are fixed and re-audited) — `pnpm intake:fetch --all && pnpm intake:extract --all && pnpm demo:fixtures --real && pnpm test:core`, then `pnpm witness:numbers` with the service up, then `pnpm data:push`. B1 and D1 are not asked again: they are fetch failures (see Live runs)
 
 - §2.4, the extraction — needs a key the Models API accepts (this one is not scoped to a workspace: 400 on every call) — `pnpm intake:extract --all && pnpm data:push`; report per thread P paper and per polymer field: anchored, rejected by rule, cost, values with a strain id, values with a carbon source

@@ -441,3 +441,14 @@ def test_r2_a_row_that_crashes_reads_as_a_warning_and_the_rest_still_run(monkeyp
     checks = ready.run(no_network=True, port=1)
     row = next(c for c in checks if c.name == "index")
     assert row.mark == "warn" and "could not be checked" in row.detail and checks[-1].name == "service"
+
+
+def test_the_workspace_400_names_the_setting_that_fixes_it(monkeypatch):
+    from openferment_core import llm
+
+    monkeypatch.delenv(llm.WORKSPACE_SETTING, raising=False)
+    e = Exception("400")
+    e.body = {"error": {"message": "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header"}}
+    assert "Set OPENFERMENT_WORKSPACE_ID in core/.env" in ready._said(e)
+    monkeypatch.setenv(llm.WORKSPACE_SETTING, "wrkspc_x")
+    assert "Set OPENFERMENT_WORKSPACE_ID" not in ready._said(e)

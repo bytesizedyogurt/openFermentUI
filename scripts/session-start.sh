@@ -38,6 +38,13 @@ elif [ -n "${OPENFERMENT_API_KEY:-}" ]; then
 else
   echo "no core/.env and no OPENFERMENT_API_KEY, so the steps that need the model wait (pnpm ready names them)"
 fi
+# A key not scoped to a workspace needs the workspace named on each request
+# (llm.make_client). The id is not a secret; it joins core/.env when the file
+# lacks it, so a service started from the file sends it too.
+if [ -n "${OPENFERMENT_WORKSPACE_ID:-}" ] && [ -e core/.env ] && ! grep -q '^OPENFERMENT_WORKSPACE_ID=' core/.env; then
+  printf 'OPENFERMENT_WORKSPACE_ID=%s\n' "${OPENFERMENT_WORKSPACE_ID//[[:space:]]/}" >> core/.env
+  echo "OPENFERMENT_WORKSPACE_ID added to core/.env"
+fi
 
 say "pnpm install --frozen-lockfile"
 pnpm install --frozen-lockfile || die "pnpm install failed"

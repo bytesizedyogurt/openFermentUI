@@ -152,6 +152,11 @@ cd core && uv run uvicorn openferment_core.api:app --reload
 pnpm dev                            # /api proxies to localhost:8000
 ```
 
+A key that is not scoped to a workspace is refused with a 400 that asks for the
+workspace's id. Put the id in `core/.env` as `OPENFERMENT_WORKSPACE_ID`; every
+client sends it as the `anthropic-workspace-id` header, and `pnpm ready` names
+the setting when the 400 comes back.
+
 Then switch Postdoc to **Live**. If the service is not running the screen says
 so and tells you what to type — it never falls back to the scripted flows. A
 convincing fake standing in for a broken service is worse than a blank screen,

@@ -220,7 +220,7 @@ def check_model(have_key: bool, client_factory: Callable[[], object] | None = No
         return Check("model", "skip", "OPENFERMENT_FIXTURES is set")
     import anthropic
 
-    client = (client_factory or anthropic.Anthropic)()
+    client = (client_factory or llm.make_client)()
     offered: list[str] = []
     missing: list[str] = []
     for model in llm.chain():
@@ -258,7 +258,10 @@ def _said(e: Exception) -> str:
     if not isinstance(message, str) or not message.strip():
         return ""
     message = " ".join(message.split())
-    return f": {message[:200]}{'…' if len(message) > 200 else ''}"
+    hint = ""
+    if "anthropic-workspace-id" in message and not llm.client_headers():
+        hint = f". Set {llm.WORKSPACE_SETTING} in core/.env (or the environment) to the workspace id, or use a key scoped to a workspace"
+    return f": {message[:200]}{'…' if len(message) > 200 else ''}{hint}"
 
 
 def check_roles(have_key: bool, client_factory: Callable[[], object] | None = None) -> Check:
@@ -279,7 +282,7 @@ def check_roles(have_key: bool, client_factory: Callable[[], object] | None = No
         return Check("roles", "skip", f"{named}; {today}")
     import anthropic
 
-    client = (client_factory or anthropic.Anthropic)()
+    client = (client_factory or llm.make_client)()
     listed: dict[str, bool] = {}
     for model in dict.fromkeys(m for models in chains.values() for m in models):
         try:
