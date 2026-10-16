@@ -402,6 +402,8 @@ class ExtractRun(BaseModel):
     run: ExtractorRun
     results: list[ExtractRunResult] = Field(default_factory=list)
     falsePositives: list[ExtractRunFalsePositive] = Field(default_factory=list)
+    # The models that answered the run's papers, from their usage records.
+    models: list[str] = Field(default_factory=list)
 
 
 class ReviewDecision(BaseModel):

@@ -218,7 +218,7 @@ def test_one_candidate_scores_one_record():
 def test_the_run_is_the_browsers_shape(run):
     assert run.run == "claude-1"
     body = run.model_dump()
-    assert set(body) == {"run", "results", "falsePositives"}
+    assert set(body) == {"run", "results", "falsePositives", "models"}
     assert set(body["results"][0]) == {"goldRecordId", "outcome", "extracted"}
 
 
@@ -367,3 +367,22 @@ def test_a_dropped_candidate_whose_value_is_a_numeric_string_is_still_a_span_err
     assert outcomes(run)["r-P1-1"] == "span_error"
     extracted = next(r.extracted for r in run.results if r.goldRecordId == "r-P1-1")
     assert extracted == Quantity(value="4,200", unit="mg/L"), "what the model wrote is what Witness shows"
+
+
+def test_a_run_names_the_models_that_answered(client, monkeypatch):
+    # Witness shows which model a run used, read from each paper's
+    # usage.models, never typed into the screen (live test, 2026-10-16).
+    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
+    client.post("/api/intake/B5/fetch")
+    monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage(models=["claude-haiku-5-5"])))
+    client.post("/api/intake/B5/extract")
+    runs = [ExtractRun.model_validate(r) for r in client.get("/api/witness/runs").json()]
+    assert runs[0].models == ["claude-haiku-5-5"]
+
+
+def test_a_run_with_no_recorded_model_says_none(client, monkeypatch):
+    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
+    client.post("/api/intake/B5/fetch")
+    monkeypatch.setattr(extract, "call_model", lambda *_: (GOOD, extract.Usage()))
+    client.post("/api/intake/B5/extract")
+    assert witness.runs()[0].models == []

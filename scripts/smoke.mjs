@@ -357,6 +357,9 @@ async function main() {
       await page.waitForTimeout(150);
       const witness = await page.locator('body').innerText();
       if (!/claude-1/.test(witness)) problems.push('Witness does not show the overlay run');
+      // The run names the models from its usage records; the fixture records none.
+      if (/Opus 5\.5, with Sonnet 5\.5/.test(witness)) problems.push('Witness still names a model the run did not record');
+      if (!/Model not recorded/.test(witness)) problems.push('Witness does not say the fixture run recorded no model');
       if (!/Provisional — curated values from OF-COR-001 standing in as gold until a reviewer flags them in Guild\./.test(witness)) {
         problems.push('Witness is not labelled provisional');
       }

@@ -407,6 +407,9 @@ export interface RunOutput {
   run: ExtractorRun;
   results: RunResult[];
   falsePositives: RunFalsePositive[];
+  /** The models that answered the run's papers, from their usage records
+   *  (core/openferment_core/witness.py). Absent for the seed's runs. */
+  models?: string[];
 }
 
 export interface CuratorNote {

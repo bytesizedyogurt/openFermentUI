@@ -68,8 +68,18 @@ const RUN_BLURB: Record<ExtractorRun, string> = {
   'v0.3': 'Baseline pass — span retrieval plus a single extraction prompt.',
   'v0.4': 'Adds unit normalisation against the ontology before scoring.',
   'v0.4r': 'v0.4 with hand-written guard rules for the fields that failed most.',
-  'claude-1': 'Claude Opus 5.5, with Sonnet 5.5 for a paper Opus declines: one structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
+  'claude-1': 'One structured response per paper over fetched full text; every candidate anchored to a verbatim quote (OF-BLD-012 §2.4).',
 };
+
+/** What a run says about itself: for claude-1, the models that answered,
+ *  read from the papers' usage records (the service's `models`), never a
+ *  model typed into the screen. */
+function runBlurb(run: RunOutput): string {
+  const base = RUN_BLURB[run.run] ?? run.run;
+  if (run.run !== 'claude-1') return base;
+  const models = run.models ?? [];
+  return `${models.length ? `Answered by ${models.join(', then ')}` : 'Model not recorded'}. ${base}`;
+}
 
 const INSUFFICIENT_N = 5;
 
@@ -676,7 +686,7 @@ export default function Witness() {
                 key={r.run}
                 onClick={() => setPickedRun(r.run)}
                 aria-pressed={i === activeIdx}
-                title={RUN_BLURB[r.run] ?? r.run}
+                title={runBlurb(r)}
                 className={cx(
                   'px-2.5 py-1 text-body font-num',
                   i === activeIdx
@@ -716,7 +726,7 @@ export default function Witness() {
           Score against curated records as provisional gold
         </label>
 
-        <div className="text-caption text-ink-soft">{RUN_BLURB[run.run]}</div>
+        <div className="text-caption text-ink-soft">{runBlurb(run)}</div>
       </div>
 
       {provisional && (
