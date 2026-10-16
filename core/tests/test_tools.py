@@ -258,3 +258,23 @@ def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_p
     assert r.error is None and r.evidence[0].id == run.artifactId and r.evidence[0].figure == "distribution"
     assert r.summary["provenance"] == "demo" and r.summary["assumedInputs"] == ["recovery", "sugarFeed", "sugarPrice"]
     assert r.evidence[0].interval.low <= r.evidence[0].value <= r.evidence[0].interval.high
+
+
+# Live test, 2026-10-16: told "an empty string for any field", the model sent
+# the two characters "" and every such search came back empty. The filters
+# are nullable now, null means unused, and the literal "" means the same.
+@pytest.mark.parametrize("unused", [None, '""', "", "''"])
+def test_an_unused_filter_is_null_and_the_literal_quotes_mean_the_same(pool, unused):
+    r = _search(pool, field=unused, organism=unused)
+    assert r.error is None
+    assert set(r.recordIds) == set(_search(pool, field=None, organism=None).recordIds)
+    assert r.recordIds, "an unused filter filters nothing"
+    assert r.summary["field"] is None and r.summary["organism"] is None
+
+
+def test_the_schema_offers_null_for_an_unused_filter():
+    schema = tools.REGISTRY["search_records"].input_model.model_json_schema()
+    for name in ("field", "organism"):
+        prop = schema["properties"][name]
+        assert {"type": "null"} in prop.get("anyOf", []), prop
+        assert "null" in prop["description"] and "empty string" not in prop["description"]
