@@ -45,6 +45,74 @@
       "seed": null
     },
     {
+      "id": "ae4d9fa3500ed3fd",
+      "tool": "geneos.ceiling",
+      "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
+      "inputs": [
+        {
+          "name": "model",
+          "value": "toy",
+          "unit": "",
+          "source": {
+            "kind": "assumption",
+            "id": "toy",
+            "note": "the STAND-IN toy network built in the geneOS worker for tests and fixtures; not a published model",
+            "by": "openFerment test fixture"
+          }
+        },
+        {
+          "name": "uptake",
+          "value": 10.0,
+          "unit": "mmol gDW-1 h-1",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+            "by": null
+          }
+        },
+        {
+          "name": "product",
+          "value": "phb",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+            "by": null
+          }
+        },
+        {
+          "name": "substrate",
+          "value": "glucose",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+            "by": null
+          }
+        }
+      ],
+      "output": {
+        "modelId": "toy",
+        "product": "phb",
+        "substrate": "glucose",
+        "exchange": "EX_glc__D_e",
+        "uptake": 10.0,
+        "flux": 20.0,
+        "molPerMol": 2.0,
+        "gPerG": 0.955727258598104,
+        "solver": "glpk_interface",
+        "status": "optimal"
+      },
+      "outputHash": "5c7b9e1e298813a0266dc8bd870326dd60a62ff803d67a694f79475ab6e8a611",
+      "provenance": "demo",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "durationMs": 0,
+      "seed": null
+    },
+    {
       "id": "bf73d708a9f9276d",
       "tool": "kinetic_fit",
       "toolVersion": "fermos-1",

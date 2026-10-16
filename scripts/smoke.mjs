@@ -694,10 +694,14 @@ async function main() {
       await page.locator('[data-testid="dossier-link"]').first().waitFor({ timeout: 10000 }).catch(() => {});
       if (!/#\/runbooks\/rb-draft-/.test(page.url())) problems.push('adopting the draft did not open its runbook');
       if (!/not yet locked/.test(await page.locator('body').innerText())) problems.push('an adopted draft is not unlocked');
-      if ((await page.locator('[data-testid="ledger-row"]').count()) !== 3) problems.push('the adopted runbook does not draw its three predictions');
+      if ((await page.locator('[data-testid="ledger-row"]').count()) !== 4) problems.push('the adopted runbook does not draw its four predictions');
       const tools = await page.locator('[data-testid="dossier-link"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tool')).join());
-      if (tools !== 'growth_forecast,proforma.run') problems.push(`the dossier does not draw the forecast then the price: ${tools}`);
-      if (!/harvest step/.test(await page.locator('[data-testid="dossier-seam"]').innerText().catch(() => ''))) problems.push('the seam between forecast and price is missing');
+      if (tools !== 'geneos.ceiling,growth_forecast,proforma.run') problems.push(`the dossier does not draw the ceiling, the forecast, then the price: ${tools}`);
+      const seams = (await page.locator('[data-testid="dossier-seam"]').allInnerTexts()).join(' | ');
+      if (!/stoichiometry/.test(seams) || !/harvest step/.test(seams)) problems.push(`the dossier's two seams are not both there: ${seams}`);
+      // The ceiling is drawn as a rule from its artifact, beside the records of its sugar.
+      if ((await page.locator('[data-testid="dossier-link"][data-tool="geneos.ceiling"] [data-testid="strip-rule"]').count()) !== 1)
+        problems.push('the dossier does not draw the ceiling as a rule');
       if (!/Stands behind the prediction Final product/.test(await page.locator('[data-testid="dossier"]').innerText().catch(() => '')))
         problems.push('a dossier figure does not name the prediction it stands behind');
       // §2 — run mode reads the same ledger and writes to it as steps complete.

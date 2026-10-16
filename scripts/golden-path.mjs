@@ -356,7 +356,7 @@ async function main() {
   await page.getByRole('button', { name: 'Turn into a runbook' }).click().catch(() => {});
   await page.locator('[data-testid="dossier-link"]').first().waitFor({ timeout: 10000 }).catch(() => {});
   check('A drafted runbook draws its predictions and the chain behind them',
-    (await page.locator('[data-testid="ledger-row"]').count()) === 3 && (await page.locator('[data-testid="dossier-link"]').count()) === 2);
+    (await page.locator('[data-testid="ledger-row"]').count()) === 4 && (await page.locator('[data-testid="dossier-link"]').count()) === 3);
   await go('/runbooks/ledger');
   check('The ledger counts locked and tested predictions', /predictions locked/.test(await page.locator('[data-testid="ledger-counts"]').innerText().catch(() => '')));
 
