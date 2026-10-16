@@ -550,17 +550,23 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
     import tempfile
     from types import SimpleNamespace
 
-    from . import artifacts, fermos, postdoc_agent, proforma, tools
+    from . import artifacts, fermos, geneos, postdoc_agent, proforma, tools
     from . import intake as _intake
     from .models import FermosSeries, InputAssumption, ProformaRunRequest
 
     pool = _stream_pool(overlay)
+    # The ceiling is the toy network's, a STAND-IN the tool refuses outside
+    # fixtures; inside this recording alone it is allowed, labelled as an
+    # assumption, so what it computes is demo (geneos.model_args).
+    real_ceiling = geneos.ceiling
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
+            geneos.ceiling = lambda model_id, product, substrate, **kw: real_ceiling(model_id, product, substrate, allow_toy=True, **kw)
+            ceiling = geneos.ceiling(geneos.TOY, "phb", "glucose")
             fit = fermos.fit(DRAFT_DEPOSITION, [FermosSeries.model_validate(x) for x in fermos_sample_series()])
             fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId)
             rs = _standin_records()
@@ -571,6 +577,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
             draft = {"title": "The stand-in run, forecast and priced", "productId": "taq-dna-polymerase",
                      "strainId": "c-necator-h16",
                      "items": [
+                         {"label": "Yield ceiling", "evidenceId": ceiling.evidence.id, "field": "", "recordIds": []},
                          {"label": "Final product", "evidenceId": fc.evidence.id, "field": "", "recordIds": []},
                          {"label": "Minimum selling price", "evidenceId": run.evidence.id, "field": "", "recordIds": []},
                          {"label": "Secreted titer", "evidenceId": "", "field": "titer_secreted", "recordIds": [STREAM_CANDIDATE]},
@@ -578,6 +585,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
                      "measures": [{"label": "Product at harvest", "unit": "g/L", "timepoint": "harvest", "itemLabel": "Final product"}]}
             turns: list[Any] = [
                 [("search_records", {"query": "", "field": "titer_secreted", "organism": "", "limit": 10})],
+                [("yield_ceiling", {"modelId": geneos.TOY, "product": "phb", "substrate": "glucose"})],
                 [("growth_forecast", {"fitArtifactId": fit.kineticArtifactId})],
                 [("selling_price", {"scenarioId": proforma.SCENARIO_ID})],
                 [("draft_runbook", draft)],
@@ -590,14 +598,15 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
                 DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
                 clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
             )
-            assert plan.runbookDraft is not None and len(plan.runbookDraft.predictions) == 3, "the stand-in draft no longer assembles"
+            assert plan.runbookDraft is not None and len(plan.runbookDraft.predictions) == 4, "the stand-in draft no longer assembles"
             for e in plan.evidence:
                 e.basis.at = AT
             events.append({"event": "plan", "data": plan.model_dump(mode="json")})
             kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0})
-                    for i in (fit.kineticArtifactId, fc.artifactId, run.artifactId)]
+                    for i in (ceiling.artifactId, fit.kineticArtifactId, fc.artifactId, run.artifactId)]
         finally:
             _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+            geneos.ceiling = real_ceiling
     return events, kept
 
 
@@ -823,10 +832,39 @@ def rebuild_figure_samples(out: Path = FIGURE_SAMPLES) -> Path:
     return out
 
 
+# §8.1: the fixtures that need BioSTEAM, which are the toy flowsheet's: one
+# evaluation, a small grid and a seeded sample, made by the real Proforma
+# worker. `pnpm test:sim` regenerates them and fails when they drift;
+# `python -m openferment_core.demo --sim` rewrites the file.
+SIM_FIXTURES = CORE / "tests" / "fixtures" / "sim" / "toy.json"
+SIM_NOTE = "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `python -m openferment_core.demo --sim`."
+
+
+def sim_fixtures() -> dict[str, Any]:
+    from . import proforma
+
+    evaluate = proforma.call("evaluate", {"flowsheet": "toy", "values": {}})
+    grid = proforma.call("grid", {"flowsheet": "toy", "axes": {"split": [0.2, 0.6], "ethanol": [40.0, 50.0]}, "base": {}})
+    sample = proforma.call("montecarlo", {"flowsheet": "toy", "specs": {
+        "split": {"kind": "uniform", "low": 0.1, "high": 0.9},
+        "ethanol": {"kind": "triangular", "low": 40.0, "mode": 50.0, "high": 70.0}}, "n": 8, "seed": 3, "base": {}})
+    return {"_fixture": SIM_NOTE, "evaluate": evaluate, "grid": grid, "montecarlo": sample}
+
+
+def rebuild_sim_fixtures(out: Path = SIM_FIXTURES) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(sim_fixtures(), indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {out}")
+    return out
+
+
 def main(argv: list[str]) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(CORE / ".env", override=False)
+    if "--sim" in argv:
+        rebuild_sim_fixtures()
+        return 0
     if "--prototype" in argv:
         rebuild_prototype()
         rebuild_figure_samples()

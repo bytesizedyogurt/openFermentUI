@@ -1,0 +1,173 @@
+{
+  "_fixture": "TEST FIXTURE: the toy flowsheet (a mixer and a splitter) through the real BioSTEAM worker; made by `python -m openferment_core.demo --sim`.",
+  "evaluate": {
+    "topEthanol": 30.0,
+    "topWater": 60.0,
+    "bottomTotal": 60.0
+  },
+  "grid": {
+    "axes": {
+      "split": [
+        0.2,
+        0.6
+      ],
+      "ethanol": [
+        40.0,
+        50.0
+      ]
+    },
+    "base": {},
+    "cells": [
+      {
+        "at": {
+          "split": 0.2,
+          "ethanol": 40.0
+        },
+        "outputs": {
+          "topEthanol": 8.0,
+          "topWater": 20.0,
+          "bottomTotal": 112.0
+        },
+        "infeasible": null
+      },
+      {
+        "at": {
+          "split": 0.2,
+          "ethanol": 50.0
+        },
+        "outputs": {
+          "topEthanol": 10.0,
+          "topWater": 20.0,
+          "bottomTotal": 120.0
+        },
+        "infeasible": null
+      },
+      {
+        "at": {
+          "split": 0.6,
+          "ethanol": 40.0
+        },
+        "outputs": {
+          "topEthanol": 23.999999999999996,
+          "topWater": 60.0,
+          "bottomTotal": 56.00000000000001
+        },
+        "infeasible": null
+      },
+      {
+        "at": {
+          "split": 0.6,
+          "ethanol": 50.0
+        },
+        "outputs": {
+          "topEthanol": 30.0,
+          "topWater": 60.0,
+          "bottomTotal": 60.0
+        },
+        "infeasible": null
+      }
+    ]
+  },
+  "montecarlo": {
+    "n": 8,
+    "seed": 3,
+    "samples": [
+      {
+        "inputs": {
+          "split": 0.6914350832856375,
+          "ethanol": 45.349729526120576
+        },
+        "outputs": {
+          "topEthanol": 31.356394011874315,
+          "topWater": 69.14350832856375,
+          "bottomTotal": 44.84982718568251
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.31987255347936033,
+          "ethanol": 51.46187299901018
+        },
+        "outputs": {
+          "topEthanol": 16.461240723023934,
+          "topWater": 31.98725534793603,
+          "bottomTotal": 103.0133769280502
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.49058713577596014,
+          "ethanol": 64.30048067660653
+        },
+        "outputs": {
+          "topEthanol": 31.544988644153864,
+          "topWater": 49.058713577596016,
+          "bottomTotal": 83.69677845485664
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.2520948701859166,
+          "ethanol": 60.67367067931971
+        },
+        "outputs": {
+          "topEthanol": 15.295521133606156,
+          "topWater": 25.209487018591656,
+          "bottomTotal": 120.1686625271219
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.7265422848590786,
+          "ethanol": 50.416195428515294
+        },
+        "outputs": {
+          "topEthanol": 36.629497820535335,
+          "topWater": 72.65422848590786,
+          "bottomTotal": 41.132469122072095
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.5608771809504338,
+          "ethanol": 56.26116767346649
+        },
+        "outputs": {
+          "topEthanol": 31.555605121673555,
+          "topWater": 56.08771809504338,
+          "bottomTotal": 68.61784445674954
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.8569371979585823,
+          "ethanol": 53.59847894682141
+        },
+        "outputs": {
+          "topEthanol": 45.9305303635312,
+          "topWater": 85.69371979585821,
+          "bottomTotal": 21.974228787431986
+        },
+        "infeasible": null
+      },
+      {
+        "inputs": {
+          "split": 0.126216221270784,
+          "ethanol": 46.25619516508607
+        },
+        "outputs": {
+          "topEthanol": 5.838282164101073,
+          "topWater": 12.621622127078398,
+          "bottomTotal": 127.79629087390659
+        },
+        "infeasible": null
+      }
+    ]
+  }
+}

@@ -62,3 +62,14 @@ def test_the_status_endpoint(warm):
 
     r = TestClient(api.app, base_url="http://127.0.0.1").get("/api/proforma/status").json()
     assert r["status"] == "ready" and r["error"] is None
+
+
+def test_the_committed_toy_fixtures_are_what_the_worker_makes(warm):
+    # §8.1: the fixtures that need BioSTEAM are regenerated here, where the
+    # real worker runs; `python -m openferment_core.demo --sim` rewrites them.
+    import json
+
+    from openferment_core import demo
+
+    committed = json.loads(demo.SIM_FIXTURES.read_text(encoding="utf-8"))
+    assert demo.sim_fixtures() == committed, "tests/fixtures/sim/toy.json no longer matches the worker: run python -m openferment_core.demo --sim"
