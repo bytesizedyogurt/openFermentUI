@@ -227,3 +227,43 @@ def test_a_lane_whose_model_refuses_is_scored_unavailable_with_the_reason(index,
     expand = next(l for l in report.lanes if l.lane == "bm25+expand")
     assert not expand.available and "not scoped to a workspace" in expand.why and expand.sets == {}
     assert report.chosenLane == "bm25"
+
+
+def test_one_refused_helper_call_leaves_the_question_unscored_and_the_lane_scored(index, monkeypatch):
+    # Live test, 2026-10-16: the safety classifier declined one helper call
+    # and the whole lane was discarded after it had paid for the rest. A
+    # refusal now costs its question alone, and the lane says how many.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
+
+    def ask(**kw):
+        text = json.dumps(kw.get("messages") or kw.get("user") or kw)
+        if "refuse me" in text:
+            raise llm.ModelRefused("bio", ["claude-haiku-5-5"], llm.Usage(costUsd=0.001, models=["claude-haiku-5-5"]))
+        return llm.Result(data={"phrasings": ["secreted titre"]}, model="claude-haiku-5-5",
+                          usage=llm.Usage(costUsd=0.001, models=["claude-haiku-5-5"]))
+
+    monkeypatch.setattr(rageval, "build_sets", lambda: (
+        {"K": [rageval.Question("K1", "K", "secreted titre xylose", ["X1:s1:0"]),
+               rageval.Question("K2", "K", "refuse me titre", ["X1:s1:0"])], "S": [], "F": []},
+        [],
+    ))
+    report = rageval.evaluate(ask=ask, lanes=["bm25", "bm25+expand"])
+    expand = next(l for l in report.lanes if l.lane == "bm25+expand")
+    assert expand.available and expand.why is None
+    assert expand.refused == 1
+    assert expand.sets["K"].questions == 1
+    assert expand.score is not None
+
+
+def test_a_refused_key_still_makes_the_lane_unavailable(index, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stand-in")
+
+    def unavailable(**kw):
+        raise llm.ModelUnavailable("today's budget is spent")
+
+    monkeypatch.setattr(rageval, "build_sets", lambda: (
+        {"K": [rageval.Question("K1", "K", "secreted titre xylose", ["X1:s1:0"])], "S": [], "F": []},
+        [],
+    ))
+    report = rageval.evaluate(ask=unavailable, lanes=["bm25+expand"])
+    assert not report.lanes[0].available and report.lanes[0].refused == 0

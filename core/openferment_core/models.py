@@ -1227,6 +1227,8 @@ class RagLaneReport(BaseModel):
     # Mean nDCG@10 over K and S (the sets present); None when it did not run.
     score: float | None = None
     sets: dict[str, RagMetrics] = Field(default_factory=dict)
+    # Questions left unscored because the helper model declined them.
+    refused: int = 0
 
 
 class RagSetInfo(BaseModel):

@@ -2302,6 +2302,8 @@ export interface RagLaneReport {
   /** Mean nDCG@10 over K and S (the sets present); null when it did not run. */
   score: number | null;
   sets: Record<string, RagMetrics>;
+  /** Questions left unscored because the helper model declined them. */
+  refused?: number;
 }
 
 export interface RagSetInfo {

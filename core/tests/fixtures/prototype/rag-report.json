@@ -40,7 +40,8 @@
             "medianSeconds": 0.0,
             "costPerQuestion": 0.0
           }
-        }
+        },
+        "refused": 0
       },
       {
         "lane": "bm25+expand",
@@ -48,7 +49,8 @@
         "why": "needs the key in core/.env for its helper model calls",
         "paid": true,
         "score": null,
-        "sets": {}
+        "sets": {},
+        "refused": 0
       },
       {
         "lane": "hybrid",
@@ -56,7 +58,8 @@
         "why": "no passage vectors yet: run pnpm index:build --dense on a machine that reaches huggingface.co",
         "paid": false,
         "score": null,
-        "sets": {}
+        "sets": {},
+        "refused": 0
       },
       {
         "lane": "bm25+rerank",
@@ -64,7 +67,8 @@
         "why": "needs the key in core/.env for its helper model calls",
         "paid": true,
         "score": null,
-        "sets": {}
+        "sets": {},
+        "refused": 0
       },
       {
         "lane": "hybrid+rerank",
@@ -72,7 +76,8 @@
         "why": "needs the key in core/.env for its helper model calls",
         "paid": true,
         "score": null,
-        "sets": {}
+        "sets": {},
+        "refused": 0
       }
     ],
     "chosenLane": "bm25",

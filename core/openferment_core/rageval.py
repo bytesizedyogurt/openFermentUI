@@ -412,12 +412,22 @@ def evaluate(
                     runs = []
                     for q in questions:
                         started = time.perf_counter()
-                        detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
+                        try:
+                            detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
+                        except llm.ModelRefused as e:
+                            # One question the helper model declined: that
+                            # question goes unscored on this lane, and is
+                            # counted. The lane is scored on the rest (live
+                            # test, 2026-10-16), and what it spent still counts.
+                            rep.refused += 1
+                            total += getattr(getattr(e, "usage", None), "costUsd", 0.0) or 0.0
+                            continue
                         runs.append(([h.passage.id for h in detail.hits], q.relevant, time.perf_counter() - started, detail.usage.costUsd))
                         total += detail.usage.costUsd
-                    rep.sets[name] = score_set(runs)
+                    if runs:
+                        rep.sets[name] = score_set(runs)
                 rep.score = lane_score(rep)
-            except (llm.ModelUnavailable, llm.ModelRefused) as e:
+            except llm.ModelUnavailable as e:
                 # The lane looked able to run and its model said no: a
                 # refused key, a spent budget. It is scored as unavailable,
                 # with the reason, and what it spent still counts.
@@ -466,6 +476,8 @@ def _print(report: RagReport) -> None:
             continue
         for name, m in l.sets.items():
             print(f"{l.lane:<15}{name:>4}{m.questions:>5}{m.recall5:>7.3f}{m.recall10:>7.3f}{m.recall20:>7.3f}{m.mrr10:>7.3f}{m.ndcg10:>7.3f}{m.medianSeconds:>8.3f}{m.costPerQuestion:>9.4f}")
+        if l.refused:
+            print(f"{l.lane:<15} {l.refused} question(s) unscored: the helper model declined them")
     print(f"chosen: {report.chosenLane} · total cost ${report.totalCostUsd:.4f}")
 
 

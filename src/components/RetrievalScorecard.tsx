@@ -78,7 +78,7 @@ export function RetrievalScorecard() {
                     <tr key={l.lane} className="border-b border-line last:border-0 text-ink-soft">
                       <td className="px-3 py-2 font-mono">{l.lane}</td>
                       <td className="px-3 py-2" colSpan={METRICS.length + 3}>
-                        not scored: {l.why ?? 'no question set to score it on'}
+                        not scored: {l.why ?? ((l.refused ?? 0) > 0 ? `the helper model declined all ${l.refused} questions` : 'no question set to score it on')}
                       </td>
                     </tr>
                   ) : (
@@ -90,6 +90,9 @@ export function RetrievalScorecard() {
                         <td className="px-3 py-2 font-mono">
                           {i === 0 ? l.lane : ''}
                           {i === 0 && l.lane === report.chosenLane && <span className="chip ml-2">in use</span>}
+                          {i === 0 && (l.refused ?? 0) > 0 && (
+                            <div className="text-caption text-ink-soft font-sans">{l.refused} unscored: the helper model declined them</div>
+                          )}
                         </td>
                         <td className="px-3 py-2">{set}</td>
                         <td className="px-3 py-2 text-right font-num">{m.questions}</td>
