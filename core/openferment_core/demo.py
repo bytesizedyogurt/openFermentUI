@@ -129,6 +129,17 @@ def record_anchoring(path: Path, result) -> None:
     path.write_text(json.dumps(saved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def with_note(xml: str, note: str) -> str:
+    """The JATS with `note` (a comment) after the XML declaration and before
+    everything else. The declaration ends at its own `?>`, never at the first
+    newline: Europe PMC sends it and <article> on one line (live test,
+    2026-10-16), and a comment after the root element would not parse."""
+    if not xml.startswith("<?xml"):
+        return note + xml
+    end = xml.index("?>") + 2
+    return xml[:end] + "\n" + note + xml[end:].lstrip("\r\n")
+
+
 def save_real(scratch: Path) -> None:
     """The real JATS from Europe PMC, and one real model response over it."""
     from . import extract, intake
@@ -140,11 +151,8 @@ def save_real(scratch: Path) -> None:
         f"{B5['pmcid']} (B5), for the offline demo (OF-BLD-012 §8.1).\n"
         "  The licence element inside says under what terms.\n-->\n"
     )
-    head, rest = (xml.split("\n", 1) + [""])[:2] if xml.startswith("<?xml") else ("", xml)
     (DEMO / "jats").mkdir(parents=True, exist_ok=True)
-    (DEMO / "jats" / f"{B5['pmcid']}.xml").write_text(
-        (head + "\n" if head else "") + note + rest, encoding="utf-8"
-    )
+    (DEMO / "jats" / f"{B5['pmcid']}.xml").write_text(with_note(xml, note), encoding="utf-8")
     print(f"saved {DEMO / 'jats' / (B5['pmcid'] + '.xml')}")
 
     # Fetch in fixture mode from what was just saved, then one real call.
