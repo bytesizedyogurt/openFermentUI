@@ -1,21 +1,21 @@
 {
   "paperId": "P25",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:49:38.968379+00:00",
+  "extractedAt": "2026-10-16T14:55:46.347588+00:00",
   "candidates": [
     {
-      "id": "cl1-P25-118b626c",
+      "id": "cl1-P25-08e08c59",
       "paperId": "P25",
-      "sectionId": "t3",
-      "quote": "Glucose (g/L) | 100.4 | 95.1",
-      "field": "medium_component_conc",
-      "value": 100.4,
-      "unit": "g L⁻¹",
+      "sectionId": "t4",
+      "quote": "Growth rate (μ) | 0.19 | 0.18 | 0.13 | 0.12 | 0.06 | 0 | 0 | 0",
+      "field": "growth_rate_mu",
+      "value": 0.19,
+      "unit": "h⁻¹",
       "si": {
-        "value": 100.4,
-        "unit": "kg m⁻³"
+        "value": 0.19,
+        "unit": "h⁻¹"
       },
-      "confidence": 0.6,
+      "confidence": 0.5,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Cupriavidus necator",
@@ -36,15 +36,15 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P25-70b862e8",
+      "id": "cl1-P25-1605cf12",
       "paperId": "P25",
-      "sectionId": "s13",
-      "quote": "when 1 g/L benzoic acid was supplemented into the minimum medium",
+      "sectionId": "s2",
+      "quote": "the defined minimal medium for C. necator (per liter, pH 6.8) was: 10 g glucose",
       "field": "medium_component_conc",
-      "value": 1.0,
+      "value": 10.0,
       "unit": "g L⁻¹",
       "si": {
-        "value": 1.0,
+        "value": 10.0,
         "unit": "kg m⁻³"
       },
       "confidence": 0.6,
@@ -52,7 +52,39 @@
       "provenance": "unverified",
       "organism": "Cupriavidus necator",
       "organismText": null,
-      "carbonSource": "benzoic acid",
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-P25-0114c0cb",
+      "paperId": "P25",
+      "sectionId": "t1",
+      "quote": "Mock slurry (1X) | 100.4 | 51.4 | 36.6",
+      "field": "medium_component_conc",
+      "value": 100.4,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 100.4,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Cupriavidus necator",
+      "organismText": null,
+      "carbonSource": "glucose",
       "componentTag": null,
       "goldOnly": null,
       "extractorRun": "claude-1",
@@ -68,23 +100,23 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P25-79cb97d8",
+      "id": "cl1-P25-033ff41c",
       "paperId": "P25",
-      "sectionId": "s11",
-      "quote": "The maximum amount of furfural was 2 g/L in the slurries in this study.",
+      "sectionId": "t1",
+      "quote": "Mock slurry (1X) | 100.4 | 51.4 | 36.6",
       "field": "medium_component_conc",
-      "value": 2.0,
+      "value": 51.4,
       "unit": "g L⁻¹",
       "si": {
-        "value": 2.0,
+        "value": 51.4,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.5,
+      "confidence": 0.55,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Cupriavidus necator",
       "organismText": null,
-      "carbonSource": "furfural",
+      "carbonSource": "xylose",
       "componentTag": null,
       "goldOnly": null,
       "extractorRun": "claude-1",
@@ -102,53 +134,31 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:49:38.968379+00:00",
+      "at": "2026-10-16T14:55:46.347588+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 2,
+  "rejected": 0,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
-    "quote": 1,
+    "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 0,
     "range": 0,
     "method": 0
   },
-  "rejectionDetails": [
-    "unit: unit 'h−1' does not normalise",
-    "quote: quote is not in section s2 after normalisation"
-  ],
-  "dropped": [
-    {
-      "paperId": "P25",
-      "sectionId": "t4",
-      "field": "growth_rate_mu",
-      "value": 0.19,
-      "unit": "h−1",
-      "rule": "unit",
-      "detail": "unit 'h−1' does not normalise"
-    },
-    {
-      "paperId": "P25",
-      "sectionId": "s2",
-      "field": "medium_component_conc",
-      "value": 10.0,
-      "unit": "g/L",
-      "rule": "quote",
-      "detail": "quote is not in section s2 after normalisation"
-    }
-  ],
+  "rejectionDetails": [],
+  "dropped": [],
   "usage": {
-    "inputTokens": 18396,
-    "outputTokens": 2241,
+    "inputTokens": 19533,
+    "outputTokens": 2145,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.00296,
+    "costUsd": 0.003026,
     "models": [
       "claude-haiku-5-5"
     ]
@@ -157,6 +167,6 @@
   "calls": 1,
   "truncatedSections": [],
   "fieldDrops": {
-    "carbonSource": 1
+    "carbonSource": 0
   }
 }

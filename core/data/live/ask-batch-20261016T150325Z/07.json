@@ -1,0 +1,160 @@
+{
+  "question": "How does the sugar mix of a hydrolysate change the monomer composition of the polymer?",
+  "claims": [
+    {
+      "id": "c2",
+      "text": "Per the cited review's framing, even-carbon volatile fatty acid feeds tend to yield 3HB monomer, while odd-carbon feeds yield 3HV and longer-chain monomers; this was shown with simple substrates such as single VFAs or VFA mixtures, not with sugar hydrolysates.",
+      "recordIds": [],
+      "paperIds": [
+        "P31"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P31:s1:5",
+          "quote": "Generally, even-carbon VFAs tend to generate 3-hydroxybutyrate (3HB) monomer, whereas odd-carbon VFAs yield 3-hydroxyvalerate (3HV) and other longer-chain monomers, which has been clearly evidenced by studies employing simple substrates, such as sole VFA or a VFAs mixture."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "In Halogeometricum borinquense strain E3, the 3HV fraction of the P(3HB-co-3HV) copolymer was lower when grown on sugarcane bagasse hydrolysate than on glucose medium, which the authors attribute possibly to hydrolysate byproducts inhibiting propionyl-CoA supply.",
+      "recordIds": [],
+      "paperIds": [
+        "P11"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P11:s20:2",
+          "quote": "The drastic reduction in 3HV units from 21.47% (glucose) to 13.29% (SCB) could be due to the inhibition of propionyl-coenzyme A synthesis, an important precursor of 3HV monomer by various byproducts of the SCB hydrolysate."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "No record in the corpus measures PHA monomer composition across a controlled series of glucose-to-xylose (or other sugar-mix) ratios in a hydrolysate, so the direct effect of the sugar mix on monomer fractions in a single pure-culture system is not established here.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "A controlled experiment varying the glucose:xylose (or hexose:pentose) ratio of a hydrolysate with monomer composition (mol%) measured at each ratio, in one strain under fixed conditions.",
+    "Monomer composition data for PHB-producing pure cultures (for example Cupriavidus necator or Burkholderia sacchari) grown on xylose versus glucose mixtures, with mol% 3HV reported.",
+    "Direct evidence on which hydrolysate inhibitors or co-products change propionyl-CoA or acyl-CoA precursor supply; the Halogeometricum explanation is the authors' hypothesis, not a measured mechanism.",
+    "Most cited monomer-composition values come from unverified curation notes or mixed-culture VFA studies; no verified record links a hydrolysate sugar mix to monomer fractions.",
+    "Whether the mixed-culture VFA-to-monomer trend applies to sugar-derived precursors, which the corpus does not test."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 2964,
+    "cacheReadTokens": 14991,
+    "cacheWriteTokens": 15376,
+    "costUsd": 0.003555,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c1: claim text contains a number ('3') — values come from the record",
+    "c4: claim text contains a number ('two') — values come from the record"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P11:s20:2",
+      "paperId": "P11",
+      "sectionId": "s20",
+      "heading": "3. Results and Discussion › 3.6. Polymer Characterization › 3.6.5. 1H-NMR Analysis",
+      "kind": "prose",
+      "text": "Interestingly, copolymer P(3HB-co-3HV)] containing a higher amount of 3HV (21.47% 3HV) was synthesized by the same E3 strain in NSM media with glucose as the substrate. The drastic reduction in 3HV units from 21.47% (glucose) to 13.29% (SCB) could be due to the inhibition of propionyl-coenzyme A synthesis, an important precursor of 3HV monomer by various byproducts of the SCB hydrolysate. PHA accumulation by extremely halophilic archaea and moderately halophilic and/or halotolerant bacteria, inhabiting hypersaline and marine regions of countries such as China, Turkey, Bolivia, Vietnam, India, etc., has been documented. ",
+      "start": 1088,
+      "end": 1715
+    },
+    {
+      "id": "P31:s1:5",
+      "paperId": "P31",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "Generally, even-carbon VFAs tend to generate 3-hydroxybutyrate (3HB) monomer, whereas odd-carbon VFAs yield 3-hydroxyvalerate (3HV) and other longer-chain monomers, which has been clearly evidenced by studies employing simple substrates, such as sole VFA or a VFAs mixture. The monomer composition of PHA subsequently determines the thermal and mechanical properties of the polymer, including its elasticity, crystallinity and rigidness. The homopolymer poly(3-hydroxybutyrate) (PHB) is a very crystalline and stiff material with a high melting point, which hinders its processing and commercial applications. To improve the properties of pure PHB, incorporating 3HV and other longer-chain monomers will lead to ameliorative attributes, such as a decreased melting point and increased ductility. ",
+      "start": 2113,
+      "end": 2909
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "hydrolysate sugar mix monomer composition polymer PHA",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of hydrolysate sugar mix monomer composition polymer PHA · 10 records",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "hydrolysate sugar mixture changes polymer monomer composition",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"hydrolysate sugar mixture changes polymer monomer composition\" · 6 passages",
+      "ms": 155,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "glucose and xylose mixed sugars copolymer 3-hydroxyvalerate fraction",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"glucose and xylose mixed sugars copolymer 3-hydroxyvalerate fraction\" · 6 passages",
+      "ms": 136,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHA monomer composition 3HV 3HB mol% carbon source mixture",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHA monomer composition 3HV 3HB mol% carbon source mixture · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 3 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

@@ -1,11 +1,11 @@
 {
   "paperId": "B5",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:36:54.682986+00:00",
+  "extractedAt": "2026-10-16T14:48:13.212395+00:00",
   "candidates": [],
   "audit": [
     {
-      "at": "2026-10-16T03:36:54.682986+00:00",
+      "at": "2026-10-16T14:48:13.212395+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
@@ -17,47 +17,56 @@
     "field": 0,
     "section": 0,
     "quote": 0,
-    "value": 3,
-    "unit": 4,
+    "value": 0,
+    "unit": 7,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
-    "value: no number in the quote equals 2.47 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation",
-    "value: no number in the quote equals 1.63 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation",
-    "value: no number in the quote equals 5.5 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation",
-    "unit: unit 'fold' does not normalise",
     "unit: unit 'transformants per µg of plasmid DNA' does not normalise",
+    "unit: unit 'colonies per µg DNA' does not normalise",
+    "unit: unit 'colonies per µg DNA' does not normalise",
+    "unit: unit 'colonies per µg DNA' does not normalise",
     "unit: unit 'fold' does not normalise",
-    "unit: unit 'fold' does not normalise"
+    "unit: unit 'days' does not normalise",
+    "unit: unit 'days' does not normalise"
   ],
   "dropped": [
     {
       "paperId": "B5",
-      "sectionId": "s9",
+      "sectionId": "s8",
       "field": "transformation_efficiency",
-      "value": 2.47,
-      "unit": "× 10^3 colonies per µg DNA",
-      "rule": "value",
-      "detail": "no number in the quote equals 2.47 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation"
+      "value": 1000.0,
+      "unit": "transformants per µg of plasmid DNA",
+      "rule": "unit",
+      "detail": "unit 'transformants per µg of plasmid DNA' does not normalise"
     },
     {
       "paperId": "B5",
       "sectionId": "s9",
       "field": "transformation_efficiency",
-      "value": 1.63,
-      "unit": "× 10^3 colonies per µg DNA",
-      "rule": "value",
-      "detail": "no number in the quote equals 1.63 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation"
+      "value": "2.47 × 10^3",
+      "unit": "colonies per µg DNA",
+      "rule": "unit",
+      "detail": "unit 'colonies per µg DNA' does not normalise"
     },
     {
       "paperId": "B5",
       "sectionId": "s9",
       "field": "transformation_efficiency",
-      "value": 5.5,
-      "unit": "× 10^3 colonies per µg DNA",
-      "rule": "value",
-      "detail": "no number in the quote equals 5.5 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation"
+      "value": "1.63 × 10^3",
+      "unit": "colonies per µg DNA",
+      "rule": "unit",
+      "detail": "unit 'colonies per µg DNA' does not normalise"
+    },
+    {
+      "paperId": "B5",
+      "sectionId": "s9",
+      "field": "transformation_efficiency",
+      "value": "5.50 × 10^3",
+      "unit": "colonies per µg DNA",
+      "rule": "unit",
+      "detail": "unit 'colonies per µg DNA' does not normalise"
     },
     {
       "paperId": "B5",
@@ -70,38 +79,29 @@
     },
     {
       "paperId": "B5",
-      "sectionId": "s8",
-      "field": "transformation_efficiency",
-      "value": 1000.0,
-      "unit": "transformants per µg of plasmid DNA",
+      "sectionId": "s7",
+      "field": "time_to_colony",
+      "value": 8.5,
+      "unit": "days",
       "rule": "unit",
-      "detail": "unit 'transformants per µg of plasmid DNA' does not normalise"
+      "detail": "unit 'days' does not normalise"
     },
     {
       "paperId": "B5",
-      "sectionId": "s11",
-      "field": "fold_improvement",
-      "value": 1.4,
-      "unit": "fold",
+      "sectionId": "s7",
+      "field": "time_to_colony",
+      "value": 17.5,
+      "unit": "days",
       "rule": "unit",
-      "detail": "unit 'fold' does not normalise"
-    },
-    {
-      "paperId": "B5",
-      "sectionId": "s11",
-      "field": "fold_improvement",
-      "value": 2.8,
-      "unit": "fold",
-      "rule": "unit",
-      "detail": "unit 'fold' does not normalise"
+      "detail": "unit 'days' does not normalise"
     }
   ],
   "usage": {
-    "inputTokens": 22660,
-    "outputTokens": 2680,
+    "inputTokens": 23773,
+    "outputTokens": 2679,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.003606,
+    "costUsd": 0.003717,
     "models": [
       "claude-haiku-5-5"
     ]

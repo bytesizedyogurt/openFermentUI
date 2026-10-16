@@ -1,0 +1,505 @@
+{
+  "question": "Express the reported PHB productivity records in grams per litre per day instead of per hour.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "PHA volumetric productivity of Bacillus thuringiensis cultivated on glucose-rich hydrolyzate, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P22-354e5fd9"
+      ],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-f5cd593e70dc1517"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "P(3HB) volumetric productivity of recombinant Ralstonia eutropha grown on xylose-containing sunflower stalk hydrolysate, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P6-bd75f1be"
+      ],
+      "paperIds": [
+        "P6"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-be54b391b00cd96d"
+      ]
+    },
+    {
+      "id": "c3",
+      "text": "Highest P(3HB) productivity reported for recombinant Ralstonia eutropha on sunflower stalk hydrolysate, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P6-ef418c6a"
+      ],
+      "paperIds": [
+        "P6"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-3778c17b2cc0b456"
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "PHA volumetric productivity of Bacillus thuringiensis in batch cultivation on glucose-rich hydrolyzate, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P22-974c01d0"
+      ],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-ef7209347a51da46"
+      ]
+    },
+    {
+      "id": "c6",
+      "text": "PHA volumetric productivity of Halogeometricum borinquense producing a P(3HB-co-3HV) copolymer on sugarcane bagasse hydrolysate, one of the loadings tested, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P11-9d2cec95"
+      ],
+      "paperIds": [
+        "P11"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-85671ff27ee8856f"
+      ]
+    },
+    {
+      "id": "c7",
+      "text": "PHA volumetric productivity of Halogeometricum borinquense producing a P(3HB-co-3HV) copolymer on sugarcane bagasse hydrolysate, the other loading tested, restated in grams per litre per day from the paper's hourly value",
+      "recordIds": [
+        "cl1-P11-db6e358d"
+      ],
+      "paperIds": [
+        "P11"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-357adf57bdd17926"
+      ]
+    }
+  ],
+  "gaps": [
+    "All converted records are unverified extractor candidates, not curated records; they need verification against the source papers before use.",
+    "The conversion is a restatement of the same rate in a different time unit (hours to days). It does not show that a process ran for a full day or that productivity was sustained over that period.",
+    "Two Halogeometricum borinquense records (P11) report a PHBV copolymer, not PHB alone, so they do not strictly answer a PHB-only question.",
+    "Overall productivity values in grams per litre per hour for the Emergent Approaches review (P16) are attached to whole-process biomass and PHA content records rather than stored as PHB productivity records, so I did not convert them; they also cover total biomass rather than PHB alone.",
+    "No PHB productivity record from a curated source was found in this search, so the corpus has no verified PHB-specific daily productivity value to cite."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 4324,
+    "cacheReadTokens": 26475,
+    "cacheWriteTokens": 15813,
+    "costUsd": 0.004404,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: claim text contains a number ('first') — values come from the record"
+  ],
+  "evidence": [
+    {
+      "id": "ev-357adf57bdd17926",
+      "label": "PHA volumetric productivity, cl1-P11-db6e358d, in g L⁻¹ d⁻¹",
+      "value": 0.228,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.0095,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P11-db6e358d",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "357adf57bdd17926",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "ev-3778c17b2cc0b456",
+      "label": "PHA volumetric productivity, cl1-P6-ef418c6a, in g L⁻¹ d⁻¹",
+      "value": 2.88,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.12,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P6-ef418c6a",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "3778c17b2cc0b456",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "ev-85671ff27ee8856f",
+      "label": "PHA volumetric productivity, cl1-P11-9d2cec95, in g L⁻¹ d⁻¹",
+      "value": 0.2712,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.0113,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P11-9d2cec95",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "85671ff27ee8856f",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "ev-be54b391b00cd96d",
+      "label": "PHA volumetric productivity, cl1-P6-bd75f1be, in g L⁻¹ d⁻¹",
+      "value": 3.6,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.15,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P6-bd75f1be",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "be54b391b00cd96d",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "ev-ef7209347a51da46",
+      "label": "PHA volumetric productivity, cl1-P22-974c01d0, in g L⁻¹ d⁻¹",
+      "value": 2.568,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.107,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P22-974c01d0",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "ef7209347a51da46",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    },
+    {
+      "id": "ev-f5cd593e70dc1517",
+      "label": "PHA volumetric productivity, cl1-P22-354e5fd9, in g L⁻¹ d⁻¹",
+      "value": 5.256,
+      "unit": "g L⁻¹ d⁻¹",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 0.219,
+            "unit": "g L⁻¹ h⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P22-354e5fd9",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "g L⁻¹ d⁻¹",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "f5cd593e70dc1517",
+        "at": "2026-10-16T15:19:15Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB productivity",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB productivity · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHA volumetric productivity g L-1 h-1 poly(3-hydroxybutyrate)",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHA volumetric productivity g L-1 h-1 poly(3-hydroxybutyrate) · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "P(3HB) productivity overall productivity g/L/h",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of P(3HB) productivity overall productivity g/L/h · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P22-354e5fd9",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P22-354e5fd9 to g L⁻¹ d⁻¹",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P6-bd75f1be",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P6-bd75f1be to g L⁻¹ d⁻¹",
+      "ms": 13,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P6-ef418c6a",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P6-ef418c6a to g L⁻¹ d⁻¹",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P22-d8919787",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P22-d8919787 to g L⁻¹ d⁻¹",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P22-974c01d0",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P22-974c01d0 to g L⁻¹ d⁻¹",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P11-9d2cec95",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P11-9d2cec95 to g L⁻¹ d⁻¹",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 10,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P11-db6e358d",
+        "toUnit": "g L⁻¹ d⁻¹"
+      },
+      "summary": "Converted cl1-P11-db6e358d to g L⁻¹ d⁻¹",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 11,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 6 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

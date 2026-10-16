@@ -1,0 +1,275 @@
+{
+  "question": "Which inhibitors in lignocellulosic hydrolysates have been reported to slow PHA producers, and what detoxification steps were tried?",
+  "claims": [
+    {
+      "id": "c3",
+      "text": "Non-detoxified spruce sawdust hydrolysate gave low PHA content in Burkholderia sacchari, whereas over-limed hydrolysate gave high PHA content in the same strain at harvest.",
+      "recordIds": [
+        "cl1-P21-d4967312",
+        "cl1-P21-2734f2ce"
+      ],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:6",
+          "quote": "More significantly, the effect of detoxification was reflected in the content of PHB in biomass."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "Activated carbon detoxification of spruce hydrolysate gave high PHA content in Burkholderia sacchari, comparable to over-liming, while non-detoxified hydrolysate gave low PHA content.",
+      "recordIds": [
+        "cl1-P21-009b3e8b",
+        "cl1-P21-d4967312"
+      ],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:6",
+          "quote": "A positive effect on the biosynthesis of PHB occurred primarily in the strain of B. sacchari."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "Overliming, activated carbon and lignite were compared as detoxification steps for spruce hydrolysate, and both overliming and activated carbon significantly lowered polyphenol concentrations.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:5",
+          "quote": "It is evident that both detoxification techniques significantly reduce the concentration of polyphenols in hydrolysates."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "Activated carbon was the more effective adsorbent for polyphenols in spruce hydrolysate, and lignite was reported as a cheaper sorbent that improved fermentability and PHA yields comparably to activated carbon.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:5",
+          "quote": "More effective is the application of activated carbon, which can adsorb and thereby remove more than 90% of polyphenols."
+        },
+        {
+          "passageId": "P21:s8:0",
+          "quote": "Lignite can be used as a sorbent to detoxify wood hydrolyzate and its efficiency was comparable with commonly used activated carbon."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c7",
+      "text": "The detoxification step itself was described as time-consuming and expensive, especially when activated carbon is used on hydrolysates.",
+      "recordIds": [],
+      "paperIds": [
+        "P21"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P21:s7:6",
+          "quote": "On the other hand, the detoxification process itself is time-consuming and particularly expensive, especially if activated carbon is used for detoxification of the hydrolyzates."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c10",
+      "text": "Ralstonia eutropha was reported to tolerate fermentation inhibitors generated during acid pretreatment of sugarcane bagasse and still produce PHA.",
+      "recordIds": [],
+      "paperIds": [
+        "P32"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P32:s10:1",
+          "quote": "However, this strain exhibited the potential to grow on the fermentation inhibitors generated during pretreatment and to produce PHA."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c11",
+      "text": "Detoxification of hydrolysates with over-liming or activated carbon has been reported in more than one PHA study, but the review sources cite such steps without reporting their effect on each inhibitor in the same strain.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s15:13",
+          "quote": "Two common detoxification procedures to eliminate microbial inhibitors include separation by adsorption of inhibitors using activated carbon and over-liming."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "Per-inhibitor concentrations before and after each detoxification step, in the same hydrolysate, as a table or record; the spruce study shows these mainly in a figure and the extracted records lack them.",
+    "Lignite PHA-content records: only non-detoxified and over-limed and activated-carbon values for Burkholderia sacchari and cepacia were retrieved, so the lignite effect on PHA yield is not quantified in the records.",
+    "Inhibitor thresholds for Cupriavidus necator, Paraburkholderia sacchari or other PHA producers on real hydrolysates, with growth and PHA read-outs at each threshold.",
+    "Detoxification tested on C. necator with real lignocellulosic hydrolysate; the retrieved C. necator work tested individual compounds in a Bioscreen assay rather than detoxified hydrolysate.",
+    "Whether adaptive evolution or inoculum increase was tested with a measured PHA outcome; the retrieved review sentences mention these only as proposals."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 4833,
+    "cacheReadTokens": 15281,
+    "cacheWriteTokens": 14945,
+    "costUsd": 0.004438,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 4,
+  "rejectionReasons": [
+    "c1: a quote that is not a whole sentence or row of P10:s7:3",
+    "c2: claim text contains a number ('5') — values come from the record",
+    "c8: a quote of P32:s10:1 longer than 300 characters",
+    "c9: a quote that is not a whole sentence or row of P25:f3:0"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P21:s7:5",
+      "paperId": "P21",
+      "sectionId": "s7",
+      "heading": "3. Results and Discussion",
+      "kind": "prose",
+      "text": "In the first phase, we compared two common detoxification procedures—separation by adsorption inhibitors on activated carbon and over-liming. Theoretically, overliming is effective due to precipitation or chemical destabilization of inhibitors and activated charcoal could improve the fermentability of hydrolysate by absorbing phenolic compounds and other inhibitory substances. The effect of various methods of detoxification on the concentration of the most important inhibitors present in hydrolysates and polyphenols is demonstrated in Figure 2. It is evident that both detoxification techniques significantly reduce the concentration of polyphenols in hydrolysates. More effective is the application of activated carbon, which can adsorb and thereby remove more than 90% of polyphenols. ",
+      "start": 3480,
+      "end": 4273
+    },
+    {
+      "id": "P21:s7:6",
+      "paperId": "P21",
+      "sectionId": "s7",
+      "heading": "3. Results and Discussion",
+      "kind": "prose",
+      "text": "More effective is the application of activated carbon, which can adsorb and thereby remove more than 90% of polyphenols. Table 2 demonstrates results of cultivation experiment with detoxified WH, employing the same PHB producers as in the previous test. Both methods of detoxification exhibited a positive influence on the growth of biomass, and this effect was more apparent with B. cepacia. More significantly, the effect of detoxification was reflected in the content of PHB in biomass. A positive effect on the biosynthesis of PHB occurred primarily in the strain of B. sacchari. PHB content reached nearly 90% of CDW. The yields were 8–12 times higher compared to the use of non-detoxified hydrolyzate. On the other hand, the detoxification process itself is time-consuming and particularly expensive, especially if activated carbon is used for detoxification of the hydrolyzates. ",
+      "start": 4152,
+      "end": 5038
+    },
+    {
+      "id": "P21:s8:0",
+      "paperId": "P21",
+      "sectionId": "s8",
+      "heading": "4. Conclusions",
+      "kind": "prose",
+      "text": "This article demonstrates the possibilities of utilization of lignite in biotechnology. Lignite can be used as a sorbent to detoxify wood hydrolyzate and its efficiency was comparable with commonly used activated carbon. This detoxification method was evaluated directly using the hydrolyzates to produce PHAs employing Burkholderia cepacia and Burkholderia sacchari. The results showed that the use of lignite considerably improved fermentability of wood hydrolyzates and enhanced PHA yields. Therefore, lignite can cope with significantly more expensive activated carbon.",
+      "start": 0,
+      "end": 573
+    },
+    {
+      "id": "P22:s15:13",
+      "paperId": "P22",
+      "sectionId": "s15",
+      "heading": "Results and discussion › Statistical optimization of biomass fermentation medium",
+      "kind": "prose",
+      "text": "During the hydrolysis of cellulosic biomass, sugars are not the only by-product. Toxic cell inhibitors such as volatile organic acids, furfurals, and acid-soluble lignin are also released (Larsson et al. 1999). The inhibitory effect of phenolic and other aromatic compounds on microbial growth and product yield is variable. One possible mechanism is that phenolic compounds such as furfural and 5-hydroxymethylfurfural (5-HMF) interfere with the cell membrane by influencing its functions and changing its protein-to-lipid ratio (Peters 2006; Zhang et al. 2018). Two common detoxification procedures to eliminate microbial inhibitors include separation by adsorption of inhibitors using activated carbon and over-liming. Such detoxification methods significantly reduce the concentration of inhibitors, thereby having a positive influence on the growth of biomass. ",
+      "start": 7889,
+      "end": 8755
+    },
+    {
+      "id": "P32:s10:1",
+      "paperId": "P32",
+      "sectionId": "s10",
+      "heading": "3. Results and Discussion › 3.3. PHA Production Studies",
+      "kind": "prose",
+      "text": "However, during acid and ASC pretreatment of SCB, some toxic compounds, for instance, furfural and hydroxymethylfurfural, formic, acetic acid, and various lignin degraded aromatics, are generated, which directly influences the microbial growth during fermentation and consequently PHA production. To overcome the effects of fermentation inhibitors in the SCB hydrolysates, many investigators have proposed some solutions, mainly, adaptation of potential microbial strains to the inhibitors; detoxification of hydrolysates before PHA production; addition of a higher quantity of inoculum size for effective PHA production. Ralstonia eutropha showed less capability to utilize 5C sugars and oligosaccharides in LC biomass hydrolysates. However, this strain exhibited the potential to grow on the fermentation inhibitors generated during pretreatment and to produce PHA. ",
+      "start": 334,
+      "end": 1202
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "lignocellulosic hydrolysate inhibitors furfural HMF acetic acid phenolic PHA production",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"lignocellulosic hydrolysate inhibitors furfural HMF acetic acid phenolic PHA production\" · 6 passages",
+      "ms": 156,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "hydrolysate inhibitor detoxification PHA",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of hydrolysate inhibitor detoxification PHA · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Cupriavidus necator pre-treatment inhibitor sensitivity growth lignin-derived compounds",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Cupriavidus necator pre-treatment inhibitor sensitivity growth lignin-derived compounds\" · 6 passages",
+      "ms": 156,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "overliming activated carbon lignite detoxification spruce hydrolyzate polyphenols",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"overliming activated carbon lignite detoxification spruce hydrolyzate polyphenols\" · 6 passages",
+      "ms": 148,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 7 claims kept, 4 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

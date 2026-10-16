@@ -1,13 +1,13 @@
 {
   "paperId": "P2",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:44:44.516500+00:00",
+  "extractedAt": "2026-10-16T14:54:24.945061+00:00",
   "candidates": [
     {
-      "id": "cl1-P2-9422792c",
+      "id": "cl1-P2-88b5e2fd",
       "paperId": "P2",
       "sectionId": "s5",
-      "quote": "During the TPA fermentation, Pp-TP and PpΔ-TP both produced more mcl-PHA (163.80 ± 16.83 and 140.96 ± 8.05 mg/L, respectively)",
+      "quote": "Pp-TP and PpΔ-TP both produced more mcl-PHA (163.80 ± 16.83 and 140.96 ± 8.05 mg/L, respectively)",
       "field": "pha_titre",
       "value": 163.8,
       "unit": "mg L⁻¹",
@@ -15,7 +15,7 @@
         "value": 0.1638,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.85,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pp-TP",
@@ -27,7 +27,7 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "undetermined",
+      "method": null,
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -36,10 +36,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P2-ba766b19",
+      "id": "cl1-P2-d9fa841f",
       "paperId": "P2",
       "sectionId": "s5",
-      "quote": "For single-strain co-utilization of pure TPA and EG mixture, Pp-TEP exhibited a higher titer (392.64 ± 15.70 mg/L)",
+      "quote": "Pp-TEP exhibited a higher titer (392.64 ± 15.70 mg/L)",
       "field": "pha_titre",
       "value": 392.64,
       "unit": "mg L⁻¹",
@@ -47,19 +47,19 @@
         "value": 0.39264,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.85,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pp-TEP",
       "organismText": null,
-      "carbonSource": "TPA and EG mixture",
+      "carbonSource": "pure TPA and EG mixture",
       "componentTag": null,
       "goldOnly": null,
       "extractorRun": "claude-1",
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "undetermined",
+      "method": null,
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -68,10 +68,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P2-b7663482",
+      "id": "cl1-P2-a93b93f1",
       "paperId": "P2",
       "sectionId": "s5",
-      "quote": "Remarkably, through the fed-batch fermentation, the consortium produced 637.30 ± 10.14 mg/L mcl-PHA",
+      "quote": "Remarkably, through the fed-batch fermentation, the consortium produced 637.30 ± 10.14 mg/L mcl-PHA, which was about 92% higher than that of Pp-TEP.",
       "field": "pha_titre",
       "value": 637.3,
       "unit": "mg L⁻¹",
@@ -79,7 +79,7 @@
         "value": 0.6373,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.85,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "TP-EP consortium",
@@ -91,71 +91,7 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "undetermined",
-      "numbering": null,
-      "curationRef": null,
-      "range": null,
-      "comparativeBaseline": null,
-      "negativeResult": null,
-      "valueBasis": "exact"
-    },
-    {
-      "id": "cl1-P2-e68c1fce",
-      "paperId": "P2",
-      "sectionId": "s5",
-      "quote": "engineered P. putida KT2440 was reported to produce 372 mg/L of mcl-PHA from pure EG under batch fermentation",
-      "field": "pha_titre",
-      "value": 372.0,
-      "unit": "mg L⁻¹",
-      "si": {
-        "value": 0.372,
-        "unit": "kg m⁻³"
-      },
-      "confidence": 0.7,
-      "status": "unverified",
-      "provenance": "unverified",
-      "organism": "p-putida-kt2440",
-      "organismText": "P. putida KT2440",
-      "carbonSource": "EG",
-      "componentTag": null,
-      "goldOnly": null,
-      "extractorRun": "claude-1",
-      "rejectReason": null,
-      "isPrimary": false,
-      "citesRecordId": null,
-      "method": "undetermined",
-      "numbering": null,
-      "curationRef": null,
-      "range": null,
-      "comparativeBaseline": null,
-      "negativeResult": null,
-      "valueBasis": "exact"
-    },
-    {
-      "id": "cl1-P2-b36292ee",
-      "paperId": "P2",
-      "sectionId": "s5",
-      "quote": "its relative, Pseudomonas umsongensis GO16, yielded 2349 mg/L of mcl-PHA from pure TPA in fed-batch fermentation",
-      "field": "pha_titre",
-      "value": 2349.0,
-      "unit": "mg L⁻¹",
-      "si": {
-        "value": 2.349,
-        "unit": "kg m⁻³"
-      },
-      "confidence": 0.7,
-      "status": "unverified",
-      "provenance": "unverified",
-      "organism": "Pseudomonas umsongensis GO16",
-      "organismText": null,
-      "carbonSource": "TPA",
-      "componentTag": null,
-      "goldOnly": null,
-      "extractorRun": "claude-1",
-      "rejectReason": null,
-      "isPrimary": false,
-      "citesRecordId": null,
-      "method": "undetermined",
+      "method": null,
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -166,39 +102,28 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:44:44.516500+00:00",
+      "at": "2026-10-16T14:54:24.945061+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 4,
+  "rejected": 2,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
-    "quote": 1,
+    "quote": 0,
     "value": 1,
-    "unit": 2,
+    "unit": 1,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
-    "unit: unit 'mgPHA/gCDW' does not normalise",
     "unit: unit 'mgPHA/gTPA' does not normalise",
-    "quote: quote is not in section s5 after normalisation",
     "value: no number in the quote equals 0.8 within 0.5%; the quote does not state the recorded range 0.6-1 either"
   ],
   "dropped": [
-    {
-      "paperId": "P2",
-      "sectionId": "s5",
-      "field": "pha_content_cdw",
-      "value": 64.55,
-      "unit": "mgPHA/gCDW",
-      "rule": "unit",
-      "detail": "unit 'mgPHA/gCDW' does not normalise"
-    },
     {
       "paperId": "P2",
       "sectionId": "s5",
@@ -207,15 +132,6 @@
       "unit": "mgPHA/gTPA",
       "rule": "unit",
       "detail": "unit 'mgPHA/gTPA' does not normalise"
-    },
-    {
-      "paperId": "P2",
-      "sectionId": "s5",
-      "field": "fold_improvement",
-      "value": 2.84,
-      "unit": "fold",
-      "rule": "quote",
-      "detail": "quote is not in section s5 after normalisation"
     },
     {
       "paperId": "P2",
@@ -228,11 +144,11 @@
     }
   ],
   "usage": {
-    "inputTokens": 29598,
-    "outputTokens": 4387,
+    "inputTokens": 30759,
+    "outputTokens": 2536,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.005153,
+    "costUsd": 0.004344,
     "models": [
       "claude-haiku-5-5"
     ]

@@ -1,0 +1,277 @@
+{
+  "question": "Turn the best-supported glucose PHB result in the corpus into a runbook I can lock and run next week.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The best-matching glucose PHB record in the corpus is a titre measured in an engineered E. coli strain grown on glucose as sole carbon source, but the record is an unverified extractor candidate with no strain or condition fields filled in.",
+      "recordIds": [
+        "cl1-P17-6efa5b8a"
+      ],
+      "paperIds": [
+        "P17"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "PHB content as a share of cell dry weight for the glucose-fed engineered E. coli strain is recorded only as an unverified extractor candidate, and it does not agree with the content figure given in the same paper's conclusions.",
+      "recordIds": [
+        "cl1-P17-b5220bd3"
+      ],
+      "paperIds": [
+        "P17"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P17:abstract:1",
+          "quote": "In addition, activating the ED pathway together with overexpressing the PDH complex further increased the PHB production to 5.54 g/L with content of 81.1% CDW."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "The paper's abstract and conclusions give different PHB titre and content values for the same engineered glucose strain than the extracted records do, so the record values should not be locked as a prediction.",
+      "recordIds": [
+        "cl1-P17-6efa5b8a",
+        "cl1-P17-b5220bd3"
+      ],
+      "paperIds": [
+        "P17"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P17:s7:0",
+          "quote": "The final strain produced 5.52 g/L PHB from glucose with a content of 81.11% CDW."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "In the flux balance model of E. coli central carbon metabolism with the PHB route added, the theoretical maximum PHB yield from glucose is a computed ceiling with no time axis or vessel.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "inferred",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-207a9865f4a8c578"
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "No curated, verified record of PHB production from glucose in a named strain under stated cultivation conditions exists in the corpus.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No curated or verified glucose PHB record: every glucose titre and content record is an unverified extractor candidate, and the records' strain and conditions fields are empty.",
+    "The P17 E. coli paper gives inconsistent titre and content values across its abstract, results table and conclusions; the primary table values need to be read directly from the paper before any prediction is locked.",
+    "No fed-batch or bioreactor glucose PHB result for E. coli is in the corpus; the higher-biomass glucose results found (Bacillus thuringiensis on a glucose-rich hydrolyzate, and Cupriavidus necator in a review table) use a different host or feedstock and are not comparable.",
+    "The glucose ceiling is a theoretical FBA value from the core model, not a measured yield, and it cannot serve as a bench prediction on its own.",
+    "The records' provenance is unverified; a person needs to check each source paper before a runbook item cites a value."
+  ],
+  "declined": "I did not draft a runbook. The only glucose PHB result that matches the request is an E. coli study whose records are unverified and conflict with the paper's own text, and no record gives the strain or cultivation conditions needed to run it. Locking a runbook on those values would present an unchecked prediction as a bench target. A verified source paper, with its strain, medium, vessel and time course stated, is needed before a runbook can be drafted.",
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 3493,
+    "cacheReadTokens": 26089,
+    "cacheWriteTokens": 16709,
+    "costUsd": 0.004098,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "ev-207a9865f4a8c578",
+      "label": "most PHB from glucose, E. coli K-12 central metabolism (core model) (central carbon)",
+      "value": 0.47786362929905185,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "E. coli K-12 central metabolism (core model)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "e_coli_core",
+              "note": "bundled with cobra as textbook (BiGG Models, bundled with cobra 0.32.1)",
+              "by": null
+            }
+          },
+          {
+            "name": "add-on",
+            "value": "phaCAB",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "RehMBEL1391",
+              "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "phb",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "207a9865f4a8c578",
+        "at": "2026-10-16T04:00:10Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [
+    {
+      "id": "P17:abstract:1",
+      "paperId": "P17",
+      "sectionId": "abstract",
+      "heading": "Abstract",
+      "kind": "abstract",
+      "text": "In addition, activating the ED pathway together with overexpressing the PDH complex further increased the PHB production to 5.54 g/L with content of 81.1% CDW. The intracellular acetyl-CoA concentration and the [NADPH]/[NADP+] ratio were enhanced after the modification of SD pathway, ED pathway and the PDH complex. Meanwhile, these engineering strains also had a significant increase in PHB concentration and content when xylose or glycerol was used as carbon source. Conclusions Significant levels of PHB biosynthesis from different kinds of carbon sources can be achieved by engineering the Serine-Deamination pathway, Entner-Doudoroff pathway and pyruvate dehydrogenase complex in E. coli JM109 harboring the PHB biosynthesis genes from Ralstonia eutropha. This work demonstrates a novel strategy for improving PHB production in E. coli. The strategy reported here should be useful for the bio-based production of PHB from renewable resources.",
+      "start": 1146,
+      "end": 2094
+    },
+    {
+      "id": "P17:s7:0",
+      "paperId": "P17",
+      "sectionId": "s7",
+      "heading": "Conclusions",
+      "kind": "prose",
+      "text": "Through combined engineering of SD pathway, ED pathway and PDH, a recombinant E. coli strain was obtained which led to significantly enhanced PHB accumulation. The final strain produced 5.52 g/L PHB from glucose with a content of 81.11% CDW. A similar phenomenon was observed when xylose or glycerol was served as carbon sources. In conclusion, enhancing the availability of acetyl-CoA via engineering the SD pathway, ED pathway and the PDH complex offered an effective way for improving the PHB production in E. coli from different carbon sources.",
+      "start": 0,
+      "end": 548
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB titre glucose yield",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB titre glucose yield · 10 records",
+      "ms": 10,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "e_coli_core",
+        "product": "phb",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 175,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "poly-3-hydroxybutyrate glucose fed-batch cell dry weight strain",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of poly-3-hydroxybutyrate glucose fed-batch cell dry weight strain · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB glucose Escherichia coli production conditions",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB glucose Escherichia coli production conditions\" · 6 passages",
+      "ms": 128,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB glucose 4.86 g/L shake flask medium cultivation conditions",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB glucose 4.86 g/L shake flask medium cultivation conditions\" · 6 passages",
+      "ms": 150,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

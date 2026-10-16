@@ -1,0 +1,341 @@
+{
+  "question": "What PHB yields on glucose have been reported, and how far are they from the ceiling?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Flux balance ceiling for PHB made from glucose in the E. coli K-12 central-carbon core model, with the phaCAB add-on route; this is a computed upper bound with no time axis or vessel.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-207a9865f4a8c578"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Flux balance ceiling for PHB made from glucose in the genome-scale E. coli K-12 MG1655 model (iJO1366), with the phaCAB add-on route; this is a computed upper bound and is higher than the core-model ceiling.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-7c399b414f823553"
+      ]
+    },
+    {
+      "id": "c4",
+      "text": "A recombinant Escherichia coli strain was reported to produce PHB from glucose as sole carbon source at a volumetric titre, not a yield per glucose.",
+      "recordIds": [
+        "cl1-P17-6efa5b8a"
+      ],
+      "paperIds": [
+        "P17"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "The corpus contains no reported PHB yield on glucose in grams per gram for an engineered Escherichia coli strain, so a direct comparison with the E. coli ceilings cannot be made.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No record in the corpus gives a PHB yield on glucose in grams per gram for an engineered E. coli strain; the only E. coli glucose PHB figure is a titre (cl1-P17-6efa5b8a), so the gap to the ceiling cannot be measured for E. coli.",
+    "The yeast yields in P24 are reported in milligrams PHB per gram glucose, while the ceilings are in grams per gram; a unit-consistent record of the yeast yield is needed to state how far below the ceiling it lies.",
+    "The ceilings are flux balance upper bounds with no time axis, vessel or process; no measured fed-batch or batch PHB yield on glucose from the same host and process is in the corpus to set against them.",
+    "Glucose-only yields for PHB in Pseudomonas, Bacillus or Ralstonia hosts were not found as records; the R. eutropha yield found (P6) is on a glucose plus xylose hydrolysate, not glucose alone."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 6333,
+    "cacheReadTokens": 46857,
+    "cacheWriteTokens": 23334,
+    "costUsd": 0.006552,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c3: a quote that is not a whole sentence or row of P24:t1:2",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "ev-207a9865f4a8c578",
+      "label": "most PHB from glucose, E. coli K-12 central metabolism (core model) (central carbon)",
+      "value": 0.47786362929905185,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "E. coli K-12 central metabolism (core model)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "e_coli_core",
+              "note": "bundled with cobra as textbook (BiGG Models, bundled with cobra 0.32.1)",
+              "by": null
+            }
+          },
+          {
+            "name": "add-on",
+            "value": "phaCAB",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "RehMBEL1391",
+              "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "phb",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "207a9865f4a8c578",
+        "at": "2026-10-16T04:00:10Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    },
+    {
+      "id": "ev-7c399b414f823553",
+      "label": "most PHB from glucose, E. coli K-12 MG1655 (iJO1366) (genome scale)",
+      "value": 0.5931326473577976,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "E. coli K-12 MG1655 (iJO1366)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "iJO1366",
+              "note": "bundled with cobra as iJO1366 (BiGG Models, bundled with cobra 0.32.1)",
+              "by": null
+            }
+          },
+          {
+            "name": "add-on",
+            "value": "phaCAB",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "RehMBEL1391",
+              "note": "ACACT1r, PHAB, PHAC; the route RehMBEL1391 carries, each reaction checked for mass balance",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "phb",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "a demand on phb_c; the PHB repeat unit C4H6O2 (86.09 g mol-1), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "7c399b414f823553",
+        "at": "2026-10-16T04:00:11Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB yield on glucose",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB yield on glucose · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "e_coli_core",
+        "product": "phb",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 2867,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "iJO1366",
+        "product": "phb",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 6087,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "poly(3-hydroxybutyrate) yield g per g glucose consumed",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of poly(3-hydroxybutyrate) yield g per g glucose consumed · 10 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB yield on glucose g/g",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB yield on glucose g/g\" · 6 passages",
+      "ms": 151,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB yield per glucose Saccharomyces Escherichia Cupriavidus",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB yield per glucose Saccharomyces Escherichia Cupriavidus · 10 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB yield glucose Escherichia coli recombinant phaCAB",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB yield glucose Escherichia coli recombinant phaCAB\" · 6 passages",
+      "ms": 140,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Cupriavidus necator DSM 545 one stage PHB glucose table yield productivity",
+        "k": 4
+      },
+      "summary": "Searched the papers for \"Cupriavidus necator DSM 545 one stage PHB glucose table yield productivity\" · 4 passages",
+      "ms": 136,
+      "ok": true
+    },
+    {
+      "n": 9,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

@@ -1,0 +1,177 @@
+{
+  "question": "Draft a first shake-flask run to test PHB production from a mixed glucose and xylose medium.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "No retrieved record or passage reports PHB production measured on a mixed glucose and xylose medium, so the corpus has no co-feed baseline for a shake-flask run on that medium.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "In shake flask, engineered Saccharomyces cerevisiae strain TMB4443 produced PHB from xylose as the carbon source, with the PHB titre at harvest recorded in the shake-flask row of that paper.",
+      "recordIds": [
+        "cl1-P27-773555fb"
+      ],
+      "paperIds": [
+        "P27"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "The same S. cerevisiae study reports PHB titre from xylose in a well-aerated bioreactor, a separate condition from the shake flask.",
+      "recordIds": [
+        "cl1-P27-38157845"
+      ],
+      "paperIds": [
+        "P27"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "Under anaerobic conditions with xylose, the best recombinant S. cerevisiae strain in one study accumulated PHB as a fraction of cell dry weight at harvest.",
+      "recordIds": [
+        "cl1-P20-d0694c2a"
+      ],
+      "paperIds": [
+        "P20"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "In the S. cerevisiae nitrogen study, the two engineered strains were tested with glucose or xylose each as sole carbon source, and the strain giving the most PHB differed by carbon source and oxygen condition.",
+      "recordIds": [],
+      "paperIds": [
+        "P24"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P24:abstract:1",
+          "quote": "TMB4443 accumulated most PHB under aerobic conditions and with glucose as sole carbon source, whereas the highest PHB concentrations were obtained with TMB4425 under anaerobic conditions and xylose as carbon source."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No runbook was drafted: draft_runbook needs a product id and a strain id, and the user named neither. The corpus also gives no basis for predicted values for a glucose plus xylose co-feed.",
+    "No record shows glucose and xylose being co-consumed, or whether xylose uptake is repressed by glucose in the chosen host. Sugar consumption profiles on the mixed medium are missing.",
+    "Most retrieved records are unverified curation notes from different hosts (S. cerevisiae, Pseudomonas putida, Cupriavidus necator, haloarchaea). None is a verified glucose-xylose PHB result in a shake flask in a single host.",
+    "The strain that carries both a xylose pathway and a PHB pathway is not identified in the corpus. A host must be named before any PHB yield, titre or cell dry weight can be predicted.",
+    "No growth or product forecast was run, and no yield ceiling was computed for a glucose plus xylose feed."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3470,
+    "cacheReadTokens": 15464,
+    "cacheWriteTokens": 16360,
+    "costUsd": 0.003935,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c5: claim text contains a number ('5') — values come from the record",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P24:abstract:1",
+      "paperId": "P24",
+      "sectionId": "abstract",
+      "heading": "Abstract",
+      "kind": "abstract",
+      "text": "TMB4443 accumulated most PHB under aerobic conditions and with glucose as sole carbon source, whereas the highest PHB concentrations were obtained with TMB4425 under anaerobic conditions and xylose as carbon source. In both cases, the highest PHB contents were obtained with high availability of nitrogen. The major impact of nitrogen availability was observed in TMB4425, where a 2.7-fold increase in PHB content was obtained. In contrast to what was observed in natural PHB-producing bacteria, nitrogen deficiency did not improve PHB accumulation in S. cerevisiae. Instead the excess available carbon from xylose was shunted into glycogen, indicating a significant gluconeogenic activity on xylose.",
+      "start": 989,
+      "end": 1689
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production glucose xylose mixed sugar shake flask",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB production glucose xylose mixed sugar shake flask · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB titre cell dry weight xylose",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB titre cell dry weight xylose · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "co-utilization of glucose and xylose polyhydroxybutyrate",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of co-utilization of glucose and xylose polyhydroxybutyrate · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "glucose and xylose mixture PHB accumulation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"glucose and xylose mixture PHB accumulation\" · 6 passages",
+      "ms": 124,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

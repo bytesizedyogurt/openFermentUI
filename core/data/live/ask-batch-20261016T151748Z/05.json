@@ -1,0 +1,187 @@
+{
+  "question": "Convert the highest reported PHA titre in the corpus from grams per litre to milligrams per millilitre.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Highest PHA titre among the titre records in the corpus, from cyclic fed-batch Bacillus thuringiensis on glucose-rich hydrolyzate, converted from grams per litre to milligrams per millilitre by the platform's unit engine",
+      "recordIds": [
+        "cl1-P22-e813ae43"
+      ],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-509e8b3d81774087"
+      ]
+    }
+  ],
+  "gaps": [
+    "A review in the corpus (P16) states a fed-batch PHB figure higher than this titre, but it is recorded only as PHA content in percent of cell dry weight (cl1-P16-1dc33273), so the unit engine cannot convert it to milligrams per millilitre. A titre record for that figure, with its primary source and conditions, would be needed before it could be compared or converted.",
+    "The corpus records of the highest titre (cl1-P22-e813ae43) are unverified curation notes, and its conditions field is empty, so the cultivation scale and strain details behind this value are not established.",
+    "The unit engine converted the value, but I could not write the converted number in this answer; the figure is shown from the evidence item beside the claim."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 3310,
+    "cacheReadTokens": 44192,
+    "cacheWriteTokens": 21311,
+    "costUsd": 0.004761,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [
+    {
+      "id": "ev-509e8b3d81774087",
+      "label": "PHA titre, cl1-P22-e813ae43, in mg/mL",
+      "value": 14.28,
+      "unit": "mg/mL",
+      "interval": null,
+      "provenance": "unverified",
+      "basis": {
+        "tool": "convert_units",
+        "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+        "inputs": [
+          {
+            "name": "record value",
+            "value": 14.28,
+            "unit": "g L⁻¹",
+            "source": {
+              "kind": "record",
+              "id": "cl1-P22-e813ae43",
+              "note": null,
+              "by": null
+            }
+          },
+          {
+            "name": "unit asked for",
+            "value": "mg/mL",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the unit the caller asked for",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "509e8b3d81774087",
+        "at": "2026-10-16T15:18:59Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHA titre g/L",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHA titre g/L · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "polyhydroxyalkanoate concentration highest fed-batch g/L",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of polyhydroxyalkanoate concentration highest fed-batch g/L · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production titer dry cell weight",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB production titer dry cell weight · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB titre fed-batch Cupriavidus necator waste oil g/L",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB titre fed-batch Cupriavidus necator waste oil g/L · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB g/L fed-batch highest titre",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB g/L fed-batch highest titre\" · 6 passages",
+      "ms": 156,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "convert_units",
+      "input": {
+        "recordId": "cl1-P22-e813ae43",
+        "toUnit": "mg/mL"
+      },
+      "summary": "Converted cl1-P22-e813ae43 to mg/mL",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "105 g/L PHB fed-batch 76% CDW",
+        "k": 3
+      },
+      "summary": "Searched the papers for \"105 g/L PHB fed-batch 76% CDW\" · 3 passages",
+      "ms": 137,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 1 claim kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

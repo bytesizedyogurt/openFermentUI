@@ -1,0 +1,279 @@
+{
+  "question": "How have waste paper and cotton textile been turned into fermentable sugar for PHA production, and which pretreatment and hydrolysis steps were used?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The corpus contains no primary study that converts waste paper or cotton textile into fermentable sugar and then uses it for PHA production; the only waste-paper and cardboard hydrolysate mentions are secondary citations inside an introduction.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "An introduction in the corpus reports that hydrolysates from waste office paper were used as alternative substrates for PHB production, citing an earlier work rather than reporting its own experiment.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s1:4",
+          "quote": "Moreover, hydrolyzates from wheat bran (Annamalai and Sivakumar 2016), waste office paper (Annamalai et al. 2017), and wheat straw (Ferreira and Schlottbom 2016) were successful as alternative substrates for PHB production."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "The same introduction reports a glucose-rich hydrolysate from corrugated cardboard used as a nutrient source for yeast proliferation, a non-PHA use cited from an earlier work.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s1:3",
+          "quote": "Glucose-rich hydrolyzate obtained from corrugated cardboard was used as a nutrient source for yeast proliferation (García et al. 2015)."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "No record or passage in the corpus reports a pretreatment or hydrolysis step applied to cotton textile waste for sugar release.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c6",
+      "text": "The closest documented route to PHA from a solid waste with enzymatic sugar release is a bakery waste hydrolysate, in which enzymatic hydrolysis with fungal crude enzyme or commercial glucoamylase was run at a mildly acidic pH and an elevated temperature before the hydrolysate fed PHB fermentation.",
+      "recordIds": [
+        "cl1-P34-5e786bd7",
+        "cl1-P34-a0e61dbe"
+      ],
+      "paperIds": [
+        "P34"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P34:s14:0",
+          "quote": "Hydrolysis was carried out at 55°C and pH 4–4.5."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c7",
+      "text": "In the bakery waste study, the hydrolysate was used as a fermentation feed in a fed-batch process for PHB, and the reported PHA content and titre were measured by the authors on that feed.",
+      "recordIds": [
+        "cl1-P34-f6ec8b8c",
+        "cl1-P34-dc4f59ee"
+      ],
+      "paperIds": [
+        "P34"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P34:s17:7",
+          "quote": "Apart from glucose, fructose was found in hydrolysates by the hydrolysis of sucrose in cake rich bakery wastes."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c8",
+      "text": "For lignocellulosic sugarcane bagasse, the documented route used dilute acid pretreatment followed by cellulase saccharification at a citrate-buffered mildly acidic pH, with the concentrated hydrolysate then used for PHA production in a co-culture.",
+      "recordIds": [],
+      "paperIds": [
+        "P32"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P32:s4:0",
+          "quote": "The reaction solution was further placed at 50 °C for 24 h under shaking conditions (150 rpm)."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No study in the corpus converts waste paper (office paper, cardboard, recycled paper sludge) into sugar for PHA; a primary paper on that route with its pretreatment, enzyme loading and sugar yield is needed.",
+    "No study in the corpus reports cotton textile waste being pretreated or hydrolysed for PHA; cellulose-rich textile hydrolysis parameters and PHA results are absent.",
+    "The waste paper and cardboard hydrolysate uses cited in the introduction are secondary citations, so their pretreatment steps, hydrolysis conditions and yields are not in the corpus and would need the original sources.",
+    "Any PHA titre or content from a paper or textile hydrolysate is missing; the bakery waste and bagasse records are analogues, not paper or cotton."
+  ],
+  "declined": "The corpus cannot answer the question as asked: it holds no primary record of waste paper or cotton textile being turned into fermentable sugar for PHA production, and no pretreatment or hydrolysis parameters for either feedstock. It offers only secondary mentions of paper and cardboard hydrolysates and analogous bakery waste and bagasse routes.",
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 4046,
+    "cacheReadTokens": 17810,
+    "cacheWriteTokens": 20393,
+    "costUsd": 0.004751,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: a quote that is not a whole sentence or row of P22:s1:4"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P22:s1:3",
+      "paperId": "P22",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "Waste biomass is an attractive alternative source of fermentable sugars for application as inexpensive feedstock for the production of platform chemicals (Moritz and Duff 1996; Peters 2006; Prasetyo et al. 2010; Martin-Sampedro et al. 2011). Glucose-rich hydrolyzate obtained from corrugated cardboard was used as a nutrient source for yeast proliferation (García et al. 2015). Hydrolyzates obtained from enzymolysis of recycled paper sludge was used for the production of lactic acid by bacteria (Marques et al. 2008), primary clarifier sludge from kraft and low-yield sulfite pulping operations (Duff et al. 1994) and recycled paper sludge (Madrid and Díaz 2011; Schroeder et al. 2015) was used in bio-ethanol production. ",
+      "start": 1799,
+      "end": 2523
+    },
+    {
+      "id": "P22:s1:4",
+      "paperId": "P22",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "Hydrolyzates obtained from enzymolysis of recycled paper sludge was used for the production of lactic acid by bacteria (Marques et al. 2008), primary clarifier sludge from kraft and low-yield sulfite pulping operations (Duff et al. 1994) and recycled paper sludge (Madrid and Díaz 2011; Schroeder et al. 2015) was used in bio-ethanol production. Moreover, hydrolyzates from wheat bran (Annamalai and Sivakumar 2016), waste office paper (Annamalai et al. 2017), and wheat straw (Ferreira and Schlottbom 2016) were successful as alternative substrates for PHB production. Bacillus species have an innate ability to produce a variety of hydrolytic enzymes enabling them to metabolize complex residues and utilize a diverse array of carbon wastes (Rohini et al. 2006). ",
+      "start": 2177,
+      "end": 2942
+    },
+    {
+      "id": "P32:s4:0",
+      "paperId": "P32",
+      "sectionId": "s4",
+      "heading": "2. Materials and Methods › 2.3. Enzymatic Hydrolysis of Pretreated SCB",
+      "kind": "prose",
+      "text": "Enzymatic saccharification of untreated and each chemically pretreated SCB biomass was conducted in 100 mL Erlenmeyer conical flask containing 2.0% (w/v) biomass in 20 mL of 50 mM citrate buffer (pH 5.0) with 0.005% (w/v) sodium azide and the enzyme loading of cellulase from Trichoderma reesei ATCC 26921 of 20 FPU/g of SCB. The reaction solution was further placed at 50 °C for 24 h under shaking conditions (150 rpm). The sample aliquots were withdrawn at the function of time and measured saccharification yield in terms of reducing sugar production after enzymatic hydrolysis by standard dinitrosalicylic acid technique. In addition, the overall hydrolysis and glucose yields were assessed by following the standard methodology reported earlier. The resulting SCB enzymatic hydrolysates were concentrated by heating the solution at 80 °C, followed by centrifugation and PHA production.",
+      "start": 0,
+      "end": 890
+    },
+    {
+      "id": "P34:s14:0",
+      "paperId": "P34",
+      "sectionId": "s14",
+      "heading": "2. Materials and Methods › 2.13. Investigation of Bakery Waste Hydrolysis",
+      "kind": "prose",
+      "text": "Hydrolysis of 548.8 g (dry weight) homogenized bakery waste was conducted with one of the following methods: (1) crude enzyme extract from Aspergillus awamori solid mashes from three petri dishes; (2) commercial glucoamylase added in a ratio of 6.9 and 13.1 U per gram dry bakery waste; and (3) Aspergillus awamori solid mashes from three petri dishes in demineralized water. Different enzyme-to-solid ratios were used to investigate the opportunity to adjust glucose and FAN concentrations in hydrolysates. Hydrolysis was carried out at 55°C and pH 4–4.5. A solid-to-liquid ratio, defined as the ratio of dry weight (g) to liquid (mL), of 38 to 47% (w/v) was used in all hydrolyses. In addition, a control experiment without addition of enzymes or fungal biomass was carried out under the same experimental conditions. ",
+      "start": 0,
+      "end": 820
+    },
+    {
+      "id": "P34:s17:7",
+      "paperId": "P34",
+      "sectionId": "s17",
+      "heading": "3. Results and Discussion › 3.2. Investigation of Bakery Waste Hydrolysis",
+      "kind": "prose",
+      "text": "A medium consisting of 200 g L−1 glucose, but only 100 mg L−1 FAN would facilitate PHB accumulation during fed-batch phase. At the same time, due to its high glucose concentration, the dilution effect due to increasing fermentation broth volume during fed-batch cultivation can be minimized. Apart from glucose, fructose was found in hydrolysates by the hydrolysis of sucrose in cake rich bakery wastes. Although the yields of fructose were 7 to 10 times lower compared to the yields of glucose (Table 3), it was utilized by Halomonas boliviensis and contributed to cell growth and PHB formation (Figure 1(b)). Table 3 shows that similar yields of glucose, fructose, and FAN were obtained when hydrolysis was carried out using commercial glucoamylase in seawater as solvent instead of tap water. ",
+      "start": 4362,
+      "end": 5158
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "waste paper cotton textile hydrolysis fermentable sugar PHA",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of waste paper cotton textile hydrolysis fermentable sugar PHA · 10 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "waste paper enzymatic hydrolysis pretreatment sugar polyhydroxyalkanoate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"waste paper enzymatic hydrolysis pretreatment sugar polyhydroxyalkanoate\" · 6 passages",
+      "ms": 139,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "cotton textile waste hydrolysis glucose fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"cotton textile waste hydrolysis glucose fermentation\" · 6 passages",
+      "ms": 121,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "waste paper",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"waste paper\" · 6 passages",
+      "ms": 160,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "cotton textile",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"cotton textile\" · 6 passages",
+      "ms": 184,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "waste paper cellulose hydrolysate polyhydroxybutyrate",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of waste paper cellulose hydrolysate polyhydroxybutyrate · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 7 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

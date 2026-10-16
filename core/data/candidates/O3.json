@@ -1,13 +1,13 @@
 {
   "paperId": "O3",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:40:59.307453+00:00",
+  "extractedAt": "2026-10-16T14:51:38.352088+00:00",
   "candidates": [
     {
-      "id": "cl1-O3-c6d23153",
+      "id": "cl1-O3-a0915faf",
       "paperId": "O3",
       "sectionId": "s5",
-      "quote": "In the empirical scenarios, the 1 L fermentation yielded a biomass density of 4.2 g/L with a target protein content of 0.1% of cell mass",
+      "quote": "the 1 L fermentation yielded a biomass density of 4.2 g/L with a target protein content of 0.1% of cell mass",
       "field": "final_biomass_density",
       "value": 4.2,
       "unit": "g L⁻¹",
@@ -15,7 +15,7 @@
         "value": 4.2,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.5,
+      "confidence": 0.6,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Methylorubrum extorquens",
@@ -47,7 +47,7 @@
         "value": 6.5,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.5,
+      "confidence": 0.6,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Methylorubrum extorquens",
@@ -70,143 +70,113 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:40:59.307453+00:00",
+      "at": "2026-10-16T14:51:38.352088+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 11,
+  "rejected": 8,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
-    "value": 2,
-    "unit": 9,
+    "value": 0,
+    "unit": 8,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
-    "value: no number in the quote equals 1187.5 within 0.5%; the quote does not state the recorded range 75-2300 either",
-    "value: no number in the quote equals 49485.0 within 0.5%; the quote does not state the recorded range 970-99000 either",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise",
-    "unit: unit '$/kg' does not normalise"
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise",
+    "unit: unit '$/kg protein' does not normalise"
   ],
   "dropped": [
-    {
-      "paperId": "O3",
-      "sectionId": "abstract",
-      "field": "minimum_selling_price",
-      "value": 1187.5,
-      "unit": "$/kg",
-      "rule": "value",
-      "detail": "no number in the quote equals 1187.5 within 0.5%; the quote does not state the recorded range 75-2300 either"
-    },
-    {
-      "paperId": "O3",
-      "sectionId": "abstract",
-      "field": "minimum_selling_price",
-      "value": 49485.0,
-      "unit": "$/kg",
-      "rule": "value",
-      "detail": "no number in the quote equals 49485.0 within 0.5%; the quote does not state the recorded range 970-99000 either"
-    },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 2300.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
-      "value": 99000.0,
-      "unit": "$/kg",
+      "value": "99,000",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 500.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 16000.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 120.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 3600.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 75.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     },
     {
       "paperId": "O3",
       "sectionId": "t3",
       "field": "minimum_selling_price",
       "value": 970.0,
-      "unit": "$/kg",
+      "unit": "$/kg protein",
       "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
-    },
-    {
-      "paperId": "O3",
-      "sectionId": "s5",
-      "field": "minimum_selling_price",
-      "value": 316.0,
-      "unit": "$/kg",
-      "rule": "unit",
-      "detail": "unit '$/kg' does not normalise"
+      "detail": "unit '$/kg protein' does not normalise"
     }
   ],
   "usage": {
-    "inputTokens": 21287,
-    "outputTokens": 4543,
+    "inputTokens": 22360,
+    "outputTokens": 3582,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.0044,
+    "costUsd": 0.004027,
     "models": [
       "claude-haiku-5-5"
     ]

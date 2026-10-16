@@ -1,0 +1,79 @@
+{
+  "question": "What would PHB cost per kilogram at the titres and yields reported so far?",
+  "claims": [],
+  "gaps": [
+    "No minimum selling price run exists for a PHB scenario: selling_price refused scenario sc-pha-1 because no run of it exists. A person must run the scenario in Proforma before a per-kilogram price can be cited.",
+    "The PHA yield on sugar input is missing from the scenario. The only yield records found (cl1-P9-76893aae, cl1-P23-6eba7e21) are unverified, have no strain or conditions, and use different substrates (pineapple residue, cellobiose), so they cannot be taken as the process yield.",
+    "Solids recovered at harvest is missing for the PHB process.",
+    "The price of fermentable sugar and the sugar fed to the process are missing.",
+    "The titre records found are heterogeneous and unverified: they span different hosts (Escherichia coli, Saccharomyces cerevisiae, Cupriavidus necator, Pseudomonas putida, Bacillus thuringiensis), polymer types (PHB, mcl-PHA, PHBV), substrates and units. None is tied to one strain and one fed-batch process, so there is no single titre to carry into a costing.",
+    "The yield_ceiling tool was not run because the question asks for a cost, and a theoretical ceiling would not be a reported yield in any case."
+  ],
+  "declined": "The corpus cannot support a per-kilogram PHB cost. The selling-price tool refuses because no Proforma run exists for a PHB scenario, and its inputs (PHA yield on sugar, solids recovered at harvest, price of fermentable sugar, sugar fed) have no source. The titre and yield records that exist are unverified, scattered across hosts, substrates and polymer types, and do not describe one process. A person needs to set up and run a PHB scenario in Proforma with a sourced yield, harvest solids, sugar price and sugar feed; then the minimum selling price can be cited from that run.",
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 1366,
+    "cacheReadTokens": 4863,
+    "cacheWriteTokens": 10200,
+    "costUsd": 0.002007,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "sc-pha-1"
+      },
+      "summary": "selling_price refused: selling_price refused: no run of sc-pha-1 exists; inputs still waiting for a source: PHA yield on sugar, solids recovered at harvest, price of fermentable sugar",
+      "ms": 16,
+      "ok": false
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB titre harvest g/L",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB titre harvest g/L · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB yield on sugar g/g",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB yield on sugar g/g · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 0 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

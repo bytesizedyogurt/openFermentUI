@@ -1,0 +1,165 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "Which organisms have been shown to make PHB from hydrolysates that contain xylose, and what feedstock did each study use?",
+      "kept": 1,
+      "dropped": 5,
+      "toolCalls": 7,
+      "rounds": 4,
+      "seconds": 25.93,
+      "costUsd": 0.005285,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 2,
+      "question": "How have waste paper and cotton textile been turned into fermentable sugar for PHA production, and which pretreatment and hydrolysis steps were used?",
+      "kept": 7,
+      "dropped": 1,
+      "toolCalls": 6,
+      "rounds": 3,
+      "seconds": 19.07,
+      "costUsd": 0.004751,
+      "stopped": "done",
+      "declined": "The corpus cannot answer the question as asked: it holds no primary record of waste paper or cotton textile being turned into fermentable sugar for PHA production, and no pretreatment or hydrolysis parameters for either feedstock. It offers only secondary mentions of paper and cardboard hydrolysates and analogous bakery waste and bagasse routes.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 5
+    },
+    {
+      "n": 3,
+      "question": "How does nitrogen limitation affect PHB accumulation in Cupriavidus necator?",
+      "kept": 6,
+      "dropped": 0,
+      "toolCalls": 2,
+      "rounds": 2,
+      "seconds": 12.93,
+      "costUsd": 0.002564,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 6
+    },
+    {
+      "n": 4,
+      "question": "What PHB yields on glucose have been reported, and how far are they from the ceiling?",
+      "kept": 4,
+      "dropped": 1,
+      "toolCalls": 8,
+      "rounds": 5,
+      "seconds": 42.92,
+      "costUsd": 0.006552,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 5,
+      "question": "Which inhibitors in lignocellulosic hydrolysates have been reported to slow PHA producers, and what detoxification steps were tried?",
+      "kept": 7,
+      "dropped": 4,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 20.81,
+      "costUsd": 0.004438,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 7
+    },
+    {
+      "n": 6,
+      "question": "What polymer molecular weights have been reported, and by which methods were they measured?",
+      "kept": 4,
+      "dropped": 1,
+      "toolCalls": 6,
+      "rounds": 4,
+      "seconds": 40.18,
+      "costUsd": 0.004285,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 4
+    },
+    {
+      "n": 7,
+      "question": "How does the sugar mix of a hydrolysate change the monomer composition of the polymer?",
+      "kept": 3,
+      "dropped": 2,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 15.82,
+      "costUsd": 0.003555,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 2
+    },
+    {
+      "n": 8,
+      "question": "What would PHB cost per kilogram at the titres and yields reported so far?",
+      "kept": 0,
+      "dropped": 0,
+      "toolCalls": 3,
+      "rounds": 2,
+      "seconds": 8.51,
+      "costUsd": 0.002007,
+      "stopped": "done",
+      "declined": "The corpus cannot support a per-kilogram PHB cost. The selling-price tool refuses because no Proforma run exists for a PHB scenario, and its inputs (PHA yield on sugar, solids recovered at harvest, price of fermentable sugar, sugar fed) have no source. The titre and yield records that exist are unverified, scattered across hosts, substrates and polymer types, and do not describe one process. A person needs to set up and run a PHB scenario in Proforma with a sourced yield, harvest solids, sugar price and sugar feed; then the minimum selling price can be cited from that run.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 9,
+      "question": "What has nobody measured yet for recycled-paper reject fibre as a PHA feedstock?",
+      "kept": 4,
+      "dropped": 0,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 17.1,
+      "costUsd": 0.003337,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    },
+    {
+      "n": 10,
+      "question": "Draft a first shake-flask run to test PHB production from a mixed glucose and xylose medium.",
+      "kept": 5,
+      "dropped": 1,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 17.55,
+      "costUsd": 0.003935,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 4
+    }
+  ],
+  "costUsd": 0.040709
+}

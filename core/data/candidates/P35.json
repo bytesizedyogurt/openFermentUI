@@ -1,7 +1,7 @@
 {
   "paperId": "P35",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:52:58.799824+00:00",
+  "extractedAt": "2026-10-16T14:58:58.917291+00:00",
   "candidates": [
     {
       "id": "cl1-P35-c4774fc5",
@@ -15,7 +15,7 @@
         "value": 3.98,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.9,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "P. putida KT∆ABZF (p2-a-J)",
@@ -36,10 +36,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-dd7ab72d",
+      "id": "cl1-P35-fd9ef05c",
       "paperId": "P35",
       "sectionId": "abstract",
-      "quote": "the engineered P. putida-E. coli microbial consortium could produce 1.30 g/L of mcl-PHA from 10 g/L glucose and xylose.",
+      "quote": "could produce 1.30 g/L of mcl-PHA from 10 g/L glucose and xylose",
       "field": "pha_titre",
       "value": 1.3,
       "unit": "g L⁻¹",
@@ -47,11 +47,11 @@
         "value": 1.3,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.7,
+      "confidence": 0.9,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "ecoli",
-      "organismText": "P. putida-E. coli consortium",
+      "organismText": "P. putida-E. coli microbial consortium",
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -68,10 +68,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-deb8dad7",
+      "id": "cl1-P35-f97519dc",
       "paperId": "P35",
       "sectionId": "abstract",
-      "quote": "the consortium produced 1.02 g/L of mcl-PHA using lignocellulosic hydrolysate containing 10.50 g/L glucose and 10.21 g/L xylose as the substrate.",
+      "quote": "the consortium produced 1.02 g/L of mcl-PHA using lignocellulosic hydrolysate containing 10.50 g/L glucose and 10.21 g/L xylose as the substrate",
       "field": "pha_titre",
       "value": 1.02,
       "unit": "g L⁻¹",
@@ -79,11 +79,11 @@
         "value": 1.02,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.7,
+      "confidence": 0.9,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "ecoli",
-      "organismText": "P. putida-E. coli consortium",
+      "organismText": "P. putida-E. coli microbial consortium",
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -100,85 +100,21 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-287dc477",
+      "id": "cl1-P35-563aee40",
       "paperId": "P35",
-      "sectionId": "s14",
-      "quote": "the dual-vector strain E. coli ∆4D (ACP-SCLAC) secreted up to 3.38 g/L acetic acid and 0.67 g/L FFAs.",
-      "field": "titer_secreted",
-      "value": 3.38,
+      "sectionId": "s10",
+      "quote": "the mcl-PHA titer was 3.98 g/L (Figure 2B)",
+      "field": "pha_titre",
+      "value": 3.98,
       "unit": "g L⁻¹",
       "si": {
-        "value": 3.38,
+        "value": 3.98,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.3,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
-      "organism": "ecoli",
-      "organismText": "E. coli ∆4D (ACP-SCLAC)",
-      "carbonSource": null,
-      "componentTag": null,
-      "goldOnly": null,
-      "extractorRun": "claude-1",
-      "rejectReason": null,
-      "isPrimary": true,
-      "citesRecordId": null,
-      "method": null,
-      "numbering": null,
-      "curationRef": null,
-      "range": null,
-      "comparativeBaseline": null,
-      "negativeResult": null,
-      "valueBasis": "exact"
-    },
-    {
-      "id": "cl1-P35-e97187b9",
-      "paperId": "P35",
-      "sectionId": "s14",
-      "quote": "The ability of the engineered E. coli strains to produce acetic acid (Figure 4A) and FFAs (Figure 4B) was assessed in shake-flask fermentations with 10 g/L xylose as substrate for 64 h.",
-      "field": "medium_component_conc",
-      "value": 10.0,
-      "unit": "g L⁻¹",
-      "si": {
-        "value": 10.0,
-        "unit": "kg m⁻³"
-      },
-      "confidence": 0.4,
-      "status": "unverified",
-      "provenance": "unverified",
-      "organism": "ecoli",
-      "organismText": "E. coli ∆4D (ACP-SCLAC)",
-      "carbonSource": null,
-      "componentTag": null,
-      "goldOnly": null,
-      "extractorRun": "claude-1",
-      "rejectReason": null,
-      "isPrimary": true,
-      "citesRecordId": null,
-      "method": null,
-      "numbering": null,
-      "curationRef": null,
-      "range": null,
-      "comparativeBaseline": null,
-      "negativeResult": null,
-      "valueBasis": "exact"
-    },
-    {
-      "id": "cl1-P35-8dc08d46",
-      "paperId": "P35",
-      "sectionId": "s17",
-      "quote": "(21.39 g/L xylose, 1.63 g/L glucose, and 3.13 g/L arabinose)",
-      "field": "medium_component_conc",
-      "value": 21.39,
-      "unit": "g L⁻¹",
-      "si": {
-        "value": 21.39,
-        "unit": "kg m⁻³"
-      },
-      "confidence": 0.4,
-      "status": "unverified",
-      "provenance": "unverified",
-      "organism": null,
+      "organism": "P. putida KT∆ABZF (p2-a-J)",
       "organismText": null,
       "carbonSource": null,
       "componentTag": null,
@@ -196,22 +132,22 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-7f699adc",
+      "id": "cl1-P35-e4b260ff",
       "paperId": "P35",
-      "sectionId": "s18",
-      "quote": "the consortium could efficiently produce an mcl-PHA titer of 1.64 g/L using a mixed carbon source consisting of 10 g/L glucose and 10 g/L xylose.",
-      "field": "pha_titre",
-      "value": 1.64,
-      "unit": "g L⁻¹",
+      "sectionId": "s10",
+      "quote": "The content of intracellular PHA in engineered KT∆ABZF (p2-a-J) overexpressing the acs and phaJ genes reached 91.96 wt%",
+      "field": "pha_content_cdw",
+      "value": 91.96,
+      "unit": "% CDW",
       "si": {
-        "value": 1.64,
-        "unit": "kg m⁻³"
+        "value": 91.96,
+        "unit": "% CDW"
       },
-      "confidence": 0.5,
+      "confidence": 0.7,
       "status": "unverified",
       "provenance": "unverified",
-      "organism": "ecoli",
-      "organismText": "P. putida-E. coli consortium",
+      "organism": "P. putida KT∆ABZF (p2-a-J)",
+      "organismText": null,
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -219,7 +155,7 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": null,
+      "method": "undetermined",
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -228,10 +164,42 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-f12f5867",
+      "id": "cl1-P35-742b1df5",
       "paperId": "P35",
       "sectionId": "s12",
-      "quote": "the engineered strain KT∆ABZF (p2-a-J) produced 1.80 g/L mcl-PHA, which was 73.08% higher compared to the wild-type strain KT2440.",
+      "quote": "accumulated 49.39% of mcl-PHA",
+      "field": "pha_content_cdw",
+      "value": 49.39,
+      "unit": "% CDW",
+      "si": {
+        "value": 49.39,
+        "unit": "% CDW"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "P. putida KT∆ABZF (p2Tac-SCLAC)",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-P35-93342911",
+      "paperId": "P35",
+      "sectionId": "s12",
+      "quote": "the engineered strain KT∆ABZF (p2-a-J) produced 1.80 g/L mcl-PHA",
       "field": "pha_titre",
       "value": 1.8,
       "unit": "g L⁻¹",
@@ -239,7 +207,7 @@
         "value": 1.8,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.45,
+      "confidence": 0.7,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "P. putida KT∆ABZF (p2-a-J)",
@@ -260,22 +228,22 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P35-9e9c8037",
+      "id": "cl1-P35-993ecd41",
       "paperId": "P35",
-      "sectionId": "s10",
-      "quote": "The content of intracellular PHA in engineered KT∆ABZF (p2-a-J) overexpressing the acs and phaJ genes reached 91.96 wt% (Supplementary Table S3)",
-      "field": "pha_content_cdw",
-      "value": 91.96,
-      "unit": "% CDW",
+      "sectionId": "s16",
+      "quote": "As shown in Figure 5B, the mcl-PHA titer reached 1.64 g/L, which was 26.15% higher than before.",
+      "field": "pha_titre",
+      "value": 1.64,
+      "unit": "g L⁻¹",
       "si": {
-        "value": 91.96,
-        "unit": "% CDW"
+        "value": 1.64,
+        "unit": "kg m⁻³"
       },
-      "confidence": 0.6,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
-      "organism": "P. putida KT∆ABZF (p2-a-J)",
-      "organismText": null,
+      "organism": "ecoli",
+      "organismText": "P. putida-E. coli microbial consortium",
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -283,7 +251,39 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "undetermined",
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P35-4b686c1c",
+      "paperId": "P35",
+      "sectionId": "s17",
+      "quote": "accumulating 1.02 g/L mcl-PHA",
+      "field": "pha_titre",
+      "value": 1.02,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 1.02,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "ecoli",
+      "organismText": "P. putida-E. coli microbial consortium",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -294,31 +294,43 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:52:58.799824+00:00",
+      "at": "2026-10-16T14:58:58.917291+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 0,
+  "rejected": 1,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
     "unit": 0,
-    "range": 0,
+    "range": 1,
     "method": 0
   },
-  "rejectionDetails": [],
-  "dropped": [],
+  "rejectionDetails": [
+    "range: 96.77 % CDW is outside the range 0.1–95 for pha_content_cdw"
+  ],
+  "dropped": [
+    {
+      "paperId": "P35",
+      "sectionId": "s10",
+      "field": "pha_content_cdw",
+      "value": 96.77,
+      "unit": "% CDW",
+      "rule": "range",
+      "detail": "96.77 % CDW is outside the range 0.1–95 for pha_content_cdw"
+    }
+  ],
   "usage": {
-    "inputTokens": 31104,
-    "outputTokens": 1489,
+    "inputTokens": 32257,
+    "outputTokens": 4179,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.003855,
+    "costUsd": 0.005315,
     "models": [
       "claude-haiku-5-5"
     ]
@@ -327,6 +339,6 @@
   "calls": 1,
   "truncatedSections": [],
   "fieldDrops": {
-    "carbonSource": 7
+    "carbonSource": 8
   }
 }

@@ -1,7 +1,7 @@
 {
   "paperId": "G3",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:38:38.494533+00:00",
+  "extractedAt": "2026-10-16T14:49:39.825968+00:00",
   "candidates": [
     {
       "id": "cl1-G3-220096be",
@@ -18,7 +18,7 @@
       "confidence": 0.6,
       "status": "unverified",
       "provenance": "unverified",
-      "organism": null,
+      "organism": "mouse ameloblast-like cells",
       "organismText": null,
       "carbonSource": null,
       "componentTag": null,
@@ -38,43 +38,31 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:38:38.494533+00:00",
+      "at": "2026-10-16T14:49:39.825968+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 1,
+  "rejected": 0,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 0,
     "range": 0,
     "method": 0
   },
-  "rejectionDetails": [
-    "unit: unit 'fold' does not normalise"
-  ],
-  "dropped": [
-    {
-      "paperId": "G3",
-      "sectionId": "s6",
-      "field": "fold_improvement",
-      "value": 19.0,
-      "unit": "fold",
-      "rule": "unit",
-      "detail": "unit 'fold' does not normalise"
-    }
-  ],
+  "rejectionDetails": [],
+  "dropped": [],
   "usage": {
-    "inputTokens": 28022,
-    "outputTokens": 1458,
+    "inputTokens": 29239,
+    "outputTokens": 957,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.003531,
+    "costUsd": 0.003402,
     "models": [
       "claude-haiku-5-5"
     ]

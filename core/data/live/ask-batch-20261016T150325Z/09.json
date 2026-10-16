@@ -1,0 +1,185 @@
+{
+  "question": "What has nobody measured yet for recycled-paper reject fibre as a PHA feedstock?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "No record in the corpus measures PHA production (content, titre or yield) from recycled-paper reject fibre, whether as raw fibre or as an enzymatic or acid hydrolysate.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "The closest measured analogue in the corpus is PHA production by Bacillus thuringiensis on glucose-rich hydrolysate from enzymatically saccharified pulp and paper mill sludge, which is a different feedstock from recycled-paper reject fibre.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s1:7",
+          "quote": "This study reports the practicality of employing Bacillus thuringiensis in a CFBF cultivation using glucose-rich hydrolyzate derived from enzymatic saccharification of pulp and paper mill sludge as the sole carbon source."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "Recycled paper sludge hydrolysates are reported in the corpus only as feedstocks for lactic acid and bio-ethanol production, not for PHA.",
+      "recordIds": [],
+      "paperIds": [
+        "P22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P22:s1:3",
+          "quote": "Waste biomass is an attractive alternative source of fermentable sugars for application as inexpensive feedstock for the production of platform chemicals (Moritz and Duff 1996; Peters 2006; Prasetyo et al. 2010; Martin-Sampedro et al. 2011)."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c4",
+      "text": "Paper-mill sludge and wastewater have been used in mixed-culture PHA work, where activated sludge from pulp and paper manufacturing gave the highest PHA formation among the wastewaters tested, but these are wastewater and sludge streams rather than recycled-paper reject fibre.",
+      "recordIds": [],
+      "paperIds": [
+        "P16"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P16:s18:1",
+          "quote": "Activated sludge from pulp and paper mills gave maximal PHA formation (43% of suspended solid dry weight)."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "PHA content, titre and yield measured on recycled-paper reject fibre, in any form (raw, pretreated, or hydrolysed).",
+    "Sugar composition and inhibitor content (acetic acid, furans, phenolics, ash) of enzymatic hydrolysate from recycled-paper reject fibre, so the carbon source can be characterised.",
+    "Enzymatic saccharification yield on reject fibre under stated enzyme loading and solids conditions.",
+    "Whether a PHA-producing strain (e.g. Cupriavidus necator, recombinant E. coli, or Bacillus species) has been tested on recycled-paper reject hydrolysate, and the resulting growth and polymer data.",
+    "Effect of contaminants typical of reject streams (fillers, plastics, adhesives, ink residues) on fermentation and on downstream PHA recovery.",
+    "A selling-price run for a reject-fibre PHA scenario; none exists in the corpus, so no cost figure can be given."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3245,
+    "cacheReadTokens": 14702,
+    "cacheWriteTokens": 12532,
+    "costUsd": 0.003337,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P16:s18:1",
+      "paperId": "P16",
+      "sectionId": "s18",
+      "heading": "7. Industrial/Agro-Industrial Waste for Production of scl-and mcl-PHA › 7.8. Wastewater for PHA Production",
+      "kind": "prose",
+      "text": "Yan et al., assessed the potential use of activated sludge as a source of carbon and nutrients for PHA formation. Substrates were obtained from full-scale wastewater plants that include those from cheese, starch, municipal and pulp/paper manufacturing facilities. These wastewaters were used as sources of PHA producing microbes for shake flask experiments. VFAs from wastewaters were believed to function as carbon substrates. Activated sludge from pulp and paper mills gave maximal PHA formation (43% of suspended solid dry weight).",
+      "start": 677,
+      "end": 1211
+    },
+    {
+      "id": "P22:s1:3",
+      "paperId": "P22",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "Waste biomass is an attractive alternative source of fermentable sugars for application as inexpensive feedstock for the production of platform chemicals (Moritz and Duff 1996; Peters 2006; Prasetyo et al. 2010; Martin-Sampedro et al. 2011). Glucose-rich hydrolyzate obtained from corrugated cardboard was used as a nutrient source for yeast proliferation (García et al. 2015). Hydrolyzates obtained from enzymolysis of recycled paper sludge was used for the production of lactic acid by bacteria (Marques et al. 2008), primary clarifier sludge from kraft and low-yield sulfite pulping operations (Duff et al. 1994) and recycled paper sludge (Madrid and Díaz 2011; Schroeder et al. 2015) was used in bio-ethanol production. ",
+      "start": 1799,
+      "end": 2523
+    },
+    {
+      "id": "P22:s1:7",
+      "paperId": "P22",
+      "sectionId": "s1",
+      "heading": "Introduction",
+      "kind": "prose",
+      "text": "The CFBF process entails the partial withdrawal of fermentation medium and subsequent re-filling with an equal volume of fresh fermentation medium. The chemical composition of the fermentation medium must be consistent throughout the \"empty-and-fill\" process. The CFBF strategy prevents increases in concentrations of toxic by-products and enhances cell growth to achieve high concentrations of final biomass and increased PHA yields (Ibrahim and Steinbüchel 2010; Gahlawat and Srivastava 2018). This study reports the practicality of employing Bacillus thuringiensis in a CFBF cultivation using glucose-rich hydrolyzate derived from enzymatic saccharification of pulp and paper mill sludge as the sole carbon source. Firstly, a statistical optimization study was conducted to elucidate the optimal fermentation medium to produce high cell density biomass. ",
+      "start": 4008,
+      "end": 4865
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "recycled paper reject fibre PHA feedstock",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of recycled paper reject fibre PHA feedstock · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "paper mill reject fibre polyhydroxyalkanoate production",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"paper mill reject fibre polyhydroxyalkanoate production\" · 6 passages",
+      "ms": 228,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "recycled paper deinking reject waste cellulose hydrolysate bacteria",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"recycled paper deinking reject waste cellulose hydrolysate bacteria\" · 6 passages",
+      "ms": 152,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "recycled paper reject hydrolysate",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of recycled paper reject hydrolysate · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

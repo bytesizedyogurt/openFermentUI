@@ -1,0 +1,134 @@
+{
+  "question": "Draft a locked runbook for a shake-flask test of PHB from xylose by Cupriavidus necator, with a prediction for each measurement.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Review literature reports that conversion of xylose, a pentose from hemicellulose hydrolysis, by C. necator for PHB production has seldom been reported.",
+      "recordIds": [],
+      "paperIds": [
+        "P10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P10:s7:2",
+          "quote": "Hitherto, C. necator has been confirmed as a glucose-utilizing strain with high PHB-production ability; however, the conversion of pentoses (e.g., xylose) derived from hydrolysis of the hemicellulose content in lignocellulosic materials has seldom been reported."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "No shake-flask record of PHB titre, PHA content, or xylose consumption for C. necator grown on xylose as sole carbon source is present in the curated or extracted records.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No measured PHB titre, PHA content, biomass, or xylose consumption for C. necator on xylose in monoculture shake flask exists in the corpus, so no prediction can be anchored to a record for any measurement in the runbook.",
+    "The genome-scale C. necator model (RehMBEL1391) has no xylose uptake reaction, so no flux-balance yield ceiling for PHB from xylose can be computed; the core model and iJO1366 were not run for this organism.",
+    "No strain-specific record links a C. necator strain id to a xylose experiment; the only C. necator strain-tagged records concern glucose-like or oil, lignin-monomer, or CO2 substrates.",
+    "Selling price cannot be drawn for a xylose PHB process: no BioSTEAM run exists for this route.",
+    "Pure-culture xylose uptake in C. necator, as opposed to co-culture, is not established by any record here; the xylose passage is a literature-review statement without primary data."
+  ],
+  "declined": "I did not draft the runbook. The corpus has no measurement of PHB from xylose by C. necator in pure culture, so the runbook's required prediction for each measurement cannot be anchored to a cited value. Drafting predictions from glucose or oil records would misrepresent the xylose route. Adding a monoculture xylose shake-flask record, or a C. necator xylose uptake reaction in a model, would let a runbook be drafted.",
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 2846,
+    "cacheReadTokens": 12904,
+    "cacheWriteTokens": 12115,
+    "costUsd": 0.003068,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c2: claim text contains a number ('1') — values come from the record",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P10:s7:2",
+      "paperId": "P10",
+      "sectionId": "s7",
+      "heading": "Current Carbon Sources and PHB Production Efficiencies › PHB Production From Lignocellulosic Materials",
+      "kind": "prose",
+      "text": "Later, Soto et al. (2019) continued to study the PHB production using a wheat straw with another C. necator strain (C. necator DSM 545) and achieved a higher PHB accumulation of 12.1 g/L and PHB content of 80.1%. Hitherto, C. necator has been confirmed as a glucose-utilizing strain with high PHB-production ability; however, the conversion of pentoses (e.g., xylose) derived from hydrolysis of the hemicellulose content in lignocellulosic materials has seldom been reported. Recently, Lee et al. (2021) found that the co-culture system of C. necator NCIMB 11599 and Bacillus sp. SM01 contributed to the enhancement of PHB production and utilization of xylose as a carbon source. More studies can be carried out to improve the conversion of pentose (e.g., xylose) during PHB production via C. necator strain. ",
+      "start": 1216,
+      "end": 2025
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production from xylose Cupriavidus necator shake flask",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB production from xylose Cupriavidus necator shake flask · 10 records",
+      "ms": 3,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "RehMBEL1391",
+        "product": "phb",
+        "substrate": "xylose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 4991,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "xylose Cupriavidus necator polyhydroxybutyrate",
+        "field": null,
+        "organism": "c-necator-h16",
+        "limit": 10
+      },
+      "summary": "Looked up records of xylose Cupriavidus necator polyhydroxybutyrate · 5 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "xylose as carbon source for Cupriavidus necator PHB",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"xylose as carbon source for Cupriavidus necator PHB\" · 6 passages",
+      "ms": 3518,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 2 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

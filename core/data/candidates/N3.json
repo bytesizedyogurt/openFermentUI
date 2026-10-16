@@ -1,11 +1,11 @@
 {
   "paperId": "N3",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:40:28.512194+00:00",
+  "extractedAt": "2026-10-16T14:51:12.008160+00:00",
   "candidates": [],
   "audit": [
     {
-      "at": "2026-10-16T03:40:28.512194+00:00",
+      "at": "2026-10-16T14:51:12.008160+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
@@ -25,11 +25,11 @@
   "rejectionDetails": [],
   "dropped": [],
   "usage": {
-    "inputTokens": 13634,
-    "outputTokens": 178,
+    "inputTokens": 14795,
+    "outputTokens": 198,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.001452,
+    "costUsd": 0.001579,
     "models": [
       "claude-haiku-5-5"
     ]

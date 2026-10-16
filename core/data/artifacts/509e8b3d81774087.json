@@ -1,0 +1,43 @@
+{
+  "id": "509e8b3d81774087",
+  "tool": "convert_units",
+  "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+  "inputs": [
+    {
+      "name": "record value",
+      "value": 14.28,
+      "unit": "g L⁻¹",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P22-e813ae43",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "unit asked for",
+      "value": "mg/mL",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the unit the caller asked for",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "label": "cl1-P22-e813ae43 in mg/mL",
+    "value": 14.28,
+    "unit": "mg/mL",
+    "from": {
+      "value": 14.28,
+      "unit": "g L⁻¹"
+    }
+  },
+  "outputHash": "0e4ecb46e042b82d8f627767a99543271830cd484df480797dd10a6ee75a388f",
+  "provenance": "unverified",
+  "createdAt": "2026-10-16T15:18:59Z",
+  "durationMs": 0,
+  "seed": null
+}

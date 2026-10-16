@@ -1,21 +1,53 @@
 {
   "paperId": "P27",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:50:26.826225+00:00",
+  "extractedAt": "2026-10-16T14:56:45.567063+00:00",
   "candidates": [
     {
-      "id": "cl1-P27-773555fb",
+      "id": "cl1-P27-3e9e9b6a",
       "paperId": "P27",
-      "sectionId": "t3",
-      "quote": "TMB 4443 | Shake flask | 0.231 ± 0.01 | 0.11 ± 0.02 | 0.10 ± 0.05 | 0.14 ± 0.0 | 0.05 ± 0.03 | 0.01 ± 0.0 | 1.17 ± 0.18 | 45.0 ± 3.54 | 1.04 ± 0.03 | 76.8 ± 4.6",
+      "sectionId": "s10",
+      "quote": "cellular PHB reached 0.49 ± 0.06% PHB/CDW",
+      "field": "pha_content_cdw",
+      "value": 0.49,
+      "unit": "% CDW",
+      "si": {
+        "value": 0.49,
+        "unit": "% CDW"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "S. cerevisiae TMB 4443",
+      "organismText": null,
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "quantitative conversion of PHB to crotonic acid catalyzed by hot concentrated sulfuric acid",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P27-38157845",
+      "paperId": "P27",
+      "sectionId": "s11",
+      "quote": "increased to 101.7 ± 7.1 mg L−1 of PHB in well-aerated bioreactor",
       "field": "pha_titre",
-      "value": 45.0,
+      "value": 101.7,
       "unit": "mg L⁻¹",
       "si": {
-        "value": 0.045,
+        "value": 0.1017,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.85,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "S. cerevisiae TMB 4443",
@@ -36,18 +68,18 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P27-34de290a",
+      "id": "cl1-P27-773555fb",
       "paperId": "P27",
       "sectionId": "t3",
       "quote": "TMB 4443 | Shake flask | 0.231 ± 0.01 | 0.11 ± 0.02 | 0.10 ± 0.05 | 0.14 ± 0.0 | 0.05 ± 0.03 | 0.01 ± 0.0 | 1.17 ± 0.18 | 45.0 ± 3.54 | 1.04 ± 0.03 | 76.8 ± 4.6",
-      "field": "pha_content_cdw",
-      "value": 1.04,
-      "unit": "% CDW",
+      "field": "pha_titre",
+      "value": 45.0,
+      "unit": "mg L⁻¹",
       "si": {
-        "value": 1.04,
-        "unit": "% CDW"
+        "value": 0.045,
+        "unit": "kg m⁻³"
       },
-      "confidence": 0.75,
+      "confidence": 0.9,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "S. cerevisiae TMB 4443",
@@ -59,7 +91,39 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "conversion of PHB to crotonic acid with hot concentrated sulfuric acid, followed by HPLC",
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P27-5e4c0205",
+      "paperId": "P27",
+      "sectionId": "t3",
+      "quote": "TMB 4443 | Shake flask | 0.231 ± 0.01 | 0.11 ± 0.02 | 0.10 ± 0.05 | 0.14 ± 0.0 | 0.05 ± 0.03 | 0.01 ± 0.0 | 1.17 ± 0.18 | 45.0 ± 3.54 | 1.04 ± 0.03 | 76.8 ± 4.6",
+      "field": "pha_content_cdw",
+      "value": 1.04,
+      "unit": "% CDW",
+      "si": {
+        "value": 1.04,
+        "unit": "% CDW"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "S. cerevisiae TMB 4443",
+      "organismText": null,
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "quantitative conversion of PHB to crotonic acid catalyzed by hot concentrated sulfuric acid",
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -79,7 +143,7 @@
         "value": 0.1017,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.9,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "S. cerevisiae TMB 4443",
@@ -100,7 +164,7 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P27-6ef167b6",
+      "id": "cl1-P27-0e5d641b",
       "paperId": "P27",
       "sectionId": "t3",
       "quote": "TMB 4443 | Bioreactor | 0.184 ± 0.01 | 0.41 ± 0.02 | 0.004 ± 0.0 | 0.0 ± 0.0 | 0.028 ± 0.0 | 0.0 ± 0.0 | 1.99 ± 0.15 | 101.7 ± 7.1 | 0.49 ± 0.06 | 100 ± 0",
@@ -111,7 +175,7 @@
         "value": 0.49,
         "unit": "% CDW"
       },
-      "confidence": 0.75,
+      "confidence": 0.85,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "S. cerevisiae TMB 4443",
@@ -123,7 +187,7 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": "conversion of PHB to crotonic acid with hot concentrated sulfuric acid, followed by HPLC",
+      "method": "quantitative conversion of PHB to crotonic acid catalyzed by hot concentrated sulfuric acid",
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -134,37 +198,31 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:50:26.826225+00:00",
+      "at": "2026-10-16T14:56:45.567063+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 13,
+  "rejected": 7,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 12,
-    "range": 1,
+    "unit": 7,
+    "range": 0,
     "method": 0
   },
   "rejectionDetails": [
     "unit: unit 'mg PHB g−1 xylose' does not normalise",
     "unit: unit 'mg PHB L−1' does not normalise",
     "unit: unit 'mg PHB g−1 xylose' does not normalise",
-    "unit: unit 'mg PHB g−1 xylose consumed' does not normalise",
-    "unit: unit '% PHB/CDW' does not normalise",
     "unit: unit 'mg PHB g−1 xylose' does not normalise",
-    "unit: unit 'mg L−1' does not normalise",
-    "unit: unit 'mg L−1' does not normalise",
-    "unit: unit 'h−1' does not normalise",
+    "unit: unit 'mg PHB g−1 xylose' does not normalise",
     "unit: unit 'mg/g Xyl' does not normalise",
-    "unit: unit 'h−1' does not normalise",
-    "unit: unit 'mg/g Xyl' does not normalise",
-    "range: 0 g L⁻¹ is outside the range 0.01–250 for pha_titre"
+    "unit: unit 'mg/g Xyl' does not normalise"
   ],
   "dropped": [
     {
@@ -199,18 +257,9 @@
       "sectionId": "s10",
       "field": "pha_yield_substrate",
       "value": 1.17,
-      "unit": "mg PHB g−1 xylose consumed",
+      "unit": "mg PHB g−1 xylose",
       "rule": "unit",
-      "detail": "unit 'mg PHB g−1 xylose consumed' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "s10",
-      "field": "pha_content_cdw",
-      "value": 0.49,
-      "unit": "% PHB/CDW",
-      "rule": "unit",
-      "detail": "unit '% PHB/CDW' does not normalise"
+      "detail": "unit 'mg PHB g−1 xylose' does not normalise"
     },
     {
       "paperId": "P27",
@@ -220,33 +269,6 @@
       "unit": "mg PHB g−1 xylose",
       "rule": "unit",
       "detail": "unit 'mg PHB g−1 xylose' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "s11",
-      "field": "pha_titre",
-      "value": 101.7,
-      "unit": "mg L−1",
-      "rule": "unit",
-      "detail": "unit 'mg L−1' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "s11",
-      "field": "pha_titre",
-      "value": 45.0,
-      "unit": "mg L−1",
-      "rule": "unit",
-      "detail": "unit 'mg L−1' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "t3",
-      "field": "growth_rate_mu",
-      "value": 0.231,
-      "unit": "h−1",
-      "rule": "unit",
-      "detail": "unit 'h−1' does not normalise"
     },
     {
       "paperId": "P27",
@@ -260,37 +282,19 @@
     {
       "paperId": "P27",
       "sectionId": "t3",
-      "field": "growth_rate_mu",
-      "value": 0.184,
-      "unit": "h−1",
-      "rule": "unit",
-      "detail": "unit 'h−1' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "t3",
       "field": "pha_yield_substrate",
       "value": 1.99,
       "unit": "mg/g Xyl",
       "rule": "unit",
       "detail": "unit 'mg/g Xyl' does not normalise"
-    },
-    {
-      "paperId": "P27",
-      "sectionId": "t3",
-      "field": "pha_titre",
-      "value": 0.0,
-      "unit": "mg/L",
-      "rule": "range",
-      "detail": "0 g L⁻¹ is outside the range 0.01–250 for pha_titre"
     }
   ],
   "usage": {
-    "inputTokens": 16495,
-    "outputTokens": 7530,
+    "inputTokens": 17584,
+    "outputTokens": 5489,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.005415,
+    "costUsd": 0.004503,
     "models": [
       "claude-haiku-5-5"
     ]

@@ -1,0 +1,43 @@
+{
+  "id": "be54b391b00cd96d",
+  "tool": "convert_units",
+  "toolVersion": "units.py 884b3ac6b59c · tables 967ee1f1c168",
+  "inputs": [
+    {
+      "name": "record value",
+      "value": 0.15,
+      "unit": "g L⁻¹ h⁻¹",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-bd75f1be",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "unit asked for",
+      "value": "g L⁻¹ d⁻¹",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the unit the caller asked for",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "label": "cl1-P6-bd75f1be in g L⁻¹ d⁻¹",
+    "value": 3.6,
+    "unit": "g L⁻¹ d⁻¹",
+    "from": {
+      "value": 0.15,
+      "unit": "g L⁻¹ h⁻¹"
+    }
+  },
+  "outputHash": "7bc9d770cbef3dd127e1485bcd4ae17750b977ba4020bc85ed48aed3a51a70cd",
+  "provenance": "unverified",
+  "createdAt": "2026-10-16T15:19:15Z",
+  "durationMs": 0,
+  "seed": null
+}

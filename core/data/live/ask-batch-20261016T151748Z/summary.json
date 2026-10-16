@@ -1,0 +1,101 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "Draft a locked runbook for a shake-flask test of PHB from xylose by Cupriavidus necator, with a prediction for each measurement.",
+      "kept": 2,
+      "dropped": 1,
+      "toolCalls": 4,
+      "rounds": 3,
+      "seconds": 23.71,
+      "costUsd": 0.003068,
+      "stopped": "done",
+      "declined": "I did not draft the runbook. The corpus has no measurement of PHB from xylose by C. necator in pure culture, so the runbook's required prediction for each measurement cannot be anchored to a cited value. Drafting predictions from glucose or oil records would misrepresent the xylose route. Adding a monoculture xylose shake-flask record, or a C. necator xylose uptake reaction in a model, would let a runbook be drafted.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 2,
+      "question": "Turn the best-supported glucose PHB result in the corpus into a runbook I can lock and run next week.",
+      "kept": 5,
+      "dropped": 0,
+      "toolCalls": 5,
+      "rounds": 4,
+      "seconds": 19.71,
+      "costUsd": 0.004098,
+      "stopped": "done",
+      "declined": "I did not draft a runbook. The only glucose PHB result that matches the request is an E. coli study whose records are unverified and conflict with the paper's own text, and no record gives the strain or cultivation conditions needed to run it. Locking a runbook on those values would present an unchecked prediction as a bench target. A verified source paper, with its strain, medium, vessel and time course stated, is needed before a runbook can be drafted.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 3
+    },
+    {
+      "n": 3,
+      "question": "Forecast how biomass will grow over the next day in the sample fermOS run, from its fitted kinetics.",
+      "kept": 0,
+      "dropped": 0,
+      "toolCalls": 2,
+      "rounds": 2,
+      "seconds": 7.44,
+      "costUsd": 0.001792,
+      "stopped": "done",
+      "declined": "The corpus does not contain a kinetic fit for the sample fermOS run, so I cannot forecast its biomass over the next day. Please provide or keep a kinetic fit for that run and send its artifact id.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 4,
+      "question": "Using the fitted growth model for the sample run, when will the sugar run out and what biomass should we expect then?",
+      "kept": 0,
+      "dropped": 0,
+      "toolCalls": 2,
+      "rounds": 2,
+      "seconds": 6.72,
+      "costUsd": 0.001786,
+      "stopped": "done",
+      "declined": "The corpus does not contain a kinetic fit for the sample run, and no tool returned one, so I cannot say when the sugar will run out or what biomass to expect at that point.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    },
+    {
+      "n": 5,
+      "question": "Convert the highest reported PHA titre in the corpus from grams per litre to milligrams per millilitre.",
+      "kept": 1,
+      "dropped": 0,
+      "toolCalls": 7,
+      "rounds": 5,
+      "seconds": 20.94,
+      "costUsd": 0.004761,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 1
+    },
+    {
+      "n": 6,
+      "question": "Express the reported PHB productivity records in grams per litre per day instead of per hour.",
+      "kept": 6,
+      "dropped": 1,
+      "toolCalls": 10,
+      "rounds": 4,
+      "seconds": 20.9,
+      "costUsd": 0.004404,
+      "stopped": "done",
+      "declined": null,
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 6
+    }
+  ],
+  "costUsd": 0.019909
+}

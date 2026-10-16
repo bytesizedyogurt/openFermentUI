@@ -1,13 +1,77 @@
 {
   "paperId": "P3",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:51:13.607603+00:00",
+  "extractedAt": "2026-10-16T14:57:29.308277+00:00",
   "candidates": [
     {
-      "id": "cl1-P3-b3db89f8",
+      "id": "cl1-P3-1fab9757",
       "paperId": "P3",
       "sectionId": "s8",
-      "quote": "The final mutant strain was able to accumulate PHA using biorefinery waste as the sole substrate, achieving 160 mg/L under N-source limited conditions.",
+      "quote": "34% of PHA was accumulated",
+      "field": "pha_content_cdw",
+      "value": 34.0,
+      "unit": "% CDW",
+      "si": {
+        "value": 34.0,
+        "unit": "% CDW"
+      },
+      "confidence": 0.45,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "Pseudomonas putida KT2440",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-P3-8cfc4335",
+      "paperId": "P3",
+      "sectionId": "s8",
+      "quote": "the use of actual APL as substrate led to the accumulation of 32% of PHA",
+      "field": "pha_content_cdw",
+      "value": 32.0,
+      "unit": "% CDW",
+      "si": {
+        "value": 32.0,
+        "unit": "% CDW"
+      },
+      "confidence": 0.45,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "Pseudomonas putida KT2440",
+      "carbonSource": "APL",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-P3-32274340",
+      "paperId": "P3",
+      "sectionId": "s8",
+      "quote": "achieving 160 mg/L under N-source limited conditions",
       "field": "pha_titre",
       "value": 160.0,
       "unit": "mg L⁻¹",
@@ -15,10 +79,10 @@
         "value": 0.16,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.5,
       "status": "unverified",
       "provenance": "unverified",
-      "organism": "Pseudomonas putida A514",
+      "organism": "Pseudomonas putida A514 mutant",
       "organismText": null,
       "carbonSource": "biorefinery waste",
       "componentTag": null,
@@ -36,10 +100,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P3-79153c50",
+      "id": "cl1-P3-d30bcdc4",
       "paperId": "P3",
       "sectionId": "s8",
-      "quote": "PHA production from vanillic acid reached 246 mg/L, which is the highest record among the reported titer",
+      "quote": "PHA production from vanillic acid reached 246 mg/L",
       "field": "pha_titre",
       "value": 246.0,
       "unit": "mg L⁻¹",
@@ -47,7 +111,7 @@
         "value": 0.246,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.8,
+      "confidence": 0.55,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pseudomonas putida A514",
@@ -68,10 +132,10 @@
       "valueBasis": "exact"
     },
     {
-      "id": "cl1-P3-6adfc63c",
+      "id": "cl1-P3-87e319f8",
       "paperId": "P3",
       "sectionId": "t3",
-      "quote": "Pseudomonas putida KT2440 | Wild type | Alkaline pretreated liquor (APL) | 252 mg/L | Linger et al., 2014",
+      "quote": "PHA | Pseudomonas putida KT2440 | Wild type | Alkaline pretreated liquor (APL) | 252 mg/L | Linger et al., 2014",
       "field": "pha_titre",
       "value": 252.0,
       "unit": "mg L⁻¹",
@@ -79,7 +143,7 @@
         "value": 0.252,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "p-putida-kt2440",
@@ -111,7 +175,7 @@
         "value": 0.161,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pseudomonas putida ADVJ4C1",
@@ -143,7 +207,7 @@
         "value": 0.246,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pseudomonas putida Axyl_alkKphaGC1",
@@ -175,12 +239,12 @@
         "value": 0.40900000000000003,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Pandoraea sp. ISTKB",
       "organismText": null,
-      "carbonSource": null,
+      "carbonSource": "4-hydroxybenzoic acid",
       "componentTag": null,
       "goldOnly": null,
       "extractorRun": "claude-1",
@@ -207,7 +271,7 @@
         "value": 0.128,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Cupriavidus basilensis B-8",
@@ -239,7 +303,7 @@
         "value": 0.45,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.7,
+      "confidence": 0.75,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "Cupriavidus basilensis B-8",
@@ -271,12 +335,12 @@
         "value": 0.435,
         "unit": "kg m⁻³"
       },
-      "confidence": 0.85,
+      "confidence": 0.8,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "c-necator-h16",
       "organismText": "Ralstonia eutropha H16",
-      "carbonSource": null,
+      "carbonSource": "4-hydroxybenzoic acid",
       "componentTag": null,
       "goldOnly": null,
       "extractorRun": "claude-1",
@@ -294,53 +358,63 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:51:13.607603+00:00",
+      "at": "2026-10-16T14:57:29.308277+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 2,
+  "rejected": 3,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
-    "quote": 1,
+    "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 3,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
-    "quote: quote is not in section s8 after normalisation",
-    "unit: unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+    "unit: unit 'fold' does not normalise",
+    "unit: unit 'fold' does not normalise",
+    "unit: unit 'fold' does not normalise"
   ],
   "dropped": [
     {
       "paperId": "P3",
-      "sectionId": "s8",
-      "field": "pha_content_cdw",
-      "value": 34.0,
-      "unit": "%",
-      "rule": "quote",
-      "detail": "quote is not in section s8 after normalisation"
+      "sectionId": "s6",
+      "field": "fold_improvement",
+      "value": 3.9,
+      "unit": "fold",
+      "rule": "unit",
+      "detail": "unit 'fold' does not normalise"
     },
     {
       "paperId": "P3",
-      "sectionId": "s8",
-      "field": "pha_content_cdw",
-      "value": 32.0,
-      "unit": "%",
+      "sectionId": "s3",
+      "field": "fold_improvement",
+      "value": 2.0,
+      "unit": "fold",
       "rule": "unit",
-      "detail": "unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+      "detail": "unit 'fold' does not normalise"
+    },
+    {
+      "paperId": "P3",
+      "sectionId": "s5",
+      "field": "fold_improvement",
+      "value": 14.2,
+      "unit": "fold",
+      "rule": "unit",
+      "detail": "unit 'fold' does not normalise"
     }
   ],
   "usage": {
-    "inputTokens": 31542,
-    "outputTokens": 3706,
+    "inputTokens": 32607,
+    "outputTokens": 5366,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.005007,
+    "costUsd": 0.005944,
     "models": [
       "claude-haiku-5-5"
     ]
@@ -349,6 +423,6 @@
   "calls": 1,
   "truncatedSections": [],
   "fieldDrops": {
-    "carbonSource": 2
+    "carbonSource": 1
   }
 }

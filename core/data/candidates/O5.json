@@ -1,47 +1,35 @@
 {
   "paperId": "O5",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:41:07.816503+00:00",
+  "extractedAt": "2026-10-16T14:51:43.295218+00:00",
   "candidates": [],
   "audit": [
     {
-      "at": "2026-10-16T03:41:07.816503+00:00",
+      "at": "2026-10-16T14:51:43.295218+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 1,
+  "rejected": 0,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 0,
     "range": 0,
     "method": 0
   },
-  "rejectionDetails": [
-    "unit: unit '€ kg−1' does not normalise"
-  ],
-  "dropped": [
-    {
-      "paperId": "O5",
-      "sectionId": "s5",
-      "field": "minimum_selling_price",
-      "value": 6.7,
-      "unit": "€ kg−1",
-      "rule": "unit",
-      "detail": "unit '€ kg−1' does not normalise"
-    }
-  ],
+  "rejectionDetails": [],
+  "dropped": [],
   "usage": {
-    "inputTokens": 14567,
-    "outputTokens": 1080,
+    "inputTokens": 15672,
+    "outputTokens": 118,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.001997,
+    "costUsd": 0.001626,
     "models": [
       "claude-haiku-5-5"
     ]

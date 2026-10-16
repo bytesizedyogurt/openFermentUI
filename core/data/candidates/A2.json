@@ -1,47 +1,68 @@
 {
   "paperId": "A2",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:35:50.237600+00:00",
-  "candidates": [],
+  "extractedAt": "2026-10-16T14:47:14.171949+00:00",
+  "candidates": [
+    {
+      "id": "cl1-A2-743403ff",
+      "paperId": "A2",
+      "sectionId": "s10",
+      "quote": "Arginine (100 µg mL−1) was added to the medium as required.",
+      "field": "medium_component_conc",
+      "value": 100.0,
+      "unit": "µg mL⁻¹",
+      "si": {
+        "value": 0.1,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.45,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
   "audit": [
     {
-      "at": "2026-10-16T03:35:50.237600+00:00",
+      "at": "2026-10-16T14:47:14.171949+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 1,
+  "rejected": 0,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 0,
     "range": 0,
     "method": 0
   },
-  "rejectionDetails": [
-    "unit: unit 'µg mL−1' does not normalise"
-  ],
-  "dropped": [
-    {
-      "paperId": "A2",
-      "sectionId": "s10",
-      "field": "medium_component_conc",
-      "value": 100.0,
-      "unit": "µg mL−1",
-      "rule": "unit",
-      "detail": "unit 'µg mL−1' does not normalise"
-    }
-  ],
+  "rejectionDetails": [],
+  "dropped": [],
   "usage": {
-    "inputTokens": 38890,
-    "outputTokens": 858,
+    "inputTokens": 40139,
+    "outputTokens": 648,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.004318,
+    "costUsd": 0.004338,
     "models": [
       "claude-haiku-5-5"
     ]

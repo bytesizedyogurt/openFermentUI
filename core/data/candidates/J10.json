@@ -1,24 +1,57 @@
 {
   "paperId": "J10",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:39:40.324381+00:00",
-  "candidates": [],
+  "extractedAt": "2026-10-16T14:50:38.727249+00:00",
+  "candidates": [
+    {
+      "id": "cl1-J10-ea0651a3",
+      "paperId": "J10",
+      "sectionId": "abstract",
+      "quote": "Additional experiments showed that even at low energy input (0.05 kWh/kgbiomass), still about 70% of the proteins could be released with respect to bead beating as reference.",
+      "field": "disruption_protein_yield",
+      "value": 70.0,
+      "unit": "%",
+      "si": {
+        "value": 70.0,
+        "unit": "%"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii cc-400",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "pulsed electric field (PEF)",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
   "audit": [
     {
-      "at": "2026-10-16T03:39:40.324381+00:00",
+      "at": "2026-10-16T14:50:38.727249+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 7,
+  "rejected": 5,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 7,
+    "unit": 5,
     "range": 0,
     "method": 0
   },
@@ -27,9 +60,7 @@
     "unit: unit '%proteins' does not normalise",
     "unit: unit '%proteins' does not normalise",
     "unit: unit '%proteins' does not normalise",
-    "unit: unit 'kWh/kgDW' does not normalise",
-    "unit: unit '%protein' does not normalise",
-    "unit: unit 'fold' does not normalise"
+    "unit: unit 'kWh/kgDW' does not normalise"
   ],
   "dropped": [
     {
@@ -76,32 +107,14 @@
       "unit": "kWh/kgDW",
       "rule": "unit",
       "detail": "unit 'kWh/kgDW' does not normalise"
-    },
-    {
-      "paperId": "J10",
-      "sectionId": "s18",
-      "field": "disruption_protein_yield",
-      "value": 5.0,
-      "unit": "%protein",
-      "rule": "unit",
-      "detail": "unit '%protein' does not normalise"
-    },
-    {
-      "paperId": "J10",
-      "sectionId": "s18",
-      "field": "fold_improvement",
-      "value": 2.0,
-      "unit": "fold",
-      "rule": "unit",
-      "detail": "unit 'fold' does not normalise"
     }
   ],
   "usage": {
-    "inputTokens": 15602,
-    "outputTokens": 4498,
+    "inputTokens": 16739,
+    "outputTokens": 2482,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.003809,
+    "costUsd": 0.002915,
     "models": [
       "claude-haiku-5-5"
     ]

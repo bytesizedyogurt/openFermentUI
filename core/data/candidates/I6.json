@@ -1,25 +1,25 @@
 {
   "paperId": "I6",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:39:19.433024+00:00",
+  "extractedAt": "2026-10-16T14:50:25.051640+00:00",
   "candidates": [
     {
-      "id": "cl1-I6-5e32c03f",
+      "id": "cl1-I6-22b08f8a",
       "paperId": "I6",
-      "sectionId": "s6",
-      "quote": "co-express a β-casein analogue with the catalytic α subunit of casein kinase II",
-      "field": "kinase_identity",
-      "value": "casein kinase II",
-      "unit": "",
+      "sectionId": "s9",
+      "quote": "Deconvolution of the whole protein mass spectrum of r-H-β-casein confirmed that the main species was the 4-P phosphoform",
+      "field": "phosphate_count",
+      "value": 4.0,
+      "unit": "mol mol⁻¹",
       "si": {
-        "value": "casein kinase II",
-        "unit": ""
+        "value": 4.0,
+        "unit": "mol mol⁻¹"
       },
       "confidence": 0.6,
       "status": "unverified",
       "provenance": "unverified",
       "organism": "ecoli",
-      "organismText": "E. coli",
+      "organismText": "E. coli (recombinant cow β-casein analogue)",
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -27,7 +27,7 @@
       "rejectReason": null,
       "isPrimary": true,
       "citesRecordId": null,
-      "method": null,
+      "method": "Electrospray ionisation quadruple time-of-flight mass spectrometry",
       "numbering": null,
       "curationRef": null,
       "range": null,
@@ -38,53 +38,31 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:39:19.433024+00:00",
+      "at": "2026-10-16T14:50:25.051640+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 2,
+  "rejected": 0,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 2,
+    "unit": 0,
     "range": 0,
     "method": 0
   },
-  "rejectionDetails": [
-    "unit: unit 'gL-1' does not normalise",
-    "unit: unit 'P' does not normalise"
-  ],
-  "dropped": [
-    {
-      "paperId": "I6",
-      "sectionId": "s7",
-      "field": "medium_component_conc",
-      "value": 40.0,
-      "unit": "gL-1",
-      "rule": "unit",
-      "detail": "unit 'gL-1' does not normalise"
-    },
-    {
-      "paperId": "I6",
-      "sectionId": "s9",
-      "field": "phosphate_count",
-      "value": 4.0,
-      "unit": "P",
-      "rule": "unit",
-      "detail": "unit 'P' does not normalise"
-    }
-  ],
+  "rejectionDetails": [],
+  "dropped": [],
   "usage": {
-    "inputTokens": 25287,
-    "outputTokens": 2527,
+    "inputTokens": 26488,
+    "outputTokens": 1066,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.003792,
+    "costUsd": 0.003182,
     "models": [
       "claude-haiku-5-5"
     ]

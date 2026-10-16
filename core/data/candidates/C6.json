@@ -1,48 +1,13 @@
 {
   "paperId": "C6",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:37:53.446642+00:00",
+  "extractedAt": "2026-10-16T14:48:59.994465+00:00",
   "candidates": [
     {
-      "id": "cl1-C6-fa16c2b1",
+      "id": "cl1-C6-a628175c",
       "paperId": "C6",
       "sectionId": "s1",
-      "quote": "the level of chloroplastic transgene expression can reach 20% of total soluble protein (Mathieu-Rivet et al. 2014)",
-      "field": "expression_pct_tsp",
-      "value": 20.0,
-      "unit": "% TSP",
-      "si": {
-        "value": 20.0,
-        "unit": "% TSP"
-      },
-      "confidence": 0.8,
-      "status": "unverified",
-      "provenance": "unverified",
-      "organism": null,
-      "organismText": null,
-      "carbonSource": null,
-      "componentTag": null,
-      "goldOnly": null,
-      "extractorRun": "claude-1",
-      "rejectReason": null,
-      "isPrimary": false,
-      "citesRecordId": null,
-      "method": null,
-      "numbering": null,
-      "curationRef": null,
-      "range": {
-        "low": 20.0,
-        "high": 20.0
-      },
-      "comparativeBaseline": null,
-      "negativeResult": null,
-      "valueBasis": "converted"
-    },
-    {
-      "id": "cl1-C6-78d04382",
-      "paperId": "C6",
-      "sectionId": "s1",
-      "quote": "achieving significantly improved yields of secreted RP (12–15 mg/L) (Lauersen et al. 2015; Ramos-Martinez et al. 2017)",
+      "quote": "achieving significantly improved yields of secreted RP (12–15 mg/L)",
       "field": "titer_secreted",
       "value": 13.5,
       "unit": "mg L⁻¹",
@@ -54,7 +19,7 @@
       "status": "unverified",
       "provenance": "unverified",
       "organism": "uvm4",
-      "organismText": "UVM4 (C. reinhardtii)",
+      "organismText": "Chlamydomonas reinhardtii UVM4",
       "carbonSource": null,
       "componentTag": null,
       "goldOnly": null,
@@ -76,24 +41,25 @@
   ],
   "audit": [
     {
-      "at": "2026-10-16T03:37:53.446642+00:00",
+      "at": "2026-10-16T14:48:59.994465+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 1,
+  "rejected": 2,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
     "value": 0,
-    "unit": 1,
+    "unit": 2,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
+    "unit: unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error.",
     "unit: unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
   ],
   "dropped": [
@@ -105,14 +71,23 @@
       "unit": "%",
       "rule": "unit",
       "detail": "unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+    },
+    {
+      "paperId": "C6",
+      "sectionId": "s1",
+      "field": "expression_pct_tsp",
+      "value": 20.0,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
     }
   ],
   "usage": {
-    "inputTokens": 20468,
-    "outputTokens": 1688,
+    "inputTokens": 21573,
+    "outputTokens": 1355,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.002891,
+    "costUsd": 0.002835,
     "models": [
       "claude-haiku-5-5"
     ]

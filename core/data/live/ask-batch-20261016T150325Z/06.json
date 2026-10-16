@@ -1,0 +1,231 @@
+{
+  "question": "What polymer molecular weights have been reported, and by which methods were they measured?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Weight-average molecular weight and polydispersity of PHB and two PHBV copolymer samples were measured by SEC-MALLS in chloroform, and the PHBV-1 sample had the highest weight-average molecular weight of the three before any degradation.",
+      "recordIds": [],
+      "paperIds": [
+        "P29"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P29:s7:9",
+          "quote": "The molecular weight values of the tested polymers were in the following order: PHBV-1 (Mw = 517 ± 11.08, Đ = 1.1) > PHB (Mw = 480 ± 4.22, Đ = 1.5) > PHBV-2 (Mw = 235 ± 5.33, Đ = 1.3)."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c2",
+      "text": "Molecular weight of PHB and PHBV scaffolds fell over time during in vitro incubation in model gastric and buffer fluids, tracked by SEC-MALLS, with PHB losing the most weight-average molecular weight.",
+      "recordIds": [],
+      "paperIds": [
+        "P29"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P29:s8:5",
+          "quote": "The variations in the molecular weight of PHAs during degradation were monitored using the SEC-MALLS technique (Table 5 and Table 6)."
+        },
+        {
+          "passageId": "P29:s9:4",
+          "quote": "The decrease of molecular weight in time for all PHA scaffolds showed typical exponential decay."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c3",
+      "text": "SEC-MALLS was the method used to characterise molecular weight, molecular size and polydispersity of the PHA polymers in that study.",
+      "recordIds": [],
+      "paperIds": [
+        "P29"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P29:s9:4",
+          "quote": "The SEC-MALLS technique was used for the indication of the degradation state, the variation in polymer molecular weight, and the polydispersity of the studied scaffolds due to the bond cleavage of polymer chains."
+        }
+      ],
+      "evidenceIds": []
+    },
+    {
+      "id": "c5",
+      "text": "For lignin substrate (a polymer feedstock, not the PHA product), weight-average and number-average molecular weight decreased after plug-in pretreatment, with the largest drops seen in sulfite-treated lignin.",
+      "recordIds": [],
+      "paperIds": [
+        "P4"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "P4:s5:2",
+          "quote": "After the PIPOL, the highest decreases in weight-average molecular weight and number-average molecular weight were 81% and 76%, respectively, which were obtained from SEP-treated lignin."
+        }
+      ],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "No curated or verified records hold a PHA molecular weight value, so every reported molecular weight here comes from article text rather than a structured record; the platform cannot yet convert or compare these values.",
+    "The GPC study (P31) gives its method but the returned passages do not show its Mw or Mn values; those would need the full results section or tables.",
+    "No molecular weight measurements were returned for PHA made by the strains most used on the platform (e.g. cw15, UVM4) or in the Pseudomonas putida PHA studies beyond lignin.",
+    "No reported method comparison or calibration check (for example GPC polystyrene standards against SEC-MALLS absolute values) was found, so the sizes are not directly comparable across papers.",
+    "Molecular weight values are not tied to a production condition (carbon source, feed, harvest time) in the returned passages, except for the degradation time series."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 4101,
+    "cacheReadTokens": 22915,
+    "cacheWriteTokens": 16033,
+    "costUsd": 0.004285,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c4: claim text contains a number ('3') — values come from the record"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "P29:s7:9",
+      "paperId": "P29",
+      "sectionId": "s7",
+      "heading": "3. Results › 3.1. Production of PHBV and Properties of PHB, PHBV-1, and PHBV-2 Scaffolds",
+      "kind": "prose",
+      "text": "The molecular weight values of the tested polymers were in the following order: PHBV-1 (Mw = 517 ± 11.08, Đ = 1.1) > PHB (Mw = 480 ± 4.22, Đ = 1.5) > PHBV-2 (Mw = 235 ± 5.33, Đ = 1.3). Small differences in the molecular weights of PHB and PHBV-1 did not indicate any particular differences in the degradation of these two polymers. However, the molecular weight of PHV-2 was much lower than that of PHB and PHBV-1. Therefore, the degradation of PHBV-2 in model fluids could be expected to proceed differently. The melting and crystallization behavior of PHB, PHBV-1, andPHBV-2, were studied by DSC (Figure 4). First, heating scans obtained at the rate of 10 °C min−1 showed double melting behavior for all tested PHAs (Figure 4a). ",
+      "start": 6265,
+      "end": 6996
+    },
+    {
+      "id": "P29:s8:5",
+      "paperId": "P29",
+      "sectionId": "s8",
+      "heading": "3. Results › 3.2. Degradation of PHB and PHBV Scaffolds in Model Fluids",
+      "kind": "prose",
+      "text": "The results indicated that the extent of PHA surface degradation in the model fluids corresponded with the primary semi-crystalline character of the samples and the presence of an active enzyme. The main principle of PHA degradation in fluids with or without enzymes is hydrolysis. The carboxylic esters start to decompose, resulting in a decrease in the polymer’s measured molecular weight. The variations in the molecular weight of PHAs during degradation were monitored using the SEC-MALLS technique (Table 5 and Table 6). SEC-MALLS chromatograms are shown in the Supporting Information (see Figures S1–S3). The values of weight-average molecular weight decreased the most in the case of PHB hydrolysis, showing around 51.7% and 43.7% losses in SGJ and PBS, respectively. ",
+      "start": 3523,
+      "end": 4298
+    },
+    {
+      "id": "P29:s9:4",
+      "paperId": "P29",
+      "sectionId": "s9",
+      "heading": "4. Discussion",
+      "kind": "prose",
+      "text": "The SEC-MALLS technique was used for the indication of the degradation state, the variation in polymer molecular weight, and the polydispersity of the studied scaffolds due to the bond cleavage of polymer chains. The comparison of the changes in values of molecular weight between the PHA scaffolds showed markedly higher losses in the PHB scaffolds than in the PHBV-1 or PHBV-2 scaffolds. The introduction of 3HV into the macromolecule enhanced the hydrolytic stability of the copolymer. The enhanced hydrolytic stability of the PHBV copolymers compared to PHB copolymers corresponded with the literature and may be explained by the higher hydrophobicity of PHBV than PHB. The decrease of molecular weight in time for all PHA scaffolds showed typical exponential decay. Therefore, first-order kinetics for polymer degradation modeling could be applied (Figure 8). ",
+      "start": 2439,
+      "end": 3304
+    },
+    {
+      "id": "P4:s5:2",
+      "paperId": "P4",
+      "sectionId": "s5",
+      "heading": "Results › The chemical mechanisms for enhanced lignin processibility",
+      "kind": "prose",
+      "text": "After the PIPOL, the highest decreases in weight-average molecular weight and number-average molecular weight were 81% and 76%, respectively, which were obtained from SEP-treated lignin. The results of fermentation confirmed that low-molecular lignin could be consumed by P. putida KT2440, which was indicated by the increase of weight-average molecular weight of lignin (Supplementary Fig. 5d, e, f). When the soluble lignin from the PIPOL with SEP and AFEX was used, more than a 40% increase in the weight-average molecular weight was observed after fermentation, which was consistent with better PHA fermentation performance. Therefore, the PIPOL effectively depolymerized the lignin to low-molecular-weight derivatives, promoted its consumption, and thus facilitated its bioconversion. ",
+      "start": 1254,
+      "end": 2044
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "polymer molecular weight",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of polymer molecular weight · 0 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "molecular weight of PHA polymer measured by GPC",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"molecular weight of PHA polymer measured by GPC\" · 6 passages",
+      "ms": 142,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "weight-average molecular weight Mw",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of weight-average molecular weight Mw · 0 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "number-average molecular weight determined",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"number-average molecular weight determined\" · 6 passages",
+      "ms": 126,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHA molecular weight kDa obtained from fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHA molecular weight kDa obtained from fermentation\" · 6 passages",
+      "ms": 129,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "SEC-MALLS molecular weight PHB PHBV Table",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"SEC-MALLS molecular weight PHB PHBV Table\" · 6 passages",
+      "ms": 139,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

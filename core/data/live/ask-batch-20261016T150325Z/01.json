@@ -1,0 +1,151 @@
+{
+  "question": "Which organisms have been shown to make PHB from hydrolysates that contain xylose, and what feedstock did each study use?",
+  "claims": [
+    {
+      "id": "c6",
+      "text": "A Pseudomonas putida and Escherichia coli consortium converted lignocellulosic hydrolysate containing glucose and xylose into medium-chain-length PHA, not PHB, so it does not count as a PHB example.",
+      "recordIds": [
+        "cl1-P35-f97519dc"
+      ],
+      "paperIds": [
+        "P35"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": []
+    }
+  ],
+  "gaps": [
+    "For the pineapple core study, the retrieved text does not show whether strain A-04 consumed xylose from the hydrolysate or whether the PHB came only from glucose and fructose; the xylose consumption data are needed.",
+    "No primary paper on Paraburkholderia sacchari with a hydrolysate was retrieved; the wood-hydrolysate result is known only from a review's description, and the primary Dietrich et al. study and its sugar composition are absent from the corpus.",
+    "No record gives the xylose concentration in the wood hydrolysate used for Paraburkholderia sacchari.",
+    "The sunflower stalk titre and content records lack a stated strain or conditions field, so the feedstock-to-strain mapping relies on the passage text.",
+    "Only a few xylose-containing hydrolysate PHB studies were found; the search did not establish whether other organisms (e.g. Bacillus, Pseudomonas, or wild-type Paraburkholderia strains on corn stover, bagasse or similar feedstocks) have been reported.",
+    "Yields on xylose in the hydrolysate studies were not compared on a common basis, and the tool gave no yield ceiling for PHB from xylose in the corpus."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 10,
+    "outputTokens": 4424,
+    "cacheReadTokens": 30580,
+    "cacheWriteTokens": 22130,
+    "costUsd": 0.005285,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 5,
+  "rejectionReasons": [
+    "c1: a quote that is not a whole sentence or row of P9:s4:0",
+    "c2: a quote of P6:abstract:4 longer than 300 characters",
+    "c3: a quote that is not a whole sentence or row of P6:s3:0",
+    "c4: claim text contains a number ('1') — values come from the record",
+    "c5: a quote that is not a whole sentence or row of P24:s9:1"
+  ],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB production from xylose hydrolysate",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB production from xylose hydrolysate · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "PHB accumulation from xylose-containing hydrolysate",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"PHB accumulation from xylose-containing hydrolysate\" · 6 passages",
+      "ms": 1332,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "pineapple core hydrolysate sugar composition xylose",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"pineapple core hydrolysate sugar composition xylose\" · 6 passages",
+      "ms": 148,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "sunflower stalk hydrolysate xylose PHB Ralstonia eutropha",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"sunflower stalk hydrolysate xylose PHB Ralstonia eutropha\" · 6 passages",
+      "ms": 192,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "Paraburkholderia sacchari wood hydrolysate PHB",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of Paraburkholderia sacchari wood hydrolysate PHB · 0 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "C. necator A-04 core hydrolysate xylose not consumed PHB glucose fructose",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"C. necator A-04 core hydrolysate xylose not consumed PHB glucose fructose\" · 6 passages",
+      "ms": 174,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "PHB from hydrolysate xylose consumption Cupriavidus Burkholderia Escherichia",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of PHB from hydrolysate xylose consumption Cupriavidus Burkholderia Escherichia · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 1 claim kept, 5 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "runbookDraft": null
+}

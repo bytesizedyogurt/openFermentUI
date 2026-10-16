@@ -1,107 +1,67 @@
 {
   "paperId": "P28",
   "run": "claude-1",
-  "extractedAt": "2026-10-16T03:50:38.402507+00:00",
+  "extractedAt": "2026-10-16T14:56:59.356981+00:00",
   "candidates": [],
   "audit": [
     {
-      "at": "2026-10-16T03:50:38.402507+00:00",
+      "at": "2026-10-16T14:56:59.356981+00:00",
       "who": "claude-1",
       "action": "extracted",
       "from_": null,
       "to": null
     }
   ],
-  "rejected": 7,
+  "rejected": 3,
   "rejectionReasons": {
     "field": 0,
     "section": 0,
     "quote": 0,
-    "value": 0,
-    "unit": 7,
+    "value": 1,
+    "unit": 2,
     "range": 0,
     "method": 0
   },
   "rejectionDetails": [
-    "unit: unit '×10^3' does not normalise",
-    "unit: unit '×10^3' does not normalise",
-    "unit: unit '×10^3' does not normalise",
-    "unit: unit '×10^3' does not normalise",
-    "unit: unit '% (w/v)' does not normalise",
+    "value: no number in the quote equals 587.0 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation",
     "unit: unit '%' is not in the family of 'g L⁻¹': Incompatible units: % (percent) vs g L⁻¹ (massConc)",
     "unit: unit '%' is not in the family of 'g L⁻¹': Incompatible units: % (percent) vs g L⁻¹ (massConc)"
   ],
   "dropped": [
     {
       "paperId": "P28",
-      "sectionId": "t2",
+      "sectionId": "s12",
       "field": "pha_mw",
       "value": 587.0,
-      "unit": "×10^3",
-      "rule": "unit",
-      "detail": "unit '×10^3' does not normalise"
+      "unit": "× 10^3",
+      "rule": "value",
+      "detail": "no number in the quote equals 587.0 within 0.5%; the value is derived from the quote's numbers; edit it to the paper's spelling or record the derivation"
     },
     {
       "paperId": "P28",
-      "sectionId": "t2",
-      "field": "pha_mw",
-      "value": 319.0,
-      "unit": "×10^3",
-      "rule": "unit",
-      "detail": "unit '×10^3' does not normalise"
-    },
-    {
-      "paperId": "P28",
-      "sectionId": "t2",
-      "field": "pha_mw",
-      "value": 220.0,
-      "unit": "×10^3",
-      "rule": "unit",
-      "detail": "unit '×10^3' does not normalise"
-    },
-    {
-      "paperId": "P28",
-      "sectionId": "t2",
-      "field": "pha_mw",
-      "value": 194.0,
-      "unit": "×10^3",
-      "rule": "unit",
-      "detail": "unit '×10^3' does not normalise"
-    },
-    {
-      "paperId": "P28",
-      "sectionId": "s11",
+      "sectionId": "abstract",
       "field": "medium_component_conc",
       "value": 1.0,
-      "unit": "% (w/v)",
-      "rule": "unit",
-      "detail": "unit '% (w/v)' does not normalise"
-    },
-    {
-      "paperId": "P28",
-      "sectionId": "s11",
-      "field": "medium_component_conc",
-      "value": 0.4,
       "unit": "%",
       "rule": "unit",
       "detail": "unit '%' is not in the family of 'g L⁻¹': Incompatible units: % (percent) vs g L⁻¹ (massConc)"
     },
     {
       "paperId": "P28",
-      "sectionId": "s11",
+      "sectionId": "abstract",
       "field": "medium_component_conc",
-      "value": 3.0,
+      "value": 0.4,
       "unit": "%",
       "rule": "unit",
       "detail": "unit '%' is not in the family of 'g L⁻¹': Incompatible units: % (percent) vs g L⁻¹ (massConc)"
     }
   ],
   "usage": {
-    "inputTokens": 18462,
-    "outputTokens": 2237,
+    "inputTokens": 19575,
+    "outputTokens": 2055,
     "cacheReadTokens": 0,
     "cacheWriteTokens": 0,
-    "costUsd": 0.002965,
+    "costUsd": 0.002985,
     "models": [
       "claude-haiku-5-5"
     ]
