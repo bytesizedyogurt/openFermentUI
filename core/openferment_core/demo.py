@@ -391,7 +391,9 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         path = out / name
         if name.endswith(".jsonl"):
             # One event a line, as the stream sends them; the note leads.
-            lines = [{"_fixture": PROTOTYPE_NOTE}, *value]
+            # §10.3: the note leads, with when the run was recorded and that a
+            # scripted stand-in stood in for the model; a replay shows both.
+            lines = [{"_fixture": PROTOTYPE_NOTE, "recordedAt": AT, "standIn": True}, *value]
             path.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines), encoding="utf-8")
         else:
             wrapped = {"_fixture": PROTOTYPE_NOTE, "response": value}

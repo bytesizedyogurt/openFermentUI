@@ -1,7 +1,11 @@
 /**
- * The offline demo (OF-BLD-012 §8.1).
+ * The offline intake demo (OF-BLD-012 §8.1).
  *
- *   pnpm demo:offline
+ *   pnpm demo:offline:intake
+ *
+ * (Since OF-BLD-014 §10.3, `pnpm demo:offline` replays all nine beats of the
+ * demo through the service double: scripts/demo-replay.mjs. This one still
+ * runs the real service in fixture mode over the intake loop alone.)
  *
  * Replays the whole Intake → Extract → Witness → Guild loop from saved
  * responses, with no key and no network. Three things run:

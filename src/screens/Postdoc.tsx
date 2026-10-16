@@ -38,7 +38,7 @@ import { Markdown } from '@/components/Markdown';
 import { ProvDot } from '@/components/Provenance';
 import { useSeriesColor } from '@/lib/viz';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, postdocHealth, PostdocDown, type PostdocHealth } from '@/lib/postdoc';
+import { askPostdocStream, postdocHealth, PostdocDown, type PostdocHealth, type ReplayInfo } from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
 
 const SLASH_HINTS = [
@@ -390,6 +390,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   // mean inventing a message shape for something that is not one, which is the
   // mistake §1 warns about — bolting the API onto the transcript shape.
   const [livePlan, setLivePlan] = useState<AnswerPlan | null>(null);
+  const [liveReplay, setLiveReplay] = useState<ReplayInfo | null>(null);
   const [liveSteps, setLiveSteps] = useState<TraceStep[]>([]);
   const [liveQuestion, setLiveQuestion] = useState('');
   const [down, setDown] = useState<{ message: string; remedy: string } | null>(null);
@@ -480,8 +481,9 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       setLiveQuestion(text);
       setLivePlan(null);
       setLiveSteps([]);
+      setLiveReplay(null);
       try {
-        setLivePlan(await askPostdocStream(text, (step) => setLiveSteps((prev) => [...prev, step])));
+        setLivePlan(await askPostdocStream(text, (step) => setLiveSteps((prev) => [...prev, step]), { onReplay: setLiveReplay }));
       } catch (err) {
         if (err instanceof PostdocDown) setDown({ message: err.message, remedy: err.remedy });
         else if (!(err instanceof DOMException && err.name === 'AbortError')) {
@@ -609,6 +611,12 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+          {chatMode === 'live' && liveReplay && (
+            <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
+              Replay of a run on {liveReplay.recordedAt.slice(0, 10)}
+              {liveReplay.standIn ? ', recorded with a scripted stand-in in place of the model' : ''}. Nothing is being asked now.
+            </div>
+          )}
           {chatMode === 'live' ? (
             <LivePanel
               question={liveQuestion}

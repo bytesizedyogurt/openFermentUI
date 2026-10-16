@@ -325,6 +325,10 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         return res.end(JSON.stringify(events.find((e) => e.event === 'plan').data));
       }
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+      // §10.3 — a replay says it is one, with the date the run was recorded
+      // and whether a scripted stand-in stood in for the model.
+      const head = lines[0] ?? {};
+      res.write(`event: replay\ndata: ${JSON.stringify({ recordedAt: head.recordedAt ?? 'an unknown date', standIn: head.standIn !== false })}\n\n`);
       for (const e of events) {
         await new Promise((r) => setTimeout(r, 250));
         res.write(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`);

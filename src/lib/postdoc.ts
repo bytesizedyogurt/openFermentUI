@@ -122,6 +122,17 @@ export async function askPostdoc(
   return (await response.json()) as AnswerPlan;
 }
 
+/**
+ * Sent first by a stream that replays a recorded run rather than running one
+ * (OF-BLD-014 §10.3: the service double, `pnpm demo:offline`). The real
+ * service never sends it. `standIn` is true when the recording was made with
+ * a scripted stand-in in place of the model.
+ */
+export interface ReplayInfo {
+  recordedAt: string;
+  standIn: boolean;
+}
+
 /** One server-sent event: its name and its parsed data. */
 export interface StreamEvent {
   event: string;
@@ -154,9 +165,10 @@ export function parseEvents(buffer: string): { events: StreamEvent[]; rest: stri
 export async function askPostdocStream(
   question: string,
   onStep: (step: TraceStep) => void,
-  opts: { maxEvidence?: number; signal?: AbortSignal } = {},
+  opts: { maxEvidence?: number; signal?: AbortSignal; onReplay?: (r: ReplayInfo) => void } = {},
 ): Promise<AnswerPlan> {
-  const response = await post('/api/ask/stream', question, { ...opts, mode: 'agent' });
+  const { onReplay, ...rest } = opts;
+  const response = await post('/api/ask/stream', question, { ...rest, mode: 'agent' });
   const checkLog = 'The service is running, so check its log — it will name what went wrong.';
   if (!response.body) throw new PostdocDown('Postdoc answered with no stream.', checkLog);
   const reader = response.body.getReader();
@@ -168,7 +180,8 @@ export async function askPostdocStream(
     const parsed = parseEvents(done ? `${buffer}\n\n` : buffer);
     buffer = parsed.rest;
     for (const e of parsed.events) {
-      if (e.event === 'step') onStep(e.data as TraceStep);
+      if (e.event === 'replay') onReplay?.(e.data as ReplayInfo);
+      else if (e.event === 'step') onStep(e.data as TraceStep);
       else if (e.event === 'plan') return e.data as AnswerPlan;
       else if (e.event === 'error') throw new PostdocDown(String((e.data as { message?: string }).message ?? 'Postdoc failed.'), checkLog);
     }

@@ -344,7 +344,8 @@ scripts/host/install.sh --uninstall     # stop and remove both jobs
 ### The offline demo
 
 ```bash
-pnpm demo:offline   # no key, no network: the service in fixture mode + the built app on :4173
+pnpm demo:offline   # no key, no network: all nine demo beats replayed from saved fixtures, on :4317
+pnpm demo:offline:intake  # the intake loop with the real service in fixture mode, on :4173
 ```
 
 Replays the loop from saved responses: open Intake, fetch B5, Extract, open Witness, open Guild,

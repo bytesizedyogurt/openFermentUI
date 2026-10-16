@@ -312,6 +312,9 @@ async function main() {
   const traced = await page.locator('[data-testid="trace-step"]').count();
   const quoted = await page.locator('[data-testid="passage-quote"]').count();
   check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
+  // OF-BLD-014 §10.3 — a replay says it is one, with its date.
+  const replay = await page.locator('[data-testid="replay-label"]').innerText().catch(() => '');
+  check('A replayed answer is labelled with the date it was recorded', /Replay of a run on 2026-09-15, recorded with a scripted stand-in/.test(replay), replay.slice(0, 80));
   await page.getByRole('button', { name: 'Scripted' }).click();
   await page.locator('button', { hasText: /titers have been achieved/i }).first().click();
   await page.waitForTimeout(2500);
@@ -330,6 +333,29 @@ async function main() {
   await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
   const fitted = await page.locator('[data-testid="trajectory-fit"]').count();
   check('fermOS fits a curve through the sample run', fitted === 3, `${fitted} curves`);
+
+  // ── 10e. Proforma: the PHA scenario names where each input comes from ──
+  // OF-BLD-014 §10.3, the demo's beat 7, over the double's stand-in binding.
+  await go('/proforma/scenario/sc-pha-1');
+  await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const pha = await page.locator('body').innerText();
+  check('Proforma\'s PHA scenario shows each input and its source', (await page.locator('[data-testid^="input-"]').count()) === 7 && /Waiting for a source/.test(pha));
+
+  // ── 10f. Runbooks: an answer becomes a runbook that keeps score ─────
+  // The demo's beat 8: Postdoc drafts, a person adopts, the page draws the
+  // predictions and the chain behind them; the ledger counts them.
+  await go('/postdoc');
+  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+  const ask = page.locator('textarea[aria-label="Ask a question"]');
+  await ask.fill('Draft a runbook for the stand-in run.');
+  await ask.press('Enter');
+  await page.locator('[data-testid="runbook-draft"]').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.getByRole('button', { name: 'Turn into a runbook' }).click().catch(() => {});
+  await page.locator('[data-testid="dossier-link"]').first().waitFor({ timeout: 10000 }).catch(() => {});
+  check('A drafted runbook draws its predictions and the chain behind them',
+    (await page.locator('[data-testid="ledger-row"]').count()) === 3 && (await page.locator('[data-testid="dossier-link"]').count()) === 2);
+  await go('/runbooks/ledger');
+  check('The ledger counts locked and tested predictions', /predictions locked/.test(await page.locator('[data-testid="ledger-counts"]').innerText().catch(() => '')));
 
   // ── 11. Command palette navigates ───────────────────────────────────
   await page.keyboard.press('Control+k');

@@ -1,4 +1,4 @@
-{"_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool."}
+{"_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.", "recordedAt": "2026-09-15T09:00:00Z", "standIn": true}
 {"event": "step", "data": {"n": 1, "kind": "tool", "tool": "search_records", "input": {"query": "", "field": "titer_secreted", "organism": "", "limit": 10}, "summary": "Looked up records of secreted titer · 1 record", "ms": 0, "ok": true}}
 {"event": "step", "data": {"n": 2, "kind": "tool", "tool": "growth_forecast", "input": {"fitArtifactId": "bf73d708a9f9276d"}, "summary": "Ran growth_forecast", "ms": 0, "ok": true}}
 {"event": "step", "data": {"n": 3, "kind": "tool", "tool": "selling_price", "input": {"scenarioId": "sc-pha-1"}, "summary": "Ran selling_price", "ms": 0, "ok": true}}
