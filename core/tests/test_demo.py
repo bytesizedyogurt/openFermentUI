@@ -148,9 +148,14 @@ def test_the_committed_sets_are_what_demo_fixtures_writes(tmp_path):
     assert (tmp_path / "export.json").read_text(encoding="utf-8") == (EXPORT / "biorepo.json").read_text(encoding="utf-8")
 
 
-def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path):
+def test_the_prototype_fixtures_are_what_demo_prototype_writes(tmp_path, monkeypatch):
     """OF-BLD-014 E.2: the smoke double serves these files, so they must be
-    what the code produces today."""
+    what the code produces today. The fixtures name the model chain they were
+    written under, `llm.py`'s defaults; a session whose environment names other
+    models (one model as primary and fallback, say) regenerates at those
+    defaults, so the comparison is of the code and never of the environment."""
+    for name in ("OPENFERMENT_MODEL", "OPENFERMENT_FALLBACK_MODEL", "OPENFERMENT_INDEX_MODEL", "OPENFERMENT_EFFORT"):
+        monkeypatch.delenv(name, raising=False)
     written = demo.rebuild_prototype(out=tmp_path)
     assert written
     for path in written:

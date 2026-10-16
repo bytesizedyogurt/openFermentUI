@@ -181,10 +181,20 @@ def test_wall_time_ends_the_loop(pool):  # noqa: F811
 
 
 def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, monkeypatch):  # noqa: F811
-    first, second = llm.chain("answer")[:2]
+    chain = llm.chain("answer")
+    first = chain[0]
     refused = llm.ModelRefused("cyber", [first], Usage(costUsd=0.002, models=[first]))
     script = Script([records()], refused, [records()], plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
+    if len(chain) == 1:
+        # Primary and fallback name the same model, so the chain has one rung:
+        # there is nothing to restart on, and the refusal declines the question.
+        assert [c["model"] for c in script.calls] == [first, first]
+        assert [s.kind for s in out.trace] == ["tool", "final"]
+        assert out.claims == [] and out.declined
+        assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
+        return
+    second = chain[1]
     assert [c["model"] for c in script.calls] == [first, first, second, second]
     assert [s.kind for s in out.trace] == ["tool", "restart", "tool", "final"]
     assert f"{first} declined; asked again on {second}" == out.trace[1].summary
@@ -197,6 +207,10 @@ def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, monkeypatch):
 def test_the_restart_forgets_what_the_first_conversation_retrieved(pool):  # noqa: F811
     script = Script([records()], llm.ModelUnavailable("overloaded"), plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
+    if len(llm.chain("answer")) == 1:
+        # One rung: the outage declines the question, and nothing is kept.
+        assert out.claims == [] and out.rejected == 0 and out.declined
+        return
     assert out.claims == [] and out.rejected == 1, "the second model never retrieved r-X1-1"
 
 

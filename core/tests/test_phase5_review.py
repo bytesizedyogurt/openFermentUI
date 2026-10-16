@@ -123,10 +123,13 @@ def test_a_question_no_model_answered_ends_its_trace_with_a_failed_step(pool):  
 
 # R7 — a restart gets the whole call budget again.
 def test_a_restart_gets_its_own_call_budget(pool):  # noqa: F811
-    first, second = llm.chain("answer")[:2]
     turns = [[records(f"q{chr(97 + 3 * t + i)}") for i in range(3)] for t in range(3)]  # nine calls
     script = Script(*turns, llm.ModelUnavailable("overloaded"), [records("x"), records("y"), records("z")], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
+    if len(llm.chain("answer")) == 1:
+        # Primary and fallback are one model: no restart, so the outage declines.
+        assert out.declined and not any(s.kind == "restart" for s in out.trace)
+        return
     assert out.stopped == "done", "the second model's three calls fit its own twelve"
 
 
