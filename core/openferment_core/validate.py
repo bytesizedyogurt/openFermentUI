@@ -69,9 +69,12 @@ _WORD_NUMBER = re.compile(
 
 # Ranges and comparisons written without digits are quantities too: "roughly
 # an order of magnitude higher" is a number wearing a coat.
+# "-fold" is a count only after a count: a number word, or several, many,
+# multi, n or x. Scaffold, manifold, unfold and billfold are words.
+_FOLD_COUNTS = (*_WORD_NUMBERS, "several", "many", "multi", "n", "x")
 _MAGNITUDE = re.compile(
     r"(?<![a-z])(an?\s+order\s+of\s+magnitude|orders\s+of\s+magnitude|"
-    r"[a-z]+-?fold)(?![a-z])",
+    r"(?:" + "|".join(_FOLD_COUNTS) + r")-?fold)(?![a-z])",
     re.IGNORECASE,
 )
 
