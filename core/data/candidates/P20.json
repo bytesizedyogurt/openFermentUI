@@ -1,0 +1,222 @@
+{
+  "paperId": "P20",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:45:02.669879+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P20-7183fa4f",
+      "paperId": "P20",
+      "sectionId": "s15",
+      "quote": "TMB4425 (XRmut, AvAAR) reached the highest PHB titer, 252 mg/L",
+      "field": "pha_titre",
+      "value": 252.0,
+      "unit": "mg L⁻¹",
+      "si": {
+        "value": 0.252,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "S. cerevisiae TMB4425",
+      "organismText": null,
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P20-cfd4a7bf",
+      "paperId": "P20",
+      "sectionId": "s16",
+      "quote": "TMB4425 grew at a maximum growth rate of 0.07/h",
+      "field": "growth_rate_mu",
+      "value": 0.07,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.07,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "S. cerevisiae TMB4425",
+      "organismText": null,
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P20-d4aaac7e",
+      "paperId": "P20",
+      "sectionId": "s5",
+      "quote": "13.4 g/L YNB without amino acids, 50 g/L xylose",
+      "field": "medium_component_conc",
+      "value": 50.0,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 50.0,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": null,
+      "organismText": null,
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:45:02.669879+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 8,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 8,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)",
+    "unit: unit 'mg PHB/L' does not normalise",
+    "unit: unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)",
+    "unit: unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)",
+    "unit: unit '-fold' does not normalise",
+    "unit: unit '-fold' does not normalise",
+    "unit: unit 'mg PHB/L' does not normalise",
+    "unit: unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+  ],
+  "dropped": [
+    {
+      "paperId": "P20",
+      "sectionId": "abstract",
+      "field": "pha_content_cdw",
+      "value": 14.0,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s15",
+      "field": "pha_titre",
+      "value": 131.0,
+      "unit": "mg PHB/L",
+      "rule": "unit",
+      "detail": "unit 'mg PHB/L' does not normalise"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s15",
+      "field": "pha_content_cdw",
+      "value": 14.7,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s15",
+      "field": "pha_content_cdw",
+      "value": 9.4,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s14",
+      "field": "fold_improvement",
+      "value": 5.1,
+      "unit": "-fold",
+      "rule": "unit",
+      "detail": "unit '-fold' does not normalise"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s14",
+      "field": "fold_improvement",
+      "value": 4.3,
+      "unit": "-fold",
+      "rule": "unit",
+      "detail": "unit '-fold' does not normalise"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s16",
+      "field": "pha_titre",
+      "value": 360.0,
+      "unit": "mg PHB/L",
+      "rule": "unit",
+      "detail": "unit 'mg PHB/L' does not normalise"
+    },
+    {
+      "paperId": "P20",
+      "sectionId": "s16",
+      "field": "pha_content_cdw",
+      "value": 14.2,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% CDW': Incompatible units: % (percent) vs % CDW (percentCdw)"
+    }
+  ],
+  "usage": {
+    "inputTokens": 18685,
+    "outputTokens": 3982,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.00386,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

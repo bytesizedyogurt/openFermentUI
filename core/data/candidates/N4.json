@@ -1,0 +1,88 @@
+{
+  "paperId": "N4",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:40:39.174364+00:00",
+  "candidates": [
+    {
+      "id": "cl1-N4-5f9a1763",
+      "paperId": "N4",
+      "sectionId": "abstract",
+      "quote": "or secrete it in the growth medium, with a titer value up to 82 µg/L, enabling the production of microalga-based super-food.",
+      "field": "titer_secreted",
+      "value": 82.0,
+      "unit": "µg L⁻¹",
+      "si": {
+        "value": 0.000082,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:40:39.174364+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 1,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 1,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: field titer_secreted is denominated in 'g L⁻¹'; no unit given"
+  ],
+  "dropped": [
+    {
+      "paperId": "N4",
+      "sectionId": "s11",
+      "field": "titer_secreted",
+      "value": 0.0,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field titer_secreted is denominated in 'g L⁻¹'; no unit given"
+    }
+  ],
+  "usage": {
+    "inputTokens": 18620,
+    "outputTokens": 1585,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.002655,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

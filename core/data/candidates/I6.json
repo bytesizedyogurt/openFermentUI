@@ -1,0 +1,98 @@
+{
+  "paperId": "I6",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:39:19.433024+00:00",
+  "candidates": [
+    {
+      "id": "cl1-I6-5e32c03f",
+      "paperId": "I6",
+      "sectionId": "s6",
+      "quote": "co-express a β-casein analogue with the catalytic α subunit of casein kinase II",
+      "field": "kinase_identity",
+      "value": "casein kinase II",
+      "unit": "",
+      "si": {
+        "value": "casein kinase II",
+        "unit": ""
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "ecoli",
+      "organismText": "E. coli",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:39:19.433024+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 2,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'gL-1' does not normalise",
+    "unit: unit 'P' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "I6",
+      "sectionId": "s7",
+      "field": "medium_component_conc",
+      "value": 40.0,
+      "unit": "gL-1",
+      "rule": "unit",
+      "detail": "unit 'gL-1' does not normalise"
+    },
+    {
+      "paperId": "I6",
+      "sectionId": "s9",
+      "field": "phosphate_count",
+      "value": 4.0,
+      "unit": "P",
+      "rule": "unit",
+      "detail": "unit 'P' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 25287,
+    "outputTokens": 2527,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003792,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "paperId": "P25",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:49:38.968379+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P25-118b626c",
+      "paperId": "P25",
+      "sectionId": "t3",
+      "quote": "Glucose (g/L) | 100.4 | 95.1",
+      "field": "medium_component_conc",
+      "value": 100.4,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 100.4,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Cupriavidus necator",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P25-70b862e8",
+      "paperId": "P25",
+      "sectionId": "s13",
+      "quote": "when 1 g/L benzoic acid was supplemented into the minimum medium",
+      "field": "medium_component_conc",
+      "value": 1.0,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 1.0,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Cupriavidus necator",
+      "organismText": null,
+      "carbonSource": "benzoic acid",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P25-79cb97d8",
+      "paperId": "P25",
+      "sectionId": "s11",
+      "quote": "The maximum amount of furfural was 2 g/L in the slurries in this study.",
+      "field": "medium_component_conc",
+      "value": 2.0,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 2.0,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.5,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Cupriavidus necator",
+      "organismText": null,
+      "carbonSource": "furfural",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:49:38.968379+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 1,
+    "value": 0,
+    "unit": 1,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'h−1' does not normalise",
+    "quote: quote is not in section s2 after normalisation"
+  ],
+  "dropped": [
+    {
+      "paperId": "P25",
+      "sectionId": "t4",
+      "field": "growth_rate_mu",
+      "value": 0.19,
+      "unit": "h−1",
+      "rule": "unit",
+      "detail": "unit 'h−1' does not normalise"
+    },
+    {
+      "paperId": "P25",
+      "sectionId": "s2",
+      "field": "medium_component_conc",
+      "value": 10.0,
+      "unit": "g/L",
+      "rule": "quote",
+      "detail": "quote is not in section s2 after normalisation"
+    }
+  ],
+  "usage": {
+    "inputTokens": 18396,
+    "outputTokens": 2241,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.00296,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 1
+  }
+}

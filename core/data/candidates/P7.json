@@ -1,0 +1,168 @@
+{
+  "paperId": "P7",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:53:57.160264+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P7-8a67e05f",
+      "paperId": "P7",
+      "sectionId": "abstract",
+      "quote": "polyhydroxyalkanoate production was increased to ~270 mg/L",
+      "field": "pha_titre",
+      "value": 270.0,
+      "unit": "mg L⁻¹",
+      "si": {
+        "value": 0.27,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": null,
+      "organismText": null,
+      "carbonSource": "ferulic acid",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:53:57.160264+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 9,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 9,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise",
+    "unit: unit 'mg L−1' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "P7",
+      "sectionId": "s10",
+      "field": "pha_titre",
+      "value": 270.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "s9",
+      "field": "pha_titre",
+      "value": 158.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "s8",
+      "field": "pha_titre",
+      "value": 164.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "s8",
+      "field": "pha_titre",
+      "value": 95.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "s8",
+      "field": "pha_titre",
+      "value": 105.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "s7",
+      "field": "pha_titre",
+      "value": 65.0,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "t4",
+      "field": "pha_titre",
+      "value": 268.3,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "t4",
+      "field": "pha_titre",
+      "value": 59.3,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    },
+    {
+      "paperId": "P7",
+      "sectionId": "t4",
+      "field": "pha_titre",
+      "value": 65.4,
+      "unit": "mg L−1",
+      "rule": "unit",
+      "detail": "unit 'mg L−1' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 30608,
+    "outputTokens": 3672,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004897,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

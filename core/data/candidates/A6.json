@@ -1,0 +1,130 @@
+{
+  "paperId": "A6",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:36:29.945000+00:00",
+  "candidates": [
+    {
+      "id": "cl1-A6-b4e2051f",
+      "paperId": "A6",
+      "sectionId": "s7",
+      "quote": "Secreted hEGF reached concentrations of 100 µg/L after 48 h and exhibited full biological activity compared to commercial standards.",
+      "field": "titer_secreted",
+      "value": 100.0,
+      "unit": "µg L⁻¹",
+      "si": {
+        "value": 0.00009999999999999999,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-A6-ee1e3c4c",
+      "paperId": "A6",
+      "sectionId": "s7",
+      "quote": "Recently, the SARS-CoV-2 spike protein was shown to accumulate up to 11.2 µg/L in C. reinhardtii culture supernatants.",
+      "field": "titer_secreted",
+      "value": 11.2,
+      "unit": "µg L⁻¹",
+      "si": {
+        "value": 0.0000112,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:36:29.945000+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 1,
+    "range": 1,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "range: 150 × is outside the range 0.1–100 for fold_improvement",
+    "unit: unit 'mg astaxanthin/L/h' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "A6",
+      "sectionId": "s5",
+      "field": "fold_improvement",
+      "value": 150.0,
+      "unit": "×",
+      "rule": "range",
+      "detail": "150 × is outside the range 0.1–100 for fold_improvement"
+    },
+    {
+      "paperId": "A6",
+      "sectionId": "s7",
+      "field": "volumetric_productivity",
+      "value": 1.09,
+      "unit": "mg astaxanthin/L/h",
+      "rule": "unit",
+      "detail": "unit 'mg astaxanthin/L/h' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 14990,
+    "outputTokens": 3403,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.0032,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

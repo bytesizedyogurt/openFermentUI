@@ -1,0 +1,121 @@
+{
+  "paperId": "C9",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:38:06.247669+00:00",
+  "candidates": [
+    {
+      "id": "cl1-C9-e442a515",
+      "paperId": "C9",
+      "sectionId": "abstract",
+      "quote": "Interestingly, the inhibitory rate of c-ALFPm3 from T-JcA against four Vibrio was 2.77 to 6.23 times greater than that of a-ALFPm3 from T-JaA",
+      "field": "fold_improvement",
+      "value": 4.5,
+      "unit": "×",
+      "si": {
+        "value": 4.5,
+        "unit": "×"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii JUV",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": {
+        "low": 2.77,
+        "high": 6.23
+      },
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "range-midpoint"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:38:06.247669+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 4,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 3,
+    "range": 1,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'times' does not normalise",
+    "unit: unit 'weeks' does not normalise",
+    "unit: unit 'weeks' does not normalise",
+    "range: 0 g L⁻¹ is outside the range 1e-05–50 for titer_secreted"
+  ],
+  "dropped": [
+    {
+      "paperId": "C9",
+      "sectionId": "s6",
+      "field": "fold_improvement",
+      "value": 2.06,
+      "unit": "times",
+      "rule": "unit",
+      "detail": "unit 'times' does not normalise"
+    },
+    {
+      "paperId": "C9",
+      "sectionId": "s3",
+      "field": "time_to_colony",
+      "value": 3.5,
+      "unit": "weeks",
+      "rule": "unit",
+      "detail": "unit 'weeks' does not normalise"
+    },
+    {
+      "paperId": "C9",
+      "sectionId": "s8",
+      "field": "time_to_colony",
+      "value": 2.5,
+      "unit": "weeks",
+      "rule": "unit",
+      "detail": "unit 'weeks' does not normalise"
+    },
+    {
+      "paperId": "C9",
+      "sectionId": "s4",
+      "field": "titer_secreted",
+      "value": 0.0,
+      "unit": "g L⁻¹",
+      "rule": "range",
+      "detail": "0 g L⁻¹ is outside the range 1e-05–50 for titer_secreted"
+    }
+  ],
+  "usage": {
+    "inputTokens": 16779,
+    "outputTokens": 2448,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.002902,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

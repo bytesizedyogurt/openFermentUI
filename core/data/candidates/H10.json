@@ -1,0 +1,172 @@
+{
+  "paperId": "H10",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:39:04.409502+00:00",
+  "candidates": [
+    {
+      "id": "cl1-H10-c24edcaa",
+      "paperId": "H10",
+      "sectionId": "s4",
+      "quote": "Results confirmed colonies 9 and 17 secreted high amounts of phytase to the extracellular media, 175 and 215 µg/mL, respectively, while colony number 2 presented very lower production at 32 µg/mL.",
+      "field": "titer_secreted",
+      "value": 175.0,
+      "unit": "µg mL⁻¹",
+      "si": {
+        "value": 0.17500000000000002,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "gs115",
+      "organismText": "Pichia pastoris",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "Bradford assay",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-H10-b2d3e324",
+      "paperId": "H10",
+      "sectionId": "s4",
+      "quote": "Results confirmed colonies 9 and 17 secreted high amounts of phytase to the extracellular media, 175 and 215 µg/mL, respectively, while colony number 2 presented very lower production at 32 µg/mL.",
+      "field": "titer_secreted",
+      "value": 215.0,
+      "unit": "µg mL⁻¹",
+      "si": {
+        "value": 0.215,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "gs115",
+      "organismText": "Pichia pastoris",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "Bradford assay",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-H10-34bd6b3d",
+      "paperId": "H10",
+      "sectionId": "s4",
+      "quote": "Results confirmed colonies 9 and 17 secreted high amounts of phytase to the extracellular media, 175 and 215 µg/mL, respectively, while colony number 2 presented very lower production at 32 µg/mL.",
+      "field": "titer_secreted",
+      "value": 32.0,
+      "unit": "µg mL⁻¹",
+      "si": {
+        "value": 0.032,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "gs115",
+      "organismText": "Pichia pastoris",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "Bradford assay",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:39:04.409502+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 3,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 2,
+    "range": 1,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "range: 0 g L⁻¹ is outside the range 1e-05–50 for titer_secreted",
+    "unit: unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)",
+    "unit: unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+  ],
+  "dropped": [
+    {
+      "paperId": "H10",
+      "sectionId": "s4",
+      "field": "titer_secreted",
+      "value": 0.0,
+      "unit": "µg/mL",
+      "rule": "range",
+      "detail": "0 g L⁻¹ is outside the range 1e-05–50 for titer_secreted"
+    },
+    {
+      "paperId": "H10",
+      "sectionId": "s8",
+      "field": "medium_component_conc",
+      "value": 1.0,
+      "unit": "% w/v",
+      "rule": "unit",
+      "detail": "unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+    },
+    {
+      "paperId": "H10",
+      "sectionId": "s8",
+      "field": "medium_component_conc",
+      "value": 2.0,
+      "unit": "% w/v",
+      "rule": "unit",
+      "detail": "unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+    }
+  ],
+  "usage": {
+    "inputTokens": 17941,
+    "outputTokens": 2726,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003157,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

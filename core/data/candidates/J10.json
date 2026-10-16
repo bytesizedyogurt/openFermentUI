@@ -1,0 +1,115 @@
+{
+  "paperId": "J10",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:39:40.324381+00:00",
+  "candidates": [],
+  "audit": [
+    {
+      "at": "2026-10-16T03:39:40.324381+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 7,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 7,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'kWh/kgbiomass' does not normalise",
+    "unit: unit '%proteins' does not normalise",
+    "unit: unit '%proteins' does not normalise",
+    "unit: unit '%proteins' does not normalise",
+    "unit: unit 'kWh/kgDW' does not normalise",
+    "unit: unit '%protein' does not normalise",
+    "unit: unit 'fold' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "J10",
+      "sectionId": "abstract",
+      "field": "disruption_energy",
+      "value": 0.05,
+      "unit": "kWh/kgbiomass",
+      "rule": "unit",
+      "detail": "unit 'kWh/kgbiomass' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s15",
+      "field": "disruption_protein_yield",
+      "value": 31.0,
+      "unit": "%proteins",
+      "rule": "unit",
+      "detail": "unit '%proteins' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s15",
+      "field": "disruption_protein_yield",
+      "value": 11.0,
+      "unit": "%proteins",
+      "rule": "unit",
+      "detail": "unit '%proteins' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s15",
+      "field": "disruption_protein_yield",
+      "value": 23.0,
+      "unit": "%proteins",
+      "rule": "unit",
+      "detail": "unit '%proteins' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s15",
+      "field": "disruption_energy",
+      "value": 0.5,
+      "unit": "kWh/kgDW",
+      "rule": "unit",
+      "detail": "unit 'kWh/kgDW' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s18",
+      "field": "disruption_protein_yield",
+      "value": 5.0,
+      "unit": "%protein",
+      "rule": "unit",
+      "detail": "unit '%protein' does not normalise"
+    },
+    {
+      "paperId": "J10",
+      "sectionId": "s18",
+      "field": "fold_improvement",
+      "value": 2.0,
+      "unit": "fold",
+      "rule": "unit",
+      "detail": "unit 'fold' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 15602,
+    "outputTokens": 4498,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003809,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

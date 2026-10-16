@@ -1,0 +1,182 @@
+{
+  "paperId": "C4",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:37:42.125922+00:00",
+  "candidates": [
+    {
+      "id": "cl1-C4-07ea0063",
+      "paperId": "C4",
+      "sectionId": "s3",
+      "quote": "revealed that the enzyme accumulated to approximately 0.25% of total soluble protein",
+      "field": "expression_pct_tsp",
+      "value": 0.25,
+      "unit": "% TSP",
+      "si": {
+        "value": 0.25,
+        "unit": "% TSP"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii ble2A-xyn1 line",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-C4-325ec273",
+      "paperId": "C4",
+      "sectionId": "s1",
+      "quote": "with the highest reported recombinant protein accumulation at 0.2% of total soluble protein",
+      "field": "expression_pct_tsp",
+      "value": 0.2,
+      "unit": "% TSP",
+      "si": {
+        "value": 0.2,
+        "unit": "% TSP"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "converted"
+    },
+    {
+      "id": "cl1-C4-ed3000c3",
+      "paperId": "C4",
+      "sectionId": "s5",
+      "quote": "almost 95% of xylanase activity was found in the culture media for the Ble2A-SP-Xyn1 strain",
+      "field": "secreted_fraction",
+      "value": 95.0,
+      "unit": "%",
+      "si": {
+        "value": 95.0,
+        "unit": "%"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Chlamydomonas reinhardtii Ble2A-SP-Xyn1",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:37:42.125922+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 4,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 3,
+    "range": 1,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'colonies per µg of DNA' does not normalise",
+    "unit: unit 'fold' does not normalise",
+    "range: 256 residue is outside the range 1–224 for phospho_site_position",
+    "unit: unit 'µg/ml' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "C4",
+      "sectionId": "s2",
+      "field": "transformation_efficiency",
+      "value": 200.0,
+      "unit": "colonies per µg of DNA",
+      "rule": "unit",
+      "detail": "unit 'colonies per µg of DNA' does not normalise"
+    },
+    {
+      "paperId": "C4",
+      "sectionId": "s4",
+      "field": "fold_improvement",
+      "value": 100.0,
+      "unit": "fold",
+      "rule": "unit",
+      "detail": "unit 'fold' does not normalise"
+    },
+    {
+      "paperId": "C4",
+      "sectionId": "s6",
+      "field": "phospho_site_position",
+      "value": 256.0,
+      "unit": "residue",
+      "rule": "range",
+      "detail": "256 residue is outside the range 1–224 for phospho_site_position"
+    },
+    {
+      "paperId": "C4",
+      "sectionId": "s9",
+      "field": "medium_component_conc",
+      "value": 100.0,
+      "unit": "µg/ml",
+      "rule": "unit",
+      "detail": "unit 'µg/ml' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 24785,
+    "outputTokens": 4097,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004527,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

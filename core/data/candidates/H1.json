@@ -1,0 +1,194 @@
+{
+  "paperId": "H1",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:28:08.006523+00:00",
+  "candidates": [
+    {
+      "id": "cl1-H1-048302af",
+      "paperId": "H1",
+      "sectionId": "t1",
+      "quote": "Bovine αs1-casein | E. coli | Pulse-chase labeling, SDS-PAGE, and WB | Phosphatase treatment and SDS-PAGE | Not phosphorylated",
+      "field": "phosphorylation_degree",
+      "value": 0.0,
+      "unit": "% of native sites",
+      "si": {
+        "value": 0.0,
+        "unit": "%"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "ecoli",
+      "organismText": "E. coli",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "Phosphatase treatment and SDS-PAGE",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": true,
+      "valueBasis": "negation"
+    },
+    {
+      "id": "cl1-H1-17c9bbae",
+      "paperId": "H1",
+      "sectionId": "t1",
+      "quote": "SDS-PAGE stained with ethyl stains—all mass spectrometry analysis | Not phosphorylated",
+      "field": "phosphorylation_degree",
+      "value": 0.0,
+      "unit": "% of native sites",
+      "si": {
+        "value": 0.0,
+        "unit": "%"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "ecoli",
+      "organismText": "E. coli",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "mass spectrometry analysis",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": true,
+      "valueBasis": "negation"
+    },
+    {
+      "id": "cl1-H1-a0b01267",
+      "paperId": "H1",
+      "sectionId": "t1",
+      "quote": "Bovine β-casein | E. coli | SDS-PAGE | - | Not phosphorylated | - |",
+      "field": "phosphorylation_degree",
+      "value": 0.0,
+      "unit": "% of native sites",
+      "si": {
+        "value": 0.0,
+        "unit": "%"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "ecoli",
+      "organismText": "E. coli",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "undetermined",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": true,
+      "valueBasis": "negation"
+    },
+    {
+      "id": "cl1-H1-b0ff60aa",
+      "paperId": "H1",
+      "sectionId": "t3",
+      "quote": "Bovine β-casein | Glycine max | SDS-PAGE and WB | Mass spectrometry (MALDI-MS) | Not phosphorylated | 0.1–0.4%",
+      "field": "phosphorylation_degree",
+      "value": 0.0,
+      "unit": "% of native sites",
+      "si": {
+        "value": 0.0,
+        "unit": "%"
+      },
+      "confidence": 0.6,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Glycine max",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": false,
+      "citesRecordId": null,
+      "method": "Mass spectrometry (MALDI-MS)",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": true,
+      "valueBasis": "negation"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:28:08.006523+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 2,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'phosphate groups' does not normalise",
+    "unit: unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+  ],
+  "dropped": [
+    {
+      "paperId": "H1",
+      "sectionId": "s1",
+      "field": "phosphate_count",
+      "value": 5.0,
+      "unit": "phosphate groups",
+      "rule": "unit",
+      "detail": "unit 'phosphate groups' does not normalise"
+    },
+    {
+      "paperId": "H1",
+      "sectionId": "t4",
+      "field": "expression_pct_tsp",
+      "value": 1.0,
+      "unit": "%",
+      "rule": "unit",
+      "detail": "unit '%' is not in the family of '% TSP': Both are percentages but of different denominators — % of total soluble protein is not % of dry weight or % of native phosphorylation sites. Comparing them directly is a category error."
+    }
+  ],
+  "usage": {
+    "inputTokens": 22147,
+    "outputTokens": 4720,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004575,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

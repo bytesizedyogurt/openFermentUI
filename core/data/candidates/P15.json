@@ -1,0 +1,190 @@
+{
+  "paperId": "P15",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:43:13.516459+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P15-15ff0e10",
+      "paperId": "P15",
+      "sectionId": "s5",
+      "quote": "the maximum PHA content was 45.7% CDW (with 0.2 g L−1 NH4Cl)",
+      "field": "pha_content_cdw",
+      "value": 45.7,
+      "unit": "% CDW",
+      "si": {
+        "value": 45.7,
+        "unit": "% CDW"
+      },
+      "confidence": 0.75,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "Pseudomonas putida KT2440",
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": "gravimetric",
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:43:13.516459+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 11,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 11,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit '% of CDW' does not normalise",
+    "unit: unit '% of CDW' does not normalise",
+    "unit: unit '% of CDW' does not normalise",
+    "unit: unit '% of CDW' does not normalise",
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit 'g L−1' does not normalise",
+    "unit: unit 'g L−1' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "final_biomass_density",
+      "value": 2.6,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s4",
+      "field": "final_biomass_density",
+      "value": 2.9,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "pha_content_cdw",
+      "value": 20.7,
+      "unit": "% of CDW",
+      "rule": "unit",
+      "detail": "unit '% of CDW' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "pha_content_cdw",
+      "value": 30.9,
+      "unit": "% of CDW",
+      "rule": "unit",
+      "detail": "unit '% of CDW' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s4",
+      "field": "pha_content_cdw",
+      "value": 37.2,
+      "unit": "% of CDW",
+      "rule": "unit",
+      "detail": "unit '% of CDW' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s4",
+      "field": "pha_content_cdw",
+      "value": 28.3,
+      "unit": "% of CDW",
+      "rule": "unit",
+      "detail": "unit '% of CDW' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "pha_titre",
+      "value": 0.9,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s4",
+      "field": "pha_titre",
+      "value": 1.1,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "medium_component_conc",
+      "value": 10.0,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "medium_component_conc",
+      "value": 0.5,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    },
+    {
+      "paperId": "P15",
+      "sectionId": "s2",
+      "field": "medium_component_conc",
+      "value": 0.8,
+      "unit": "g L−1",
+      "rule": "unit",
+      "detail": "unit 'g L−1' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 35345,
+    "outputTokens": 4517,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.005793,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [
+    "section s7 was truncated at a sentence boundary to 11957 of 17098 characters"
+  ],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 1
+  }
+}

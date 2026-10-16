@@ -1,0 +1,98 @@
+{
+  "paperId": "A3",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:36:07.438925+00:00",
+  "candidates": [
+    {
+      "id": "cl1-A3-b59c7fdb",
+      "paperId": "A3",
+      "sectionId": "f7",
+      "quote": "The number of resistant colonies was averaged from three independent transformation experiments (scored 6 days after transformation).",
+      "field": "time_to_colony",
+      "value": 6.0,
+      "unit": "d",
+      "si": {
+        "value": 144.0,
+        "unit": "h"
+      },
+      "confidence": 0.45,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": null,
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:36:07.438925+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 2,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: field expression_pct_tsp is denominated in '% TSP'; no unit given",
+    "unit: unit 'fold' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "A3",
+      "sectionId": "s10",
+      "field": "expression_pct_tsp",
+      "value": 0.0,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field expression_pct_tsp is denominated in '% TSP'; no unit given"
+    },
+    {
+      "paperId": "A3",
+      "sectionId": "s13",
+      "field": "fold_improvement",
+      "value": 50.0,
+      "unit": "fold",
+      "rule": "unit",
+      "detail": "unit 'fold' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 26165,
+    "outputTokens": 2362,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003798,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

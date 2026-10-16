@@ -1,0 +1,55 @@
+{
+  "paperId": "A2",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:35:50.237600+00:00",
+  "candidates": [],
+  "audit": [
+    {
+      "at": "2026-10-16T03:35:50.237600+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 1,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 1,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'µg mL−1' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "A2",
+      "sectionId": "s10",
+      "field": "medium_component_conc",
+      "value": 100.0,
+      "unit": "µg mL−1",
+      "rule": "unit",
+      "detail": "unit 'µg mL−1' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 38890,
+    "outputTokens": 858,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004318,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

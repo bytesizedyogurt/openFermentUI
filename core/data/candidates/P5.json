@@ -1,0 +1,192 @@
+{
+  "paperId": "P5",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:53:18.776581+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P5-f72db86f",
+      "paperId": "P5",
+      "sectionId": "abstract",
+      "quote": "The cells reached a maximum specific growth rate of 0.24 h-1 and a final cell dry weight (CDW) of 2.5 g L-1",
+      "field": "growth_rate_mu",
+      "value": 0.24,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.24,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "P. putida KT2440 (pSLM1)",
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P5-44698df0",
+      "paperId": "P5",
+      "sectionId": "abstract",
+      "quote": "a final cell dry weight (CDW) of 2.5 g L-1",
+      "field": "final_biomass_density",
+      "value": 2.5,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 2.5,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "P. putida KT2440 (pSLM1)",
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P5-7c732a04",
+      "paperId": "P5",
+      "sectionId": "s3",
+      "quote": "P. putida KT2440 (pSLM1) was grown on E2 medium with 10 g L-1 xylose in a 3.7 L laboratory bioreactor.",
+      "field": "medium_component_conc",
+      "value": 10.0,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 10.0,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "p-putida-kt2440",
+      "organismText": "P. putida KT2440 (pSLM1)",
+      "carbonSource": "xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:53:18.776581+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 5,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 5,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit '% w w-1' does not normalise",
+    "unit: unit 'g mcl-PHA per g octanoic acid' does not normalise",
+    "unit: unit '% w w-1' does not normalise",
+    "unit: unit '% w w-1' does not normalise",
+    "unit: unit '% w w-1' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "P5",
+      "sectionId": "abstract",
+      "field": "pha_content_cdw",
+      "value": 20.0,
+      "unit": "% w w-1",
+      "rule": "unit",
+      "detail": "unit '% w w-1' does not normalise"
+    },
+    {
+      "paperId": "P5",
+      "sectionId": "abstract",
+      "field": "pha_yield_substrate",
+      "value": 0.37,
+      "unit": "g mcl-PHA per g octanoic acid",
+      "rule": "unit",
+      "detail": "unit 'g mcl-PHA per g octanoic acid' does not normalise"
+    },
+    {
+      "paperId": "P5",
+      "sectionId": "s3",
+      "field": "pha_content_cdw",
+      "value": 0.3,
+      "unit": "% w w-1",
+      "rule": "unit",
+      "detail": "unit '% w w-1' does not normalise"
+    },
+    {
+      "paperId": "P5",
+      "sectionId": "s4",
+      "field": "pha_content_cdw",
+      "value": 0.0,
+      "unit": "% w w-1",
+      "rule": "unit",
+      "detail": "unit '% w w-1' does not normalise"
+    },
+    {
+      "paperId": "P5",
+      "sectionId": "t2",
+      "field": "pha_content_cdw",
+      "value": 28.7,
+      "unit": "% w w-1",
+      "rule": "unit",
+      "detail": "unit '% w w-1' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 20447,
+    "outputTokens": 3178,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003634,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

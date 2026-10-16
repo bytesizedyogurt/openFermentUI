@@ -1,0 +1,274 @@
+{
+  "paperId": "P24",
+  "run": "claude-1",
+  "extractedAt": "2026-10-16T03:49:27.143016+00:00",
+  "candidates": [
+    {
+      "id": "cl1-P24-43b696f7",
+      "paperId": "P24",
+      "sectionId": "t1",
+      "quote": "TMB4443 | Glucose | No | Aerobic | 3.8 ± 0.0 | 0.06 ± 0.00 | 0.00 ± 0.00 | 0.04 ± 0.01 | 0.01 ± 0.00 | 0.04 ± 0.01 | 1.0 ± 0.1 | 0.12 ± 0.00 | 1.8 ± 0.0",
+      "field": "pha_titre",
+      "value": 0.12,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 0.12,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "TMB4443",
+      "organismText": null,
+      "carbonSource": "Glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P24-683edd42",
+      "paperId": "P24",
+      "sectionId": "t1",
+      "quote": "TMB4443 | Glucose | Yes | Aerobic | 0.01 ± 0.00 | 0.09 ± 0.01 | 0.00 ± 0.00 | 0.05 ± 0.01 | 0.03 ± 0.01 | 0.14 ± 0.07 | 2.12 ± 0.04 | 0.11 ± 0.00 | 2.4 ± 0.0",
+      "field": "pha_titre",
+      "value": 0.11,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 0.11,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "TMB4443",
+      "organismText": null,
+      "carbonSource": "Glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P24-789885f4",
+      "paperId": "P24",
+      "sectionId": "t1",
+      "quote": "TMB4425 | Xylose | No | Anaerobic | 4.1 ± 0.2 | 0.06 ± 0.01 | 0.02 ± 0.00 | 0.09 ± 0.01 | 0.01 ± 0.00 | 0.01 ± 0.01 | 8.3 ± 0.8 | 0.43 ± 0.00 | 6.1 ± 0.1",
+      "field": "pha_titre",
+      "value": 0.43,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 0.43,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "TMB4425",
+      "organismText": null,
+      "carbonSource": "Xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-P24-a7be0c20",
+      "paperId": "P24",
+      "sectionId": "t1",
+      "quote": "TMB4425 | Xylose | Yes | Anaerobic | 0.02 ± 0.00 | 0.09 ± 0.00 | 0.04 ± 0.00 | 0.04 ± 0.00 | 0.01 ± 0.00 | 0.21 ± 0.03 | 13.8 ± 0.6 | 0.73 ± 0.00 | 16.4 ± 0.8",
+      "field": "pha_titre",
+      "value": 0.73,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 0.73,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "TMB4425",
+      "organismText": null,
+      "carbonSource": "Xylose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-16T03:49:27.143016+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 10,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 10,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit '% PHB/CDW' does not normalise",
+    "unit: unit 'mg/g C-source' does not normalise",
+    "unit: unit '% PHB/CDW' does not normalise",
+    "unit: unit 'mg/g C-source' does not normalise",
+    "unit: unit '% PHB/CDW' does not normalise",
+    "unit: unit 'mg/g C-source' does not normalise",
+    "unit: unit '% PHB/CDW' does not normalise",
+    "unit: unit 'mg/g C-source' does not normalise",
+    "unit: unit 'wt %' does not normalise",
+    "unit: unit '% PHB/CDW' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_content_cdw",
+      "value": 1.8,
+      "unit": "% PHB/CDW",
+      "rule": "unit",
+      "detail": "unit '% PHB/CDW' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_yield_substrate",
+      "value": 1.0,
+      "unit": "mg/g C-source",
+      "rule": "unit",
+      "detail": "unit 'mg/g C-source' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_content_cdw",
+      "value": 2.4,
+      "unit": "% PHB/CDW",
+      "rule": "unit",
+      "detail": "unit '% PHB/CDW' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_yield_substrate",
+      "value": 2.12,
+      "unit": "mg/g C-source",
+      "rule": "unit",
+      "detail": "unit 'mg/g C-source' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_content_cdw",
+      "value": 6.1,
+      "unit": "% PHB/CDW",
+      "rule": "unit",
+      "detail": "unit '% PHB/CDW' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_yield_substrate",
+      "value": 8.3,
+      "unit": "mg/g C-source",
+      "rule": "unit",
+      "detail": "unit 'mg/g C-source' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_content_cdw",
+      "value": 16.4,
+      "unit": "% PHB/CDW",
+      "rule": "unit",
+      "detail": "unit '% PHB/CDW' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "t1",
+      "field": "pha_yield_substrate",
+      "value": 13.8,
+      "unit": "mg/g C-source",
+      "rule": "unit",
+      "detail": "unit 'mg/g C-source' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "s1",
+      "field": "pha_content_cdw",
+      "value": 14.0,
+      "unit": "wt %",
+      "rule": "unit",
+      "detail": "unit 'wt %' does not normalise"
+    },
+    {
+      "paperId": "P24",
+      "sectionId": "s9",
+      "field": "pha_content_cdw",
+      "value": 0.0,
+      "unit": "% PHB/CDW",
+      "rule": "unit",
+      "detail": "unit '% PHB/CDW' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 19263,
+    "outputTokens": 5607,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.00473,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}
