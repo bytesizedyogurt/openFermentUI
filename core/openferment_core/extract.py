@@ -28,6 +28,7 @@ demo replays the loop that way, and the tests here stub the call directly.
 """
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import sys
@@ -97,8 +98,11 @@ A field marked requiresMethod needs the analytical method the paper used. \
 Name it as the paper does; if the paper reports the value without saying how \
 it was measured, write "undetermined".
 
-Give the unit as the paper wrote it. Give confidence as your own estimate \
-that the quote really reports this field, from 0 to 1.
+Give the unit as the paper wrote it, with one exception: a field that is a \
+share of dry cell mass takes the unit "% CDW", chosen from its list, \
+whether the paper writes "%", "wt%", "% of CDW" or "% (w/w)". Give \
+confidence as your own estimate that the quote really reports this field, \
+from 0 to 1.
 
 When the sentence states a RANGE rather than a point — "7-10 days", "0.6 to \
 1 g/L", "$4-6/kg" — emit `range` with the low and high as the paper wrote \
@@ -131,7 +135,7 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
     field ids as enums, so the model cannot cite a section that does not
     exist or a field the ontology does not have. §2.4 checks both anyway;
     the enum just stops the wasted output."""
-    return {
+    tool = {
         "name": "emit_candidates",
         "description": (
             "Return every measurement the paper reports for a field in the ontology, "
@@ -236,6 +240,39 @@ def build_tool(section_ids: list[str], field_ids: list[str]) -> dict[str, Any]:
             "required": ["candidates"],
         },
     }
+    return _cdw_variants(tool, field_ids)
+
+
+# The unit a cell-mass fraction is recorded in (live test, 2026-10-16): the
+# model wrote "%" for such a field, another family, and 70 values were
+# rejected. These fields take their unit from an enumeration.
+CDW_UNITS = ["% CDW"]
+
+
+def _cdw_variants(tool: dict[str, Any], field_ids: list[str]) -> dict[str, Any]:
+    """Split the candidate schema in two when the ontology has cell-mass
+    fraction fields: those fields with `unit` enumerated, every other field
+    with `unit` free as before."""
+    ontology = tables()["ontology"]
+    cdw = [f for f in field_ids if ontology.get(f, {}).get("canonicalUnit") in CDW_UNITS]
+    if not cdw:
+        return tool
+    items = tool["input_schema"]["properties"]["candidates"]["items"]
+    other = [f for f in field_ids if f not in cdw]
+    fraction = copy.deepcopy(items)
+    fraction["properties"]["field"] = {**fraction["properties"]["field"], "enum": cdw}
+    fraction["properties"]["unit"] = {
+        "type": "string",
+        "enum": list(CDW_UNITS),
+        "description": "A share of dry cell mass is recorded in % CDW, whatever the paper writes.",
+    }
+    variants = [fraction]
+    if other:
+        rest = copy.deepcopy(items)
+        rest["properties"]["field"] = {**rest["properties"]["field"], "enum": other}
+        variants.append(rest)
+    tool["input_schema"]["properties"]["candidates"]["items"] = {"anyOf": variants}
+    return tool
 
 
 # ── the prompt ─────────────────────────────────────────────────────────

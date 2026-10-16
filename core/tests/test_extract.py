@@ -144,7 +144,7 @@ def test_extract_anchors_persists_and_counts_rejections(monkeypatch):
     sent = call.calls[0]
     assert sent["paper_id"] == "X1"
     assert "[t1 · Table 1 Placeholder rows, kept as rows.]" in sent["user_text"]
-    assert "titer_secreted" in sent["tool"]["input_schema"]["properties"]["candidates"]["items"]["properties"]["field"]["enum"]
+    assert any("titer_secreted" in v["properties"]["field"]["enum"] for v in item_variants(sent["tool"]))
 
     # Persisted, and the cache is honoured.
     path = extract.CANDIDATES_DIR / "X1.json"
@@ -246,7 +246,7 @@ def test_extract_endpoint_says_when_there_is_no_key(client, monkeypatch):
 
 def test_the_tool_lets_the_model_state_a_range_and_an_absence():
     tool = extract.build_tool(["s1"], ["titer_secreted"])
-    props = tool["input_schema"]["properties"]["candidates"]["items"]["properties"]
+    props = item_variants(tool)[-1]["properties"]
     assert props["range"]["properties"]["low"]["type"] == "number"
     assert props["range"]["properties"]["high"]["type"] == "number"
     assert props["negativeResult"]["type"] == "boolean"
@@ -354,8 +354,16 @@ def one_per_section(section_ids: list[str]) -> dict:
     }
 
 
+def item_variants(tool: dict) -> list[dict]:
+    """The candidate schema's variants: one for the cell-mass fraction fields,
+    one for the rest (live test, 2026-10-16); a schema with no such fields
+    has one."""
+    items = tool["input_schema"]["properties"]["candidates"]["items"]
+    return items.get("anyOf", [items])
+
+
 def sections_asked(tool: dict) -> list[str]:
-    return tool["input_schema"]["properties"]["candidates"]["items"]["properties"]["sectionId"]["enum"]
+    return item_variants(tool)[0]["properties"]["sectionId"]["enum"]
 
 
 def truncated(usage_in: int = 100) -> tuple[dict, extract.Usage]:
@@ -523,7 +531,7 @@ def test_a_carbon_source_absent_from_the_section_is_dropped_and_its_candidate_ke
 
 def test_the_tool_asks_for_the_carbon_source_in_the_papers_words():
     tool = extract.build_tool(["s1"], ["pha_content_cdw"])
-    items = tool["input_schema"]["properties"]["candidates"]["items"]
+    items = item_variants(tool)[0]
     prop = items["properties"]["carbonSource"]
     assert prop["type"] == "string"
     assert "words the paper uses" in prop["description"] and "names none" in prop["description"]
