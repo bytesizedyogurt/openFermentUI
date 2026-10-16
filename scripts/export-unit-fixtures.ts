@@ -79,6 +79,12 @@ const NORMALIZE_INPUTS = [
   'Da',
   'g mol⁻¹',
   'g mol-1', // ASCII superscript, by the fallback
+  // The minus sign journals print (live test, 2026-10-16): U+2212 and the en dash.
+  'g L\u22121',
+  'g g\u22121',
+  'h\u22121',
+  'g L\u22121 h\u22121',
+  'g L\u20131',
 ];
 
 const normalize = NORMALIZE_INPUTS.map((raw) => ({

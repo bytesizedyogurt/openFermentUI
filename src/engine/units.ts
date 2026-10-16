@@ -291,7 +291,7 @@ export function normalizeUnit(raw: string): string | null {
   // uses — Python mirrors this exact sequence of replacements, so change it
   // in both places or the fixture test will say which one you forgot.
   const strip = (s: string) =>
-    s.replace(/[·⋅]/g, ' ').replace(/⁻¹/g, '-1').replace(/⁻²/g, '-2').replace(/⁻³/g, '-3').replace(/³/g, '3').replace(/²/g, '2').replace(/\s+/g, ' ').toLowerCase();
+    s.replace(/[·⋅]/g, ' ').replace(/[\u2212\u2013]/g, '-').replace(/⁻¹/g, '-1').replace(/⁻²/g, '-2').replace(/⁻³/g, '-3').replace(/³/g, '3').replace(/²/g, '2').replace(/\s+/g, ' ').toLowerCase();
   const target = strip(t);
   for (const key of Object.keys(U)) {
     if (strip(key) === target) return key;
