@@ -182,6 +182,33 @@ Sonnet answers; the plan shows the exact cost. Set a spend limit in the Anthropi
 console first, not because the volume is risky, but because a cap turns a runaway
 loop from a bill into a bug report.
 
+### The same tools, from an assistant outside the app
+
+`core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
+seven tools Postdoc uses, with the registry's own schemas, and two more:
+`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`. The
+registry's rules hold there as everywhere: a number typed into an input is
+refused. No tool writes to BioRepo, to Guild's ledger or to anything a person
+signs.
+
+A Claude Code session in this repository picks it up from `.mcp.json`. For
+Claude Desktop, add this to `claude_desktop_config.json`, with the path to your
+checkout:
+
+```json
+{
+  "mcpServers": {
+    "openferment": {
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/openfermentui/core", "--all-extras",
+               "python", "-m", "openferment_core.mcp_server"]
+    }
+  }
+}
+```
+
+`ask_postdoc` spends like a question asked in the app, under the same caps.
+
 ## Running it
 
 ```bash

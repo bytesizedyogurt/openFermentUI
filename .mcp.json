@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "openferment": {
+      "command": "uv",
+      "args": ["run", "--project", "core", "--all-extras", "python", "-m", "openferment_core.mcp_server"]
+    }
+  }
+}
