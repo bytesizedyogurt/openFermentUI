@@ -9,9 +9,9 @@
         "glucose"
       ],
       "finding": null,
-      "artifactId": "d9f046970a805bfb",
+      "artifactId": "ae4d9fa3500ed3fd",
       "evidence": {
-        "id": "ev-d9f046970a805bfb",
+        "id": "ev-ae4d9fa3500ed3fd",
         "label": "most PHB from glucose, toy",
         "value": 0.955727258598104,
         "unit": "g g-1",
@@ -19,7 +19,7 @@
         "provenance": "demo",
         "basis": {
           "tool": "geneos.ceiling",
-          "toolVersion": "cobra 0.32.1 · worker f2f0ebe1f978",
+          "toolVersion": "cobra 0.32.1 · worker 99be594f8858",
           "inputs": [
             {
               "name": "model",
@@ -66,7 +66,7 @@
               }
             }
           ],
-          "artifactId": "d9f046970a805bfb",
+          "artifactId": "ae4d9fa3500ed3fd",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         },

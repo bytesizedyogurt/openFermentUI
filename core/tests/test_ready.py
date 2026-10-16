@@ -11,6 +11,8 @@ from pathlib import Path
 
 import anthropic
 import httpx
+import json
+
 import pytest
 
 from openferment_core import api, biorepo, extract, intake, llm, ready
@@ -342,3 +344,87 @@ def test_roles_fails_on_a_budget_that_is_not_dollars(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "lots")
     check = ready.check_roles(False)
     assert check.mark == "fail" and "OPENFERMENT_DAILY_BUDGET_USD" in check.detail
+
+
+# ── what OF-BLD-014 added (§10.2) ──────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _no_worker_start(monkeypatch, request):
+    """A real worker takes most of a minute to start; every test but the
+    one that asks for it reads the row as skipped."""
+    if request.node.name != "test_a_worker_that_does_not_answer_is_said":
+        monkeypatch.setattr(ready, "check_workers", lambda ping=True: ready.Check("workers", "skip", "test"))
+
+
+def test_the_new_rows_are_listed_and_change_no_lane(monkeypatch):
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    checks = ready.run(no_network=True, port=1)
+    names = [c.name for c in checks]
+    for n in ("index", "models", "artifacts", "spend", "workers"):
+        assert n in names
+    assert ready.lane(checks) == "none"
+
+
+def test_index_warns_when_fewer_papers_are_indexed_than_fetched(monkeypatch):
+    from openferment_core import passages
+    from openferment_core.models import RagStatus
+
+    monkeypatch.setattr(passages, "status", lambda: RagStatus(papersIndexed=3, passages=40, lanes=[], chosenLane="bm25"))
+    monkeypatch.setattr(ready, "_fetched_complete", lambda: 5)
+    c = ready.check_index()
+    assert c.mark == "warn" and "3 papers indexed of 5 fetched" in c.detail and "lane bm25" in c.detail
+    monkeypatch.setattr(ready, "_fetched_complete", lambda: 3)
+    assert ready.check_index().mark == "ok"
+
+
+def test_a_model_file_that_is_missing_or_changed_is_named(monkeypatch):
+    from openferment_core import geneos_models as shelf
+
+    monkeypatch.setattr(shelf, "available", lambda m: f"{m.id}'s file is not on this machine: run pnpm geneos:fetch" if m.fetched else None)
+    c = ready.check_models()
+    assert c.mark == "warn" and "RehMBEL1391's file is not on this machine" in c.detail and "e_coli_core bundled" in c.detail
+
+
+def test_artifacts_are_counted(monkeypatch, tmp_path):
+    from openferment_core import artifacts
+
+    monkeypatch.setattr(artifacts, "folder", lambda: tmp_path)
+    (tmp_path / "a.json").write_text("{}")
+    (tmp_path / "b.json").write_text("{}")
+    assert ready.check_artifacts().detail == "2 kept"
+
+
+def test_spend_reads_today_against_the_cap_and_a_damaged_file_fails(monkeypatch, tmp_path):
+    from openferment_core import spend
+
+    f = tmp_path / "spend.json"
+    monkeypatch.setattr(spend, "path", lambda: f)
+    monkeypatch.setenv("OPENFERMENT_DAILY_BUDGET_USD", "2")
+    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 1.5, "index": 0.25}, "calls": 3, "reservations": {}}))
+    c = ready.check_spend()
+    assert c.mark == "ok" and "$1.75 of the $2.00 daily cap" in c.detail
+    f.write_text(json.dumps({"day": spend.today(), "byRole": {"answer": 2.0}, "calls": 3, "reservations": {}}))
+    assert ready.check_spend().mark == "warn"
+    f.write_text("{not json")
+    assert ready.check_spend().mark == "fail"
+
+
+def test_a_worker_that_does_not_answer_is_said(monkeypatch):
+    from openferment_core import workers
+
+    class Mute:
+        def __init__(self, module, timeout_s):
+            self.module = module
+
+        def ping(self, timeout_s=None):
+            if "proforma" in self.module:
+                raise workers.WorkerTimeout("no answer in 240 s")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(workers, "SimWorker", Mute)
+    c = ready.check_workers()
+    assert c.mark == "warn" and "geneOS answers" in c.detail and "Proforma does not" in c.detail
+    assert ready.check_workers(ping=False).mark == "skip"

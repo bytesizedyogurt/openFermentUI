@@ -221,3 +221,17 @@ def test_yield_ceiling_takes_ids_and_words_and_returns_one_evidence(store):
     finding = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"})
     assert finding.evidence == [] and "no uptake reaction" in finding.summary["finding"]
     assert "a number was typed" in (tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": 10}).error or "")
+
+
+def test_an_answer_does_not_depend_on_what_the_worker_solved_before():
+    # OF-BLD-014 §10.2: the nightly replay found a warm model's answer drifting
+    # in the last digits with the solve before it, so a kept ceiling did not
+    # replay identically. Each request now solves a fresh copy.
+    from openferment_core.geneos import worker
+
+    w = worker()
+    first = w.call("ceiling", {"modelId": "iJO1366", "product": "phb", "substrate": "glucose"})
+    w.call("mix", {"modelId": "iJO1366", "product": "phb", "a": "glucose", "b": "xylose"})
+    w.call("frontier", {"modelId": "iJO1366", "product": "phb", "substrate": "xylose"})
+    again = w.call("ceiling", {"modelId": "iJO1366", "product": "phb", "substrate": "glucose"})
+    assert again == first

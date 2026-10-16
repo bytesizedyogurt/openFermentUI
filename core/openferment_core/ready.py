@@ -119,6 +119,92 @@ def check_intake() -> Check:
     return Check("intake", "ok", summary)
 
 
+# ── what this document added (OF-BLD-014 §10.2) ───────────────────────
+
+
+def _fetched_complete() -> int:
+    n = 0
+    for path in intake.FULLTEXT_DIR.glob("*.json"):
+        try:
+            hit = intake.cached(path.stem)
+        except ValueError:
+            continue
+        n += hit is not None and hit.status == "complete"
+    return n
+
+
+def check_index() -> Check:
+    from . import passages
+
+    st = passages.status()
+    fetched = _fetched_complete()
+    detail = f"{st.papersIndexed} papers indexed of {fetched} fetched, {st.passages} passages; lane {st.chosenLane}"
+    if st.papersIndexed < fetched:
+        return Check("index", "warn", f"{detail}. Rebuild: pnpm index:build")
+    return Check("index", "ok", detail)
+
+
+def check_workers(ping: bool = True) -> Check:
+    """Each simulation worker answering ping. BioSTEAM takes most of a
+    minute to import, so this row is slow on a cold machine."""
+    if not ping:
+        return Check("workers", "skip", "--no-workers")
+    from .workers import SimWorker
+
+    said = []
+    worst = "ok"
+    for name, module in (("geneOS", "openferment_core.workers.geneos_worker"),
+                         ("Proforma", "openferment_core.workers.proforma_worker")):
+        w = SimWorker(module, timeout_s=240)
+        try:
+            w.ping(timeout_s=240)
+            said.append(f"{name} answers")
+        except Exception as e:  # any failure is the row's answer, in words
+            worst = "warn"
+            said.append(f"{name} does not: {_said(e)}")
+        finally:
+            w.close()
+    return Check("workers", worst, "; ".join(said))
+
+
+def check_models() -> Check:
+    from . import geneos_models as shelf
+
+    said, worst = [], "ok"
+    for m in shelf.SHELF.values():
+        if not m.fetched:
+            said.append(f"{m.id} bundled")
+            continue
+        why = shelf.available(m)
+        if why:
+            worst = "warn"
+            said.append(why)
+        else:
+            said.append(f"{m.id} present, sha256 {m.fetched.sha256[:12]} matches")
+    return Check("models", worst, "; ".join(said))
+
+
+def check_artifacts() -> Check:
+    from . import artifacts
+
+    try:
+        n = len(list(artifacts.folder().glob("*.json")))
+    except OSError as e:
+        return Check("artifacts", "warn", f"the artifact store cannot be read: {e}")
+    return Check("artifacts", "ok", f"{n} kept")
+
+
+def check_spend() -> Check:
+    try:
+        cap = spend.daily_budget()
+        day = spend.today()
+        spent = sum(float(v) for v in spend._read(day)["byRole"].values())
+    except (spend.BudgetSettingInvalid, spend.SpendFileDamaged) as e:
+        return Check("spend", "fail", str(e))
+    mark = "warn" if spent >= cap else "ok"
+    return Check("spend", mark, f"${spent:.2f} of the ${cap:.2f} daily cap spent today ({day}, UTC)")
+
+
 # ── what is out there ──────────────────────────────────────────────────
 
 
@@ -313,13 +399,14 @@ def check_backup() -> Check:
 # ── the report ─────────────────────────────────────────────────────────
 
 
-def run(no_network: bool = False, port: int | None = None) -> list[Check]:
+def run(no_network: bool = False, port: int | None = None, workers: bool = True) -> list[Check]:
     load_dotenv(CORE / ".env", override=False)
     host, found_port = service_address()
     port = port or found_port
     key = check_key()
     have_key = key.mark in ("ok", "warn")
-    checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
+    checks = [key, check_corpus(), check_build(), check_data(), check_intake(),
+              check_index(), check_models(), check_artifacts(), check_spend(), check_workers(workers)]
     if no_network:
         checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface", "backup")]
     else:
@@ -355,10 +442,10 @@ def report(checks: list[Check]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if any(a != "--no-network" for a in argv):
-        print("usage: python -m openferment_core.ready [--no-network]")
+    if any(a not in ("--no-network", "--no-workers") for a in argv):
+        print("usage: python -m openferment_core.ready [--no-network] [--no-workers]")
         return 2
-    checks = run(no_network="--no-network" in argv)
+    checks = run(no_network="--no-network" in argv, workers="--no-workers" not in argv)
     print(report(checks))
     return 1 if any(c.mark == "fail" for c in checks) else 0
 
