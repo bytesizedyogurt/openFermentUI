@@ -70,3 +70,14 @@ def test_the_server_answers_over_stdio():
 
     names = asyncio.run(asyncio.wait_for(go(), timeout=120))
     assert "draft_runbook" in names and "ask_postdoc" in names
+
+
+def test_u1_ask_postdoc_declines_in_words_when_the_loop_fails(monkeypatch):
+    from openferment_core import postdoc_agent
+
+    def boom(question, **kw):
+        raise FileNotFoundError("corpus.json not found. Generate it with `pnpm export:corpus`")
+
+    monkeypatch.setattr(postdoc_agent, "ask", boom)
+    out = _text(asyncio.run(mcp_server.build().call_tool("ask_postdoc", {"question": "What PHB yields?"})))
+    assert out["declined"].startswith("Postdoc could not run") and "export:corpus" in out["declined"]

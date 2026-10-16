@@ -613,8 +613,12 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
           {chatMode === 'live' && liveReplay && (
             <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
-              Replay of a run on {liveReplay.recordedAt.slice(0, 10)}
-              {liveReplay.standIn ? ', recorded with a scripted stand-in in place of the model' : ''}. Nothing is being asked now.
+              {/* §10.R: a stand-in recording's date is fixed to keep the fixture
+                  stable, so it claims none; a real recording names its day. */}
+              {liveReplay.standIn
+                ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
+                : `Replay of a run on ${liveReplay.recordedAt.slice(0, 10)}.`}{' '}
+              Nothing is being asked now.
             </div>
           )}
           {chatMode === 'live' ? (

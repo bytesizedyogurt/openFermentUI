@@ -314,7 +314,10 @@ async function main() {
   check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
   // OF-BLD-014 §10.3 — a replay says it is one, with its date.
   const replay = await page.locator('[data-testid="replay-label"]').innerText().catch(() => '');
-  check('A replayed answer is labelled with the date it was recorded', /Replay of a run on 2026-09-15, recorded with a scripted stand-in/.test(replay), replay.slice(0, 80));
+  // §10.R: a stand-in recording claims no date (its date is fixed so the
+  // fixture stays the same); a real recording names the day it was made.
+  check('A replayed answer says it is a replay, and a stand-in one claims no date',
+    /Replay of a recorded test run, made with a scripted stand-in in place of the model/.test(replay) && !/\d{4}-\d{2}-\d{2}/.test(replay), replay.slice(0, 100));
   await page.getByRole('button', { name: 'Scripted' }).click();
   await page.locator('button', { hasText: /titers have been achieved/i }).first().click();
   await page.waitForTimeout(2500);

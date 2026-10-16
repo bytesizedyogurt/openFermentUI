@@ -11,7 +11,7 @@ are checked every time `pnpm verify` runs.
 |---|---|---|
 | Start | `pnpm prototype:up` (the service on :8000, the build on :4173) | `pnpm demo:offline` (the build and the service double on :4317) |
 | Needs | a key the Models API accepts, the passage index (`pnpm data:prepare`), thread P extracted | nothing: no key, no network, no Python |
-| Postdoc | asks the model | replays a recorded run and labels it *Replay of a run on <date>* |
+| Postdoc | asks the model | replays a recorded run and labels it as a replay: *Replay of a run on <date>* for a real recording, *Replay of a recorded test run, made with a scripted stand-in* for the fixtures made with no key |
 
 Start the offline one in a second terminal before the demo. When the live
 service fails on the day, switch the browser tab to it.

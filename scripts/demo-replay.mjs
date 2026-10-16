@@ -9,7 +9,8 @@
  * Serves the build beside the service double, which answers every /api route
  * the nine beats use from the fixtures `demo.py --prototype` generates: no
  * key, no network, no Python. Postdoc's live panel replays a recorded run and
- * says so, with the date it was recorded. Start it in a second terminal
+ * says so: with its date when it is a real recording, and as a test run made
+ * with a scripted stand-in when it is not. Start it in a second terminal
  * before the demo; when the real service fails on the day, open this one.
  */
 import { existsSync } from 'node:fs';
@@ -26,6 +27,6 @@ if (!existsSync(join(DIST, 'index.html'))) {
 const { server } = createServiceDouble({ dist: DIST });
 server.listen(PORT, LOOPBACK, () => {
   console.log(`openFerment, offline: http://${LOOPBACK}:${PORT}/`);
-  console.log('Every service answer is a saved fixture; Postdoc labels its panel as a replay with its date.');
+  console.log('Every service answer is a saved fixture; Postdoc labels its panel as a replay.');
   console.log('Ctrl-C stops it.');
 });

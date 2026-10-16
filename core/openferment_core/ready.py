@@ -405,8 +405,15 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True)
     port = port or found_port
     key = check_key()
     have_key = key.mark in ("ok", "warn")
-    checks = [key, check_corpus(), check_build(), check_data(), check_intake(),
-              check_index(), check_models(), check_artifacts(), check_spend(), check_workers(workers)]
+    checks = [key, check_corpus(), check_build(), check_data(), check_intake()]
+    # §10.R: one damaged file must not stop the report; a row that cannot be
+    # checked says why and the rest still run.
+    for name, row in (("index", check_index), ("models", check_models), ("artifacts", check_artifacts),
+                      ("spend", check_spend), ("workers", lambda: check_workers(workers))):
+        try:
+            checks.append(row())
+        except Exception as e:  # any failure is the row's answer, in words
+            checks.append(Check(name, "warn", f"could not be checked: {type(e).__name__}: {e}"))
     if no_network:
         checks += [Check(n, "skip", "--no-network") for n in ("model", "roles", "europepmc", "huggingface", "backup")]
     else:

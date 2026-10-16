@@ -60,8 +60,14 @@ def build() -> MCPServer:
         "that carry no numbers of their own, each citing records, quoted sentences or computed values."))
     def ask_postdoc(question: str) -> str:
         from . import postdoc_agent
+        from .models import AnswerPlan
 
-        return postdoc_agent.ask(question).model_dump_json()
+        # §10.R: a loop that cannot run declines in words, as over HTTP,
+        # rather than surfacing as a protocol error.
+        try:
+            return postdoc_agent.ask(question).model_dump_json()
+        except Exception as e:
+            return AnswerPlan(question=question, declined=f"Postdoc could not run: {e}").model_dump_json()
 
     @server.tool(name="get_artifact", description="Read one kept artifact by its id: what was computed, from which inputs, with its provenance.")
     def get_artifact(id: str) -> str:  # noqa: A002 (the E.6 name)

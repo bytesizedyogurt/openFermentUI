@@ -428,3 +428,16 @@ def test_a_worker_that_does_not_answer_is_said(monkeypatch):
     c = ready.check_workers()
     assert c.mark == "warn" and "geneOS answers" in c.detail and "Proforma does not" in c.detail
     assert ready.check_workers(ping=False).mark == "skip"
+
+
+def test_r2_a_row_that_crashes_reads_as_a_warning_and_the_rest_still_run(monkeypatch):
+    from openferment_core import passages
+
+    def broken():
+        raise AttributeError("'list' object has no attribute 'get'")
+
+    monkeypatch.setattr(passages, "status", broken)
+    monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
+    checks = ready.run(no_network=True, port=1)
+    row = next(c for c in checks if c.name == "index")
+    assert row.mark == "warn" and "could not be checked" in row.detail and checks[-1].name == "service"
