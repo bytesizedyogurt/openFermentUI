@@ -152,7 +152,8 @@ class _Run:
 
 
 def _tool_defs() -> list[dict[str, Any]]:
-    return [{"name": i.name, "description": i.description, "input_schema": i.inputSchema} for i in tools.infos()]
+    return [{"name": i.name, "description": i.description, "input_schema": i.inputSchema,
+             "strict": tools.REGISTRY[i.name].strict} for i in tools.infos()]
 
 
 def _count(n: int, noun: str) -> str:

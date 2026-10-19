@@ -104,6 +104,10 @@ class Tool:
     # Small, mostly required fields (B.4's limits on strict schemas).
     input_model: type[BaseModel]
     run: Callable[[BaseModel, ToolContext], ToolResult]
+    # Whether the model is offered it strict. The API compiles one grammar for
+    # every strict tool in a request and refuses one that grows too large;
+    # `run` validates the input of every tool alike, strict or not.
+    strict: bool = True
 
     def info(self) -> ToolInfo:
         return ToolInfo(name=self.name, description=self.description, inputSchema=self.input_model.model_json_schema())

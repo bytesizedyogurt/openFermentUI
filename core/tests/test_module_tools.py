@@ -29,7 +29,7 @@ def ctx_for(pool_, **over):  # noqa: F811
     return tools.ToolContext(pool_factory=lambda: pool_, stores_factory=make)
 
 
-def read(module, ctx, ids=(), words="", kind=None, state=None, limit=20):
+def read(module, ctx, ids=(), words="", kind="", state="", limit=20):
     return tools.run(f"{module}_read", {"ids": list(ids), "words": words, "kind": kind, "state": state, "limit": limit}, ctx)
 
 
@@ -69,7 +69,7 @@ def test_words_and_refs_both_find_a_row(pool):  # noqa: F811
 
 def test_a_number_a_wrong_kind_and_a_wrong_state_are_refused_in_words(pool):  # noqa: F811
     ctx = ctx_for(pool)
-    assert "a number was typed" in tools.run("dominion_read", {"ids": [], "words": "", "kind": None, "state": None,
+    assert "a number was typed" in tools.run("dominion_read", {"ids": [], "words": "", "kind": "", "state": "",
                                                                "limit": 5, "ids_extra": 3}, ctx).error
     assert "not a kind" in read("pureos", ctx, kind="molecule").error
     assert "refused its input" in read("dominion", ctx, state="free").error
@@ -124,3 +124,41 @@ def test_what_is_open_in_dominion_is_answered_from_dominion_read(pool):  # noqa:
     assert next(m for m in out.coverage.modules if m.module == "dominion").count > 0
     # The tool the model was offered is the registry's, by the API's name rule.
     assert "dominion_read" in [t["name"] for t in script.calls[0]["tools"]]
+
+
+def _unions(node, path=""):
+    """Parameters a strict schema leaves nullable or union-typed, as the API
+    counts them: a type array or an anyOf."""
+    found = []
+    if isinstance(node, dict):
+        if isinstance(node.get("type"), list) or "anyOf" in node:
+            found.append(path)
+        for key in ("properties", "$defs"):
+            for name, child in (node.get(key) or {}).items():
+                found += _unions(child, f"{path}.{name}")
+        if "items" in node:
+            found += _unions(node["items"], f"{path}[]")
+    return found
+
+
+def test_a_whole_request_stays_inside_the_sixteen_union_parameters_strict_tools_allow():
+    from openferment_core import llm
+
+    defs = [llm.strict_schema(t["input_schema"]) for t in postdoc_agent._tool_defs() if t["strict"]]
+    count = sum(len(_unions(d)) for d in defs) + len(_unions(llm.strict_schema(postdoc_agent.PLAN_SCHEMA)))
+    assert count <= 16, f"{count} union-typed parameters; the API refuses more than sixteen"
+    assert not any(_unions(llm.strict_schema(tools.REGISTRY[f"{m}_read"].info().inputSchema))
+                   for m in module_stores.MODULES)
+
+
+def test_the_read_tools_go_out_loose_and_the_rest_strict():
+    """Eighteen strict tools compiled to a grammar the API refused as too
+    large (live, 2026-10-19); the seven earlier tools stay strict, and
+    `tools.run` validates every input either way."""
+    from openferment_core import llm
+
+    sent = [llm.tool_param(t["name"], t["description"], t["input_schema"], t["strict"]) for t in postdoc_agent._tool_defs()]
+    assert [t["name"] for t in sent if t["strict"]] == list(tools.WHITELIST[:7])
+    assert {t["name"] for t in sent if not t["strict"]} == {f"{m}_read" for m in module_stores.MODULES}
+    assert "refused its input" in tools.run("dominion_read", {"ids": "hot-start-taq", "words": "", "kind": "", "state": "",
+                                                              "limit": 5}).error

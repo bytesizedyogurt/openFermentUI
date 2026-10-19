@@ -22,10 +22,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .. import module_stores
-from ..models import ModuleState, ToolResult
+from ..models import ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
 MAX_ROWS = 20
@@ -50,20 +52,26 @@ WHAT = {
 
 
 class ModuleReadInput(BaseModel):
+    """No field is nullable. Strict tools allow sixteen nullable or union
+    parameters across a whole request, and eleven tools with two each sent
+    twenty-five: the API answered 400 (live, 2026-10-19). An empty string
+    means "any", and `test_module_tools` counts the unions."""
+
     model_config = ConfigDict(extra="forbid")
 
     ids: list[str] = Field(description="Ids or refs (`<module>/<kind>/<id>`) to read, or an empty list.")
     words: str = Field(description="Words to search the module for, or an empty string for no word search.")
-    kind: str | None = Field(description="One of the module's kinds, named in the tool's description, or null for every kind.")
-    state: ModuleState | None = Field(description="One of open, fenced, approved, locked, proposed, retired; or null for every state.")
+    kind: str = Field(description="One of the module's kinds, named in the tool's description, or an empty string for every kind.")
+    state: Literal["", "open", "fenced", "approved", "locked", "proposed", "retired"] = Field(
+        description="One of open, fenced, approved, locked, proposed, retired; or an empty string for every state.")
     limit: int = Field(description=f"How many rows to return, at most {MAX_ROWS}.")
 
     @field_validator("kind", "state", mode="before")
     @classmethod
-    def _unused_is_null(cls, v: Any) -> Any:
-        # As in search_records: an empty value, or quotes around nothing, is null.
-        if isinstance(v, str) and v.strip() in ("", '""', "''"):
-            return None
+    def _unused_is_empty(cls, v: Any) -> Any:
+        # As in search_records: null, or quotes around nothing, means unused.
+        if v is None or (isinstance(v, str) and v.strip() in ('""', "''")):
+            return ""
         return v
 
 
@@ -90,14 +98,14 @@ def _runner(module: str):
     def run(inp: ModuleReadInput, ctx: ToolContext) -> ToolResult:
         name = f"{module}_read"
         kinds = module_stores.KINDS[module]
-        if inp.kind is not None and inp.kind not in kinds:
+        if inp.kind and inp.kind not in kinds:
             return ToolResult(error=f"{name} refused: {inp.kind!r} is not a kind {module_stores.LABEL[module]} holds; "
                                     f"the kinds are {', '.join(kinds)}.")
         stores = ctx.stores
         error = stores.error(module)
         if error:
             return ToolResult(error=f"{name} could not read the module: {error}")
-        matched = module_stores.find(stores, module, ids=inp.ids, words=inp.words, kind=inp.kind, state=inp.state)
+        matched = module_stores.find(stores, module, ids=inp.ids, words=inp.words, kind=inp.kind or None, state=inp.state or None)
         limit = max(0, min(inp.limit, MAX_ROWS))
         picked = [r.model() for r in matched[:limit]]
         dumped = [r.model_dump(mode="json", exclude={"module"}) for r in picked]
@@ -117,7 +125,7 @@ def _description(module: str) -> str:
     partial = module_stores.PARTIAL.get(module)
     return (
         f"Read {label}: {WHAT[module]}. Kinds: {kinds}. Pass ids or refs, words, a kind and a state to narrow; pass an "
-        f"empty list, an empty string and nulls to list the module. Returns at most {MAX_ROWS} rows, each with its "
+        f"empty list and empty strings to list the module. Returns at most {MAX_ROWS} rows, each with its "
         "ref (cite it in moduleRefs), label, state (open, fenced, approved, locked, proposed, retired; computed by the "
         "service), the module's own status word and its provenance; and the count of every match by state."
         + (f" Read in part: {partial}." if partial else "")
@@ -125,7 +133,9 @@ def _description(module: str) -> str:
 
 
 TOOLS = {
+    # Offered loose: eighteen strict tools compile to a grammar the API
+    # refuses (live, 2026-10-19). `tools.run` validates the input all the same.
     module: register(Tool(name=f"{module}_read", description=_description(module), input_model=ModuleReadInput,
-                          run=_runner(module)))
+                          run=_runner(module), strict=False))
     for module in module_stores.MODULES
 }
