@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from .models import CoverageHit, CoverageMap, ModuleCoverage
+from .models import CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
 
 PROJECTION = Path(__file__).parent / "data" / "modules.json"
 
@@ -102,8 +102,28 @@ class Row:
     def ref(self) -> str:
         return f"{self.module}/{self.kind}/{self.id}"
 
+    def model(self) -> ModuleRow:
+        return ModuleRow(module=self.module, kind=self.kind, id=self.id, ref=self.ref, label=self.label,  # type: ignore[arg-type]
+                         state=self.state, status=self.status, provenance=self.provenance,  # type: ignore[arg-type]
+                         detail=_short(self.detail))
+
     def hit(self) -> CoverageHit:
         return CoverageHit(ref=self.ref, id=self.id, kind=self.kind, label=self.label, state=self.state)  # type: ignore[arg-type]
+
+
+MAX_TEXT = 300
+MAX_ITEMS = 10
+
+
+def _short(value: Any) -> Any:
+    """A row's detail kept short enough that a page of rows stays readable."""
+    if isinstance(value, str):
+        return value if len(value) <= MAX_TEXT else value[: MAX_TEXT - 1] + "…"
+    if isinstance(value, list):
+        return [_short(v) for v in value[:MAX_ITEMS]]
+    if isinstance(value, dict):
+        return {k: _short(v) for k, v in value.items()}
+    return value
 
 
 # ── states, computed from each module's own word ──────────────────────────
@@ -165,6 +185,7 @@ class Sources:
     intake: Callable[[], dict[str, Any]]
     shelf: Callable[[], list[Any]]
     strain_aliases: Callable[[], dict[str, str]]
+    witness: Callable[[], list[Any]] = list
 
 
 def _projection() -> dict[str, Any]:
@@ -180,7 +201,7 @@ def _strain_aliases() -> dict[str, str]:
 
 
 def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
-    from . import artifacts, checks, evidence_pool, geneos, guild, intake
+    from . import artifacts, checks, evidence_pool, geneos, guild, intake, witness
 
     return Sources(
         projection=_projection,
@@ -191,6 +212,7 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         intake=intake.all_statuses,
         shelf=geneos.models,
         strain_aliases=_strain_aliases,
+        witness=witness.runs,
     )
 
 
@@ -322,11 +344,24 @@ class Stores:
 
     def _biorepo(self) -> Iterable[Row]:
         for r in self.pool().records:
-            yield Row("biorepo", "record", r["id"], r.get("measurement") or r.get("field") or r["id"],
+            kind = "candidate" if r.get("source") == "candidate" else "record"
+            yield Row("biorepo", kind, r["id"], r.get("measurement") or r.get("field") or r["id"],
                       record_state(r.get("provenance"), r.get("status")), r.get("provenance") or "unverified",
-                      provenance=r.get("provenance"), words="", detail={"paperId": r.get("paperId"), "field": r.get("field")})
+                      provenance=r.get("provenance") or "unverified",
+                      words=" ".join(str(r.get(k) or "") for k in ("field", "paperId", "strainId", "organism", "productId",
+                                                                   "carbonSource")),
+                      detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")})
         for a in self._get("artifacts"):
             yield _artifact_row("biorepo", a)
+        for run in self._get("witness"):
+            outcomes: dict[str, int] = {}
+            for x in run.results:
+                outcomes[x.outcome] = outcomes.get(x.outcome, 0) + 1
+            # A run's scores are provisional until a person has decided every
+            # record they rest on; Witness says so, and so does the row.
+            yield Row("biorepo", "witness-run", run.run, f"Witness run {run.run}", "open", "provisional",
+                      words="witness extractor run", detail={"outcomes": outcomes, "falsePositives": len(run.falsePositives),
+                                                             "models": run.models})
 
     def _guild(self) -> Iterable[Row]:
         # Personnel fields are reduced to what the ledger shows: a name, a
@@ -366,6 +401,54 @@ class Stores:
                 # Who a check names is never shown before it is run.
                 yield Row("home", "check", c.id, f"Open check on {', '.join(c.skillIds)}", check_state(c.state), c.state,
                           detail={"skillIds": c.skillIds})
+
+
+# ── reading, for the read tools ───────────────────────────────────────────
+
+KINDS = {
+    "dominion": ("molecule", "finding"),
+    "runbooks": ("runbook", "protocol"),
+    "geneos": ("host", "pathway", "model", "artifact"),
+    "fermos": ("artifact",),
+    "pureos": ("unit-operation",),
+    "proforma": ("scenario", "artifact"),
+    "biorepo": ("record", "candidate", "artifact", "witness-run"),
+    "guild": ("person", "check"),
+    "primer": ("lesson",),
+    "intake": ("source",),
+    "home": ("review", "check"),
+}
+
+
+def _tokens(text: str) -> set[str]:
+    from .corpus import tokenize
+
+    return set(tokenize(text))
+
+
+def find(stores: Stores, module: str, *, ids: Iterable[str] = (), words: str = "", kind: str | None = None,
+         state: str | None = None) -> list[Row]:
+    """A module's rows by id or ref, by words, by kind and by state; every
+    filter given is applied. Words rank by how many of them a row holds, its
+    label, names and words together; a row holding none is left out."""
+    rows = stores.rows(module)
+    if kind:
+        rows = [r for r in rows if r.kind == kind]
+    if state:
+        rows = [r for r in rows if r.state == state]
+    wanted = {i.strip() for i in ids if i.strip()}
+    if wanted:
+        rows = [r for r in rows if r.id in wanted or r.ref in wanted]
+    query = _tokens(words)
+    if query:
+        scored = []
+        for n, r in enumerate(rows):
+            have = _tokens(" ".join([r.label, r.id, r.words, *r.names]))
+            score = len(query & have)
+            if score:
+                scored.append((-score, n, r))
+        rows = [r for _, _, r in sorted(scored, key=lambda x: (x[0], x[1]))]
+    return rows
 
 
 # ── matching ──────────────────────────────────────────────────────────────

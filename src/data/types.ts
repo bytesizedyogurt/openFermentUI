@@ -1275,6 +1275,8 @@ export interface Claim {
   passages?: PassageRef[];
   /** Computed values it rests on, by evidence id. Absent on older plans. */
   evidenceIds?: string[];
+  /** OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`. Absent on older plans. */
+  moduleRefs?: string[];
 }
 
 /** A sentence a claim quotes, and the passage it stands in. */
@@ -1342,6 +1344,23 @@ export interface ModuleCoverage {
   error: string | null;
 }
 
+/** One row a module's read tool returns (OF-BLD-015 §7.2). */
+export interface ModuleRow {
+  module: ModuleName;
+  kind: string;
+  id: string;
+  /** `<module>/<kind>/<id>`, what a claim cites. */
+  ref: string;
+  label: string;
+  /** Computed by the service from `status`, never by a model. */
+  state: ModuleState;
+  /** The module's own word for where the row stands. */
+  status: string;
+  /** Null for a seed row that carries no mark. */
+  provenance: Provenance | null;
+  detail: Record<string, unknown>;
+}
+
 export interface CoverageMap {
   entities: string[];
   searched: number;
@@ -1392,6 +1411,8 @@ export interface AnswerPlan {
   runbookDraft?: RunbookDraft | null;
   /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans and in single mode. */
   coverage?: CoverageMap | null;
+  /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
+  rows?: ModuleRow[];
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -2097,6 +2118,8 @@ export interface ToolResult {
   usage: AnswerPlanUsage;
   /** A runbook draft the service assembled (§9.2). */
   draft: RunbookDraft | null;
+  /** Module rows a plan may cite (OF-BLD-015 §7.2). */
+  rows: ModuleRow[];
 }
 
 // ── Runbook drafts (OF-BLD-014 §9.2) ─────────────────────────────────────

@@ -81,7 +81,11 @@ name the record, the field or the unit, and the tool looks the value up.
 7. Cite only ids a tool returned to you in this conversation. A computed value \
 is cited by its evidence id.
 8. A price comes from a run a person produced. When selling_price refuses, \
-say which inputs wait for a source; never supply one yourself."""
+say which inputs wait for a source; never supply one yourself.
+9. The app's modules each have a read tool (dominion_read, runbooks_read, \
+geneos_read and the rest). When the coverage map names a module, read it with \
+its tool before you answer, and cite the rows you rely on by their ref in \
+moduleRefs. A row's state is the service's; say it, never decide it."""
 )
 
 
@@ -106,7 +110,12 @@ def _plan_schema() -> dict[str, Any]:
         "items": {"type": "string"},
         "description": "Evidence ids of computed values a tool returned, exactly as given.",
     }
-    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds"]
+    claim["properties"]["moduleRefs"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Refs of module rows a read tool returned (`<module>/<kind>/<id>`), exactly as given.",
+    }
+    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds", "moduleRefs"]
     claim["properties"]["paperIds"]["description"] = "Paper ids the evidence came from. The server derives them anyway."
     return schema
 
@@ -162,6 +171,12 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Looked up records of {what} · {_count(len(result.recordIds), 'record')}"
     if name == "convert_units":
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
+    if name.endswith("_read") and name[: -len("_read")] in module_stores.LABEL:
+        label = module_stores.LABEL[name[: -len("_read")]]
+        what = [f'"{inp["words"]}"'] if inp.get("words") else []
+        what += [", ".join(inp["ids"])] if inp.get("ids") else []
+        what += [str(inp[k]) for k in ("kind", "state") if inp.get(k)]
+        return f"Read {label}{' for ' + ' · '.join(what) if what else ''} · {_count(int(result.summary.get('count', 0)), 'row')}"
     return f"Ran {name}"
 
 
@@ -374,6 +389,7 @@ def ask(
         gaps.append(g)
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
+    cited_rows = {m for c in result.claims for m in c.moduleRefs}
     run.step(kind="final", tool=None, input=None,
              summary=f"Answered: {_count(len(result.claims), 'claim')} kept, {result.rejected} dropped", ms=0, ok=True)
     return AnswerPlan(
@@ -390,4 +406,5 @@ def ask(
         stopped=stopped,
         runbookDraft=run.draft,
         coverage=run.coverage,
+        rows=[run.seen.rows[m] for m in sorted(cited_rows)],
     )

@@ -4,10 +4,12 @@ Postdoc's loop, the HTTP endpoints (`GET /api/tools`, `POST /api/tools/{name}`)
 and the MCP server all run a tool through `run`, so a rule enforced here is
 enforced for every caller.
 
-The whitelist is closed at seven, added phase by phase: `search_records` and
-`convert_units` (Phase 3), `search_passages` (5), `yield_ceiling` (6),
-`growth_forecast` (7), `selling_price` (8), `draft_runbook` (9). An eighth is
-a new document.
+The whitelist is closed, added phase by phase: `search_records` and
+`convert_units` (OF-BLD-014 Phase 3), `search_passages` (5), `yield_ceiling`
+(6), `growth_forecast` (7), `selling_price` (8), `draft_runbook` (9); then one
+read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
+Messages API refuses a dot in a tool name. A tool outside it is a new
+document.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
 file, a field or a scenario, and the service looks the quantity up. A JSON
@@ -30,7 +32,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..models import ToolInfo, ToolResult
 
-# The seven names E.6 allows, whichever have been built.
+# The names E.6 and OF-BLD-015 allow, whichever have been built.
 WHITELIST = (
     "search_records",
     "convert_units",
@@ -39,6 +41,18 @@ WHITELIST = (
     "growth_forecast",
     "selling_price",
     "draft_runbook",
+    # OF-BLD-015 §7.2 — one read tool per module, in the rail's order.
+    "dominion_read",
+    "runbooks_read",
+    "geneos_read",
+    "fermos_read",
+    "pureos_read",
+    "proforma_read",
+    "biorepo_read",
+    "guild_read",
+    "primer_read",
+    "intake_read",
+    "home_read",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -100,7 +114,7 @@ REGISTRY: dict[str, Tool] = {}
 
 def register(tool: Tool) -> Tool:
     if tool.name not in WHITELIST:
-        raise ValueError(f"{tool.name!r} is not one of the seven tools OF-BLD-014 E.6 allows")
+        raise ValueError(f"{tool.name!r} is not in WHITELIST; a tool outside it does not exist")
     REGISTRY[tool.name] = tool
     return tool
 
@@ -157,6 +171,7 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
             update={
                 "summary": {},
                 "recordIds": [],
+                "rows": [],
                 "passages": [],
                 "evidence": [],
                 "error": f"{name} returned a summary of {size} characters, over the {MAX_SUMMARY_CHARS} a model may read.",
@@ -172,6 +187,7 @@ def infos() -> list[ToolInfo]:
 # The tools this phase builds register on import.
 from . import fermos as _fermos  # noqa: E402,F401
 from . import geneos as _geneos  # noqa: E402,F401
+from . import modules as _modules  # noqa: E402,F401
 from . import passages as _passages  # noqa: E402,F401
 from . import proforma as _proforma  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401

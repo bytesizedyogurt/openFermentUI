@@ -72,6 +72,9 @@ class Claim(BaseModel):
     # against its passage, and computed values it rests on, by evidence id.
     passages: list[PassageRef] = Field(default_factory=list)
     evidenceIds: list[str] = Field(default_factory=list)
+    # OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`,
+    # each returned by a module's read tool in this run.
+    moduleRefs: list[str] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -154,6 +157,27 @@ class ModuleCoverage(BaseModel):
     error: str | None = None
 
 
+class ModuleRow(BaseModel):
+    """One row a module's read tool returns (OF-BLD-015 §7.2): what the
+    module holds, where it stands, and how it is marked."""
+
+    module: ModuleName
+    kind: str
+    id: str
+    # `<module>/<kind>/<id>`, what a claim cites.
+    ref: str
+    label: str
+    # Computed from `status` by module_stores, never by a model.
+    state: ModuleState
+    # The module's own word: a clearance state, a runbook status, an ingest state.
+    status: str
+    # The row's provenance mark when the module keeps one; null for a seed
+    # row that carries none (a lesson, a unit operation).
+    provenance: Provenance | None = None
+    # A few named fields the module shows, kept short.
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
 class CoverageMap(BaseModel):
     """The sweep, module by module, in the order the rail lists them."""
 
@@ -190,6 +214,8 @@ class AnswerPlan(BaseModel):
     # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
     # held. The answer's footer reads it; null on the single-call path.
     coverage: CoverageMap | None = None
+    # OF-BLD-015 §7.2: the module rows the claims cite.
+    rows: list[ModuleRow] = Field(default_factory=list)
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
@@ -1022,6 +1048,8 @@ class ToolResult(BaseModel):
     usage: Usage = Field(default_factory=Usage)
     # A runbook draft the service assembled (OF-BLD-014 §9.2, E.6).
     draft: "RunbookDraft | None" = None
+    # Module rows a plan may cite (OF-BLD-015 §7.2).
+    rows: list[ModuleRow] = Field(default_factory=list)
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
