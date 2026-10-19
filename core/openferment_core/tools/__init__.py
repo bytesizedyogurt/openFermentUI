@@ -55,6 +55,11 @@ class ToolContext:
     # What this run's tool calls returned (validate.SeenSet), when a loop
     # owns the run; draft_runbook accepts only ids in it (§9.2).
     seen: Any = None
+    # Every module's store (module_stores.Stores), read on first use; its
+    # records come from this context's pool (OF-BLD-015 §7.1). A fixture
+    # hands in its own factory.
+    stores_factory: Callable[[], Any] | None = None
+    _stores: Any = field(default=None, repr=False)
 
     @property
     def pool(self) -> Any:
@@ -65,6 +70,16 @@ class ToolContext:
                 self.pool_factory = evidence_pool.load
             self._pool = self.pool_factory()
         return self._pool
+
+    @property
+    def stores(self) -> Any:
+        if self._stores is None:
+            if self.stores_factory is None:
+                from .. import module_stores
+
+                self.stores_factory = lambda: module_stores.Stores(pool_factory=lambda: self.pool)
+            self._stores = self.stores_factory()
+        return self._stores
 
 
 @dataclass(frozen=True)

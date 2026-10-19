@@ -40,7 +40,7 @@ def test_ask_runs_the_loop_by_default(client, monkeypatch):
     body = client.post("/api/ask", json={"question": "How much PHB?"}).json()
     assert len(script.calls) == 2
     assert [c["recordIds"] for c in body["claims"]] == [["r-X1-1"]]
-    assert [s["kind"] for s in body["trace"]] == ["tool", "final"] and body["stopped"] == "done"
+    assert [s["kind"] for s in body["trace"]] == ["coverage", "tool", "final"] and body["stopped"] == "done"
 
 
 def test_single_mode_is_one_call_with_no_tools(client, monkeypatch):
@@ -72,18 +72,18 @@ def test_the_stream_sends_each_step_then_the_plan(client, monkeypatch):
     r = client.post("/api/ask/stream", json={"question": "How much PHB from xylose?"})
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
     got = events(r.text)
-    assert [e for e, _ in got] == ["step", "step", "step", "plan"]
-    assert [d["n"] for _, d in got[:3]] == [1, 2, 3] and got[2][1]["kind"] == "final"
+    assert [e for e, _ in got] == ["step", "step", "step", "step", "plan"]
+    assert [d["n"] for _, d in got[:4]] == [1, 2, 3, 4] and got[0][1]["kind"] == "coverage" and got[3][1]["kind"] == "final"
     final = got[-1][1]
-    assert final["trace"] == [d for _, d in got[:3]], "the plan's trace is the steps that streamed"
+    assert final["trace"] == [d for _, d in got[:4]], "the plan's trace is the steps that streamed"
     assert [p["id"] for p in final["passages"]] == ["X1:s1:0"]
 
 
 def test_a_declined_plan_is_a_plan_event(client, monkeypatch):
     script_in(monkeypatch, llm.BudgetExhausted("today's budget is spent"))
     got = events(client.post("/api/ask/stream", json={"question": "q?"}).text)
-    assert [e for e, _ in got] == ["step", "plan"] and "budget" in got[1][1]["declined"]
-    assert got[0][1]["kind"] == "final" and got[0][1]["ok"] is False
+    assert [e for e, _ in got] == ["step", "step", "plan"] and "budget" in got[2][1]["declined"]
+    assert got[0][1]["kind"] == "coverage" and got[1][1]["kind"] == "final" and got[1][1]["ok"] is False
 
 
 def test_a_failure_in_the_service_is_an_error_event(client, monkeypatch):

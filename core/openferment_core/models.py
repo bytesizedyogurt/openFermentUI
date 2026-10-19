@@ -81,7 +81,7 @@ class PassageRef(BaseModel):
     quote: str
 
 
-TraceKind = Literal["tool", "restart", "final"]
+TraceKind = Literal["coverage", "tool", "restart", "final"]
 StopReason = Literal["done", "rounds", "calls", "cost", "time"]
 
 
@@ -114,6 +114,56 @@ class Usage(BaseModel):
     models: list[str] = Field(default_factory=list)
 
 
+# ── Coverage (OF-BLD-015 §7.1) ─────────────────────────────────────────
+#
+# Before Postdoc's first turn, code sweeps every module store for what the
+# question names, so Postdoc never calls a thing absent that a screen shows.
+
+# The one state every module row reads as (OF-BLD-015 §7.2). It is computed
+# in `module_stores.py` from the module's own word (a clearance state, a
+# runbook's status and lock, a check's state), never chosen by a model.
+ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
+ModuleName = Literal["dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
+                     "primer", "intake", "home"]
+
+
+class CoverageHit(BaseModel):
+    """One row of one module that the question names."""
+
+    # `<module>/<kind>/<id>`, the id a claim cites it by.
+    ref: str
+    id: str
+    kind: str
+    label: str
+    state: ModuleState
+
+
+class ModuleCoverage(BaseModel):
+    """What the sweep found in one module."""
+
+    module: ModuleName
+    label: str
+    # How many rows match; `hits` lists at most COVERAGE_HITS of them.
+    count: int = 0
+    hits: list[CoverageHit] = Field(default_factory=list)
+    # The question names the module itself ("what is open in Dominion").
+    named: bool = False
+    # Set when part of the module lives only in a browser, in words.
+    partial: str | None = None
+    # Set when the module's store could not be read, in words.
+    error: str | None = None
+
+
+class CoverageMap(BaseModel):
+    """The sweep, module by module, in the order the rail lists them."""
+
+    # Names the question was found to hold, in its own words.
+    entities: list[str] = Field(default_factory=list)
+    searched: int = 0
+    found: int = 0
+    modules: list[ModuleCoverage] = Field(default_factory=list)
+
+
 class AnswerPlan(BaseModel):
     question: str
     claims: list[Claim] = Field(default_factory=list)
@@ -137,6 +187,9 @@ class AnswerPlan(BaseModel):
     passages: list[Passage] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
+    # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
+    # held. The answer's footer reads it; null on the single-call path.
+    coverage: CoverageMap | None = None
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None

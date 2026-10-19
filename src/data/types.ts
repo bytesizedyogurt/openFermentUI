@@ -1283,7 +1283,7 @@ export interface PassageRef {
   quote: string;
 }
 
-export type TraceKind = 'tool' | 'restart' | 'final';
+export type TraceKind = 'coverage' | 'tool' | 'restart' | 'final';
 export type StopReason = 'done' | 'rounds' | 'calls' | 'cost' | 'time';
 
 /** One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1). */
@@ -1296,6 +1296,57 @@ export interface TraceStep {
   summary: string;
   ms: number;
   ok: boolean;
+}
+
+// ── Coverage (OF-BLD-015 §7.1) ─────────────────────────────────────────
+// Mirrors of the Pydantic models in core/openferment_core/models.py. Before
+// Postdoc's first turn, code sweeps every module store for what the question
+// names; the trace shows it as its first step and the footer reports it.
+
+/** The one state every module row reads as, computed by the service. */
+export type ModuleState = 'open' | 'fenced' | 'approved' | 'locked' | 'proposed' | 'retired';
+export type ModuleName =
+  | 'dominion'
+  | 'runbooks'
+  | 'geneos'
+  | 'fermos'
+  | 'pureos'
+  | 'proforma'
+  | 'biorepo'
+  | 'guild'
+  | 'primer'
+  | 'intake'
+  | 'home';
+
+/** One row of one module that the question names. */
+export interface CoverageHit {
+  /** `<module>/<kind>/<id>`, the id a claim cites it by. */
+  ref: string;
+  id: string;
+  kind: string;
+  label: string;
+  state: ModuleState;
+}
+
+/** What the sweep found in one module. */
+export interface ModuleCoverage {
+  module: ModuleName;
+  label: string;
+  count: number;
+  hits: CoverageHit[];
+  /** The question names the module itself. */
+  named: boolean;
+  /** Set when part of the module lives only in a browser, in words. */
+  partial: string | null;
+  /** Set when the module's store could not be read. */
+  error: string | null;
+}
+
+export interface CoverageMap {
+  entities: string[];
+  searched: number;
+  found: number;
+  modules: ModuleCoverage[];
 }
 
 export interface AnswerPlanUsage {
@@ -1339,6 +1390,8 @@ export interface AnswerPlan {
   stopped?: StopReason;
   /** A runbook the agent drafted, its numbers written by the service (OF-BLD-014 §9.2). */
   runbookDraft?: RunbookDraft | null;
+  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans and in single mode. */
+  coverage?: CoverageMap | null;
 }
 
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────

@@ -94,8 +94,8 @@ def test_two_searches_then_a_plan(pool):  # noqa: F811
     [c] = out.claims
     assert c.recordIds == ["r-X1-1"] and c.paperIds == ["X1"] and c.provenance == "curated"
     assert [p.id for p in out.passages] == ["X1:s1:0"]
-    assert [s.kind for s in out.trace] == ["tool", "tool", "final"]
-    assert out.trace[1].summary.startswith('Searched the papers for "xylose hydrolysate"')
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "tool", "final"]
+    assert out.trace[2].summary.startswith('Searched the papers for "xylose hydrolysate"')
     assert out.usage.costUsd == pytest.approx(0.003)
     assert all(c["tool_choice"] == "auto" for c in script.calls)
     assert script.calls[0]["system"] == postdoc_agent.AGENT_SYSTEM
@@ -109,7 +109,7 @@ def test_a_repeated_call_is_answered_from_the_cache(pool, passages_found):  # no
     script = Script([papers(), papers()], plan(claim(quotes=[("X1:s1:0", SENTENCE)])))
     out = ask(script, pool)
     assert len(passages_found) == 1, "the same input runs once"
-    assert [s.kind for s in out.trace] == ["tool", "tool", "final"]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "tool", "final"]
 
 
 def test_a_citation_of_something_never_retrieved_is_dropped(pool):  # noqa: F811
@@ -190,14 +190,14 @@ def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, monkeypatch):
         # Primary and fallback name the same model, so the chain has one rung:
         # there is nothing to restart on, and the refusal declines the question.
         assert [c["model"] for c in script.calls] == [first, first]
-        assert [s.kind for s in out.trace] == ["tool", "final"]
+        assert [s.kind for s in out.trace] == ["coverage", "tool", "final"]
         assert out.claims == [] and out.declined
         assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
         return
     second = chain[1]
     assert [c["model"] for c in script.calls] == [first, first, second, second]
-    assert [s.kind for s in out.trace] == ["tool", "restart", "tool", "final"]
-    assert f"{first} declined; asked again on {second}" == out.trace[1].summary
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "restart", "tool", "final"]
+    assert f"{first} declined; asked again on {second}" == out.trace[2].summary
     assert len(out.claims) == 1
     assert out.usage.costUsd == pytest.approx(0.002 + 0.001 * 3)
     # The second conversation starts fresh: only the question.
@@ -226,7 +226,7 @@ def test_a_tool_error_reaches_the_model(pool):  # noqa: F811
     out = ask(script, pool)
     block = script.calls[1]["messages"][-1]["content"][0]
     assert block["is_error"] is True and "number" in block["content"]
-    assert out.trace[0].ok is False and out.trace[0].summary.startswith("search_records refused")
+    assert out.trace[1].ok is False and out.trace[1].summary.startswith("search_records refused")
 
 
 def test_an_instruction_inside_a_passage_changes_nothing_the_validator_lets_through(pool):  # noqa: F811
@@ -265,7 +265,7 @@ def test_steps_stream_as_they_happen(pool):  # noqa: F811
     seen = []
     script = Script([records()], plan(claim(records=["r-X1-1"])))
     postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool), on_step=seen.append)
-    assert [s.kind for s in seen] == ["tool", "final"] and [s.n for s in seen] == [1, 2]
+    assert [s.kind for s in seen] == ["coverage", "tool", "final"] and [s.n for s in seen] == [1, 2, 3]
 
 
 def test_the_agent_prompt_names_its_tools_as_its_sources():

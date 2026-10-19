@@ -2,6 +2,7 @@
 (OF-BLD-014 §5.2).
 
     seen, trace, spent = SeenSet(), [], Usage()
+    coverage = module_stores.coverage(question)   # code, no model (OF-BLD-015 §7.1)
     for round in 1 … MAX_ROUNDS:
         turn = llm.converse(... tool_choice='auto')
         if the turn called tools: run them (cached by canonical input), keep
@@ -10,6 +11,10 @@
             last turn runs with tool_choice 'none' and is the answer
         else: the turn is the answer
     plan = validate_plan(answer, seen, pool)
+
+THE COVERAGE PASS. Before round one, code sweeps all eleven module stores for
+what the question names and puts the map in round one, after the question;
+the trace shows it as its first step and the plan carries it for the footer.
 
 THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
@@ -35,8 +40,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import llm, spend, tools
-from .models import AnswerPlan, RunbookDraft, ToolResult, TraceStep, Usage
+from . import llm, module_stores, spend, tools
+from .models import AnswerPlan, CoverageMap, RunbookDraft, ToolResult, TraceStep, Usage
 from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
@@ -128,6 +133,7 @@ class _Run:
     calls: int = 0
     cache: dict[str, ToolResult] = field(default_factory=dict)
     draft: RunbookDraft | None = None
+    coverage: CoverageMap | None = None
     cancelled: Callable[[], bool] = lambda: False
 
     def step(self, **kw: Any) -> TraceStep:
@@ -210,7 +216,11 @@ STOP_WORDS = {
 def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
     """One conversation on one model. Returns the answering turn and why the
     loop stopped. Raises what `converse` raises."""
-    messages: list[dict[str, Any]] = [{"role": "user", "content": run.question}]
+    first: Any = run.question
+    if run.coverage is not None:
+        # The map rides in round one, after the question (§7.1).
+        first = [{"type": "text", "text": run.question}, {"type": "text", "text": module_stores.for_model(run.coverage)}]
+    messages: list[dict[str, Any]] = [{"role": "user", "content": first}]
     defs = _tool_defs()
     rounds = 0
     while True:
@@ -246,6 +256,33 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
         messages.append({"role": "user", "content": blocks})
 
 
+def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
+    """The coverage pass (§7.1): code, no model, before round one. A sweep
+    that fails is said in the trace and the loop goes on without a map."""
+    started = run.clock()
+    try:
+        run.coverage = module_stores.coverage(run.question, ctx.stores)
+    except Exception as e:  # the sweep is a help to the answer, never a reason to refuse one
+        log.exception("coverage sweep failed")
+        run.step(kind="coverage", tool=None, input=None, summary=f"Could not sweep the modules: {type(e).__name__}",
+                 ms=int(round((run.clock() - started) * 1000)), ok=False)
+        return
+    run.step(kind="coverage", tool=None, input={"modules": module_stores.trace_lines(run.coverage)},
+             summary=f"Swept the modules for what the question names · {module_stores.footer(run.coverage)}",
+             ms=int(round((run.clock() - started) * 1000)), ok=True)
+
+
+def _declined(result: Any, model_declined: str | None, cmap: CoverageMap | None) -> str | None:
+    """`decline_reason`, except that an answer with nothing to say never
+    claims the corpus is silent about what a module holds (§7.1)."""
+    reason = decline_reason(result, model_declined)
+    if reason is None or model_declined or result.rejected or cmap is None or not cmap.found:
+        return reason
+    held = ", ".join(m.label for m in cmap.modules if m.count)
+    return (f"Postdoc wrote no claim it could support, though the app holds what the question names in {held}. "
+            "Those screens show it; ask again naming what you want from them.")
+
+
 def ask(
     question: str,
     *,
@@ -278,6 +315,8 @@ def ask(
     except spend.BudgetSettingInvalid as e:
         return AnswerPlan(question=question, declined=str(e))
 
+    _sweep(run, ctx)
+
     models = llm.chain("answer")
     answer: llm.Turn | None = None
     stopped = "done"
@@ -290,7 +329,7 @@ def ask(
         except Cancelled:
             run.step(kind="final", tool=None, input=None, summary="Stopped: nobody was waiting for the answer", ms=0, ok=False)
             return AnswerPlan(question=question, declined="Postdoc stopped: nobody was waiting for the answer.",
-                              usage=run.spent, trace=run.trace, stopped=stopped)
+                              usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
         except (llm.ModelRefused, llm.ModelUnavailable) as e:
             failure = e
             used = getattr(e, "usage", None)
@@ -312,13 +351,13 @@ def ask(
         run.step(kind="final", tool=None, input=None, summary=f"No answer: {str(failure)[:160] if failure else 'no model answered'}",
                  ms=0, ok=False)
         return AnswerPlan(question=question, declined=str(failure) if failure else "No model answered.",
-                          usage=run.spent, trace=run.trace, stopped=stopped)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
     data = answer.data
     if data is None:
         why = "it ran out of room" if answer.stopReason == "max_tokens" else "it was not a plan"
         run.step(kind="final", tool=None, input=None, summary=f"No plan: {why}", ms=0, ok=False)
         return AnswerPlan(question=question, declined=f"Postdoc's answer did not arrive whole ({why}).",
-                          usage=run.spent, trace=run.trace, stopped=stopped)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
 
     result = validate_plan(data.get("claims") or [], run.seen, ctx.pool)
     if result.rejected:
@@ -341,7 +380,7 @@ def ask(
         question=question,
         claims=result.claims,
         gaps=gaps,
-        declined=decline_reason(result, data.get("declined")),
+        declined=_declined(result, data.get("declined"), run.coverage),
         usage=run.spent,
         rejected=result.rejected,
         rejectionReasons=result.reasons,
@@ -350,4 +389,5 @@ def ask(
         trace=run.trace,
         stopped=stopped,
         runbookDraft=run.draft,
+        coverage=run.coverage,
     )

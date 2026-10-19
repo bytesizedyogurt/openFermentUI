@@ -12,7 +12,7 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { AnswerPlan, Claim, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
+import type { AnswerPlan, Claim, CoverageMap, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -323,8 +323,33 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             </>
           )}
         </span>
+        {plan.coverage && <CoverageFooter coverage={plan.coverage} />}
       </div>
     </div>
+  );
+}
+
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const inWords = (n: number) => WORDS[n] ?? String(n);
+
+/**
+ * OF-BLD-015 §7.1 — which modules the coverage pass searched and where it
+ * found what the question names, with the modules read only in part.
+ */
+function CoverageFooter({ coverage }: { coverage: CoverageMap }) {
+  const found = coverage.modules.filter((m) => m.count > 0);
+  const partial = coverage.modules.filter((m) => m.partial);
+  return (
+    <span className="text-caption text-ink-soft" data-testid="plan-coverage">
+      Searched {inWords(coverage.searched)}, found in {coverage.found ? inWords(coverage.found) : 'none'}
+      {found.length > 0 && <>: {found.map((m) => `${m.label} (${m.count})`).join(', ')}</>}
+      {partial.length > 0 && (
+        <span title={partial.map((m) => `${m.label}: ${m.partial}`).join('\n')}>
+          {' '}
+          · read in part: {partial.map((m) => m.label).join(', ')}
+        </span>
+      )}
+    </span>
   );
 }
 

@@ -543,12 +543,22 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
     ]
     events: list[dict[str, Any]] = []
     plan = postdoc_agent.ask(
-        STREAM_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+        STREAM_QUESTION, converse=_stand_in_converse(turns), ctx=_seed_ctx(pool),
         clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
     )
     assert plan.claims and not plan.rejected, f"the stand-in plan no longer passes the validator: {plan.rejectionReasons}"
     events.append({"event": "plan", "data": plan.model_dump(mode="json")})
     return events
+
+
+def _seed_ctx(pool: Any) -> tools.ToolContext:
+    """A context whose coverage pass (OF-BLD-015 §7.1) sweeps the seed and
+    the stand-in pool alone, so the recorded loop is the same on every
+    machine."""
+    from . import module_stores, tools
+
+    return tools.ToolContext(pool_factory=lambda: pool,
+                             stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool)))
 
 
 # §9.4: a second recorded loop, in which the stand-in asks for a forecast and
@@ -610,7 +620,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
             ]
             events: list[dict[str, Any]] = []
             plan = postdoc_agent.ask(
-                DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+                DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=_seed_ctx(pool),
                 clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
             )
             assert plan.runbookDraft is not None and len(plan.runbookDraft.predictions) == 4, "the stand-in draft no longer assembles"
