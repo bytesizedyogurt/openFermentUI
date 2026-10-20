@@ -20,7 +20,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { SKILL_BY_ID } from '../src/data/skills';
-import { sampleGuild } from '../src/data/guildSample';
+import { sampleGuild } from './lib/guild-ladder';
 import { DEFAULT_POLICY, addDays, competenceOf } from '../src/engine/competence';
 import { proposeChecks, rankPairs } from '../src/engine/checks';
 import type { Guild, GuildEvidence, GuildPerson } from '../src/data/types';

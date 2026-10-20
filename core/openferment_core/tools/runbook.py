@@ -15,7 +15,7 @@ from functools import lru_cache
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import runbook_draft
+from .. import programs, runbook_draft
 from ..models import DraftItem, DraftMeasure, ToolResult
 from . import Tool, ToolContext, register
 
@@ -43,6 +43,9 @@ def _ids() -> tuple[frozenset[str], frozenset[str]]:
 
 
 def _run(inp: DraftRunbookInput, ctx: ToolContext) -> ToolResult:
+    refused = programs.archived_refusal(NAME, [("product", inp.productId), ("strain", inp.strainId)], ctx.include_archived)
+    if refused:
+        return ToolResult(error=refused)
     try:
         products, strains = _ids()
         draft, left_out = runbook_draft.build(inp.title, inp.productId, inp.strainId, inp.items, inp.measures,

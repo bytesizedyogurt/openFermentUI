@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import proforma
+from .. import programs, proforma
 from ..models import ToolResult
 from . import Tool, ToolContext, register
 
@@ -27,9 +27,12 @@ NAME = "selling_price"
 class SellingPriceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # The draft flowsheet is named only while no archived program holds it
+    # (OF-BLD-016 §2.R); with the switch off `_run` refuses it.
     scenarioId: str = Field(description=(
-        f"A BioSTEAM scenario's id: {proforma.SCENARIO_ID}, the draft PHA flowsheet, or {proforma.BENCHMARK}, "
-        "the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it."))
+        "A BioSTEAM scenario's id: "
+        + "".join(f"{s}, a draft flowsheet, or " for s in programs.offered("scenario", [proforma.SCENARIO_ID]))
+        + f"{proforma.BENCHMARK}, the NREL 2011 corn stover ethanol design as biorefineries.cornstover builds it."))
 
 
 def _benchmark() -> ToolResult:
@@ -60,8 +63,13 @@ def _benchmark() -> ToolResult:
 def _run(inp: SellingPriceInput, ctx: ToolContext) -> ToolResult:
     if inp.scenarioId == proforma.BENCHMARK:
         return _benchmark()
+    refused = programs.archived_refusal(NAME, [("scenario", inp.scenarioId)], ctx.include_archived)
+    if refused:
+        return ToolResult(error=refused)
     if inp.scenarioId != proforma.SCENARIO_ID:
-        return ToolResult(error=f"{NAME} refused: there is no BioSTEAM scenario {inp.scenarioId!r}; the one there is is {proforma.SCENARIO_ID}")
+        shown = programs.offered("scenario", [proforma.SCENARIO_ID]) if not ctx.include_archived else [proforma.SCENARIO_ID]
+        there = f"the ids it takes are {', '.join(shown + [proforma.BENCHMARK])}"
+        return ToolResult(error=f"{NAME} refused: there is no BioSTEAM scenario {inp.scenarioId!r}; {there}")
     art = proforma.latest_run(inp.scenarioId)
     if art is None:
         info = proforma.scenario(pool=ctx.pool)

@@ -129,11 +129,11 @@ Not built: Common Seal.
 
 **Ask, plan, answer from records.** `/postdoc` · chord `g o`
 
-The thing you talk to. Runs a bounded loop of tools on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`: it searches the records and the papers' passages, shows each step as it runs, and writes claims that carry no numbers of their own, each citing a record, a sentence checked word for word against its passage, or a computed value.
+The thing you talk to. Before its first turn, code sweeps all eleven modules for what the question names and hands the model the map; then a bounded loop of tools runs on one model (`claude-haiku-5-5` in this build, restarted once on the fallback model on a refusal or an outage) through `openferment-core`: it reads any module through that module's read tool, searches the records and the papers' passages, shows each step as it runs, and writes claims that carry no numbers of their own, each citing a record, a module row with its computed state, a sentence checked word for word against its passage, or a computed value. It writes through each module's write tool, which calls the module's own write function and marks the result as the model's in the audit log; an action at a gate becomes a proposal that waits on Home for a person. A follow-up is swept with the earlier questions it reads, never their answers. A plan's gaps and decline hold no number, like its claims, and so do a proposal's words; a proposal to check a person shows to the lead and assessors alone, never to the person it names. A candidate the model writes by hand is anchored like the extractor's and kept apart from the extractor's file, so it never counts as an extraction. With archived programs hidden, the default, its evidence pool, its passages and every module's rows leave casein and PHA out; a question that names something archived is told which program holds it and where the switch is, and the switch reaches the service with the question, never from the model.
 
 | Component | Implemented in |
 |---|---|
-| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` |
+| Postdoc | `src/lib/postdoc.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py`, `src/components/ProposalsCard.tsx` |
 
 ### geneOS
 
@@ -151,7 +151,7 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 | Sequence search | `geneos.search` | stub |
 | Structure | `geneos.structure` | stub |
 | Function | `geneos.function` | stub |
-| Model | `geneos.model` | stub |
+| Model | `geneos.model` | live |
 | Strain design | `geneos.design` | stub |
 
 | Component | Implemented in |
@@ -166,7 +166,7 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 | Subsystem | Key | State |
 |---|---|---|
-| Kinetics | `fermos.kinetics` | stub |
+| Kinetics | `fermos.kinetics` | live |
 | Transport | `fermos.transport` | stub |
 | Operating mode | `fermos.mode` | stub |
 | Scale | `fermos.scale` | stub |
@@ -261,7 +261,7 @@ for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
-| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
+| Postdoc | The agent | `src/lib/postdoc.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
@@ -296,11 +296,22 @@ them. They are in the table because the table is the architecture, not an
 inventory of what happens to exist — and because a name with nothing under it
 is a smaller problem than a system with no name for the thing it is missing.
 
-**A destination can be empty and still be in the rail.** fermOS has a screen,
-five named subsystems and no code. That is deliberate: putting it in the
-navigation from day one means that when kinetics arrives the question is what
-fermOS does with it, not where in the navigation it should go. The screen says
-it is empty rather than implying otherwise, and Home says so too.
+**A destination can be thin and still be in the rail.** pureOS has a screen,
+the unit-operation vocabulary and no process model. fermOS had a screen and five
+named subsystems with no code until kinetics arrived, fitted from depositions
+alone; transport, operating mode, scale and control are still named and not
+built. Putting them in the navigation from day one means that when the work
+arrives the question is what the destination does with it, not where in the
+navigation it should go. Each screen says what it lacks rather than implying
+otherwise.
+
+**A program is not a destination.** The corpus serves three research programs
+(`src/data/programs.ts`): yeast ethanol, active, and casein and PHA, archived
+(OF-BLD-016). A program cuts across the eleven: its papers sit in BioRepo, its
+hosts in geneOS, its scenarios in Proforma, its runbooks and protocols in
+Runbooks. So it is a filter every destination applies through one selector in
+the store, not a twelfth entry, and the one switch that shows archived programs
+lives in Settings → Programs.
 
 **The Assay layer is where the arrow reverses.** Everything above Runbook is
 software reasoning about the world. Deposition is the world reporting back.

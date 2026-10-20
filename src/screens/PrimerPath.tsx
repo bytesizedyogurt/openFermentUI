@@ -8,9 +8,14 @@
 // shows levels and next steps and holds nothing of its own. No points,
 // scores or streaks: a count appears only where a skill asks for one, as the
 // supervised runs it needs before a witnessed check.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The lessons a path offers, the runs in progress
+// it points at and the protocol it sends someone to read all pass the store's
+// program filter, so with archived programs hidden it never names a casein or
+// PHA lesson or protocol.
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Lesson } from '@/data/types';
-import { useStore } from '@/store';
+import { useProgramFilter, useStore } from '@/store';
 import { SKILLS, SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { PRIMER_TABS } from '@/data/tabs';
@@ -19,7 +24,7 @@ import { REFRESH_WINDOW, pathOf, type PathItem, type PathSection } from '@/engin
 import { ActingAs, useGuild, type GuildContext } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
+import { Button, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { href } from '@/router';
 
 /** Up to three names, then how many more. */
@@ -33,16 +38,17 @@ export default function PrimerPath() {
   const ctx = useGuild();
   const modules = useStore((s) => s.modules);
   const runs = useStore((s) => s.runs);
-  const loadSample = useStore((s) => s.guildLoadSample);
-  const clearSample = useStore((s) => s.guildClearSample);
+
+  const shows = useProgramFilter();
 
   const lessonsFor = useMemo(() => {
     const out: Record<string, Lesson[]> = {};
-    for (const m of modules) for (const l of m.lessons) for (const sk of l.skills ?? []) (out[sk] ??= []).push(l);
+    for (const m of modules)
+      for (const l of m.lessons) if (shows('lesson', l.id)) for (const sk of l.skills ?? []) (out[sk] ??= []).push(l);
     return out;
-  }, [modules]);
+  }, [modules, shows]);
 
-  const openRuns = Object.values(runs).filter((r) => !r.finishedAt);
+  const openRuns = Object.values(runs).filter((r) => !r.finishedAt && shows('protocol', r.protocolId));
   const learner = ctx.acting && ctx.acting.active ? ctx.acting : null;
 
   return (
@@ -55,32 +61,17 @@ export default function PrimerPath() {
       <div className="-mt-2 mb-4">
         <ActingAs id="path-learning-as" label="Learning as" />
       </div>
-      {ctx.sample && (
-        <div className="mb-4">
-          <Callout kind="warn" title="Sample team: invented people">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Nothing done to the sample is saved or sent to the service.</span>
-              <Button size="sm" onClick={clearSample}>
-                Hide the sample
-              </Button>
-            </span>
-          </Callout>
-        </div>
-      )}
       <OwnerTabs tabs={PRIMER_TABS} />
 
       {ctx.guild.people.length === 0 ? (
         <Card>
           <EmptyState
             title="Nobody is on Guild’s ledger yet"
-            body="A path is read from the ledger: the people on the team and what has been recorded about each of them. Start the ledger in Guild, or look at an invented team first."
+            body="A path is read from the ledger: the people on the team and what has been recorded about each of them. Start the ledger in Guild with yourself as its lead, then add the team."
             action={
-              <span className="flex flex-wrap gap-2 justify-center">
-                <LinkButton to="/guild/matrix" variant="primary">
-                  Start the ledger
-                </LinkButton>
-                <Button onClick={loadSample}>Show a sample team</Button>
-              </span>
+              <LinkButton to="/guild/people" variant="primary">
+                Add the first person
+              </LinkButton>
             }
           />
         </Card>
@@ -110,6 +101,7 @@ function Path({
   lessonsFor: Record<string, Lesson[]>;
   openRuns: { id: string; protocolId: string; version: string }[];
 }) {
+  const shows = useProgramFilter();
   const others = ctx.members.filter((m) => m.id !== personId);
   const assessors = (sk: string) => few(others.filter((m) => isAssessor(ctx.status, m.id, sk)).map((m) => m.name));
   const cosigners = (sk: string) => few(others.filter((m) => mayCosign(ctx.status, m.id, [sk])).map((m) => m.name));
@@ -133,7 +125,7 @@ function Path({
     // Otherwise the protocol that asks the most of it.
     const uses = (x: (typeof PROTOCOLS)[number]) =>
       x.versions.find((v) => v.version === x.currentVersion)?.steps.filter((st) => st.skills?.includes(sk)).length ?? 0;
-    const p = PROTOCOLS.filter((x) => uses(x) > 0).sort((x, y) => uses(y) - uses(x))[0];
+    const p = PROTOCOLS.filter((x) => shows('protocol', x.id) && uses(x) > 0).sort((x, y) => uses(y) - uses(x))[0];
     return p ? { to: `/runbooks/protocols/${p.id}`, cta: `Open ${p.id}` } : null;
   };
   const soon = new Set(SKILLS.filter((sk) => openRuns.some((r) => needs(r.protocolId, r.version, sk.id))).map((sk) => sk.id));

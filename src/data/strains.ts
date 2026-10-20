@@ -118,6 +118,7 @@ export function normalizeStrain(raw: string): string | null {
 export const STRAINS: Strain[] = [
   {
     id: 'cw15',
+    program: 'casein',
     binomial: 'Chlamydomonas reinhardtii',
     designation: 'cw15 (cell-wall-deficient)',
     taxonomy: [
@@ -158,6 +159,7 @@ export const STRAINS: Strain[] = [
   },
   {
     id: 'uvm4',
+    program: 'casein',
     binomial: 'Chlamydomonas reinhardtii',
     designation: 'UVM4 / UVM11 (expression mutants)',
     taxonomy: [
@@ -188,6 +190,7 @@ export const STRAINS: Strain[] = [
   },
   {
     id: 'creinhardtii-wt',
+    program: 'casein',
     binomial: 'Chlamydomonas reinhardtii',
     designation: 'walled wild type (CC-137c, cc124, WT12)',
     taxonomy: [
@@ -279,6 +282,7 @@ export const STRAINS: Strain[] = [
   },
   {
     id: 'bovine',
+    program: 'casein',
     binomial: 'Bos taurus',
     designation: 'β-casein source (CSN2)',
     taxonomy: ['Eukaryota', 'Metazoa', 'Chordata', 'Mammalia', 'Artiodactyla', 'Bovidae', 'Bos'],
@@ -399,6 +403,7 @@ export const STRAINS: Strain[] = [
   // arrives through Intake and a Guild decision.
   {
     id: 'c-necator-h16',
+    program: 'pha',
     binomial: 'Cupriavidus necator',
     designation: 'H16',
     taxonomy: ['Bacteria', 'Pseudomonadota', 'Betaproteobacteria', 'Burkholderiales'],
@@ -416,6 +421,7 @@ export const STRAINS: Strain[] = [
   },
   {
     id: 'p-putida-kt2440',
+    program: 'pha',
     binomial: 'Pseudomonas putida',
     designation: 'KT2440',
     taxonomy: ['Bacteria', 'Pseudomonadota', 'Gammaproteobacteria', 'Pseudomonadales'],
@@ -437,6 +443,7 @@ export const STRAINS: Strain[] = [
   // note says where the identity comes from and states no process number.
   {
     id: 's-cerevisiae-s288c',
+    program: 'yeast',
     binomial: 'Saccharomyces cerevisiae',
     designation: 'S288C',
     taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes', 'Saccharomycetales', 'Saccharomycetaceae', 'Saccharomyces'],
@@ -454,6 +461,7 @@ export const STRAINS: Strain[] = [
   },
   {
     id: 's-cerevisiae-cenpk113-7d',
+    program: 'yeast',
     binomial: 'Saccharomyces cerevisiae',
     designation: 'CEN.PK113-7D',
     taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes', 'Saccharomycetales', 'Saccharomycetaceae', 'Saccharomyces'],

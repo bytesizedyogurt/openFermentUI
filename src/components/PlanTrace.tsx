@@ -3,8 +3,10 @@
 // Every line is written by code in postdoc_agent.py from the tool's name, its
 // input and what it returned; the model writes none of it. A line opens to
 // the exact input the tool was given, so what was searched is checkable, and
-// a refused call reads as refused.
-import { AlertTriangle, CheckCircle2, Database, FileSearch, RefreshCw, Repeat, Wrench } from 'lucide-react';
+// a refused call reads as refused. The first line is the coverage pass
+// (OF-BLD-015 §7.1): code sweeping every module for what the question names,
+// opening to one line a module.
+import { AlertTriangle, CheckCircle2, Database, FileSearch, LayoutGrid, RefreshCw, Repeat, Wrench } from 'lucide-react';
 import type { StopReason, TraceStep } from '@/data/types';
 
 const ICON: Record<string, typeof Database> = {
@@ -27,7 +29,11 @@ function duration(ms: number): string {
 
 function StepLine({ step }: { step: TraceStep }) {
   const Icon =
-    step.kind === 'restart'
+    step.kind === 'coverage'
+      ? step.ok
+        ? LayoutGrid
+        : AlertTriangle
+      : step.kind === 'restart'
       ? Repeat
       : step.kind === 'final'
         ? step.ok
@@ -41,9 +47,24 @@ function StepLine({ step }: { step: TraceStep }) {
     <span className="flex items-baseline gap-2 min-w-0">
       <Icon size={13} className={`${tone} shrink-0 translate-y-0.5`} aria-hidden />
       <span className="text-body text-ink min-w-0 break-words">{step.summary}</span>
-      {step.kind === 'tool' && <span className="font-num text-caption text-ink-soft shrink-0 ml-auto">{duration(step.ms)}</span>}
+      {(step.kind === 'tool' || step.kind === 'coverage') && <span className="font-num text-caption text-ink-soft shrink-0 ml-auto">{duration(step.ms)}</span>}
     </span>
   );
+  const modules = step.kind === 'coverage' ? (step.input?.modules as string[] | undefined) : undefined;
+  if (modules) {
+    return (
+      <li className="py-1" data-testid="trace-step">
+        <details>
+          <summary className="cursor-pointer list-none">{line}</summary>
+          <ul className="mt-1 ml-5 text-caption text-ink-soft" data-testid="trace-coverage">
+            {modules.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </details>
+      </li>
+    );
+  }
   if (step.kind !== 'tool' || !step.input) {
     return (
       <li className="py-1" data-testid="trace-step">

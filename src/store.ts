@@ -2,6 +2,7 @@
 // provenance-affecting changes fan out to derived views in one place.
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5);
 // what must survive a reload goes to the Durable tier (src/lib/durable.ts).
+import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import type {
   InputAssumption,
@@ -10,9 +11,7 @@ import type {
   Candidate,
   ReviewDecision,
   ActivityEvent,
-  ChatMessage,
   ClearanceStateId,
-  ChatSession,
   Collection,
   LiveConversation,
   LiveTurn,
@@ -52,6 +51,8 @@ import type {
   CheckNote,
   CheckResult,
   Checks,
+  Program,
+  ProgramId,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -62,7 +63,7 @@ import { RUNBOOKS } from '@/data/runbooks';
 import { PROTOCOLS } from '@/data/protocols';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
-import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
+import { PROGRAMS, PROGRAM_BY_ID, isArchived, programOfPaperId } from '@/data/programs';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
@@ -92,11 +93,9 @@ import {
   postWithdrawal,
   postPolicy,
 } from '@/lib/guild';
-import { sampleGuild } from '@/data/guildSample';
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
-import { mayQueue, proposeChecks, type Proposal } from '@/engine/checks';
-import { competenceOf, isAssessor, localToday, mayCosign, statusOf } from '@/engine/competence';
+import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
 import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
@@ -301,7 +300,6 @@ export interface OFState {
   collections: Collection[];
   modules: LearnModule[];
   activity: ActivityEvent[];
-  sessions: ChatSession[];
   /**
    * Postdoc's Live conversations, newest first. Durable: a question asked
    * here is still on the page after a citation is followed and after a
@@ -339,12 +337,10 @@ export interface OFState {
     bannerDismissed: boolean;
     paletteOpen: boolean;
     jobsOpen: boolean;
-    inspectorOpen: boolean;
     sessionsOpen: boolean;
     railCollapsed: boolean;
     tourStop: number | null;
     helpOpen: boolean;
-    chatMode: 'scripted' | 'live';
   };
 
   // ── actions ──────────────────────────────────────────────────────────
@@ -433,8 +429,7 @@ export interface OFState {
   togglePin: (id: string) => void;
   duplicateScenario: (id: string) => string;
 
-  // chat
-  createSession: (title: string, scope?: ChatSession['scope']) => string;
+  // Postdoc's Live conversations — the only conversations there are
   /** A new Live conversation, first in the list; returns its id. */
   startLiveConversation: (title: string) => string;
   /** Add a turn to a Live conversation. */
@@ -443,9 +438,12 @@ export interface OFState {
   patchLiveTurn: (conversationId: string, turnId: string, patch: Partial<LiveTurn> & { step?: TraceStep }) => void;
   /** Remove a Live conversation. */
   dropLiveConversation: (conversationId: string) => void;
-  appendMessage: (sessionId: string, msg: ChatMessage) => void;
-  updateMessage: (sessionId: string, msgId: string, patch: Partial<ChatMessage>) => void;
-  pinEvidence: (sessionId: string, hits: ChatSession['pinned']) => void;
+  /**
+   * Take back a turn the service never received (it was not running), and
+   * the conversation with it when that turn was its only one. Nothing was
+   * asked, so nothing is kept as if it had been.
+   */
+  dropLiveTurn: (conversationId: string, turnId: string) => void;
 
   // learn
   completeLesson: (lessonId: string) => void;
@@ -512,6 +510,15 @@ export interface OFState {
   reviewer: string;
   setReviewerName: (name: string) => void;
   /**
+   * Whether archived programs show (OF-BLD-016 §2.1, E.1′). Off by default:
+   * casein and PHA leave every list, count, prompt and evidence pool until a
+   * person turns this on in Settings → Programs. Durable, like the reviewer's
+   * name: a choice about what to see should survive a reload. Screens read
+   * it through `useProgramFilter()` / `programVisible`, never directly.
+   */
+  showArchived: boolean;
+  setShowArchived: (on: boolean) => void;
+  /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
    * against them: the later of the two wins (OF-BLD-012 §7.3).
@@ -559,21 +566,12 @@ export interface OFState {
   /** Who is signing, as chosen in Guild's header. A claim, until there is sign-in. */
   guildActingId: string | null;
   /**
-   * The invented sample team, shown in place of the ledger while set. Never
-   * posted, never in the Durable tier; a reload drops it.
-   */
-  guildSample: Guild | null;
-  /**
    * OF-BLD-014 §7.4 — fermOS's fits made in this session, by deposition id,
-   * so Forecast can offer them; and whether the invented sample run is
-   * loaded. Ephemeral: a fit is kept by the service as an artifact, and the
-   * sample is kept nowhere.
+   * so Forecast can offer them. Ephemeral: a fit is kept by the service as
+   * an artifact.
    */
   fermosFits: Record<string, FermosFitResponse>;
-  fermosSampleLoaded: boolean;
   keepFermosFit: (fit: FermosFitResponse) => void;
-  setFermosSample: (loaded: boolean) => void;
-  guildSampleActingId: string | null;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
   /**
@@ -586,24 +584,12 @@ export interface OFState {
   /** A drafted scenario, or a session the tutor just answered, merged into `practice`. */
   mergePractice: (item: { scenario?: PracticeScenario; session?: PracticeSession }) => void;
   /**
-   * Whoever is learning, as Practice names them to the service: a person on
-   * the ledger who can hold skills, or null. A sample person is never sent.
-   */
-  practiceLearner: () => string | null;
-  /**
    * A session just closed. For a learner on the ledger the service has
-   * already put practice on it, so the ledger is fetched again; with the
-   * sample shown, the sample's learner gets the entry here, in the sample
-   * alone.
+   * already put practice on it, so the ledger is fetched again.
    */
   practiceClosed: (session: PracticeSession, title: string) => Promise<void>;
-  /**
-   * Guild's checks as the service last answered (OF-BLD-013 §5.4), or null.
-   * With the sample shown, `guildSampleChecks` stands in: the same ranking
-   * run in this browser, kept in memory, never posted.
-   */
+  /** Guild's checks as the service last answered (OF-BLD-013 §5.4), or null. */
   checks: Checks | null;
-  guildSampleChecks: Check[] | null;
   loadChecks: () => Promise<void>;
   /** Each returns null when it worked, or why it did not, in words. */
   checksPropose: () => Promise<{ made: number } | { why: string }>;
@@ -648,8 +634,6 @@ export interface OFState {
    * counts toward no skill or nobody who can hold skills is signing.
    */
   recordLessonForGuild: (lessonId: string) => Promise<{ personId: string; skills: string[] } | null>;
-  guildLoadSample: () => void;
-  guildClearSample: () => void;
   /** Post what this browser made offline, then take the service's ledger as the truth. */
   syncGuild: () => Promise<void>;
 
@@ -657,7 +641,8 @@ export interface OFState {
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
   addCollectionPapers: (collectionId: string, paperIds: string[]) => void;
-  resetDemo: () => void;
+  /** Settings → Clear this browser's data: the Durable tier, and the copies in memory it restores. */
+  clearBrowserData: () => void;
 }
 
 /**
@@ -778,10 +763,11 @@ const seedState = () => ({
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
-  collections: structuredClone(COLLECTIONS),
+  // Collections and activity start empty: what lands in them is what a
+  // person did in this browser, never an authored history (OF-BLD-016 §3.1).
+  collections: [] as Collection[],
   modules: structuredClone(MODULES),
-  activity: structuredClone(ACTIVITY),
-  sessions: structuredClone(SEED_SESSIONS),
+  activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
   activeRunId: null,
@@ -830,12 +816,10 @@ export const useStore = create<OFState>()((set, get) => ({
     bannerDismissed: false,
     paletteOpen: false,
     jobsOpen: false,
-    inspectorOpen: true,
     sessionsOpen: true,
     railCollapsed: false,
     tourStop: null,
     helpOpen: false,
-    chatMode: 'scripted',
   },
 
   setUI: (patch) => set((s) => ({ ui: { ...s.ui, ...patch } })),
@@ -843,20 +827,20 @@ export const useStore = create<OFState>()((set, get) => ({
   reviewer: '',
   setReviewerName: (name) => set({ reviewer: name }),
 
+  // Outside seedState: a reset discards the session's work, not what the
+  // person chose to see.
+  showArchived: false,
+  setShowArchived: (on) => set({ showArchived: on }),
+
   guild: EMPTY_GUILD,
   guildPending: [] as string[],
   guildPendingWithdrawals: [] as GuildWithdrawal[],
   guildActingId: null as string | null,
-  guildSample: null as Guild | null,
   fermosFits: {} as Record<string, FermosFitResponse>,
-  fermosSampleLoaded: false,
   keepFermosFit: (fit: FermosFitResponse) => set((s) => ({ fermosFits: { ...s.fermosFits, [fit.depositionId]: fit } })),
-  setFermosSample: (loaded: boolean) => set({ fermosSampleLoaded: loaded }),
-  guildSampleActingId: null as string | null,
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,
-  guildSampleChecks: null as Check[] | null,
 
   toast: (t) => {
     const id = nextId('toast');
@@ -1513,8 +1497,8 @@ export const useStore = create<OFState>()((set, get) => ({
 
   tickTimers: (dtMs) => {
     const s = get();
-    const speed = s.ui.simSpeed === Infinity ? 60 : s.ui.simSpeed;
-    const dt = (dtMs / 1000) * speed;
+    // A bench timer runs at wall-clock speed, always (OF-BLD-016 §3.R).
+    const dt = dtMs / 1000;
     const finishedTimers: TimerState[] = [];
     const runs = { ...s.runs };
     let changed = false;
@@ -1591,76 +1575,64 @@ export const useStore = create<OFState>()((set, get) => ({
       id,
       kind: 'research',
       title: `${product.name} — enumeration around the claim`,
-      status: enumerable ? 'running' : 'complete',
+      // Nothing runs behind an enumeration yet, so it opens as a draft with no
+      // ETA, cost, progress or count (OF-BLD-016 §3.R).
+      status: enumerable ? 'draft' : 'complete',
       stages,
       note: enumerable
         ? 'Handed off from the molecule catalogue. The industrial route is fenced, so this asks the question the fence does not cover: what else does the job, and does any of it fall outside the claim.'
         : 'Handed off from the molecule catalogue and stopped immediately, on purpose. Claim architecture, not molecular diversity, decides whether enumeration is worth paying for — and here it is not. Recorded so nobody funds the same sweep next quarter.',
-      eta: enumerable ? '~3 h' : null,
+      eta: null,
       outputs: enumerable ? [] : ['Claim reading', 'Recommendation not to enumerate'],
       productId: product.id,
-      progressPct: enumerable ? 18 : 100,
-      estCostUsd: enumerable ? 140 : 2,
+      progressPct: enumerable ? 0 : 100,
+      estCostUsd: null,
       strainId: product.defaultStrainId,
       // The prediction IS the claim being handed off. When the claim recites a
       // function rather than a sequence the honest prediction is zero escapes
       // — the same call rb-heme-calib records, reached the same way.
-      predictions: [
-        {
-          id: `${id}-escapes`,
-          label: 'Candidates falling outside the claim',
-          value: enumerable ? 120 : 0,
-          unit: 'candidates',
-          confidence: enumerable ? 'low' : 'high',
-          basis: enumerable
-            ? 'Structure-reciting claim, so the genus around it is enumerable. Count is an opening estimate and is what the sweep will test.'
-            : 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
-        },
-      ],
+      // An enumerable claim gets no count: nobody has one to predict yet.
+      predictions: enumerable
+        ? []
+        : [
+            {
+              id: `${id}-escapes`,
+              label: 'Candidates falling outside the claim',
+              value: 0,
+              unit: 'candidates',
+              confidence: 'high',
+              basis: 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
+            },
+          ],
       measurementSchema: [
         {
           id: `${id}-ms-escapes`,
           label: 'Candidates outside the claim on counsel review',
           unit: 'candidates',
           timepoint: 'analysis',
-          predictionId: `${id}-escapes`,
+          predictionId: enumerable ? null : `${id}-escapes`,
         },
       ],
-      // Locked at creation: it starts consuming compute immediately, and a
-      // prediction editable after the sweep runs is not a prediction.
-      lockedAt: new Date().toISOString(),
+      // The declined sweep's reasoning is locked at creation; a draft is not.
+      lockedAt: enumerable ? null : new Date().toISOString(),
       lockHash: null,
     };
-    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
+    if (runbook.lockedAt) runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-
-    if (enumerable) {
-      get().startJob({
-        title: `Enumerating around ${product.name}`,
-        kind: 'runbook',
-        stages: [
-          { label: 'Classify', ms: 1200 },
-          { label: 'Retrieve', ms: 2600 },
-          { label: 'Rank', ms: 2200 },
-          { label: 'Package', ms: 1400 },
-        ],
-        href: `#/runbooks/${id}`,
-      });
-    }
 
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
       text: enumerable
-        ? `Research runbook opened — enumerating around the claims on ${product.name}`
+        ? `Research runbook drafted — enumeration around the claims on ${product.name}`
         : `Enumeration declined for ${product.name} — the claim recites a function, not a sequence`,
       href: `#/runbooks/${id}`,
       provenance: 'user',
     });
     get().toast({
       text: enumerable
-        ? `Enumerating around ${product.name}. This is a research lead, not clearance.`
+        ? `Drafted a research runbook for ${product.name}. Nothing runs behind it yet; this is a research lead, not clearance.`
         : `Enumeration would not help ${product.name} — opened the reasoning instead.`,
       kind: enumerable ? 'info' : 'warn',
       href: `#/runbooks/${id}`,
@@ -1691,7 +1663,8 @@ export const useStore = create<OFState>()((set, get) => ({
       id,
       kind: 'industrial',
       title: `${product?.name ?? source.title} — process definition`,
-      status: 'running',
+      // Nothing runs behind the process stages yet: a draft (OF-BLD-016 §3.R).
+      status: 'draft',
       stages: [
         {
           name: 'Clearance sweep',
@@ -1701,7 +1674,7 @@ export const useStore = create<OFState>()((set, get) => ({
         },
         {
           name: 'Host & construct selection',
-          status: 'running',
+          status: 'pending',
           detail: product ? `Starting from ${product.defaultStrainId}` : null,
           value: null,
         },
@@ -1717,11 +1690,11 @@ export const useStore = create<OFState>()((set, get) => ({
         },
       ],
       note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
-      eta: '~50 min',
+      eta: null,
       outputs: [],
       productId: source.productId,
-      progressPct: 14,
-      estCostUsd: 52,
+      progressPct: 0,
+      estCostUsd: null,
       strainId: source.strainId ?? product?.defaultStrainId ?? null,
       // Promotion carries the research finding across verbatim. It does NOT
       // invent process predictions: the titre and recovery models have not run,
@@ -1751,23 +1724,11 @@ export const useStore = create<OFState>()((set, get) => ({
           predictionId: null,
         },
       ],
-      lockedAt: new Date().toISOString(),
+      lockedAt: null,
       lockHash: null,
     };
-    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-    get().startJob({
-      title: `Industrial runbook — ${product?.name ?? source.title}`,
-      kind: 'runbook',
-      stages: [
-        { label: 'Host', ms: 1800 },
-        { label: 'Train', ms: 2400 },
-        { label: 'Titre', ms: 2600 },
-        { label: 'CAPEX', ms: 2000 },
-      ],
-      href: `#/runbooks/${id}`,
-    });
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1808,20 +1769,11 @@ export const useStore = create<OFState>()((set, get) => ({
           }
           return st;
         });
-        return { ...r, status: 'running' as const, stages, eta: '~90 min' };
+        return { ...r, status: 'running' as const, stages, eta: null };
       }),
     }));
 
     const r = get().runbooks.find((x) => x.id === runbookId);
-    get().startJob({
-      title: `Resuming ${r?.title ?? 'runbook'}`,
-      kind: 'runbook',
-      stages: [
-        { label: 'Re-check', ms: 1200 },
-        { label: 'Cascade', ms: 3000 },
-      ],
-      href: `#/runbooks/${runbookId}`,
-    });
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1859,18 +1811,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }));
     const r = get().runbooks.find((x) => x.id === runbookId);
     if (!r) return;
-    // A Job with no stages would divide by zero in tickJobs, so the tray gets
-    // at least one even for a runbook whose stages are all already done.
-    const jobStages = r.stages
-      .filter((st) => st.status !== 'done')
-      .slice(0, 4)
-      .map((st) => ({ label: st.name.split(' ')[0], ms: 2400 }));
-    get().startJob({
-      title: r.title,
-      kind: 'runbook',
-      stages: jobStages.length > 0 ? jobStages : [{ label: 'Run', ms: 2400 }],
-      href: `#/runbooks/${runbookId}`,
-    });
+    // No timed job: nothing runs behind a runbook's stages yet (OF-BLD-016 §3.R).
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -2048,9 +1989,8 @@ export const useStore = create<OFState>()((set, get) => ({
       runbookId,
       protocolId,
       // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
-      // holds skills. Never a sample person: depositions are Durable, and the
-      // sample is kept out of the Durable tier.
-      operatorId: s.guildSample ? null : runOperatorDefault(s),
+      // holds skills.
+      operatorId: runOperatorDefault(s),
       startedAt: new Date().toISOString(),
       closedAt: null,
       state: 'staged',
@@ -2277,45 +2217,7 @@ export const useStore = create<OFState>()((set, get) => ({
     return copy.id;
   },
 
-  // ── chat ─────────────────────────────────────────────────────────────
-  createSession: (title, scope) => {
-    const id = nextId('sess');
-    const session: ChatSession = { id, title, startedAt: stamp(), scope, messages: [], pinned: [] };
-    set((s) => ({ sessions: [session, ...s.sessions] }));
-    return id;
-  },
-
-  appendMessage: (sessionId, msg) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) =>
-        x.id === sessionId ? { ...x, messages: [...x.messages, msg] } : x,
-      ),
-    })),
-
-  updateMessage: (sessionId, msgId, patch) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) =>
-        x.id === sessionId
-          ? {
-              ...x,
-              messages: x.messages.map((m) =>
-                m.id === msgId ? ({ ...m, ...patch } as ChatMessage) : m,
-              ),
-            }
-          : x,
-      ),
-    })),
-
-  pinEvidence: (sessionId, hits) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) => {
-        if (x.id !== sessionId) return x;
-        const seen = new Set(x.pinned.map((p) => `${p.paperId}:${p.sectionId}`));
-        const add = hits.filter((h) => !seen.has(`${h.paperId}:${h.sectionId}`));
-        return { ...x, pinned: [...x.pinned, ...add] };
-      }),
-    })),
-
+  // ── Postdoc ──────────────────────────────────────────────────────────
   // Live conversations take time-based ids, because nextId restarts on a
   // reload and these outlive one (the same reason adopted runbooks do).
   startLiveConversation: (title) => {
@@ -2348,6 +2250,15 @@ export const useStore = create<OFState>()((set, get) => ({
 
   dropLiveConversation: (conversationId) =>
     set((s) => ({ liveConversations: s.liveConversations.filter((c) => c.id !== conversationId) })),
+
+  dropLiveTurn: (conversationId, turnId) =>
+    set((s) => ({
+      liveConversations: s.liveConversations.flatMap((c) => {
+        if (c.id !== conversationId) return [c];
+        const turns = c.turns.filter((t) => t.id !== turnId);
+        return turns.length ? [{ ...c, turns }] : [];
+      }),
+    })),
 
   // ── learn ────────────────────────────────────────────────────────────
   // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
@@ -2521,6 +2432,9 @@ export const useStore = create<OFState>()((set, get) => ({
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
         reviewer: snap.reviewerName ?? '',
+        // OF-BLD-016 §2.1 — older snapshots predate the switch; the current
+        // position (off unless changed since load) stands.
+        showArchived: snap.showArchived ?? s.showArchived,
         // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
         // it still owes the service. Older snapshots predate the field.
         guild: snap.guild?.ledger ?? s.guild,
@@ -2779,12 +2693,11 @@ export const useStore = create<OFState>()((set, get) => ({
   //
   // Every write is applied here first, then posted. The service stores it or
   // refuses it with a rule: a refusal takes the write back out and says why;
-  // no service keeps it, marked pending, for `syncGuild` to post later. While
-  // the sample team is shown, writes touch the sample and nothing else.
+  // no service keeps it, marked pending, for `syncGuild` to post later.
 
   guildAddPerson: async (input) => {
     const s = get();
-    const ledger = s.guildSample ?? s.guild;
+    const ledger = s.guild;
     const person: GuildPerson = {
       id: personIdFor(input.name, ledger.people.map((p) => p.id)),
       name: input.name.trim(),
@@ -2795,10 +2708,6 @@ export const useStore = create<OFState>()((set, get) => ({
       addedBy: ledger.people.length === 0 ? null : actingIdOf(s),
       addedAt: new Date().toISOString(),
     };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, people: [...s.guildSample.people, person] } });
-      return person;
-    }
     set({ guild: { ...s.guild, people: [...s.guild.people, person] } });
     if (ledger.people.length === 0 && !s.guildActingId) set({ guildActingId: person.id });
     return guildPost(set, get, person.id, () => postPerson(person), (stored) => ({
@@ -2809,10 +2718,6 @@ export const useStore = create<OFState>()((set, get) => ({
   guildUpdatePerson: async (person) => {
     const s = get();
     const changed: GuildPerson = { ...person, updatedBy: actingIdOf(s), updatedAt: new Date().toISOString() };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, people: s.guildSample.people.map((p) => (p.id === person.id ? changed : p)) } });
-      return changed;
-    }
     const before = s.guild.people.find((p) => p.id === person.id);
     set({ guild: { ...s.guild, people: s.guild.people.map((p) => (p.id === person.id ? changed : p)) } });
     return guildPost(set, get, person.id, () => postPerson(changed), (stored) => ({
@@ -2825,10 +2730,6 @@ export const useStore = create<OFState>()((set, get) => ({
   guildRecord: async (input) => {
     const s = get();
     const entry: GuildEvidence = { ...input, id: newEvidenceId(), recordedAt: null };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, evidence: [...s.guildSample.evidence, entry] } });
-      return entry;
-    }
     set({ guild: { ...s.guild, evidence: [...s.guild.evidence, entry] } });
     return guildPost(set, get, entry.id, () => postEvidence(entry), (stored) => ({
       guild: { ...get().guild, evidence: get().guild.evidence.map((e) => (e.id === entry.id ? stored : e)) },
@@ -2845,10 +2746,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const w: GuildWithdrawal = { evidenceId, by, at: localToday(), reason: reason.trim() };
     const mark = (e: GuildEvidence): GuildEvidence =>
       e.id === evidenceId ? { ...e, withdrawnAt: w.at, withdrawnBy: by, withdrawReason: w.reason } : e;
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, evidence: s.guildSample.evidence.map(mark) } });
-      return true;
-    }
     const before = s.guild.evidence.find((e) => e.id === evidenceId);
     set({ guild: { ...s.guild, evidence: s.guild.evidence.map(mark) } });
     const unmark = () => ({
@@ -2878,7 +2775,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  guildSetActing: (id) => set((s) => (s.guildSample ? { guildSampleActingId: id } : { guildActingId: id })),
+  guildSetActing: (id) => set({ guildActingId: id }),
 
   guildSetPolicy: async (choice) => {
     const s = get();
@@ -2890,10 +2787,6 @@ export const useStore = create<OFState>()((set, get) => ({
       return false;
     }
     const policy: GuildPolicy = { ...choice, updatedBy: lead.id, updatedAt: new Date().toISOString() };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, policy } });
-      return true;
-    }
     if (!s.serviceUp) {
       get().toast({ text: 'The gate and the check rate are kept by the service, which is not answering here.', kind: 'error' });
       return false;
@@ -2908,20 +2801,9 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  guildLoadSample: () => {
-    const sample = sampleGuild(localToday());
-    // The sample's queue is the ranking run here on the invented ledger.
-    const checks = proposeChecks(sample, SKILL_BY_ID, localToday()).map((p, i) => sampleCheck(p, i));
-    set({ guildSample: sample, guildSampleActingId: 'p-sample-eric', guildSampleChecks: checks });
-  },
-
-  guildClearSample: () => set({ guildSample: null, guildSampleActingId: null, guildSampleChecks: null }),
-
   // ── Checks (OF-BLD-013 §5.4) ─────────────────────────────────────────
   //
-  // The service's rules decide every write; with the sample shown the same
-  // moves happen to the sample's checks in memory, under the few rules a
-  // screen needs (who may act), and nothing is posted.
+  // The service's rules decide every write.
 
   loadChecks: async () => {
     set({ checks: await loadChecksFromService() });
@@ -2933,15 +2815,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const by = actingIdOf(s);
     if (!by) return { why: 'Choose who you are with Acting as: the ranking is run by an assessor or the lead.' };
-    if (s.guildSample) {
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      const me = s.guildSample.people.find((p) => p.id === by) ?? null;
-      if (!mayQueue(me, map)) return { why: 'The ranking is run by an assessor or the lead.' };
-      const open = s.guildSampleChecks ?? [];
-      const made = proposeChecks(s.guildSample, SKILL_BY_ID, localToday(), coveredBy(open)).map((p, i) => sampleCheck(p, open.length + i));
-      set({ guildSampleChecks: [...open, ...made] });
-      return { made: made.filter((c) => c.personId !== by).length };
-    }
     try {
       const made = await postPropose(by);
       await get().loadChecks();
@@ -2959,24 +2832,6 @@ export const useStore = create<OFState>()((set, get) => ({
     // open: a duplicate is the queue's to know, and the person never sees a
     // check that names them before it is run.
     const own = by === personId;
-    if (s.guildSample) {
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      const them = s.guildSample.people.find((p) => p.id === personId);
-      if (!them || !them.active || them.role === 'auditor') return 'A check is for an active person who can hold skills.';
-      if (!own && !skillIds.some((k) => isAssessor(map, by, k))) return 'A check is asked for by the person, or by an assessor on one of its skills.';
-      const open = s.guildSampleChecks ?? [];
-      const cover = coveredBy(open);
-      const fresh = skillIds.filter((k) => !cover.has(`${personId}|${k}`));
-      if (fresh.length === 0) return own ? null : 'A check already in the queue covers this.';
-      const who = by === personId ? 'the person themselves' : guildView(s).people.find((p) => p.id === by)?.name ?? by;
-      const made = sampleCheck(
-        { personId, skillIds: fresh, score: 0, reasons: fresh.map((k) => ({ kind: 'requested' as const, skillId: k, text: `Asked for by ${who}.` })) },
-        open.length,
-        by,
-      );
-      set({ guildSampleChecks: [...open, made] });
-      return null;
-    }
     try {
       await postRequest({ personId, skillIds, by });
       await get().loadChecks();
@@ -2987,25 +2842,12 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  checksSchedule: async (checkId, day) =>
-    checkMove(set, get, checkId, (c, by, map, ledger) => {
-      if (!ledger.people.some((p) => p.id === c.personId && p.active)) return 'The person checked is no longer active; the check can be dismissed.';
-      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Scheduled by an assessor on every one of its skills, never by the person checked.';
-      return { ...c, state: 'scheduled', assessorId: by, scheduledFor: day };
-    }, (by) => postSchedule(checkId, { by, scheduledFor: day })),
+  checksSchedule: async (checkId, day) => checkMove(get, (by) => postSchedule(checkId, { by, scheduledFor: day })),
 
-  checksDismiss: async (checkId, reason) =>
-    checkMove(set, get, checkId, (c, by, map, ledger) => {
-      if (reason.trim().length < 2) return 'A dismissal says why; it is kept for the audit trail.';
-      const lead = ledger.people.some((p) => p.id === by && p.active && p.role === 'lead');
-      if (by === c.personId || !(lead || c.skillIds.some((k) => isAssessor(map, by, k))))
-        return 'Dismissed by an assessor on one of its skills or by the lead, never by the person checked.';
-      return { ...c, state: 'dismissed', dismissedBy: by, dismissReason: reason.trim(), closedAt: new Date().toISOString() };
-    }, (by) => postDismiss(checkId, { by, reason })),
+  checksDismiss: async (checkId, reason) => checkMove(get, (by) => postDismiss(checkId, { by, reason })),
 
   checksBrief: async (checkId) => {
     const s = get();
-    if (s.guildSample) return 'A brief is drafted by the service from the ledger it keeps, and the sample stays in this browser.';
     const by = actingIdOf(s);
     if (!by) return 'Choose who you are first.';
     try {
@@ -3021,37 +2863,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const by = actingIdOf(s);
     if (!by) return 'Choose who you are first: a check is signed by the assessor who ran it.';
-    if (s.guildSample) {
-      const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
-      if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Run by an assessor on every one of its skills, never by the person checked.';
-      const ids: string[] = [];
-      for (const k of c.skillIds) {
-        const n = SKILL_BY_ID[k].mastery.length;
-        const mine = results.filter((r) => r.skillId === k);
-        if (mine.length !== n) return `Every criterion of ${SKILL_BY_ID[k].name} is called before the check is signed.`;
-        const note = notes.find((x) => x.skillId === k)?.text.trim() ?? '';
-        if (note.length < 2) return `Write what you saw on ${SKILL_BY_ID[k].name}.`;
-        const e = await get().guildRecord({
-          personId: c.personId,
-          skillId: k,
-          kind: 'witnessed',
-          outcome: mine.every((r) => r.meets) ? 'pass' : 'fail',
-          at,
-          observerId: by,
-          source: { kind: 'check', ref: c.id },
-          raw: note,
-        });
-        if (e) ids.push(e.id);
-      }
-      set((x) => ({
-        guildSampleChecks: (x.guildSampleChecks ?? []).map((y) =>
-          y.id === checkId ? { ...y, state: 'done', assessorId: by, results, evidenceIds: ids, closedAt: new Date().toISOString() } : y,
-        ),
-      }));
-      return null;
-    }
     try {
       await postRecord(checkId, { by, at, results, notes });
       await get().loadChecks();
@@ -3082,34 +2893,12 @@ export const useStore = create<OFState>()((set, get) => ({
       };
     }),
 
-  practiceLearner: () => {
-    const s = get();
-    return s.guildSample ? null : runOperatorDefault(s);
-  },
 
-  practiceClosed: async (session, title) => {
-    const s = get();
+  practiceClosed: async (session) => {
     if (!session.closedAt) return;
     // A session the service named somebody on is theirs, whatever is shown
     // now: the service has put it on their ledger, so fetch the ledger back.
-    if (session.personId) {
-      if (session.evidenceId) await get().syncGuild();
-      return;
-    }
-    if (s.guildSample) {
-      const learner = runOperatorDefault(s);
-      if (!learner) return;
-      await get().guildRecord({
-        personId: learner,
-        skillId: session.skillId,
-        kind: 'scenario',
-        outcome: 'pass',
-        at: session.closedAt.slice(0, 10),
-        observerId: null,
-        source: { kind: 'scenario', ref: session.id },
-        raw: `Practice, \u201c${title}\u201d. The tutor observed: ${session.observed.map((o) => o.text).join(' ')}`,
-      });
-    }
+    if (session.personId && session.evidenceId) await get().syncGuild();
   },
 
   setRunOperator: (runId, personId) =>
@@ -3119,10 +2908,9 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step. A sample person is
-        // never written into a deposition, which is Durable.
+        // on the ledger names who performed that step.
         depositions:
-          run.depositionId && !s.guildSample
+          run.depositionId
             ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
             : s.depositions,
       };
@@ -3369,7 +3157,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  resetDemo: () => {
+  clearBrowserData: () => {
     // Clear persistence as well as memory. A reset that leaves a durable
     // snapshot behind would restore itself on the next reload, which is the
     // opposite of what the button says.
@@ -3378,7 +3166,9 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
+    // The shipped state hides archived programs, so the switch goes off too
+    // (it lives outside seedState so that nothing else resets it).
+    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {}, showArchived: false });
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3387,13 +3177,10 @@ export const useStore = create<OFState>()((set, get) => ({
       guildPending: [],
       guildPendingWithdrawals: [],
       guildActingId: serviceUp ? get().guildActingId : null,
-      guildSample: null,
-      guildSampleActingId: null,
-      guildSampleChecks: null,
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished and conversations kept here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3401,60 +3188,20 @@ export const useStore = create<OFState>()((set, get) => ({
 
 // ── Guild helpers (OF-BLD-013 §1.3) ────────────────────────────────────
 
-/** The ledger every Guild screen reads: the sample team while it is shown. */
-export function guildView(s: Pick<OFState, 'guild' | 'guildSample'>): Guild {
-  return s.guildSample ?? s.guild;
+/** The ledger every Guild screen reads. */
+export function guildView(s: Pick<OFState, 'guild'>): Guild {
+  return s.guild;
 }
 
-/** The checks every Guild screen reads: the sample's while it is shown. */
-export function checksView(s: Pick<OFState, 'checks' | 'guildSample' | 'guildSampleChecks'>): Check[] {
-  return s.guildSample ? (s.guildSampleChecks ?? []) : (s.checks?.checks ?? []);
+/** The checks every Guild screen reads, as the service last answered. */
+export function checksView(s: Pick<OFState, 'checks'>): Check[] {
+  return s.checks?.checks ?? [];
 }
 
-/** person|skill pairs an open check covers. */
-function coveredBy(checks: Check[]): Set<string> {
-  return new Set(checks.filter((c) => c.state === 'proposed' || c.state === 'scheduled').flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`)));
-}
-
-/** A check in the sample's queue, made here and never posted. */
-function sampleCheck(p: Proposal, n: number, by: string | null = null): Check {
-  return {
-    id: `ck-sample-${n + 1}`,
-    personId: p.personId,
-    skillIds: p.skillIds,
-    reasons: p.reasons,
-    state: 'proposed',
-    score: p.score,
-    proposedAt: new Date().toISOString(),
-    proposedBy: by,
-    results: [],
-    evidenceIds: [],
-  };
-}
-
-/**
- * One move on one open check: in the sample, `local` makes it here (or says
- * why not); otherwise `post` asks the service and the queue is fetched again.
- */
-async function checkMove(
-  set: StoreSet,
-  get: () => OFState,
-  checkId: string,
-  local: (c: Check, by: string, map: ReturnType<typeof competenceOf>, ledger: Guild) => Check | string,
-  post: (by: string) => Promise<unknown>,
-): Promise<string | null> {
-  const s = get();
-  const by = actingIdOf(s);
+/** One move on one open check: `post` asks the service and the queue is fetched again. */
+async function checkMove(get: () => OFState, post: (by: string) => Promise<unknown>): Promise<string | null> {
+  const by = actingIdOf(get());
   if (!by) return 'Choose who you are first.';
-  if (s.guildSample) {
-    const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
-    if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
-    const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-    const next = local(c, by, map, s.guildSample);
-    if (typeof next === 'string') return next;
-    set((x) => ({ guildSampleChecks: (x.guildSampleChecks ?? []).map((y) => (y.id === checkId ? next : y)) }));
-    return null;
-  }
   try {
     await post(by);
     await get().loadChecks();
@@ -3464,9 +3211,9 @@ async function checkMove(
   }
 }
 
-/** Who is signing: the sample's acting person while the sample is shown. */
-export function actingIdOf(s: Pick<OFState, 'guildSample' | 'guildActingId' | 'guildSampleActingId'>): string | null {
-  return s.guildSample ? s.guildSampleActingId : s.guildActingId;
+/** Who is signing, as chosen in Guild's header. */
+export function actingIdOf(s: Pick<OFState, 'guildActingId'>): string | null {
+  return s.guildActingId;
 }
 
 let guildSyncing = false;
@@ -3572,6 +3319,7 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     reviewDecisions,
     runbookLocks,
     reviewerName: s.reviewer,
+    showArchived: s.showArchived,
     guild: {
       ledger: s.guild,
       pending: s.guildPending,
@@ -3612,6 +3360,7 @@ if (durableAvailable()) {
       s.runbooks === prev.runbooks &&
       s.measuredEvidence === prev.measuredEvidence &&
       s.reviewer === prev.reviewer &&
+      s.showArchived === prev.showArchived &&
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
@@ -3626,6 +3375,249 @@ if (durableAvailable()) {
   });
   // A tab closing mid-run must not lose the last few hundred milliseconds.
   window.addEventListener('pagehide', flushDurable);
+}
+
+// ── programs (OF-BLD-016 §2.1, E.1′) ───────────────────────────────────
+//
+// One question, asked one way: which program does this entity belong to, and
+// does it show? Every list a screen renders, every count on Home and every
+// suggested prompt filters through `programVisible` (or the hook below); no
+// screen reads `showArchived` or a `program` field itself. The service asks
+// the same of corpus.json and modules.json through `programs.py`.
+
+/** What `programOf` can be asked about. */
+export type ProgramEntityKind =
+  | 'paper'
+  | 'record'
+  | 'strain'
+  | 'product'
+  | 'scenario'
+  | 'protocol'
+  | 'runbook'
+  | 'module'
+  | 'lesson'
+  | 'deposition';
+
+/**
+ * The lists `programOf` reads, from the store's state or any part of it.
+ * Each falls back to the seed when absent, so a check script or the corpus
+ * export can ask with no store at all. `records` and `runbooks` are worth
+ * passing from the store: the first holds the extractor's candidates, the
+ * second the runbooks adopted from a draft. `depositions` exist nowhere else.
+ */
+export type ProgramLookup = Partial<
+  Pick<OFState, 'records' | 'strains' | 'products' | 'scenarios' | 'protocols' | 'runbooks' | 'modules' | 'depositions'>
+>;
+
+const idIndexes = new WeakMap<readonly { id: string }[], Map<string, { id: string }>>();
+/** An id → entity map per list, built once per list identity. */
+function indexById<T extends { id: string }>(list: readonly T[]): Map<string, T> {
+  let m = idIndexes.get(list) as Map<string, T> | undefined;
+  if (!m) {
+    m = new Map(list.map((x) => [x.id, x]));
+    idIndexes.set(list, m);
+  }
+  return m;
+}
+
+const lessonIndexes = new WeakMap<readonly LearnModule[], Map<string, { lesson: ProgramId | undefined; module: ProgramId | undefined }>>();
+function lessonIndex(modules: readonly LearnModule[]) {
+  let m = lessonIndexes.get(modules);
+  if (!m) {
+    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, { lesson: l.program, module: mod.program }] as const)));
+    lessonIndexes.set(modules, m);
+  }
+  return m;
+}
+
+/** The programs that show by default: those whose status is active. */
+export function activePrograms(): Program[] {
+  return PROGRAMS.filter((p) => p.status === 'active');
+}
+
+/**
+ * The program an entity belongs to, or null when it is general (and always
+ * shows) or unknown.
+ *
+ *   paper       by its thread letter ('P12' → 'pha')
+ *   record      by the paper it cites, candidates included
+ *   strain, product, scenario, protocol, module
+ *               by the entry's own `program` field
+ *   lesson      its own field, else its module's
+ *   runbook     its own field, else the product it names, else the strain
+ *   deposition  the runbook it follows, else its protocol
+ */
+export function programOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): ProgramId | null {
+  switch (kind) {
+    case 'paper':
+      return programOfPaperId(id);
+    case 'record': {
+      const r = indexById(s.records ?? RECORDS).get(id) ?? indexById(RECORDS).get(id);
+      return r ? programOfPaperId(r.paperId) : null;
+    }
+    case 'strain':
+      return indexById(s.strains ?? STRAINS).get(id)?.program ?? null;
+    case 'product':
+      return indexById(s.products ?? PRODUCTS).get(id)?.program ?? null;
+    case 'scenario':
+      return indexById(s.scenarios ?? SCENARIOS).get(id)?.program ?? null;
+    case 'protocol':
+      return indexById(s.protocols ?? PROTOCOLS).get(id)?.program ?? null;
+    case 'module':
+      return indexById(s.modules ?? MODULES).get(id)?.program ?? null;
+    case 'lesson': {
+      const l = lessonIndex(s.modules ?? MODULES).get(id);
+      return l?.lesson ?? l?.module ?? null;
+    }
+    case 'runbook': {
+      const rb = indexById(s.runbooks ?? RUNBOOKS).get(id);
+      if (!rb) return null;
+      return (
+        rb.program ??
+        (rb.productId ? programOf('product', rb.productId, s) : null) ??
+        (rb.strainId ? programOf('strain', rb.strainId, s) : null)
+      );
+    }
+    case 'deposition': {
+      const d = indexById(s.depositions ?? []).get(id);
+      if (!d) return null;
+      return programOf('runbook', d.runbookId, s) ?? programOf('protocol', d.protocolId, s);
+    }
+  }
+}
+
+const exampleLessonIndexes = new WeakMap<readonly LearnModule[], Map<string, boolean>>();
+function exampleLessonIndex(modules: readonly LearnModule[]) {
+  let m = exampleLessonIndexes.get(modules);
+  if (!m) {
+    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, !!(l.example ?? mod.example)] as const)));
+    exampleLessonIndexes.set(modules, m);
+  }
+  return m;
+}
+
+/**
+ * Whether an entity is an example (OF-BLD-016 §3.3, D3): a seed runbook,
+ * protocol, scenario, module or lesson that describes a run nobody made. An
+ * example is treated as archived — hidden by default, shown by the same
+ * switch, opened under ArchivedBanner by a link — and is never deleted. A
+ * lesson is an example when it or its module says so. A deposition is one
+ * only by its own flag: a run a person starts from an example runbook is a
+ * run someone made.
+ */
+export function isExample(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): boolean {
+  switch (kind) {
+    case 'runbook':
+      return !!indexById(s.runbooks ?? RUNBOOKS).get(id)?.example;
+    case 'protocol':
+      return !!indexById(s.protocols ?? PROTOCOLS).get(id)?.example;
+    case 'scenario':
+      return !!indexById(s.scenarios ?? SCENARIOS).get(id)?.example;
+    case 'module':
+      return !!indexById(s.modules ?? MODULES).get(id)?.example;
+    case 'lesson':
+      return exampleLessonIndex(s.modules ?? MODULES).get(id) ?? false;
+    case 'deposition':
+      return !!indexById(s.depositions ?? []).get(id)?.example;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether an entity shows: it is general or its program is active, and it is
+ * not an example — or the person has turned archived programs and examples
+ * on. The one selector every screen calls (through `useProgramFilter` in a
+ * component).
+ */
+export function programVisible(
+  kind: ProgramEntityKind,
+  id: string,
+  s: ProgramLookup & Pick<OFState, 'showArchived'>,
+): boolean {
+  return s.showArchived || (!isArchived(programOf(kind, id, s)) && !isExample(kind, id, s));
+}
+
+/** The archived program an entity belongs to, or null — what ArchivedBanner names. */
+export function archivedProgramOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): Program | null {
+  const p = programOf(kind, id, s);
+  return p && isArchived(p) ? PROGRAM_BY_ID[p] : null;
+}
+
+/**
+ * `programVisible` bound to the store, for a component: call it once per
+ * render and filter with the predicate it returns —
+ *
+ *   const shows = useProgramFilter();
+ *   const papers = allPapers.filter((p) => shows('paper', p.id));
+ *
+ * It re-renders the component when the switch moves, a candidate arrives,
+ * a runbook is adopted, a scenario is copied or a deposition starts. Every
+ * list `programOf` reads comes from the store, so a copy of an archived
+ * scenario (which keeps its `program`) stays with its program.
+ */
+export function useProgramFilter(): (kind: ProgramEntityKind, id: string) => boolean {
+  const showArchived = useStore((s) => s.showArchived);
+  const lookup = useProgramLookup();
+  return useCallback(
+    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { ...lookup, showArchived }),
+    [showArchived, lookup],
+  );
+}
+
+/**
+ * The program filter as a page that names one entity applies it.
+ *
+ * Every list on the page filters through `useProgramFilter`, with one
+ * widening: when the page's own entity belongs to an archived program (a deep
+ * link to cw15's strain page, a runbook or lesson opened from an old link),
+ * what belongs to that same program shows too, because the link opens what
+ * it names and the page sits under ArchivedBanner saying so. Anything of
+ * another archived program stays hidden. With no page entity, or a general
+ * or active one, this is `useProgramFilter` itself.
+ */
+export function useProgramScope(
+  page?: { kind: ProgramEntityKind; id: string | null | undefined } | null,
+): (kind: ProgramEntityKind, id: string) => boolean {
+  const shows = useProgramFilter();
+  const lookup = useProgramLookup();
+  const kind = page?.kind;
+  const id = page?.id;
+  const own = useMemo(
+    () => (kind && id ? archivedProgramOf(kind, id, lookup)?.id ?? null : null),
+    [kind, id, lookup],
+  );
+  // An example opened by link (§3.3) widens the same way: the other examples
+  // it names show beside it, unless their program is archived and not its own.
+  const ownExample = useMemo(() => (kind && id ? isExample(kind, id, lookup) : false), [kind, id, lookup]);
+  return useCallback(
+    (k: ProgramEntityKind, x: string) => {
+      if (shows(k, x)) return true;
+      const p = programOf(k, x, lookup);
+      if (own !== null && p === own) return true;
+      return ownExample && isExample(k, x, lookup) && (!isArchived(p) || p === own);
+    },
+    [shows, own, ownExample, lookup],
+  );
+}
+
+/**
+ * The store's lists `programOf` reads, as one value that changes only when
+ * one of them does: what `useProgramFilter` and `ArchivedBanner` ask with.
+ */
+export function useProgramLookup(): ProgramLookup {
+  const records = useStore((s) => s.records);
+  const strains = useStore((s) => s.strains);
+  const products = useStore((s) => s.products);
+  const scenarios = useStore((s) => s.scenarios);
+  const protocols = useStore((s) => s.protocols);
+  const runbooks = useStore((s) => s.runbooks);
+  const modules = useStore((s) => s.modules);
+  const depositions = useStore((s) => s.depositions);
+  return useMemo(
+    () => ({ records, strains, products, scenarios, protocols, runbooks, modules, depositions }),
+    [records, strains, products, scenarios, protocols, runbooks, modules, depositions],
+  );
 }
 
 // ── derived selectors ──────────────────────────────────────────────────

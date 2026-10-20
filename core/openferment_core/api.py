@@ -30,10 +30,13 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, programs, rageval, retrieve, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
+    AuditEntry,
+    Proposal,
+    ProposalAction,
     AnswerPlan,
     Artifact,
     AskRequest,
@@ -139,10 +142,12 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None, include_archived: bool = False) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
-    with the conversation's earlier turns when the question is a follow-up."""
-    ctx = tools.ToolContext()
+    with the conversation's earlier turns when the question is a follow-up.
+    The browser's program switch rides in the tools' context (OF-BLD-016
+    §2.3): off, archived programs are left out of everything the loop reads."""
+    ctx = tools.ToolContext(include_archived=include_archived)
     try:
         ctx.pool  # loaded now, so a missing corpus declines in words
     except FileNotFoundError as e:
@@ -167,7 +172,7 @@ def ask(request: AskRequest) -> AnswerPlan:
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     if request.mode == "agent":
-        return _ask_agent(question, history=request.history)
+        return _ask_agent(question, history=request.history, include_archived=request.includeArchived)
 
     try:
         corpus = load_corpus()
@@ -176,7 +181,10 @@ def ask(request: AskRequest) -> AnswerPlan:
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
 
     limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
-    records = corpus.search(question, limit=limit)
+    # The switch holds here too (OF-BLD-016 §2.3): an archived program's
+    # records are neither given to the model nor accepted from it.
+    records = [r for r in corpus.search(question, limit=MAX_EVIDENCE if not request.includeArchived else limit)
+               if not programs.hides(programs.program_of_record(r), request.includeArchived)][:limit]
     log.info(
         "ask: %r → %d records%s",
         question[:80],
@@ -192,7 +200,8 @@ def ask(request: AskRequest) -> AnswerPlan:
 
     result = validate_claims(
         raw.get("claims") or [],
-        corpus.records_by_id,
+        {rid: r for rid, r in corpus.records_by_id.items()
+         if not programs.hides(programs.program_of_record(r), request.includeArchived)},
         corpus.papers_by_id,
     )
 
@@ -206,13 +215,15 @@ def ask(request: AskRequest) -> AnswerPlan:
             "; ".join(result.reasons),
         )
 
-    gaps = [str(g) for g in (raw.get("gaps") or []) if str(g).strip()]
+    # Gaps and the decline are model prose, held to Rule 1 as the loop holds
+    # them: one with a number is dropped and named (OF-BLD-016 §1.R).
+    gaps, said = postdoc_agent.held_to_rule_one(raw.get("gaps"), raw.get("declined"), result.reasons)
 
     return AnswerPlan(
         question=question,
         claims=result.claims,
         gaps=gaps,
-        declined=decline_reason(result, raw.get("declined")),
+        declined=decline_reason(result, said),
         usage=usage,
         rejected=result.rejected,
         rejectionReasons=result.reasons,
@@ -247,7 +258,8 @@ def _stream_events(request: AskRequest):
                 plan = ask(request)
             else:
                 plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
-                                  cancelled=gone.is_set, history=request.history)
+                                  cancelled=gone.is_set, history=request.history,
+                                  include_archived=request.includeArchived)
             events.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
@@ -681,9 +693,11 @@ def practice_read() -> Practice:
 
 
 @app.post("/api/practice/draft", response_model=PracticeScenario)
-def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
+def practice_draft(request: PracticeDraftRequest, includeArchived: bool = False) -> PracticeScenario:  # noqa: N803 (the wire name)
+    """A scenario for one skill. An archived program's protocols are no source
+    unless `?includeArchived=true` asks for them (OF-BLD-016 §2.R)."""
     try:
-        return practice.draft(request)
+        return practice.draft(request, include_archived=includeArchived)
     except practice.PracticeRefused as e:
         log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -739,9 +753,19 @@ def witness_runs() -> list[ExtractRun]:
 
 
 @app.get("/api/biorepo/artifacts", response_model=list[Artifact])
-def artifacts_list() -> list[Artifact]:
-    """Every value this service computed and kept, newest first."""
-    return artifacts.all_artifacts()
+def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N803 (the wire name)
+    """Every value this service computed and kept, newest first. A value
+    computed from an archived program's records, models, products or strains
+    is left out unless `?includeArchived=true` asks for it (OF-BLD-016 §2.R),
+    as the evidence pool leaves it out of Postdoc."""
+    kept = artifacts.all_artifacts()
+    if includeArchived:
+        return kept
+    try:
+        lookup = load_corpus().record
+    except FileNotFoundError:
+        lookup = None
+    return [a for a in kept if not programs.hides(programs.program_of_artifact(a, lookup))]
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)
@@ -775,14 +799,63 @@ def tools_list() -> list[ToolInfo]:
     return tools.infos()
 
 
+# ── Proposals and the audit log (OF-BLD-015 §7.3, §7.4) ────────────────
+
+
+@app.get("/api/proposals", response_model=list[Proposal])
+def proposals_list(state: str | None = None) -> list[Proposal]:
+    """Every proposal, or those in one state; Home shows the `proposed`."""
+    from . import proposals
+
+    # As a reader sees them: a Guild proposal without its words, since who a
+    # check names is never shown before it is run (OF-BLD-016 §1.R).
+    return proposals.listed(state)
+
+
+@app.post("/api/proposals/{proposal_id}/carry-out", response_model=Proposal)
+def proposals_carry_out(proposal_id: str, action: ProposalAction) -> Proposal:
+    """A person presses the button: the server runs the action in their name
+    where it can, and records that they took it otherwise."""
+    from . import checks, extract, proposals
+
+    try:
+        return proposals.carry_out(proposal_id, action.person, action.actingId)
+    except proposals.ProposalRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except checks.CheckRefused as e:
+        raise HTTPException(status_code=422, detail=f"{e}") from e
+    except (extract.ExtractUnavailable, extract.ExtractTruncated, llm.ModelUnavailable, llm.ModelRefused) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/proposals/{proposal_id}/dismiss", response_model=Proposal)
+def proposals_dismiss(proposal_id: str, action: ProposalAction) -> Proposal:
+    from . import proposals
+
+    try:
+        return proposals.dismiss(proposal_id, action.person, action.reason)
+    except proposals.ProposalRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/audit", response_model=list[AuditEntry])
+def audit_read(limit: int = 200) -> list[AuditEntry]:
+    """The newest lines of the audit log, newest last."""
+    from . import audit
+
+    return audit.read(max(1, min(limit, audit.MAX_READ)))
+
+
 @app.post("/api/tools/{name}", response_model=ToolResult)
-def tools_run(name: str, body: dict[str, Any]) -> ToolResult:
+def tools_run(name: str, body: dict[str, Any], includeArchived: bool = False) -> ToolResult:  # noqa: N803 (the wire name)
     """Run one tool through the registry, the same path Postdoc's loop and
     the MCP server take. A refusal is a result with `error` set; an unknown
-    tool is a 404."""
+    tool is a 404. The program switch is a query parameter,
+    `?includeArchived=true`, and rides in the tool's context: the body is the
+    tool's input, and no input carries it (OF-BLD-016 §2.3)."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    return tools.run(name, body)
+    return tools.run(name, body, tools.ToolContext(include_archived=includeArchived))
 
 
 # ── Passage retrieval (OF-BLD-014 Phase 4) ───────────────────────────────
@@ -801,7 +874,8 @@ def rag_search(request: RagSearchRequest) -> RagSearchResponse:
     that cannot run here is a 409 that says why; a paid lane's helper calls
     are held to the daily cap like every model call."""
     try:
-        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane)
+        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane,
+                                        include_archived=request.includeArchived)
     except retrieve.LaneUnavailable as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
     except (llm.ModelUnavailable, llm.ModelRefused, spend.BudgetSettingInvalid) as e:
@@ -824,7 +898,9 @@ def rag_report() -> RagReport:
     report = rageval.read_report()
     if report is None:
         raise HTTPException(status_code=404, detail="no retrieval scorecard yet: run pnpm rag:eval")
-    return report
+    # The rule's choice and the lane in use can differ: a person may hold the
+    # lane apart (OF-BLD-016 §4.1), and the screen names both.
+    return report.model_copy(update={"laneInUse": passages.chosen_lane()})
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

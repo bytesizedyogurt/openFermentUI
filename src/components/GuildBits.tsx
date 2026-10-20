@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
 import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Skill } from '@/data/types';
-import { useStore, guildView, actingIdOf } from '@/store';
+import { useStore, guildView, actingIdOf, useProgramFilter } from '@/store';
 import { SKILLS, SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { GUILD_TABS } from '@/data/tabs';
@@ -35,7 +35,6 @@ export interface GuildContext {
   today: string;
   actingId: string | null;
   acting: GuildPerson | null;
-  sample: boolean;
   /** Active people who can hold skills: everyone but auditors and the inactive. */
   members: GuildPerson[];
   personById: Map<string, GuildPerson>;
@@ -44,25 +43,19 @@ export interface GuildContext {
 export function useGuild(): GuildContext {
   const guild = useStore((s) => guildView(s));
   const actingId = useStore((s) => actingIdOf(s));
-  const sample = useStore((s) => s.guildSample !== null);
   const today = localToday();
   const status = useMemo(() => competenceOf(guild.evidence, guild.people, SKILL_BY_ID, today), [guild, today]);
   const personById = useMemo(() => new Map(guild.people.map((p) => [p.id, p])), [guild.people]);
   const members = useMemo(() => guild.people.filter((p) => p.active && p.role !== 'auditor'), [guild.people]);
-  return { guild, status, today, actingId, acting: (actingId && personById.get(actingId)) || null, sample, members, personById };
+  return { guild, status, today, actingId, acting: (actingId && personById.get(actingId)) || null, members, personById };
 }
 
 // ── checks, as every Guild view reads them (OF-BLD-013 §5.4) ──────────
 
-/** The checks the store holds: the sample's while it is shown. `loaded` is false until the service answers. */
+/** The checks the service last answered. `loaded` is false until it answers. */
 export function useChecks(): { all: GuildCheck[]; loaded: boolean } {
-  const sample = useStore((s) => s.guildSample !== null);
-  const sampleChecks = useStore((s) => s.guildSampleChecks);
   const served = useStore((s) => s.checks);
-  return useMemo(
-    () => (sample ? { all: sampleChecks ?? [], loaded: true } : { all: served?.checks ?? [], loaded: served !== null }),
-    [sample, sampleChecks, served],
-  );
+  return useMemo(() => ({ all: served?.checks ?? [], loaded: served !== null }), [served]);
 }
 
 /**
@@ -120,8 +113,6 @@ export function ActingAs({ id, label = 'Acting as' }: { id: string; label?: stri
 }
 
 export function GuildHeader({ title, subtitle }: { title: string; subtitle: ReactNode }) {
-  const sample = useStore((s) => s.guildSample !== null);
-  const clearSample = useStore((s) => s.guildClearSample);
   const pending = useStore((s) => s.guildPending.length + s.guildPendingWithdrawals.length);
   const serviceUp = useStore((s) => s.serviceUp);
   return (
@@ -140,19 +131,7 @@ export function GuildHeader({ title, subtitle }: { title: string; subtitle: Reac
       <div className="md:hidden -mt-2 mb-4">
         <ActingAs id="guild-acting-as-narrow" />
       </div>
-      {sample && (
-        <div className="mb-4">
-          <Callout kind="warn" title="Sample team: invented people">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Everything shown here is made up, and nothing you do to it is saved or sent to the service.</span>
-              <Button size="sm" onClick={clearSample}>
-                Hide the sample
-              </Button>
-            </span>
-          </Callout>
-        </div>
-      )}
-      {!sample && pending > 0 && (
+      {pending > 0 && (
         <p className="text-caption text-signal-warn mb-3">
           {pending} change{pending === 1 ? '' : 's'} kept in this browser
           {serviceUp === false ? ' until the service answers' : ', being sent to the service'}.
@@ -243,7 +222,7 @@ export function EvidenceRow({
             {nameOf(ctx, e.personId)}
           </a>
         )}
-        {!e.recordedAt && !ctx.sample && <span className="chip text-signal-warn border-signal-warn/40">not yet on the service</span>}
+        {!e.recordedAt && <span className="chip text-signal-warn border-signal-warn/40">not yet on the service</span>}
       </div>
       <div className="text-body text-ink-soft">
         &ldquo;{e.raw}&rdquo;
@@ -303,12 +282,11 @@ export function EvidenceRow({
 /** The service's answer about an entry, asked shortly after it stops changing. Null while unknown. */
 function useServiceCheck(entry: GuildEvidence | null): DecisionCheck | null {
   const serviceUp = useStore((s) => s.serviceUp);
-  const sample = useStore((s) => s.guildSample !== null);
   const [answer, setAnswer] = useState<DecisionCheck | null>(null);
   const key = entry ? JSON.stringify({ ...entry, id: '' }) : '';
   useEffect(() => {
     setAnswer(null);
-    if (!entry || !serviceUp || sample) return;
+    if (!entry || !serviceUp) return;
     const ctl = new AbortController();
     const t = window.setTimeout(() => {
       checkEvidence(entry, ctl.signal).then(setAnswer, () => undefined);
@@ -319,7 +297,7 @@ function useServiceCheck(entry: GuildEvidence | null): DecisionCheck | null {
     };
     // The key holds everything about the entry except its fresh id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, serviceUp, sample]);
+  }, [key, serviceUp]);
   return answer;
 }
 
@@ -339,9 +317,10 @@ const SIGN_HINT: Record<SignKind, string> = {
   witnessed: 'You watched them perform it against every criterion below.',
 };
 
-function stepsNeeding(skillId: string): { ref: string; stepId: string; text: string }[] {
+function stepsNeeding(skillId: string, shows: (kind: 'protocol', id: string) => boolean): { ref: string; stepId: string; text: string }[] {
   const out: { ref: string; stepId: string; text: string }[] = [];
   for (const p of PROTOCOLS) {
+    if (!shows('protocol', p.id)) continue;
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
     for (const st of v.steps) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
   }
@@ -361,7 +340,8 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
   const person = ctx.personById.get(personId);
   const st = statusOf(ctx.status, personId, skillId);
   const entries = ctx.guild.evidence.filter((e) => e.personId === personId && e.skillId === skillId).slice().reverse();
-  const steps = useMemo(() => stepsNeeding(skillId), [skillId]);
+  const shows = useProgramFilter();
+  const steps = useMemo(() => stepsNeeding(skillId, shows), [skillId, shows]);
 
   const [kind, setKind] = useState<SignKind>(() =>
     !skill || !st.knowledgeComplete ? 'knowledge' : readyForCheck(st, skill) || st.level >= 3 ? 'witnessed' : 'supervised',
@@ -755,7 +735,7 @@ export function exportLedger(ctx: GuildContext, personId: string) {
   });
   const body = [
     `# openFerment Guild ledger — ${person.name}${person.title ? `, ${person.title}` : ''}`,
-    `# Exported ${ctx.today}.${ctx.sample ? ' SAMPLE TEAM: invented people, not a real record.' : ''}`,
+    `# Exported ${ctx.today}.`,
     '# Every row is an entry as recorded. Levels are computed from the rows that are not withdrawn:',
     ...levels,
     ['date', 'skill', 'entry', 'outcome', 'observer', 'source', 'note', 'recorded', 'withdrawn'].join(','),
@@ -821,7 +801,6 @@ export function WorkforceCard() {
   if (loaded) rows.push(['checks open in the assessor queue', shownTo(all, ctx.actingId).filter(isOpen).length, '/guild/checks']);
   return (
     <Card className="p-3 space-y-1.5">
-      {ctx.sample && <div className="text-caption text-signal-warn">Sample team: invented people</div>}
       {rows.map(([label, n, to]) => (
         <a key={label} href={href(to)} className="flex items-baseline gap-2 text-body hover:text-accent">
           <span className={cx('font-num w-8 text-right', n > 0 && !CALM.has(label) ? 'text-signal-warn' : 'text-ink')}>{n}</span>

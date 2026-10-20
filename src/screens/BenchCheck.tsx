@@ -16,8 +16,7 @@
 // Nothing here decides anything. The calls are the assessor's; the service's
 // `checks.record` refuses a check with a criterion uncalled or a skill with
 // no words, and writes one witnessed entry per skill with the check as its
-// source. With the sample shown, the store writes the same entries to the
-// sample alone.
+// source.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check as Tick, X } from 'lucide-react';
 import type { Check, CheckResult } from '@/data/types';
@@ -40,11 +39,10 @@ export default function BenchCheck({ checkId }: { checkId: string }) {
   const loadChecks = useStore((s) => s.loadChecks);
   const serviceUp = useStore((s) => s.serviceUp);
   const { all } = useChecks();
-  const [asked, setAsked] = useState(ctx.sample);
+  const [asked, setAsked] = useState(false);
   useEffect(() => {
-    if (ctx.sample) return;
     void loadChecks().finally(() => setAsked(true));
-  }, [loadChecks, serviceUp, ctx.sample]);
+  }, [loadChecks, serviceUp]);
   // Kept once found, so the done screen survives the check closing.
   const [held, setHeld] = useState<Check | null>(null);
   const found = shownTo(all, ctx.actingId).find((c) => c.id === checkId) ?? null;

@@ -12,6 +12,7 @@ import { PROTOCOLS } from '@/data/protocols';
 import { LEVEL_NAME, statusOf, type Level } from '@/engine/competence';
 import { renderStepText } from '@/engine/scale';
 import { href } from '@/router';
+import { useProgramFilter } from '@/store';
 
 export default function GuildSkills({ skillId }: { skillId?: string }) {
   if (skillId) return <SkillPage skillId={skillId} />;
@@ -61,6 +62,7 @@ const LADDER: Level[] = [4, 3, 2, 1];
 
 function SkillPage({ skillId }: { skillId: string }) {
   const ctx = useGuild();
+  const shows = useProgramFilter();
   const skill = SKILL_BY_ID[skillId];
   if (!skill) {
     return (
@@ -72,7 +74,7 @@ function SkillPage({ skillId }: { skillId: string }) {
       </>
     );
   }
-  const uses = PROTOCOLS.flatMap((p) => {
+  const uses = PROTOCOLS.filter((p) => shows('protocol', p.id)).flatMap((p) => {
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
     return v.steps.filter((st) => st.skills?.includes(skillId)).map((st) => ({ p, st, v }));
   });

@@ -356,9 +356,13 @@ def _gather() -> Gathered:
     (ids are content-addressed, so the same id IS the same content), and the
     only copy on a fresh clone where candidates/ is empty. The scored papers
     are the extracted ones alone: a decided candidate does not make its paper
-    a paper the extractor ran over in this checkout."""
+    a paper the extractor ran over in this checkout.
+
+    A candidate a model wrote by hand is gathered for the overlay, so Guild
+    shows it, and never scored: it makes no paper extracted and is never the
+    extractor's match (OF-BLD-016 §1.R finding 3)."""
     repo = biorepo.read()
-    responses = extract.all_cached()
+    responses = extract.all_extracted()
     copies = {c.id: c for c in repo.records}
     out = Gathered(decisions=dict(repo.decisions), papers={r.paperId for r in responses})
     seen: set[str] = set()
@@ -371,13 +375,21 @@ def _gather() -> Gathered:
         for m in r.usage.models:
             if m not in out.models:
                 out.models.append(m)
+    for r in extract.all_hand():
+        for c in r.candidates:
+            if c.id not in seen:
+                seen.add(c.id)
+                out.candidates.append(copies.get(c.id, c))
     out.candidates += [c for cid, c in copies.items() if cid not in seen]
     return out
 
 
 def _run(g: Gathered, seed: list[dict[str, Any]]) -> ExtractRun:
     run = match_run(g.current, seed, papers=g.papers, dropped=g.dropped)
-    run.falsePositives = false_positives([c for c in g.candidates if c.paperId in g.papers], g.decisions)
+    # A rejected hand-written candidate is the model's mistake, not the extractor's.
+    run.falsePositives = false_positives(
+        [c for c in g.candidates if c.paperId in g.papers and not extract.by_hand(c.id)], g.decisions
+    )
     run.models = list(g.models)
     outcomes: dict[str, int] = defaultdict(int)
     for r in run.results:

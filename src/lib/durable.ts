@@ -12,8 +12,9 @@
 //   Reference  papers, protocols, products, vocabulary — never mutated, so
 //              there is nothing to persist. Reloading gets them from source.
 //   Durable    depositions, review decisions, runbook locks, this browser's
-//              copy of Guild's ledger, the lessons finished here, and
-//              Postdoc's Live conversations — must survive.
+//              copy of Guild's ledger, the lessons finished here,
+//              Postdoc's Live conversations, and whether archived
+//              programs show — must survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -96,6 +97,11 @@ export interface DurableSnapshot {
    * that carries no name, so nothing reaches the committed file unsigned.
    */
   reviewerName: string;
+  /**
+   * Whether archived programs show (OF-BLD-016 §2.1). Optional, so a
+   * snapshot written before programs existed still loads, and reads as off.
+   */
+  showArchived?: boolean;
   /**
    * Guild's ledger as this browser last held it, what it still owes the
    * service, and who was signing (OF-BLD-013 §1.3). Optional, so snapshots

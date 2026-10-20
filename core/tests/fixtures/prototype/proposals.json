@@ -1,0 +1,26 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "id": "pr-standin000001",
+      "at": "2026-09-15T09:00:00Z",
+      "module": "runbooks",
+      "action": "lock",
+      "gate": "lock",
+      "title": "Runbooks: lock a runbook's predictions before a run — rb-brazzein",
+      "why": "the draft's predictions are in hand and a run is planned",
+      "how": "open the runbook and press Lock predictions",
+      "route": "/runbooks",
+      "server": false,
+      "target": "rb-brazzein",
+      "fields": {},
+      "note": "lock before the pilot run so the ledger can score it",
+      "by": "stand-in model",
+      "askId": "ask-standin",
+      "state": "proposed",
+      "carriedOutBy": null,
+      "carriedOutAt": null,
+      "result": null
+    }
+  ]
+}

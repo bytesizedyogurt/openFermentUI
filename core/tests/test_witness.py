@@ -314,6 +314,46 @@ def test_a_decision_stays_with_its_content_across_a_re_extraction(client, monkey
     assert sorted(c.value for c in biorepo.records()) == [7, 9]
 
 
+def test_a_candidate_written_by_hand_is_shown_and_never_scored(client, monkeypatch):
+    """OF-BLD-016 §1.R finding 3. A model's hand-written candidate is in the
+    overlay for Guild, and Witness scores the extractor alone: the paper is
+    not extracted until the extractor runs over it, the candidate is never
+    the extractor's match, and a rejection of it is not the extractor's
+    false positive."""
+    monkeypatch.setattr(intake, "resolve_pmcid", lambda paper: "structural")
+    assert client.post("/api/intake/B5/fetch").json()["status"] == "complete"
+    monkeypatch.setattr(witness, "seed_records", lambda: [
+        {"id": "r-B5-9", "paperId": "B5", "field": "titer_secreted", "value": 9, "unit": "mg L-1"},
+    ])
+    made, _, detail = extract.add_candidate("B5", {"sectionId": "t1", "field": "titer_secreted", "value": "9", "unit": "mg L-1",
+                                                   "quote": "Placeholder B | 9 | mg L-1"}, who="claude-haiku-5-5")
+    assert made is not None, detail
+    assert client.get("/api/witness/runs").json() == []
+    overlay = Overlay.model_validate(client.get("/api/biorepo/overlay").json())
+    assert overlay.runs == [] and [c.id for c in overlay.candidates] == [made.id]
+
+    asked = []
+
+    def model(*_):
+        asked.append("B5")
+        return GOOD, extract.Usage()
+
+    monkeypatch.setattr(extract, "call_model", model)
+    assert client.post("/api/intake/B5/extract").status_code == 200 and asked == ["B5"]
+    # A rejection of the hand-written one, as biorepo.json would keep it.
+    repo = biorepo.read()
+    repo.decisions[made.id] = ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton",
+                                             recordId=made.id, at="2026-10-20T00:00:00Z", rejectReason="a placeholder row")
+    repo.records.append(made)
+    biorepo.PATH.write_text(repo.model_dump_json())
+
+    [run] = witness.runs()
+    # The extractor's 7 is the reading scored; the hand-written 9 would have matched.
+    assert outcomes(run) == {"r-B5-9": "value_mismatch"} and run.falsePositives == []
+    _, candidates, decisions = witness.overlay_bundle()
+    assert sorted(c.id for c in candidates) == sorted(["cl1-B5-a07dd73c", made.id]) and made.id in decisions
+
+
 def test_a_range_candidate_matches_a_range_record_on_its_endpoints():
     # r-P1-3 is 8.5 d, the midpoint of the 7-10 the source states. A model
     # that emitted the same range but wrote the low end as its value is

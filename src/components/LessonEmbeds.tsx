@@ -3,7 +3,7 @@
 // here propagates to the strain pages and the validation metrics.
 import { useMemo, useState } from 'react';
 import { ArrowRight, Check, SkipForward, X } from 'lucide-react';
-import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
+import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE, useProgramFilter } from '@/store';
 import { navigate } from '@/router';
 import type { FieldId, LessonBlock } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
@@ -433,10 +433,14 @@ function ProtocolCard({ protocolId }: { protocolId: string }) {
  * The steps a skill is needed for, read live from the protocols, with what an
  * assessor watches for (OF-BLD-013 §3.1). Every number the learner sees here
  * is the protocol's own, rendered by the same code run mode uses, so a lesson
- * built on this embed carries no quantity of its own.
+ * built on this embed carries no quantity of its own. Only protocols whose
+ * program shows are read (OF-BLD-016 §2.2): a general lesson does not list
+ * an archived program's steps while that program is hidden.
  */
 function SkillSteps({ skillId }: { skillId: string }) {
-  const protocols = useStore((s) => s.protocols);
+  const allProtocols = useStore((s) => s.protocols);
+  const shows = useProgramFilter();
+  const protocols = useMemo(() => allProtocols.filter((p) => shows('protocol', p.id)), [allProtocols, shows]);
   const skill = SKILL_BY_ID[skillId];
   if (!skill) {
     return (
@@ -537,7 +541,7 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
             <span className="text-body text-ink-soft ml-1">/kg</span>
           </div>
           <div className="text-caption text-ink-soft">
-            Demo model v0 — illustrative economics, not validated
+            Cost model v0 — illustrative economics, not validated
           </div>
         </Tick>
         <div className="flex-1 min-w-[220px]">
@@ -582,7 +586,7 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
     case 'protocol-card':
       return <ProtocolCard protocolId={arg ?? 'PR-TAP-01'} />;
     case 'ask-prompt':
-      return <AskPrompt question={arg ?? 'What growth rates are reported for cw15 in TAP'} />;
+      return <AskPrompt question={arg ?? 'What ethanol yields on glucose are reported for cenpk113-7d'} />;
     case 'skill-steps':
       return <SkillSteps skillId={arg ?? ''} />;
     case 'scenario-widget':

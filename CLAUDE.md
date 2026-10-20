@@ -4,26 +4,57 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-014)
+## The active build (OF-BLD-016)
 
-The prototype build runs on `claude/of-bld-014-prototype`. Its document is
-`docs/build/OF-BLD-014.md`. §10.4 of that document removes this section.
+OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
+tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`, with
+OF-BLD-015 Phase 7 (`claude/of-bld-015-postdoc` at `7298143`) merged in as a
+merge commit. Its document is `docs/build/OF-BLD-016.md`, its prompt
+`docs/build/PROMPT-016.md`, and its Part A amends OF-BLD-014 Part A
+(`docs/build/OF-BLD-014.md`, A.1–A.7). The pull request is
+`claude/of-bld-016-demo → main`; Sean merges it, then runs `deploy.sh` on the
+Mini, which serves `main` (D8).
 
-- **"Next phase", "continue" and "go on"** mean Part A.1 of the document: start the session
-  (`bash scripts/session-start.sh`, once §1.3 has landed), pay what `## Live owed` in `STATE.md`
-  lists and this machine can run, find the first step whose id is missing from
-  `git log --format=%s | grep -o 'OF-BLD-014 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
-  end of that step's phase.
-- **One spec is committed, for the length of this build.** A cloud session starts from a fresh
-  clone, so this build's document lives under `docs/build/` on the work branch. §10.4 deletes
-  the folder before the pull request. Every other spec stays out of git, as "Where the
-  documents live" says.
+- **"Next phase", "continue" and "go on"** mean Part A of `docs/build/OF-BLD-016.md`: start the
+  session (`bash scripts/session-start.sh`), pay what `## Live owed` in `STATE.md` lists and this
+  machine can run, find the first step whose id is missing from
+  `git log --format=%s | grep -o 'OF-BLD-016 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
+  end of that step's phase. One commit per step, `OF-BLD-016 §n.m: <what>`, `pnpm verify` green
+  before each, every commit pushed.
+- **The session is unattended.** Where OF-BLD-014 A.5 says "Ask", take the default in Part D,
+  record the choice in `STATE.md` under the step, and go on. One exception stops the session: a
+  change that would delete corpus data, a record, a candidate, a decision, an artifact or a
+  person's entry. Archive and flag instead (D1, D3).
+- **The wall clock.** `date -u` at the start of every step. From 10:30 UTC start no new step:
+  finish the one in hand, make verify green, push, write the report (A.7) and stop. A step that
+  cannot go green by then is reverted and named in the report. Past two thirds of the context,
+  finish the step, commit, push, stop and name the next step.
+- **Spend.** The night's cap is 1.50 USD; Appendix 3 estimates under 1.00. A batch costing three
+  times its estimate stops and is reported (§4.1's thread Q scorecard did, at $0.7528).
+- **Every model call openFerment makes runs `claude-haiku-5-5` at effort `medium`**: primary,
+  fallback, index, eval. `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`,
+  `OPENFERMENT_INDEX_MODEL` and `OPENFERMENT_EFFORT` carry it (the environment in a cloud
+  session; `core/.env` on the Mini); `llm.py`'s defaults are untouched. Numbers in `STATE.md`
+  dated from 2026-10-16 are Haiku's. The build session itself runs on Opus.
+- **The build documents are committed, for the length of the builds.** A cloud session starts
+  from a fresh clone, so `docs/build/` holds OF-BLD-014's document, OF-BLD-015 Phase 7's and
+  OF-BLD-016's on the work branch. OF-BLD-016 leaves the folder in place: OF-BLD-015's closing
+  pass owns its deletion. Every other spec stays out of git, as "Where the documents live" says.
+- **The run sheet is `docs/DEMO.md`** (§4.2): start on the Mini and the fallback on a laptop,
+  what to point at, the eleven questions in order with what each showed on 2026-10-20, and
+  **Steer around**. `docs/questions-yeast.txt` holds the eleven for `pnpm ask:batch`.
+  `docs/DEMO-YEAST.md` and `DEMO-PHASE7.md` are folded into it and gone.
 - **The key in a cloud session** arrives as `OPENFERMENT_API_KEY`, and
   `scripts/session-start.sh` writes it to `core/.env`. Leave `ANTHROPIC_API_KEY` unset in the
-  session's environment: Claude Code reads that name for its own sign-in.
+  session's environment: Claude Code reads that name for its own sign-in. The key never
+  appears in a chat, a log or a response.
 - **Data from live runs** travels on the branch `openferment-data` (`pnpm data:push`,
-  `pnpm data:pull`). Fetched full text stays on the machine that fetched it.
-- **Stop conditions** are Part A.5 of the document. A stated fact that turns out false is one.
+  `pnpm data:pull`). Fetched full text, the audit log and the proposals stay on the machine.
+- **Stop conditions**: verify red for a cause outside the step; a fact the prompt states
+  turns out false when measured (the tree wins, and the report says so); a write tool that
+  would reach a store with no write function and no clean refusal; a key that could reach a
+  response, a log, the browser or git; a change that would let a second account read the
+  owner's conversations with no visibility check in the way; a deletion of the kinds above.
 
 ## The map is closed
 
@@ -52,13 +83,17 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   `claude-sonnet-5-5` on a refusal or when Opus is unavailable; structured
   outputs (`output_config.format`, schema made strict by `strict_schema`),
   effort `medium`, streamed. Postdoc alone runs a loop
-  (`postdoc_agent.py`): `llm.converse` turns on one model with strict tools
+  (`postdoc_agent.py`): `llm.converse` turns on one model with tools
   and `tool_choice` `auto`, bounded at 6 rounds, 12 tool calls,
   `OPENFERMENT_ASK_BUDGET_USD` and 180 seconds, after which one last turn
   runs with `tool_choice` `none`; a refusal or an outage restarts it once on
   the next model with a fresh conversation. Both models REJECT forced tool
   use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
-  live in `llm.PRICES`; `usage.models` records which model answered.
+  live in `llm.PRICES`; `usage.models` records which model answered. The
+  seven OF-BLD-014 tools go out strict; the twenty-two module tools go out
+  loose, because eighteen strict tools compile to a grammar the API refuses
+  (OF-BLD-015 §7.2, measured 2026-10-19), and `tools.run` validates every
+  input alike before anything runs.
 
 ## Rule 1 and its mirror
 
@@ -153,8 +188,9 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Twenty-three stages, in order: check:secrets → typecheck →
-  check:plan → check:reference → test:core → test:sim → check:licences → check:seed →
+  green.** Twenty-four stages, in order: check:secrets → typecheck →
+  check:plan → check:reference → test:core → test:sim → check:licences → check:tools →
+  check:seed →
   check:biorepo → test:export → check:anchors → check:store → check:guild →
   check:lock → check:capture → check:figures → build → test:durable → test:deposition →
   test:reconcile → test:smoke → test:golden → test:deep. Live tests are
@@ -280,9 +316,9 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   needing the skill is refused whole. The tutor is held to the same, closes
   on the third answer with what it observed, and a closed session for a
   person on the ledger becomes a `scenario` entry (no observer, the session
-  as its source), which is Learning and no more. With the sample shown the
-  service is sent nobody (`practiceLearner`), and the entry goes on the
-  sample alone. `core/data/practice.json` never enters git. Offline tests use
+  as its source), which is Learning and no more. A session for someone who
+  is not on the ledger closes on nobody's record. `core/data/practice.json`
+  never enters git. Offline tests use
   a stand-in model; the real one is `pnpm test:live`.
 - **Checks are proposed by fixed rules, and run by an assessor.**
   `rankPairs` / `proposeChecks` in `src/engine/checks.ts` rank every person
@@ -310,12 +346,18 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   is swallowed for the asker alone). `/guild/checks/:id/run` is the bench
   (`BenchCheck.tsx`), a full-screen takeover under Deposition's constraints:
   one criterion at a time, Meets or Needs work, the assessor's words per
-  skill, then a sign step in the assessor's name. With the sample shown the
-  queue is the ranking run in the browser and the bench writes to the sample
-  alone. `check:guild` part 10 and the smoke's bench flow hold all of it.
-- **The sample team is invented and stays in the browser.** `guildSample` is
-  shown in place of the ledger while loaded; nothing in it is posted, written
-  to `guild.json` or kept in the Durable tier.
+  skill, then a sign step in the assessor's name. Every move on a check is
+  a post `checks.py` decides; the browser makes none on its own.
+  `check:guild` part 10 and the smoke's bench flow hold all of it. A
+  model's proposal to check someone follows the same rules on Home
+  (`shownProposals` in `src/lib/proposals.ts`, `check:guild` part 11).
+- **There is no invented team.** `guildSample` left `src/` (OF-BLD-016
+  §3.2): the ladder `check:guild` and `export:competence-fixtures` build in
+  memory is `scripts/lib/guild-ladder.ts`, and `check:guild` fails if the
+  store holds a team of its own. With an empty ledger, Matrix and People say
+  *Add yourself below as the lead* over the add-person form, Checks and My
+  path link to it, and Home's Workforce card says nobody is on the ledger
+  yet.
 
 ## Licences, sessions and data that outlive a VM (OF-BLD-014 Phase 1)
 
@@ -360,11 +402,13 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - **Three programs, one corpus.** Threads A–O are the hand-curated casein
   program; thread P is PHA from waste cellulosic sugars and thread Q ethanol
   from glucose by wild-type *S. cerevisiae*, each proposed by rule and
-  approved by a person (see "The seed" above). The thread letters are written
-  as `[A-Q]` in three places — `byEntryId` in `src/data/papers.ts`,
-  `src/sim/chat.ts` and the chip pattern in `scripts/golden-path.mjs` — and a
-  new letter changes all three. Home's Programs strip counts each program
-  live from the store.
+  approved by a person (see "The seed" above). Since OF-BLD-016 yeast is the
+  one active program and casein and PHA are archived behind one switch (see
+  "Programs" below). The thread letters are declared in
+  `src/data/programs.ts` and written as a class in one place in code,
+  `byEntryId` in `src/data/papers.ts`, which `check:seed` holds to them.
+  Home's Programs strip counts the active program live from the store and
+  names the archived ones in one muted line.
 - **A strain alias carries the designation.** `STRAIN_ALIASES` maps `h16` and
   `kt2440` spellings, never a species alone, so a value measured on another
   strain of the species stays apart. Extracted values carry `organismText`
@@ -411,12 +455,15 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   writes at 1.25× input, reads at 0.05× on Opus and Sonnet 5.5, 0.1×
   otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
   Offline tests charge a file of their own (`core/tests/conftest.py`).
-- **`converse` is one tool turn on one model.** Strict tools, `tool_choice`
-  `auto` or `none` and nothing else (anything else is refused before it is
-  sent), the answer schema in `output_config.format`, top-level
+- **`converse` is one tool turn on one model.** Each tool strict unless the
+  registry marks it loose (the twenty-two module tools, see above),
+  `tool_choice` `auto` or `none` and nothing else (anything else is refused
+  before it is sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
-- **One tool registry, closed at seven names** (`tools/__init__.py`, E.6).
+- **One tool registry, closed at twenty-nine names** (`tools/__init__.py`, E.6
+  and OF-BLD-015 §7.2–§7.3: the seven below, then one read and one write tool
+  a module, named `<module>_read` and `<module>_write`).
   Postdoc's loop, `GET /api/tools` / `POST /api/tools/{name}` and the MCP
   server all go through `tools.run`. **Tool inputs carry ids and words:** a
   JSON number anywhere in an input outside top-level `k` and `limit` refuses
@@ -459,6 +506,17 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   a whole sentence or table row of the passage, or a run of them, word for
   word after `normalize_text`; anything else zeroes the grade and is
   counted, never repaired, cache included.
+- **The scorecard is measured on thread Q, and the lane is held on
+  hybrid.** `rageval --thread` narrows the questions to one thread's papers
+  while every search still runs over the whole index
+  (`pnpm rag:questions --n 100 --thread Q` keeps `questions-Q.jsonl` beside
+  the old set). On 2026-10-20 the rule chose `bm25+rerank` (0.5942 against
+  hybrid's 0.4587), and search stays on `hybrid`: `core/data/index/config.json`
+  keeps it, because each reranked search is a model call of about twenty
+  seconds. `GET /api/rag/report` fills `laneInUse` from `config.json`, and
+  Witness → Retrieval names both the lane in use and the rule's choice. To
+  adopt the rule's lane, copy the `lane` the report names into
+  `config.json` on the Mini.
 - **The default lane is chosen by a number.** `rageval.choose_lane`: mean
   nDCG@10 on K and S; `bm25` holds until a lane scores higher, and a lane
   that calls a model per question must lead the best free lane by 0.02. K is
@@ -486,7 +544,10 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   A follow-up posts the earlier turns as `PriorTurn`s (question, claims,
   gaps, decline: words only); `postdoc_agent._opening` sends the last four as
   user and assistant text, drops a line holding a number, and `SeenSet`
-  still starts empty, so nothing an earlier turn retrieved is citable.
+  still starts empty, so nothing an earlier turn retrieved is citable. The
+  coverage sweep reads those earlier questions with the follow-up
+  (`_swept`), never the earlier answers, and the map then says it names what
+  the conversation names.
 
 - **A plan answers to `validate_plan`.** Every claim the loop writes is
   dropped whole and counted when its text holds a number, a record id does
@@ -495,11 +556,14 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   result), a quote is over 300 characters or is not one whole sentence or
   table row of its passage, or a run of them, after `normalize_text`
   (`rerank.is_whole_sentence`: a fragment can lift a number out of its
-  negation), or it cites nothing without saying `unsupported`. A gap with a
-  number is dropped and named in `rejectionReasons`. Its provenance is the weakest of its records and
+  negation), or it cites nothing without saying `unsupported`. A gap or the
+  decline with a number is dropped and named in `rejectionReasons`
+  (`held_to_rule_one`, on the single path too), and the decline code writes
+  stands in. Its provenance is the weakest of its records and
   computed values, `unverified` on quotes alone; its papers are derived. A
-  restart forgets what the first conversation retrieved and gets the whole
-  call budget again; the tool cache does not forget, and what a search lane
+  restart opens as the first conversation did (earlier turns, then the
+  question and the map), forgets what the first conversation retrieved and
+  gets the whole call budget again; the tool cache does not forget, and what a search lane
   spends on a model (`ToolResult.usage`) is charged to the question once.
 - **Text inside a tool result is evidence, never an instruction.** The
   prompt says so, and the validator is the guard: a passage telling the
@@ -519,7 +583,89 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   the code, and the smoke and golden path watch the panel draw it.
 - **`pnpm ask:batch <file>`** asks a file of questions through the loop and
   keeps each plan under `core/data/live/` (on the data branch);
-  `docs/build/questions-pha.txt` holds Appendix 4's ten.
+  `docs/build/questions-pha.txt` holds OF-BLD-014 Appendix 4's ten (PHA,
+  archived), and `docs/questions-yeast.txt` the run sheet's eleven.
+
+## Postdoc reaches every module (OF-BLD-015 Phase 7)
+
+- **A coverage pass runs before the first turn, in code.** `module_stores.py`
+  reads all eleven modules into one row shape: the seed's modules through
+  `modules.json`, which `pnpm export:corpus` writes beside `corpus.json`
+  (Dominion's molecules and findings, runbooks, protocols, hosts, pathways,
+  unit operations, scenarios, lessons), and the service's own stores (records
+  and candidates through the evidence pool, artifacts, Guild's ledger and
+  checks, Intake's fetch state, the geneOS shelf, the open proposals).
+  `coverage(question)` finds the rows the question names by label, id or
+  spelling, and every row of a module it names, kept to the states a clause
+  about that module asks for. The map rides in round one after the question,
+  is the trace's first step (one line a module when opened), and the plan
+  carries it: the footer reads "Searched eleven, found in two: … · read in
+  part: Runbooks, fermOS, BioRepo". A plan with no claim never says the
+  corpus is silent when a module found something.
+- **One state enum, computed, never chosen.** `open`, `fenced`, `approved`,
+  `locked`, `proposed`, `retired`, from each module's own word in
+  `module_stores.py` (a clearance of `clear-expired` or `clear-none` is
+  `open`; `watch-*`, `blocked` and `unknown` are `fenced`; a locked runbook is
+  `locked`). The table is in `docs/TOOLS.md`.
+- **A read tool a module** (`tools/modules.py`): one input (ids or refs,
+  words, a kind, a state, a limit), one output, `ModuleRow` (`ref`
+  `<module>/<kind>/<id>`, label, state, the module's status word, the
+  provenance mark or null, a short detail). Guild reads a name, a role and
+  whether the person is active, never a level or a title. A claim cites rows
+  in `moduleRefs`; `SeenSet` keeps them and `validate_plan` drops a claim
+  citing a ref no tool returned; the rows' marks enter the claim's weakest
+  provenance. An artifact row's mark is recomputed from its inputs as they
+  stand when it is read (`basis_provenance`), never copied from the file.
+- **A write tool a module** (`tools/writes.py`), and it never touches a
+  store: each action calls the module's own write function (`geneos.ceiling`
+  and kin, `fermos.forecast_run`, `proforma.run`, `extract.add_candidate`
+  under §2.4 with ids `mw1-…`, `intake.fetch_paper`, `extract.extract_paper`)
+  or refuses in words with who makes the change (Dominion, pureOS and Primer
+  are seed; protocols, depositions, assumptions, decisions and new sources
+  are a person's). Every write that goes through is appended to
+  `core/data/audit.jsonl` (`audit.py`, `GET /api/audit`, gitignored) with
+  `agent: model`, the model id, the effort and the ask id
+  (`ToolContext.ask_id`). A person's carry-out or dismissal is appended the
+  same way. **A candidate written by hand is not an extraction:** it is kept
+  in `candidates/hand/<paper>.json`, never in the extractor's file, so the
+  extractor still runs on its paper and Witness never scores it (the overlay
+  still carries it, and `biorepo.write` resolves its id there). It passes on
+  only the fields the action lists, and `negativeResult` and `isPrimary` as
+  the word true or false; any other field refuses the call.
+- **The gates are one table** (`tools/gates.py`, the same rows in
+  `docs/TOOLS.md`): `publish`, `spend`, `lock`, `sign`, `personnel`, `bench`,
+  `notebook`. An action at a gate writes nothing and becomes a proposal
+  (`proposals.py`, `core/data/proposals.json`, gitignored) with
+  `state: proposed`; Home shows every open one as a card with one button,
+  disabled until a reviewer name is set; `POST /api/proposals/{id}/carry-out`
+  and `/dismiss` take a named person (placeholders refused) and, for a check,
+  `actingId`, the Guild person the browser acts as. The server runs what it
+  can in the person's name (`checks.request` by the acting Guild person; an
+  extraction once the budget allows), with the store's locks let go while it
+  runs, and records that the person took the rest to the place the gate
+  names; a server gate with no server action is refused and stays open. The
+  model may propose a check and may never record or sign one:
+  `guild record_check` is refused, and no gate's server action signs
+  anything. **A proposal is held to Rule 1** (`proposals.propose`): its
+  note, target, field values, title and why hold no number and its target
+  is one id, or it is refused whole; one ask leaves one open proposal per
+  module, action and target. A Guild proposal is served
+  (`proposals.listed`, `home_read`) without its note, why and target, and
+  its title names nobody.
+- **`pnpm check:tools`** (`scripts/check-tools.py`, the eighth stage) fails
+  when a module lacks a read or a write tool, when `writes.py` holds a file
+  write or reaches a store function outside `ALLOWED_WRITES` (the file is
+  parsed and every name followed through its import, aliases included; a
+  store module handed around bare or a dynamic import fails), when a gated action
+  completes without a named person, or when `gates.py` and `docs/TOOLS.md`
+  name different gates. **Eval set O** (`evalo.py`, `pnpm eval:o`): ten
+  cross-module questions keyed by the coverage code, scored on the modules
+  read; the footer is not scored, because its key and the footer are the
+  same `coverage` call and it held by construction. The report goes to
+  `core/data/live/eval-o.json`.
+- **The MCP server needs no change for any of it**: it lists `tools.infos()`
+  and calls `tools.run`, so the module tools appear there with the same marks
+  and gates; `test_mcp` counts thirty-one.
 
 ## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
 
@@ -532,8 +678,11 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   (the question as title, units, CSV, sources, the basis of anything
   computed, and what would fill it when empty). `pnpm check:figures` holds
   it; `recharts` stays in Compare and ProformaScenario alone. Settings →
-  Figure grammar (`/settings/figures`) is the written definition, over a
-  sample `demo.py --prototype` writes to `src/data/figureSamples.json`.
+  Figure grammar (`/settings/figures`) is the written definition, drawn over
+  the newest kept `geneos.ceiling` and `geneos.frontier` artifacts from
+  `/api/biorepo/artifacts`, else the legend alone with where to compute one.
+  `src/data/figureSamples.json`, which `demo.py --prototype` writes, feeds
+  `check:figures` and is never shown.
 - **geneOS computes a ceiling.** Flux balance analysis on a shelf of
   published reaction networks (`geneos_models.py`, data only): `e_coli_core`
   and `iJO1366` bundled with cobra plus the phaCAB add-on, each added
@@ -594,9 +743,13 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   without it), ends where the median sugar runs out, and refuses a fit whose
   μ or Xmax is unidentified. A changed starting value is an assumption with
   a name, so the forecast is `demo`; one equal to the run's own is no change.
-- **The sample run is invented** (`demo.py --prototype` writes
-  `src/data/fermosSample.json`), labelled, fitted and forecast inline
-  (`sample: true`) and kept nowhere. `growth_forecast` is the fifth tool.
+- **No sample run on screen** (OF-BLD-016 §3.2, D4). `demo.py --prototype`
+  still writes `src/data/fermosSample.json` for the tests; no screen reads
+  it. fermOS and its Forecast with no deposited run say *No run deposited
+  yet* and name the readings (each sample's time in hours, biomass at four
+  or more times, product and substrate at the same times) and where
+  (Runbooks → Depositions, the Time series panel). `growth_forecast` is the
+  fifth tool.
 
 ## Proforma prices a flowsheet BioSTEAM ran (OF-BLD-014 Phase 8)
 
@@ -661,11 +814,136 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   predictions as ceiling, forecast, price, keeping what loads. The double
   replays `ask-draft-stream.jsonl` for a question that starts with "Draft".
 
+## Programs (OF-BLD-016)
+
+- **A program is data.** `src/data/programs.ts` declares three: **Yeast
+  ethanol** (`yeast`, thread Q, active), **Casein** (`casein`, threads A–O,
+  archived) and **PHA** (`pha`, thread P, archived), each with a name, its
+  letters, a status and one line. `Program` is in `types.ts`, `models.py`
+  and `PAIRS`. Archived means hidden, never deleted (D1): the papers,
+  records, strains, products, scenarios, protocols, runbooks and lessons
+  stay in the repository, and the guards that rest on them (`check:anchors`,
+  `check:lock`, the export fixtures on B5, the golden path) still run on
+  them. Deleting them is a later document, with those guards rewritten
+  first.
+- **`programOf` says which program an entity belongs to** (`src/store.ts`):
+  a paper by its thread letter, a record or candidate by its paper, a
+  strain, product, scenario, protocol or module by its own `program` field,
+  a lesson by its own or its module's, a runbook by its own field, else its
+  product's, else its strain's, a deposition by its runbook, else its
+  protocol. An entity with no program is general and always shows.
+  `activePrograms()`, `programVisible`, `archivedProgramOf` and the hook
+  `useProgramFilter()` are the one selector every list, count, chooser,
+  search and suggested prompt filters through; a screen never writes its own
+  test. `core/openferment_core/programs.py` (`program_of`, `shows`, `hides`)
+  is the service's copy, reading the `programs` that `export:corpus` writes
+  into `corpus.json` and `modules.json`, with a `program` (null for general)
+  on every row.
+- **One switch, `showArchived`.** Durable (`snapshotOf`, `applyDurable`),
+  off by default, and outside `seedState`; *Clear this browser's data* (one
+  confirm step) turns it off again, since the shipped state hides archived
+  programs (§3.R). Settings → Programs (`/settings/programs`,
+  `PROGRAMS_SETTINGS_PATH`) lists the three programs and holds it, as *Show
+  archived programs and examples*. A list it empties says what it hides,
+  whose, and where the switch is (`HiddenByArchive`). A deep link to an
+  archived entity still opens it, under `ArchivedBanner`, which names the
+  program and links to the switch; `useProgramScope` shows that entity's own
+  program on its page and nothing of another. A Live conversation whose
+  questions name an archived entity, and a proposal whose target is one,
+  hide with the hidden-count line like any list (`src/lib/programShows.ts`,
+  §2.R). BioRepo → Artifacts and Settings → Figure grammar list artifacts
+  through `visibleArtifacts` (an artifact takes the program of the records,
+  product or strain its basis names) and send the switch to
+  `GET /api/biorepo/artifacts?includeArchived=`.
+- **Examples hide with the archive** (§3.3, D3). `example: true` marks a
+  seed runbook, protocol, scenario, module (its lessons inherit) or
+  deposition that describes a run nobody made: all ten runbooks, the seven
+  casein protocols, `sc-s1…s3`, modules m0–m5. `PR-OD-01`, `PR-CIP-01` and
+  m6 teach generic methods and stay, and a deposition is an example only by
+  its own flag. `isExample` feeds `programVisible`, so the one switch shows
+  both, and `ArchivedBanner` says when a page is an example. The flag is
+  outside `canonical()`, so the eight lock digests are unchanged;
+  `check:seed` fails on a runbook carrying a locked prediction with no
+  deposition behind it and no `example`. The service carries the flag
+  (`example: true` in a module row's `detail`): with the switch off
+  `Stores.rows` leaves examples out as the browser does (§4.R), with it on a
+  read returns them marked; the coverage pass never counts an example as an
+  archived program's row.
+- **The service takes the switch from the request, never from a model.**
+  `includeArchived` (default false) on `AskRequest` and `RagSearchRequest`;
+  `?includeArchived=true` on `POST /api/tools/{name}`, a query parameter
+  because the body is the tool's input; `OPENFERMENT_INCLUDE_ARCHIVED` for
+  the MCP server (unset: off), never a client. It rides in
+  `ToolContext.include_archived`, and a tool input that carries it is
+  refused like any extra field. `src/lib/postdoc.ts` and `src/lib/rag.ts`
+  send the store's switch with every question and every search. With it
+  off, `evidence_pool` leaves out every record and candidate on an A–P
+  paper (counted in `EvidencePool.hidden`), retrieval drops archived
+  passages from each ranking before fusion and before any reader grades,
+  and `Stores.rows` leaves archived module rows out; an artifact's program
+  is what its inputs name.
+- **A question that names something archived is told so.** With the switch
+  off the coverage pass fills `CoverageMap.archived` (`ArchivedCoverage`,
+  in `PAIRS`), the trace says *found in archived program PHA (hidden)*, and
+  the code, not the model, writes a gap naming Settings → Programs. No
+  hidden row's ref reaches the model, and a read tool asked by id for a
+  hidden row says which archived program holds it.
+- **What keeps everything**: the callers that measure, or that a person
+  opened by id. `proforma.scenario` and `run`, `rageval` (its `--thread`
+  narrows the questions, never the index), and eval set O
+  (`evalo.INCLUDE_ARCHIVED`). `ask:batch` follows the API's default, off.
+  The write tools and the compute tools (`yield_ceiling`, `selling_price`,
+  `growth_forecast`, `draft_runbook`) are filtered by nothing beyond the
+  pool they read.
+- **`check:seed` holds the letters to the programs**: a thread with papers
+  and no program, a program with no letter, a letter in two programs, a gap
+  in the letters, and a `program` field naming nothing each fail it. The
+  class `byEntryId` writes in `src/data/papers.ts` is held to
+  `THREAD_LETTER_CLASS`, which `programs.ts` builds (`[A-Q]` today), so a
+  new thread changes `programs.ts` first and `check:seed` names what has not
+  followed.
+
+## Nothing invented on screen (OF-BLD-016)
+
+- **Postdoc speaks only through the service.** `src/sim/` is gone, the
+  scripted player and its invented delays with it, and `check:seed` refuses
+  the directory and any import from `@/sim` or `../sim` under `src/`. There
+  is no Scripted mode, no Inspector and no seed session; the store has no
+  `chatMode`. With the service down Postdoc says *Postdoc needs the
+  service* and how to start it (`pnpm prototype:up`), keeps the
+  conversations, and puts a question it could not ask back in the box.
+  `SUGGESTED_PROMPTS` is `livePrompts.ts` (`check:seed` holds it): the yeast
+  five, then Appendix 2's six cross-module questions, filtered by program.
+  The F flows stay in `flows.ts` as the evaluation set, graded against and
+  never offered. `src/data/misc.ts` is gone with its seed sessions, activity
+  and collections; Home's activity card says nothing has happened in this
+  browser yet and names the next step.
+- **No demo chrome.** No banner; the top bar shows the reviewer name or *No
+  reviewer name set*, linking to Settings. Settings' button is *Clear this
+  browser's data* (`clearBrowserData`, the Durable tier alone). Intake →
+  Ingest has no reset button, no placeholder DOI and no inactive card; *How
+  a paper enters* names `pnpm thread:propose`, a person's approval,
+  `pnpm thread:apply`, then Fetch. Authored cost surfaces are labelled *Cost
+  model v0*.
+- **`check:seed` holds it (E.3′).** It walks the syntax tree of every
+  `.ts`/`.tsx` under `src/` and fails on *demo*, *sample run*, *stand-in*,
+  *placeholder* or *scripted* in any string literal, template part or JSX
+  text. Comments never count, nor do code tokens (`'demo'` the provenance,
+  `tick-demo`); `ALLOWED` names three exceptions with why: the
+  `demo:offline` replay label, `rb-taq-kigali`'s locked prediction basis
+  (its words are in the lock digest), and the CSV legend that names the
+  `demo` provenance code.
+- **The double keeps its fixtures** (D4). `demo.py --prototype`,
+  `scripts/lib/service-double.mjs` and `pnpm demo:offline` are how verify
+  runs with no key; a user never sees them, and a replayed answer says it is
+  a replay.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
   this browser's copy of Guild's ledger with what it still owes the service,
-  the lessons finished here, and Postdoc's Live conversations across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+  the lessons finished here, Postdoc's Live conversations and the program
+  switch (`showArchived`) across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —
@@ -697,7 +975,11 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - OF-BLD specs arrive as files at repo root for the session (`OF-BLD-0NN.md`,
   `PROMPT.md`) and are deleted before the final commit of that session; they
   live in Notion. Never commit them.
-- OF-BLD-014 is the one exception, for the length of its build (its decision
-  D1): `docs/build/OF-BLD-014.md` and `docs/build/PROMPT.md` are committed on
-  `claude/of-bld-014-prototype`, and its §10.4 deletes `docs/build/` before
-  the pull request.
+- `docs/DEMO.md` — the one run sheet. `docs/TOOLS.md` — the tool registry,
+  the gates, the program switch and the proposal rules.
+- A build's own document is the exception, for the length of its build
+  (OF-BLD-014's decision D1, kept by OF-BLD-015 and OF-BLD-016):
+  `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's and OF-BLD-016's
+  documents and prompts on the work branch, and OF-BLD-015's closing truth
+  pass deletes the folder. OF-BLD-014's `docs/build/OF-BLD-014.md` and
+  `PROMPT.md` are still on `main`, its §10.4 having been left undone.

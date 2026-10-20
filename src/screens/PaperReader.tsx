@@ -16,14 +16,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  FolderPlus,
   Loader2,
   MessageSquare,
   RefreshCw,
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { useStore, provenanceOf, tickClass } from '@/store';
+import { useProgramFilter, useStore, provenanceOf, tickClass } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -33,12 +33,9 @@ import {
   Card,
   EmptyState,
   LinkButton,
-  Popover,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { locateQuote } from '@/lib/review';
 import { fetchSourceName } from '@/lib/intake';
 
@@ -121,17 +118,16 @@ export default function PaperReader({
 }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
-  const collections = useStore((s) => s.collections);
+  // OF-BLD-016 §2.2: a link opens any paper, and one in an archived program
+  // opens under the banner that names it.
+  const shows = useProgramFilter();
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const startJob = useStore((s) => s.startJob);
   const ingestPaper = useStore((s) => s.ingestPaper);
-  const addCollectionPapers = useStore((s) => s.addCollectionPapers);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(null);
@@ -142,17 +138,6 @@ export default function PaperReader({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth';
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [paperId]);
 
   const recs = useMemo(() => records.filter((r) => r.paperId === paperId), [records, paperId]);
 
@@ -205,23 +190,23 @@ export default function PaperReader({
   }, [quote, sectionId, paper]);
 
   useEffect(() => {
-    if (!quoted || !ready) return;
+    if (!quoted) return;
     const t = window.setTimeout(() => quoteRef.current?.scrollIntoView({ behavior, block: 'center' }), 60);
     return () => window.clearTimeout(t);
-  }, [quoted, ready, behavior]);
+  }, [quoted, paperId, behavior]);
 
   // Deep link to a section: scroll to its heading, nothing selected.
   useEffect(() => {
-    if (!sectionId || spanId || quoted || !ready) return;
+    if (!sectionId || spanId || quoted) return;
     const t = window.setTimeout(() => {
       sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [sectionId, spanId, quoted, ready, behavior]);
+  }, [sectionId, spanId, quoted, paperId, behavior]);
 
   // Deep link: select, scroll into view, pulse once.
   useEffect(() => {
-    if (!spanId || !ready) return;
+    if (!spanId) return;
     setActiveId(spanId);
     const t1 = window.setTimeout(() => {
       spanRefs.current[spanId]?.scrollIntoView({ behavior, block: 'center' });
@@ -233,7 +218,7 @@ export default function PaperReader({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [spanId, ready, behavior]);
+  }, [spanId, paperId, behavior]);
 
   const topField = useMemo(() => {
     const counts = new Map<FieldId, number>();
@@ -273,27 +258,6 @@ export default function PaperReader({
   const selectFromRail = (id: string) => {
     setActiveId(id);
     spanRefs.current[id]?.scrollIntoView({ behavior, block: 'center' });
-  };
-
-  const runExtraction = (label: string) => {
-    startJob({
-      title: `${label} — ${paper.id}`,
-      kind: 'extraction',
-      stages: [
-        { label: 'Load sections', ms: 700 },
-        { label: 'Chunk', ms: 600 },
-        { label: 'Extract fields', ms: 1800 },
-        { label: 'Score confidence', ms: 800 },
-        { label: 'Stage for review', ms: 500 },
-      ],
-      href: `#/intake?paper=${paper.id}`,
-    });
-    toast({
-      text: `${label} queued for ${paper.id} — the demo extractor replays this paper's seeded records rather than minting new ones`,
-      kind: 'info',
-      href: '#/intake',
-      hrefLabel: 'Extract',
-    });
   };
 
   const askQuery = topField
@@ -411,6 +375,7 @@ export default function PaperReader({
 
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
+      <ArchivedBanner kind="paper" id={paper.id} />
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library
@@ -475,7 +440,7 @@ export default function PaperReader({
         <div className="mt-4">
           <Callout kind="info" title="Not ingested yet">
             <p className="mb-2">
-              <span className="font-num">{paper.id}</span> is still on the demo shelf, so it is not part of
+              <span className="font-num">{paper.id}</span> is still in the ingest queue, so it is not part of
               the searchable corpus and carries no extractions.
             </p>
             <div className="flex gap-2">
@@ -543,12 +508,7 @@ export default function PaperReader({
         </div>
       )}
 
-      {!ready ? (
-        <Card className="mt-5">
-          <Skeleton rows={12} />
-        </Card>
-      ) : (
-        <>
+      <>
           {paper.textSource !== 'full-text' && (
             <section className="mt-6">
               <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
@@ -606,8 +566,7 @@ export default function PaperReader({
               </section>
             ))
           )}
-        </>
-      )}
+      </>
     </article>
   );
 
@@ -649,18 +608,12 @@ export default function PaperReader({
             body={
               parseFailed
                 ? 'Nothing can be extracted until the paper parses into sections. Retry the ingest, or continue with abstract-only text from the ingest board.'
-                : 'Nothing has been pulled from this paper yet. Run the extractor to stage candidate records for review.'
+                : 'Nothing has been pulled from this paper yet. Extraction runs through the service: Extract on the ingest board, or pnpm intake:extract.'
             }
             action={
-              parseFailed ? (
-                <LinkButton to="/intake/ingest" size="sm">
-                  Open ingest board
-                </LinkButton>
-              ) : (
-                <Button size="sm" onClick={() => runExtraction('Extraction')}>
-                  Run extraction
-                </Button>
-              )
+              <LinkButton to="/intake/ingest" size="sm">
+                Open ingest board
+              </LinkButton>
             }
           />
         ) : (
@@ -802,51 +755,10 @@ export default function PaperReader({
           >
             <MessageSquare size={13} /> Ask about this paper
           </Button>
-          <Button size="sm" onClick={() => runExtraction('Re-extraction')}>
-            <RefreshCw size={13} /> Queue re-extraction
-          </Button>
-          <Popover
-            openOnHover={false}
-            width={280}
-            label="Add to collection"
-            trigger={(pr) => (
-              <button {...pr} className="btn btn-sm">
-                <FolderPlus size={13} /> Add to collection
-              </button>
-            )}
-          >
-            <div className="space-y-1">
-              <div className="text-caption text-ink-soft mb-1">
-                Add <span className="font-num">{paper.id}</span> to:
-              </div>
-              {collections.length === 0 && (
-                <div className="text-body text-ink-soft">No collections exist in this session.</div>
-              )}
-              {collections.map((c) => {
-                const already = c.paperIds.includes(paper.id);
-                return (
-                  <button
-                    key={c.id}
-                    className="w-full flex items-center justify-between gap-2 px-1.5 py-1 rounded-input text-left hover:bg-accent-wash disabled:opacity-50 disabled:hover:bg-transparent"
-                    disabled={already}
-                    onClick={() => {
-                      addCollectionPapers(c.id, [paper.id]);
-                      toast({ text: `${paper.id} added to ${c.name}`, kind: 'success' });
-                    }}
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span className="font-num text-caption text-ink-soft shrink-0">
-                      {already ? 'already in' : c.paperIds.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </Popover>
         </div>
         <p className="text-caption text-ink-soft mt-2">
-          Re-extraction replays this paper&rsquo;s seeded records through the pipeline animation; it does not
-          invent new ones.
+          Extraction runs through the service: Extract on the ingest board, or{' '}
+          <span className="font-mono">pnpm intake:extract</span>.
         </p>
       </Card>
     </aside>

@@ -5,8 +5,8 @@ prose and cites a record; the interface renders the value from that record.
 This is the strongest available implementation of Rule 1, because the model is
 not being asked to be careful with quantities — it has no slot to put one in.
 
-    model emits   "Titre in cw15 under mixotrophic conditions"  + ["r-A1-1"]
-    UI renders    Titre in cw15 under mixotrophic conditions — 4.2 g/L (verified)
+    model emits   "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions"  + [its record id]
+    UI renders    Ethanol yield on glucose in cenpk113-7d under anaerobic conditions — <the record's value and unit> (verified)
 
 A claim is rejected when any of these hold:
 
@@ -79,11 +79,12 @@ _MAGNITUDE = re.compile(
 )
 
 
-# Identifiers carry digits and are not quantities. Strain designations (cw15,
-# UVM4, Elow47, CC-4350), assay names (OD600), proteins (CK2) and corpus ids
-# (A1, H4, r-A1-1) all contain digits, and a claim that cannot name the strain
-# it is about is useless — "Titre in cw15 under mixotrophic conditions" is the
-# specification's own worked example of a GOOD claim.
+# Identifiers carry digits and are not quantities. Strain designations
+# (cenpk113-7d, S288C, cw15, UVM4, CC-4350), model names (iMM904, Yeast9),
+# assay names (OD600), proteins (CK2) and corpus ids (Q4, r-A1-1) all contain
+# digits, and a claim that cannot name the strain it is about is useless —
+# "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions" is a
+# GOOD claim (the specification's own worked example named cw15 the same way).
 #
 # The distinguishing feature is position: an identifier's digits are attached to
 # letters, letters first. A quantity's digits stand alone or lead — "4.2 g/L",
@@ -306,6 +307,8 @@ class SeenSet:
     records: set[str] = field(default_factory=set)
     passages: dict[str, Any] = field(default_factory=dict)
     evidence: dict[str, Any] = field(default_factory=dict)
+    # Module rows by ref (OF-BLD-015 §7.2).
+    rows: dict[str, Any] = field(default_factory=dict)
 
     def add(self, result: Any) -> None:
         # A refused result was read as a refusal: nothing in it is citable.
@@ -316,6 +319,8 @@ class SeenSet:
             self.passages[p.id] = p
         for e in getattr(result, "evidence", None) or []:
             self.evidence[e.id] = e
+        for r in getattr(result, "rows", None) or []:
+            self.rows[r.ref] = r
 
 
 def _whole_sentences(quote: str, passage: Any) -> bool:
@@ -330,15 +335,16 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
 
     1. Its text holds a number.
     2. A record id does not resolve in the evidence pool.
-    3. A record, passage or evidence id was never returned by a tool call in
-       this run.
+    3. A record, passage, evidence id or module ref was never returned by a
+       tool call in this run.
     4. A quote is longer than MAX_QUOTE_CHARS, or is not one whole sentence
        or table row of its passage, or a run of them, after `normalize_text`
        (§5.R: a fragment can lift a number out of its negation).
     5. It cites nothing, and its support is not `unsupported`.
 
-    Its provenance is the weakest of its records and computed values; a claim
-    that quotes passages alone is `unverified`. Its papers are derived from
+    Its provenance is the weakest of its records, computed values and module
+    rows that carry a mark; a claim resting on quotes or unmarked rows alone
+    is `unverified`. Its papers are derived from
     its records and passages, never taken from the model.
     """
     out = ValidationResult()
@@ -351,6 +357,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         text = str(raw.get("text") or "").strip()
         record_ids = [str(r) for r in (raw.get("recordIds") or [])]
         evidence_ids = [str(e) for e in (raw.get("evidenceIds") or [])]
+        module_refs = [str(m) for m in (raw.get("moduleRefs") or [])]
         refs = [r for r in (raw.get("passages") or []) if isinstance(r, dict)]
         support = raw.get("support") or "direct"
         if support not in ("direct", "inferred", "unsupported"):
@@ -374,6 +381,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
             [r for r in record_ids if r not in seen.records]
             + [str(r.get("passageId")) for r in refs if str(r.get("passageId")) not in seen.passages]
             + [e for e in evidence_ids if e not in seen.evidence]
+            + [m for m in module_refs if m not in seen.rows]
         )
         if unseen:
             reject(f"cites what no tool returned in this run: {', '.join(unseen)}")
@@ -393,13 +401,14 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
         if bad_quote:
             reject(bad_quote)
             continue
-        if not (record_ids or refs or evidence_ids) and support != "unsupported":
+        if not (record_ids or refs or evidence_ids or module_refs) and support != "unsupported":
             reject(f"cites nothing and support is '{support}', not 'unsupported'")
             continue
 
         classes = [pool.record(r).get("provenance", "unverified") for r in record_ids]
         classes += [seen.evidence[e].provenance for e in evidence_ids]
-        if not classes and refs:
+        classes += [seen.rows[m].provenance for m in module_refs if seen.rows[m].provenance]
+        if not classes and (refs or module_refs):
             classes = ["unverified"]
         papers = {pool.record(r)["paperId"] for r in record_ids}
         papers |= {seen.passages[str(r.get("passageId"))].paperId for r in refs}
@@ -413,6 +422,7 @@ def validate_plan(raw_claims: list[dict[str, Any]], seen: SeenSet, pool: Any) ->
                 provenance=weakest_provenance(classes) if classes else "unverified",
                 passages=[PassageRef(passageId=str(r.get("passageId")), quote=str(r.get("quote"))) for r in refs],
                 evidenceIds=evidence_ids,
+                moduleRefs=module_refs,
             )
         )
     return out

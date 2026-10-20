@@ -1,9 +1,12 @@
-// Scripted agent flows (OF-DES-001 §16.2, rewired onto OF-COR-001 §21).
+// Authored agent flows (OF-DES-001 §16.2, rewired onto OF-COR-001 §21) —
+// the EVAL SET, never a screen. OF-BLD-016 §3.1 removed the scripted player
+// that once replayed them in Postdoc (D5): every answer a person sees now
+// comes from the service. What stays is what a human said the right answer
+// cites. `pnpm export:fixtures` writes them to core/tests/fixtures/flows.json,
+// and `rageval` grades retrieval against them (the F set).
 //
 // A flow is the complete data behind one turn: the plan, the tool calls with
-// their retrieval sets, the answer, and the follow-ups. The Inspector renders
-// this same object, so the trace a reviewer inspects is the literal data that
-// produced the answer rather than a reconstruction ("honest by construction").
+// their retrieval sets, the answer, and the follow-ups.
 //
 // WHAT IS REAL HERE AND WHAT IS NOT
 // --------------------------------
@@ -24,6 +27,7 @@
 // Answers name their evidential standing where it changes how the answer should
 // be read, rather than carrying an identical disclaimer everywhere.
 import type { ChatFlow } from './types';
+import { LIVE_PROMPTS, livePrompts, type SubjectShows } from './livePrompts';
 
 export const FLOWS: ChatFlow[] = [
   // ── F1 — the cross-host prior-art table ─────────────────────────────
@@ -1059,14 +1063,20 @@ For this programme the stake is bounded: β-casein is not natively N-glycosylate
 ];
 
 /**
- * Prompt chips on the empty Ask screen. Each string is one flow's trigger
- * verbatim, so clicking a chip is an exact match rather than a fuzzy one.
+ * The questions Postdoc's empty state offers. They are the questions in
+ * livePrompts.ts, each tested against the live service, and nothing else:
+ * the flows above are graded against, never offered (OF-BLD-016 D5).
  */
-export const SUGGESTED_PROMPTS: string[] = [
-  'What titers have been achieved for recombinant β-casein?',
-  'Has anyone expressed a casein in an alga?',
-  'Compare Chlamydomonas and Pichia as casein hosts',
-  'What is the maximum secreted protein yield from Chlamydomonas?',
-  'Does phosphorylation actually matter for making cheese?',
-  'What is the regulatory status of C. reinhardtii as food?',
-];
+export const SUGGESTED_PROMPTS: readonly string[] = LIVE_PROMPTS;
+
+/**
+ * The suggested prompts a screen offers, in their order: those whose
+ * subjects all show through the program selector (`useProgramFilter` in
+ * src/store.ts; OF-BLD-016 §2.2, E.1′). Each question in livePrompts.ts
+ * names the strains and papers it is about, and nothing here names a
+ * program: which program an id belongs to is `programOf`'s to answer. A
+ * question naming nothing is general and always shows.
+ */
+export function suggestedPrompts(shows: SubjectShows): string[] {
+  return livePrompts(shows);
+}

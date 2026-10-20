@@ -43,17 +43,22 @@ async function main() {
     await page.waitForTimeout(500);
   };
 
-  // Run at instant sim speed so scripted timings don't dominate the test.
-  await go('/settings/appearance');
-  const instant = page.locator('label', { hasText: /^Instant/ }).first();
-  let speedSet = false;
-  if (await instant.count()) {
-    await instant.click();
-    await page.waitForTimeout(300);
-    // The top bar shows a speed badge whenever the multiplier is not 1×.
-    speedSet = /instant\s+speed/i.test(await page.locator('header').first().innerText());
-  }
-  check('Sim speed control responds', speedSet);
+  // OF-BLD-016 §2.2 — the walk below is the casein and PHA demo, and both
+  // programs are archived: the switch in Settings → Programs goes on first,
+  // and the walk passes unchanged with everything showing as before. (The
+  // smoke runs with it off.) Every `go` is a same-document navigation, so the
+  // store keeps the switch.
+  await go('/settings/programs');
+  const archiveSwitch = page.locator('[data-testid="show-archived"]');
+  await archiveSwitch.waitFor({ timeout: 8000 }).catch(() => {});
+  if ((await archiveSwitch.count()) && !(await archiveSwitch.isChecked())) await archiveSwitch.check().catch(() => {});
+  await page
+    .waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 })
+    .catch(() => {});
+  check(
+    'Archived programs show once the switch is on',
+    (await archiveSwitch.count()) === 1 && (await archiveSwitch.isChecked()),
+  );
 
   // ── 1. Home vitals reflect seed data ────────────────────────────────
   await go('/');
@@ -64,27 +69,26 @@ async function main() {
     homeText.match(/\b1[23]\d\b/g)?.slice(0, 3).join(', ') ?? '',
   );
 
-  // ── 2. Postdoc: a scripted flow plays and produces chips ────────────────
+  // ── 2. Postdoc speaks only through the service (OF-BLD-016 §3.1) ─────
+  // The golden path leaves /api/health unanswered, so to Postdoc the service
+  // is down: it says so and how to start it, and offers the tested questions,
+  // never a scripted answer or a mode that would play one.
   await go('/postdoc');
-  const suggested = page.locator('button', { hasText: /titers have been achieved/i }).first();
-  await suggested.click();
-  await page.waitForTimeout(2500);
-  const askText = await page.locator('body').innerText();
-  check('Postdoc plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
-  const chips = page.locator('button', { hasText: /^\[[A-Q]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
-  const chipCount = await chips.count();
-  check('Answer carries working citation chips', chipCount > 0, `${chipCount} chips`);
-
-  // Inspector reproduces the retrieval
-  const inspectorTab = page.getByRole('button', { name: /^retrieval$/i }).first();
-  if (await inspectorTab.count()) {
-    await inspectorTab.click();
-    await page.waitForTimeout(300);
-    const inspectorText = await page.locator('aside').last().innerText();
-    check('Inspector shows retrieved passages', inspectorText.length > 80);
-  } else {
-    check('Inspector shows retrieved passages', false, 'tab not found');
-  }
+  await page.locator('[data-testid="postdoc-down"]').waitFor({ timeout: 8000 }).catch(() => {});
+  const downNote = (await page.locator('[data-testid="postdoc-down"]').innerText().catch(() => '')) ?? '';
+  check(
+    'With the service down, Postdoc says so and how to start it',
+    /Postdoc needs the service/.test(downNote) && /Start it with pnpm prototype:up/.test(downNote),
+    downNote.split('\n')[0] ?? '',
+  );
+  const yeastPrompts = await page.locator('[data-testid="prompts-yeast"] [data-testid="suggested-prompt"]').count();
+  const acrossPrompts = await page.locator('[data-testid="prompts-across"] [data-testid="suggested-prompt"]').count();
+  const scriptedMode = await page.getByRole('button', { name: 'Scripted' }).count();
+  check(
+    'Postdoc offers the yeast five, then the cross-module questions, and no scripted mode',
+    yeastPrompts === 5 && acrossPrompts === 6 && scriptedMode === 0,
+    `${yeastPrompts} yeast, ${acrossPrompts} across, ${scriptedMode} scripted`,
+  );
 
   // ── 3. Chip → reader, anchored on the span ──────────────────────────
   await go('/biorepo/papers/H4?span=r-H4-1');
@@ -265,63 +269,27 @@ async function main() {
     check('Numeric checkpoint accepts a unit-equivalent answer', false, 'input not found');
   }
 
-  // ── 10. Agent declines an out-of-corpus question ────────────────────
-  await go('/postdoc');
-  await page.waitForTimeout(400);
-  const composer = page.locator('textarea').first();
-  await composer.fill('What is the optimal sous-vide temperature for brisket?');
-  await composer.press('Enter');
-  // Wait for streaming to settle rather than guessing a duration.
-  await page
-    .locator('text=/outside this demo corpus/i')
-    .first()
-    .waitFor({ timeout: 20000 })
-    .catch(() => {});
-  const declineText = await page.locator('body').innerText();
-  check(
-    'Out-of-corpus question gets an honest decline',
-    /outside this|corpus does not|does not cover/i.test(declineText),
-  );
-
-  // The algal-casein question is NOT a decline — the corpus answers it with a
-  // substantive "no", which is the demo's whole point (OF-COR-001 §21 F6).
-  await go('/postdoc');
-  await page.waitForTimeout(400);
-  const c2 = page.locator('textarea').first();
-  await c2.fill('Has anyone expressed a casein in an alga?');
-  await c2.press('Enter');
-  await page
-    .locator('text=/no algal|never been|no.{0,12}alga/i')
-    .first()
-    .waitFor({ timeout: 25000 })
-    .catch(() => {});
-  const f6 = await page.locator('body').innerText();
-  check(
-    'The algal-casein absence is answered substantively, not declined',
-    /17 bacterial|Kiverdi|no algal/i.test(f6),
-  );
-
-  // ── 10b. Live mode shows the loop's work; Scripted is untouched ─────
+  // ── 10. Postdoc shows the loop's work ────────────────────────────────
   // OF-BLD-014 §5.4. The double replays the stream the real loop recorded.
   await go('/postdoc');
-  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
   const live = page.locator('textarea[aria-label="Ask a question"]');
   await live.fill('What does the stand-in table report for placeholder A?');
   await live.press('Enter');
   await page.locator('[data-testid="passage-quote"]').first().waitFor({ timeout: 10000 }).catch(() => {});
   const traced = await page.locator('[data-testid="trace-step"]').count();
   const quoted = await page.locator('[data-testid="passage-quote"]').count();
-  check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
+  check('Live Postdoc shows each step and the sentence it quotes', traced === 4 && quoted === 1, `${traced} steps, ${quoted} quotes`);
   // OF-BLD-014 §10.3 — a replay says it is one, with its date.
   const replay = await page.locator('[data-testid="replay-label"]').innerText().catch(() => '');
   // §10.R: a stand-in recording claims no date (its date is fixed so the
   // fixture stays the same); a real recording names the day it was made.
   check('A replayed answer says it is a replay, and a stand-in one claims no date',
     /Replay of a recorded test run, made with a scripted stand-in in place of the model/.test(replay) && !/\d{4}-\d{2}-\d{2}/.test(replay), replay.slice(0, 100));
-  await page.getByRole('button', { name: 'Scripted' }).click();
-  await page.locator('button', { hasText: /titers have been achieved/i }).first().click();
-  await page.waitForTimeout(2500);
-  check('Scripted mode still plays its flow', /500 mg\/L|15–18|1\.45/.test(await page.locator('body').innerText()));
+  // An answer that streamed is the service answering: the conversation is
+  // listed, and the notice that it was down is gone.
+  const listed = await page.locator('[data-testid="live-conversations"] button').count();
+  const stillDown = await page.locator('[data-testid="postdoc-down"]').count();
+  check('The answered conversation is listed, and Postdoc no longer says the service is down', listed === 1 && stillDown === 0, `${listed} listed`);
 
   // ── 10c. geneOS draws the ceiling beside what was reported ──────────
   // OF-BLD-014 §6.4, over the double's toy-network fixtures.
@@ -330,12 +298,17 @@ async function main() {
   const rules = await page.locator('[data-testid="strip-rule"]').count();
   check('geneOS → Model draws a computed ceiling and the envelope', rules === 1 && (await page.locator('[data-testid="frontier"]').count()) === 1, `${rules} rules`);
 
-  // ── 10d. fermOS fits the sample run and forecasts from it ───────────
+  // ── 10d. fermOS names what to deposit (OF-BLD-016 §3.2) ─────────────
+  // The invented sample run left the screen, and depositions live in the
+  // browser, where the double cannot supply one; so the beat checks that a
+  // fresh fermOS offers nothing invented and says what a run must carry.
   await go('/fermos');
-  await page.getByRole('button', { name: 'Load a sample run' }).click();
-  await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
-  const fitted = await page.locator('[data-testid="trajectory-fit"]').count();
-  check('fermOS fits a curve through the sample run', fitted === 3, `${fitted} curves`);
+  await page.locator('[data-testid="fermos-empty"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const fermosEmpty = await page.locator('[data-testid="fermos-empty"]').innerText().catch(() => '');
+  check(
+    'fermOS with no run deposited names the readings to deposit and where, and offers no invented run',
+    /time of each sample/.test(fermosEmpty) && /biomass/.test(fermosEmpty) && /Runbooks → Depositions/.test(fermosEmpty) && (await page.getByRole('button', { name: /sample run/i }).count()) === 0,
+  );
 
   // ── 10e. Proforma: the PHA scenario names where each input comes from ──
   // OF-BLD-014 §10.3, the demo's beat 7, over the double's stand-in binding.
@@ -348,7 +321,6 @@ async function main() {
   // The demo's beat 8: Postdoc drafts, a person adopts, the page draws the
   // predictions and the chain behind them; the ledger counts them.
   await go('/postdoc');
-  await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
   const ask = page.locator('textarea[aria-label="Ask a question"]');
   await ask.fill('Draft a runbook for the stand-in run.');
   await ask.press('Enter');

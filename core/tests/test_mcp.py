@@ -81,3 +81,39 @@ def test_u1_ask_postdoc_declines_in_words_when_the_loop_fails(monkeypatch):
     monkeypatch.setattr(postdoc_agent, "ask", boom)
     out = _text(asyncio.run(mcp_server.build().call_tool("ask_postdoc", {"question": "What PHB yields?"})))
     assert out["declined"].startswith("Postdoc could not run") and "export:corpus" in out["declined"]
+
+
+# ── OF-BLD-015 §7.5: the same registry, the reads and the writes, the gates ──
+
+
+def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
+    from openferment_core import module_stores
+    from openferment_core.tools import gates
+
+    listed = asyncio.run(mcp_server.build().list_tools())
+    names = [t.name for t in listed]
+    reads = [f"{m}_read" for m in module_stores.MODULES]
+    writes = [f"{m}_write" for m in module_stores.MODULES]
+    assert len(names) == 7 + len(reads) + len(writes) + 2 == 31
+    assert set(reads) | set(writes) <= set(names)
+    by_name = {t.name: t for t in listed}
+    # A read says what state it computes; a write says which actions a gate stops.
+    assert all("computed by the service" in by_name[r].description for r in reads)
+    for module, action in gates.BY_ACTION:
+        assert f"{action}:" in by_name[f"{module}_write"].description and "gated" in by_name[f"{module}_write"].description
+
+
+def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monkeypatch):
+    from openferment_core import audit, proposals
+
+    monkeypatch.setattr(audit, "PATH", store / "audit.jsonl")
+    monkeypatch.setattr(proposals, "PATH", store / "proposals.json")
+    monkeypatch.setenv("OPENFERMENT_MODEL", "claude-haiku-5-5")
+    server = mcp_server.build()
+    out = _text(asyncio.run(server.call_tool("guild_write", {"action": "evidence", "target": "", "fields": {"personId": "p-1"}, "note": "n"})))
+    assert out["summary"]["state"] == "proposed" and out["summary"]["gate"] == "sign"
+    assert not (store / "guild.json").exists() and len(proposals.open_ones()) == 1
+    [line] = audit.read()
+    assert line.agent == "model" and line.askId is None  # no ask owns a call from outside the app
+    refused = _text(asyncio.run(server.call_tool("pureos_write", {"action": "add", "target": "", "fields": {}, "note": ""})))
+    assert "no write function" in refused["error"]

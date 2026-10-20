@@ -1,65 +1,239 @@
-# The demo, in ten minutes
+# The demo: yeast ethanol, for Dr. Ramarao
 
-One question travels the whole chain: **what would it take to make PHA from
-waste cellulosic sugar?** Nine beats, one screen each. The clicks below are the
-ones the golden path walks (`pnpm test:golden`, sections 10b to 10f), so they
-are checked every time `pnpm verify` runs.
+One run sheet for showing openFerment on the yeast-ethanol program: wild-type *Saccharomyces
+cerevisiae* making ethanol from glucose (thread Q, 22 sources, 163 extracted values). Casein and
+PHA are archived and out of sight by default. The per-question figures below were measured on 2026-10-20 between
+08:46 and 08:54 UTC on `claude-haiku-5-5` at effort medium, through the service's stream route over the merged tree,
+with archived programs hidden and search on the hybrid lane. They predate §3.3 (examples hidden) and the §2.R and §3.R
+fixes, which changed questions 6, 8 and 10 as their notes say.
 
-## Before you start
+**Use a device on your tailnet, with the Tailscale app connected.** The service refuses every question, search and
+review that arrives through the public Funnel address (`guard.py`: nothing from the public internet may change
+anything, because the app has no login). Pages load for anyone with the link; only a tailnet device can ask. Run the
+meeting from your own laptop or phone with Tailscale on, and hand Ram that keyboard, never the link.
 
-| | Live | Offline |
-|---|---|---|
-| Start | `pnpm prototype:up` (the service on :8000, the build on :4173) | `pnpm demo:offline` (the build and the service double on :4317) |
-| Needs | a key the Models API accepts, the passage index (`pnpm data:prepare`), thread P extracted | nothing: no key, no network, no Python |
-| Postdoc | asks the model | replays a recorded run and labels it as a replay: *Replay of a run on <date>* for a real recording, *Replay of a recorded test run, made with a scripted stand-in* for the fixtures made with no key |
+Pages are named as the app names them. The route in brackets goes after `#` in the address, for
+example `https://seans-mac-mini-1.tail918752.ts.net/#/settings/programs`.
 
-Start the offline one in a second terminal before the demo. When the live
-service fails on the day, switch the browser tab to it.
+## 1. Start
 
-Set a reviewer name first (Settings → Corpus → Reviewer name): beat 7's
-assumptions and beat 8's decisions carry it.
+### On the Mac Mini (about fifteen minutes)
 
-## The beats
+1. If `MORNING` in `STATE.md` says green: GitHub → the pull request → **squash and merge** into `main`.
+2. In Terminal, in the openferment folder:
+   ```
+   git status        # only core/data/biorepo.json may show (your Guild decisions; --keep-decisions commits them).
+                     # Anything else: stop and tell Claude. Do not git stash: it would stash the decisions too.
+   bash scripts/host/deploy.sh --keep-decisions
+   pnpm data:pull
+   pnpm data:prepare
+   sudo launchctl kickstart -k system/com.umutuzo.openferment
+   pnpm ready
+   ```
+   - `deploy.sh` pulls `main`, installs every Python extra, builds the app and restarts the service. It keeps your review decisions.
+   - `data:pull` brings tonight's data from the `openferment-data` branch: thread Q's values, the written questions, the batch's plans.
+     It keeps a local file that differs from the branch's and names it. If it names `core/data/rageval/report.json`, the
+     Mini still has its old scorecard: run `rm core/data/rageval/report.json && pnpm data:pull` to take tonight's. Keep the
+     Mini's own `core/data/index/` files (its vectors belong to its own index).
+   - `data:prepare` fetches thread Q's full text on this machine (full text never travels), fetches Yeast9 and iMM904, and builds the passage index. It takes a while.
+   - `launchctl kickstart` is macOS restarting the service, so it reads the new corpus. `pnpm ready` checks everything without spending.
+3. **Ready looks like this:** the last line reads `lane: full`; the roles read `answer: claude-haiku-5-5; index: claude-haiku-5-5`;
+   Yeast9 and iMM904 are present with matching hashes. A `huggingface` warning is fine. If a role is not
+   Haiku, `core/.env` lacks these four lines. Add them (the file stays mode 600), then run `kickstart` and `pnpm ready` again:
+   ```
+   OPENFERMENT_MODEL=claude-haiku-5-5
+   OPENFERMENT_FALLBACK_MODEL=claude-haiku-5-5
+   OPENFERMENT_INDEX_MODEL=claude-haiku-5-5
+   OPENFERMENT_EFFORT=medium
+   ```
+4. On the device you will use in the meeting, with Tailscale connected, open `https://seans-mac-mini-1.tail918752.ts.net/`.
+   The reviewer name, the switch and the conversations are kept per browser, so check them in that browser.
+   - Settings → Corpus & ontology (`/settings/corpus`): your reviewer name is set. The top bar shows it.
+   - Settings → Programs (`/settings/programs`): Yeast ethanol active, Casein and PHA archived, the switch off.
+   - BioRepo → Witness (`/biorepo/witness`), Retrieval: dated 2026-10-20 07:46 UTC, questions drawn from thread Q. If older, see Steer around.
+   - Postdoc (`/postdoc`): ask question 1 below. If it answers, you are ready. Press **New conversation** so Ram starts on an empty page.
 
-| # | Open | Click | What appears | Say |
-|---|---|---|---|---|
-| 1 | Intake → Ingest (`/intake/ingest`) | a PHA paper's title (thread P, ids P1 to P35) | the paper's own words, extraction spans highlighted | "Every number in here is pinned to the sentence it came from." |
-| 2 | BioRepo → Search (`/biorepo/search`) | type *PHB from xylose hydrolysate*, press Enter, open the first hit | passages with the matching sentence; the reader opens on it and marks its words | "It searches what the authors wrote." |
-| 3 | BioRepo → Witness (`/biorepo/witness`) | scroll to **Extraction**, then **Retrieval** | two scorecards from real runs, each with its date | "This is how often it is right. The table picked the default." |
-| 4 | Postdoc (`/postdoc`) | **Live (Postdoc service)**; ask *What PHB yields on glucose have been reported, and how far are they from the ceiling?* | the trace fills in step by step; claims with no number in the prose; beside each, values from records, quoted sentences, a computed card | "It writes the words and the citations, and the screen fills in the numbers from the sources." |
-| 5 | geneOS → Model (`/geneos/model`) | pick **PHB**, **glucose**; then **fructose** | a dotted ceiling for each model that can use the sugar; every reported yield as a point | "The gap between the points and the lines is the room left." |
-| 6 | fermOS (`/fermos`), then **Forecast** | pick a deposition with a time course (or **Load a sample run**); on Forecast, **Forecast** | a fitted curve through measured points with its parameters; a band for the next run | "Filled points are measurements, and the band is the forecast." |
-| 7 | Proforma → *PHA from cellulosic sugar — draft flowsheet* (`/proforma/scenario/sc-pha-1`) | read the inputs table; type the assumptions you can defend (value, low, high, what it rests on, **Keep assumption**); **Run the scenario** | a source on every input; a price distribution, a tornado, the sliders | "Dashed amber means a person assumed it. It turns solid as records replace assumptions." |
-| 8 | Postdoc, then the runbook | ask *Draft a runbook for …*; **Turn into a runbook**; on its page **Lock predictions**; then Runbooks → **Ledger** | predictions with intervals and a lock time; the dossier behind them; the ledger's counts | "It keeps score on itself." |
-| 9 | Claude Desktop | ask the same question as beat 4 | the same tools, called from outside the app (README: *The same tools, from an assistant outside the app*) | "Any assistant can use the same evidence." |
+### Fallback: a laptop
 
-## What each beat shows today (2026-10-16)
+In a checkout of `main` whose `core/.env` holds the key and the four lines above:
+```
+pnpm data:pull
+pnpm data:prepare
+pnpm prototype:up    # the service on 127.0.0.1:8000, the app on http://127.0.0.1:4173
+pnpm ready           # in a second terminal: lane: full
+```
+Only the laptop can open it; share your screen.
 
-The live loop has not run: the key in the cloud environment is refused
-(`pnpm ready` reads lane `none`), so thread P is fetched and indexed but not
-extracted. Until it is:
+Leave `pnpm demo:offline` closed. Ram sees the live app alone.
 
-- **Beat 1** shows the 66 papers fetched with full text; extraction spans
-  appear only on the curated records.
-- **Beat 3**'s Extraction scorecard waits for the first extraction; Retrieval
-  is real (bm25, from 2026-10-15) and says it is provisional.
-- **Beat 4** live answers only with a key. Offline, the replay is a recorded run
-  of the real loop with a scripted stand-in in place of the model, over a
-  stand-in paper, and the panel says so.
-- **Beat 5** draws the ceilings; no reported PHA yield exists yet to draw beside
-  them.
-- **Beat 6** has no deposited run with a time course; the sample run is
-  invented and labelled.
-- **Beat 7**: all seven inputs wait for a source until thread P's records
-  arrive, so the run needs seven assumptions. Offline, the double binds four
-  inputs to stand-in records and runs a closed-form stand-in in place of
-  BioSTEAM; the benchmark card shows the real corn stover result (1.9677 USD per
-  gallon against 1.968).
-- **Beat 8** offline drafts from a recorded run over stand-in artifacts; the
-  adopted runbook, its lock and the ledger are the real code.
-- **Beat 9** works with nothing more than `uv`: `.mcp.json` starts the server for
-  a Claude Code session in this repository, and the README gives Claude
-  Desktop's snippet. `ask_postdoc` needs the key; the other tools do not.
+## 2. What to point at, on any answer
 
-`STATE.md` → `## Live owed` lists the runs that turn each of these into the
-real thing, with the command for each.
+1. **The first trace line:** *Swept the modules for what the question names · searched eleven, found in one*. Click it:
+   one line per module, with the ids it found and the modules read only in part. Code runs this sweep before the model's first turn.
+2. **The read lines**, such as *Read Runbooks for "ethanol" · 0 rows* (question 8 tonight). Each opens to the exact input
+   the tool was given. They are the same tools the MCP server offers Claude Desktop.
+3. **The grey tags under each claim.** Each is a row a tool returned in this run, with the state the service computed.
+   A claim citing a row no tool returned is dropped before it reaches the screen (tonight, in questions 6 and 7). Click a tag: it opens the module's page.
+4. **The footer:** *Searched eleven, found in …*, then *read in part: Runbooks, fermOS, BioRepo*. That last part names
+   what still lives only in the browser (depositions, decisions not yet posted).
+5. **Claims carry no numbers.** The value beside a claim is read from the record, the computed card or the quoted sentence,
+   never from the model's words. When a claim is dropped, the line says *Answered: 4 claims kept, 1 dropped*, and a yellow
+   box under the answer lists each reason. Tonight's: a number word (*second*, *two*, *zero*, *thirteen*), a quote over 300
+   characters, a quote that is not a whole sentence, a source no tool returned. That is Rule 1 working. Say so when it happens.
+
+**The one point to make, once:** every number on every screen was written by a paper, a model file, a run or a named
+person, and the model wrote the words.
+
+## 3. The questions, in order
+
+The eleven are buttons on Postdoc's empty page: the yeast five, then *Across the modules*. Each was asked twice (runs
+**a** and **b**) and once by `pnpm ask:batch` (**batch**). Figures are claims kept/dropped, seconds, cost. All eleven
+cost $0.0499 (a), $0.0574 (b) and $0.0316 (batch).
+
+**1. What is the theoretical maximum ethanol yield on glucose according to the Yeast9 and iMM904 genome-scale models, and how close do measured ethanol yields come to it?**
+- Reaches: geneOS (`yield_ceiling` twice, `geneos_read`), BioRepo records. Found in one.
+- Tonight: a 5/0, 25.9 s, $0.0046 · b 2/0, 23.4 s, $0.0042 · batch 4/2, 31.8 s, $0.0034.
+- Gist: both models give the same ceiling (the computed cards show 0.5114 g g⁻¹ each, as measured for PR #10); measured
+  yields sit below it, the anaerobic CEN.PK113-7D ones close. Gaps: yields unverified, conditions unrecorded, no ratio computed.
+- Reliable; two to five claims. geneOS → Model (`/geneos/model`) opens on ethanol and draws each model's ceiling. cobra,
+  an open-source package, finds the most ethanol each published metabolic network can make from the sugar.
+
+**2. How does CEN.PK113-7D differ from S288C, according to the Saccharomyces Genome Database?**
+- Reaches: geneOS hosts, the two SGD entries' passages, BioRepo records. Found in one.
+- Tonight: a 5/1, 18.8 s, $0.0031 · b 6/0, 20.2 s, $0.0051 · batch 6/2, 16.1 s, $0.0030.
+- Gist: quoted SGD sentences. CEN.PK113-7D comes from ENY.WA-1A and MC996A, has duplicated regions rich in maltose genes
+  and many SNPs and indels, and is a biotin prototroph where S288C is an auxotroph; S288C is non-flocculent, galactose-negative, with a mutated HAP1.
+- Reliable.
+
+**3. What maximum specific growth rate does wild-type Saccharomyces cerevisiae CEN.PK113-7D reach on glucose, and what biomass and ethanol yields go with it?**
+**Hand Ram the keyboard here.** He can check this one against his own knowledge.
+- Reaches: BioRepo records and passages, geneOS. Found in one.
+- Tonight: a 4/1, 13.2 s, $0.0053 · b 4/1, 13.8 s, $0.0053 · batch 5/0, 15.8 s, $0.0033.
+- Gist: μmax, biomass yield and ethanol yield of wild-type CEN.PK113-7D in anaerobic, very-high-gravity fed-batch culture (not batch), from the glycerol-formation
+  study (Q7), each value read from its record (PR #10 recorded μmax 0.29 h⁻¹, Yx/s 0.076, Yp/s 0.47 g g⁻¹). Gaps: medium,
+  temperature and glucose concentration not recorded; no aerobic value.
+- Reliable. One claim usually drops for the word *second*.
+
+**4. What minimum ethanol selling price does the NREL corn stover design report by Humbird et al. state, and how does the BioSTEAM benchmark of that design compare?**
+- Reaches: Proforma's stored benchmark (`selling_price`), the report's record, its passages. Found in none.
+- Tonight: a **0/3, declined**, 10.9 s, $0.0043 · b 3/0, 10.3 s, $0.0038 · batch 3/1, 16.7 s, $0.0027.
+- Gist: the report's stated price (2.15 USD gal⁻¹ in PR #10's run) beside the benchmark, which is lower (1.968 USD gal⁻¹).
+  BioSTEAM is an open-source Python package that simulates a whole plant and prices its product. Gap: no side-by-side of the two sets of assumptions.
+- Sometimes drops every claim: run a lost all three for *2* and *zero* and said *Postdoc produced 3 claims, none of which
+  passed validation*. If it declines, say that is Rule 1, and ask question 10.
+
+**5. Which Monod saturation constants (Ks) and ethanol or substrate inhibition constants have been reported for Saccharomyces cerevisiae ethanol fermentation, and in which kinetic models?**
+- Reaches: BioRepo records and passages. Found in none.
+- Tonight: a 6/4, 29.2 s, $0.0069 · b 6/4, 24.3 s, $0.0068 · batch 4/4, 17.8 s, $0.0032.
+- Gist: Ks on molasses (Monod against Andrews), on sugarcane-leaf hydrolysates, a Ks and a substrate inhibition constant
+  from a sorghum extractive fermentation, AFY's Ks on ethanol; then: no record gives an ethanol inhibition constant for *S. cerevisiae*.
+- Always answers, always drops several (long quotes, number words, a record that does not exist). The best one for the yellow box.
+
+**6. What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?**
+- Reaches: BioRepo (`search_records`, `search_passages`, `biorepo_read`), geneOS (`geneos_read`; run b also `yield_ceiling`). Tonight's runs read **found in none**: the sweep did not recognise the species name. It does now (§2.R): on this data it finds geneOS, BioRepo and Intake. The question was not asked live again after that fix.
+- Tonight: a 5/4, 16.1 s, $0.0035 · b 3/5, 19.7 s, $0.0064 · batch 7/1, 15.3 s, $0.0030.
+- Gist: thread Q's extracted titres and yields in BioRepo (all unverified) and the two computed ceilings in geneOS;
+  Runbooks, fermOS, Proforma and the rest hold nothing on it. Run a's own gap says the map found nothing while the reads returned rows.
+- Answers every time; drops several (*1*, *zero*, sources no tool returned).
+
+**7. Which hosts in geneOS could make ethanol, which models sit on their pages, and what ceiling does each give on glucose?**
+- Reaches: geneOS (`geneos_read`, seven reads). Found in one.
+- Tonight: a 3/3, 17.7 s, $0.0056 · b 7/0, 22.1 s, $0.0058 · batch 3/4, 16.1 s, $0.0028.
+- Gist: only the S288C host page carries models, iMM904 and Yeast9, with the same ethanol ceiling on glucose; no host page
+  claims ethanol; CEN.PK113-7D has no model of its own.
+- Varies: drops for sources no tool returned and for *thirteen*.
+
+**8. Draft a runbook for a batch ethanol fermentation in CEN.PK113-7D on glucose, using the extracted yield records and the Yeast9 glucose ceiling as a bound.**
+- Reaches: BioRepo, geneOS (`yield_ceiling`), Runbooks, Dominion, `draft_runbook`. Found in two.
+- Tonight: a 7/1, 52.8 s, $0.0103 (stopped at the twelve-call limit) · b 5/0, 44.1 s, $0.0090 · batch 4/0, 44.3 s, $0.0066.
+- Gist: cites the Yeast9 ceiling and CEN.PK113-7D's yield records, and notes they are fed-batch, not batch.
+  **In all three runs `draft_runbook` was refused: there is no product `ethanol` in Dominion's catalogue.** Nothing was drafted or proposed.
+- The slowest question. Show the refusal line in the trace: the tool will not invent a product.
+- Appendix 2's browser steps, **not walked tonight in a browser**, and out of reach while the draft is refused: **Turn into
+  a runbook** under the answer → on its page **Lock predictions** (in the browser this locks at once; a lock proposal
+  under the `lock` gate comes only when Postdoc proposes one) → Runbooks → Ledger (`/runbooks/ledger`) counts one.
+
+**9. What is waiting for a person on Home right now?**
+- Reaches: Home (`home_read`, three reads). Found in none.
+- Tonight: a 2/1, 10.1 s, $0.0018 · b 3/0, 9.9 s, $0.0039 · batch 2/0, 8.0 s, $0.0017.
+- Gist: the review queue, extraction candidates on Q1, Q10, Q11, Q12 and others, each awaiting a reviewer. Run b: no open
+  checks, no proposals. With no draft from question 8, there is no lock card.
+- Reliable and fast.
+
+**10. What does Proforma need before it can price ethanol from glucose on this evidence, and what does the corn stover benchmark give?**
+- Reaches: Proforma (`proforma_read`, `selling_price` twice). Found in one.
+- Tonight: a 4/1, 11.7 s, $0.0017 · b 4/1, 17.2 s, $0.0042 · batch 2/2, 11.5 s, $0.0015.
+- Gist: the corn stover benchmark is Proforma's only artifact, and it prices a cellulosic plant, not glucose; no ethanol
+  scenario exists; one would need the sugar fed, a sugar price, and a titre, yield and productivity from a run.
+- Reliable; drops a claim that cites nothing. Tonight's runs named the archived PHA draft scenario `sc-pha-1` through the price tool; with the switch off `selling_price` now refuses an archived scenario (§2.R, fixed after the runs and not asked live again).
+
+**11. What is archived in this corpus, and how would I see the PHA work?**
+- Reaches: nothing but the sweep, which reads *found in none · found in archived program PHA (hidden)*.
+- Tonight: a 0/0, 8.1 s, $0.0028 · b 0/0, 10.4 s, $0.0028 · batch 0/0, 4.8 s, $0.0005. Declined every time.
+- Gist: a decline that names the switch, and a gap the code writes: *Settings → Programs has the switch that shows archived programs; turn it on to include them.*
+- That decline is the right answer. Point at the first trace line; the footer does not carry the archived line.
+
+## 4. Things to know before he asks
+
+- **The archive switch.** Settings → Programs (`/settings/programs`), *Show archived programs and examples*, off. With it
+  off, BioRepo lists 22 papers (thread Q) and says 167 in Casein and PHA are hidden; Hosts shows 13 strains; Molecules 116
+  of 119; Protocols `PR-OD-01` and `PR-CIP-01`; Primer module m6; Proforma no scenarios; Runbooks none (the ten seed
+  runbooks describe runs nobody made, so they are examples, hidden with the archive), and the Ledger and Home's
+  Predictions card count zero. A link to an archived page opens it under a
+  banner naming the program. Postdoc sends the switch with every question. With it on, everything shows as before. Nothing was deleted.
+- **Every extracted value is unverified until a person decides it in Guild** (`/guild`). Computed values (the ceilings,
+  the benchmark) carry their basis instead. Haiku extracted the 163 thread Q
+  values, each inside a verbatim sentence or table row of its source; they read *Extracted · unverified*. The two SGD
+  entries carry no DOI or PMID, so Guild cannot keep decisions on them.
+- **Name the Humbird report by its authors, never its year.** A year in a question makes claims drop. The Humbird design
+  co-ferments glucose and xylose with recombinant *Zymomonas mobilis*, not yeast.
+- **The retrieval scorecard** (BioRepo → Witness → Retrieval), rerun on thread Q at 07:46 UTC: 85 questions built from the
+  163 anchored values (K) and 83 written questions kept of 100 (S); no flow touches thread Q, so F is empty. nDCG@10 (how
+  high the right passage ranks in the top ten), mean of K and S: bm25 (word matching) 0.4226, bm25+expand 0.4294, hybrid
+  (words plus meaning vectors) 0.4587, bm25+rerank (Haiku reorders the hits) 0.5942; hybrid+rerank was not scored, because
+  the night's spend cap stopped it. The rule picks bm25+rerank, but a rerank search is a Haiku call of about 20 seconds,
+  so for the meeting the app searches on **hybrid** (`core/data/index/config.json`). The card says so: *in use: hybrid
+  (the rule chose bm25+rerank; search stays on hybrid until a person adopts it)*. To adopt it after the meeting, set
+  `"lane": "bm25+rerank"` in `core/data/index/config.json` on the Mini and restart the service.
+- **The coverage line matches names** (a strain id, a model, a paper, and since §2.R a species named in full or as
+  *S. cerevisiae*). Questions 4, 5 and 9 read *found in none*; the reads that follow still find the rows.
+- **Guild has no team** until a person is added. The empty ledger says *Add yourself below as the lead*.
+- **fermOS has no deposited run.** It says *No run deposited yet* and names what to deposit through Runbooks → Depositions:
+  sample times in hours, biomass at four or more times, product and substrate at the same times. It fits only a run's own readings.
+- **Writes are marked as the model's.** Postdoc can keep a computed ceiling or add an unverified candidate. Anything at a
+  gate (lock, sign, publish, a note, a check) becomes a card on Home that only a named person can carry out. `GET /api/audit` lists every write.
+- **One model, no fallback.** Every role runs on Haiku. A classifier refusal declines the question; reword it and ask again.
+- **No login.** Anyone with the Funnel address can load the pages; only a tailnet device can ask, search or decide. Accounts are OF-BLD-017's.
+
+## 5. Steer around
+
+Questions:
+- Ram's own phone or laptop: it can load pages but not ask (see the top of this sheet). Use your tailnet device.
+- Question 4, when it declines → ask question 10 instead.
+- Question 8's browser steps (Turn into a runbook, Lock predictions, the Home card, the ledger): the draft was refused in all three runs. Do not promise a runbook.
+- Question 11 → let the decline stand. To show PHA, flip the switch (`/settings/programs`) yourself, then flip it back.
+- A year in any question ("the 2011 report") → claims drop. Name the authors.
+- *At what ethanol concentration does growth stop?* → 0–2 claims kept in three runs (PR #10).
+- Luedeking–Piret coefficients → none were extracted; Postdoc declines.
+- PHB, *C. necator* or casein questions with the switch off → Postdoc says they are archived and hidden, and names the switch. Let that stand.
+
+Screens:
+- Settings → *Clear this browser's data*: do not press it. After one confirm it discards the conversations, decisions and locks kept in this browser.
+- BioRepo → Search (`/biorepo/search`): leave the lane on its default; a rerank lane takes about 20 s a search.
+- BioRepo → Witness → Retrieval (`/biorepo/witness`): skip it if it is dated before 2026-10-20.
+- Hosts `gs115`, `ecoli`, `treesei` (`/geneos/hosts/gs115` and so on): their descriptions are written as casein comparators (gs115 names bovine β-casein).
+- Use the strain pages `/geneos/hosts/s-cerevisiae-s288c` and `/geneos/hosts/s-cerevisiae-cenpk113-7d` rather than the species entry `/geneos/hosts/s-cerevisiae`, whose only runbook is an example.
+- Runbooks → Protocols → `PR-OD-01` and `PR-CIP-01`, and Primer lesson l6-1: general methods, but their steps cite casein (thread M) records and values.
+- Guild's team flows (`/guild/matrix`, `/guild/people`, `/guild/checks`, `/primer/path`, `/primer/practice`): since the sample team left, no browser test walks adding a person, a sign-off, a cosigned run, a check or practice. Do not add people or draft a Practice scenario live.
+- Postdoc with the service down: do not ask from *New conversation* then; it can drop the oldest kept conversation.
+- fermOS (`/fermos`, `/fermos/forecast`) for Monod or inhibition kinetics: it has no such model.
+- The switch left on: Postdoc then reads casein and PHA too. Turn it off before the next question.
+
+Seed content that describes runs nobody made is marked as examples (§3.3) and hidden with the archive: the ten seed
+runbooks, the seven casein protocols, lessons m0–m5 and scenarios `sc-s1`…`sc-s3`. Postdoc's reads leave them out too
+with the switch off (§4.R; tonight's runs predate this, and question 8's trace then named three of them). One trace remains:
+- With the switch on, run mode opens from any example runbook. Do not start a run from one.
+
+---
+
+This file folds `docs/DEMO-YEAST.md` and `docs/build/DEMO-PHASE7.md`, which are removed.

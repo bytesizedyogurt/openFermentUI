@@ -13,6 +13,12 @@ rankings it appears in of `1 / (60 + rank)`, rank 1 first.
 `search(question, k=8, lane=None)` uses the lane `core/data/index/config.json`
 names when none is given, and `bm25` when that file is absent. A lane that
 cannot run here raises `LaneUnavailable` with the reason in words.
+
+THE PROGRAM SWITCH (OF-BLD-016 §2.3, E.2′). A passage of a paper in an
+archived program is left out of every ranking before fusion, and so before a
+reader grades anything, unless the caller passes `include_archived=True`.
+Off is the default. Each ranking is then read past `DEPTH` until it holds
+`DEPTH` passages that show.
 """
 from __future__ import annotations
 
@@ -20,7 +26,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import llm, passages
+from . import llm, passages, programs
 from .models import PassageHit, RagLane, Usage
 
 LANES = ("bm25", "bm25+expand", "hybrid", "bm25+rerank", "hybrid+rerank")
@@ -123,6 +129,25 @@ class Detail:
     unverifiedSentences: int = 0
     # Why another lane ran in place of the chosen one, when it did.
     note: str | None = None
+    # Passages of archived programs the rankings left out (OF-BLD-016 §2.3).
+    hidden: int = 0
+
+
+def _visible(include_archived: bool) -> Callable[[str], bool]:
+    """Whether a passage id shows: its paper is general or in an active
+    program, or archived programs were asked for."""
+    if include_archived:
+        return lambda pid: True
+    archived = programs.archived_ids()
+    cache: dict[str, bool] = {}
+
+    def shows(pid: str) -> bool:
+        paper = pid.split(":", 1)[0]
+        if paper not in cache:
+            cache[paper] = programs.program_of_paper(paper) not in archived
+        return cache[paper]
+
+    return shows
 
 
 def search_detail(
@@ -132,6 +157,7 @@ def search_detail(
     *,
     ask: Callable[..., llm.Result] | None = None,
     embedder=None,
+    include_archived: bool = False,
 ) -> Detail:
     note = None
     if lane is None:
@@ -148,7 +174,22 @@ def search_detail(
         raise LaneUnavailable(f"{lane}: {why}")
     index = passages.bm25_index()
     usage = Usage()
-    rankings: dict[str, list[str]] = {"bm25": [h.passage.id for h in index.search(question, DEPTH)]}
+    shows = _visible(include_archived)
+    # With archived programs hidden, a ranking is read in full and cut to
+    # DEPTH after the archived passages leave it.
+    depth = DEPTH if include_archived else max(DEPTH, len(index.cuts))
+    left_out: set[str] = set()
+
+    def ranked(ids: list[str]) -> list[str]:
+        kept = []
+        for pid in ids:
+            if shows(pid):
+                kept.append(pid)
+            else:
+                left_out.add(pid)
+        return kept[:DEPTH]
+
+    rankings: dict[str, list[str]] = {"bm25": ranked([h.passage.id for h in index.search(question, depth)])}
     phrased: list[str] = []
 
     if lane == "bm25+expand":
@@ -157,14 +198,14 @@ def search_detail(
         phrased, spent = expand.phrasings(question, ask=ask)
         usage = llm.add(usage, spent)
         for n, p in enumerate(phrased, start=1):
-            rankings[f"phrasing-{n}"] = [h.passage.id for h in index.search(p, DEPTH)]
+            rankings[f"phrasing-{n}"] = ranked([h.passage.id for h in index.search(p, depth)])
 
     if lane.startswith("hybrid"):
         dense, _ = _dense(index)
         assert dense is not None
         emb = embedder or _query_embedder(dense.model)
         qv = emb.embed([question])[0]
-        rankings["dense"] = [pid for pid, _ in dense.search(qv, DEPTH)]
+        rankings["dense"] = ranked([pid for pid, _ in dense.search(qv, depth)])
 
     fused = rrf(rankings)
     unverified = 0
@@ -191,7 +232,8 @@ def search_detail(
         )
         for pid, score, ranks in fused[: max(k, 0)]
     ]
-    return Detail(hits=hits, lane=lane, usage=usage, phrasings=phrased, unverifiedSentences=unverified, note=note)
+    return Detail(hits=hits, lane=lane, usage=usage, phrasings=phrased, unverifiedSentences=unverified, note=note,
+                  hidden=len(left_out))
 
 
 def search(question: str, k: int = 8, lane: str | None = None, **kw) -> list[PassageHit]:

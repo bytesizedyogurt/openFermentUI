@@ -27,7 +27,7 @@ def passages_found(monkeypatch):
     """`search_passages` finds the one stand-in passage for any question."""
     calls: list[str] = []
 
-    def search_detail(question, k=8, lane=None, ask=None):
+    def search_detail(question, k=8, lane=None, ask=None, include_archived=False):
         calls.append(question)
         return retrieve.Detail(hits=[PassageHit(passage=PASSAGE, score=1 / 61, lanes={"bm25": 1})], lane="bm25")
 
@@ -94,8 +94,8 @@ def test_two_searches_then_a_plan(pool):  # noqa: F811
     [c] = out.claims
     assert c.recordIds == ["r-X1-1"] and c.paperIds == ["X1"] and c.provenance == "curated"
     assert [p.id for p in out.passages] == ["X1:s1:0"]
-    assert [s.kind for s in out.trace] == ["tool", "tool", "final"]
-    assert out.trace[1].summary.startswith('Searched the papers for "xylose hydrolysate"')
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "tool", "final"]
+    assert out.trace[2].summary.startswith('Searched the papers for "xylose hydrolysate"')
     assert out.usage.costUsd == pytest.approx(0.003)
     assert all(c["tool_choice"] == "auto" for c in script.calls)
     assert script.calls[0]["system"] == postdoc_agent.AGENT_SYSTEM
@@ -109,7 +109,7 @@ def test_a_repeated_call_is_answered_from_the_cache(pool, passages_found):  # no
     script = Script([papers(), papers()], plan(claim(quotes=[("X1:s1:0", SENTENCE)])))
     out = ask(script, pool)
     assert len(passages_found) == 1, "the same input runs once"
-    assert [s.kind for s in out.trace] == ["tool", "tool", "final"]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "tool", "final"]
 
 
 def test_a_citation_of_something_never_retrieved_is_dropped(pool):  # noqa: F811
@@ -180,37 +180,92 @@ def test_wall_time_ends_the_loop(pool):  # noqa: F811
     assert out.stopped == "time"
 
 
-def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, monkeypatch):  # noqa: F811
+@pytest.fixture()
+def two_models(monkeypatch):
+    """A chain of two rungs, whatever this machine's core/.env names. A
+    restart needs a second model to go to; a session whose primary and
+    fallback name one model would otherwise test no restart at all
+    (OF-BLD-016 §1.R)."""
+    monkeypatch.setenv("OPENFERMENT_MODEL", llm.DEFAULT_PRIMARY)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", llm.DEFAULT_FALLBACK)
     chain = llm.chain("answer")
-    first = chain[0]
+    assert len(chain) == 2, chain
+    return chain
+
+
+def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, two_models):  # noqa: F811
+    first, second = two_models
     refused = llm.ModelRefused("cyber", [first], Usage(costUsd=0.002, models=[first]))
     script = Script([records()], refused, [records()], plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    if len(chain) == 1:
-        # Primary and fallback name the same model, so the chain has one rung:
-        # there is nothing to restart on, and the refusal declines the question.
-        assert [c["model"] for c in script.calls] == [first, first]
-        assert [s.kind for s in out.trace] == ["tool", "final"]
-        assert out.claims == [] and out.declined
-        assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
-        return
-    second = chain[1]
     assert [c["model"] for c in script.calls] == [first, first, second, second]
-    assert [s.kind for s in out.trace] == ["tool", "restart", "tool", "final"]
-    assert f"{first} declined; asked again on {second}" == out.trace[1].summary
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "restart", "tool", "final"]
+    assert f"{first} declined; asked again on {second}" == out.trace[2].summary
     assert len(out.claims) == 1
     assert out.usage.costUsd == pytest.approx(0.002 + 0.001 * 3)
-    # The second conversation starts fresh: only the question.
-    assert script.calls[2]["messages"] == [{"role": "user", "content": "How much PHB from xylose?"}]
+    # The second conversation starts fresh: the question, then the same map.
+    opening = script.calls[0]["messages"]
+    assert script.calls[2]["messages"] == opening
+    [only] = opening
+    asked, cmap = only["content"]
+    assert only["role"] == "user" and asked == {"type": "text", "text": "How much PHB from xylose?"}
+    assert cmap["type"] == "text" and cmap["text"].startswith("COVERAGE MAP")
 
 
-def test_the_restart_forgets_what_the_first_conversation_retrieved(pool):  # noqa: F811
+def test_a_refusal_with_one_model_in_the_chain_declines(pool, monkeypatch):  # noqa: F811
+    # Primary and fallback name the same model, so the chain has one rung:
+    # there is nothing to restart on, and the refusal declines the question.
+    monkeypatch.setenv("OPENFERMENT_MODEL", llm.DEFAULT_FALLBACK)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", llm.DEFAULT_FALLBACK)
+    [only] = llm.chain("answer")
+    refused = llm.ModelRefused("cyber", [only], Usage(costUsd=0.002, models=[only]))
+    script = Script([records()], refused, [records()], plan(claim(records=["r-X1-1"])))
+    out = ask(script, pool)
+    assert [c["model"] for c in script.calls] == [only, only]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "final"]
+    assert out.claims == [] and out.declined
+    assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
+
+
+def test_a_restart_reopens_a_follow_up_with_its_earlier_turns_and_the_map(pool, two_models, monkeypatch):  # noqa: F811
+    first, second = two_models
+    earlier = PriorTurn(question="Which hosts make PHB on xylose?",
+                        claims=["Cupriavidus necator makes polyhydroxybutyrate.",
+                                "A strain reached a titre of 3 grams per litre."])  # a number: never sent back
+    ran_as: list[tuple[str, str]] = []
+    run = tools.run
+
+    def spy(name, inp, ctx):
+        ran_as.append((ctx.model, ctx.ask_id))
+        return run(name, inp, ctx)
+
+    monkeypatch.setattr(tools, "run", spy)
+    script = Script([records()], llm.ModelUnavailable("overloaded"), [records("titre")], plan(claim(records=["r-X1-1"])))
+    out = postdoc_agent.ask("And from glucose?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool), history=[earlier])
+    assert [c["model"] for c in script.calls] == [first, first, second, second]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "restart", "tool", "final"]
+    # The second conversation opens as the first did: the earlier turn in
+    # words, then the follow-up with the map.
+    again = script.calls[2]["messages"]
+    assert again == script.calls[0]["messages"]
+    assert [m["role"] for m in again] == ["user", "assistant", "user"]
+    assert again[0]["content"] == earlier.question
+    assert "Cupriavidus necator makes polyhydroxybutyrate." in again[1]["content"]
+    assert "3 grams" not in again[1]["content"]
+    asked, cmap = again[2]["content"]
+    assert asked["text"] == f"{postdoc_agent.FOLLOW_UP}\n\nAnd from glucose?"
+    assert cmap["text"].startswith("COVERAGE MAP")
+    # Each conversation's tools run as its own model, under the one question's id.
+    assert [m for m, _ in ran_as] == [first, second]
+    assert len({a for _, a in ran_as}) == 1 and ran_as[0][1].startswith("ask-")
+    # What the second conversation cites, its own tools returned.
+    assert [c.recordIds for c in out.claims] == [["r-X1-1"]] and out.rejected == 0
+
+
+def test_the_restart_forgets_what_the_first_conversation_retrieved(pool, two_models):  # noqa: F811
     script = Script([records()], llm.ModelUnavailable("overloaded"), plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    if len(llm.chain("answer")) == 1:
-        # One rung: the outage declines the question, and nothing is kept.
-        assert out.claims == [] and out.rejected == 0 and out.declined
-        return
     assert out.claims == [] and out.rejected == 1, "the second model never retrieved r-X1-1"
 
 
@@ -226,7 +281,7 @@ def test_a_tool_error_reaches_the_model(pool):  # noqa: F811
     out = ask(script, pool)
     block = script.calls[1]["messages"][-1]["content"][0]
     assert block["is_error"] is True and "number" in block["content"]
-    assert out.trace[0].ok is False and out.trace[0].summary.startswith("search_records refused")
+    assert out.trace[1].ok is False and out.trace[1].summary.startswith("search_records refused")
 
 
 def test_an_instruction_inside_a_passage_changes_nothing_the_validator_lets_through(pool):  # noqa: F811
@@ -265,7 +320,7 @@ def test_steps_stream_as_they_happen(pool):  # noqa: F811
     seen = []
     script = Script([records()], plan(claim(records=["r-X1-1"])))
     postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool), on_step=seen.append)
-    assert [s.kind for s in seen] == ["tool", "final"] and [s.n for s in seen] == [1, 2]
+    assert [s.kind for s in seen] == ["coverage", "tool", "final"] and [s.n for s in seen] == [1, 2, 3]
 
 
 def test_the_agent_prompt_names_its_tools_as_its_sources():
@@ -280,10 +335,15 @@ def test_the_agent_prompt_names_its_tools_as_its_sources():
 
 
 def test_a_question_with_no_history_opens_with_the_question_alone(pool):  # noqa: F811
+    assert postdoc_agent._opening("How much PHB from xylose?", []) == [
+        {"role": "user", "content": "How much PHB from xylose?"}]
     script = Script(plan(claim(support="unsupported")))
     postdoc_agent.ask("How much PHB from xylose?", converse=script,
                       ctx=tools.ToolContext(pool_factory=lambda: pool), history=[])
-    assert script.calls[0]["messages"] == [{"role": "user", "content": "How much PHB from xylose?"}]
+    [opening] = script.calls[0]["messages"]
+    assert opening["role"] == "user"
+    assert opening["content"][0] == {"type": "text", "text": "How much PHB from xylose?"}
+    assert opening["content"][1]["text"].startswith("COVERAGE MAP")
 
 
 def test_a_follow_up_reads_earlier_turns_as_words_and_searches_again(pool):  # noqa: F811
@@ -303,8 +363,10 @@ def test_a_follow_up_reads_earlier_turns_as_words_and_searches_again(pool):  # n
     assert "Polyhydroxybutyrate titre was reported on xylose hydrolysate." in opening[1]["content"]
     assert "No record states the pretreatment." in opening[1]["content"]
     assert "3 grams" not in opening[1]["content"]
-    assert opening[2]["content"].startswith(postdoc_agent.FOLLOW_UP)
-    assert opening[2]["content"].endswith("And on glucose?")
+    asked, cmap = opening[2]["content"]
+    assert asked["text"].startswith(postdoc_agent.FOLLOW_UP)
+    assert asked["text"].endswith("And on glucose?")
+    assert cmap["text"].startswith("COVERAGE MAP")
     # The plan answers the follow-up, and cites only what this run retrieved.
     assert out.question == "And on glucose?"
     assert [c.recordIds for c in out.claims] == [["r-X1-1"]]
@@ -325,3 +387,65 @@ def test_a_follow_up_reads_only_the_last_few_turns(pool):  # noqa: F811
     users = [m["content"] for m in script.calls[0]["messages"] if m["role"] == "user"]
     assert len(users) == postdoc_agent.MAX_HISTORY_TURNS + 1
     assert users[0] == history[-postdoc_agent.MAX_HISTORY_TURNS].question
+
+
+def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns(pool):  # noqa: F811
+    """OF-BLD-016 §1.2: the merge keeps Phase 7's coverage pass and module
+    tools and the yeast tree's prior-turn opening, all three on one run."""
+    earlier = PriorTurn(question="Which hosts make ethanol?", claims=["Wild-type yeast ferments glucose to ethanol."])
+    script = Script(plan(claim(support="unsupported")))
+    out = postdoc_agent.ask("And which models sit on their pages?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool), history=[earlier])
+    # The coverage pass runs before round one, and is the trace's first step.
+    assert out.trace[0].kind == "coverage" and out.trace[0].ok
+    first = script.calls[0]
+    # Every tool in the registry is offered: the reads loose, the seven strict.
+    offered = {t["name"]: t["strict"] for t in first["tools"]}
+    assert set(offered) == {i.name for i in tools.infos()} and len(offered) == 29
+    assert sorted(n for n, strict in offered.items() if strict) == [
+        "convert_units", "draft_runbook", "growth_forecast", "search_passages",
+        "search_records", "selling_price", "yield_ceiling"]
+    # The earlier turn opens the conversation, then the question with the map.
+    roles = [m["role"] for m in first["messages"]]
+    assert roles == ["user", "assistant", "user"]
+    assert first["messages"][0]["content"] == earlier.question
+    asked, cmap = first["messages"][2]["content"]
+    assert asked["text"].startswith(postdoc_agent.FOLLOW_UP) and asked["text"].endswith("And which models sit on their pages?")
+    assert cmap["text"].startswith("COVERAGE MAP")
+
+
+# ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
+
+
+ARCHIVED_QUESTION = "What PHB yield did Cupriavidus necator H16 reach on glucose?"
+
+
+def test_with_the_switch_off_an_archived_name_gets_the_line_and_a_gap_naming_the_switch(pool):  # noqa: F811
+    script = Script(plan(claim(support="unsupported")))
+    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
+    assert out.coverage is not None and out.coverage.includeArchived is False
+    assert [a.name for a in out.coverage.archived] == ["PHA"]
+    # The coverage line, in the trace and in the map round one carries.
+    assert out.trace[0].summary.endswith("found in archived program PHA (hidden)")
+    assert out.trace[0].input["modules"][-1] == "PHA · found in archived program PHA (hidden)"
+    _, cmap = script.calls[0]["messages"][0]["content"]
+    assert "found in archived program PHA (hidden)" in cmap["text"]
+    # A gap, written by code, names the program and the switch.
+    switch = [g for g in out.gaps if "Settings → Programs" in g]
+    assert len(switch) == 1 and "PHA is an archived program" in switch[0]
+
+
+def test_with_the_switch_on_the_same_question_is_swept_as_before(pool):  # noqa: F811
+    script = Script(plan(claim(support="unsupported")))
+    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool, include_archived=True))
+    assert out.coverage is not None and out.coverage.includeArchived is True and out.coverage.archived == []
+    assert "archived" not in out.trace[0].summary
+    assert not [g for g in out.gaps if "Settings → Programs" in g]
+    assert "c-necator-h16" in [h.id for m in out.coverage.modules for h in m.hits]
+
+
+def test_a_question_naming_nothing_archived_gets_no_line_and_no_gap(pool):  # noqa: F811
+    out = postdoc_agent.ask("How much ethanol from glucose?", converse=Script(plan(claim(support="unsupported"))),
+                            ctx=tools.ToolContext(pool_factory=lambda: pool))
+    assert out.coverage is not None and out.coverage.archived == [] and out.gaps == []

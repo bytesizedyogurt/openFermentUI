@@ -1,7 +1,8 @@
 // Dominion — patents and clearance (OF-BLD-008 §4).
 //
 // NOT A PLACEHOLDER. Dominion arrives with the molecule catalogue as its
-// default view and the clearance engine behind it — 117 molecules, six
+// default view and the clearance engine behind it — every molecule in the
+// catalogue (counted from PRODUCTS at render, never typed), six
 // jurisdictions, and a set of authored findings. `Molecules.tsx` and
 // `MoleculeDetail.tsx` are the same files they were; what changed is that they
 // live under an owner now, because a catalogue of what could be made is
@@ -18,8 +19,14 @@
 // four Dominion subsystems, so `SubsystemShelf` now names each of them AND
 // carries the reference content for it (OF-BLD-010). Keeping both would have
 // stated the same four absences twice on one screen, and the shelf says more.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The tab badges, the clearance distribution, its
+// stat tiles and the authored findings count only the molecules the program
+// selector lets show, so with archived programs hidden no casein or PHA
+// molecule is counted here; with the switch on every number is as before.
 import { useMemo } from 'react';
 import { PRODUCTS } from '@/data/products';
+import { useProgramFilter } from '@/store';
 import { CLEARANCE_STATES_BY_ID } from '@/data/vocabulary';
 import { CLEARANCE_FINDINGS } from '@/data/clearanceFindings';
 import {
@@ -35,6 +42,18 @@ import { SubsystemShelf } from '@/components/ReferenceView';
 import Molecules from './Molecules';
 
 
+/** The catalogue and its authored findings, as the program switch lets them show. */
+function useShownCatalogue() {
+  const shows = useProgramFilter();
+  return useMemo(
+    () => ({
+      catalogue: PRODUCTS.filter((p) => shows('product', p.id)),
+      findings: CLEARANCE_FINDINGS.filter((f) => shows('product', f.productId)),
+    }),
+    [shows],
+  );
+}
+
 const RISK_TONE: Record<string, string> = {
   low: 'text-accent',
   'low-moderate': 'text-accent/80',
@@ -43,22 +62,23 @@ const RISK_TONE: Record<string, string> = {
 };
 
 function ClearanceView() {
+  const { catalogue, findings } = useShownCatalogue();
   // Distribution over the STORED headline state, which is a claim-architecture
   // judgement rather than a search result. Counted from the catalogue so the
   // number cannot drift from what the molecule pages show.
   const distribution = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const product of PRODUCTS) {
+    for (const product of catalogue) {
       counts.set(product.clearanceState, (counts.get(product.clearanceState) ?? 0) + 1);
     }
     return [...counts.entries()]
       .map(([id, count]) => ({ state: CLEARANCE_STATES_BY_ID[id], count }))
       .filter((row) => row.state)
       .sort((a, b) => b.count - a.count);
-  }, []);
+  }, [catalogue]);
 
-  const cells = PRODUCTS.length * JURISDICTIONS.length;
-  const authored = CLEARANCE_FINDINGS.length;
+  const cells = catalogue.length * JURISDICTIONS.length;
+  const authored = findings.length;
 
   return (
     <>
@@ -67,7 +87,7 @@ function ClearanceView() {
       </Callout>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 my-5">
-        <Stat label="Molecules" value={String(PRODUCTS.length)} sub="each carrying one headline state" />
+        <Stat label="Molecules" value={String(catalogue.length)} sub="each carrying one headline state" />
         <Stat label="Jurisdictions" value={String(JURISDICTIONS.length)} sub="offices the matrix has rows for" />
         <Stat
           label="Cells authored"
@@ -76,14 +96,14 @@ function ClearanceView() {
         />
         <Stat
           label="Coverage"
-          value={`${((authored / cells) * 100).toFixed(2)}%`}
+          value={`${cells > 0 ? ((authored / cells) * 100).toFixed(2) : '0.00'}%`}
           sub="of the matrix has been looked at by a person"
         />
       </div>
 
       <section aria-labelledby="clearance-dist">
         <SectionTitle
-          right={<span className="font-num text-caption text-ink-soft">{PRODUCTS.length} molecules</span>}
+          right={<span className="font-num text-caption text-ink-soft">{catalogue.length} molecules</span>}
         >
           <span id="clearance-dist">Headline state across the catalogue</span>
         </SectionTitle>
@@ -106,9 +126,9 @@ function ClearanceView() {
                 <div className="text-body text-ink-soft mt-0.5">{state.action}</div>
                 <div
                   className="mt-1.5 h-1.5 rounded-full bg-accent/25"
-                  style={{ width: `${(count / PRODUCTS.length) * 100}%` }}
+                  style={{ width: `${(count / catalogue.length) * 100}%` }}
                   role="img"
-                  aria-label={`${count} of ${PRODUCTS.length} molecules`}
+                  aria-label={`${count} of ${catalogue.length} molecules`}
                 />
               </li>
             ))}
@@ -128,12 +148,13 @@ function ClearanceView() {
 
 export default function Dominion() {
   const route = useRoute();
+  const { catalogue, findings } = useShownCatalogue();
   const tabs: OwnerTab[] = useMemo(
     () => [
-      { label: 'Molecules', to: '/dominion/molecules', badge: PRODUCTS.length },
-      { label: 'Clearance', to: '/dominion/clearance', badge: CLEARANCE_FINDINGS.length },
+      { label: 'Molecules', to: '/dominion/molecules', badge: catalogue.length },
+      { label: 'Clearance', to: '/dominion/clearance', badge: findings.length },
     ],
-    [],
+    [catalogue, findings],
   );
   const active = activeTab(route.path, tabs);
   const onClearance = active === '/dominion/clearance';
@@ -157,8 +178,8 @@ export default function Dominion() {
           component="Dominion"
           action={
             onClearance
-              ? `${CLEARANCE_FINDINGS.length} findings authored`
-              : `${PRODUCTS.length} molecules`
+              ? `${findings.length} findings authored`
+              : `${catalogue.length} molecules`
           }
         />
       </div>

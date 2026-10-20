@@ -11,26 +11,28 @@
  *      the overlays (lapsed, suspended) land on the right side of their
  *      boundary, withdrawn entries count for nothing, and the gate reads
  *      the result the way run mode will;
- *   2. the sample team: every entry in it is one the service's rules would
- *      accept, and the people the sample was written to show at a level
- *      come out at that level;
+ *   2. the ladder team, built here in memory (scripts/lib/guild-ladder.ts,
+ *      invented people the app never shows): every entry in it is one the
+ *      service's rules would accept, and the people it was written to show
+ *      at a level come out at that level;
  *   3. the store: writes made with the service down are kept and marked
- *      pending, the sample never leaks into the ledger, and `syncGuild`
- *      posts people, then entries, then withdrawals, and drops what the
- *      service refuses;
+ *      pending, the store holds no invented team of its own, and
+ *      `syncGuild` posts people, then entries, then withdrawals, and drops
+ *      what the service refuses;
  *   4. a run (OF-BLD-013 §2): completing a step writes a run alone, a
  *      supervised run or a deviation, once per step, for whoever is the
  *      operator at the time.
  *
  * Parts 5 to 10 follow the same pattern for lessons, the path, what the
- * reviews found, practice, enforce mode, and checks (§5.4): the sample's
- * queue, the bench's rules, what a person may see, and the service's moves.
+ * reviews found, practice, enforce mode, and checks (§5.4): the ranking on
+ * the ladder team, what a person may see, and the service's moves. The
+ * bench's rules are the service's (checks.py, core/tests/test_checks.py).
  *
  * Runs with no service and no network: the service is a stub `fetch` here.
  */
 import { useStore, guildView, actingIdOf, checksView } from '../src/store';
 import { SKILLS, SKILL_BY_ID } from '../src/data/skills';
-import { sampleGuild, SAMPLE_LEAD } from '../src/data/guildSample';
+import { sampleGuild, SAMPLE_LEAD } from './lib/guild-ladder';
 import { offlineRefusal } from '../src/lib/guild';
 import { REFRESH_WINDOW, pathOf } from '../src/engine/path';
 import {
@@ -46,8 +48,9 @@ import {
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson } from '../src/data/types';
+import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, LiveConversation, Proposal } from '../src/data/types';
 import { mayQueue, proposeChecks, shownTo } from '../src/engine/checks';
+import { needsActing, shownProposals } from '../src/lib/proposals';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -184,7 +187,7 @@ check(
   verdictFor([{ skills: ['SK-CIP'] }, { skills: ['SK-CAUSTIC'] }, { skills: [] }], 'p-tom', G).missing.join() === 'SK-CIP',
 );
 
-// ── 2. the sample team ─────────────────────────────────────────────────
+// ── 2. the ladder team, in memory ──────────────────────────────────────
 
 const sample = sampleGuild(TODAY);
 const sampleMap = competenceOf(sample.evidence, sample.people, SKILLS_MAP, TODAY);
@@ -224,22 +227,10 @@ async function main() {
   await s().guildWithdraw(entry!.id, 'Wrong skill');
   check('a withdrawal made offline is kept to send later', s().guildPendingWithdrawals.length === 1 && !!s().guild.evidence.find((e) => e.id === entry!.id)?.withdrawnAt);
 
-  s().guildLoadSample();
-  const before = s().guild;
-  check('the sample is what Guild shows while it is loaded', guildView(s()) === s().guildSample && actingIdOf(s()) === 'p-sample-eric');
-  await s().guildRecord({
-    personId: 'p-sample-aline',
-    skillId: 'SK-OD',
-    kind: 'knowledge',
-    outcome: 'pass',
-    at: TODAY,
-    observerId: 'p-sample-eric',
-    source: { kind: 'signoff', ref: 'PR-OD-01' },
-    raw: 'Briefed',
-  });
-  check('a write on the sample touches the sample and nothing else', s().guild === before && s().guildPending.length === 3);
-  s().guildClearSample();
-  check('clearing the sample brings the ledger back unchanged', guildView(s()) === before && actingIdOf(s()) === lead?.id);
+  check(
+    'the store holds no invented team: Guild reads the ledger and nothing else',
+    !('guildSample' in s()) && !('guildLoadSample' in s()) && guildView(s()) === s().guild && actingIdOf(s()) === lead?.id,
+  );
 
   // The service comes back: people, then entries, then withdrawals; one refused.
   const posted: string[] = [];
@@ -274,8 +265,8 @@ async function main() {
 
   // With the service down, so the reset's own sync does not race what follows.
   useStore.setState({ serviceUp: false });
-  s().resetDemo();
-  check('a reset clears what was only ever in this browser', s().guildPending.length === 0 && s().guildSample === null && s().guild.people.length === 0);
+  s().clearBrowserData();
+  check('a reset clears what was only ever in this browser', s().guildPending.length === 0 && s().guild.people.length === 0);
 
   // ── 4. a run writes to the ledger (OF-BLD-013 §2) ───────────────────
   useStore.setState({
@@ -366,11 +357,6 @@ async function main() {
   await s().recordLessonForGuild(bench!.id);
   check('the next learner gets entries of their own', lessonEntries().filter((e) => e.personId === 'p-ann').length === bench!.skills!.length);
   check('every lesson entry is one the service would accept, as far as the browser can tell', lessonEntries().every((e) => offlineRefusal(e, s().guild) === null));
-  s().guildLoadSample();
-  const real = s().guild;
-  await s().recordLessonForGuild(bench!.id);
-  check('with the sample shown, a lesson writes to the sample alone', s().guild === real && s().guildSample!.evidence.some((e) => e.source.kind === 'lesson' && e.personId === 'p-sample-eric'));
-  s().guildClearSample();
   s().completeLesson(bench!.id);
   check('completing a lesson marks it finished in this browser', s().learnProgress[bench!.id] === true);
 
@@ -429,7 +415,6 @@ async function main() {
   const reset7 = (extra: Partial<Parameters<typeof useStore.setState>[0]> = {}) =>
     useStore.setState({
       serviceUp: false,
-      guildSample: null,
       guild: { version: 1, people: R_PEOPLE, evidence: [ev('p-ann', 'SK-OD', 'designation', '2026-02-01'), ev('p-tom', 'SK-OD', 'knowledge', '2026-09-01')] },
       guildPending: [],
       guildPendingWithdrawals: [],
@@ -511,14 +496,6 @@ async function main() {
     s().guildPending,
   );
 
-  // The sample stays out of the Durable tier.
-  reset7();
-  s().guildLoadSample();
-  const opened = s().openDeposition(s().runbooks[0].id, 'PR-OD-01', 1)!;
-  check('a deposition opened while the sample is shown names no sample person', s().depositions.find((d) => d.id === opened.depositionId)?.operatorId === null);
-  s().setRunOperator(opened.runId, 'p-sample-patrick');
-  check('nor does a handover to one', s().depositions.find((d) => d.id === opened.depositionId)?.operatorId === null && s().runs[opened.runId].operatorId === 'p-sample-patrick');
-  s().guildClearSample();
 
   // ── 8. practice (OF-BLD-013 §4.3) ───────────────────────────────────
   const closedSession = (personId: string | null, evidenceId: string | null) => ({
@@ -534,26 +511,17 @@ async function main() {
     usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, models: [] },
   });
   reset7({ guildActingId: 'p-tom' });
-  check('a learner on the ledger is named to the service', s().practiceLearner() === 'p-tom');
-  s().guildSetActing('p-qa');
-  check('an auditor is named as nobody', s().practiceLearner() === null);
-  s().guildLoadSample();
-  s().guildSetActing('p-sample-olivier');
-  check('a sample person is never named to the service', s().practiceLearner() === null);
   const realBefore = s().guild;
   await s().practiceClosed(closedSession(null, null), 'A reading above the range');
-  const practised = s().guildSample!.evidence.filter((e) => e.kind === 'scenario');
+  check('a closed session on nobody\u2019s record writes nothing to the ledger', s().guild === realBefore);
+  const L8: Guild = { version: 1, people: R_PEOPLE, evidence: [] };
+  const practised: GuildEvidence = ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-1' } });
+  check('the offline fallback takes a practice entry with no observer', offlineRefusal(practised, L8) === null);
+  check('the offline fallback refuses practice that names an observer', offlineRefusal({ ...practised, observerId: 'p-ann' }, L8)?.rule === 'observer');
   check(
-    'with the sample shown, a closed session goes on the sample learner, in the sample alone',
-    practised.length === 1 && practised[0].personId === 'p-sample-olivier' && practised[0].source.ref === 'pt-check-1' && practised[0].observerId === null && s().guild === realBefore,
+    'and a second entry on the same session',
+    offlineRefusal({ ...practised, id: 'e-second-on-session' }, { ...L8, evidence: [practised] })?.rule === 'duplicate',
   );
-  check('and the offline fallback would take it', offlineRefusal(practised[0], s().guildSample!) === null);
-  check('the offline fallback refuses practice that names an observer', offlineRefusal({ ...practised[0], observerId: 'p-sample-eric' }, s().guildSample!)?.rule === 'observer');
-  check('and a second entry on the same session', offlineRefusal({ ...practised[0], id: 'e-second-on-session' }, s().guildSample!)?.rule === 'duplicate');
-  const sampleBefore = s().guildSample!.evidence.length;
-  await s().practiceClosed({ ...closedSession('p-tom', null), id: 'pt-check-3' }, 'A reading above the range');
-  check('a real person\u2019s session closing while the sample is shown credits nobody in the sample', s().guildSample!.evidence.length === sampleBefore);
-  s().guildClearSample();
   reset7({ guildActingId: 'p-tom', serviceUp: true });
   server7.evidence.push({ ...ev('p-tom', 'SK-OD', 'scenario', TODAY, { observerId: null, source: { kind: 'scenario', ref: 'pt-check-2' } }), id: 'e-practice-from-service', recordedAt: `${TODAY}T09:21:00Z` });
   await s().practiceClosed({ ...closedSession('p-tom', 'e-practice-from-service'), id: 'pt-check-2' }, 'A reading above the range');
@@ -594,153 +562,30 @@ async function main() {
   check('with nobody on the ledger nothing is held', holdFor(cipStep, null, null, hmap(H), SKILLS_MAP, DEFAULT_POLICY, false) === null);
   reset7({ guildActingId: 'p-ann' });
   check('only the lead sets the policy', (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'enforce', checksPerQuarter: 2 })) === false);
-  s().guildLoadSample();
-  s().guildSetActing(SAMPLE_LEAD);
-  const realPolicy = s().guild.policy;
+  s().guildSetActing('p-lead');
   check(
-    'with the sample shown, the lead sets the sample\u2019s policy alone',
-    (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'advise', checksPerQuarter: 3 })) === true &&
-      s().guildSample!.policy?.checksPerQuarter === 3 &&
-      s().guild.policy === realPolicy,
+    'with the service down the lead is told the policy is the service\u2019s to keep',
+    (await s().guildSetPolicy({ routineGate: 'enforce', criticalGate: 'advise', checksPerQuarter: 3 })) === false && s().guild.policy === undefined,
   );
-  s().guildClearSample();
 
   const audited = { ...ev('p-tom', 'SK-OD', 'witnessed', TODAY), observerId: 'p-qa' };
   check('the offline fallback refuses an auditor as observer', offlineRefusal(audited, { version: 1, people: R_PEOPLE, evidence: [] })?.rule === 'authority');
 
   // ── 10. checks: the queue and the bench (OF-BLD-013 §5.4) ───────────
   //
-  // With the sample shown, the queue is the ranking run here on the sample,
-  // every move happens in memory under the rules a screen needs, a run at the
-  // bench writes witnessed entries with the check as their source, and
-  // nothing reaches the service. With the service up, the moves are posts
-  // and a person asking for their own check learns nothing about the queue.
-  const posts10: string[] = [];
-  (globalThis as any).fetch = async (url: string, init?: { body: string }) => {
-    posts10.push(url);
-    return { ok: false, status: 503, json: async () => ({}) } as Response;
-  };
-  reset7({ serviceUp: true });
-  s().guildLoadSample();
-  const sample10 = s().guildSample!;
-  const queue10 = s().guildSampleChecks ?? [];
-  const expected10 = proposeChecks(sample10, SKILLS_MAP, localToday());
-  check(
-    'the sample\u2019s queue is the ranking run on the sample when it loads',
-    queue10.length > 0 &&
-      queue10.length === expected10.length &&
-      queue10.every((c, i) => c.state === 'proposed' && c.personId === expected10[i].personId && c.skillIds.join() === expected10[i].skillIds.join()),
-    queue10.map((c) => c.personId),
-  );
-  check('checksView shows the sample\u2019s checks while it is shown', checksView(s()) === s().guildSampleChecks);
-  const pat = queue10.find((c) => c.personId === 'p-sample-patrick')!;
-  check('the sample proposes a check for its suspended trainee', !!pat && pat.reasons.some((r) => r.kind === 'suspended'));
-  const allCalls = (c: Check, meets = (_k: string, _i: number) => true): CheckResult[] =>
-    c.skillIds.flatMap((k) => SKILL_BY_ID[k].mastery.map((_, i) => ({ skillId: k, criterion: i, meets: meets(k, i), note: '' })));
-  const words = (c: Check, text = 'Watched every step at the bench') => c.skillIds.map((k) => ({ skillId: k, text }));
-
-  s().guildSetActing('p-sample-patrick');
-  check('a check is never run by the person it names', (await s().checksRecord(pat.id, allCalls(pat), words(pat), localToday())) !== null);
-  check('and never shows to them in the queue until it is run', !shownTo(checksView(s()), 'p-sample-patrick').some((c) => c.id === pat.id));
-  s().guildSetActing('p-sample-grace');
-  check('nor run by someone who is no assessor on its skills', (await s().checksRecord(pat.id, allCalls(pat), words(pat), localToday())) !== null);
-  check('nor scheduled by them', (await s().checksSchedule(pat.id, addDays(localToday(), 2))) !== null);
-  s().guildSetActing('p-sample-eric');
-  check(
-    'every criterion is called before a check is signed',
-    (await s().checksRecord(pat.id, allCalls(pat).slice(1), words(pat), localToday())) !== null,
-  );
-  check('and every skill has the assessor\u2019s words', (await s().checksRecord(pat.id, allCalls(pat), words(pat, ' '), localToday())) !== null);
-  check(
-    'an assessor on every skill schedules it',
-    (await s().checksSchedule(pat.id, addDays(localToday(), 2))) === null &&
-      s().guildSampleChecks!.find((c) => c.id === pat.id)?.state === 'scheduled' &&
-      s().guildSampleChecks!.find((c) => c.id === pat.id)?.assessorId === 'p-sample-eric',
-  );
-  const failOD = (k: string, i: number) => !(k === 'SK-OD' && i === 0);
-  const before10 = s().guild;
-  check('and runs it', (await s().checksRecord(pat.id, allCalls(pat, failOD), words(pat), localToday())) === null);
-  const wrote10 = s().guildSample!.evidence.filter((e) => e.source.kind === 'check' && e.source.ref === pat.id);
-  check(
-    'a run writes one witnessed entry per skill, signed by the assessor, with the check as its source',
-    wrote10.length === pat.skillIds.length && wrote10.every((e) => e.kind === 'witnessed' && e.observerId === 'p-sample-eric' && e.raw === 'Watched every step at the bench'),
-    wrote10.map((e) => [e.skillId, e.outcome]),
-  );
-  check(
-    'a skill passes only with every criterion met',
-    wrote10.find((e) => e.skillId === 'SK-OD')?.outcome === 'fail' && wrote10.filter((e) => e.skillId !== 'SK-OD').every((e) => e.outcome === 'pass'),
-  );
-  const done10 = s().guildSampleChecks!.find((c) => c.id === pat.id)!;
-  check('the check is done, with its calls and its entries', done10.state === 'done' && done10.results.length === allCalls(pat).length && done10.evidenceIds.length === wrote10.length);
-  const after10 = competenceOf(s().guildSample!.evidence, s().guildSample!.people, SKILLS_MAP, localToday());
-  const ready10 = pat.reasons.find((r) => r.kind === 'ready');
-  check(
-    'the Matrix reads it at once: a ready skill is Qualified, a failed one stays suspended',
-    statusOf(after10, 'p-sample-patrick', 'SK-OD').suspended && (!ready10 || statusOf(after10, 'p-sample-patrick', ready10.skillId).level === 3),
-  );
-  check('once run, the person sees it', shownTo(checksView(s()), 'p-sample-patrick').some((c) => c.id === pat.id));
-  check('a check that is done takes no second run', (await s().checksRecord(pat.id, allCalls(pat), words(pat), localToday())) !== null);
-  check('the real ledger is untouched by the sample\u2019s check', s().guild === before10);
-
-  const other = s().guildSampleChecks!.find((c) => c.state === 'proposed')!;
-  check('a dismissal says why', (await s().checksDismiss(other.id, ' ')) !== null);
-  s().guildSetActing(SAMPLE_LEAD);
-  check(
-    'the lead dismisses with a reason, kept on the check',
-    (await s().checksDismiss(other.id, 'Seen at the bench yesterday')) === null &&
-      s().guildSampleChecks!.find((c) => c.id === other.id)?.dismissReason === 'Seen at the bench yesterday',
-  );
-  check('the lead may not schedule a check on skills they do not assess', (await s().checksSchedule(s().guildSampleChecks!.find((c) => c.state === 'proposed')!.id, localToday())) !== null);
-
-  const openFor = (pid: string) => s().guildSampleChecks!.filter((c) => c.personId === pid && (c.state === 'proposed' || c.state === 'scheduled'));
-  const inQueue = s().guildSampleChecks!.find((c) => c.state === 'proposed')!;
-  s().guildSetActing(inQueue.personId);
-  const n10 = s().guildSampleChecks!.length;
-  check(
-    'asking for your own check on a skill already in the queue says the same as a fresh ask, and adds nothing',
-    (await s().checksRequest(inQueue.personId, [inQueue.skillIds[0]])) === null && s().guildSampleChecks!.length === n10,
-  );
-  s().guildSetActing('p-sample-eric');
-  check('an assessor asking for one already there is told so', (await s().checksRequest(inQueue.personId, [inQueue.skillIds[0]])) !== null);
-  const fresh10 = SKILLS.find((k) => !openFor('p-sample-olivier').some((c) => c.skillIds.includes(k.id)))!.id;
-  check(
-    'a fresh ask lands in the queue with its reason written',
-    (await s().checksRequest('p-sample-olivier', [fresh10])) === null &&
-      s().guildSampleChecks!.some((c) => c.personId === 'p-sample-olivier' && c.reasons.some((r) => r.kind === 'requested' && /Eric Habimana/.test(r.text))),
-  );
-  s().guildSetActing('p-sample-claudine');
-  check('in the sample too, the ranking is run by an assessor or the lead', 'why' in (await s().checksPropose()));
-  check(
-    'and a check for someone else is asked for by an assessor on one of its skills',
-    (await s().checksRequest('p-sample-olivier', ['SK-OD'])) !== null,
-  );
-  s().guildSetActing('p-sample-eric');
-  const proposed10 = await s().checksPropose();
-  const covered10 = s().guildSampleChecks!.filter((c) => c.state === 'proposed' || c.state === 'scheduled').flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`));
-  check('proposing again never repeats a pair an open check covers', 'made' in proposed10 && new Set(covered10).size === covered10.length, covered10);
-  check(
-    'a brief is the service\u2019s to draft, and the sample stays here',
-    (await s().checksBrief(s().guildSampleChecks!.find((c) => c.state === 'proposed')!.id)) !== null,
-  );
-  // §5.5 — Propose now says how many it made that the proposer can see: one naming them stays out of the count.
-  s().guildClearSample();
-  s().guildLoadSample();
-  const dianes = s().guildSampleChecks!.filter((c) => c.personId === 'p-sample-diane');
-  s().guildSetActing(SAMPLE_LEAD);
-  for (const c of dianes) await s().checksDismiss(c.id, 'Seen at the bench last week');
-  s().guildSetActing('p-sample-diane');
-  const had = s().guildSampleChecks!.length;
-  const told10 = await s().checksPropose();
-  const newOnes = s().guildSampleChecks!.slice(had);
-  check('the fixture proposes a check naming the proposer', dianes.length > 0 && newOnes.some((c) => c.personId === 'p-sample-diane'), newOnes.map((c) => c.personId));
-  check(
-    'and the count leaves it out',
-    'made' in told10 && told10.made === newOnes.filter((c) => c.personId !== 'p-sample-diane').length,
-    [told10, newOnes.length],
-  );
-  s().guildClearSample();
-  check('hiding the sample takes its checks with it', s().guildSampleChecks === null && checksView(s()).length === 0);
-  check('nothing about the sample reached the service', posts10.filter((u) => u.startsWith('/api/guild/checks')).length === 0, posts10);
+  // The ranking runs in the engine, here on the ladder team built in memory;
+  // every move on a check is a post to the service, whose rules decide it
+  // (checks.py). With the service up a person asking for their own check
+  // learns nothing about the queue.
+  const ladder10 = sampleGuild(TODAY);
+  const queue10 = proposeChecks(ladder10, SKILLS_MAP, TODAY);
+  const pat = queue10.find((c) => c.personId === 'p-sample-patrick');
+  check('the ranking on the ladder proposes a check for its suspended trainee', !!pat && pat.reasons.some((r) => r.kind === 'suspended'), queue10.map((c) => c.personId));
+  const covered10 = new Set(queue10.flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`)));
+  const again10 = proposeChecks(ladder10, SKILLS_MAP, TODAY, covered10);
+  check('ranking again never repeats a pair an open check covers', again10.every((c) => c.skillIds.every((k) => !covered10.has(`${c.personId}|${k}`))), again10.length);
+  reset7({ serviceUp: false, guildActingId: null });
+  check('nobody acting moves no check', (await s().checksSchedule('ck-any', TODAY)) !== null && (await s().checksDismiss('ck-any', 'Seen')) !== null);
 
   // The queue's visibility, read the same way by the tab strip and the page.
   const vmap = competenceOf([ev('p-ann', 'SK-OD', 'designation', '2026-02-01')], R_PEOPLE, SKILLS_MAP, TODAY);
@@ -772,6 +617,99 @@ async function main() {
   (globalThis as any).fetch = async () => ({ ok: true, status: 200, json: async () => ({ version: 1, people: [], evidence: [] }) }) as Response;
   await s().loadChecks();
   check('an answer with no list of checks is no answer about checks', s().checks === null);
+
+  // ── 11. a check proposed on Home follows the check rules (OF-BLD-016 §1.R) ──
+  // A model's proposal to check a person shows where the check would: to the
+  // lead and assessors, never to the person it names. Every other proposal
+  // shows to everyone. (The sample team it once also hid from left the
+  // browser in §3.2.)
+  {
+    const base = { at: '', why: '', how: 'h', route: null, target: null, note: '', by: 'm', askId: null, state: 'proposed',
+      carriedOutBy: null, carriedOutAt: null, result: null } as const;
+    const checkP = { ...base, id: 'pr-g', module: 'guild', action: 'propose_check', gate: 'personnel', title: 'Guild', server: true,
+      fields: { personId: 'p-alex', skillIds: 'SK-OD' } } as unknown as Proposal;
+    const lockP = { ...base, id: 'pr-l', module: 'runbooks', action: 'lock', gate: 'lock', title: 'Runbooks', server: false,
+      fields: {} } as unknown as Proposal;
+    const who = (id: string, role: GuildPerson['role']) =>
+      ({ id, name: id, role, active: true, joinedAt: '2026-01-01', addedBy: null, addedAt: '' }) as GuildPerson;
+    const seen = (acting: GuildPerson | null) =>
+      shownProposals([checkP, lockP], acting, new Map()).map((p) => p.id).join(',');
+    check('a check proposal shows to nobody when nobody is acting', seen(null) === 'pr-l', seen(null));
+    check('a check proposal shows to no member who is not an assessor', seen(who('p-bo', 'member')) === 'pr-l');
+    check('a check proposal shows to the lead', seen(who('p-sean', 'lead')) === 'pr-g,pr-l');
+    check('a check proposal never shows to the person it names', seen(who('p-alex', 'lead')) === 'pr-l');
+    check('carrying out a check proposal needs who is acting, and a lock does not', needsActing(checkP) && !needsActing(lockP));
+  }
+
+  // OF-BLD-016 review 23: every Guild and Primer screen that reads protocol
+  // steps reads them through the program filter, so an archived program's
+  // protocol (PR-SEED-01, casein) never shows on a default view.
+  {
+    const { readFileSync } = await import('node:fs');
+    for (const f of ['src/screens/GuildSkills.tsx', 'src/screens/GuildMatrix.tsx', 'src/components/GuildBits.tsx', 'src/screens/PrimerPractice.tsx']) {
+      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+      const reads = /\bPROTOCOLS\b/.test(src.replace(/^import .*$/gm, ''));
+      check(`${f} reads protocols through the program filter`, !reads || /useProgramFilter\(\)/.test(src) && /shows\('protocol'/.test(src));
+    }
+    // The service drafts from no archived protocol unless the switch is sent.
+    const practice = readFileSync(new URL('../src/screens/PrimerPractice.tsx', import.meta.url), 'utf8');
+    const client = readFileSync(new URL('../src/lib/practice.ts', import.meta.url), 'utf8');
+    check('Practice sends the switch with a draft', /draftScenario\([\s\S]*?showArchived\s*\)/.test(practice) && /\?includeArchived=true/.test(client));
+  }
+
+  // OF-BLD-016 review 23: the guided tour stands on nothing an archived
+  // program holds, and promises nothing the default view hides.
+  {
+    const { readFileSync } = await import('node:fs');
+    const { PROTOCOLS } = await import('../src/data/protocols');
+    const { archivedProgramOf } = await import('../src/store');
+    const src = readFileSync(new URL('../src/components/GuidedTour.tsx', import.meta.url), 'utf8');
+    const routes = [...src.matchAll(/route: '([^']+)'/g)].map((m) => m[1]);
+    for (const r of routes) {
+      const pid = /^\/runbooks\/protocols\/([^/?]+)/.exec(r)?.[1];
+      const p = pid ? PROTOCOLS.find((x) => x.id === pid) : undefined;
+      const archived = p
+        ? [...new Set(JSON.stringify(p).match(/\br-[A-Z]\d*-\d+\b/g) ?? [])].filter((id) => archivedProgramOf('record', id))
+        : [];
+      check(`the tour's stop ${r} cites no record of an archived program`, archived.length === 0, archived.join(', '));
+    }
+    check('the tour promises no gold-set plan', !/gold-set plan/.test(src));
+  }
+
+  // OF-BLD-016 review 23: a Live conversation or a proposal that names an
+  // archived program's record hides by default, on Home and in Postdoc.
+  {
+    const { readFileSync } = await import('node:fs');
+    const { conversationShows, proposalShows } = await import('../src/lib/programShows');
+    const { programVisible } = await import('../src/store');
+    const off = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: false });
+    const on = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: true });
+    const turn = (recordIds: string[]) => ({
+      id: 't', question: 'q', askedAt: '', steps: [], error: null, status: 'answered',
+      plan: { question: 'q', claims: [{ id: 'c', text: 't', recordIds, paperIds: [], support: 'supported', provenance: 'curated' }],
+        gaps: [], declined: null, rejected: 0, rejectionReasons: [] },
+    });
+    const conv = (recordIds: string[]) => ({ id: 'lc', title: 'q', startedAt: '', turns: [turn(recordIds)] }) as unknown as LiveConversation;
+    check('a conversation citing a casein record hides with the switch off', !conversationShows(conv(['r-M5-1']), off));
+    check('the same conversation shows with the switch on', conversationShows(conv(['r-M5-1']), on));
+    check('a conversation citing nothing archived shows', conversationShows(conv([]), off));
+    const prop = (target: string | null) => ({ id: 'p', target, fields: {} }) as unknown as Proposal;
+    check('a proposal targeting a casein record hides with the switch off', !proposalShows(prop('r-M5-1'), off) && proposalShows(prop('r-M5-1'), on));
+    check('a proposal with no target shows', proposalShows(prop(null), off));
+    for (const f of ['src/screens/Postdoc.tsx', 'src/screens/Home.tsx', 'src/components/ProposalsCard.tsx']) {
+      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+      check(`${f} filters what it lists through the program filter`, /conversationShows\(|proposalShows\(/.test(src));
+    }
+  }
+
+  // OF-BLD-016 review 23: records the switch brings back before any card of
+  // the session is decided take their seed places, as a fresh session would.
+  {
+    const { rejoinQueue } = await import('../src/lib/programShows');
+    const order = ['r-a', 'r-b', 'r-c', 'r-d'];
+    check('an untouched queue takes back the seed order', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, true).join() === order.join());
+    check('a queue already worked keeps its order and appends', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, false).join() === 'r-b,r-d,r-a,r-c');
+  }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);

@@ -52,8 +52,6 @@ export const SHORTCUTS: { context: string; keys: { key: string; does: string }[]
     keys: [
       { key: 'Enter', does: 'Send' },
       { key: '⇧Enter', does: 'Newline' },
-      { key: '⌘I', does: 'Toggle Inspector' },
-      { key: '⌘⇧P', does: 'Pin sources from last answer' },
     ],
   },
   {

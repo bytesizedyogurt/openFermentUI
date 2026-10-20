@@ -16,12 +16,22 @@
 //
 // The ten seeded runbooks sit across all seven states at once, so the board
 // shows what each state looks like without anyone having to wait for a run.
+//
+// EVERY ONE OF THEM IS AN EXAMPLE (OF-BLD-016 §3.3, D3): each describes a run
+// nobody made, so each carries `example: true` and the store treats it as
+// archived — hidden from the board, the ledger and Home by default, shown by
+// Settings → Programs' switch, opened under ArchivedBanner by a link. The flag
+// is not part of a lock digest (`canonical()` in lock.ts reads predictions and
+// schema alone), so the eight seed digests are unchanged. check:seed fails on
+// a runbook that carries a locked prediction, has no deposition behind it,
+// and is not marked an example.
 import type { Runbook, RunbookStatus } from './types';
 import { runbookLockHash } from '@/engine/lock';
 
 const SEED: Runbook[] = [
   {
     id: 'rb-taq-kigali',
+    example: true,
     kind: 'industrial',
     title: 'Taq polymerase — 2,000 L Kigali facility',
     status: 'running',
@@ -180,6 +190,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-lnfp1',
+    example: true,
     kind: 'industrial',
     title: 'LNFP-I — process definition',
     status: 'awaiting_budget',
@@ -274,6 +285,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-brazzein',
+    example: true,
     kind: 'industrial',
     title: 'Brazzein — pilot process',
     status: 'complete',
@@ -401,6 +413,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-diag-panel',
+    example: true,
     kind: 'industrial',
     title: 'Malaria antigen panel — regional supply',
     status: 'cache_hit',
@@ -495,6 +508,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-chymosin',
+    example: true,
     kind: 'industrial',
     title: 'Camel chymosin — variant landscape',
     status: 'needs_review',
@@ -598,6 +612,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-nootkatone',
+    example: true,
     kind: 'industrial',
     title: 'Nootkatone — fragrance-grade train',
     status: 'running',
@@ -692,6 +707,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-thermo-ligase',
+    example: true,
     kind: 'research',
     title: 'Thermostable ligase — homolog discovery',
     status: 'running',
@@ -798,6 +814,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-sialyl-genus',
+    example: true,
     kind: 'research',
     title: 'Sialyltransferase genus enumeration',
     status: 'blocked_unverified',
@@ -867,6 +884,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-heme-calib',
+    example: true,
     kind: 'research',
     title: 'Heme protein — claim calibration',
     status: 'complete',
@@ -917,6 +935,7 @@ const SEED: Runbook[] = [
   },
   {
     id: 'rb-lyo-ambient',
+    example: true,
     kind: 'research',
     title: 'Ambient-stable formulation for export enzymes',
     status: 'draft',

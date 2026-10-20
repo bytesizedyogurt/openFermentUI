@@ -30,7 +30,6 @@ export default function GuildPeople({ personId }: { personId?: string }) {
 }
 
 function PeopleIndex({ ctx }: { ctx: GuildContext }) {
-  const loadSample = useStore((s) => s.guildLoadSample);
   const [adding, setAdding] = useState(false);
   const isLead = ctx.acting?.role === 'lead';
   const quarter = quarterStart(ctx.today);
@@ -39,12 +38,9 @@ function PeopleIndex({ ctx }: { ctx: GuildContext }) {
       <GuildHeader title="People" subtitle="Everyone on the ledger, what they hold, and when anyone last recorded anything about them." />
       {ctx.guild.people.length === 0 ? (
         <Card className="max-w-2xl">
-          <EmptyState title="Nobody is on the ledger yet" body="Start it with yourself as its lead, or look around with a sample team first." />
+          <EmptyState title="Nobody is on the ledger yet" body="The ledger starts with its lead. Add yourself below as the lead: you then add the team, one person at a time, and designate the first assessors." />
           <div className="px-6 pb-6 space-y-4">
             <AddPersonForm />
-            <div className="border-t border-line pt-3">
-              <Button onClick={loadSample}>Show a sample team</Button>
-            </div>
           </div>
         </Card>
       ) : (
@@ -140,7 +136,7 @@ function Ledger({ ctx, personId }: { ctx: GuildContext; personId: string }) {
         <Card className="max-w-2xl">
           <EmptyState
             title="Nobody by that id"
-            body={`${personId} is not on the ledger this browser holds. If the sample team was shown when this link was made, it is gone after a reload.`}
+            body={`${personId} is not on the ledger this browser holds.`}
             action={<LinkButton to="/guild/people">All people</LinkButton>}
           />
         </Card>

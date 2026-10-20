@@ -4,8 +4,18 @@
 //
 // Statistics are derived from the live store, so a record verified in the
 // review queue changes the median and turns its dot green without a reload.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The strain itself always opens, so a bookmark
+// to an archived host still lands, under ArchivedBanner. Everything the page
+// lists about it (papers, records, media, protocols, scenarios,
+// products, runbooks) passes the program selector through `useProgramScope`:
+// on a general or active host the archived programs' share is hidden, and on
+// an archived host what belongs to its own program shows with it.
 import { HostCeilingCard } from './GeneOSModel';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -15,7 +25,6 @@ import {
   ClipboardList,
   Download,
   FlaskConical,
-  Layers,
   LineChart,
   Microscope,
   NotebookPen,
@@ -26,7 +35,15 @@ import {
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, ParameterDef, Product, Protocol, Scenario } from '@/data/types';
 import { ONTOLOGY, ONTOLOGY_BY_ID, fieldName } from '@/data/ontology';
-import { useStore, provenanceOf, aggregateExclusion, isAggregatable, EXCLUSION_NOTE } from '@/store';
+import {
+  useStore,
+  provenanceOf,
+  aggregateExclusion,
+  isAggregatable,
+  EXCLUSION_NOTE,
+  type ProgramEntityKind,
+  useProgramScope,
+} from '@/store';
 import { href, navigate } from '@/router';
 import { convert, fmt, asNumber } from '@/engine/units';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
@@ -43,11 +60,9 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 
 // ── model ──────────────────────────────────────────────────────────────
 
@@ -552,49 +567,66 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const scenarios = useStore((s) => s.scenarios);
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
-  const collections = useStore((s) => s.collections);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
   const density = useStore((s) => s.ui.density);
   const startReview = useStore((s) => s.startReview);
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
+  const depositions = useStore((s) => s.depositions);
+  const inView = useProgramScope({ kind: 'strain', id: strainId });
 
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState<'plots' | 'table'>('plots');
   const [showRejected, setShowRejected] = useState(false);
   const [fieldQuery, setFieldQuery] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [strainId]);
 
   const strain = strains.find((s) => s.id === strainId);
 
   const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
 
-  const strainPapers = useMemo(
+  // OF-BLD-016 §2.2 — what the program filter holds back from this page, by
+  // kind, so an emptied band can say what is hidden and where the switch is.
+  const lookup = useMemo(() => ({ records, runbooks, depositions }), [records, runbooks, depositions]);
+  const hiddenNote = (kind: ProgramEntityKind, ids: string[], subject: string) =>
+    ids.length === 0 ? null : (
+      <>
+        {' '}
+        <HiddenByArchive
+          subject={subject}
+          plural={ids.length !== 1}
+          programs={archivedProgramsOf(
+            ids.map((id) => [kind, id] as [ProgramEntityKind, string]),
+            lookup,
+          )}
+        />
+      </>
+    );
+
+  const allStrainPapers = useMemo(
     () => papers.filter((p) => p.organisms.includes(strainId)),
     [papers, strainId],
+  );
+  const strainPapers = useMemo(
+    () => allStrainPapers.filter((p) => inView('paper', p.id)),
+    [allStrainPapers, inView],
   );
 
   // A record belongs to this strain when it says so, or — absent a per-record
   // tag — when its paper's organism list says so. An explicit tag for another
-  // strain always wins.
-  const points = useMemo<SPoint[]>(() => {
+  // strain always wins. A record the program filter holds back is kept aside,
+  // only so an empty band can say it is hidden.
+  const { points, hiddenRecords } = useMemo(() => {
     const out: SPoint[] = [];
+    const hidden: ExtractionRecord[] = [];
     for (const rec of records) {
       const direct = rec.organism === strainId;
       const viaPaper =
         !rec.organism && (paperById.get(rec.paperId)?.organisms.includes(strainId) ?? false);
       if (!direct && !viaPaper) continue;
+      if (!inView('record', rec.id)) {
+        hidden.push(rec);
+        continue;
+      }
       const def = ONTOLOGY_BY_ID[rec.field];
       out.push({
         rec,
@@ -603,8 +635,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         canonical: def ? toCanonical(rec, def.canonicalUnit) : null,
       });
     }
-    return out;
-  }, [records, paperById, strainId]);
+    return { points: out, hiddenRecords: hidden };
+  }, [records, paperById, strainId, inView]);
 
   const recordIds = useMemo(() => new Set(points.map((p) => p.rec.id)), [points]);
 
@@ -668,10 +700,15 @@ export default function StrainPage({ strainId }: { strainId: string }) {
 
   // ── linked assets ────────────────────────────────────────────────────
 
-  const linkedProtocols = useMemo(
+  const allLinkedProtocols = useMemo(
     () => protocols.filter((p) => p.organisms.includes(strainId)),
     [protocols, strainId],
   );
+  const linkedProtocols = useMemo(
+    () => allLinkedProtocols.filter((p) => inView('protocol', p.id)),
+    [allLinkedProtocols, inView],
+  );
+  const hiddenProtocols = allLinkedProtocols.filter((p) => !inView('protocol', p.id));
 
   const runList = useMemo(() => Object.values(runs), [runs]);
 
@@ -692,6 +729,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       : [strainId.toLowerCase()];
     const out: ScenarioLink[] = [];
     for (const sc of scenarios) {
+      if (!inView('scenario', sc.id)) continue;
       const viaRecord =
         sc.assumptions.find((a) => a.recordId && recordIds.has(a.recordId))?.recordId ??
         sc.dims.find((d) => d.sourceRecordId && recordIds.has(d.sourceRecordId))?.sourceRecordId;
@@ -703,7 +741,22 @@ export default function StrainPage({ strainId }: { strainId: string }) {
       if (needles.some((n) => n.length > 2 && text.includes(n))) out.push({ sc, via: 'named' });
     }
     return out;
-  }, [scenarios, recordIds, strain, strainId]);
+  }, [scenarios, recordIds, strain, strainId, inView]);
+  // The scenarios the filter holds back that would otherwise link here, read
+  // against every record attributed to the strain, hidden ones included.
+  const hiddenScenarios = useMemo(() => {
+    const ids = new Set([...recordIds, ...hiddenRecords.map((r) => r.id)]);
+    const needles = strain
+      ? [strain.designation.toLowerCase(), strain.binomial.toLowerCase()]
+      : [strainId.toLowerCase()];
+    return scenarios.filter((sc) => {
+      if (inView('scenario', sc.id)) return false;
+      if (sc.assumptions.some((a) => a.recordId && ids.has(a.recordId))) return true;
+      if (sc.dims.some((d) => d.sourceRecordId && ids.has(d.sourceRecordId))) return true;
+      const text = `${sc.name} ${sc.description} ${sc.product}`.toLowerCase();
+      return needles.some((n) => n.length > 2 && text.includes(n));
+    });
+  }, [scenarios, recordIds, hiddenRecords, strain, strainId, inView]);
 
   // ── products made in this host (OF-BLD-005 §6) ───────────────────────
   //
@@ -711,10 +764,16 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   // scenarios say what the corpus KNOWS about this organism; products say what
   // it could be pointed at. Two of the fifteen strains carry corpus depth and
   // the rest carry catalogue breadth, and the section says which it is holding.
-  const hostProducts = useMemo(
+  const allHostProducts = useMemo(
     () => products.filter((p) => p.defaultStrainId === strainId),
     [products, strainId],
   );
+  const hostProducts = useMemo(
+    () => allHostProducts.filter((p) => inView('product', p.id)),
+    [allHostProducts, inView],
+  );
+  const hiddenHostProducts = allHostProducts.filter((p) => !inView('product', p.id));
+  const catalogueSize = products.filter((p) => inView('product', p.id)).length;
 
   const hostProductGroups = useMemo(() => {
     const by = new Map<Product['category'], Product[]>();
@@ -727,8 +786,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   }, [hostProducts]);
 
   const hostRunbooks = useMemo(
-    () => runbooks.filter((r) => r.strainId === strainId),
-    [runbooks, strainId],
+    () => runbooks.filter((r) => r.strainId === strainId && inView('runbook', r.id)),
+    [runbooks, strainId, inView],
   );
 
   const hostBlocked = useMemo(
@@ -736,12 +795,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     [hostProducts],
   );
 
-  const linkedCollections = useMemo(() => {
-    const ids = new Set(strainPapers.map((p) => p.id));
-    return collections
-      .map((c) => ({ c, hits: c.paperIds.filter((id) => ids.has(id)) }))
-      .filter((x) => x.hits.length > 0);
-  }, [collections, strainPapers]);
+  const hiddenMedium = hiddenRecords.filter((r) => r.field === 'medium_component_conc');
 
   // ── media ────────────────────────────────────────────────────────────
 
@@ -1005,28 +1059,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     );
   }
 
-  if (!ready) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="geneOS · Hosts"
-          title={
-            <span>
-              <span className="italic">{strain.binomial}</span>{' '}
-              <span className="font-num not-italic">{strain.designation}</span>
-            </span>
-          }
-        />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={10} />
-        </Card>
-      </>
-    );
-  }
-
   const bandControls = (
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative">
@@ -1117,6 +1149,8 @@ export default function StrainPage({ strainId }: { strainId: string }) {
         }
       />
 
+      <ArchivedBanner kind="strain" id={strainId} />
+
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {strain.badges.map((b) => (
           <span key={b} className="chip text-ink-soft">
@@ -1173,7 +1207,20 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           One dot is one record; click a dot to open the quoted span in its paper.
         </p>
 
-        {groups.length === 0 ? (
+        {groups.length === 0 && hiddenRecords.length > 0 ? (
+          <Card>
+            <EmptyState
+              icon={<FlaskConical size={22} />}
+              title="No extraction records for this strain in an active program"
+              body={hiddenNote(
+                'record',
+                hiddenRecords.map((r) => r.id),
+                `${hiddenRecords.length === 1 ? 'The one record' : `All ${hiddenRecords.length} records`} attributed to ${strain.designation}`,
+              )}
+              action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+            />
+          </Card>
+        ) : groups.length === 0 ? (
           <Card>
             <EmptyState
               icon={<FlaskConical size={22} />}
@@ -1254,6 +1301,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                 No <span className="font-num">medium_component_conc</span> records are attributed to
                 this strain. Medium composition for it would have to come from a protocol, not from
                 the corpus.
+                {hiddenNote(
+                  'record',
+                  hiddenMedium.map((r) => r.id),
+                  hiddenMedium.length === 1
+                    ? 'One medium component record for it'
+                    : `${hiddenMedium.length} medium component records for it`,
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1342,6 +1396,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   Browse all protocols
                 </a>
                 .
+                {hiddenNote(
+                  'protocol',
+                  hiddenProtocols.filter((p) => p.category === 'media').map((p) => p.id),
+                  hiddenProtocols.filter((p) => p.category === 'media').length === 1
+                    ? 'One media protocol that lists it'
+                    : `${hiddenProtocols.filter((p) => p.category === 'media').length} media protocols that list it`,
+                )}
               </div>
             ) : (
               <ul className="space-y-2">
@@ -1411,6 +1472,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   Open the protocol library
                 </a>
                 .
+                {hiddenNote(
+                  'protocol',
+                  hiddenProtocols.map((p) => p.id),
+                  hiddenProtocols.length === 1
+                    ? 'One protocol that lists it'
+                    : `${hiddenProtocols.length} protocols that list it`,
+                )}
               </div>
             ) : (
               <ul className="space-y-2">
@@ -1469,6 +1537,13 @@ export default function StrainPage({ strainId }: { strainId: string }) {
                   Open the simulation index
                 </a>
                 .
+                {hiddenNote(
+                  'scenario',
+                  hiddenScenarios.map((sc) => sc.id),
+                  hiddenScenarios.length === 1
+                    ? 'One scenario that draws on it'
+                    : `${hiddenScenarios.length} scenarios that draw on it`,
+                )}
               </div>
             ) : (
               <ul className="space-y-2">
@@ -1497,49 +1572,15 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               </ul>
             )}
             <div className="text-caption text-ink-soft mt-2">
-              Demo model v0 — illustrative economics, not validated.
+              Cost model v0 — illustrative economics, not validated.
             </div>
           </Card>
 
           <Card className="p-4">
             <div className="flex items-center gap-2 text-caption uppercase tracking-wide text-ink-soft mb-2">
-              <Layers size={13} /> Collections
-              <span className="font-num">({linkedCollections.length})</span>
+              <BookOpen size={13} /> Library
             </div>
-            {linkedCollections.length === 0 ? (
-              <div className="text-body text-ink-soft">
-                None of this strain&rsquo;s papers sit in a collection yet.{' '}
-                <a className="text-accent hover:underline" href={href('/biorepo')}>
-                  Open the library
-                </a>
-                .
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {linkedCollections.map(({ c, hits }) => (
-                  <li key={c.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-caption text-ink-soft">
-                      <span className="font-num">{hits.length}</span> of{' '}
-                      <span className="font-num">{c.paperIds.length}</span> papers in this collection
-                      cover the strain
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {hits.slice(0, 6).map((id) => (
-                        <CitationChip key={id} paperId={id} />
-                      ))}
-                      {hits.length > 6 && (
-                        <span className="text-caption text-ink-soft font-num self-center">
-                          +{hits.length - 6}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-3 pt-2 border-t border-line text-caption text-ink-soft flex flex-wrap items-center gap-2">
-              <BookOpen size={13} />
+            <div className="text-body text-ink-soft flex flex-wrap items-center gap-2">
               <span>
                 <span className="font-num text-ink">{strainPapers.length}</span> paper
                 {strainPapers.length === 1 ? '' : 's'} list this organism
@@ -1547,9 +1588,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               <a className="text-accent hover:underline" href={href('/biorepo')}>
                 Open the library
               </a>
-              <span className="w-full text-ink-soft">
-                Collection membership is filtered inside the library, not by this link.
-              </span>
             </div>
           </Card>
         </div>
@@ -1584,12 +1622,27 @@ export default function StrainPage({ strainId }: { strainId: string }) {
           </Explain>
         </p>
 
-        {hostProducts.length === 0 ? (
+        {hostProducts.length === 0 && hiddenHostProducts.length > 0 ? (
+          <Card>
+            <EmptyState
+              icon={<Boxes size={22} aria-hidden />}
+              title="No molecule in an active program defaults to this host"
+              body={hiddenNote(
+                'product',
+                hiddenHostProducts.map((p) => p.id),
+                hiddenHostProducts.length === 1
+                  ? 'The one molecule that names it as its chassis'
+                  : `The ${hiddenHostProducts.length} molecules that name it as their chassis`,
+              )}
+              action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+            />
+          </Card>
+        ) : hostProducts.length === 0 ? (
           <Card>
             <EmptyState
               icon={<Boxes size={22} aria-hidden />}
               title="No molecule in the catalogue defaults to this host"
-              body={`Nothing in the ${products.length}-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate.`}
+              body={`Nothing in the ${catalogueSize}-molecule catalogue names this organism as its chassis. That is a statement about the catalogue, not about the organism — plenty of things are made in hosts this build does not enumerate.`}
               action={<LinkButton to="/dominion/molecules">Browse the catalogue</LinkButton>}
             />
           </Card>

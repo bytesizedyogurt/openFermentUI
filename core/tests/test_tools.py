@@ -188,10 +188,14 @@ def test_a_summary_over_the_limit_is_replaced_by_an_error(monkeypatch, pool):
     assert r.summary == {} and "over the 9000" in r.error
 
 
-def test_only_the_seven_names_may_register():
+MODULES = ("dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake", "home")
+READS = [f"{m}_read" for m in MODULES] + [f"{m}_write" for m in MODULES]
+
+
+def test_only_the_whitelisted_names_may_register():
     with pytest.raises(ValueError):
         tools.register(tools.Tool("run_shell", "d", tools.records.SearchRecordsInput, lambda i, c: None))
-    assert [t.name for t in tools.infos()] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price", "draft_runbook"]
+    assert [t.name for t in tools.infos()] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price", "draft_runbook"] + READS
 
 
 # ── the endpoints ──────────────────────────────────────────────────────
@@ -207,7 +211,7 @@ def client(pool, monkeypatch):
 
 def test_get_tools_lists_names_descriptions_and_schemas(client):
     body = client.get("/api/tools").json()
-    assert [t["name"] for t in body] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price", "draft_runbook"]
+    assert [t["name"] for t in body] == ["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price", "draft_runbook"] + READS
     assert body[0]["inputSchema"]["properties"]["query"]["type"] == "string"
     assert all(len(t["description"]) > 80 for t in body)
 
@@ -234,7 +238,9 @@ def test_selling_price_refuses_with_no_run_and_names_what_waits(monkeypatch, tmp
     from openferment_core import intake
 
     monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
-    ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[], records_by_id={}))
+    # sc-pha-1 is PHA's, an archived program: the switch is on here, and
+    # test_programs holds the refusal with it off (OF-BLD-016 §2.R).
+    ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[], records_by_id={}), include_archived=True)
     r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, ctx)
     assert r.error and "no run of sc-pha-1 exists" in r.error and "price of fermentable sugar" in r.error
     assert "no BioSTEAM scenario" in tools.run("selling_price", {"scenarioId": "sc-s1"}, ctx).error
@@ -254,7 +260,7 @@ def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_p
     a = [InputAssumption(key=k, value=v, low=v, high=v, by="Sean Creighton", at="2026-10-15")
          for k, v in (("recovery", 0.95), ("sugarPrice", 0.4), ("sugarFeed", 1000.0))]
     run = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a), pool=pool)
-    r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, tools.ToolContext(pool_factory=lambda: pool))
+    r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, tools.ToolContext(pool_factory=lambda: pool, include_archived=True))
     assert r.error is None and r.evidence[0].id == run.artifactId and r.evidence[0].figure == "distribution"
     assert r.summary["provenance"] == "demo" and r.summary["assumedInputs"] == ["recovery", "sugarFeed", "sugarPrice"]
     assert r.evidence[0].interval.low <= r.evidence[0].value <= r.evidence[0].interval.high

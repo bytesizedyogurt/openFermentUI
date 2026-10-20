@@ -324,7 +324,10 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
     from . import evidence_pool
     from .models import ProformaScenarioInfo
 
-    pool = pool or evidence_pool.load()
+    # A person opened this scenario by id, so its thread P records bind
+    # whatever the program switch says; the screen decides whether an
+    # archived scenario shows (OF-BLD-016 §2.3). A tool passes its own pool.
+    pool = pool or evidence_pool.load(include_archived=True)
     inputs = bind(pool.records, host, assumptions, yield_cap())
     hosts = sorted({r.get("strainId") for r in pool.records
                     if r.get("strainId") and _thread_p(r.get("paperId", "")) and r.get("field") in {b[2] for b in BOUND.values()}})
@@ -503,7 +506,7 @@ def run(req, pool=None):
 
     if req.scenarioId != SCENARIO_ID:
         raise ScenarioRefused(f"there is no scenario {req.scenarioId}; the BioSTEAM scenario is {SCENARIO_ID}")
-    pool = pool or evidence_pool.load()
+    pool = pool or evidence_pool.load(include_archived=True)
     cap = yield_cap()
     inputs = bind(pool.records, req.host, req.assumptions, cap)
     waiting = [i.key for i in inputs if i.binding == "waiting"]

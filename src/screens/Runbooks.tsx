@@ -9,10 +9,19 @@
 // A runbook is not a job. The jobs tray shows the progress bar for whatever is
 // in flight; this board shows the records, including the ones that are not
 // running at all and will not be until somebody acts.
-import { useEffect, useMemo, useState } from 'react';
+//
+// PROGRAMS (OF-BLD-016 §2.2). The board, its columns and every count above
+// them read through the store's program filter: a runbook belongs to its own
+// program, else the molecule's, else the host's, and one in an archived
+// program leaves the board while the switch is off. A handoff link from an
+// archived molecule still opens its panel, under the banner that names the
+// program.
+import { useMemo } from 'react';
 import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { isExample, programOf, useProgramFilter, useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/runbooks';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
@@ -24,12 +33,11 @@ import {
   Card,
   EmptyState,
   Explain,
+  LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -149,6 +157,9 @@ function HandoffPanel({ productId }: { productId: string }) {
                 ? 'Nothing has been assessed here, so every process below it describes work that may or may not be yours to run. A clearance sweep classifies the claims before anything else is worth scheduling.'
                 : 'This molecule is not fenced, so there is nothing to enumerate around. Opening a runbook here will say so and stop, which is a cheap answer worth having on the record.'}
           </p>
+          <p className="text-caption text-ink-soft mt-1 max-w-3xl">
+            Nothing runs behind a research runbook yet: it opens as a draft, with no estimate of time or cost.
+          </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <ClearanceChip state={product.clearanceState} />
             <Button
@@ -158,7 +169,7 @@ function HandoffPanel({ productId }: { productId: string }) {
                 if (id) navigate(`/runbooks/${id}`);
               }}
             >
-              <Sparkles size={14} /> Open the research runbook
+              <Sparkles size={14} /> Draft the research runbook
             </Button>
             <Button onClick={() => navigate('/runbooks')}>Not now</Button>
             <a
@@ -175,20 +186,24 @@ function HandoffPanel({ productId }: { productId: string }) {
 }
 
 export default function Runbooks() {
-  const runbooks = useStore((s) => s.runbooks);
-  const products = useStore((s) => s.products);
+  const allRunbooks = useStore((s) => s.runbooks);
+  const allProducts = useStore((s) => s.products);
+  const shows = useProgramFilter();
+  const runbooks = useMemo(() => allRunbooks.filter((r) => shows('runbook', r.id)), [allRunbooks, shows]);
+  const products = useMemo(() => allProducts.filter((p) => shows('product', p.id)), [allProducts, shows]);
+  const hiddenPrograms = useMemo(() => {
+    const ids = new Set(
+      allRunbooks.filter((r) => !shows('runbook', r.id)).map((r) => programOf('runbook', r.id, { runbooks: allRunbooks })),
+    );
+    return PROGRAMS.filter((p) => ids.has(p.id));
+  }, [allRunbooks, shows]);
+  // The examples the filter hid (OF-BLD-016 §3.3, D3): seed runbooks that
+  // describe a run nobody made. Counted so an empty board says why it is empty.
+  const hiddenExamples = useMemo(
+    () => allRunbooks.filter((r) => !shows('runbook', r.id) && isExample('runbook', r.id, { runbooks: allRunbooks })).length,
+    [allRunbooks, shows],
+  );
   const route = useRoute();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const handoffId = route.query.get('handoff');
 
@@ -220,22 +235,6 @@ export default function Runbooks() {
   const subtitle =
     'A runbook is a synthesised, followable answer to a question about making something. Industrial runbooks output a process you could build and defend; research runbooks output a prediction and the experiments that would test it. Same toolchain, different question.';
 
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
-        <OwnerTabs tabs={RUNBOOK_TABS} />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={6} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <PageHeader
@@ -250,7 +249,12 @@ export default function Runbooks() {
       />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
-      {handoffId && <HandoffPanel productId={handoffId} />}
+      {handoffId && (
+        <>
+          <ArchivedBanner kind="product" id={handoffId} />
+          <HandoffPanel productId={handoffId} />
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
         <span className="inline-flex items-center gap-1.5">
@@ -309,7 +313,40 @@ export default function Runbooks() {
         ))}
       </div>
 
-      {runbooks.length === 0 && (
+      {runbooks.length === 0 && (hiddenPrograms.length > 0 || hiddenExamples > 0) && (
+        <Card data-testid="runbooks-empty">
+          <EmptyState
+            icon={<GitBranch size={22} aria-hidden />}
+            title="No runbook here describes a run someone made"
+            body={
+              <span data-testid="hidden-by-archive">
+                {hiddenExamples > 0 && (
+                  <>
+                    {hiddenExamples === 1 ? 'The one seed runbook is an example' : `The ${hiddenExamples} seed runbooks are examples`}: each
+                    describes a run nobody made, so the board hides {hiddenExamples === 1 ? 'it' : 'them'}.{' '}
+                  </>
+                )}
+                {hiddenPrograms.length > 0 && (
+                  <>
+                    Runbooks in {hiddenPrograms.map((p) => p.name).join(' and ')} are hidden too,{' '}
+                    {hiddenPrograms.length === 1 ? 'an archived program' : 'archived programs'}.{' '}
+                  </>
+                )}
+                Next step: ask Postdoc to draft a runbook from the evidence, then press Turn into a runbook; it lands
+                here. Settings → Programs shows archived programs and examples again.
+              </span>
+            }
+            action={
+              <div className="flex flex-wrap gap-2 justify-center">
+                <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>
+              </div>
+            }
+          />
+        </Card>
+      )}
+
+      {runbooks.length === 0 && hiddenPrograms.length === 0 && hiddenExamples === 0 && (
         <Card>
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}

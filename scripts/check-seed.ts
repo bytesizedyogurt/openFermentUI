@@ -16,9 +16,12 @@ import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import * as ts from 'typescript';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
-import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
+import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, isExample, programOf, tickClass, useStore } from '../src/store';
+import { PROGRAMS, THREAD_LETTERS, THREAD_LETTER_CLASS } from '../src/data/programs';
 import { provMeta } from '../src/components/Provenance';
 import { JURISDICTIONS } from '../src/engine/clearance';
 import {
@@ -36,7 +39,7 @@ import { SUBSYSTEMS } from '../src/data/subsystems';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
-import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
+import { LIVE_PROMPTS, YEAST_PROMPT_COUNT } from '../src/data/livePrompts';
 import { ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
@@ -128,13 +131,6 @@ for (const s of SCENARIOS) {
   }
 }
 
-for (const c of COLLECTIONS)
-  for (const pid of c.paperIds) if (!paperIds.has(pid)) fail(`${c.id}: paperId ${pid} unresolved`);
-
-for (const sess of SEED_SESSIONS)
-  if (sess.scope?.kind === 'paper' && !paperIds.has(sess.scope.id))
-    fail(`${sess.id}: scope paper ${sess.scope.id} unresolved`);
-
 // chips inside authored markdown
 const CHIP_RE = /\[\[([A-Za-z0-9\-]+)\]\]/g;
 const checkChips = (text: string, where: string) => {
@@ -165,15 +161,17 @@ for (const f of FLOWS) {
     }
   }
 }
-for (const prompt of SUGGESTED_PROMPTS) {
-  const hit = FLOWS.some((f) =>
-    f.triggers.some((t) => {
-      const a = t.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      const b = prompt.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      return a.includes(b) || b.includes(a) || a === b;
-    }),
-  );
-  if (!hit) warn(`suggested prompt has no exact trigger match: "${prompt}"`);
+// OF-BLD-016 D5 — Postdoc offers the questions tested against the live
+// service, and nothing else: the flows above are the eval set, never offered.
+// The yeast five lead, then Appendix 2's cross-module questions.
+if (SUGGESTED_PROMPTS.length !== LIVE_PROMPTS.length || SUGGESTED_PROMPTS.some((p, i) => p !== LIVE_PROMPTS[i]))
+  fail('SUGGESTED_PROMPTS is not livePrompts.ts: Postdoc offers the tested questions and nothing else (OF-BLD-016 D5)');
+if (new Set(LIVE_PROMPTS).size !== LIVE_PROMPTS.length) fail('livePrompts.ts offers the same question twice');
+if (LIVE_PROMPTS.length <= YEAST_PROMPT_COUNT)
+  fail(`livePrompts.ts holds ${LIVE_PROMPTS.length} questions; the yeast ${YEAST_PROMPT_COUNT} and the cross-module ones after them are expected`);
+for (const prompt of LIVE_PROMPTS) {
+  if (FLOWS.some((f) => f.triggers.some((t) => t.toLowerCase() === prompt.toLowerCase())))
+    fail(`livePrompts.ts offers a scripted flow's trigger: "${prompt}"`);
 }
 
 for (const mod of MODULES)
@@ -191,11 +189,153 @@ for (const mod of MODULES)
     }
   }
 
-for (const a of ACTIVITY) {
-  if (!a.href) continue;
-  const path = a.href.replace(/^#/, '');
-  const known = /^\/(|ask|library|extract|organisms|protocols|simulate|learn|settings)/.test(path);
-  if (!known) warn(`activity href does not look like a real route: ${a.href}`);
+// ── 2b. Postdoc speaks only through the service (OF-BLD-016 §3.1, D5) ──
+//
+// The scripted player and its invented delays (src/sim/) are gone. A file
+// that imported from them again would bring back an answer nobody asked the
+// service for, so the import itself fails the build, whatever it imports.
+{
+  const SIM_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](?:@\/sim|(?:\.\.?\/)+sim)(?:\/[^'"]*)?['"]/;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : /\.(ts|tsx|js|jsx|mjs)$/.test(name) ? [path] : [];
+    });
+  if (existsSync('src/sim')) fail('src/sim/ exists: the scripted chat player was deleted (OF-BLD-016 D5), and nothing replaces it');
+  for (const file of walk('src')) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      if (SIM_IMPORT.test(line)) fail(`${file}:${i + 1} imports from src/sim/ — Postdoc speaks only through the service (OF-BLD-016 §3.1)`);
+    });
+  }
+}
+
+// ── 2c. nothing invented reaches a default view (OF-BLD-016 E.3′) ─────
+//
+// The words demo, sample run, stand-in, placeholder and scripted (and the
+// phrases that renamed them: a demonstration corpus, an authored timeline,
+// timed stages over what is already there) appear in what src/ and
+// index.html show a person only in `pnpm demo:offline`'s replay label.
+// Whitespace is collapsed before the test, JSX text is never a code token,
+// and a capitalised or spaced word joined by - or / is prose.
+//
+// What a person can see is read from the syntax tree, not the raw text: every
+// string literal, template-literal part and JSX text node in every .ts and
+// .tsx file under src/ (attribute values included). Comments are not strings,
+// so they never count. Three kinds of string are code, not copy, and pass: an
+// import or export path, a literal used as a type, and a lowercase token with
+// no space in it (a provenance value such as 'demo', a class name, an id). A
+// word joined to a code token by - _ . / : @ or # (tick-demo, chip-demo,
+// demo:offline) is part of that token. Everything else is prose a person
+// reads, and a hit fails the build, with the file and line.
+//
+// ALLOWED names each exception and why; it stays this short.
+{
+  const WORD = /(?<![\w\-./:@#])(demo|demonstration (?:corpus|data|purposes)|sample[ -]run|stand-in|placeholder|scripted|authored (?:job )?timelines?|authored durations?|timed stages over)(?![\w\-/:@])/i;
+  // A word joined to another by - or / is prose when it starts with a capital
+  // or the string holds a space (Demo-grade, Demo/preview, a sample-run of it).
+  const JOINED = /(?<![\w.:@#])(demo|sample[\s-]+run|stand-in|placeholder|scripted)(?=[-/][A-Za-z])/i;
+  const ALLOWED: { file: string; text: RegExp; why: string }[] = [
+    { file: 'src/screens/Postdoc.tsx', text: /^Replay of a recorded test run, made with a scripted stand-in in place of the model\.$/, why: "pnpm demo:offline's replay label (E.3′)" },
+    { file: 'src/lib/csv.ts', text: /^#\s+demo\s+modeled, not measured \(simulation outputs\)$/, why: 'an export\'s legend names the provenance code `demo` its rows carry' },
+    { file: 'src/data/learn.ts', text: /^The value was invented for demonstration purposes$/, why: 'a wrong option in a quiz on what "curated" claims: it says what a record is not' },
+    { file: 'src/screens/Home.tsx', text: /^Every number in openFerment carries a provenance tick: .* a dashed amber bar for demonstration data with/, why: 'the tick legend names the provenance `demo` a computed value on an assumption carries' },
+    { file: 'src/data/runbooks.ts', text: /^Equipment and CAPEX stage has not run; figure is a placeholder to be tested$/, why: 'a locked prediction\'s basis: its words are in the lock digest check:lock holds (OF-BLD-016 §3.3 marks the runbook an example)' },
+  ];
+  const CODE_TOKEN = /^[a-z0-9_\-:.\/@#]+$/;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : /\.tsx?$/.test(name) ? [path] : [];
+    });
+  // index.html is read too: its title names every tab and bookmark.
+  {
+    const html = readFileSync('index.html', 'utf8').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+    const shown = [...html.matchAll(/>([^<]+)</g)].map((m) => m[1]).concat([...html.matchAll(/(?:content|title|alt|aria-label)="([^"]*)"/g)].map((m) => m[1]));
+    for (const said of shown) {
+      if (WORD.test(said.replace(/\s+/g, ' '))) fail(`index.html shows "${said.trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
+    }
+  }
+  for (const file of walk('src')) {
+    const text = readFileSync(file, 'utf8');
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const visit = (node: ts.Node): void => {
+      let said: string | null = null;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) said = node.text;
+      else if (ts.isJsxText(node)) said = node.text;
+      // Whitespace is collapsed first: the formatter wraps JSX text mid-phrase.
+      if (said !== null) said = said.replace(/\s+/g, ' ');
+      if (said !== null && (WORD.test(said) || (/\s|^[A-Z]/.test(said.trim()) && JOINED.test(said)))) {
+        const parent = node.parent;
+        const code =
+          (parent && (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent) || ts.isLiteralTypeNode(parent) || ts.isExternalModuleReference(parent))) ||
+          // JSX text is always shown, so a bare token there is prose too.
+          (CODE_TOKEN.test(said.trim()) && !ts.isJsxText(node));
+        const allowed = ALLOWED.some((a) => file.replace(/\\/g, '/') === a.file && a.text.test(said!.trim()));
+        if (!code && !allowed) {
+          const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
+          fail(`${file}:${line + 1} shows "${(said.match(WORD) ?? said.match(JOINED))?.[0]}" in "${said.trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+}
+
+// ── 2d. the palette never wipes this browser in one keystroke (OF-BLD-016 §3.R)
+// Clearing this browser's data asks first, in Settings → Corpus & ontology;
+// the palette may take a person there and no further.
+if (/clearBrowserData/.test(readFileSync('src/components/CommandPalette.tsx', 'utf8')))
+  fail('src/components/CommandPalette.tsx calls clearBrowserData — clearing this browser\u2019s data asks first, in Settings (OF-BLD-016 §3.R)');
+
+// ── 2e. no timed job stands in for work on a screen (OF-BLD-016 §3.R) ──
+// A job a screen starts is real (`real: true`, a service call behind it), or
+// the screen does not start one: a clock that ends in "complete" with nothing
+// read, extracted or staged is invented.
+{
+  const screens = readdirSync('src/screens').filter((n) => n.endsWith('.tsx')).map((n) => join('src/screens', n));
+  for (const file of screens) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/startJob\(\{([\s\S]*?)\n\s*\}\);/g)) {
+      if (!/real:\s*true/.test(m[1])) {
+        const line = text.slice(0, m.index).split('\n').length;
+        fail(`${file}:${line} starts a timed job with no work behind it (OF-BLD-016 §3.R)`);
+      }
+    }
+  }
+}
+
+// ── 2f. no simulated-latency control (OF-BLD-016 §3.R) ─────────────────
+// Nothing on a screen offers to speed up a clock, and a bench timer runs at
+// wall-clock speed: the multiplier is store-internal, for the offline jobs.
+{
+  const walkAll = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walkAll(path) : /\.tsx?$/.test(name) ? [path] : [];
+    });
+  for (const file of walkAll('src')) {
+    if (file.replace(/\\/g, '/') === 'src/store.ts') continue;
+    if (/\bsimSpeed\b/.test(readFileSync(file, 'utf8').replace(/\/\/.*$/gm, ''))) fail(`${file} offers a simulated-latency control (OF-BLD-016 §3.R)`);
+  }
+  const store = readFileSync('src/store.ts', 'utf8');
+  const timers = store.slice(store.indexOf('  tickTimers: (dtMs) => {'), store.indexOf('  tickTimers: (dtMs) => {') + 600);
+  if (/simSpeed/.test(timers)) fail('src/store.ts: tickTimers scales a bench timer by the simulated-latency multiplier (OF-BLD-016 §3.R)');
+}
+
+// ── 2g. no control for collections nothing can create (OF-BLD-016 §3.R) ─
+// The seed collections went with §3.1, and no action makes one, so no screen
+// offers to add a paper to one.
+{
+  const store = readFileSync('src/store.ts', 'utf8');
+  if (!/\bcreateCollection\b/.test(store)) {
+    for (const name of readdirSync('src/screens').filter((n) => n.endsWith('.tsx'))) {
+      const text = readFileSync(join('src/screens', name), 'utf8');
+      if (/Add to collection/.test(text)) fail(`src/screens/${name} offers "Add to collection", and nothing can create a collection (OF-BLD-016 §3.R)`);
+      if (/>\s*Collections\s*(?:<|\n)/.test(text)) fail(`src/screens/${name} shows a Collections section, and nothing can create a collection (OF-BLD-016 §3.R)`);
+    }
+  }
 }
 
 // ── 3. record integrity for the real corpus ────────────────────────────
@@ -1038,6 +1178,112 @@ for (const f of CLEARANCE_FINDINGS) {
       fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
 }
 
+// ── programs (OF-BLD-016 §2.1, E.1′, D7) ───────────────────────────────
+//
+// A program is data, and its letters are the rule. Every thread a paper
+// carries has exactly one program; every program names at least one letter;
+// no letter is in two. The thread-letter pattern written in code — `[A-Q]`
+// in papers.ts's byEntryId — must span exactly the declared letters, so a
+// new thread changes programs.ts first and this names every pattern that has
+// not followed. (src/sim/chat.ts and the golden path's chip matcher held the
+// other two; §3.1 deleted the first and the scripted chips the second read.) Each entry's own `program` field must name a program.
+{
+  const ids = new Set<string>();
+  const owner = new Map<string, string>();
+  for (const p of PROGRAMS) {
+    if (ids.has(p.id)) fail(`programs: "${p.id}" is declared twice`);
+    ids.add(p.id);
+    if (p.letters.length === 0) fail(`programs: "${p.id}" has no thread letter`);
+    if (p.status !== 'active' && p.status !== 'archived') fail(`programs: "${p.id}" has status "${p.status}"`);
+    if (!p.name.trim() || !p.summary.trim()) fail(`programs: "${p.id}" needs a name and a line`);
+    for (const l of p.letters) {
+      if (!/^[A-Z]$/.test(l)) fail(`programs: "${p.id}" names "${l}", which is not a thread letter`);
+      if (owner.has(l)) fail(`programs: thread ${l} is in both "${owner.get(l)}" and "${p.id}"`);
+      owner.set(l, p.id);
+    }
+  }
+  if (!PROGRAMS.some((p) => p.status === 'active')) fail('programs: none is active, so every default view would be empty');
+
+  // Every thread letter a paper carries has a program.
+  for (const t of [...new Set(PAPERS.map((p) => p.thread))].sort())
+    if (!owner.has(t)) fail(`programs: thread ${t} has papers and no program — declare it in src/data/programs.ts`);
+  for (const p of PAPERS) {
+    if (programOf('paper', p.id) !== owner.get(p.thread))
+      fail(`programs: paper ${p.id} is thread ${p.thread} but resolves to "${programOf('paper', p.id)}"`);
+  }
+  // A declared letter no paper carries yet is allowed (a thread proposed and
+  // not applied), and said.
+  for (const l of owner.keys())
+    if (!PAPERS.some((p) => p.thread === l)) warn(`programs: thread ${l} (${owner.get(l)}) has no paper yet`);
+
+  // One class names the letters: they run from the first to the last
+  // without a gap.
+  const codes = THREAD_LETTERS.map((l) => l.charCodeAt(0));
+  if (codes.some((c, i) => i > 0 && c !== codes[i - 1] + 1))
+    fail(`programs: the letters ${THREAD_LETTERS.join('')} have a gap, so no ${THREAD_LETTER_CLASS} pattern names them`);
+
+  // The patterns in code, held to that class. A thread-letter class is the
+  // one followed by the entry index's digit (`[A-Q])(\d`, `[A-Q]\d`).
+  const PATTERN_FILES: { path: string; required: boolean }[] = [
+    { path: 'src/data/papers.ts', required: true },
+  ];
+  for (const { path, required } of PATTERN_FILES) {
+    if (!existsSync(path)) {
+      if (required) fail(`programs: ${path} is missing, and it holds a thread-letter pattern`);
+      continue;
+    }
+    const found = [...readFileSync(path, 'utf8').matchAll(/\[A-([A-Z])\]\)?\(?\\d/g)].map((m) => m[0].slice(0, 5));
+    if (found.length === 0) fail(`programs: ${path} holds no thread-letter pattern; expected ${THREAD_LETTER_CLASS}`);
+    for (const f of found)
+      if (f !== THREAD_LETTER_CLASS)
+        fail(`programs: ${path} writes the thread letters as ${f}, but src/data/programs.ts declares ${THREAD_LETTER_CLASS}`);
+  }
+
+  // Every entry's own field names a declared program.
+  const named: [string, string, string | undefined][] = [
+    ...STRAINS.map((x) => ['strain', x.id, x.program] as [string, string, string | undefined]),
+    ...PRODUCTS.map((x) => ['product', x.id, x.program] as [string, string, string | undefined]),
+    ...SCENARIOS.map((x) => ['scenario', x.id, x.program] as [string, string, string | undefined]),
+    ...PROTOCOLS.map((x) => ['protocol', x.id, x.program] as [string, string, string | undefined]),
+    ...RUNBOOKS.map((x) => ['runbook', x.id, x.program] as [string, string, string | undefined]),
+    ...MODULES.map((x) => ['module', x.id, x.program] as [string, string, string | undefined]),
+    ...MODULES.flatMap((m) => m.lessons.map((x) => ['lesson', x.id, x.program] as [string, string, string | undefined])),
+  ];
+  for (const [kind, id, program] of named)
+    if (program !== undefined && !ids.has(program)) fail(`programs: ${kind} ${id} names program "${program}", which is not declared`);
+
+  // The resolutions the document states (§2.1 tests, D6).
+  const pPaper = PAPERS.find((p) => p.thread === 'P');
+  if (pPaper && programOf('paper', pPaper.id) !== 'pha') fail(`programs: a thread P paper (${pPaper.id}) must resolve to pha`);
+  if (programOf('strain', 's-cerevisiae-cenpk113-7d') !== 'yeast') fail('programs: s-cerevisiae-cenpk113-7d must resolve to yeast');
+  if (programOf('strain', 's-cerevisiae') !== null) fail('programs: the species entry s-cerevisiae stays general (D6)');
+  for (const r of RECORDS)
+    if (programOf('record', r.id) !== programOf('paper', r.paperId))
+      fail(`programs: record ${r.id} must take the program of the paper it cites (${r.paperId})`);
+}
+
+// ── examples (OF-BLD-016 §3.3, D3) ─────────────────────────────────────
+//
+// A locked prediction says "do this and you will get that". Unless a
+// deposition stands behind it, the runbook describes a run nobody made, and
+// it must say so: `example: true`, which the store treats as archived. The
+// seed's depositions are the fresh store's (none today), and a deposition
+// that is itself an example stands behind nothing. The two generic protocols
+// and the bench-track module teach a method with no run behind them, so they
+// stay unflagged and show by default.
+const seedDepositions = useStore.getState().depositions;
+{
+  for (const r of RUNBOOKS) {
+    const locked = r.lockedAt !== null && r.predictions.length > 0;
+    const behind = seedDepositions.some((d) => d.runbookId === r.id && !d.example);
+    if (locked && !behind && !r.example)
+      fail(`examples: runbook ${r.id} carries a locked prediction with no deposition behind it and is not marked \`example: true\` (OF-BLD-016 §3.3, D3)`);
+  }
+  for (const id of ['PR-OD-01', 'PR-CIP-01'])
+    if (isExample('protocol', id)) fail(`examples: ${id} teaches a general method with no run behind it and must not be an example (OF-BLD-016 §3.3)`);
+  if (isExample('module', 'm6')) fail('examples: m6 teaches methods from PR-OD-01 and PR-CIP-01 with no run behind them and must not be an example (OF-BLD-016 §3.3)');
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -1049,6 +1295,8 @@ console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.pr
 console.log(`  non-primary       ${RECORDS.filter((r) => r.isPrimary === false).length} (citations of other records, excluded from aggregates)`);
 console.log(`  with method       ${RECORDS.filter((r) => r.method).length}, of which ${RECORDS.filter((r) => r.method === 'undetermined').length} undetermined`);
 console.log(`  gold set          ${goldIds.size} annotated (60 planned across 14 papers — pending tranche-1 ingest)`);
+console.log(`  examples          ${RUNBOOKS.filter((r) => r.example).length}/${RUNBOOKS.length} runbooks, ${PROTOCOLS.filter((p) => p.example).length}/${PROTOCOLS.length} protocols, ${SCENARIOS.filter((x) => x.example).length}/${SCENARIOS.length} scenarios, ${MODULES.filter((m) => m.example).length}/${MODULES.length} modules, ${seedDepositions.filter((d) => d.example).length}/${seedDepositions.length} depositions; every locked runbook with no deposition behind it is one`);
+console.log(`  programs          ${PROGRAMS.map((p) => `${p.name} (${p.letters.length === 1 ? p.letters[0] : `${p.letters[0]}–${p.letters[p.letters.length - 1]}`}, ${p.status})`).join(' · ')}; letters ${THREAD_LETTER_CLASS} held in code`);
 console.log(`  strains           ${STRAINS.length}`);
 console.log(`  molecules         ${PRODUCTS.length} across ${new Set(PRODUCTS.map((p) => p.category)).size} categories, ${new Set(PRODUCTS.map((p) => p.processCode)).size} process families (all modeled)`);
 console.log(`  clearance         ${PRODUCTS.filter((p) => p.clearanceState === 'blocked').length} blocked, ${PRODUCTS.filter((p) => p.clearanceState === 'unknown').length} unassessed, ${PRODUCTS.filter((p) => p.clearanceState.startsWith('clear')).length} clear`);
@@ -1064,7 +1312,8 @@ console.log(`  locked            ${RUNBOOKS.filter((r) => r.lockedAt).length}/${
 console.log(`  runbooks          ${RUNBOOKS.length} over ${new Set(RUNBOOKS.map((r) => r.status)).size} states (${RUNBOOKS.filter((r) => r.kind === 'industrial').length} industrial, ${RUNBOOKS.filter((r) => r.kind === 'research').length} research)`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);
-console.log(`  chat flows        ${FLOWS.length}`);
+console.log(`  eval flows        ${FLOWS.length} (graded against, never offered)`);
+console.log(`  postdoc prompts   ${LIVE_PROMPTS.length} (${YEAST_PROMPT_COUNT} yeast, ${LIVE_PROMPTS.length - YEAST_PROMPT_COUNT} across the modules)`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
 console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);

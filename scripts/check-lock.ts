@@ -87,5 +87,20 @@ check('original still locked and unchanged',
   check('changing an artifactId changes the digest', runbookLockHash(other, rb.measurementSchema) !== h);
 }
 
+// OF-BLD-016 §3.3 (D3) — every locked seed runbook is an example, and the
+// flag sits outside the digest: the eight digests above are the ones taken
+// before the flag existed, each runbook still reads as intact, and a copy
+// with the flag dropped hashes the same.
+{
+  const lockedSeed = RUNBOOKS.filter((r) => r.lockedAt);
+  check('every locked seed runbook is marked an example', lockedSeed.every((r) => r.example === true));
+  check('a locked example still reads as intact', lockedSeed.every((r) => lockIntact(r)));
+  check('the example flag is not part of the digest', lockedSeed.every((r) => {
+    const { example: _drop, ...plain } = r;
+    return lockIntact({ ...plain, lockHash: r.lockHash });
+  }));
+  check('canonical() names no example field', !/example/.test(readFileSync('src/engine/lock.ts', 'utf8').split('function canonical')[1]?.split('\n}\n')[0] ?? 'example'));
+}
+
 console.log(fails === 0 ? '\nFREEZE CONTRACT HOLDS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

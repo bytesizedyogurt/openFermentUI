@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import geneos, geneos_models as shelf
+from .. import geneos, geneos_models as shelf, programs
 from ..models import ToolResult
 from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 from . import Tool, ToolContext, register
@@ -21,16 +21,32 @@ from . import Tool, ToolContext, register
 NAME = "yield_ceiling"
 
 
+# What the schema names: the shelf models and products no archived program
+# holds (OF-BLD-016 §2.R). An archived one is refused in `_run` with the
+# switch off, and accepted with it on; the description never names it.
+_PRODUCTS = programs.offered("product", shelf.PRODUCTS)
+_MODELS = [(m.id, [p for p in m.products if p in _PRODUCTS]) for m in shelf.SHELF.values()
+           if m.id in programs.offered("model", [m.id])]
+_MODELS = [(mid, ps) for mid, ps in _MODELS if ps]
+
+
 class YieldCeilingInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     modelId: str = Field(description="A model on geneOS's shelf, with the products it names a route to: " + "; ".join(
-        f"{m.id} ({', '.join(m.products)})" for m in shelf.SHELF.values()) + ".")
-    product: str = Field(description=f"The product: {', '.join(shelf.PRODUCTS)}.")
+        f"{mid} ({', '.join(ps)})" for mid, ps in _MODELS) + ".")
+    product: str = Field(description=f"The product: {', '.join(_PRODUCTS)}.")
     substrate: str = Field(description=f"The sugar fed: {', '.join(shelf.SUBSTRATES)}.")
 
 
 def _run(inp: YieldCeilingInput, ctx: ToolContext) -> ToolResult:
+    # A model off the shelf (the toy among them) is refused for that, below;
+    # one on it is refused first when an archived program holds it or the
+    # product, with the switch off (OF-BLD-016 §2.R).
+    refused = inp.modelId in shelf.SHELF and programs.archived_refusal(
+        NAME, [("model", inp.modelId), ("product", inp.product)], ctx.include_archived)
+    if refused:
+        return ToolResult(error=refused)
     try:
         result = geneos.ceiling(inp.modelId, inp.product, inp.substrate)
     except geneos.GeneosUnavailable as e:

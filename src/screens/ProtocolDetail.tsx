@@ -3,6 +3,15 @@
 // bound quantity in the steps and every row of the materials table is
 // recomputed from @/engine/scale, so scaling 1 L → 5 L is one number changing
 // in one place and nothing else needing to agree by hand.
+//
+// PROGRAMS (OF-BLD-016 §2.2). A protocol in an archived program has left the
+// library, but its link still opens it here, under the banner that names the
+// program and the switch. Its host chips read through the program filter,
+// widened to the protocol's own program: a casein protocol opened by link
+// still names its casein hosts, and a general protocol shows no host of an
+// archived program while the switch is off. What its steps and materials
+// cite is the protocol's own provenance and is never filtered: a quantity
+// shown without its source would read as though it had none.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
@@ -18,7 +27,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { ExtractionRecord, Protocol, ProtocolVersion, RunState, Step } from '@/data/types';
-import { useStore } from '@/store';
+import { useProgramScope, useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate } from '@/router';
 import {
   batchLabel,
@@ -48,6 +58,7 @@ import { exportCSV, exportText } from '@/lib/csv';
 import {
   CAPABILITY_META,
   CATEGORY_META,
+  HostsArchived,
   capabilitiesOf,
   capabilityKeys,
   capabilityReason,
@@ -789,6 +800,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
   const runs = useStore((s) => s.runs);
   const startRun = useStore((s) => s.startRun);
   const toast = useStore((s) => s.toast);
+  const inScope = useProgramScope({ kind: 'protocol', id: protocolId });
 
   const [versionId, setVersionId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -857,6 +869,9 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
 
   const meta = CATEGORY_META[protocol.category];
   const Glyph = meta.Icon;
+  // The hosts the program filter shows, and, on an archived protocol opened by
+  // link, the hosts of its own program too.
+  const hosts = protocol.organisms.filter((o) => inScope('strain', o));
   const caps = capabilitiesOf(version);
   const prov = protocolProvenance(version, records);
   const isCurrent = version.version === protocol.currentVersion;
@@ -994,6 +1009,8 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
         }
       />
 
+      <ArchivedBanner kind="protocol" id={protocol.id} />
+
       {!isCurrent && (
         <div className="mb-4">
           <Callout kind="warn" title={`You are reading v${version.version}, not the current version`}>
@@ -1016,9 +1033,11 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
           </span>
           {protocol.organisms.length === 0 ? (
             <span className="text-caption text-ink-soft">Organism-independent</span>
+          ) : hosts.length === 0 ? (
+            <HostsArchived />
           ) : (
             <span className="flex flex-wrap items-center gap-1">
-              {protocol.organisms.map((o) => {
+              {hosts.map((o) => {
                 const s = strainLabel(o, strains);
                 return (
                   <a
@@ -1066,7 +1085,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             <span className="font-num">
               {citedSteps}/{version.steps.length}
             </span>{' '}
-            steps cite a source. Everything else is a demo value authored for this simulation.
+            steps cite a source. Everything else is a value authored for this protocol, with no source behind it.
           </p>
         </div>
       </Card>
@@ -1264,7 +1283,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
               </span>
               <span>
                 Amounts round to each material's own precision spec, so a scaled recipe stays
-                pipettable. Rows without a source chip are demo values authored for this simulation.
+                pipettable. Rows without a source chip are values authored for this protocol, with no source behind them.
               </span>
             </p>
           </Card>

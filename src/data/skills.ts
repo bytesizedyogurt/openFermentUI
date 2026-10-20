@@ -1,14 +1,13 @@
 // Skills (OF-BLD-013 §1.1): the trunk competencies Guild records and the
 // run-mode gate checks.
 //
-// PLACEHOLDER CONTENT. These fourteen are drawn from the steps of three seeded
-// protocols, PR-CIP-01, PR-OD-01 and PR-SEED-01, and each mastery criterion
-// restates something one of those steps asks an operator to do, written as a
-// behaviour an assessor can see. The real taxonomy comes with the skills
-// content pass; until then the families are working names and the ids are the
-// only part meant to last. `check:seed` holds the file to its invariants: ids
-// unique, families known, prerequisites resolving and acyclic, every step tag
-// naming a skill that exists here.
+// Fourteen bench skills, drawn from the steps of three seeded protocols,
+// PR-CIP-01, PR-OD-01 and PR-SEED-01: each mastery criterion restates
+// something one of those steps asks an operator to do, written as a behaviour
+// an assessor can see. The ids are stable; the ledger's entries point at them.
+// `check:seed` holds the file to its invariants: ids unique, families known,
+// prerequisites resolving and acyclic, every step tag naming a skill that
+// exists here.
 //
 // Reference data, like a protocol. Nothing mutates it at runtime; a change is a
 // commit, so the ledger's entries always point at a definition someone can

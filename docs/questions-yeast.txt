@@ -1,0 +1,11 @@
+What is the theoretical maximum ethanol yield on glucose according to the Yeast9 and iMM904 genome-scale models, and how close do measured ethanol yields come to it?
+How does CEN.PK113-7D differ from S288C, according to the Saccharomyces Genome Database?
+What maximum specific growth rate does wild-type Saccharomyces cerevisiae CEN.PK113-7D reach on glucose, and what biomass and ethanol yields go with it?
+What minimum ethanol selling price does the NREL corn stover design report by Humbird et al. state, and how does the BioSTEAM benchmark of that design compare?
+Which Monod saturation constants (Ks) and ethanol or substrate inhibition constants have been reported for Saccharomyces cerevisiae ethanol fermentation, and in which kinetic models?
+What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?
+Which hosts in geneOS could make ethanol, which models sit on their pages, and what ceiling does each give on glucose?
+Draft a runbook for a batch ethanol fermentation in CEN.PK113-7D on glucose, using the extracted yield records and the Yeast9 glucose ceiling as a bound.
+What is waiting for a person on Home right now?
+What does Proforma need before it can price ethanol from glucose on this evidence, and what does the corn stover benchmark give?
+What is archived in this corpus, and how would I see the PHA work?

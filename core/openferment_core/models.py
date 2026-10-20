@@ -72,6 +72,9 @@ class Claim(BaseModel):
     # against its passage, and computed values it rests on, by evidence id.
     passages: list[PassageRef] = Field(default_factory=list)
     evidenceIds: list[str] = Field(default_factory=list)
+    # OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`,
+    # each returned by a module's read tool in this run.
+    moduleRefs: list[str] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -81,7 +84,7 @@ class PassageRef(BaseModel):
     quote: str
 
 
-TraceKind = Literal["tool", "restart", "final"]
+TraceKind = Literal["coverage", "tool", "restart", "final"]
 StopReason = Literal["done", "rounds", "calls", "cost", "time"]
 
 
@@ -114,6 +117,164 @@ class Usage(BaseModel):
     models: list[str] = Field(default_factory=list)
 
 
+# ── Coverage (OF-BLD-015 §7.1) ─────────────────────────────────────────
+#
+# Before Postdoc's first turn, code sweeps every module store for what the
+# question names, so Postdoc never calls a thing absent that a screen shows.
+
+# The one state every module row reads as (OF-BLD-015 §7.2). It is computed
+# in `module_stores.py` from the module's own word (a clearance state, a
+# runbook's status and lock, a check's state), never chosen by a model.
+ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
+ModuleName = Literal["dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
+                     "primer", "intake", "home"]
+
+
+class CoverageHit(BaseModel):
+    """One row of one module that the question names."""
+
+    # `<module>/<kind>/<id>`, the id a claim cites it by.
+    ref: str
+    id: str
+    kind: str
+    label: str
+    state: ModuleState
+
+
+class ModuleCoverage(BaseModel):
+    """What the sweep found in one module."""
+
+    module: ModuleName
+    label: str
+    # How many rows match; `hits` lists at most COVERAGE_HITS of them.
+    count: int = 0
+    hits: list[CoverageHit] = Field(default_factory=list)
+    # The question names the module itself ("what is open in Dominion").
+    named: bool = False
+    # Set when part of the module lives only in a browser, in words.
+    partial: str | None = None
+    # Set when the module's store could not be read, in words.
+    error: str | None = None
+
+
+class ModuleRow(BaseModel):
+    """One row a module's read tool returns (OF-BLD-015 §7.2): what the
+    module holds, where it stands, and how it is marked."""
+
+    module: ModuleName
+    kind: str
+    id: str
+    # `<module>/<kind>/<id>`, what a claim cites.
+    ref: str
+    label: str
+    # Computed from `status` by module_stores, never by a model.
+    state: ModuleState
+    # The module's own word: a clearance state, a runbook status, an ingest state.
+    status: str
+    # The row's provenance mark when the module keeps one; null for a seed
+    # row that carries none (a lesson, a unit operation).
+    provenance: Provenance | None = None
+    # A few named fields the module shows, kept short.
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuditEntry(BaseModel):
+    """One line of core/data/audit.jsonl (OF-BLD-015 §7.3): a write a model
+    made, or a proposal a person carried out or dismissed."""
+
+    at: str
+    agent: Literal["model", "person"]
+    # The model id, or the person's name.
+    who: str
+    module: ModuleName
+    action: str
+    # The state the write left behind, or `proposed`, `done`, `dismissed`.
+    state: str
+    target: str | None = None
+    askId: str | None = None
+    effort: str | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+ProposalState = Literal["proposed", "done", "dismissed"]
+
+
+class Proposal(BaseModel):
+    """What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+    carries it out or dismisses it on Home."""
+
+    id: str
+    at: str
+    module: ModuleName
+    action: str
+    gate: str
+    title: str
+    why: str
+    # What the button does, in words, and where it takes the person when the
+    # server cannot act itself.
+    how: str
+    route: str | None = None
+    server: bool = False
+    target: str | None = None
+    fields: dict[str, str] = Field(default_factory=dict)
+    note: str = ""
+    # The model that proposed it.
+    by: str
+    askId: str | None = None
+    state: ProposalState = "proposed"
+    carriedOutBy: str | None = None
+    carriedOutAt: str | None = None
+    result: str | None = None
+
+
+class Proposals(BaseModel):
+    """core/data/proposals.json."""
+
+    version: Literal[1] = 1
+    proposals: list[Proposal] = Field(default_factory=list)
+
+
+class ProposalAction(BaseModel):
+    """A person carrying out or dismissing a proposal."""
+
+    person: str
+    reason: str = ""
+    # The Guild person id the browser is acting as: a check is asked for by a
+    # person on Guild, which knows people by id, never by the reviewer name
+    # (OF-BLD-016 §1.R finding 11). None when nobody is chosen.
+    actingId: str | None = None
+
+
+class ArchivedCoverage(BaseModel):
+    """What the question names in one archived program, left out of the
+    sweep while archived programs are hidden (OF-BLD-016 §2.3, E.2′): the
+    trace says "found in archived program PHA (hidden)" and the plan carries a
+    gap naming the switch."""
+
+    # The program's id and its name, as src/data/programs.ts declares them.
+    program: str
+    name: str
+    # The question's own words that named it.
+    entities: list[str] = Field(default_factory=list)
+    # How many hidden rows the question names, and the modules they sit in.
+    count: int = 0
+    modules: list[ModuleName] = Field(default_factory=list)
+
+
+class CoverageMap(BaseModel):
+    """The sweep, module by module, in the order the rail lists them."""
+
+    # Names the question was found to hold, in its own words.
+    entities: list[str] = Field(default_factory=list)
+    searched: int = 0
+    found: int = 0
+    modules: list[ModuleCoverage] = Field(default_factory=list)
+    # OF-BLD-016 §2.3: whether archived programs were swept (the browser's
+    # switch), and, when they were not, what the question names in them.
+    includeArchived: bool = False
+    archived: list[ArchivedCoverage] = Field(default_factory=list)
+
+
 class AnswerPlan(BaseModel):
     question: str
     claims: list[Claim] = Field(default_factory=list)
@@ -137,6 +298,11 @@ class AnswerPlan(BaseModel):
     passages: list[Passage] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
+    # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
+    # held. The answer's footer reads it; null on the single-call path.
+    coverage: CoverageMap | None = None
+    # OF-BLD-015 §7.2: the module rows the claims cite.
+    rows: list[ModuleRow] = Field(default_factory=list)
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
@@ -186,6 +352,29 @@ class AskRequest(BaseModel):
     # The earlier turns of the same conversation, oldest first. The agent
     # reads the last few as context; `single` mode ignores them.
     history: list[PriorTurn] = Field(default_factory=list)
+    # OF-BLD-016 §2.3: the browser's "show archived programs" switch. Off,
+    # the evidence pool, the passages, the coverage pass and every read tool
+    # leave archived programs out. It rides in the tools' context from this
+    # request; no tool input carries it.
+    includeArchived: bool = False
+
+
+# ── Programs (OF-BLD-016 §2.1, E.1′, E.2′) ──────────────────────────────
+#
+# A program is data: the corpus threads that are its papers, a name, and
+# whether it is active or archived. Declared in src/data/programs.ts and
+# written into corpus.json and modules.json by `pnpm export:corpus`;
+# `programs.py` reads them. Mirrors `Program` in src/data/types.ts.
+
+ProgramStatus = Literal["active", "archived"]
+
+
+class Program(BaseModel):
+    id: str
+    name: str
+    letters: list[str]
+    status: ProgramStatus
+    summary: str
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -740,7 +929,7 @@ class PracticeSession(BaseModel):
     scenarioId: str
     skillId: str
     # A person on Guild's ledger, or None for a session nobody's record keeps
-    # (the sample team, or nobody chosen).
+    # (nobody chosen as learning).
     personId: str | None = None
     turns: list[PracticeTurn] = Field(default_factory=list)
     observed: list[PracticeObservation] = Field(default_factory=list)
@@ -996,6 +1185,8 @@ class ToolResult(BaseModel):
     usage: Usage = Field(default_factory=Usage)
     # A runbook draft the service assembled (OF-BLD-014 §9.2, E.6).
     draft: "RunbookDraft | None" = None
+    # Module rows a plan may cite (OF-BLD-015 §7.2).
+    rows: list[ModuleRow] = Field(default_factory=list)
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
@@ -1280,6 +1471,13 @@ class RagReport(BaseModel):
     # The rule that chose it, in words.
     rule: str
     totalCostUsd: float
+    # The thread the questions were drawn from (OF-BLD-016 §4.1), or None for
+    # every paper. Every search ran over the whole index either way.
+    thread: str | None = None
+    # The lane search runs on now (core/data/index/config.json), which a person
+    # may hold apart from the rule's choice; the API fills it when it serves the
+    # report, and the stored report leaves it None (OF-BLD-016 §4.1).
+    laneInUse: str | None = None
 
 
 class RagSearchRequest(BaseModel):
@@ -1287,6 +1485,9 @@ class RagSearchRequest(BaseModel):
     k: int = 8
     # A lane by name, or None for the chosen one.
     lane: str | None = None
+    # OF-BLD-016 §2.3: the browser's switch; off leaves archived programs'
+    # passages out.
+    includeArchived: bool = False
 
 
 class RagSearchResponse(BaseModel):

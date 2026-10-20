@@ -4,8 +4,9 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { GitCompare, Pin } from 'lucide-react';
-import { useStore } from '@/store';
-import { navigate } from '@/router';
+import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { href, navigate } from '@/router';
 import type { CostLine, Scenario } from '@/data/types';
 import { evaluateGrid, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
@@ -50,8 +51,30 @@ function summarize(a: Evaluated, b: Evaluated): string {
 export default function Compare() {
   const scenarios = useStore((s) => s.scenarios);
   const grids = useStore((s) => s.grids);
+  // OF-BLD-016 §2.2: a pinned scenario in an archived program is not compared
+  // while archived programs are hidden (the default); it stays pinned, and
+  // comes back in its place when the switch in Settings is on.
+  const shows = useProgramFilter();
 
-  const pinned = scenarios.filter((s) => s.pinned);
+  const pinned = scenarios.filter((s) => s.pinned && shows('scenario', s.id));
+  const pinnedHidden = scenarios.filter((s) => s.pinned && !shows('scenario', s.id));
+  const hiddenNames = (() => {
+    const hit = new Set(pinnedHidden.map((s) => archivedProgramOf('scenario', s.id)?.id));
+    return PROGRAMS.filter((p) => hit.has(p.id))
+      .map((p) => p.name)
+      .join(' and ');
+  })();
+  const hiddenLine =
+    pinnedHidden.length > 0 ? (
+      <>
+        {pinnedHidden.length} pinned scenario{pinnedHidden.length === 1 ? '' : 's'} in {hiddenNames}{' '}
+        {pinnedHidden.length === 1 ? 'is' : 'are'} not compared here, because archived programs are hidden.{' '}
+        <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+          Settings → Programs
+        </a>{' '}
+        shows {pinnedHidden.length === 1 ? 'it' : 'them'}.
+      </>
+    ) : null;
   const shown = pinned.slice(0, 3);
 
   const evaluated = useMemo<Evaluated[]>(
@@ -79,8 +102,16 @@ export default function Compare() {
         <PageHeader title="Compare scenarios" subtitle="Pin scenarios to line them up side by side." />
         <OwnerTabs tabs={BIOREPO_TABS} />
         <EmptyState
-          title="Nothing pinned yet"
-          body="Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once."
+          title={hiddenLine ? 'Nothing pinned in the programs showing' : 'Nothing pinned yet'}
+          body={
+            hiddenLine ? (
+              <>
+                {hiddenLine} Or open a scenario and use Pin to compare (or press p) to add it here.
+              </>
+            ) : (
+              'Open a scenario and use Pin to compare (or press p) to add it here. Up to three can be compared at once.'
+            )
+          }
           icon={<GitCompare size={28} />}
           action={<Button onClick={() => navigate('/proforma')}>Browse scenarios</Button>}
         />
@@ -113,6 +144,12 @@ export default function Compare() {
             {pinned.length} scenarios are pinned; showing the first three. Unpin one to swap it out.
           </Callout>
         </div>
+      )}
+
+      {hiddenLine && (
+        <p className="text-caption text-ink-soft mb-4" data-testid="archived-hidden">
+          {hiddenLine}
+        </p>
       )}
 
       {crossModel && (
@@ -149,7 +186,7 @@ export default function Compare() {
                 <span className="text-body text-ink-soft ml-1">/kg</span>
               </div>
               <div className="text-caption text-ink-soft">
-                Demo model v0 — illustrative economics, not validated
+                Cost model v0 — illustrative economics, not validated
               </div>
             </Tick>
             <div className="text-caption text-ink-soft mt-2 space-y-0.5">

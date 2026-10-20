@@ -4,10 +4,20 @@
 // actually stands behind each strain: cw15 is covered across every asset
 // class; the others are not, and the card says so rather than padding the
 // layout to look even.
-import { useEffect, useMemo, useState } from 'react';
+//
+// PROGRAMS (OF-BLD-016 §2.2). Every strain, paper, record, protocol and
+// scenario counted here passes through the store's one program selector, so
+// with archived programs hidden (the default) the catalogue holds no casein
+// or PHA host and no card counts their papers. A page that names one entity
+// applies it through `useProgramScope` (store.ts), and an emptied list says
+// what it hides through `HiddenByArchive` (components/HiddenByArchive.tsx).
+import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
-import type { ExtractionRecord, Paper, Strain } from '@/data/types';
-import { useStore } from '@/store';
+import type { ExtractionRecord, Paper, Program, Strain } from '@/data/types';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { useProgramFilter, useStore, type ProgramEntityKind } from '@/store';
+import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
+import { href } from '@/router';
 import { ProvDot, ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
 import {
   Bar,
@@ -16,10 +26,8 @@ import {
   Explain,
   LinkButton,
   PageHeader,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 // ── coverage model ─────────────────────────────────────────────────────
 
@@ -239,33 +247,33 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   const records = useStore((s) => s.records);
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
+  const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
+  const shows = useProgramFilter();
 
-  const [ready, setReady] = useState(false);
   const [sort, setSort] = useState<SortKey>('coverage');
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
 
+  // OF-BLD-016 §2.2 — what the program switch lets show. With it on, each of
+  // these is the whole list, in the same order.
+  const shownStrains = useMemo(() => strains.filter((x) => shows('strain', x.id)), [strains, shows]);
+  const shownPapers = useMemo(() => papers.filter((x) => shows('paper', x.id)), [papers, shows]);
+  const shownRecords = useMemo(() => records.filter((x) => shows('record', x.id)), [records, shows]);
+  const shownProtocols = useMemo(() => protocols.filter((x) => shows('protocol', x.id)), [protocols, shows]);
+  const shownScenarios = useMemo(() => scenarios.filter((x) => shows('scenario', x.id)), [scenarios, shows]);
+
   const coverage = useMemo<Coverage[]>(() => {
-    return strains.map((strain) => {
-      const recs = recordsFor(records, paperById, strain.id);
+    return shownStrains.map((strain) => {
+      const recs = recordsFor(shownRecords, paperById, strain.id);
       const live = recs.filter((r) => r.status !== 'rejected');
       const ids = new Set(recs.map((r) => r.id));
       const gold = live.filter((r) => !!r.gold).length;
       const verified = live.filter((r) => r.status === 'verified').length;
       const unverified = live.filter((r) => r.status === 'unverified').length;
-      const paperCount = papers.filter((p) => p.organisms.includes(strain.id)).length;
-      const protocolCount = protocols.filter((p) => p.organisms.includes(strain.id)).length;
-      const scenarioCount = scenarios.filter(
+      const paperCount = shownPapers.filter((p) => p.organisms.includes(strain.id)).length;
+      const protocolCount = shownProtocols.filter((p) => p.organisms.includes(strain.id)).length;
+      const scenarioCount = shownScenarios.filter(
         (sc) =>
           sc.assumptions.some((a) => a.recordId && ids.has(a.recordId)) ||
           sc.dims.some((d) => d.sourceRecordId && ids.has(d.sourceRecordId)),
@@ -284,7 +292,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
         prov,
       };
     });
-  }, [strains, records, papers, protocols, scenarios, paperById]);
+  }, [shownStrains, shownRecords, shownPapers, shownProtocols, shownScenarios, paperById]);
 
   const maxes = useMemo(
     () => ({
@@ -326,22 +334,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   );
 
   const subtitle =
-    'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe this demonstration corpus — not the published literature.';
-
-  if (!ready) {
-    return (
-      <>
-        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={7} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
+    'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe the corpus as curated here — not the published literature.';
 
   if (strains.length === 0) {
     return (
@@ -351,8 +344,34 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <EmptyState
             icon={<FlaskConical size={22} />}
             title="No strains in this session"
-            body="The seeded strain set is empty, which normally means the demo data was cleared. Restoring the seeded state from the corpus settings brings the organism index back."
+            body="The seeded strain set is empty in this session. Clearing this browser’s data from the corpus settings brings the organism index back."
             action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
+          />
+        </Card>
+      </>
+    );
+  }
+
+  if (shownStrains.length === 0) {
+    // Every strain belongs to an archived program: say which, and where the switch is.
+    return (
+      <>
+        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
+        <Card>
+          <EmptyState
+            icon={<FlaskConical size={22} />}
+            title="No strain in an active program"
+            body={
+              <HiddenByArchive
+                subject={strains.length === 1 ? 'The one strain in this session' : `All ${strains.length} strains in this session`}
+                plural={strains.length !== 1}
+                programs={archivedProgramsOf(
+                  strains.map((x) => ['strain', x.id] as [ProgramEntityKind, string]),
+                  { records, runbooks, depositions },
+                )}
+              />
+            }
+            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
           />
         </Card>
       </>
@@ -405,11 +424,11 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
         <span className="inline-flex items-center gap-1.5">
           <FlaskConical size={13} />
-          <span className="font-num text-ink">{strains.length}</span> strains
+          <span className="font-num text-ink">{shownStrains.length}</span> strains
         </span>
         <span className="inline-flex items-center gap-1.5">
           <BookOpen size={13} />
-          <span className="font-num text-ink">{papers.length}</span> papers in the corpus
+          <span className="font-num text-ink">{shownPapers.length}</span> papers in the corpus
         </span>
         <span className="inline-flex items-center gap-1.5">
           <ShieldCheck size={13} />
@@ -456,7 +475,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <LineChart size={13} className="mt-[2px] shrink-0" />
           <span>
             A scenario counts for a strain only when one of its assumptions cites a record for that
-            strain. Demo model v0 — illustrative economics, not validated.
+            strain. Cost model v0 — illustrative economics, not validated.
           </span>
         </div>
       </div>

@@ -6,19 +6,35 @@
 // lane ran, and where each lane ranked it. Every word shown in a passage is
 // the paper's; one click opens the reader at that sentence. With the service
 // down this says so; nothing stands in for a result (E.2).
+//
+// OF-BLD-016 §2.2: a passage from a paper in an archived program is not shown
+// while archived programs are hidden (the default); the result line says how
+// many were held back and where the switch is.
 import { useEffect, useState, type FormEvent } from 'react';
 import { Search as SearchIcon } from 'lucide-react';
 import type { PassageHit, RagSearchResponse, RagStatus } from '@/data/types';
 import { RagDown, RagRefused, quoteOf, ragSearch, ragStatus, readerHref } from '@/lib/rag';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { href } from '@/router';
+import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
 import { Button, Callout, Card, EmptyState, PageHeader } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
 
 const KIND_LABEL: Record<string, string> = { abstract: 'Abstract', prose: 'Text', table: 'Table', figure: 'Figure caption' };
 
+/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
+function archivedNames(paperIds: string[]): string {
+  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
+  return PROGRAMS.filter((p) => hit.has(p.id))
+    .map((p) => p.name)
+    .join(' and ');
+}
+
 export default function BioRepoSearch() {
   const papers = useStore((s) => s.papers);
+  const shows = useProgramFilter();
+  const showArchived = useStore((s) => s.showArchived);
   const [status, setStatus] = useState<RagStatus | null>(null);
   const [down, setDown] = useState<RagDown | null>(null);
   const [question, setQuestion] = useState('');
@@ -90,7 +106,7 @@ export default function BioRepoSearch() {
               <input
                 aria-label="Question"
                 className="input w-full"
-                placeholder="e.g. PHB from xylose hydrolysate"
+                placeholder="e.g. ethanol yield of Saccharomyces cerevisiae on glucose"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
               />
@@ -112,21 +128,61 @@ export default function BioRepoSearch() {
             </Button>
           </form>
           <p className="text-caption text-ink-soft mb-4">
-            {status.passages.toLocaleString()} passages from {status.papersIndexed} papers.{' '}
+            {/* The service counts its whole index, which holds every program's
+                passages; with archived programs hidden a search returns only
+                passages from papers that show (OF-BLD-016 §2.3). */}
+            The index holds {status.passages.toLocaleString()} passages from {status.papersIndexed} papers, every
+            program&rsquo;s{showArchived ? '' : '; a search returns passages only from the papers that show'}.{' '}
             {status.lanes
               .filter((l) => !l.available)
               .map((l) => `${l.name}: ${l.why}`)
               .join(' · ')}
           </p>
           {refused && <Callout kind="warn">{refused}</Callout>}
-          {result && <Results result={result} titleOf={titleOf} />}
+          {result && (
+            <Results
+              result={result}
+              titleOf={titleOf}
+              shows={(h) => shows('paper', h.passage.paperId)}
+            />
+          )}
         </>
       )}
     </div>
   );
 }
 
-function Results({ result, titleOf }: { result: RagSearchResponse; titleOf: (id: string) => string }) {
+function Results({
+  result,
+  titleOf,
+  shows,
+}: {
+  result: RagSearchResponse;
+  titleOf: (id: string) => string;
+  shows: (hit: PassageHit) => boolean;
+}) {
+  const hits = result.hits.filter(shows);
+  const hidden = result.hits.filter((h) => !shows(h)).map((h) => h.passage.paperId);
+  const hiddenLine =
+    hidden.length > 0 ? (
+      <>
+        {hidden.length} passage{hidden.length === 1 ? '' : 's'} from papers in {archivedNames(hidden)}{' '}
+        {hidden.length === 1 ? 'is' : 'are'} not shown, because archived programs are hidden.{' '}
+        <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+          Settings → Programs
+        </a>{' '}
+        shows them.
+      </>
+    ) : null;
+  if (hits.length === 0 && hidden.length > 0) {
+    return (
+      <EmptyState
+        icon={<SearchIcon size={28} />}
+        title="Every passage found is in an archived program"
+        body={hiddenLine}
+      />
+    );
+  }
   if (result.hits.length === 0) {
     return (
       <EmptyState
@@ -139,14 +195,19 @@ function Results({ result, titleOf }: { result: RagSearchResponse; titleOf: (id:
   return (
     <div className="space-y-3" data-testid="search-results">
       <p className="text-caption text-ink-soft">
-        {result.hits.length} passages · lane {result.lane}
+        {hits.length} passages · lane {result.lane}
         {result.phrasings.length > 0 && ` · also searched, as phrased by a model: ${result.phrasings.join('; ')}`}
         {result.unverifiedSentences > 0 &&
           ` · ${result.unverifiedSentences} sentence${result.unverifiedSentences === 1 ? '' : 's'} the reader returned were not in their passage and were dropped`}
         {result.costUsd > 0 && ` · $${result.costUsd.toFixed(4)}`}
       </p>
+      {hiddenLine && (
+        <p className="text-caption text-ink-soft" data-testid="archived-hidden">
+          {hiddenLine}
+        </p>
+      )}
       {result.note && <Callout kind="info">{result.note}</Callout>}
-      {result.hits.map((h) => (
+      {hits.map((h) => (
         <Hit key={h.passage.id} hit={h} title={titleOf(h.passage.paperId)} />
       ))}
     </div>

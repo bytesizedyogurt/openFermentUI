@@ -11,7 +11,9 @@ from openferment_core.validate import SeenSet
 from test_postdoc_agent import Script, ask, plan
 from test_tools import pool  # noqa: F401
 
-PRODUCT, STRAIN = "taq-dna-polymerase", "c-necator-h16"
+# A strain no archived program holds: with the switch off the tool refuses
+# an archived one before it drafts anything (OF-BLD-016 §2.R, test_programs).
+PRODUCT, STRAIN = "taq-dna-polymerase", "s-cerevisiae-s288c"
 
 
 def ev(eid, value, *, figure, interval=None, unit="g g-1"):

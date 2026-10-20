@@ -59,6 +59,10 @@ class Corpus:
     _bm25: BM25Okapi
     _order: list[str]
     _tokens: dict[str, frozenset[str]]
+    # The programs (OF-BLD-016 §2.1, E.2′) as corpus.json carries them: id,
+    # name, thread letters, status and one line. `programs.py` resolves a
+    # paper's or a record's program from these; empty for a hand-built corpus.
+    programs: tuple[dict[str, Any], ...] = ()
 
     def search(self, question: str, limit: int = 30) -> list[dict[str, Any]]:
         """The `limit` best-scoring records for a question, or nothing.
@@ -179,4 +183,5 @@ def load_corpus(path: str | None = None) -> Corpus:
         _bm25=BM25Okapi(docs),
         _order=order,
         _tokens={rid: frozenset(doc) for rid, doc in zip(order, docs)},
+        programs=tuple(raw.get("programs") or ()),
     )

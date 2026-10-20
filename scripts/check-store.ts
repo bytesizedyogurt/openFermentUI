@@ -26,10 +26,14 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
-import { mergeAssumptions, snapshotOf, useStore } from '../src/store';
+import { readFileSync } from 'node:fs';
+import { isExample, mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
+import { RECORDS } from '../src/data/records';
+import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Candidate, Overlay } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, Overlay } from '../src/data/types';
+import { visibleArtifacts } from '../src/lib/artifacts';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -394,8 +398,169 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('after a reload the conversation is back with both turns', back?.turns.map((t) => t.id).join() === 'lt-a,lt-b');
   check('a turn the reload cut short reads interrupted', back?.turns.find((t) => t.id === 'lt-b')?.status === 'interrupted');
   check('a conversation started since the page loaded is kept, first', st().liveConversations[0]?.id === fresh);
-  st().resetDemo();
-  check('Reset demo data clears the conversations', st().liveConversations.length === 0);
+  // OF-BLD-016 §3.1 — a question the service never received is taken back:
+  // its turn goes, the turns before it stay, and a conversation made for it
+  // alone goes with it.
+  st().addLiveTurn(id, turn('lt-c', 'running'));
+  st().dropLiveTurn(id, 'lt-c');
+  check('a turn the service never received is taken back, and the turns before it stay',
+    st().liveConversations.find((c) => c.id === id)?.turns.map((t) => t.id).join() === 'lt-a,lt-b');
+  st().addLiveTurn(fresh, turn('lt-d', 'running'));
+  st().dropLiveTurn(fresh, 'lt-d');
+  check('a conversation made for an unreceived question goes with it', !st().liveConversations.some((c) => c.id === fresh));
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data clears the conversations', st().liveConversations.length === 0);
+}
+
+// OF-BLD-016 §2.1 — whether archived programs show is Durable: the switch
+// survives a reload, a snapshot from before programs existed leaves it where
+// it is, and it starts off. The selector every screen calls answers from it.
+{
+  const st = () => useStore.getState();
+  check('archived programs start hidden', st().showArchived === false && !programVisible('paper', 'P1', st()) && programVisible('paper', 'Q1', st()));
+  st().setShowArchived(true);
+  const snap = snapshotOf(st());
+  check('the snapshot carries the switch', snap.showArchived === true, snap.showArchived);
+  st().setShowArchived(false);
+  st().applyDurable(snap);
+  check('after a reload the switch is back on, and an archived paper shows', st().showArchived === true && programVisible('paper', 'P1', st()));
+  st().setShowArchived(false);
+  const { showArchived: _dropped, ...older } = snapshotOf(st());
+  st().applyDurable(older);
+  check('a snapshot from before programs leaves the switch where it is', st().showArchived === false);
+  check('a general entity shows with the switch off', programVisible('strain', 's-cerevisiae', st()));
+  check('an archived strain does not', !programVisible('strain', 'c-necator-h16', st()));
+  check('a record shows as its paper does', programOf('record', RECORDS.find((r) => r.paperId.startsWith('H'))!.id, st()) === 'casein');
+}
+
+// OF-BLD-016 §3.3 (D3) — an example is treated as archived: a general seed
+// runbook that describes a run nobody made is hidden with the switch off and
+// shows with it on; a general protocol that teaches a method stays; a lesson
+// takes its module's flag; a copy of an example scenario stays an example;
+// and a deposition a person starts from an example runbook is not one.
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(false);
+  check('an example runbook is general, yet hidden with the switch off',
+    programOf('runbook', 'rb-taq-kigali', st()) === null && isExample('runbook', 'rb-taq-kigali', st()) && !programVisible('runbook', 'rb-taq-kigali', st()));
+  check('no seed runbook shows with the switch off', st().runbooks.every((r) => !programVisible('runbook', r.id, st())));
+  check('the generic protocols show with the switch off', programVisible('protocol', 'PR-OD-01', st()) && programVisible('protocol', 'PR-CIP-01', st()));
+  check('a lesson of an example module is an example', isExample('lesson', st().modules.find((m) => m.id === 'm0')!.lessons[0].id, st()));
+  check('the bench-track lessons show with the switch off', st().modules.find((m) => m.id === 'm6')!.lessons.every((l) => programVisible('lesson', l.id, st())));
+  st().setShowArchived(true);
+  check('the switch brings every example back', st().runbooks.every((r) => programVisible('runbook', r.id, st())));
+  st().setShowArchived(false);
+  const copyId = st().duplicateScenario('sc-s1');
+  check('a copy of an example scenario stays an example', isExample('scenario', copyId, st()) && !programVisible('scenario', copyId, st()), copyId);
+  check('a deposition is an example only by its own flag',
+    !isExample('deposition', 'dep-x', { ...st(), depositions: [{ id: 'dep-x', runbookId: 'rb-taq-kigali', protocolId: 'PR-OD-01' } as never] }));
+  st().clearBrowserData();
+}
+
+// OF-BLD-016 §3.R — a research handoff, a promotion, a resume and an
+// authorisation invent nothing: no ETA, no cost, no progress figure, no
+// locked count, and no timed job with no work behind it.
+{
+  const st = () => useStore.getState();
+  const before = st().jobs.length;
+  const invented = (id: string | null) => {
+    const r = st().runbooks.find((x) => x.id === id);
+    return !r || r.eta !== null || r.estCostUsd !== null || (r.status !== 'complete' && r.progressPct !== 0) ||
+      r.predictions.some((p) => typeof p.value === 'number' && p.value > 0);
+  };
+  const states = [...new Set(st().products.map((p) => p.clearanceState))];
+  const opened = states.map((c) => st().handoffToResearchRunbook(st().products.find((p) => p.clearanceState === c)!.id));
+  check('a research handoff invents no ETA, cost, progress or count', opened.every((id) => !invented(id)), opened.filter(invented));
+  const promoted = opened.map((id) => st().promoteRunbook(id!)).filter(Boolean);
+  check('a promotion invents no ETA, cost, progress or count', promoted.every((id) => !invented(id)), promoted.filter(invented));
+  const blocked = st().runbooks.find((r) => r.status === 'blocked_unverified');
+  if (blocked) {
+    st().resolveRunbookInput(blocked.id, 'source');
+    check('a resume sets no ETA', st().runbooks.find((r) => r.id === blocked.id)!.eta === null);
+  }
+  const waiting = st().runbooks.find((r) => r.status === 'awaiting_budget');
+  if (waiting) st().authoriseRunbookBudget(waiting.id);
+  check('none of them starts a timed job', st().jobs.length === before, st().jobs.slice(before).map((j) => j.title));
+  st().clearBrowserData();
+}
+
+// OF-BLD-016 §3.R — clearing this browser's data returns it to the shipped
+// state, and the shipped state has archived programs hidden.
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(true);
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data turns the archive switch off', st().showArchived === false && snapshotOf(st()).showArchived === false);
+}
+
+// OF-BLD-016 §2.R — a computed artifact follows what its basis names: a
+// record (by its paper, a candidate's id included), a product or a strain.
+// BioRepo → Artifacts and Settings → Figure grammar list through it, so a
+// PHB ceiling or a thread P conversion hides with the switch off.
+{
+  const st = () => useStore.getState();
+  const src = (kind: BasisSource['kind'], id: string | null = null): BasisSource => ({ kind, id, note: null, by: null });
+  const art = (id: string, inputs: Artifact['inputs']): Artifact => ({
+    id, tool: 't', toolVersion: 'v', inputs, output: {}, outputHash: '', provenance: 'computed', createdAt: '', durationMs: 0, seed: null,
+  });
+  const list = [
+    art('phb-ceiling', [{ name: 'model', value: 'E. coli core', unit: '', source: src('model', 'e_coli_core') }, { name: 'product', value: 'phb', unit: '', source: src('convention') }]),
+    art('p-conversion', [{ name: 'record value', value: 'x', unit: '', source: src('record', 'cl1-P6-ef418c6a') }]),
+    art('b5-conversion', [{ name: 'record value', value: 'x', unit: '', source: src('record', 'r-B5-3') }]),
+    art('ethanol-ceiling', [{ name: 'model', value: 'iMM904', unit: '', source: src('model', 'iMM904') }, { name: 'product', value: 'ethanol', unit: '', source: src('convention') }]),
+    art('benchmark', [{ name: 'model', value: 'cornstover', unit: '', source: src('model', 'biorefineries.cornstover@2.35.1') }]),
+  ];
+  st().setShowArchived(false);
+  const shown = visibleArtifacts(list, st()).map((a) => a.id).join();
+  check('with the switch off, artifacts computed from casein or PHA inputs are not listed', shown === 'ethanol-ceiling,benchmark', shown);
+  st().setShowArchived(true);
+  check('with the switch on, every artifact is listed', visibleArtifacts(list, st()).length === list.length);
+  st().setShowArchived(false);
+}
+
+// OF-BLD-016 §3.R — Settings → About says what this build does. The
+// sentences a review found false are gone, and the one it now makes about
+// what survives a refresh is held against the snapshot itself.
+{
+  const about = readFileSync(new URL('../src/screens/Settings.tsx', import.meta.url), 'utf8');
+  for (const said of ['No extractor has ever been run', 'held in memory only', 'There is no database, no account and no server', 'No document is retrieved', 'No full\n              text has been retrieved']) {
+    check(`Settings → About no longer says "${said.replace(/\s+/g, ' ')}"`, !about.includes(said));
+  }
+  const snap = snapshotOf(useStore.getState()) as unknown as Record<string, unknown>;
+  const kept = ['depositions', 'liveConversations', 'showArchived'];
+  check('what About says survives a refresh is in the Durable snapshot', kept.every((k) => k in snap), kept.filter((k) => !(k in snap)));
+}
+
+// OF-BLD-016 §2.R — Intake → Ingest's header counts what shows; it never
+// states the casein catalogue's counts in writing.
+{
+  const ingest = readFileSync(new URL('../src/screens/IntakeIngest.tsx', import.meta.url), 'utf8');
+  check('Intake → Ingest states no written count of the catalogue', !/Twenty-seven|of the 132 entries/.test(ingest));
+}
+
+// OF-BLD-016 §2.R — BioRepo → Search's status line counts the whole index,
+// which holds every program's passages; with archived programs hidden it
+// says so, since a search returns only what shows.
+{
+  const search = readFileSync(new URL('../src/screens/BioRepoSearch.tsx', import.meta.url), 'utf8');
+  check('BioRepo → Search does not present the whole index as what a search reaches',
+    !/\{status\.passages\.toLocaleString\(\)\} passages from \{status\.papersIndexed\} papers\.\{' '\}/.test(search) && /every program/.test(search));
+}
+
+// OF-BLD-016 §2.R — pureOS counts the molecules that show, as Dominion and
+// Home do: it never counts the seed's product list straight.
+{
+  const pure = readFileSync(new URL('../src/screens/PureOS.tsx', import.meta.url), 'utf8');
+  check('pureOS counts products through the program filter', !/PRODUCTS\.length|of PRODUCTS\)|PRODUCTS\.filter\(\(p\) => \(p\.unitOperationIds/.test(pure) && /shows\('product'/.test(pure));
+  const shownProducts = PRODUCTS.filter((p) => programVisible('product', p.id, { ...useStore.getState(), showArchived: false })).length;
+  check('with the switch off, fewer products show than the catalogue holds', shownProducts < PRODUCTS.length, [shownProducts, PRODUCTS.length]);
+}
+
+// OF-BLD-016 §2.R — fermOS offers the runs Runbooks → Depositions shows: a
+// deposition of an archived protocol is not in its chooser.
+{
+  const ferm = readFileSync(new URL('../src/screens/FermOS.tsx', import.meta.url), 'utf8');
+  check("fermOS filters its runs through shows('deposition')", /shows\('deposition', d\.id\)/.test(ferm));
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

@@ -7,9 +7,9 @@ import {
   ChartScatter,
   Database,
   Download,
-  Gauge,
   Info,
   KeyRound,
+  Layers,
   Moon,
   Palette,
   RotateCcw,
@@ -17,7 +17,17 @@ import {
   ShieldCheck,
   Sun,
 } from 'lucide-react';
-import { useStore, provenanceOf, guildView, actingIdOf, type Density, type Theme, type UnitMode } from '@/store';
+import {
+  useStore,
+  provenanceOf,
+  guildView,
+  actingIdOf,
+  useProgramFilter,
+  type Density,
+  type Theme,
+  type UnitMode,
+} from '@/store';
+import { PROGRAMS } from '@/data/programs';
 import { policyOf } from '@/engine/competence';
 import { Tick } from '@/components/Provenance';
 import {
@@ -67,6 +77,12 @@ const SECTIONS: SectionDef[] = [
     blurb: 'Theme, density, motion and the rehearsal clock. Changes apply immediately.',
   },
   {
+    id: 'programs',
+    label: 'Programs',
+    blurb:
+      'The research programs the corpus serves, which are active and which archived, and the one switch that shows archived programs again.',
+  },
+  {
     id: 'units',
     label: 'Units & display',
     blurb:
@@ -81,7 +97,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'corpus',
     label: 'Corpus & ontology',
-    blurb: 'Owner controls: the ontology reference, the gold set, and demo data reset.',
+    blurb: 'Owner controls: the ontology reference, the gold set, and clearing this browser’s data.',
     owner: true,
   },
   {
@@ -95,7 +111,7 @@ const SECTIONS: SectionDef[] = [
     id: 'figures',
     label: 'Figure grammar',
     blurb:
-      'How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Shown over a labelled sample.',
+      'How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Drawn over the newest computed results the service keeps, or by its legend alone.',
   },
   {
     id: 'export',
@@ -105,7 +121,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'about',
     label: 'About & fidelity',
-    blurb: 'What is real in this build, what is scripted, and what is only a surface.',
+    blurb: 'What is real in this build, what is written into it by hand, and what is only a surface.',
   },
 ];
 
@@ -162,7 +178,6 @@ function RadioCards<T extends string | number>({
 function GuildPolicySection() {
   const ledger = useStore((s) => guildView(s));
   const actingId = useStore((s) => actingIdOf(s));
-  const sample = useStore((s) => s.guildSample !== null);
   const save = useStore((s) => s.guildSetPolicy);
   const current = policyOf(ledger);
   // Only what the lead has changed is held here; every other field reads the
@@ -185,11 +200,6 @@ function GuildPolicySection() {
   ];
   return (
     <div className="space-y-6 max-w-2xl">
-      {sample && (
-        <Callout kind="warn" title="Sample team: invented people">
-          A change made now applies to the sample alone, and goes when the sample is hidden.
-        </Callout>
-      )}
       {ledger.people.length === 0 && (
         <p className="text-body text-ink-soft">
           Nobody is on Guild&rsquo;s ledger yet, so the gate holds nothing. The first person added is the lead, who sets these.
@@ -266,9 +276,11 @@ function AppearanceSection() {
   const theme = useStore((s) => s.ui.theme);
   const density = useStore((s) => s.ui.density);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
-  const simSpeed = useStore((s) => s.ui.simSpeed);
   const setUI = useStore((s) => s.setUI);
-  const records = useStore((s) => s.records);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The preview draws the first records whose program shows (OF-BLD-016 §2.2).
+  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
   const previewRecords = records.slice(0, 3);
 
   const [systemReduced] = useState(() =>
@@ -347,7 +359,9 @@ function AppearanceSection() {
                       className="px-1 text-caption text-ink-soft"
                       style={{ height: 'var(--row-h)' }}
                     >
-                      No records loaded in this session.
+                      {allRecords.length > records.length
+                        ? 'No values in the active programs yet. Values in archived programs are hidden; Settings → Programs shows them.'
+                        : 'No records loaded in this session.'}
                     </td>
                   </tr>
                 ) : (
@@ -399,34 +413,108 @@ function AppearanceSection() {
         </Card>
       </section>
 
+    </div>
+  );
+}
+
+// ── programs (OF-BLD-016 §2.1, §2.2, E.1′) ───────────────────────────────
+//
+// The programs are data (src/data/programs.ts); this section lists them and
+// holds the one switch. Off, the default, an archived program's papers,
+// values, strains, molecules, scenarios, protocols, runbooks, lessons and
+// suggested questions leave every list, count and prompt; on, everything
+// shows as it did before programs existed. Nothing is deleted either way
+// (D1), and a link to an archived entity opens it under a banner. The switch
+// is in the Durable tier, so it survives a reload; clearing this browser's
+// data turns it off, because the shipped state hides archived programs.
+
+/** "threads A to O", "thread Q": a program's letters, written out. */
+function lettersLabel(letters: readonly string[]): string {
+  const l = [...letters].sort();
+  return l.length === 1 ? `thread ${l[0]}` : `threads ${l[0]} to ${l[l.length - 1]}`;
+}
+
+function ProgramsSection() {
+  const showArchived = useStore((s) => s.showArchived);
+  const setShowArchived = useStore((s) => s.setShowArchived);
+  const archived = PROGRAMS.filter((p) => p.status === 'archived');
+
+  return (
+    <div className="space-y-6" data-testid="settings-programs">
       <section>
-        <SectionTitle
-          right={
-            <span className="text-caption text-ink-soft inline-flex items-center gap-1.5">
-              <Gauge size={13} aria-hidden /> rehearsal clock
+        <SectionTitle>Programs</SectionTitle>
+        <ul className="space-y-2">
+          {PROGRAMS.map((p) => (
+            <li key={p.id}>
+              <Card className="p-3" data-program={p.id} data-program-status={p.status}>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="font-serif text-section-title font-semibold">{p.name}</span>
+                  <span className="text-caption uppercase tracking-wide text-ink-soft">
+                    {lettersLabel(p.letters)}
+                  </span>
+                  <span
+                    className={cx(
+                      'chip text-[11px] py-0',
+                      p.status === 'active'
+                        ? 'border-accent/40 text-accent'
+                        : 'border-line text-ink-soft',
+                    )}
+                  >
+                    {p.status === 'active' ? 'Active' : 'Archived'}
+                  </span>
+                </div>
+                <p className="text-body text-ink-soft mt-1 max-w-3xl">{p.summary}</p>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <SectionTitle>Archived programs and examples</SectionTitle>
+        <Card className="p-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-checked={showArchived}
+              className="mt-1 shrink-0"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              data-testid="show-archived"
+            />
+            <span>
+              <span className="block text-body font-medium">Show archived programs and examples</span>
+              <span className="block text-caption text-ink-soft mt-0.5 max-w-3xl">
+                When it is off,{' '}
+                {archived.length === 0 ? 'nothing is hidden, because no program is archived' : (
+                  <>
+                    the papers, values, strains, molecules, scenarios, protocols, runbooks, lessons
+                    and suggested questions of{' '}
+                    {archived.map((p, i) => (
+                      <span key={p.id}>
+                        {i > 0 && (i === archived.length - 1 ? ' and ' : ', ')}
+                        <span className="text-ink">{p.name}</span>
+                      </span>
+                    ))}{' '}
+                    leave every list, count and prompt
+                  </>
+                )}
+                . When it is on, everything shows as before. Nothing is deleted either way, and a
+                link to something archived still opens it, under a note that names its program.
+              </span>
+              <span className="block text-caption text-ink-soft mt-1 max-w-3xl" data-testid="show-archived-examples">
+                The same switch shows the examples: the seed runbooks, protocols, scenarios and lessons that
+                describe a run nobody made. They are kept to show the shape of a run, never as a record of one.
+              </span>
             </span>
-          }
-        >
-          Simulation speed
-        </SectionTitle>
-        <RadioCards<number>
-          name="simspeed"
-          label="Simulation speed"
-          value={simSpeed}
-          onChange={(v) => setUI({ simSpeed: v })}
-          className="sm:grid-cols-3"
-          options={[
-            { value: 1, label: '1× — real time', desc: 'Stages and timers run at their authored durations.' },
-            { value: 4, label: '4× — rehearsal', desc: 'Four times faster. Useful when walking someone through a flow.' },
-            { value: Infinity, label: 'Instant', desc: 'Jobs land immediately; run timers burn at 60× so a soak finishes on stage.' },
-          ]}
-        />
-        <p className="text-caption text-ink-soft mt-2 max-w-3xl">
-          This scales <span className="font-medium text-ink">simulated latency only</span> — ingest
-          stages, extraction and solver jobs, and Deposition timers. It changes nothing about the
-          numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so a
-          demo audience is never misled about how fast the real thing would be.
-        </p>
+          </label>
+          <div className="text-caption text-ink-soft mt-2 pt-2 border-t border-line" data-testid="show-archived-state">
+            {showArchived
+              ? 'Archived programs and examples are showing everywhere. The setting is kept in this browser across reloads.'
+              : 'Archived programs and examples are hidden. The setting is kept in this browser across reloads.'}
+          </div>
+        </Card>
       </section>
     </div>
   );
@@ -679,17 +767,25 @@ function UnitsSection() {
 // ── corpus (owner) ─────────────────────────────────────────────────────
 
 function CorpusSection() {
-  const papers = useStore((s) => s.papers);
-  const records = useStore((s) => s.records);
+  const allPapers = useStore((s) => s.papers);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The ontology and gold-set counts are of the papers and values whose
+  // program shows (OF-BLD-016 §2.2). The reset dialog below counts the whole
+  // store, because a reset restores all of it, archived programs included.
+  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
+  const visibleRecords = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
+  const records = allRecords;
+  const archivedHidden = papers.length < allPapers.length || visibleRecords.length < allRecords.length;
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
-  const resetDemo = useStore((s) => s.resetDemo);
+  const clearBrowserData = useStore((s) => s.clearBrowserData);
   const depositions = useStore((s) => s.depositions);
   const [confirm, setConfirm] = useState(false);
   const reviewer = useStore((s) => s.reviewer);
   const setReviewerName = useStore((s) => s.setReviewerName);
 
-  const gold = useMemo(() => records.filter((r) => r.gold), [records]);
+  const gold = useMemo(() => visibleRecords.filter((r) => r.gold), [visibleRecords]);
   const goldPapers = useMemo(() => new Set(gold.map((r) => r.paperId)).size, [gold]);
   const goldByField = useMemo(() => {
     const m = new Map<FieldId, number>();
@@ -701,8 +797,8 @@ function CorpusSection() {
   return (
     <div className="space-y-6">
       <Callout kind="info" title="Owner view">
-        You are signed in as the demo curator, who owns this deployment. Everything on this panel
-        edits the corpus for the whole session; there is no second reviewer to undo it for you.
+        This panel is the owner&rsquo;s. Everything on it edits the corpus for the whole session; there is
+        no second reviewer to undo it for you.
       </Callout>
 
       <section>
@@ -725,7 +821,7 @@ function CorpusSection() {
             <code className="font-mono text-caption">core/data/biorepo.json</code>, which is
             committed. A record is only verified when a named person promoted it against a sentence
             in the paper&rsquo;s own text — so the service refuses a decision signed by nobody, or
-            by a placeholder like &ldquo;you&rdquo;. The name is kept in this browser and is not
+            by a word like &ldquo;you&rdquo; that names nobody. The name is kept in this browser and is not
             sent anywhere except with a decision.
           </p>
         </Card>
@@ -755,9 +851,19 @@ function CorpusSection() {
             </div>
             <div>
               <div className="text-caption uppercase tracking-wide text-ink-soft">Records</div>
-              <div className="font-num text-display leading-tight">{records.length}</div>
+              <div className="font-num text-display leading-tight">{visibleRecords.length}</div>
             </div>
           </div>
+          {archivedHidden && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="corpus-archived-hidden">
+              Counted over the active programs. Papers and values in archived programs are kept and
+              hidden;{' '}
+              <a className="text-accent hover:underline" href="#/settings/programs">
+                Settings → Programs
+              </a>{' '}
+              shows them again.
+            </p>
+          )}
           <p className="text-body text-ink-soft mt-3 max-w-3xl">
             Every extracted value is typed to one of these fields, converted to the field's
             canonical unit, and range-checked at entry. Extending the ontology is a schema change,
@@ -804,7 +910,17 @@ function CorpusSection() {
           Gold set
         </SectionTitle>
         <Card className="p-3">
-          {gold.length === 0 ? (
+          {gold.length === 0 && archivedHidden && allRecords.some((r) => r.gold) ? (
+            <div className="text-body text-ink-soft">
+              No value in the active programs is flagged for the gold set yet. The gold set&rsquo;s
+              values sit in archived programs, which are hidden;{' '}
+              <a className="text-accent hover:underline" href="#/settings/programs">
+                Settings → Programs
+              </a>{' '}
+              shows them again. Flag a value with <span className="kbd">g</span> in the review queue
+              and it joins the baseline immediately.
+            </div>
+          ) : gold.length === 0 ? (
             <div className="text-body text-ink-soft">
               No records are flagged for the gold set, and none ship flagged: a gold annotation
               has to be made against the paper's own words, and no full text has been retrieved.
@@ -864,22 +980,22 @@ function CorpusSection() {
       </section>
 
       <section>
-        <SectionTitle>Demo data</SectionTitle>
+        <SectionTitle>This browser&rsquo;s data</SectionTitle>
         <Card className="p-3">
           <p className="text-body text-ink-soft max-w-3xl">
-            Review decisions, edits, runs, new protocol versions and duplicated scenarios all live
-            in this browser tab only. Resetting puts the corpus back to the state it shipped in, so
-            the next walkthrough starts clean.
+            Depositions, review decisions, runbook locks, lessons finished, Postdoc&rsquo;s conversations
+            and Guild entries the service has not stored yet are kept in this browser (the Durable tier).
+            Clearing them leaves what the service keeps untouched.
           </p>
           <div className="mt-3">
             <Button onClick={() => setConfirm(true)}>
-              <RotateCcw size={13} /> Reset demo data
+              <RotateCcw size={13} /> Clear this browser&rsquo;s data
             </Button>
           </div>
         </Card>
       </section>
 
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="Reset demo data">
+      <Modal open={confirm} onClose={() => setConfirm(false)} title="Clear this browser’s data">
         <p className="text-body">
           Restores all <span className="font-num">{SEEDED.records}</span> records,{' '}
           <span className="font-num">{SEEDED.protocols}</span> protocols, and{' '}
@@ -905,11 +1021,11 @@ function CorpusSection() {
           <Button
             variant="primary"
             onClick={() => {
-              resetDemo();
+              clearBrowserData();
               setConfirm(false);
             }}
           >
-            <RotateCcw size={13} /> Reset demo data
+            <RotateCcw size={13} /> Clear this browser&rsquo;s data
           </Button>
         </div>
       </Modal>
@@ -1001,7 +1117,7 @@ function ExportSection() {
         <SectionTitle
           right={
             <span className="chip text-signal-warn border-signal-warn/40">
-              Not active in this demo
+              Not active in this build
             </span>
           }
         >
@@ -1023,10 +1139,10 @@ function ExportSection() {
                 aria-describedby="api-key-note"
               />
               <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" disabled title="Not active in this demo">
+                <Button size="sm" disabled title="Not active in this build">
                   Generate key
                 </Button>
-                <Button size="sm" disabled title="Not active in this demo">
+                <Button size="sm" disabled title="Not active in this build">
                   Revoke all
                 </Button>
               </div>
@@ -1046,7 +1162,7 @@ function ExportSection() {
 
 // ── about / colophon ───────────────────────────────────────────────────
 
-type Fidelity = 'Full' | 'Scripted' | 'Visual';
+type Fidelity = 'Full' | 'Authored' | 'Visual';
 
 /** `fidelity` carries the full honest phrase; `fidelityKind` reduces it to a badge colour. */
 const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
@@ -1125,20 +1241,15 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Protocol editor',
-    fidelity: 'Full for edit and reorder, scripted for validation edge cases',
+    fidelity: 'Full for edit and reorder, authored for validation edge cases',
     notes:
       'Editing, reordering and saving a new version are real; the validation warnings for pathological edits are authored examples.',
   },
   {
     feature: 'Simulation results',
-    fidelity: 'Full interpolation over scripted precomputed grids',
+    fidelity: 'Full interpolation over authored precomputed grids',
     notes:
       'Multilinear interpolation across an authored cost-model sweep. The interpolation is real; the cost model is invented.',
-  },
-  {
-    feature: 'Simulation converging job feel',
-    fidelity: 'Scripted',
-    notes: 'Solver stages and their durations follow an authored timeline. Nothing is iterating.',
   },
   {
     feature: 'Scenario compare',
@@ -1146,28 +1257,16 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     notes: 'Deltas, shared assumptions and divergences are computed from the pinned scenarios.',
   },
   {
-    feature: 'Agent chat — scripted mode',
-    fidelity: 'Scripted',
-    notes:
-      'Plans, tool calls and answers come from authored flows matched to the question. The same question always gives the same answer.',
-  },
-  {
-    feature: 'Agent chat — live mode',
+    feature: 'Agent chat',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down a question says so; nothing scripted answers in its place.',
-  },
-  {
-    feature: 'Retrieval inspector and tool traces',
-    fidelity: 'Scripted, mirroring the flow’s actual data',
-    notes:
-      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — the curator’s note for an entry the service has not fetched, the paper’s own words for one it has.',
+      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down Postdoc says so and how to start it, and keeps the conversations and the typed question; nothing answers in its place.',
   },
   {
     feature: 'Ingest pipeline',
-    fidelity: 'Scripted',
+    fidelity: 'Full for Fetch and Parse, through the service when it is running',
     notes:
-      'Fetch, parse, chunk, embed and extract are timed stages over entries already present in the build, including one authored parse failure. No document is retrieved and no text is added: every entry is still catalogued when the run finishes.',
+      'With the service running, Fetch asks Europe PMC for a paper\u2019s open-access text and Parse cuts it into sections, on the machine that runs the service; the text stays there and never enters the build. Extraction is its own step. With the service down, a fetch stops at its first stage and says the service is not running; nothing is retrieved.',
   },
   {
     feature: 'Learn lessons and checkpoints',
@@ -1182,13 +1281,14 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Jobs tray',
-    fidelity: 'Full over scripted job timelines',
-    notes: 'Progress, failure surfacing and completion toasts are real; stage durations are authored.',
+    fidelity: 'Full for fetches and extractions',
+    notes:
+      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations set in the browser, not on work done.',
   },
   {
     feature: 'Authentication, API keys, sharing',
     fidelity: 'Visual',
-    notes: 'One demo identity. No accounts, no tokens, no sharing, no server.',
+    notes: 'One identity: the reviewer name set in Settings, a claim and not a sign-in. No accounts, no tokens, no sharing.',
   },
   {
     feature: 'Real PDF rendering',
@@ -1200,22 +1300,28 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
 
 const FIDELITY_STYLE: Record<Fidelity, string> = {
   Full: 'text-accent border-accent/45',
-  Scripted: 'text-signal-info border-signal-info/45',
+  Authored: 'text-signal-info border-signal-info/45',
   Visual: 'text-signal-warn border-signal-warn/45',
 };
 
 function fidelityKind(f: string): Fidelity {
   if (f.startsWith('Full')) return 'Full';
-  if (f.startsWith('Scripted')) return 'Scripted';
+  if (f.startsWith('Authored')) return 'Authored';
   return 'Visual';
 }
 
 function AboutSection() {
-  const papers = useStore((s) => s.papers);
-  const records = useStore((s) => s.records);
+  const allPapers = useStore((s) => s.papers);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The colophon counts what shows: with archived programs hidden it counts
+  // the active ones, and says so (OF-BLD-016 §2.2).
+  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
+  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
+  const archivedHidden = papers.length < allPapers.length || records.length < allRecords.length;
 
   const counts = useMemo(() => {
-    const c: Record<Fidelity, number> = { Full: 0, Scripted: 0, Visual: 0 };
+    const c: Record<Fidelity, number> = { Full: 0, Authored: 0, Visual: 0 };
     for (const r of FIDELITY_ROWS) c[fidelityKind(r.fidelity)]++;
     return c;
   }, []);
@@ -1252,6 +1358,15 @@ function AboutSection() {
     <div className="space-y-6">
       <section>
         <SectionTitle>Colophon</SectionTitle>
+        {archivedHidden && (
+          <p className="text-caption text-ink-soft mb-2" data-testid="about-archived-hidden">
+            The counts below are of the active programs. Archived programs are kept and hidden;{' '}
+            <a className="text-accent hover:underline" href="#/settings/programs">
+              Settings → Programs
+            </a>{' '}
+            shows them again.
+          </p>
+        )}
         <Callout kind="warn" title="Read this before you believe a number on this site">
           <ul className="space-y-1.5 mt-1">
             <li>
@@ -1268,40 +1383,45 @@ function AboutSection() {
               <span className="font-num">{corpus.verify}</span> are flagged for verification.
             </li>
             <li>
-              <span className="font-medium">Every entry is catalogued, not ingested.</span> No full
-              text has been retrieved. Each entry is metadata plus a hand-written curator note, so a
-              highlighted extraction span anchors to the curator&rsquo;s prose, not to the
-              paper&rsquo;s own words. Of the{' '}
-              <span className="font-num">{records.length}</span> extraction records,{' '}
-              <span className="font-num">{prov.curated}</span> are curated: transcribed from the
-              curation document and not yet checked against the source PDF. The remaining{' '}
+              <span className="font-medium">The build carries no paper&rsquo;s full text.</span>{' '}
+              A hand-curated entry is metadata plus a curator&rsquo;s note, so a span highlighted on
+              it anchors to the curator&rsquo;s prose. With the service running, Intake fetches
+              open-access full text onto that machine, where extraction and search read it; it never
+              enters the build. Of the <span className="font-num">{records.length}</span> extraction
+              records showing, <span className="font-num">{prov.curated}</span> are curated:
+              transcribed from the curation document and not yet checked against the source PDF;{' '}
               <span className="font-num">{prov.estimate}</span> are industry estimates, which are
-              not evidence. Read a value against its source before you cite it.
+              not evidence; and <span className="font-num">{records.length - prov.curated - prov.estimate}</span>{' '}
+              carry another provenance, shown on each by its badge. Read a value against its source
+              before you cite it.
             </li>
             <li>
-              <span className="font-medium">No extractor has ever been run.</span> There is no
-              extractor output in this build, so no precision, recall or F1 figure appears anywhere.
-              Validation shows the gold set that is planned, the difficulty cases it has to include,
-              and the values the ontology cannot yet hold — and states that nothing has been scored.
+              <span className="font-medium">The extractor runs in the service, not here.</span>{' '}
+              What it extracts arrives as unverified candidates, each anchored to a sentence of a
+              fetched paper, and waits for a reviewer in Guild. Witness scores a run against the
+              curated records on the papers it fetched and labels the figures provisional; with the
+              service down, or before any run, it shows no figure.
             </li>
             <li>
-              <span className="font-medium">Session state is held in memory only.</span> Reviews,
-              edits, runs, new protocol versions and chat history live in this browser tab and are
-              gone on refresh. There is no database, no account and no server; exporting a CSV is
-              the only way anything leaves.
+              <span className="font-medium">What you do here is kept in this browser.</span>{' '}
+              Depositions, review decisions, runbook locks, the lessons finished here, Postdoc&rsquo;s
+              conversations, this browser&rsquo;s copy of Guild&rsquo;s ledger and the program switch
+              survive a refresh.
+              With the service running, a review decision is also written to the service&rsquo;s
+              files on its machine. There is no account and no sign-in.
             </li>
             <li>
               <span className="font-medium">Simulation economics are illustrative.</span> The cost
-              models are authored spreadsheets swept over a grid — Demo model v0, illustrative
+              models are authored spreadsheets swept over a grid — cost model v0, illustrative
               economics, not validated. This is the part of the build that really is synthetic.
               Treat a minimum selling price here as a shape to reason about, never as a number to
               plan against.
             </li>
             <li>
-              <span className="font-medium">Scripted answers are written, not generated.</span>{' '}
-              In scripted mode, plans, tool calls and answer prose come from authored flows matched
-              to the question, so the same question always returns the same answer. Live mode is a
-              real model call through openferment-core and is labelled as such.
+              <span className="font-medium">Postdoc answers only through the service.</span>{' '}
+              Every answer is a real model call through openferment-core, and every value in it is
+              rendered from the record it cites. With the service down Postdoc says so and how to
+              start it; nothing answers in its place.
             </li>
           </ul>
         </Callout>
@@ -1333,9 +1453,9 @@ function AboutSection() {
             <span className="font-num">{counts.Full}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="chip text-signal-info border-signal-info/45">Scripted</span>
-            follows an authored timeline or answer —{' '}
-            <span className="font-num">{counts.Scripted}</span>
+            <span className="chip text-signal-info border-signal-info/45">Authored</span>
+            is written into the build by hand, not computed —{' '}
+            <span className="font-num">{counts.Authored}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-warn border-signal-warn/45">Visual</span>
@@ -1407,15 +1527,14 @@ function AboutSection() {
             named reviewer decides; Witness scores that run.
           </Row>
           <Row label="Agent">
-            Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
-            flows and no model is called. Live: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
-            Sonnet 5.5 as fallback by default), values rendered from the cited records.
+            One path: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
+            Sonnet 5.5 as fallback by default), values rendered from the cited records. With the
+            service down it says so, and nothing answers in its place.
           </Row>
           <Row label="Retrieval">
-            Local lexical scorer over the section text held in the build — the curator&rsquo;s note
-            for an entry the service has not fetched, the paper&rsquo;s own words for one it has. No
-            embedding model, no vector store; the &ldquo;Embed&rdquo; stage in ingest is a timed
-            animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
+            In the service: passages cut from the fetched papers, searched by the lane the service
+            names (BioRepo &rarr; Search, Witness &rarr; Retrieval). The browser holds no index; the
+            &ldquo;Embed&rdquo; stage in the offline ingest board is a timed animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
             one structured response per paper for the candidates.
           </Row>
           <Row label="Storage">
@@ -1424,9 +1543,9 @@ function AboutSection() {
             decisions, runbook locks and Postdoc&rsquo;s Live conversations — is written to
             IndexedDB in this browser, because a fermentation at hour 14 with timers running cannot
             be lost to a page reload, and neither can a question somebody is halfway through. Everything
-            else is memory only and resets: open panels, density, theme, simulation speed. No
+            else is memory only and resets: open panels, density, theme. No
             localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
-            browser. &ldquo;Reset demo data&rdquo; clears the durable store as well as memory.
+            browser. &ldquo;Clear this browser&rsquo;s data&rdquo; clears the durable store as well as memory.
           </Row>
           <Row label="Type">
             <span className="inline-flex items-center gap-1.5">
@@ -1476,6 +1595,7 @@ export default function Settings({ section }: { section: string }) {
                     )}
                   >
                     {s.id === 'appearance' && <Sun size={14} aria-hidden />}
+                    {s.id === 'programs' && <Layers size={14} aria-hidden />}
                     {s.id === 'units' && <Ruler size={14} aria-hidden />}
                     {s.id === 'corpus' && <Database size={14} aria-hidden />}
                     {s.id === 'guild' && <ShieldCheck size={14} aria-hidden />}
@@ -1497,6 +1617,7 @@ export default function Settings({ section }: { section: string }) {
 
         <div className="min-w-0">
           {active === 'appearance' && <AppearanceSection />}
+          {active === 'programs' && <ProgramsSection />}
           {active === 'units' && <UnitsSection />}
           {active === 'corpus' && <CorpusSection />}
           {active === 'guild' && <GuildPolicySection />}

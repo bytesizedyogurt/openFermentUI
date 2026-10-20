@@ -267,3 +267,195 @@ def test_a_refused_key_still_makes_the_lane_unavailable(index, monkeypatch):
     ))
     report = rageval.evaluate(ask=unavailable, lanes=["bm25+expand"])
     assert not report.lanes[0].available and report.lanes[0].refused == 0
+
+
+# ── one thread (OF-BLD-016 §4.1) ───────────────────────────────────────
+# The scorecard rerun on thread Q alone: its questions drawn from thread Q's
+# papers, while every search still runs over the whole index. STAND-IN text.
+
+THREAD_TEXTS = {
+    "Q1": ["The yeast culture converted the glucose feed into ethanol over the course of the batch, and the broth "
+           "was sampled at each stage so that sugar and product could be followed together across the whole run of "
+           "the fermentation in the stirred vessel."],
+    "Q2": ["Biomass formation slowed once the alcohol accumulated in the medium, which the authors attribute to "
+           "inhibition of growth by the product itself; the effect was followed by optical density in every flask "
+           "and compared between the two strains they grew."],
+    "P1": ["The bacterium stored the polyester inside its cells when nitrogen ran short, and granules were seen "
+           "under the microscope by the end of the cultivation on the pretreated straw hydrolysate that the group "
+           "prepared in its own pilot unit beforehand."],
+    "B5": ["The alga secreted the reporter protein into the medium when grown on acetate in the light, and the "
+           "protein was recovered from the supernatant after the cells were removed by gentle centrifugation at the "
+           "end of each culture in the shaken flasks."],
+}
+
+
+@pytest.fixture()
+def thread_index(monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(intake, "FULLTEXT_DIR", tmp_path / "fulltext")
+    monkeypatch.setattr(passages, "_papers_meta", lambda: {})
+    monkeypatch.setattr(passages, "_LOADED", None)
+    (tmp_path / "fulltext").mkdir()
+    for pid, sentences in THREAD_TEXTS.items():
+        r = FetchResult(paperId=pid, pmcid=None, status="complete", fetchedAt="2026-10-20T00:00:00Z",
+                        sections=[FetchedSection(id=f"s{n}", heading="Results", text=t) for n, t in enumerate(sentences, start=1)])
+        (tmp_path / "fulltext" / f"{pid}.json").write_text(r.model_dump_json(), encoding="utf-8")
+    passages.build()
+    return tmp_path
+
+
+def test_a_paper_is_on_a_thread_when_its_id_is_the_letter_then_a_number():
+    assert rageval.on_thread("Q1", "Q") and rageval.on_thread("Q22", "Q") and rageval.on_thread("H4", "H")
+    for pid in ("P1", "QX1", "Q", "Q1a", "AQ1", ""):
+        assert not rageval.on_thread(pid, "Q"), pid
+    assert rageval.on_thread("P3", None), "no thread: every paper, as before"
+
+
+def _asking(asked: list[str]):
+    def ask(**kw):
+        ids = [line[1:].split("]")[0] for line in kw["user"].splitlines() if line.startswith("[")]
+        asked.extend(ids)
+        return llm.Result(data={"questions": [{"passageId": i, "question": "Which feed suits this organism best?"} for i in ids]},
+                          model="claude-haiku-5-5", usage=Usage(costUsd=0.0001))
+    return ask
+
+
+def test_written_questions_on_a_thread_sample_only_its_passages(thread_index):
+    asked: list[str] = []
+    meta = rageval.write_questions(10, ask=_asking(asked), thread="Q")
+    assert asked and {a.split(":")[0] for a in asked} == {"Q1", "Q2"}
+    assert meta["thread"] == "Q" and meta["asked"] == len(asked) == 2
+    qs, saved = rageval.read_s("Q")
+    assert {q.relevant[0].split(":")[0] for q in qs} == {"Q1", "Q2"} and saved["thread"] == "Q"
+
+
+def test_written_questions_on_a_thread_leave_the_set_for_every_paper_alone(thread_index):
+    asked: list[str] = []
+    every = rageval.write_questions(10, ask=_asking(asked))
+    assert {a.split(":")[0] for a in asked} == set(THREAD_TEXTS), "no thread: every paper, as before"
+    assert "thread" not in every
+    before = (thread_index / "rageval" / "questions.jsonl").read_text(encoding="utf-8")
+    rageval.write_questions(10, ask=_asking([]), thread="Q")
+    assert (thread_index / "rageval" / "questions.jsonl").read_text(encoding="utf-8") == before
+    qs, _ = rageval.read_s()
+    assert len(qs) == every["kept"] == 4
+    assert len(rageval.read_s("Q")[0]) == 2
+
+
+def test_a_thread_with_no_passage_writes_nothing(thread_index):
+    with pytest.raises(ValueError, match="thread Z"):
+        rageval.write_questions(10, ask=_asking([]), thread="Z")
+    assert not (thread_index / "rageval" / "questions-Z.jsonl").exists()
+
+
+THREAD_ITEMS = [
+    {"id": "cl1-Q1-aaaaaaaa", "paperId": "Q1", "field": "ethanol_titre", "quote": "converted the glucose feed into ethanol",
+     "strainId": "s-cerevisiae-s288c", "carbonSource": "glucose", "source": "candidate"},
+    {"id": "r-Q2-test", "paperId": "Q2", "field": "ethanol_inhibition_ki", "quote": "inhibition of growth by the product itself",
+     "strainId": "s-cerevisiae-s288c", "source": "seed"},
+    {"id": "cl1-P1-bbbbbbbb", "paperId": "P1", "field": "pha_content", "quote": "stored the polyester inside its cells",
+     "strainId": "c-necator-h16", "source": "candidate"},
+    {"id": "r-B5-test", "paperId": "B5", "field": "titer_secreted", "quote": "secreted the reporter protein into the medium",
+     "strainId": "cw15", "source": "seed"},
+]
+
+
+@pytest.fixture()
+def thread_pool(thread_index, monkeypatch):
+    from types import SimpleNamespace
+
+    from openferment_core import corpus, evidence_pool
+
+    monkeypatch.setattr(evidence_pool, "load", lambda **kw: SimpleNamespace(records=THREAD_ITEMS))
+    monkeypatch.setattr(corpus, "load_corpus", lambda: SimpleNamespace(records_by_id={i["id"]: i for i in THREAD_ITEMS if i["source"] == "seed"}))
+    monkeypatch.setattr(rageval, "_corpus_extras", lambda: ({"ethanol_titre": "Ethanol titre (g L-1)", "ethanol_inhibition_ki": "Ethanol inhibition constant (g L-1)",
+                                                             "pha_content": "PHA content (%)", "titer_secreted": "Secreted titer (g L-1)"}, {}))
+    return thread_index
+
+
+def test_k_on_a_thread_holds_only_that_threads_items(thread_pool):
+    sets, infos = rageval.build_sets(thread="Q")
+    assert sorted(i for q in sets["K"] for i in q.source["items"]) == ["cl1-Q1-aaaaaaaa", "r-Q2-test"]
+    assert all(r.split(":")[0] in {"Q1", "Q2"} for q in sets["K"] for r in q.relevant)
+    k = next(i for i in infos if i.name == "K")
+    assert k.questions == 2 and "thread Q" in k.note and "1 records and 1 anchored candidates" in k.note
+    # The authored flows cite no thread Q record: F is empty, and says so.
+    f = next(i for i in infos if i.name == "F")
+    assert sets["F"] == [] and f.questions == 0 and "thread Q" in f.note
+    # No thread: every item, as before.
+    every, every_infos = rageval.build_sets()
+    assert len(every["K"]) == 4 and "thread" not in next(i for i in every_infos if i.name == "K").note
+
+
+def test_eval_on_a_thread_reads_that_threads_written_questions(thread_pool):
+    rageval.write_questions(10, ask=_asking([]))
+    rageval.write_questions(10, ask=_asking([]), thread="Q")
+    on_q, infos = rageval.build_sets(thread="Q")
+    assert len(on_q["S"]) == 2 and all(q.relevant[0].split(":")[0] in {"Q1", "Q2"} for q in on_q["S"])
+    s = next(i for i in infos if i.name == "S")
+    assert "thread Q" in s.note and "2 kept of 2 asked" in s.note
+    assert len(rageval.build_sets()[0]["S"]) == 4
+
+
+def test_the_report_carries_its_thread_and_retrieval_searches_every_paper(thread_index, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    seen: dict = {}
+
+    def sets(thread=None):
+        seen["thread"] = thread
+        return {"K": [rageval.Question("K1", "K", "alcohol inhibits growth of the yeast", ["Q2:s1:0"])], "S": [], "F": []}, []
+
+    monkeypatch.setattr(rageval, "build_sets", sets)
+    report = rageval.evaluate(lanes=["bm25"], thread="Q")
+    assert seen["thread"] == "Q" and report.thread == "Q"
+    assert report.papersIndexed == 4, "the index searched is the whole one"
+    rageval.save(report)
+    assert rageval.read_report().thread == "Q"
+    config = json.loads((thread_index / "index" / "config.json").read_text())
+    assert config["thread"] == "Q" and config["lane"] == report.chosenLane
+    # Without one, nothing names a thread.
+    plain = rageval.evaluate(lanes=["bm25"])
+    assert plain.thread is None
+    rageval.save(plain)
+    assert "thread" not in json.loads((thread_index / "index" / "config.json").read_text())
+
+
+def test_the_command_line_takes_a_thread(monkeypatch):
+    import dotenv
+
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)
+    calls: list = []
+    monkeypatch.setattr(rageval, "write_questions", lambda n, thread=None: calls.append(("questions", n, thread)) or {"kept": 0, "asked": 0, "discarded": {}, "costUsd": 0.0})
+    monkeypatch.setattr(rageval, "evaluate", lambda thread=None: calls.append(("eval", thread)) or "report")
+    monkeypatch.setattr(rageval, "save", lambda report: None)
+    monkeypatch.setattr(rageval, "_print", lambda report: None)
+    assert rageval.main(["questions", "--n", "100", "--thread", "Q"]) == 0
+    # pnpm may pass its own "--" through.
+    assert rageval.main(["eval", "--", "--thread", "Q"]) == 0
+    assert rageval.main(["questions"]) == 0 and rageval.main(["eval"]) == 0
+    assert calls == [("questions", 100, "Q"), ("eval", "Q"), ("questions", 200, None), ("eval", None)]
+    assert rageval.main(["eval", "--thread", "q1"]) == 2 and rageval.main(["eval", "--thread"]) == 2
+    assert len(calls) == 4
+
+
+def test_the_report_says_which_lane_search_runs_on_when_a_person_holds_it_apart(index, monkeypatch):
+    """OF-BLD-016 §4.1: the rule may choose a lane a person has not adopted
+    (tonight: bm25+rerank, a model call of about twenty seconds a search,
+    held off for the meeting). Witness must say which lane search runs on,
+    from config.json, beside the rule's choice, never one for the other."""
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(rageval, "build_sets", lambda: (
+        {"K": [rageval.Question("K1", "K", "secreted titre xylose", ["X1:s1:0"])], "S": [], "F": []},
+        [],
+    ))
+    rageval.save(rageval.evaluate())
+    config = index / "index" / "config.json"
+    held = json.loads(config.read_text())
+    held["lane"] = "hybrid"
+    config.write_text(json.dumps(held))
+    body = TestClient(api.app, base_url="http://127.0.0.1").get("/api/rag/report").json()
+    assert body["chosenLane"] == "bm25" and body["laneInUse"] == "hybrid"

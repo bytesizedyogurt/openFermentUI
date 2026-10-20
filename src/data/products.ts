@@ -1,4 +1,4 @@
-// The molecule catalogue (OF-BLD-005 §3) — 117 products across 11 categories,
+// The molecule catalogue (OF-BLD-005 §3) — every product across 11 categories,
 // and two PHA products in a twelfth (OF-BLD-014 §2.2), every one of them
 // modeled rather than measured.
 //
@@ -1551,6 +1551,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'beta-lactoglobulin',
+    program: 'casein',
     name: 'Beta-lactoglobulin',
     aliases: ['BLG'],
     category: 'food_protein',
@@ -2813,6 +2814,7 @@ export const PRODUCTS: Product[] = [
   // proteins and small molecules above, so it opens its own process family.
   {
     id: 'phb',
+    program: 'pha',
     name: 'Polyhydroxybutyrate (PHB)',
     aliases: ['PHB', 'P3HB', 'poly(3-hydroxybutyrate)'],
     category: 'biopolymer',
@@ -2832,6 +2834,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'mcl-pha',
+    program: 'pha',
     name: 'Medium-chain-length PHA',
     aliases: ['mcl-PHA', 'PHA (mcl)'],
     category: 'biopolymer',

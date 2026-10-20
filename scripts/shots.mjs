@@ -73,8 +73,8 @@ try {
     page.on('pageerror', (e) => errors.push(e.message));
     try {
       await page.goto(`${url}/#${route}`, { waitUntil: 'networkidle' });
-      // Settled: no request in flight, fonts loaded, and the screen's own
-      // simulated latency (src/sim/latency.ts) given time to resolve.
+      // Settled: no request in flight, fonts loaded, and a moment for the
+      // screen's own effects (charts measuring themselves, scroll-to-span).
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(1200);
       await page.waitForLoadState('networkidle');

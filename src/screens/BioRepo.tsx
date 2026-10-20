@@ -1,18 +1,17 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
 // in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BookMarked,
   Download,
-  FolderPlus,
   Layers,
   Loader2,
-  Wand2,
   X,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ProvenanceLegend, Tick, type ProvKind } from '@/components/Provenance';
@@ -23,12 +22,9 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
-  Popover,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
 import { SubsystemShelf } from '@/components/ReferenceView';
@@ -96,12 +92,6 @@ function authorLabel(authors: string[]): string {
   return `${authors[0]}, ${authors[1]} et al.`;
 }
 
-function nowStamp(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
   if (items.length === 0) return <span className="text-ink-soft">—</span>;
   const shown = items.slice(0, max);
@@ -122,30 +112,41 @@ function TagList({ items, max = 2 }: { items: string[]; max?: number }) {
   );
 }
 
+/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
+function archivedNames(paperIds: string[]): string {
+  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
+  return PROGRAMS.filter((p) => hit.has(p.id))
+    .map((p) => p.name)
+    .join(' and ');
+}
+
 export default function BioRepo() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
-  const collections = useStore((s) => s.collections);
+  const allCollections = useStore((s) => s.collections);
+  // OF-BLD-016 §2.2: every paper, record, collection and count on this
+  // screen passes through the one program filter. With archived programs
+  // hidden (the default) a casein or PHA paper is not listed, not counted
+  // and not offered in a collection; with the switch on, this is the whole
+  // library exactly as before.
+  const shows = useProgramFilter();
+  // A collection shows while it is empty or holds a paper that shows, and
+  // counts the papers that show.
+  const collections = useMemo(
+    () => allCollections.filter((c) => c.paperIds.length === 0 || c.paperIds.some((id) => shows('paper', id))),
+    [allCollections, shows],
+  );
+  const shownIn = (paperIds: string[]) => paperIds.filter((id) => shows('paper', id)).length;
+  const hiddenPapers = useMemo(
+    () => papers.filter((p) => p.ingest !== 'shelf' && !shows('paper', p.id)).map((p) => p.id),
+    [papers, shows],
+  );
+  const shownRecords = useMemo(() => records.filter((r) => shows('record', r.id)).length, [records, shows]);
   const jobs = useStore((s) => s.jobs);
   const density = useStore((s) => s.ui.density);
-  const addCollectionPapers = useStore((s) => s.addCollectionPapers);
-  const startJob = useStore((s) => s.startJob);
-  const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
-
-  // Simulated first-paint latency (§13.5) so the loading state is real.
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const allRows = useMemo<LibRow[]>(() => {
     const byPaper = new Map<string, { total: number; gold: number; verified: number }>();
@@ -157,7 +158,7 @@ export default function BioRepo() {
       byPaper.set(r.paperId, agg);
     }
     return papers
-      .filter((p) => p.ingest !== 'shelf')
+      .filter((p) => p.ingest !== 'shelf' && shows('paper', p.id))
       .map((paper) => {
         const agg = byPaper.get(paper.id) ?? { total: 0, gold: 0, verified: 0 };
         const ingestKey: LibRow['ingestKey'] = paper.ingest.startsWith('failed:')
@@ -189,7 +190,7 @@ export default function BioRepo() {
           ingestKey,
         };
       });
-  }, [papers, records, collections]);
+  }, [papers, records, collections, shows]);
 
   const activeCollection = collections.find((c) => c.id === collectionFilter) ?? null;
   const rows = useMemo(
@@ -201,52 +202,7 @@ export default function BioRepo() {
   const brokenRows = allRows.filter((r) => r.ingestKey === 'failed');
 
   // ── actions ──────────────────────────────────────────────────────────
-  const addToCollection = (collectionId: string, selected: LibRow[], clear: () => void) => {
-    const col = collections.find((c) => c.id === collectionId);
-    if (!col) return;
-    const ids = selected.map((r) => r.paper.id);
-    const added = ids.filter((id) => !col.paperIds.includes(id)).length;
-    addCollectionPapers(collectionId, ids);
-    toast({
-      text:
-        added === 0
-          ? `All ${ids.length} papers were already in ${col.name}`
-          : `Added ${added} paper${added === 1 ? '' : 's'} to ${col.name}`,
-      kind: added === 0 ? 'info' : 'success',
-    });
-    clear();
-  };
 
-  const queueExtraction = (selected: LibRow[], clear: () => void) => {
-    const n = selected.length;
-    const weight = Math.min(4, Math.max(1, n));
-    startJob({
-      title: `Extraction — ${n} paper${n === 1 ? '' : 's'}`,
-      kind: 'extraction',
-      stages: [
-        { label: 'Load sections', ms: 600 * weight },
-        { label: 'Chunk', ms: 500 * weight },
-        { label: 'Extract fields', ms: 1400 * weight },
-        { label: 'Score confidence', ms: 700 },
-        { label: 'Stage for review', ms: 500 },
-      ],
-      href: n === 1 ? `#/intake?paper=${selected[0].paper.id}` : '#/intake',
-    });
-    logActivity({
-      at: nowStamp(),
-      icon: 'table',
-      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'}`,
-      href: '#/intake',
-      provenance: 'demo',
-    });
-    toast({
-      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — the demo extractor replays the seeded records, it does not mint new ones`,
-      kind: 'info',
-      href: '#/intake',
-      hrefLabel: 'Extract',
-    });
-    clear();
-  };
 
   const exportSelected = (selected: LibRow[]) => {
     exportCSV(
@@ -455,54 +411,6 @@ export default function BioRepo() {
   // ── header actions ───────────────────────────────────────────────────
   const headerActions = (
     <>
-      <Popover
-        openOnHover={false}
-        width={330}
-        label="Collections"
-        trigger={(p) => (
-          <button {...p} className="btn btn-sm" title="Collection manager">
-            <Layers size={13} /> Collections
-          </button>
-        )}
-      >
-        <div className="space-y-1">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Collections</div>
-          {collections.length === 0 && (
-            <div className="text-body text-ink-soft">
-              No collections in this session. Select rows to add papers to one.
-            </div>
-          )}
-          {collections.map((c) => {
-            const on = collectionFilter === c.id;
-            return (
-              <div key={c.id} className="flex items-center gap-2">
-                <button
-                  className={cx(
-                    'flex-1 flex items-center justify-between gap-2 px-1.5 py-1 rounded-input text-left',
-                    on ? 'bg-accent-wash font-medium' : 'hover:bg-ink-soft/[0.08]',
-                  )}
-                  onClick={() => setCollectionFilter(on ? null : c.id)}
-                  aria-pressed={on}
-                  title={on ? 'Remove this filter' : `Filter the table to ${c.name}`}
-                >
-                  <span className="truncate">{c.name}</span>
-                  <span className="font-num text-caption text-ink-soft shrink-0">
-                    {c.paperIds.length}
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-          {collectionFilter && (
-            <button className="btn btn-sm w-full mt-1" onClick={() => setCollectionFilter(null)}>
-              <X size={12} /> Show all papers
-            </button>
-          )}
-          <div className="text-caption text-ink-soft pt-2 mt-1 border-t border-line">
-            Collections are session-scoped. Add papers with the row selection toolbar.
-          </div>
-        </div>
-      </Popover>
       <LinkButton to="/intake/ingest" variant="primary" size="sm">
         Ingest papers
       </LinkButton>
@@ -517,8 +425,18 @@ export default function BioRepo() {
       subtitle={
         <>
           Real literature, catalogued by hand — <span className="font-num">{allRows.length}</span> papers carrying{' '}
-          <span className="font-num">{records.length}</span> extraction records. Filters combine with AND
+          <span className="font-num">{shownRecords}</span> extraction records. Filters combine with AND
           across groups and OR inside a group.
+          {hiddenPapers.length > 0 && (
+            <span className="block text-caption text-ink-soft mt-0.5" data-testid="archived-hidden">
+              <span className="font-num">{hiddenPapers.length}</span> papers in {archivedNames(hiddenPapers)} are
+              hidden, because archived programs are.{' '}
+              <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+                Settings → Programs
+              </a>{' '}
+              shows them.
+            </span>
+          )}
         </>
       }
       actions={headerActions}
@@ -527,16 +445,17 @@ export default function BioRepo() {
     </>
   );
 
-  if (!ready) {
+  if (allRows.length === 0 && hiddenPapers.length > 0) {
     return (
       <>
         {header}
         <Card>
-          <Skeleton rows={10} />
+          <EmptyState
+            title="Every paper here is in an archived program"
+            body={`The ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are hidden, because archived programs are hidden unless you turn them on. Nothing was deleted.`}
+            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Show archived programs in Settings</LinkButton>}
+          />
         </Card>
-        <div className="sr-only" aria-live="polite">
-          Loading corpus table
-        </div>
       </>
     );
   }
@@ -548,7 +467,7 @@ export default function BioRepo() {
         <Card>
           <EmptyState
             title="No papers in the corpus yet"
-            body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
+            body="Every paper is still in the ingest queue. Fetch one to see it flow through fetch, parse, chunk, embed and extract."
             action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>
@@ -647,8 +566,10 @@ export default function BioRepo() {
         emptyTitle={activeCollection ? 'This collection is empty' : 'No papers match'}
         emptyBody={
           activeCollection
-            ? `${activeCollection.name} has no papers in it yet. Select rows and use “Add to collection”.`
-            : 'Nothing in the corpus matches the current filters.'
+            ? `${activeCollection.name} has no papers in it.`
+            : hiddenPapers.length > 0
+              ? `Nothing in the corpus matches the current filters. ${hiddenPapers.length} papers in ${archivedNames(hiddenPapers)} are not searched, because archived programs are hidden; Settings → Programs shows them.`
+              : 'Nothing in the corpus matches the current filters.'
         }
         toolbar={
           activeCollection ? (
@@ -659,7 +580,7 @@ export default function BioRepo() {
             >
               <Layers size={12} /> {activeCollection.name}
               <span className="font-num text-caption text-ink-soft">
-                {activeCollection.paperIds.length}
+                {shownIn(activeCollection.paperIds)}
               </span>
               <X size={11} />
             </button>
@@ -667,44 +588,6 @@ export default function BioRepo() {
         }
         bulkActions={(selected, clear) => (
           <>
-            <Popover
-              openOnHover={false}
-              width={300}
-              label="Add to collection"
-              trigger={(p) => (
-                <button {...p} className="btn btn-sm">
-                  <FolderPlus size={13} /> Add to collection
-                </button>
-              )}
-            >
-              <div className="space-y-1">
-                <div className="text-caption text-ink-soft mb-1">
-                  Add <span className="font-num">{selected.length}</span> selected paper
-                  {selected.length === 1 ? '' : 's'} to:
-                </div>
-                {collections.length === 0 && (
-                  <div className="text-body text-ink-soft">No collections exist in this session.</div>
-                )}
-                {collections.map((c) => {
-                  const already = selected.filter((r) => c.paperIds.includes(r.paper.id)).length;
-                  return (
-                    <button
-                      key={c.id}
-                      className="w-full flex items-center justify-between gap-2 px-1.5 py-1 rounded-input text-left hover:bg-accent-wash"
-                      onClick={() => addToCollection(c.id, selected, clear)}
-                    >
-                      <span className="truncate">{c.name}</span>
-                      <span className="font-num text-caption text-ink-soft shrink-0">
-                        {already > 0 ? `${already} already` : `${c.paperIds.length}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </Popover>
-            <Button size="sm" onClick={() => queueExtraction(selected, clear)}>
-              <Wand2 size={13} /> Queue extraction
-            </Button>
             <Button size="sm" onClick={() => exportSelected(selected)}>
               <Download size={13} /> Export metadata
             </Button>

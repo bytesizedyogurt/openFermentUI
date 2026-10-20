@@ -103,6 +103,20 @@ await page.waitForTimeout(1400);
 const dens3 = await page.evaluate(() => document.documentElement.dataset.density);
 check('Ephemeral density RESET on reload', dens3 === dens1, `${dens3}`);
 
+// OF-BLD-016 §2.2 — rb-taq-kigali's run is staged on TAP medium (PR-TAP-01),
+// a casein protocol, and casein is archived: the start dialog offers it only
+// with the switch in Settings → Programs on, so it goes on first, as on the
+// golden path. The Durable tier keeps it across the reloads below.
+await go('/settings/programs');
+{
+  const sw = page.locator('[data-testid="show-archived"]');
+  await sw.waitFor({ timeout: 8000 }).catch(() => {});
+  if ((await sw.count()) && !(await sw.isChecked())) await sw.check().catch(() => {});
+  await page.waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 }).catch(() => {});
+  check('archived programs show once the switch is on', (await sw.count()) === 1 && (await sw.isChecked()));
+  await page.waitForTimeout(600);
+}
+
 // OF-BLD-014 §7.1 — readings' sample times and a series' role survive a reload.
 await go('/runbooks/rb-taq-kigali');
 await page.getByRole('button', { name: /Start a deposition/ }).click();
@@ -130,11 +144,11 @@ check('a series role SURVIVED a page reload',
 // Reset must clear the durable store, not just memory.
 await page.evaluate(() => { /* noop */ });
 await go('/settings/corpus');
-const resetBtn = page.getByRole('button', { name: /Reset demo data/ }).first();
+const resetBtn = page.getByRole('button', { name: /Clear this browser’s data/ }).first();
 if (await resetBtn.count() > 0) {
   await resetBtn.click();                       // opens the confirmation
   await page.waitForTimeout(500);
-  await page.locator('div[role="dialog"]').getByRole('button', { name: /Reset demo data/ }).click();
+  await page.locator('div[role="dialog"]').getByRole('button', { name: /Clear this browser’s data/ }).click();
   await page.waitForTimeout(1400);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1600);
@@ -144,7 +158,7 @@ if (await resetBtn.count() > 0) {
   console.log('  (reset button not on this screen — checked via palette instead)');
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);
-  await page.locator('input[aria-label="Command palette"]').fill('Reset demo');
+  await page.locator('input[aria-label="Command palette"]').fill('Clear this browser');
   await page.waitForTimeout(300);
   await page.keyboard.press('Enter');
   await page.waitForTimeout(1200);

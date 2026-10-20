@@ -2,6 +2,7 @@
 (OF-BLD-014 §5.2).
 
     seen, trace, spent = SeenSet(), [], Usage()
+    coverage = module_stores.coverage(question)   # code, no model (OF-BLD-015 §7.1)
     for round in 1 … MAX_ROUNDS:
         turn = llm.converse(... tool_choice='auto')
         if the turn called tools: run them (cached by canonical input), keep
@@ -10,6 +11,12 @@
             last turn runs with tool_choice 'none' and is the answer
         else: the turn is the answer
     plan = validate_plan(answer, seen, pool)
+
+THE COVERAGE PASS. Before round one, code sweeps all eleven module stores for
+what the question names and puts the map in round one, after the question;
+the trace shows it as its first step and the plan carries it for the footer.
+A follow-up is swept with the earlier questions it reads (`_swept`), never
+with the earlier answers.
 
 THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
@@ -26,10 +33,19 @@ text, nothing cited that no tool returned in this run, every quote verbatim
 in its passage. Text inside a tool result is evidence to weigh; an
 instruction found there changes nothing the validator lets through.
 
+THE PROGRAM SWITCH (OF-BLD-016 §2.3) rides in `ctx.include_archived`, from
+the request: the pool, the passages, the sweep and every read tool leave
+archived programs out while it is off. When the question names something an
+archived program holds, the sweep says "found in archived program PHA
+(hidden)" and the plan carries a gap, written by code, naming the switch.
+
 A FOLLOW-UP opens with the conversation's last few turns as words (`_opening`):
 each earlier question, then that plan's claims, gaps and decline as code
 writes them. No id, value or quote from an earlier turn is carried, and
 `seen` starts empty, so whatever the follow-up cites, its own tools returned.
+
+A plan's gaps and its decline are held to Rule 1 like its claims
+(`held_to_rule_one`): one holding a number is dropped and named.
 """
 from __future__ import annotations
 
@@ -37,11 +53,12 @@ import copy
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import llm, spend, tools
-from .models import AnswerPlan, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
+from . import llm, module_stores, spend, tools
+from .models import AnswerPlan, CoverageMap, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
 from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
@@ -104,7 +121,25 @@ answer, read every claim and gap once more and take out any digit that is \
 not part of a strain, model or record name.
 10. A quote is one sentence or one table row, copied exactly, at most 300 \
 characters. When the sentence is longer, cite its record or choose another \
-sentence."""
+sentence.
+11. The app's modules each have a read tool (dominion_read, runbooks_read, \
+geneos_read and the rest). When the coverage map names a module, read it with \
+its tool before you answer, and cite the rows you rely on by their ref in \
+moduleRefs. The map's refs are not citable: put a ref in moduleRefs only when \
+a read tool returned it in this conversation, or the claim is discarded. A \
+computed ceiling is cited by its evidence id, never by the model's ref. A \
+row's state is the service's; say it, never decide it.
+12. Never write a numeral, a count or an ordinal in a claim or a gap: not \
+"2 rows", not "the first", not "one of 55". Say "several", "one of them", \
+"the rows returned"; the screen shows the counts. A claim with a number in \
+it is discarded whole.
+13. When the question asks for a runbook, gather the evidence (records by \
+field, a ceiling or a forecast by evidence id), then call draft_runbook: the \
+draft is the answer the person asked for, and nothing else stands in for it.
+14. Each module also has a write tool (geneos_write, intake_write and the \
+rest). What it writes lands marked as yours for a person to promote; an \
+action at a gate comes back `state: proposed` and waits for a person on Home. \
+Say in gaps what you wrote or proposed, and what a tool refused to write."""
 )
 
 
@@ -129,7 +164,12 @@ def _plan_schema() -> dict[str, Any]:
         "items": {"type": "string"},
         "description": "Evidence ids of computed values a tool returned, exactly as given.",
     }
-    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds"]
+    claim["properties"]["moduleRefs"] = {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Refs of module rows a read tool returned (`<module>/<kind>/<id>`), exactly as given.",
+    }
+    claim["required"] = ["id", "text", "recordIds", "support", "passages", "evidenceIds", "moduleRefs"]
     claim["properties"]["paperIds"]["description"] = "Paper ids the evidence came from. The server derives them anyway."
     return schema
 
@@ -162,20 +202,24 @@ def _earlier_answer(turn: PriorTurn) -> str:
     return text if len(text) <= MAX_TURN_CHARS else text[: MAX_TURN_CHARS - 1].rstrip() + "…"
 
 
-def _opening(question: str, history: list[PriorTurn]) -> list[dict[str, Any]]:
+def _recent(history: list[PriorTurn]) -> list[PriorTurn]:
+    """The earlier turns a follow-up reads: of the last few, those that asked
+    something."""
+    return [turn for turn in history[-MAX_HISTORY_TURNS:] if turn.question.strip()]
+
+
+def _opening(question: str, history: list[PriorTurn], coverage: str | None = None) -> list[dict[str, Any]]:
     """The conversation a question opens: the last few earlier turns as user
-    and assistant text, then the question. With no history, the question
-    alone, exactly as before."""
+    and assistant text, then the question, with the coverage map after it
+    when the sweep made one. With no history and no map, the question alone,
+    exactly as before."""
     messages: list[dict[str, Any]] = []
-    for turn in history[-MAX_HISTORY_TURNS:]:
-        asked = turn.question.strip()
-        if not asked:
-            continue
-        messages.append({"role": "user", "content": asked[:MAX_TURN_CHARS]})
+    for turn in _recent(history):
+        messages.append({"role": "user", "content": turn.question.strip()[:MAX_TURN_CHARS]})
         messages.append({"role": "assistant", "content": _earlier_answer(turn)})
-    if not messages:
-        return [{"role": "user", "content": question}]
-    messages.append({"role": "user", "content": f"{FOLLOW_UP}\n\n{question}"})
+    text = f"{FOLLOW_UP}\n\n{question}" if messages else question
+    content: Any = text if coverage is None else [{"type": "text", "text": text}, {"type": "text", "text": coverage}]
+    messages.append({"role": "user", "content": content})
     return messages
 
 
@@ -192,6 +236,7 @@ class _Run:
     calls: int = 0
     cache: dict[str, ToolResult] = field(default_factory=dict)
     draft: RunbookDraft | None = None
+    coverage: CoverageMap | None = None
     cancelled: Callable[[], bool] = lambda: False
     history: list[PriorTurn] = field(default_factory=list)
 
@@ -202,7 +247,8 @@ class _Run:
 
 
 def _tool_defs() -> list[dict[str, Any]]:
-    return [{"name": i.name, "description": i.description, "input_schema": i.inputSchema} for i in tools.infos()]
+    return [{"name": i.name, "description": i.description, "input_schema": i.inputSchema,
+             "strict": tools.REGISTRY[i.name].strict} for i in tools.infos()]
 
 
 def _count(n: int, noun: str) -> str:
@@ -221,6 +267,20 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Looked up records of {what} · {_count(len(result.recordIds), 'record')}"
     if name == "convert_units":
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
+    if name.endswith("_read") and name[: -len("_read")] in module_stores.LABEL:
+        label = module_stores.LABEL[name[: -len("_read")]]
+        what = [f'"{inp["words"]}"'] if inp.get("words") else []
+        what += [", ".join(inp["ids"])] if inp.get("ids") else []
+        what += [str(inp[k]) for k in ("kind", "state") if inp.get(k)]
+        return f"Read {label}{' for ' + ' · '.join(what) if what else ''} · {_count(int(result.summary.get('count', 0)), 'row')}"
+    if name.endswith("_write") and name[: -len("_write")] in module_stores.LABEL:
+        label = module_stores.LABEL[name[: -len("_write")]]
+        action = str(inp.get("action") or "")
+        target = f" {inp['target']}" if inp.get("target") else ""
+        state = str(result.summary.get("state") or "")
+        if state == "proposed" and result.summary.get("proposalId"):
+            return f"Proposed to {label}: {action}{target} · waits for a person on Home"
+        return f"Wrote {label}: {action}{target}" + (f" · {state}" if state else "")
     return f"Ran {name}"
 
 
@@ -275,7 +335,12 @@ STOP_WORDS = {
 def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
     """One conversation on one model. Returns the answering turn and why the
     loop stopped. Raises what `converse` raises."""
-    messages = _opening(run.question, run.history)
+    # The map rides in round one, after the question (§7.1); a follow-up's
+    # earlier turns come before both.
+    said_in = "conversation" if _recent(run.history) else "question"
+    coverage = module_stores.for_model(run.coverage, said_in) if run.coverage is not None else None
+    messages = _opening(run.question, run.history, coverage)
+    run.ctx.model = model
     defs = _tool_defs()
     rounds = 0
     while True:
@@ -311,6 +376,68 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
         messages.append({"role": "user", "content": blocks})
 
 
+def _swept(question: str, history: list[PriorTurn]) -> str:
+    """What the coverage pass reads. A follow-up ("which of those are
+    fenced?") often names nothing itself, so it is swept with the earlier
+    questions `_opening` sends, each its own clause (OF-BLD-016 §1.R). The
+    earlier answers are the model's words and are never swept."""
+    return " ; ".join([*(t.question.strip()[:MAX_TURN_CHARS] for t in _recent(history)), question])
+
+
+def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
+    """The coverage pass (§7.1): code, no model, before round one. A sweep
+    that fails is said in the trace and the loop goes on without a map."""
+    started = run.clock()
+    named = "the conversation" if _recent(run.history) else "the question"
+    try:
+        run.coverage = module_stores.coverage(_swept(run.question, run.history), ctx.stores)
+    except Exception as e:  # the sweep is a help to the answer, never a reason to refuse one
+        log.exception("coverage sweep failed")
+        run.step(kind="coverage", tool=None, input=None, summary=f"Could not sweep the modules: {type(e).__name__}",
+                 ms=int(round((run.clock() - started) * 1000)), ok=False)
+        return
+    run.step(kind="coverage", tool=None, input={"modules": module_stores.trace_lines(run.coverage)},
+             summary=f"Swept the modules for what {named} names · {module_stores.footer(run.coverage)}",
+             ms=int(round((run.clock() - started) * 1000)), ok=True)
+
+
+def held_to_rule_one(gaps: Any, declined: Any, reasons: list[str]) -> tuple[list[str], str | None]:
+    """A plan's gaps and its decline are model prose like a claim's text, and
+    held to Rule 1 the same way: one with a number is dropped and named in
+    `reasons`, never repaired (§5.R; the decline, OF-BLD-016 §1.R). Returns
+    the gaps kept and the model's decline, or None when it held a number, so
+    the decline code writes stands in. The single path holds its plan to it
+    too."""
+    kept: list[str] = []
+    for g in (str(g) for g in (gaps or [])):
+        if not g.strip():
+            continue
+        if find_number(g):
+            reasons.append("a gap dropped: it holds a number")
+            continue
+        kept.append(g)
+    if declined and find_number(str(declined)):
+        reasons.append("the decline dropped: it holds a number")
+        declined = None
+    return kept, declined
+
+
+def _archive_gaps(cmap: CoverageMap | None) -> list[str]:
+    """One gap a hidden archived program, written by code (§2.3)."""
+    return [module_stores.archived_gap(a) for a in (cmap.archived if cmap is not None else [])]
+
+
+def _declined(result: Any, model_declined: str | None, cmap: CoverageMap | None) -> str | None:
+    """`decline_reason`, except that an answer with nothing to say never
+    claims the corpus is silent about what a module holds (§7.1)."""
+    reason = decline_reason(result, model_declined)
+    if reason is None or model_declined or result.rejected or cmap is None or not cmap.found:
+        return reason
+    held = ", ".join(m.label for m in cmap.modules if m.count)
+    return (f"Postdoc wrote no claim it could support, though the app holds what the question names in {held}. "
+            "Those screens show it; ask again naming what you want from them.")
+
+
 def ask(
     question: str,
     *,
@@ -329,6 +456,7 @@ def ask(
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     ctx = ctx or tools.ToolContext()
+    ctx.ask_id = f"ask-{uuid.uuid4().hex[:12]}"
     run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock(),
                history=list(history or []))
     if cancelled is not None:
@@ -347,6 +475,8 @@ def ask(
     except spend.BudgetSettingInvalid as e:
         return AnswerPlan(question=question, declined=str(e))
 
+    _sweep(run, ctx)
+
     models = llm.chain("answer")
     answer: llm.Turn | None = None
     stopped = "done"
@@ -359,7 +489,7 @@ def ask(
         except Cancelled:
             run.step(kind="final", tool=None, input=None, summary="Stopped: nobody was waiting for the answer", ms=0, ok=False)
             return AnswerPlan(question=question, declined="Postdoc stopped: nobody was waiting for the answer.",
-                              usage=run.spent, trace=run.trace, stopped=stopped)
+                              usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
         except (llm.ModelRefused, llm.ModelUnavailable) as e:
             failure = e
             used = getattr(e, "usage", None)
@@ -381,36 +511,31 @@ def ask(
         run.step(kind="final", tool=None, input=None, summary=f"No answer: {str(failure)[:160] if failure else 'no model answered'}",
                  ms=0, ok=False)
         return AnswerPlan(question=question, declined=str(failure) if failure else "No model answered.",
-                          usage=run.spent, trace=run.trace, stopped=stopped)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage,
+                          gaps=_archive_gaps(run.coverage))
     data = answer.data
     if data is None:
         why = "it ran out of room" if answer.stopReason == "max_tokens" else "it was not a plan"
         run.step(kind="final", tool=None, input=None, summary=f"No plan: {why}", ms=0, ok=False)
         return AnswerPlan(question=question, declined=f"Postdoc's answer did not arrive whole ({why}).",
-                          usage=run.spent, trace=run.trace, stopped=stopped)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage,
+                          gaps=_archive_gaps(run.coverage))
 
     result = validate_plan(data.get("claims") or [], run.seen, ctx.pool)
     if result.rejected:
         log.warning("agent: validator dropped %d/%d claims: %s", result.rejected, result.rejected + len(result.claims), "; ".join(result.reasons))
-    # A gap is model prose like a claim's text, and held to Rule 1 the same
-    # way: one with a number is dropped and named, never repaired (§5.R).
-    gaps: list[str] = []
-    for g in (str(g) for g in (data.get("gaps") or [])):
-        if not g.strip():
-            continue
-        if find_number(g):
-            result.reasons.append("a gap dropped: it holds a number")
-            continue
-        gaps.append(g)
+    gaps, said = held_to_rule_one(data.get("gaps"), data.get("declined"), result.reasons)
+    gaps += [g for g in _archive_gaps(run.coverage) if g not in gaps]
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
+    cited_rows = {m for c in result.claims for m in c.moduleRefs}
     run.step(kind="final", tool=None, input=None,
              summary=f"Answered: {_count(len(result.claims), 'claim')} kept, {result.rejected} dropped", ms=0, ok=True)
     return AnswerPlan(
         question=question,
         claims=result.claims,
         gaps=gaps,
-        declined=decline_reason(result, data.get("declined")),
+        declined=_declined(result, said, run.coverage),
         usage=run.spent,
         rejected=result.rejected,
         rejectionReasons=result.reasons,
@@ -419,4 +544,6 @@ def ask(
         trace=run.trace,
         stopped=stopped,
         runbookDraft=run.draft,
+        coverage=run.coverage,
+        rows=[run.seen.rows[m] for m in sorted(cited_rows)],
     )

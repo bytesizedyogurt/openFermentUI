@@ -6,9 +6,16 @@
 // the ledger of whoever is learning, which is whoever is signing in Guild.
 // That entry puts them at Learning. Supervised waits for an assessor's
 // training sign-off at the bench, and the page says so before and after.
+//
+// PROGRAMS (OF-BLD-016 §2.2). A lesson in an archived program has left the
+// module map, but its link still opens it here, under the banner that names
+// the program and the switch. Previous and next walk the lessons the program
+// filter shows, widened on an archived lesson to its own program, so a link
+// into the casein primer can still be read through to its end.
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, RotateCcw, X } from 'lucide-react';
-import { useStore } from '@/store';
+import { useProgramScope, useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate } from '@/router';
 import type { CheckpointQuestion } from '@/data/types';
 import { SKILL_BY_ID } from '@/data/skills';
@@ -171,9 +178,14 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
   const lessonIndex = mod?.lessons.findIndex((l) => l.id === lessonId) ?? -1;
   const lesson = lessonIndex >= 0 ? mod!.lessons[lessonIndex] : undefined;
 
+  // Visible lessons, plus the lesson's own archived program when a link opened it.
+  const inScope = useProgramScope({ kind: 'lesson', id: lessonId });
   const flat = useMemo(
-    () => modules.flatMap((m) => m.lessons.map((l) => ({ moduleId: m.id, lessonId: l.id, title: l.title }))),
-    [modules],
+    () =>
+      modules.flatMap((m) =>
+        m.lessons.filter((l) => inScope('lesson', l.id)).map((l) => ({ moduleId: m.id, lessonId: l.id, title: l.title })),
+      ),
+    [modules, inScope],
   );
   const flatIdx = flat.findIndex((f) => f.moduleId === moduleId && f.lessonId === lessonId);
   const prev = flatIdx > 0 ? flat[flatIdx - 1] : null;
@@ -249,6 +261,8 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
         </div>
       </div>
 
+      <ArchivedBanner kind="lesson" id={lesson.id} />
+
       <div className="mb-1 text-caption uppercase tracking-wide text-ink-soft font-num">
         Lesson {lessonIndex + 1} of {mod.lessons.length} · {lesson.minutes} min
       </div>
@@ -290,11 +304,6 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
               <>Choose who is learning to have this lesson count toward a skill.</>
             )}
           </p>
-          {ctx.sample && (
-            <p className="text-caption text-signal-warn">
-              Sample team: invented people. A lesson passed now is recorded on the sample alone.
-            </p>
-          )}
           {ctx.guild.people.length > 0 && <ActingAs id="lesson-learning-as" label="Learning as" />}
         </Card>
       )}

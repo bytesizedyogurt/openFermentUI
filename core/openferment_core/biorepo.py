@@ -116,6 +116,9 @@ def records() -> list[Candidate]:
 # a file name under candidates/, and nothing with a slash or a dot in it is
 # opened (OF-BLD-012.1 §6.9).
 _CANDIDATE_ID = re.compile(r"^[^-]+-(?P<paper>[A-Za-z0-9_]+)-[0-9a-f]{8}$")
+# A candidate a model wrote by hand ('mw1-B5-0000', OF-BLD-015 §7.3), kept in
+# its own file beside the extractor's (OF-BLD-016 §1.R).
+_HAND_ID = re.compile(rf"^{extract.MODEL_PREFIX}-(?P<paper>[A-Za-z0-9_]+)-[0-9]{{4}}$")
 
 
 def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
@@ -129,7 +132,8 @@ def _resolve(record_id: str) -> dict[str, Any] | Candidate | None:
     all. Guild asks `/check` twice per card, and each ask used to read and
     validate every candidates/*.json on disk."""
     m = _CANDIDATE_ID.match(record_id)
-    response = extract.cached(m.group("paper")) if m else None
+    hand = _HAND_ID.match(record_id)
+    response = extract.cached(m.group("paper")) if m else extract.hand(hand.group("paper")) if hand else None
     for c in response.candidates if response else []:
         if c.id == record_id:
             return c

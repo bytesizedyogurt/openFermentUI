@@ -17,8 +17,6 @@ import { useMemo } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
-  FileUp,
-  Link2,
   Loader2,
   Plus,
   RefreshCw,
@@ -26,7 +24,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { Job, Paper } from '@/data/types';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
 import { fetchSourceName } from '@/lib/intake';
@@ -165,6 +164,29 @@ const CELL_BORDER: Record<CellState, string> = {
   notrun: 'border-line border-dashed',
 };
 
+/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
+function archivedNames(paperIds: string[]): string {
+  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
+  return PROGRAMS.filter((p) => hit.has(p.id))
+    .map((p) => p.name)
+    .join(' and ');
+}
+
+/** "N papers in Casein are hidden … Settings → Programs shows them." */
+function HiddenLine({ paperIds, one, many }: { paperIds: string[]; one: string; many: string }) {
+  const single = paperIds.length === 1;
+  return (
+    <>
+      {paperIds.length} {single ? one : many} in {archivedNames(paperIds)} {single ? 'is' : 'are'} hidden,
+      because archived programs are.{' '}
+      <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+        Settings → Programs
+      </a>{' '}
+      shows them.
+    </>
+  );
+}
+
 export default function IntakeIngest() {
   const papers = useStore((s) => s.papers);
   const records = useStore((s) => s.records);
@@ -172,24 +194,35 @@ export default function IntakeIngest() {
   const ingestPaper = useStore((s) => s.ingestPaper);
   const extractPaperLive = useStore((s) => s.extractPaperLive);
   const setPaperIngest = useStore((s) => s.setPaperIngest);
-  const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
   const serviceUp = useStore((s) => s.serviceUp);
   const live = serviceUp === true;
 
+  // OF-BLD-016 §2.2: the queue and the board hold only papers whose program
+  // shows; with archived programs hidden (the default) a casein or PHA paper
+  // is neither offered nor on the board, and each list says how many it
+  // holds back.
+  const shows = useProgramFilter();
+
   // The demo shelf is gone with the synthetic corpus. What sits here now is
   // the real ingest queue: tranche-1 entries whose full text has not been
   // parsed yet (OF-COR-001 §22.6).
-  const shelf = useMemo(
+  const tranche = useMemo(
     () => papers.filter((p) => p.tranche === 1 && p.textSource === 'curation-note'),
     [papers],
   );
+  const shelf = useMemo(() => tranche.filter((p) => shows('paper', p.id)), [tranche, shows]);
+  const shelfHidden = useMemo(
+    () => tranche.filter((p) => !shows('paper', p.id)).map((p) => p.id),
+    [tranche, shows],
+  );
 
-  const rows = useMemo<BoardRow[]>(() => {
+  const board = useMemo<{ rows: BoardRow[]; hidden: string[] }>(() => {
     const counts = new Map<string, number>();
     for (const r of records) counts.set(r.paperId, (counts.get(r.paperId) ?? 0) + 1);
 
     const out: BoardRow[] = [];
+    const hidden: string[] = [];
     for (const paper of papers) {
       const job = ingestJobFor(jobs, paper.id);
       const ingesting = paper.ingest.startsWith('stage:');
@@ -199,6 +232,10 @@ export default function IntakeIngest() {
       // with a job — a fetch that happened before this page load is still a
       // thing that happened.
       if (!job && !ingesting && !failed && !fetched) continue;
+      if (!shows('paper', paper.id)) {
+        hidden.push(paper.id);
+        continue;
+      }
       const real = fetched || Boolean(job?.real) || (!job && failed && Boolean(paper.ingestReason));
 
       const seededIndex = Math.max(
@@ -231,10 +268,14 @@ export default function IntakeIngest() {
 
       out.push({ paper, job, state, stageIndex, extractions: counts.get(paper.id) ?? 0, real });
     }
-    return out.sort(
-      (a, b) => ROW_ORDER[a.state] - ROW_ORDER[b.state] || a.paper.id.localeCompare(b.paper.id),
-    );
-  }, [papers, jobs, records]);
+    return {
+      rows: out.sort(
+        (a, b) => ROW_ORDER[a.state] - ROW_ORDER[b.state] || a.paper.id.localeCompare(b.paper.id),
+      ),
+      hidden,
+    };
+  }, [papers, jobs, records, shows]);
+  const { rows, hidden: boardHidden } = board;
 
   const addFromShelf = (paper: Paper) => {
     ingestPaper(paper.id);
@@ -265,9 +306,22 @@ export default function IntakeIngest() {
           <>
             A paper enters the corpus here or not at all. Fetch asks Europe PMC for the open-access
             full text and splits it into sections, so a record&rsquo;s quote can anchor to the
-            paper&rsquo;s own words rather than to a curation note. Twenty-seven of the 132 entries
-            carry a PMCID and are fetchable; the DOI-only ones are looked up once; the rest need
-            manual retrieval.
+            paper&rsquo;s own words rather than to a curation note.{' '}
+            {(() => {
+              // Counted from the entries that show under the program switch.
+              const showing = papers.filter((p) => shows('paper', p.id));
+              const pmcid = showing.filter((p) => p.pmcid).length;
+              const doiOnly = showing.filter((p) => !p.pmcid && p.doi).length;
+              return (
+                <>
+                  Of the <span className="font-num">{showing.length}</span> entries showing,{' '}
+                  <span className="font-num">{pmcid}</span> carry a PMCID and are fetchable,{' '}
+                  <span className="font-num">{doiOnly}</span> carry a DOI alone and are looked up once,
+                  and <span className="font-num">{showing.length - pmcid - doiOnly}</span> carry
+                  neither.
+                </>
+              );
+            })()}
           </>
         }
         actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}
@@ -312,18 +366,23 @@ export default function IntakeIngest() {
                 : 'With the service down, Add runs the timed simulation and halts at Fetch.'}
             </p>
 
-            {shelf.length === 0 ? (
+            {shelf.length === 0 && shelfHidden.length > 0 ? (
+              <EmptyState
+                title="Nothing to fetch in the programs showing"
+                body={<HiddenLine paperIds={shelfHidden} one="tranche-1 entry waiting for full text" many="tranche-1 entries waiting for full text" />}
+              />
+            ) : shelf.length === 0 ? (
               <EmptyState
                 title="The shelf is empty"
-                body="Every tranche-1 entry already has parsed full text."
-                action={
-                  <Button size="sm" onClick={resetDemo}>
-                    <RefreshCw size={13} /> Reset demo data
-                  </Button>
-                }
+                body="Every tranche-1 entry already has parsed full text. A new paper enters through a thread's propose-and-approve rule, below."
               />
             ) : (
               <div>
+                {shelfHidden.length > 0 && (
+                  <p className="text-caption text-ink-soft mb-1" data-testid="archived-hidden">
+                    <HiddenLine paperIds={shelfHidden} one="tranche-1 entry waiting for full text" many="tranche-1 entries waiting for full text" />
+                  </p>
+                )}
                 {shelf.map((p) => (
                   <div
                     key={p.id}
@@ -355,45 +414,14 @@ export default function IntakeIngest() {
             )}
           </Card>
 
-          {/* Inactive input methods — visibly present, explicitly off. */}
-          <Card className="p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="font-serif text-section-title font-semibold text-ink-soft">
-                Import by DOI list
-              </h2>
-              <span className="chip text-ink-soft border-dashed">Inactive</span>
-            </div>
-            <fieldset disabled className="opacity-55 space-y-2">
-              <textarea
-                className="input font-num h-[68px] resize-none"
-                placeholder={'10.0000/openferment.demo.001\n10.0000/openferment.demo.002'}
-                aria-label="DOI list (inactive in this demo)"
-              />
-              <Button size="sm">
-                <Link2 size={13} /> Fetch metadata
-              </Button>
-            </fieldset>
-            <p className="text-caption text-ink-soft mt-2">
-              Not active in this build. Fetch by identifier runs from the queue above.
-            </p>
-          </Card>
-
-          <Card className="p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="font-serif text-section-title font-semibold text-ink-soft">
-                Upload PDFs
-              </h2>
-              <span className="chip text-ink-soft border-dashed">Inactive</span>
-            </div>
-            <fieldset disabled className="opacity-55 space-y-2">
-              <div className="rounded-card border border-dashed border-line py-5 grid place-items-center text-center gap-1">
-                <FileUp size={18} className="text-ink-soft" aria-hidden />
-                <span className="text-body text-ink-soft">Drop PDFs here</span>
-              </div>
-              <Button size="sm">Choose files</Button>
-            </fieldset>
-            <p className="text-caption text-ink-soft mt-2">
-              Not active in this build. Fetch by identifier runs from the queue above.
+          {/* OF-BLD-016 §3.2: the inactive DOI-list and PDF-upload controls are gone; this says how a paper enters today. */}
+          <Card className="p-3" data-testid="how-a-paper-enters">
+            <h2 className="font-serif text-section-title font-semibold mb-1">How a paper enters</h2>
+            <p className="text-body text-ink-soft">
+              Through a thread&rsquo;s propose-and-approve rule: <code className="font-num">pnpm thread:propose</code> asks
+              Europe PMC with the thread&rsquo;s fixed rule, a person approves the rows to keep,{' '}
+              <code className="font-num">pnpm thread:apply</code> writes them into the corpus under that person&rsquo;s name, and
+              Fetch in the queue above brings in each paper&rsquo;s text.
             </p>
           </Card>
         </div>
@@ -426,15 +454,27 @@ export default function IntakeIngest() {
             <span>
               {live
                 ? 'Chunk, Embed and Extract are not built; a fetched paper shows them as not run.'
-                : 'Stage times are scripted demo budgets, not measured throughput.'}
+                : 'With the service down, stage times are timed in this browser and are not measured throughput.'}
             </span>
           </div>
+          {rows.length > 0 && boardHidden.length > 0 && (
+            <p className="text-caption text-ink-soft mb-3" data-testid="archived-hidden">
+              <HiddenLine paperIds={boardHidden} one="paper on the board" many="papers on the board" />
+            </p>
+          )}
 
-          {rows.length === 0 ? (
+          {rows.length === 0 && boardHidden.length > 0 ? (
+            <Card>
+              <EmptyState
+                title="Nothing in the pipeline for the programs showing"
+                body={<HiddenLine paperIds={boardHidden} one="paper on the board" many="papers on the board" />}
+              />
+            </Card>
+          ) : rows.length === 0 ? (
             <Card>
               <EmptyState
                 title="Nothing in the pipeline"
-                body="Add a paper from the demo shelf on the left and its five stages will fill in here, left to right."
+                body="Add a paper from the ingest queue on the left and its five stages will fill in here, left to right."
               />
             </Card>
           ) : (

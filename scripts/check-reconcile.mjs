@@ -31,6 +31,20 @@ const check=(l,ok,x='')=>{console.log((ok?'✓':'✗')+' '+l+(x?'  '+x:''));if(!
 const body=async()=>(await page.locator('body').innerText()).replace(/\s+/g,' ');
 const go=async r=>{await page.goto(`http://localhost:${PORT}/#${r}`,{waitUntil:'networkidle'});await page.waitForTimeout(1200);};
 
+// OF-BLD-016 §2.2 — rb-taq-kigali's run is staged on TAP medium (PR-TAP-01),
+// a casein protocol, and casein is archived: the start dialog offers it only
+// with the switch in Settings → Programs on, so it goes on first, as on the
+// golden path. The Durable tier keeps it across the reloads below.
+await go('/settings/programs');
+{
+  const sw = page.locator('[data-testid="show-archived"]');
+  await sw.waitFor({ timeout: 8000 }).catch(() => {});
+  if ((await sw.count()) && !(await sw.isChecked())) await sw.check().catch(() => {});
+  await page.waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 }).catch(() => {});
+  check('archived programs show once the switch is on', (await sw.count()) === 1 && (await sw.isChecked()));
+  await page.waitForTimeout(600);
+}
+
 await go('/runbooks/rb-taq-kigali');
 await page.getByRole('button',{name:/Start a deposition/}).click(); await page.waitForTimeout(600);
 await page.locator('div[role="dialog"] button').nth(1).click(); await page.waitForTimeout(1400);

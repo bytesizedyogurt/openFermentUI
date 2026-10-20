@@ -28,10 +28,20 @@ S (those present). `bm25` holds the choice until a lane scores higher; a lane
 that spends a model call on every question must lead the best free lane by
 `PAID_MARGIN` or more. An unavailable lane is skipped.
 
+ONE THREAD (OF-BLD-016 §4.1). `--thread Q` draws the questions from one
+thread's papers alone (a paper is on thread X when its id is X then a number,
+`on_thread`): S samples only its passages and is kept in a file of its own,
+`questions-Q.jsonl`, beside the set for every paper; K holds only its records
+and candidates; F only flows citing one of its records. Every search still
+runs over the whole index, so the other threads' passages stay as
+distractors. The report and the choice name the thread. Without the flag
+nothing changes.
+
     pnpm rag:questions --n 200    writes S (needs the key)
     pnpm rag:eval                 scores every available lane, writes
                                   core/data/rageval/report.json and the choice
                                   into core/data/index/config.json
+    … --thread Q                  either of them on thread Q's papers alone
 """
 from __future__ import annotations
 
@@ -68,6 +78,25 @@ OVERLAP_WORDS = 5
 
 def rageval_dir() -> Path:
     return intake.DATA_DIR / "rageval"
+
+
+def on_thread(paper_id: str | None, thread: str | None) -> bool:
+    """Whether a paper is on the thread: its id is the thread's letter, then
+    a number (a `ThreadRule`'s own `id_pattern` where the thread has one).
+    No thread: every paper."""
+    if thread is None:
+        return True
+    from .threadp import THREADS
+
+    rule = THREADS.get(thread)
+    return re.fullmatch(rule.id_pattern if rule else rf"{re.escape(thread)}\d+", paper_id or "") is not None
+
+
+def _s_paths(thread: str | None) -> tuple[Path, Path]:
+    """Where S is kept: one pair of files per thread, beside the set for
+    every paper, so writing one never discards another."""
+    suffix = f"-{thread}" if thread else ""
+    return rageval_dir() / f"questions{suffix}.jsonl", rageval_dir() / f"questions{suffix}.json"
 
 
 @dataclass
@@ -236,8 +265,10 @@ def sample(cuts: list[passages.Cut], n: int, seed: int = SEED) -> list[passages.
     return taken
 
 
-def write_questions(n: int, *, ask: Callable[..., llm.Result] | None = None, seed: int = SEED) -> dict[str, Any]:
-    cuts = passages.read_index()
+def write_questions(n: int, *, ask: Callable[..., llm.Result] | None = None, seed: int = SEED, thread: str | None = None) -> dict[str, Any]:
+    cuts = [c for c in passages.read_index() if on_thread(c.passage.paperId, thread)]
+    if thread and not cuts:
+        raise ValueError(f"no passage in the index is on thread {thread}")
     chosen = sample(cuts, n, seed)
     kept: list[Question] = []
     discarded: dict[str, int] = {}
@@ -268,19 +299,22 @@ def write_questions(n: int, *, ask: Callable[..., llm.Result] | None = None, see
                 continue
             kept.append(Question(id=f"S{len(kept) + 1}", set="S", text=text, relevant=[pid], source={"passage": pid, "kind": c.passage.kind}))
     lines = [json.dumps(q.__dict__, ensure_ascii=False) for q in kept]
-    atomic.write_text(rageval_dir() / "questions.jsonl", "\n".join(lines) + ("\n" if lines else ""))
+    questions_path, meta_path = _s_paths(thread)
+    atomic.write_text(questions_path, "\n".join(lines) + ("\n" if lines else ""))
     meta = {"asked": len(chosen), "kept": len(kept), "discarded": discarded, "seed": seed, "costUsd": usage.costUsd, "manifestHash": passages.manifest_hash()}
-    atomic.write_text(rageval_dir() / "questions.json", json.dumps(meta, indent=2) + "\n")
+    if thread:
+        meta["thread"] = thread
+    atomic.write_text(meta_path, json.dumps(meta, indent=2) + "\n")
     return meta
 
 
-def read_s() -> tuple[list[Question], dict[str, Any]]:
-    path = rageval_dir() / "questions.jsonl"
+def read_s(thread: str | None = None) -> tuple[list[Question], dict[str, Any]]:
+    path, meta_path = _s_paths(thread)
     if not path.exists():
         return [], {}
     qs = [Question(**json.loads(line)) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     try:
-        meta = json.loads((rageval_dir() / "questions.json").read_text(encoding="utf-8"))
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         meta = {}
     if meta.get("manifestHash") != passages.manifest_hash():
@@ -356,33 +390,50 @@ def choose_lane(report: RagReport) -> str:
 # ── the run ────────────────────────────────────────────────────────────
 
 
-def build_sets() -> tuple[dict[str, list[Question]], list[RagSetInfo]]:
+def build_sets(thread: str | None = None) -> tuple[dict[str, list[Question]], list[RagSetInfo]]:
+    """K, S and F, on one thread's papers when one is named (§4.1 of
+    OF-BLD-016). The passages a quote anchors in are always the whole index."""
     from .corpus import load_corpus
     from .evidence_pool import load as load_pool
 
     cuts = passages.read_index()
     field_names, organisms = _corpus_extras()
-    pool = load_pool()
-    k_questions, k_counts = build_k(pool.records, cuts, field_names, organisms)
+    # The scorecard measures retrieval over the whole index, archived
+    # programs included (OF-BLD-016 §2.3 leaves what it measures alone);
+    # `--thread` narrows the questions, never the passages searched.
+    pool = load_pool(include_archived=True)
+    items = [r for r in pool.records if on_thread(r.get("paperId"), thread)]
+    k_questions, k_counts = build_k(items, cuts, field_names, organisms)
     flows_path = Path(__file__).parent.parent / "tests" / "fixtures" / "flows.json"
     flows = json.loads(flows_path.read_text(encoding="utf-8")) if flows_path.exists() else []
-    f_questions, f_total = build_f(flows, load_corpus().records_by_id, cuts)
-    s_questions, s_meta = read_s()
+    records_by_id = {rid: r for rid, r in load_corpus().records_by_id.items() if on_thread(r.get("paperId"), thread)}
+    f_questions, f_total = build_f(flows, records_by_id, cuts)
+    s_questions, s_meta = read_s(thread)
     discarded = sum((s_meta.get("discarded") or {}).values())
+    on = f" on thread {thread}" if thread else ""
+    flag = f" --thread {thread}" if thread else ""
     infos = [
-        RagSetInfo(name="K", questions=len(k_questions), note=f"known items: {k_counts['records']} records and {k_counts['candidates']} anchored candidates whose quote sits in a passage"),
+        RagSetInfo(name="K", questions=len(k_questions), note=f"known items{on}: {k_counts['records']} records and {k_counts['candidates']} anchored candidates whose quote sits in a passage"),
         RagSetInfo(
             name="S",
             questions=len(s_questions),
             note=(
-                "written questions: set aside, written for an older index (run pnpm rag:questions again)"
+                f"written questions{on}: set aside, written for an older index (run pnpm rag:questions{flag} again)"
                 if s_meta.get("stale")
-                else f"written questions: {len(s_questions)} kept of {s_meta.get('asked', 0)} asked, {discarded} discarded"
+                else f"written questions{on}: {len(s_questions)} kept of {s_meta.get('asked', 0)} asked, {discarded} discarded"
                 if s_meta
-                else "written questions: none yet (pnpm rag:questions needs the key)"
+                else f"written questions{on}: none yet (pnpm rag:questions{flag} needs the key)"
             ),
         ),
-        RagSetInfo(name="F", questions=len(f_questions), note=f"flows: {len(f_questions)} of the {f_total} flows that cite records have a record that anchors"),
+        RagSetInfo(
+            name="F",
+            questions=len(f_questions),
+            note=(
+                f"flows: none of the {f_total} flows that cite records cites an anchored record{on}, so F is empty on this thread"
+                if thread and not f_questions
+                else f"flows: {len(f_questions)} of the {f_total} flows that cite records have a record{on} that anchors"
+            ),
+        ),
     ]
     return {"K": k_questions, "S": s_questions, "F": f_questions}, infos
 
@@ -394,9 +445,10 @@ def evaluate(
     lanes: Iterable[str] = retrieve.LANES,
     sets: dict[str, list[Question]] | None = None,
     infos: list[RagSetInfo] | None = None,
+    thread: str | None = None,
 ) -> RagReport:
     if sets is None:
-        sets, infos = build_sets()
+        sets, infos = build_sets(thread) if thread else build_sets()
     infos = infos or []
     status = passages.status()
     reports: list[RagLaneReport] = []
@@ -413,7 +465,8 @@ def evaluate(
                     for q in questions:
                         started = time.perf_counter()
                         try:
-                            detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
+                            detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder,
+                                                            include_archived=True)
                         except llm.ModelRefused as e:
                             # One question the helper model declined: that
                             # question goes unscored on this lane, and is
@@ -444,6 +497,7 @@ def evaluate(
         chosenLane="bm25",
         rule=RULE,
         totalCostUsd=round(total, 6),
+        thread=thread,
     )
     report.chosenLane = choose_lane(report)
     return report
@@ -452,10 +506,10 @@ def evaluate(
 def save(report: RagReport) -> None:
     atomic.write_text(rageval_dir() / "report.json", report.model_dump_json(indent=2) + "\n")
     table = {l.lane: l.score for l in report.lanes}
-    atomic.write_text(
-        passages.index_dir() / "config.json",
-        json.dumps({"lane": report.chosenLane, "chosenAt": report.date, "scores": table, "rule": report.rule}, indent=2) + "\n",
-    )
+    config = {"lane": report.chosenLane, "chosenAt": report.date, "scores": table, "rule": report.rule}
+    if report.thread:
+        config["thread"] = report.thread
+    atomic.write_text(passages.index_dir() / "config.json", json.dumps(config, indent=2) + "\n")
 
 
 def read_report() -> RagReport | None:
@@ -467,6 +521,8 @@ def read_report() -> RagReport | None:
 
 def _print(report: RagReport) -> None:
     print(f"index: {report.papersIndexed} papers, {report.passages} passages · {report.date}")
+    if report.thread:
+        print(f"questions on thread {report.thread} alone; every search ran over the whole index")
     for s in report.sets:
         print(f"  {s.name}: {s.note}")
     print(f"{'lane':<15}{'set':>4}{'n':>5}{'R@5':>7}{'R@10':>7}{'R@20':>7}{'MRR':>7}{'nDCG':>7}{'sec':>8}{'$/q':>9}")
@@ -481,23 +537,43 @@ def _print(report: RagReport) -> None:
     print(f"chosen: {report.chosenLane} · total cost ${report.totalCostUsd:.4f}")
 
 
+USAGE = "usage: python -m openferment_core.rageval questions [--n 200] [--thread Q] | eval [--thread Q]"
+
+
+def _option(argv: list[str], name: str) -> str | None:
+    """The word after `name`, "" when `name` ends the line, None when absent."""
+    if name not in argv:
+        return None
+    i = argv.index(name)
+    return argv[i + 1] if i + 1 < len(argv) else ""
+
+
 def main(argv: list[str]) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+    thread = _option(argv, "--thread")
+    if thread is not None and not re.fullmatch(r"[A-Z]", thread):
+        print(f"--thread takes one thread letter, A to Z (got {thread!r})\n{USAGE}")
+        return 2
     if argv[:1] == ["questions"]:
         n = 200
         if "--n" in argv:
             n = int(argv[argv.index("--n") + 1])
-        meta = write_questions(n)
-        print(f"questions: {meta['kept']} kept of {meta['asked']} asked; discarded {meta['discarded']}; ${meta['costUsd']:.4f}")
+        try:
+            meta = write_questions(n, thread=thread) if thread else write_questions(n)
+        except ValueError as e:
+            print(e)
+            return 2
+        on = f" on thread {thread}" if thread else ""
+        print(f"questions{on}: {meta['kept']} kept of {meta['asked']} asked; discarded {meta['discarded']}; ${meta['costUsd']:.4f}")
         return 0
     if argv[:1] == ["eval"]:
-        report = evaluate()
+        report = evaluate(thread=thread) if thread else evaluate()
         save(report)
         _print(report)
         return 0
-    print("usage: python -m openferment_core.rageval questions [--n 200] | eval")
+    print(USAGE)
     return 2
 
 

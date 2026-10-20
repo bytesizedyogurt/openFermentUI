@@ -8,7 +8,9 @@
 import { useEffect, useState } from 'react';
 import { Box, RotateCcw } from 'lucide-react';
 import type { Artifact, BasisSource, ReplayResult } from '@/data/types';
-import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, replayArtifact } from '@/lib/artifacts';
+import { ArtifactRefused, ArtifactsDown, getArtifact, headline, listArtifacts, programOfArtifact, replayArtifact, visibleArtifacts } from '@/lib/artifacts';
+import { useProgramLookup, useStore } from '@/store';
+import { PROGRAM_BY_ID, PROGRAMS_SETTINGS_PATH, isArchived } from '@/data/programs';
 import { href, navigate } from '@/router';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
@@ -58,7 +60,20 @@ export default function BioRepoArtifacts({ artifactId }: { artifactId?: string }
 }
 
 function ArtifactList() {
-  const load = useLoad((signal) => listArtifacts(signal), 'list');
+  // The program switch (OF-BLD-016 §2): an artifact computed from an archived
+  // program's records, product or strain is left out until the switch is on.
+  const showArchived = useStore((s) => s.showArchived);
+  const load = useLoad((signal) => listArtifacts(signal, showArchived), showArchived ? 'list-all' : 'list');
+  const lookup = useProgramLookup();
+  const all = load.state === 'ok' ? load.data : [];
+  const shown = visibleArtifacts(all, { ...lookup, showArchived });
+  const hidden = all.length - shown.length;
+  const hiddenNote = hidden > 0 && (
+    <p className="text-caption text-ink-soft mt-3" data-testid="artifacts-hidden">
+      {hidden} computed from an archived program {hidden === 1 ? 'is' : 'are'} not listed.{' '}
+      <a className="underline" href={href(PROGRAMS_SETTINGS_PATH)}>Settings → Programs</a> shows archived programs.
+    </p>
+  );
   return (
     <div>
       <PageHeader
@@ -69,14 +84,14 @@ function ArtifactList() {
       {load.state === 'loading' && <p className="text-body text-ink-soft">Asking the service…</p>}
       {load.state === 'down' && <ServiceDown error={load.error} />}
       {load.state === 'refused' && <Callout kind="warn">{load.why}</Callout>}
-      {load.state === 'ok' && load.data.length === 0 && (
+      {load.state === 'ok' && shown.length === 0 && (
         <EmptyState
           icon={<Box size={28} />}
           title="Nothing computed yet"
           body="The service keeps a value here each time one of its tools computes one: a converted unit, a yield ceiling, a fitted rate, a price. None has run on this machine."
         />
       )}
-      {load.state === 'ok' && load.data.length > 0 && (
+      {load.state === 'ok' && shown.length > 0 && (
         <Card className="overflow-x-auto">
           <table className="w-full border-collapse text-body" data-testid="artifact-table">
             <thead>
@@ -88,7 +103,7 @@ function ArtifactList() {
               </tr>
             </thead>
             <tbody>
-              {load.data.map((a) => {
+              {shown.map((a) => {
                 const h = headline(a);
                 return (
                   <tr key={a.id} className="border-b border-line last:border-0">
@@ -117,7 +132,21 @@ function ArtifactList() {
           </table>
         </Card>
       )}
+      {hiddenNote}
     </div>
+  );
+}
+
+/** A link opens what it names; an artifact of an archived program says so. */
+function ArchivedNote({ a }: { a: Artifact }) {
+  const lookup = useProgramLookup();
+  const p = programOfArtifact(a, lookup);
+  if (!p || !isArchived(p)) return null;
+  return (
+    <p role="note" className="text-caption text-ink-soft mb-3" data-archived-program={p}>
+      This value was computed from inputs of {PROGRAM_BY_ID[p].name}, an archived program.{' '}
+      <a className="underline" href={href(PROGRAMS_SETTINGS_PATH)}>Settings → Programs</a>
+    </p>
   );
 }
 
@@ -177,6 +206,7 @@ function ArtifactPage({ id }: { id: string }) {
       {load.state === 'loading' && <p className="text-body text-ink-soft">Asking the service…</p>}
       {load.state === 'down' && <ServiceDown error={load.error} />}
       {load.state === 'refused' && <Callout kind="warn">{load.why}</Callout>}
+      {load.state === 'ok' && <ArchivedNote a={load.data} />}
       {load.state === 'ok' && <ArtifactBody a={load.data} replay={replay} onReplay={run} />}
     </div>
   );

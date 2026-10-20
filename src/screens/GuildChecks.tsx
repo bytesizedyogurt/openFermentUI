@@ -9,8 +9,7 @@
 // shows to the person it names while they are acting: they learn of it when
 // it has been run, as a witnessed entry on their ledger, and from then on its
 // record is theirs to read like anyone's. Every rule that decides a write is
-// the service's; with the sample shown, the store makes the same moves in
-// memory and nothing is posted.
+// the service's.
 import { useEffect, useMemo, useState } from 'react';
 import type { Check, CheckBrief } from '@/data/types';
 import { useStore } from '@/store';
@@ -31,13 +30,11 @@ export default function GuildChecks({ checkId }: { checkId?: string }) {
   const ctx = useGuild();
   const loadChecks = useStore((s) => s.loadChecks);
   const serviceUp = useStore((s) => s.serviceUp);
-  const loadSample = useStore((s) => s.guildLoadSample);
   const { all, loaded } = useChecks();
   const [asked, setAsked] = useState(false);
   useEffect(() => {
-    if (ctx.sample) return;
     void loadChecks().finally(() => setAsked(true));
-  }, [loadChecks, serviceUp, ctx.sample]);
+  }, [loadChecks, serviceUp]);
 
   if (ctx.guild.people.length === 0) {
     return (
@@ -46,14 +43,11 @@ export default function GuildChecks({ checkId }: { checkId?: string }) {
         <Card className="max-w-2xl">
           <EmptyState
             title="Nobody is on the ledger yet"
-            body="Checks are proposed from the ledger: the people on it and what has been recorded about each. Start it under People, or look at an invented team first."
+            body="Checks are proposed from the ledger: the people on it and what has been recorded about each. Start it under People with yourself as its lead, then add the team."
             action={
-              <span className="flex flex-wrap gap-2 justify-center">
-                <LinkButton to="/guild/people" variant="primary">
-                  Start the ledger
-                </LinkButton>
-                <Button onClick={loadSample}>Show a sample team</Button>
-              </span>
+              <LinkButton to="/guild/people" variant="primary">
+                Add the first person
+              </LinkButton>
             }
           />
         </Card>
@@ -61,13 +55,13 @@ export default function GuildChecks({ checkId }: { checkId?: string }) {
     );
   }
 
-  const down = !ctx.sample && asked && !loaded;
+  const down = asked && !loaded;
   const shown = shownTo(all, ctx.actingId);
   if (checkId) {
     return (
       <>
         <GuildHeader title="Checks" subtitle={SUBTITLE} />
-        <OneCheck ctx={ctx} check={shown.find((c) => c.id === checkId) ?? null} id={checkId} asked={asked || ctx.sample} down={down} />
+        <OneCheck ctx={ctx} check={shown.find((c) => c.id === checkId) ?? null} id={checkId} asked={asked} down={down} />
       </>
     );
   }
@@ -132,9 +126,7 @@ function Queue({ ctx, checks, down }: { ctx: GuildContext; checks: Check[]; down
           {busy ? 'Ranking…' : 'Propose now'}
         </Button>
         <span className="text-caption text-ink-soft max-w-2xl">
-          {ctx.sample
-            ? 'The sample’s queue was ranked in this browser when the sample loaded. Proposing again ranks what has changed since.'
-            : 'The service ranks every person and skill each night. This runs the same ranking now and adds what is not in the queue already.'}
+          The service ranks every person and skill each night. This runs the same ranking now and adds what is not in the queue already.
         </span>
         {said && (
           <span role="status" className={cx('text-caption', said.bad ? 'text-signal-error' : 'text-ink')}>
@@ -230,8 +222,6 @@ function CheckCard({ ctx, check: c }: { ctx: GuildContext; check: Check }) {
           <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">Brief</div>
           {c.brief ? (
             <BriefView brief={c.brief} />
-          ) : ctx.sample ? (
-            <p className="text-caption text-ink-soft">A brief is drafted by the service from the ledger it keeps, and the sample stays in this browser.</p>
           ) : (
             <div className="space-y-1">
               <p className="text-caption text-ink-soft">
@@ -501,7 +491,7 @@ function OneCheck({ ctx, check: c, id, asked, down }: { ctx: GuildContext; check
               ? 'One moment.'
               : down
                 ? 'Checks are kept by the service, which is not answering here.'
-                : `${id} is not a check this browser can show to whoever is acting. If the sample team was shown when this link was made, it is gone after a reload.`
+                : `${id} is not a check this browser can show to whoever is acting.`
           }
           action={<LinkButton to="/guild/checks">All checks</LinkButton>}
         />
