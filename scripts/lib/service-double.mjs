@@ -108,6 +108,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const geneosCalls = [];
   const fermosCalls = [];
   const proformaRuns = [];
+  /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
+  const proformaReferences = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -310,6 +312,24 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(train));
     }
+    // OF-BLD-019 §2.2 — a reference biorefinery: its shelf entry, a run made
+    // through the real code with the stand-in in place of BioSTEAM, and the
+    // package test's values. GET reads it; POST answers as a run would, and
+    // is recorded. An id that is not a reference on the shelf is a 404.
+    const reference = url.match(/^\/api\/proforma\/reference\/([A-Za-z0-9_]+)$/);
+    if (reference && (req.method === 'GET' || req.method === 'POST')) {
+      const id = reference[1];
+      if (req.method === 'POST') proformaReferences.push(id);
+      let fixture;
+      try {
+        fixture = await prototype(`proforma-reference-${id}.json`);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `${id} is not a reference biorefinery on the shelf` }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(fixture));
+    }
     // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
     // and a run made through the real code with a stand-in evaluator.
     if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
@@ -414,5 +434,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proposalActs } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaReferences, proposalActs } };
 }

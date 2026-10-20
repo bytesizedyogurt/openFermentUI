@@ -387,6 +387,37 @@ def proforma_benchmark_run() -> dict:
     return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
 
 
+@app.get("/api/proforma/reference/{flowsheet_id}")
+def proforma_reference(flowsheet_id: str) -> dict:
+    """A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the
+    newest stored run or none, its package test's values, the simulator's
+    status. A read: it starts nothing. 404 for an id that is not a
+    reference biorefinery on the shelf."""
+    from . import proforma
+
+    try:
+        return proforma.reference(flowsheet_id).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/api/proforma/reference/{flowsheet_id}")
+def proforma_reference_run(flowsheet_id: str) -> dict:
+    """Run a reference biorefinery whole on its package's defaults and keep
+    it as one `proforma.reference` artifact (a basis already run returns its
+    stored artifact)."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        art = proforma.run_reference(flowsheet_id)
+        return proforma.reference(flowsheet_id, art).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {flowsheet_id}: {e}") from e
+
+
 @app.get("/api/proforma/scenarios")
 def proforma_scenarios(host: str | None = None) -> list[dict]:
     """The BioSTEAM scenario with its inputs bound to records (§8.3). A read:

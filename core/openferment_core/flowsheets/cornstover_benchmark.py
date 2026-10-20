@@ -25,6 +25,52 @@ REFERENCES = [
 ]
 
 
+def _settings(tea: Any) -> dict[str, Any]:
+    years = tea.duration
+    return {
+        "rateOfReturn": float(tea.IRR),
+        "operatingDays": float(tea.operating_days),
+        "incomeTax": float(tea.income_tax),
+        "startYear": int(years[0]),
+        "endYear": int(years[1]),
+    }
+
+
+# ── its reference run (OF-BLD-019 §2.2) ─────────────────────────────────
+# The same plant through GET/POST /api/proforma/reference/cornstover_benchmark,
+# as one `proforma.reference` artifact with every table. `run()` above stays
+# the benchmark's, unchanged; the reference run builds its own plant afresh,
+# as `cornstover.load()` names it, inside the worker's `package_defaults()`,
+# and leaves the benchmark's cached plant as it was.
+
+
+def load() -> Any:
+    from biorefineries import cornstover as cs
+
+    return cs.Biorefinery("corn stover ethanol", load=False, save=False)
+
+
+def parts(br: Any) -> dict[str, Any]:
+    """The system, the package's TEA, the ethanol at the price the package
+    solved for it as it built the plant, and the corn stover feedstock."""
+    return {"system": br.system, "tea": br.tea, "product": br.ethanol, "feedstock": br.cornstover,
+            "price": None, "basis_flow": float(br.ethanol.F_mass), "basis": "kg of the ethanol product stream"}
+
+
+def outputs(br: Any) -> dict[str, Any]:
+    from biorefineries import cornstover as cs
+
+    per_kg = float(br.ethanol.price)
+    return {
+        "package": f"{PACKAGE}@{version('biorefineries')}",
+        "mespUsdPerGal": per_kg * float(cs.ethanol_density_kggal),
+        "mespUsdPerKg": per_kg,
+        "ethanolDensityKgPerGal": float(cs.ethanol_density_kggal),
+        "settings": _settings(br.tea),
+        "references": REFERENCES,
+    }
+
+
 def run() -> dict[str, Any]:
     from biorefineries import cornstover as cs
 

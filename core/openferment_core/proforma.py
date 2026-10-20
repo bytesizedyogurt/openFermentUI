@@ -155,6 +155,154 @@ def benchmark_evidence(art):
         provenance=art.provenance, basis=artifacts.basis_of(art), figure=None)
 
 
+# ── Reference biorefineries (OF-BLD-019 §2.2, D3) ───────────────────────
+#
+# A published biorefinery on the shelf (`reference: True`) runs whole on its
+# package's own defaults in the worker's `reference` op and is kept as one
+# `proforma.reference` artifact: the package's result, the quantities its
+# own test asserts as this installation computed them (`measured`), its
+# defaults read back (`readBack`), every table a `proforma.run` artifact
+# holds (so `tables_of` reads it too), and the test's values beside them
+# (`regression`, `checks`), parsed from the installed test file. Every input
+# names the package, the simulator or a stated convention, so the run is
+# `computed`, as the benchmark is. The benchmark's own endpoints and
+# artifact (§8.2) are unchanged; the corn stover plant answers here too.
+
+REFERENCE = "proforma.reference"
+REFERENCE_VERSION = "reference run 1"
+# The significant digits a reference run keeps: BioSTEAM sums a set of units
+# in an order that moves the last digits from one build to the next, so the
+# run keeps fewer, and a replay compares the plant (a precision, stated in
+# every basis).
+REFERENCE_DIGITS = 10
+# numpy.allclose's own absolute tolerance, which the package's test uses
+# beside its rtol: a check holds when |measured − package| ≤ ATOL + rtol·|package|.
+ALLCLOSE_ATOL = 1e-08
+
+
+def _reference_info(flowsheet_id: str):
+    try:
+        info = _shelf.info(flowsheet_id)
+    except _shelf.NotOnShelf as e:
+        raise ScenarioRefused(str(e)) from None
+    if not info.reference:
+        refs = ", ".join(f.id for f in _shelf.SHELF.values() if f.reference)
+        raise ScenarioRefused(f"{flowsheet_id} is not a reference biorefinery: it runs on its inputs as a scenario; "
+                              f"the references are {refs}")
+    return info
+
+
+def reference_inputs(flowsheet_id: str) -> list:
+    """The basis of a reference run: the package's plant, the simulator, the
+    settings it builds under, each default the shelf lists (its value read
+    back after the run), what the run changes about the package to run it,
+    and the digits it keeps."""
+    from .models import BasisInput, BasisSource
+
+    info = _reference_info(flowsheet_id)
+    pkg = f"{_shelf.REFERENCE_MODULES[flowsheet_id]}@{_installed('biorefineries')}"
+    bst_v, tmo_v = _installed("biosteam"), _installed("thermosteam")
+    out = [
+        BasisInput(name="flowsheet", value=flowsheet_id, unit="", source=BasisSource(
+            kind="model", id=pkg, note=f"{info.title}, every setting the package's own")),
+        BasisInput(name="simulator", value=f"biosteam {bst_v}", unit="", source=BasisSource(
+            kind="model", id=f"biosteam@{bst_v}", note="the process simulator the package runs on")),
+        BasisInput(name="thermodynamics", value=f"thermosteam {tmo_v}", unit="", source=BasisSource(
+            kind="model", id=f"thermosteam@{tmo_v}", note="BioSTEAM's property engine")),
+        BasisInput(name="settings", value="bst.process_tools.default()", unit="", source=BasisSource(
+            kind="model", id=f"biosteam@{bst_v}",
+            note="BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own "
+                 "test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets "
+                 "its own, and the worker puts back what it held before")),
+    ]
+    out += [BasisInput(name=i.key, value="the package's default", unit=i.unit,
+                       source=BasisSource(kind="model", id=pkg, note=i.note)) for i in info.inputs]
+    out += [BasisInput(name="compatibility", value=what, unit="", source=BasisSource(kind="convention", note=why))
+            for what, why in _shelf.REFERENCE_COMPAT.get(flowsheet_id, [])]
+    out.append(BasisInput(name="precision", value=f"{REFERENCE_DIGITS} significant digits", unit="", source=BasisSource(
+        kind="convention", note="every number the run keeps is rounded so: BioSTEAM sums a set of units in an order "
+                                "that moves the last digits from one build to the next, and a replay compares the plant")))
+    return out
+
+
+def regression_checks(regression, measured: dict) -> list:
+    """Each of the package test's values beside what this installation
+    computed, held as the test holds it (numpy.allclose with the test's rtol)."""
+    from .models import RegressionCheck
+
+    out = []
+    for v in regression.values:
+        m = measured.get(v.expression)
+        m = float(m) if isinstance(m, (int, float)) else None
+        within = m is not None and abs(m - v.package) <= ALLCLOSE_ATOL + v.rtol * abs(v.package)
+        rel = abs(m - v.package) / abs(v.package) if m is not None and v.package != 0 else None
+        out.append(RegressionCheck(expression=v.expression, label=v.label, unit=v.unit, measured=m, package=v.package,
+                                   rtol=v.rtol, relDiff=rel, within=within))
+    return out
+
+
+def _run_reference(inputs, seed):
+    """One reference run, from its basis alone: the worker builds the plant
+    and reads it; the package test's values are set beside what it read."""
+    flowsheet = str(_named(inputs, "flowsheet"))
+    digits = int(str(_named(inputs, "precision") or REFERENCE_DIGITS).split()[0])
+    out = call("reference", {"flowsheet": flowsheet, "digits": digits})
+    regression = _shelf.package_regression(flowsheet)
+    out["regression"] = regression.model_dump(mode="json") if regression else None
+    out["checks"] = ([c.model_dump(mode="json") for c in regression_checks(regression, out.get("measured") or {})]
+                     if regression else [])
+    return out
+
+
+def _register_reference() -> None:
+    from . import artifacts
+
+    artifacts.register(REFERENCE, f"{REFERENCE_VERSION} · biosteam {_installed('biosteam')} · "
+                                  f"biorefineries {_installed('biorefineries')}", _run_reference)
+
+
+def _lazy_reference() -> None:
+    from . import artifacts
+
+    artifacts.register_lazy(REFERENCE, _register_reference)
+
+
+_lazy_reference()
+
+
+def _flowsheet_of(art) -> str | None:
+    return next((str(i.value) for i in art.inputs if i.name == "flowsheet"), None)
+
+
+def stored_reference(flowsheet_id: str):
+    """The newest stored reference run of a reference flowsheet, or None. A
+    read: it runs nothing and starts no simulator."""
+    from . import artifacts
+
+    _reference_info(flowsheet_id)
+    return next((a for a in artifacts.all_artifacts() if a.tool == REFERENCE and _flowsheet_of(a) == flowsheet_id), None)
+
+
+def run_reference(flowsheet_id: str):
+    """Run a reference biorefinery (or return the stored run of the same
+    basis) and keep it as one `proforma.reference` artifact."""
+    from . import artifacts
+
+    return artifacts.compute(REFERENCE, reference_inputs(flowsheet_id))
+
+
+def reference(flowsheet_id: str, art=None):
+    """What GET and POST /api/proforma/reference/{id} answer: the shelf's
+    entry, the run (the newest stored, unless one is given), the package
+    test's values and the simulator's status."""
+    from .models import ProformaReference
+
+    info = _reference_info(flowsheet_id)
+    art = art if art is not None else stored_reference(flowsheet_id)
+    return ProformaReference(flowsheet=info, artifact=art, regression=_shelf.package_regression(flowsheet_id),
+                             simulator=status())
+
+
 # ── The PHA scenario (§8.3) ─────────────────────────────────────────────
 #
 # Its inputs bind to records, or to an assumption a named person typed; the
@@ -617,9 +765,10 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
 
 def tables_of(art):
     """The tables a `proforma.run` artifact holds, as every reader reads
-    them (D1: Proforma, pureOS, fermOS, Postdoc, the MCP server). A run
-    stored before §2.1 reads with empty tables and its flowsheet from its
-    basis."""
+    them (D1: Proforma, pureOS, fermOS, Postdoc, the MCP server); a
+    `proforma.reference` artifact (§2.2) holds the same keys and reads the
+    same way. A run stored before §2.1 reads with empty tables and its
+    flowsheet from its basis."""
     from .models import ProformaTables
 
     o = art.output

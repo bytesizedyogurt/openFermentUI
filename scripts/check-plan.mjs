@@ -193,6 +193,11 @@ const PAIRS = [
   ['TeaLine', 'TeaLine'],
   ['TeaBreakdown', 'TeaBreakdown'],
   ['ProformaTables', 'ProformaTables'],
+  // OF-BLD-019 §2.2 — a reference biorefinery's run and its package's test.
+  ['RegressionValue', 'RegressionValue'],
+  ['PackageRegression', 'PackageRegression'],
+  ['RegressionCheck', 'RegressionCheck'],
+  ['ProformaReference', 'ProformaReference'],
   ['TraceStep', 'TraceStep'],
   // A follow-up carries its conversation's earlier turns in words.
   ['PriorTurn', 'PriorTurn'],

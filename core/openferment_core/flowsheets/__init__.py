@@ -21,8 +21,17 @@ module in KNOWN that is evaluated case by case exposes:
               of the product stream), `basis_flow` (kg/hr the price is per)
               and `basis` (what that flow is, in words)
 
-A reference biorefinery (cornstover_benchmark) runs a published model whole
-and exposes `run()` alone; the worker refuses to evaluate it case by case.
+A reference biorefinery (cornstover_benchmark, corn_drygrind) runs a
+published model whole; the worker refuses to evaluate it case by case. For
+its reference run (OF-BLD-019 §2.2, the worker's `reference` op) it exposes:
+
+    load()          the package's plant, built afresh with every default its
+                    own; the worker calls it inside `package_defaults()`
+    parts(built)    as above, with `price` None: the package's own price
+    outputs(built)  the package's result, its `package` and `references`
+    read_back(built)  (optional) every input the shelf lists, read back
+
+and cornstover_benchmark keeps `run()`, the benchmark's own (§8.2).
 """
 from __future__ import annotations
 

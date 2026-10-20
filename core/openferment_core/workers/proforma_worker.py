@@ -15,6 +15,13 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 read from BioSTEAM's objects right after it (TEA breakdown,
                 streams, units, utility duties, the diagram), the grid and
                 the samples; proforma.py keeps it as one artifact (D1)
+    reference   a published reference biorefinery run whole on its
+                package's defaults (OF-BLD-019 §2.2): built afresh inside
+                `package_defaults()`, as the package's own test builds it;
+                its outputs, the quantities that test asserts, its defaults
+                read back and every table; numbers rounded to the digits
+                the basis states, so a replay compares the plant and not
+                the order BioSTEAM sums a set of units in
 
 The tables are read through BioSTEAM's own attributes and methods, never
 recomputed: the TEA object's sales, material and utility cost, installed
@@ -27,8 +34,9 @@ from __future__ import annotations
 import itertools
 import math
 import shutil
+from contextlib import contextmanager
 from importlib.metadata import version
-from typing import Any
+from typing import Any, Iterator
 
 import biosteam as bst  # imported here so the cost is paid at start
 import numpy as np
@@ -146,6 +154,19 @@ def _id(stream_or_unit: Any) -> str | None:
     return getattr(stream_or_unit, "ID", None) or None
 
 
+def _sid(s: Any) -> str:
+    """A stream's ID, or, for a stream BioSTEAM left unnamed (a package may
+    leave one; the corn plant's water centre has four), where it sits in
+    BioSTEAM's own notation: 'U1-2' for outlet 2 of U1, '0-U1' for inlet 0."""
+    if s.ID:
+        return s.ID
+    if s.source:
+        return f"{s.source.ID}-{next((i for i, o in enumerate(s.source.outs) if o is s), 'out')}"
+    if s.sink:
+        return f"{next((i for i, o in enumerate(s.sink.ins) if o is s), 'in')}-{s.sink.ID}"
+    return "unnamed"
+
+
 def stream_table(system: Any) -> list[dict[str, Any]]:
     """Every stream of the system, in the order its units run: where it comes
     from and goes, its phase, temperature, pressure, total mass flow and the
@@ -155,7 +176,7 @@ def stream_table(system: Any) -> list[dict[str, Any]]:
         ids = s.chemicals.IDs
         flows = {i: float(m) for i, m in zip(ids, s.mass) if m}
         rows.append({
-            "id": s.ID, "source": _id(s.source), "sink": _id(s.sink), "phase": str(s.phase),
+            "id": _sid(s), "source": _id(s.source), "sink": _id(s.sink), "phase": str(s.phase),
             "T": float(s.T), "P": float(s.P), "massFlow": float(s.F_mass), "massFlows": flows,
             "price": _num(s.price) if s.price else None,
         })
@@ -182,7 +203,7 @@ def unit_table(system: Any) -> list[dict[str, Any]]:
         power = _num(u.power_utility.rate)
         rows.append({
             "id": u.ID, "unitClass": type(u).__name__, "line": getattr(u, "line", None) or None, "order": n,
-            "ins": [s.ID for s in u.ins if s], "outs": [s.ID for s in u.outs if s],
+            "ins": [_sid(s) for s in u.ins if s], "outs": [_sid(s) for s in u.outs if s],
             "installedCost": float(u.installed_cost), "purchaseCost": float(u.purchase_cost),
             "heatingDuty": heating, "coolingDuty": cooling, "power": power or None,
         })
@@ -203,6 +224,10 @@ def utility_duties(units: Any, group: str) -> dict[str, Any]:
         "electricityProduction": float(g.get_electricity_production()), "electricityProductionUnit": ug.ELEC_UNITS,
     }
 
+
+# A relative size below which a difference of two TEA totals is the float's
+# own rounding, not a cost (a precision, not a process number).
+NOISE = 1e-12
 
 LINE_WORDS = {
     "feedstock": ("Main feedstock", "the system's market value of the feedstock stream (System.get_market_value)"),
@@ -255,7 +280,12 @@ def tea_breakdown(parts: dict[str, Any]) -> dict[str, Any] | None:
     per = (out["basisFlow"] or 0.0) * hours
     lines = []
     for key, v in annual.items():
-        if v is None or (key in ("otherVariable", "coproductCredits") and v == 0.0):
+        # Other variable cost and co-product credit are lines only when they
+        # are something: a difference of two TEA totals that agree to the
+        # float's own noise (the corn plant's VOC less material and utility
+        # cost is ±1e-9 USD/yr on 6e7, and its sign changes build to build)
+        # is no line.
+        if v is None or (key in ("otherVariable", "coproductCredits") and abs(v) <= NOISE * max(abs(voc), abs(sales), 1.0)):
             continue
         label, reads = LINE_WORDS[key]
         lines.append({"key": key, "label": label, "usdPerYear": v, "perUnit": v / per if per else None, "reads": reads})
@@ -312,6 +342,110 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
 
 
+# ── a reference biorefinery's run (OF-BLD-019 §2.2) ────────────────────
+
+
+@contextmanager
+def package_defaults() -> Iterator[None]:
+    """BioSTEAM's defaults while a reference biorefinery builds and is read,
+    as the package's own test runs it (`default_settings` in
+    biorefineries/tests/test_biorefineries.py calls
+    `bst.process_tools.default()`); afterwards, what the worker held before
+    is put back, not the defaults, because the worker keeps other plants
+    warm whose costs read these globals (a PowerUtility's cost reads the
+    class's price when it is asked)."""
+    saved = {
+        "CE": bst.CE,
+        "power": bst.PowerUtility.price,
+        "powerFactors": dict(bst.PowerUtility.characterization_factors),
+        "heating": bst.HeatUtility.heating_agents,
+        "cooling": bst.HeatUtility.cooling_agents,
+        "tickets": {c: dict(c.ticket_numbers) for c in (bst.Stream, bst.Unit, bst.System)},
+        "chemicals": dict(bst.Chemical.chemical_cache),
+        "flowsheet": bst.main_flowsheet.get_flowsheet(),
+        "thermo": getattr(bst.settings, "_thermo", None),
+    }
+    bst.process_tools.default()
+    try:
+        yield
+    finally:
+        bst.CE = saved["CE"]
+        bst.PowerUtility.price = saved["power"]
+        bst.PowerUtility.characterization_factors.clear()
+        bst.PowerUtility.characterization_factors.update(saved["powerFactors"])
+        bst.HeatUtility.heating_agents = saved["heating"]
+        bst.HeatUtility.cooling_agents = saved["cooling"]
+        for cls, tickets in saved["tickets"].items():
+            cls.ticket_numbers.clear()
+            cls.ticket_numbers.update(tickets)
+        bst.Chemical.chemical_cache.clear()
+        bst.Chemical.chemical_cache.update(saved["chemicals"])
+        bst.main_flowsheet.set_flowsheet(saved["flowsheet"])
+        if saved["thermo"] is not None:
+            bst.settings.set_thermo(saved["thermo"])
+
+
+def package_test_quantities(parts: dict[str, Any]) -> dict[str, float]:
+    """The quantities the package's test template asserts, computed as it
+    computes them (`UnitGroup('Biorefinery', tea.units)`), keyed by the
+    expression it writes (flowsheets/shelf.py, TEST_QUANTITIES)."""
+    tea, feedstock, product = parts["tea"], parts["feedstock"], parts["product"]
+    units = bst.UnitGroup("Biorefinery", tea.units)
+    return {
+        "tea.IRR": float(tea.IRR),
+        "feedstock.price": float(feedstock.price),
+        "product.price": float(product.price),
+        "tea.sales": float(tea.sales),
+        "tea.material_cost": float(tea.material_cost),
+        "tea.installed_equipment_cost": float(tea.installed_equipment_cost),
+        "tea.utility_cost": float(tea.utility_cost),
+        "units.get_heating_duty()": float(units.get_heating_duty()),
+        "units.get_cooling_duty()": float(units.get_cooling_duty()),
+        "units.get_electricity_consumption()": float(units.get_electricity_consumption()),
+        "units.get_electricity_production()": float(units.get_electricity_production()),
+    }
+
+
+def rounded(value: Any, digits: int) -> Any:
+    """Every float in a JSON-ready value to `digits` significant digits."""
+    if isinstance(value, float):
+        return float(f"{value:.{digits}g}") if math.isfinite(value) else value
+    if isinstance(value, dict):
+        return {k: rounded(v, digits) for k, v in value.items()}
+    if isinstance(value, list):
+        return [rounded(v, digits) for v in value]
+    return value
+
+
+def reference(name: str, digits: int) -> dict[str, Any]:
+    """A reference biorefinery, run whole: built afresh inside
+    `package_defaults()`, then everything read before the settings go back."""
+    try:
+        module = flowsheets.load(name)
+    except KeyError as e:
+        raise Refused(str(e)) from e
+    if not hasattr(module, "load"):
+        raise Refused(f"{name} is not a reference biorefinery: it is run case by case, on its inputs")
+    if not 1 <= digits <= 17:
+        raise Refused("a reference run keeps between 1 and 17 significant digits")
+    with package_defaults():
+        b = module.load()
+        parts = module.parts(b)
+        out = {
+            "flowsheet": name,
+            "simulator": f"biosteam {version('biosteam')}",
+            **module.outputs(b),
+            "measured": package_test_quantities(parts),
+            "readBack": module.read_back(b) if hasattr(module, "read_back") else {},
+            **tables(module, b),
+        }
+    return rounded(out, digits)
+
+
+def _op_reference(args):
+    return reference(str(args["flowsheet"]), int(args.get("digits", 17)))
+
+
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
                int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None)
@@ -337,7 +471,7 @@ def _op_benchmark(args):
 
 
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
-            "run": _op_run}
+            "run": _op_run, "reference": _op_reference}
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")

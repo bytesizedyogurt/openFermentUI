@@ -398,7 +398,7 @@ async function main() {
       if (!/Casein[\s\S]*PHA/.test(await page.locator('[data-testid="home-programs-archived"]').innerText().catch(() => '')))
         problems.push('Home does not name the archived programs in one line');
 
-      await goTo('/geneos/model');
+      await goTo('/geneos/model', 'main >> text=/No model on the shelf/');
       if (!/No model on the shelf computes for an active program/.test(await page.locator('main').innerText().catch(() => '')))
         problems.push('geneOS → Model does not say the shelf has nothing for an active program');
 
@@ -488,8 +488,10 @@ async function main() {
       if (refs !== off.filter((f) => f.reference).map((f) => f.id).join()) problems.push(`the Reference runs row lists ${refs || 'nothing'}`);
       for (const f of off.filter((x) => x.reference)) {
         const card = page.locator(`[data-testid="reference-card"][data-flowsheet="${f.id}"]`);
+        // Each card asks for its own newest run: wait for its answer before reading it.
+        await card.locator('[data-testid="reference-not-run"], [data-testid="reference-result"]').first().waitFor({ timeout: 8000 }).catch(() => {});
         const text = await card.innerText().catch(() => '');
-        if (!text.includes(f.title) || !/Not run on this service yet|Ran \d{4}-/.test(text)) problems.push(`the reference card for ${f.id} does not name it and its newest run`);
+        if (!text.includes(f.title) || !/Not run on this service yet|Ran\s+\d{4}-/.test(text)) problems.push(`the reference card for ${f.id} does not name it and its newest run`);
         if (!(await card.locator('[data-testid="reference-run"]').isEnabled().catch(() => false))) problems.push(`the reference card for ${f.id} offers no run`);
         if (!/The simulator (has not started|is starting|is warm|failed)/.test(await card.locator('[data-testid="reference-status"]').innerText().catch(() => '')))
           problems.push(`the reference card for ${f.id} has no status line`);
@@ -537,6 +539,8 @@ async function main() {
         problems.push('New scenario from this does not open on its flowsheet');
       if ((await page.locator('[data-testid="new-scenario-program"]').inputValue().catch(() => '')) !== 'pha') problems.push('a scenario on the PHA flowsheet does not start in PHA');
       const made = await make('pha_sugar_v0', 'PHA from the shelf');
+      // The inputs table draws once the shelf answers.
+      await page.locator('[data-testid="made-here-inputs"] tbody tr').first().waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[data-testid="made-here-inputs"] tbody tr').count()) !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
       if (made) {
         await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });

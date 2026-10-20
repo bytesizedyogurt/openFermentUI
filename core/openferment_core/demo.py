@@ -805,6 +805,8 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
 
     if op == "evaluate":
         return evaluate(args["values"])
+    if op == "reference":
+        return _standin_reference(str(args["flowsheet"]))
     if op == "run":
         # OF-BLD-019 §2.1: the worker's whole run, composed of the three
         # below, with tables a closed form makes and labels as the stand-in.
@@ -905,6 +907,88 @@ def _standin_tables(v: dict[str, float], out: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# A reference biorefinery's run (OF-BLD-019 §2.2) in the shape the worker's
+# `reference` op writes, from a closed form: three units, five streams, a
+# TEA whose lines sum to the stand-in price, the package test's quantities
+# read from those, and every default the shelf lists. Every number is
+# invented and the run says so in `simulator` and `tablesSource`; the
+# package test's values beside it are the installed file's, as a real run's.
+def _standin_reference(flowsheet: str) -> dict[str, Any]:
+    from .flowsheets import shelf as _shelf
+    from .flowsheets.shelf import TABLE_UNITS
+
+    info = _shelf.info(flowsheet)
+    hours, feed, product, price, feed_price = 8000.0, 40000.0, 12000.0, 0.5, 0.15
+    lines_in = {"feedstock": feed * feed_price, "otherMaterials": 600.0, "utilities": 900.0,
+                "fixedOperating": 500.0, "capitalRecovery": 700.0}
+    credit = sum(lines_in.values()) - product * price  # what the co-product must bring for the lines to sum
+    annual = {k: v * hours for k, v in lines_in.items()} | {"coproductCredits": -credit * hours}
+    words = {"feedstock": "Main feedstock", "otherMaterials": "Other materials", "utilities": "Utilities",
+             "fixedOperating": "Fixed operating, labour included", "capitalRecovery": "Capital recovery",
+             "coproductCredits": "Co-product credits"}
+
+    def stream(sid, source, sink, flows, price_=None):
+        return {"id": sid, "source": source, "sink": sink, "phase": "l", "T": 298.15, "P": 101325.0,
+                "massFlow": sum(flows.values()), "massFlows": flows, "price": price_}
+
+    streams = [
+        stream("feed", None, "R1", {"Starch": feed}, feed_price),
+        stream("beer", "R1", "D1", {"Ethanol": product, "Water": 3 * product}),
+        stream("product", "D1", "M1", {"Ethanol": product}, price),
+        stream("stillage", "D1", None, {"Water": 3 * product}),
+        stream("coproduct", "R1", None, {"Solids": feed - product}, credit / (feed - product)),
+    ]
+    units = []
+    for n, (uid, heat, cool, kw) in enumerate((("R1", None, 5.0e6, 300.0), ("D1", 9.0e6, 8.0e6, 120.0),
+                                               ("M1", None, None, 40.0))):
+        installed = lines_in["capitalRecovery"] * hours * (3 - n)
+        units.append({"id": uid, "unitClass": "StandIn", "line": "STAND-IN unit", "order": n,
+                      "ins": [s["id"] for s in streams if s["sink"] == uid],
+                      "outs": [s["id"] for s in streams if s["source"] == uid],
+                      "installedCost": installed, "purchaseCost": installed / 2.0,
+                      "heatingDuty": heat, "coolingDuty": cool, "power": kw})
+    installed_total = sum(u["installedCost"] for u in units)
+    sales = product * price * hours + credit * hours
+    heating = sum(u["heatingDuty"] or 0.0 for u in units) / 1e6
+    cooling = sum(u["coolingDuty"] or 0.0 for u in units) / 1e6
+    power = sum(u["power"] or 0.0 for u in units) / 1e3
+    tea = {
+        "teaClass": "StandIn", "product": "product", "feedstock": "feed", "productPrice": price, "basisFlow": product,
+        "basis": "kg of the STAND-IN product", "operatingHours": hours, "sales": sales,
+        "materialCost": annual["feedstock"] + annual["otherMaterials"], "feedstockCost": annual["feedstock"],
+        "otherMaterialCost": annual["otherMaterials"], "utilityCost": annual["utilities"],
+        "purchaseCost": installed_total / 2.0, "installedEquipmentCost": installed_total, "FCI": installed_total,
+        "TCI": installed_total, "FOC": annual["fixedOperating"], "laborCost": annual["fixedOperating"] / 2.0,
+        "capitalRecovery": annual["capitalRecovery"], "coproductCredits": credit * hours, "IRR": 0.1, "incomeTax": None,
+        "lines": [{"key": k, "label": words[k], "usdPerYear": a, "perUnit": a / (product * hours), "reads": PROFORMA_STANDIN}
+                  for k, a in annual.items()],
+    }
+    measured = {
+        "tea.IRR": tea["IRR"], "feedstock.price": feed_price, "product.price": price, "tea.sales": sales,
+        "tea.material_cost": tea["materialCost"], "tea.installed_equipment_cost": installed_total,
+        "tea.utility_cost": tea["utilityCost"], "units.get_heating_duty()": heating, "units.get_cooling_duty()": cooling,
+        "units.get_electricity_consumption()": power, "units.get_electricity_production()": 0.0,
+    }
+    if flowsheet == "corn_drygrind":
+        outputs = {"ethanolPriceUsdPerKg": price, "IRR": tea["IRR"], "ethanolKgPerH": product, "cornKgPerH": feed}
+    else:
+        outputs = {"mespUsdPerGal": price * 3.0, "mespUsdPerKg": price, "ethanolDensityKgPerGal": 3.0,
+                   "settings": {"rateOfReturn": 0.1, "operatingDays": hours / 24.0, "incomeTax": 0.35,
+                                "startYear": 2007, "endYear": 2037}}
+    read_back = {i.key: ("STAND-IN" if i.dimension == "schedule" else 1.0) for i in info.inputs}
+    return {
+        "flowsheet": flowsheet, "simulator": PROFORMA_STANDIN, "package": f"STAND-IN for {flowsheet}",
+        **outputs, "references": [PROFORMA_STANDIN], "measured": measured, "readBack": read_back,
+        "tablesSource": PROFORMA_STANDIN, "tea": tea, "streams": streams, "units": units,
+        "utilities": {"group": "STAND-IN units", "heating": heating, "heatingUnit": "GJ/hr", "cooling": cooling,
+                      "coolingUnit": "GJ/hr", "electricityConsumption": power, "electricityConsumptionUnit": "MW",
+                      "electricityProduction": 0.0, "electricityProductionUnit": "MW"},
+        "diagram": None,
+        "diagramNote": "STAND-IN: no flowsheet was simulated, so there is no diagram; the units are listed in order.",
+        "unitOrder": [u["id"] for u in units], "tableUnits": TABLE_UNITS,
+    }
+
+
 def prototype_proforma() -> dict[str, Any]:
     import tempfile
     from types import SimpleNamespace
@@ -933,8 +1017,25 @@ def prototype_proforma() -> dict[str, Any]:
     def shelf(include_archived: bool) -> list[dict[str, Any]]:
         return [f.model_dump(mode="json") for f in proforma.shelf(include_archived=include_archived)]
 
+    # OF-BLD-019 §2.2: each reference biorefinery as GET and POST
+    # /api/proforma/reference/{id} answer, its run made through the real
+    # code (proforma.run_reference, the artifact store in a scratch folder,
+    # the package test's values parsed from the installed file) with the
+    # STAND-IN in place of BioSTEAM, and the simulator as the double has it.
+    references: dict[str, Any] = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_call
+            for fid in (f.id for f in proforma._shelf.SHELF.values() if f.reference):
+                art = proforma.run_reference(fid).model_copy(update={"createdAt": AT, "durationMs": 0})
+                ref = proforma.reference(fid, art).model_copy(update={"simulator": {"status": "cold", "error": None}})
+                references[f"proforma-reference-{fid}.json"] = ref.model_dump(mode="json")
+        finally:
+            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+
     return {"proforma-scenarios.json": [info], "proforma-run.json": run.model_dump(mode="json"),
-            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True)}
+            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references}
 
 
 # OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code

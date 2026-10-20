@@ -2876,6 +2876,56 @@ export interface FlowsheetInfo {
   priceBasis: string | null;
   leavesOut: string[];
   gridInputs: string[];
+  /** A reference biorefinery's own regression test, cited as file::test; its values come from the installed file (PackageRegression). */
+  packageTest: string | null;
+}
+
+// OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
+// defaults and is kept as one `proforma.reference` artifact: the package's
+// outputs, the quantities its own test asserts as this installation
+// computed them (`measured`), the defaults read back (`readBack`), the
+// test's values beside them (`regression`, `checks`), and every table a
+// `proforma.run` artifact holds. The test's values are parsed from the
+// installed test file; none is typed here.
+
+/** One value a package's own test asserts, as its test file writes it. */
+export interface RegressionValue {
+  /** The expression the test asserts on ('tea.IRR', 'units.get_heating_duty()'). */
+  expression: string;
+  label: string;
+  unit: string;
+  package: number;
+  rtol: number;
+}
+
+/** A reference biorefinery's regression values, read from the package's installed test file. */
+export interface PackageRegression {
+  package: string;
+  file: string;
+  test: string;
+  values: RegressionValue[];
+}
+
+/** One of the package test's values beside what this installation computed. */
+export interface RegressionCheck {
+  expression: string;
+  label: string;
+  unit: string;
+  measured: number | null;
+  package: number;
+  rtol: number;
+  /** |measured − package| / |package|; null when the package's value is zero. */
+  relDiff: number | null;
+  within: boolean;
+}
+
+/** GET and POST /api/proforma/reference/:id. */
+export interface ProformaReference {
+  flowsheet: FlowsheetInfo;
+  /** The newest stored `proforma.reference` run, or null before the first. */
+  artifact: Artifact | null;
+  regression: PackageRegression | null;
+  simulator: { status: 'cold' | 'starting' | 'ready' | 'failed'; error: string | null };
 }
 
 /** One stream of the base case: source and sink unit (null for a feed or a product). */

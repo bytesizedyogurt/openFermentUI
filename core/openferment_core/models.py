@@ -1678,6 +1678,69 @@ class FlowsheetInfo(BaseModel):
     leavesOut: list[str] = Field(default_factory=list)
     # The inputs a run's grid walks, for the sliders; none, no grid.
     gridInputs: list[str] = Field(default_factory=list)
+    # A reference biorefinery's own regression test, cited as file::test
+    # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
+    # are read from the installed file (PackageRegression), never retyped.
+    packageTest: str | None = None
+
+
+# ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
+#
+# A published biorefinery runs whole on its package's defaults and is kept
+# as one `proforma.reference` artifact: the package's outputs, the
+# quantities its own test asserts as this installation computed them, the
+# defaults read back, and every table a `proforma.run` artifact holds. The
+# test's values come from the installed test file, parsed, with the file
+# and test named.
+
+
+class RegressionValue(BaseModel):
+    """One value a package's own test asserts, as its test file writes it."""
+
+    # The expression the test asserts on ('tea.IRR', 'units.get_heating_duty()').
+    expression: str
+    label: str
+    unit: str
+    # The value the test asserts, and the relative tolerance it allows.
+    package: float
+    rtol: float
+
+
+class PackageRegression(BaseModel):
+    """A reference biorefinery's regression values, read from the package's
+    installed test file: which package, which file, which test."""
+
+    package: str
+    file: str
+    test: str
+    values: list[RegressionValue] = Field(default_factory=list)
+
+
+class RegressionCheck(BaseModel):
+    """One of the package test's values beside what this installation computed."""
+
+    expression: str
+    label: str
+    unit: str
+    measured: float | None = None
+    package: float
+    rtol: float
+    # |measured − package| / |package|; None when the package's value is zero
+    # (the check is then |measured| within rtol of nothing, as numpy's allclose
+    # with its default absolute tolerance has it).
+    relDiff: float | None = None
+    within: bool
+
+
+class ProformaReference(BaseModel):
+    """GET and POST /api/proforma/reference/{id}: the shelf's entry, the
+    newest stored reference run (or None), the package test's values, and
+    where the simulator is."""
+
+    flowsheet: FlowsheetInfo
+    artifact: Artifact | None = None
+    regression: PackageRegression | None = None
+    simulator: dict[str, Any] = Field(default_factory=dict)
 
 
 class StreamRow(BaseModel):

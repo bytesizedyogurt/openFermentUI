@@ -170,3 +170,150 @@ def test_r3_a_run_with_no_feasible_sample_makes_no_evidence():
     art = SimpleNamespace(output={"quantiles": {}, "feasible": 0}, id="x")
     with pytest.raises(proforma.ScenarioRefused, match="no sample"):
         proforma.evidence_of(art)
+
+
+# ── the dry-grind corn plant, the yeast program's reference (OF-BLD-019 §2.2) ──
+
+from openferment_core.flowsheets import shelf as _shelf  # noqa: E402
+
+# The eleven values biorefineries 2.35.1's own test asserts for the corn
+# plant, RESTATED here from biorefineries/tests/test_biorefineries.py,
+# test_corn (rtol 5e-2 each), only to hold the parser that reads that file
+# to it. The file is the authority: the service, the slow test and the
+# screens read the values from it through `shelf.package_regression`.
+TEST_CORN = [
+    ("tea.IRR", 0.05381572438333119),
+    ("feedstock.price", 0.13227735731092652),
+    ("product.price", 0.48547915353569393),
+    ("tea.sales", 74992038.8556337),
+    ("tea.material_cost", 52925382.42511212),
+    ("tea.installed_equipment_cost", 65387501.9390586),
+    ("tea.utility_cost", 10442066.327145828),
+    ("units.get_heating_duty()", 111.3588815958425),
+    ("units.get_cooling_duty()", 105.08735576937576),
+    ("units.get_electricity_consumption()", 1.6248530112233648),
+    ("units.get_electricity_production()", 0.0),
+]
+
+
+def test_the_corn_plant_is_the_yeast_programs_reference_on_the_shelf():
+    corn = _shelf.SHELF["corn_drygrind"]
+    assert corn.reference and corn.program == "yeast" and corn.source.startswith("biorefineries ")
+    assert corn.source.endswith(", corn") and _shelf.REFERENCE_MODULES["corn_drygrind"] == "biorefineries.corn"
+    assert corn.packageTest == "biorefineries/tests/test_biorefineries.py::test_corn"
+    assert corn.priceOutput in corn.outputs and corn.priceBasis
+    # Every input is the package's own default, named, bound to nothing.
+    assert corn.inputs and {i.kind for i in corn.inputs} == {"convention"}
+    assert all(i.fields == [] and i.note.startswith("the package's own default") for i in corn.inputs)
+    assert len({i.key for i in corn.inputs}) == len(corn.inputs)
+
+
+def test_the_package_test_values_are_read_from_the_installed_file():
+    reg = _shelf.package_regression("corn_drygrind")
+    assert reg is not None, "biorefineries is not installed here, or its test file moved"
+    assert (reg.file, reg.test) == ("biorefineries/tests/test_biorefineries.py", "test_corn")
+    assert reg.package.startswith("biorefineries ")
+    assert [(v.expression, v.package) for v in reg.values] == TEST_CORN
+    assert {v.rtol for v in reg.values} == {0.05}
+    assert all(v.label != v.expression and v.unit is not None for v in reg.values)
+    assert [v.expression for v in _shelf.package_regression("cornstover_benchmark").values] == [e for e, _ in TEST_CORN]
+    assert _shelf.package_regression("pha_sugar_v0") is None and _shelf.package_regression("nowhere") is None
+
+
+def test_a_check_holds_as_numpy_allclose_holds_it():
+    from openferment_core.models import PackageRegression, RegressionValue
+
+    reg = PackageRegression(package="p", file="f", test="t", values=[
+        RegressionValue(expression="a", label="a", unit="", package=100.0, rtol=0.05),
+        RegressionValue(expression="b", label="b", unit="", package=0.0, rtol=0.05),
+        RegressionValue(expression="c", label="c", unit="", package=1.0, rtol=0.05),
+    ])
+    a, b, c = proforma.regression_checks(reg, {"a": 104.9, "b": 1e-9})
+    assert a.within and a.relDiff == pytest.approx(0.049)
+    assert b.within and b.relDiff is None  # zero asserted: |measured| within numpy's absolute tolerance
+    assert not c.within and c.measured is None
+    [d] = proforma.regression_checks(reg.model_copy(update={"values": reg.values[:1]}), {"a": 105.1})
+    assert not d.within
+
+
+def test_a_reference_not_yet_run_reads_as_none_and_starts_nothing(store):
+    from openferment_core import api
+
+    before = proforma.status()["status"]
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    r = c.get("/api/proforma/reference/corn_drygrind").json()
+    assert r["artifact"] is None and r["simulator"]["status"] == before
+    assert r["flowsheet"]["id"] == "corn_drygrind" and r["regression"]["test"] == "test_corn"
+    assert c.get("/api/proforma/reference/cornstover_benchmark").json()["regression"]["test"] == "test_cornstover"
+    for bad, said in (("pha_sugar_v0", "not a reference biorefinery"), ("toy", "STAND-IN for tests"),
+                      ("nowhere", "no flowsheet nowhere")):
+        for r in (c.get(f"/api/proforma/reference/{bad}"), c.post(f"/api/proforma/reference/{bad}")):
+            assert r.status_code == 404 and said in r.json()["detail"]
+    assert c.post("/api/proforma/reference/corn_drygrind", headers={"Origin": "https://evil.example"}).status_code == 403
+    assert proforma.status()["status"] == before
+
+
+def test_a_reference_run_is_one_artifact_with_its_basis_and_the_package_values(store, monkeypatch):
+    # The run goes through the real code (the basis, the artifact store, the
+    # package test parsed from the installed file) with demo.py's STAND-IN
+    # answering for the worker, as the double's fixture is made.
+    from openferment_core import api, artifacts, demo
+
+    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    art = proforma.run_reference("corn_drygrind")
+    assert art.tool == proforma.REFERENCE and art.toolVersion.startswith(proforma.REFERENCE_VERSION)
+    assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model", "convention"}
+    named = {i.name: i for i in art.inputs}
+    assert named["flowsheet"].source.id.startswith("biorefineries.corn@")
+    assert named["precision"].value == f"{proforma.REFERENCE_DIGITS} significant digits"
+    assert "_ins_size_is_fixed" in str(named["compatibility"].value)
+    for i in _shelf.SHELF["corn_drygrind"].inputs:  # each default named in the basis, its value read back
+        assert named[i.key].value == "the package's default" and named[i.key].source.kind == "model"
+    o = art.output
+    assert [c["expression"] for c in o["checks"]] == [e for e, _ in TEST_CORN]
+    assert o["regression"]["test"] == "test_corn" and o[_shelf.SHELF["corn_drygrind"].priceOutput] is not None
+    t = proforma.tables_of(art)  # the one reader reads a reference run as it reads a scenario run
+    assert t.flowsheet == "corn_drygrind" and t.tablesSource == demo.PROFORMA_STANDIN and t.units and t.streams
+    assert proforma.stored_reference("corn_drygrind").id == art.id and proforma.stored_reference("cornstover_benchmark") is None
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    assert c.get("/api/proforma/reference/corn_drygrind").json()["artifact"]["id"] == art.id
+    again = c.post("/api/proforma/reference/corn_drygrind").json()
+    assert again["artifact"]["id"] == art.id and again["artifact"]["createdAt"] == art.createdAt  # stored, not rerun
+    assert artifacts.replay(art.id).identical
+    # The benchmark's own endpoint answers exactly as before: a reference
+    # run of any plant is not the benchmark's artifact.
+    proforma.run_reference("cornstover_benchmark")
+    assert c.get("/api/proforma/benchmark").json()["artifact"] is None
+
+
+@pytest.mark.sim
+def test_the_corn_plant_runs_in_the_worker_and_reads_back_every_input(store):
+    # Marked sim: the real worker builds the package's plant (about a second
+    # once BioSTEAM is loaded); test_proforma_slow holds its numbers to the
+    # package's test.
+    proforma.start(background=False)
+    pha = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
+           "sugarFeed": 10000.0}  # PLACEHOLDER inputs to exercise the PHA draft; no price here is a result
+    before = proforma.call("run", {"flowsheet": "pha_sugar_v0", "base": pha, "specs": {}, "samples": 0, "seed": 0})
+    art = proforma.run_reference("corn_drygrind")
+    o = art.output
+    corn = _shelf.SHELF["corn_drygrind"]
+    assert set(o["readBack"]) == {i.key for i in corn.inputs}
+    assert all(isinstance(v, float) for k, v in o["readBack"].items() if k != "depreciation")
+    assert set(o["measured"]) == set(_shelf.TEST_QUANTITIES) and len(o["checks"]) == len(TEST_CORN)
+    assert set(corn.outputs) <= set(o) and o["simulator"].startswith("biosteam ")
+    t = proforma.tables_of(art)
+    assert t.tea.product == "ethanol" and t.tea.feedstock == "corn" and t.tea.teaClass == "ConventionalEthanolTEA"
+    assert "SimultaneousSaccharificationFermentation" in {u.unitClass for u in t.units}
+    assert len({s.id for s in t.streams}) == len(t.streams) and all(s.id for s in t.streams)
+    assert t.unitOrder == [u.id for u in t.units]
+    assert sum(line.perUnit for line in t.tea.lines) == pytest.approx(o["ethanolPriceUsdPerKg"], rel=1e-8)
+    # The units the shelf states for the package test's duties are BioSTEAM's
+    # own: the worker reads the UnitGroup's DUTY_UNITS and ELEC_UNITS.
+    assert _shelf.TEST_QUANTITIES["units.get_heating_duty()"][1] == t.utilities.heatingUnit
+    assert _shelf.TEST_QUANTITIES["units.get_cooling_duty()"][1] == t.utilities.coolingUnit
+    assert _shelf.TEST_QUANTITIES["units.get_electricity_consumption()"][1] == t.utilities.electricityConsumptionUnit
+    assert _shelf.TEST_QUANTITIES["units.get_electricity_production()"][1] == t.utilities.electricityProductionUnit
+    # The worker put back what it held: the PHA draft, built before, prices as it did.
+    after = proforma.call("run", {"flowsheet": "pha_sugar_v0", "base": pha, "specs": {}, "samples": 0, "seed": 0})
+    assert after["base"] == before["base"] and after["tables"]["tea"] == before["tables"]["tea"]

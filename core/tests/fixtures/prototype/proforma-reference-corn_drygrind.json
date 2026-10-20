@@ -1,0 +1,1100 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "flowsheet": {
+      "id": "corn_drygrind",
+      "title": "Dry-grind corn to ethanol, the conventional plant",
+      "description": "The conventional dry-grind corn ethanol plant the BioSTEAM authors built after Kwiatkowski et al. 2006 (Industrial Crops and Products): milling and slurry, jet cooking and liquefaction, saccharification, simultaneous saccharification and fermentation by yeast, the ethanol purification train of biorefineries.ethanol (beer column, rectifier, molecular sieves), and DDGS and crude corn oil recovered from the stillage. Run whole on the package's own defaults: the yeast program's reference biorefinery, with the package's own regression values beside what this installation computes.",
+      "source": "biorefineries 2.35.1, corn",
+      "program": "yeast",
+      "reference": true,
+      "inputs": [
+        {
+          "key": "cornFeed",
+          "name": "corn fed",
+          "dimension": "massFlow",
+          "unit": "kg h-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: BiorefinerySettings.feedstock_hourly_mass_flow"
+        },
+        {
+          "key": "cornPrice",
+          "name": "price of corn",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['Corn']"
+        },
+        {
+          "key": "ethanolPrice",
+          "name": "price of ethanol",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['Ethanol'], the price at which the package's TEA solves the internal rate of return"
+        },
+        {
+          "key": "ddgsPrice",
+          "name": "price of DDGS (distillers' dried grains with solubles)",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['DDGS']"
+        },
+        {
+          "key": "crudeOilPrice",
+          "name": "price of crude corn oil",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['Crude oil']"
+        },
+        {
+          "key": "enzymePrice",
+          "name": "price of the amylase enzymes",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['Enzyme']"
+        },
+        {
+          "key": "yeastPrice",
+          "name": "price of yeast",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_stream_prices['Yeast']"
+        },
+        {
+          "key": "electricityPrice",
+          "name": "price of electricity",
+          "dimension": "costUSD",
+          "unit": "USD kWh-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_load_utility_settings(power_price=…)"
+        },
+        {
+          "key": "ssfYield",
+          "name": "glucose to ethanol in the fermenter, as a share of the theoretical",
+          "dimension": "fraction",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(yield_=…)"
+        },
+        {
+          "key": "ssfTime",
+          "name": "fermentation batch time",
+          "dimension": "time",
+          "unit": "h",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(tau=…)"
+        },
+        {
+          "key": "ssfTemperature",
+          "name": "fermenter temperature",
+          "dimension": "temp",
+          "unit": "K",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(T=…)"
+        },
+        {
+          "key": "ssfWorkingVolume",
+          "name": "fermenter working volume, as a share of the vessel",
+          "dimension": "fraction",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(V_wf=…)"
+        },
+        {
+          "key": "solidsContent",
+          "name": "corn in the slurry",
+          "dimension": "fraction",
+          "unit": "g g-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_process_parameters['slurry_solids_content']"
+        },
+        {
+          "key": "yeastLoading",
+          "name": "yeast loaded on the mash",
+          "dimension": "fraction",
+          "unit": "g g-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_process_parameters['yeast_loading']"
+        },
+        {
+          "key": "operatingDays",
+          "name": "operating days a year",
+          "dimension": "time",
+          "unit": "d",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['operating_days']"
+        },
+        {
+          "key": "incomeTax",
+          "name": "income tax",
+          "dimension": "fraction",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['income_tax']"
+        },
+        {
+          "key": "langFactor",
+          "name": "Lang factor, installed over purchased equipment cost",
+          "dimension": "factor",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['lang_factor']"
+        },
+        {
+          "key": "laborCost",
+          "name": "labour cost",
+          "dimension": "costUSD",
+          "unit": "USD yr-1",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['labor_cost']"
+        },
+        {
+          "key": "startYear",
+          "name": "first year of the plant's life",
+          "dimension": "year",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['duration']"
+        },
+        {
+          "key": "endYear",
+          "name": "last year of the plant's life",
+          "dimension": "year",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['duration']"
+        },
+        {
+          "key": "depreciation",
+          "name": "depreciation schedule",
+          "dimension": "schedule",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: default_tea_parameters['depreciation']"
+        },
+        {
+          "key": "cepci",
+          "name": "plant cost index (CEPCI)",
+          "dimension": "index",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "the package's own default, read back after the run: BiorefinerySettings(CEPCI=…)"
+        }
+      ],
+      "outputs": [
+        "ethanolPriceUsdPerKg",
+        "IRR",
+        "ethanolKgPerH",
+        "cornKgPerH",
+        "measured",
+        "checks",
+        "readBack",
+        "references"
+      ],
+      "priceOutput": "ethanolPriceUsdPerKg",
+      "priceBasis": "USD per kg of the ethanol product stream as the package makes it (ethanol with its denaturant): the package's own price, at which its TEA solves the internal rate of return",
+      "leavesOut": [],
+      "gridInputs": [],
+      "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn"
+    },
+    "artifact": {
+      "id": "265ab7ab750327be",
+      "tool": "proforma.reference",
+      "toolVersion": "reference run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
+      "inputs": [
+        {
+          "name": "flowsheet",
+          "value": "corn_drygrind",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "Dry-grind corn to ethanol, the conventional plant, every setting the package's own",
+            "by": null
+          }
+        },
+        {
+          "name": "simulator",
+          "value": "biosteam 2.54.0",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biosteam@2.54.0",
+            "note": "the process simulator the package runs on",
+            "by": null
+          }
+        },
+        {
+          "name": "thermodynamics",
+          "value": "thermosteam 0.54.2",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "thermosteam@0.54.2",
+            "note": "BioSTEAM's property engine",
+            "by": null
+          }
+        },
+        {
+          "name": "settings",
+          "value": "bst.process_tools.default()",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biosteam@2.54.0",
+            "note": "BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets its own, and the worker puts back what it held before",
+            "by": null
+          }
+        },
+        {
+          "name": "cornFeed",
+          "value": "the package's default",
+          "unit": "kg h-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: BiorefinerySettings.feedstock_hourly_mass_flow",
+            "by": null
+          }
+        },
+        {
+          "name": "cornPrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['Corn']",
+            "by": null
+          }
+        },
+        {
+          "name": "ethanolPrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['Ethanol'], the price at which the package's TEA solves the internal rate of return",
+            "by": null
+          }
+        },
+        {
+          "name": "ddgsPrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['DDGS']",
+            "by": null
+          }
+        },
+        {
+          "name": "crudeOilPrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['Crude oil']",
+            "by": null
+          }
+        },
+        {
+          "name": "enzymePrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['Enzyme']",
+            "by": null
+          }
+        },
+        {
+          "name": "yeastPrice",
+          "value": "the package's default",
+          "unit": "USD kg-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_stream_prices['Yeast']",
+            "by": null
+          }
+        },
+        {
+          "name": "electricityPrice",
+          "value": "the package's default",
+          "unit": "USD kWh-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_load_utility_settings(power_price=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "ssfYield",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(yield_=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "ssfTime",
+          "value": "the package's default",
+          "unit": "h",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(tau=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "ssfTemperature",
+          "value": "the package's default",
+          "unit": "K",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(T=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "ssfWorkingVolume",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(V_wf=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "solidsContent",
+          "value": "the package's default",
+          "unit": "g g-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_process_parameters['slurry_solids_content']",
+            "by": null
+          }
+        },
+        {
+          "name": "yeastLoading",
+          "value": "the package's default",
+          "unit": "g g-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_process_parameters['yeast_loading']",
+            "by": null
+          }
+        },
+        {
+          "name": "operatingDays",
+          "value": "the package's default",
+          "unit": "d",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['operating_days']",
+            "by": null
+          }
+        },
+        {
+          "name": "incomeTax",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['income_tax']",
+            "by": null
+          }
+        },
+        {
+          "name": "langFactor",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['lang_factor']",
+            "by": null
+          }
+        },
+        {
+          "name": "laborCost",
+          "value": "the package's default",
+          "unit": "USD yr-1",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['labor_cost']",
+            "by": null
+          }
+        },
+        {
+          "name": "startYear",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+            "by": null
+          }
+        },
+        {
+          "name": "endYear",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+            "by": null
+          }
+        },
+        {
+          "name": "depreciation",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: default_tea_parameters['depreciation']",
+            "by": null
+          }
+        },
+        {
+          "name": "cepci",
+          "value": "the package's default",
+          "unit": "",
+          "source": {
+            "kind": "model",
+            "id": "biorefineries.corn@2.35.1",
+            "note": "the package's own default, read back after the run: BiorefinerySettings(CEPCI=…)",
+            "by": null
+          }
+        },
+        {
+          "name": "compatibility",
+          "value": "SimultaneousSaccharificationFermentation._ins_size_is_fixed = False",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "biorefineries.corn's SimultaneousSaccharificationFermentation passes its two inlets (the mash and the yeast) to bst.BatchBioreactor, which declares one fixed inlet in biosteam 2.54.0, so corn.load() stops with 'at most 1 streams expected; 2 given'. The flowsheet lets the unit take them, as biosteam's own NRELEthanolFermentation declares; the unit's _run already mixes every inlet. No number of the package's is changed, and the package's own test values hold within its tolerance.",
+            "by": null
+          }
+        },
+        {
+          "name": "precision",
+          "value": "10 significant digits",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+            "by": null
+          }
+        }
+      ],
+      "output": {
+        "flowsheet": "corn_drygrind",
+        "simulator": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+        "package": "STAND-IN for corn_drygrind",
+        "ethanolPriceUsdPerKg": 0.5,
+        "IRR": 0.1,
+        "ethanolKgPerH": 12000.0,
+        "cornKgPerH": 40000.0,
+        "references": [
+          "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+        ],
+        "measured": {
+          "tea.IRR": 0.1,
+          "feedstock.price": 0.15,
+          "product.price": 0.5,
+          "tea.sales": 69600000.0,
+          "tea.material_cost": 52800000.0,
+          "tea.installed_equipment_cost": 33600000.0,
+          "tea.utility_cost": 7200000.0,
+          "units.get_heating_duty()": 9.0,
+          "units.get_cooling_duty()": 13.0,
+          "units.get_electricity_consumption()": 0.46,
+          "units.get_electricity_production()": 0.0
+        },
+        "readBack": {
+          "cornFeed": 1.0,
+          "cornPrice": 1.0,
+          "ethanolPrice": 1.0,
+          "ddgsPrice": 1.0,
+          "crudeOilPrice": 1.0,
+          "enzymePrice": 1.0,
+          "yeastPrice": 1.0,
+          "electricityPrice": 1.0,
+          "ssfYield": 1.0,
+          "ssfTime": 1.0,
+          "ssfTemperature": 1.0,
+          "ssfWorkingVolume": 1.0,
+          "solidsContent": 1.0,
+          "yeastLoading": 1.0,
+          "operatingDays": 1.0,
+          "incomeTax": 1.0,
+          "langFactor": 1.0,
+          "laborCost": 1.0,
+          "startYear": 1.0,
+          "endYear": 1.0,
+          "depreciation": "STAND-IN",
+          "cepci": 1.0
+        },
+        "tablesSource": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+        "tea": {
+          "teaClass": "StandIn",
+          "product": "product",
+          "feedstock": "feed",
+          "productPrice": 0.5,
+          "basisFlow": 12000.0,
+          "basis": "kg of the STAND-IN product",
+          "operatingHours": 8000.0,
+          "sales": 69600000.0,
+          "materialCost": 52800000.0,
+          "feedstockCost": 48000000.0,
+          "otherMaterialCost": 4800000.0,
+          "utilityCost": 7200000.0,
+          "purchaseCost": 16800000.0,
+          "installedEquipmentCost": 33600000.0,
+          "FCI": 33600000.0,
+          "TCI": 33600000.0,
+          "FOC": 4000000.0,
+          "laborCost": 2000000.0,
+          "capitalRecovery": 5600000.0,
+          "coproductCredits": 21600000.0,
+          "IRR": 0.1,
+          "incomeTax": null,
+          "lines": [
+            {
+              "key": "feedstock",
+              "label": "Main feedstock",
+              "usdPerYear": 48000000.0,
+              "perUnit": 0.5,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "otherMaterials",
+              "label": "Other materials",
+              "usdPerYear": 4800000.0,
+              "perUnit": 0.05,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "utilities",
+              "label": "Utilities",
+              "usdPerYear": 7200000.0,
+              "perUnit": 0.075,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "fixedOperating",
+              "label": "Fixed operating, labour included",
+              "usdPerYear": 4000000.0,
+              "perUnit": 0.041666666666666664,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "capitalRecovery",
+              "label": "Capital recovery",
+              "usdPerYear": 5600000.0,
+              "perUnit": 0.058333333333333334,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "coproductCredits",
+              "label": "Co-product credits",
+              "usdPerYear": -21600000.0,
+              "perUnit": -0.225,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            }
+          ]
+        },
+        "streams": [
+          {
+            "id": "feed",
+            "source": null,
+            "sink": "R1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 40000.0,
+            "massFlows": {
+              "Starch": 40000.0
+            },
+            "price": 0.15
+          },
+          {
+            "id": "beer",
+            "source": "R1",
+            "sink": "D1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 48000.0,
+            "massFlows": {
+              "Ethanol": 12000.0,
+              "Water": 36000.0
+            },
+            "price": null
+          },
+          {
+            "id": "product",
+            "source": "D1",
+            "sink": "M1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 12000.0,
+            "massFlows": {
+              "Ethanol": 12000.0
+            },
+            "price": 0.5
+          },
+          {
+            "id": "stillage",
+            "source": "D1",
+            "sink": null,
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 36000.0,
+            "massFlows": {
+              "Water": 36000.0
+            },
+            "price": null
+          },
+          {
+            "id": "coproduct",
+            "source": "R1",
+            "sink": null,
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 28000.0,
+            "massFlows": {
+              "Solids": 28000.0
+            },
+            "price": 0.09642857142857143
+          }
+        ],
+        "units": [
+          {
+            "id": "R1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 0,
+            "ins": [
+              "feed"
+            ],
+            "outs": [
+              "beer",
+              "coproduct"
+            ],
+            "installedCost": 16800000.0,
+            "purchaseCost": 8400000.0,
+            "heatingDuty": null,
+            "coolingDuty": 5000000.0,
+            "power": 300.0
+          },
+          {
+            "id": "D1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 1,
+            "ins": [
+              "beer"
+            ],
+            "outs": [
+              "product",
+              "stillage"
+            ],
+            "installedCost": 11200000.0,
+            "purchaseCost": 5600000.0,
+            "heatingDuty": 9000000.0,
+            "coolingDuty": 8000000.0,
+            "power": 120.0
+          },
+          {
+            "id": "M1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 2,
+            "ins": [
+              "product"
+            ],
+            "outs": [],
+            "installedCost": 5600000.0,
+            "purchaseCost": 2800000.0,
+            "heatingDuty": null,
+            "coolingDuty": null,
+            "power": 40.0
+          }
+        ],
+        "utilities": {
+          "group": "STAND-IN units",
+          "heating": 9.0,
+          "heatingUnit": "GJ/hr",
+          "cooling": 13.0,
+          "coolingUnit": "GJ/hr",
+          "electricityConsumption": 0.46,
+          "electricityConsumptionUnit": "MW",
+          "electricityProduction": 0.0,
+          "electricityProductionUnit": "MW"
+        },
+        "diagram": null,
+        "diagramNote": "STAND-IN: no flowsheet was simulated, so there is no diagram; the units are listed in order.",
+        "unitOrder": [
+          "R1",
+          "D1",
+          "M1"
+        ],
+        "tableUnits": {
+          "T": "K",
+          "P": "Pa",
+          "massFlow": "kg/hr",
+          "price": "USD/kg",
+          "cost": "USD",
+          "duty": "kJ/hr",
+          "power": "kW",
+          "annual": "USD/yr",
+          "perUnit": "USD per unit of the price's basis"
+        },
+        "regression": {
+          "package": "biorefineries 2.35.1",
+          "file": "biorefineries/tests/test_biorefineries.py",
+          "test": "test_corn",
+          "values": [
+            {
+              "expression": "tea.IRR",
+              "label": "internal rate of return",
+              "unit": "",
+              "package": 0.05381572438333119,
+              "rtol": 0.05
+            },
+            {
+              "expression": "feedstock.price",
+              "label": "feedstock price",
+              "unit": "USD/kg",
+              "package": 0.13227735731092652,
+              "rtol": 0.05
+            },
+            {
+              "expression": "product.price",
+              "label": "product price",
+              "unit": "USD/kg",
+              "package": 0.48547915353569393,
+              "rtol": 0.05
+            },
+            {
+              "expression": "tea.sales",
+              "label": "sales",
+              "unit": "USD/yr",
+              "package": 74992038.8556337,
+              "rtol": 0.05
+            },
+            {
+              "expression": "tea.material_cost",
+              "label": "material cost",
+              "unit": "USD/yr",
+              "package": 52925382.42511212,
+              "rtol": 0.05
+            },
+            {
+              "expression": "tea.installed_equipment_cost",
+              "label": "installed equipment cost",
+              "unit": "USD",
+              "package": 65387501.9390586,
+              "rtol": 0.05
+            },
+            {
+              "expression": "tea.utility_cost",
+              "label": "utility cost",
+              "unit": "USD/yr",
+              "package": 10442066.327145828,
+              "rtol": 0.05
+            },
+            {
+              "expression": "units.get_heating_duty()",
+              "label": "heating duty",
+              "unit": "GJ/hr",
+              "package": 111.3588815958425,
+              "rtol": 0.05
+            },
+            {
+              "expression": "units.get_cooling_duty()",
+              "label": "cooling duty",
+              "unit": "GJ/hr",
+              "package": 105.08735576937576,
+              "rtol": 0.05
+            },
+            {
+              "expression": "units.get_electricity_consumption()",
+              "label": "electricity consumption",
+              "unit": "MW",
+              "package": 1.6248530112233648,
+              "rtol": 0.05
+            },
+            {
+              "expression": "units.get_electricity_production()",
+              "label": "electricity production",
+              "unit": "MW",
+              "package": 0.0,
+              "rtol": 0.05
+            }
+          ]
+        },
+        "checks": [
+          {
+            "expression": "tea.IRR",
+            "label": "internal rate of return",
+            "unit": "",
+            "measured": 0.1,
+            "package": 0.05381572438333119,
+            "rtol": 0.05,
+            "relDiff": 0.8581929565362103,
+            "within": false
+          },
+          {
+            "expression": "feedstock.price",
+            "label": "feedstock price",
+            "unit": "USD/kg",
+            "measured": 0.15,
+            "package": 0.13227735731092652,
+            "rtol": 0.05,
+            "relDiff": 0.13398092500000022,
+            "within": false
+          },
+          {
+            "expression": "product.price",
+            "label": "product price",
+            "unit": "USD/kg",
+            "measured": 0.5,
+            "package": 0.48547915353569393,
+            "rtol": 0.05,
+            "relDiff": 0.0299103398334455,
+            "within": true
+          },
+          {
+            "expression": "tea.sales",
+            "label": "sales",
+            "unit": "USD/yr",
+            "measured": 69600000.0,
+            "package": 74992038.8556337,
+            "rtol": 0.05,
+            "relDiff": 0.07190148364966922,
+            "within": false
+          },
+          {
+            "expression": "tea.material_cost",
+            "label": "material cost",
+            "unit": "USD/yr",
+            "measured": 52800000.0,
+            "package": 52925382.42511212,
+            "rtol": 0.05,
+            "relDiff": 0.0023690414573675172,
+            "within": true
+          },
+          {
+            "expression": "tea.installed_equipment_cost",
+            "label": "installed equipment cost",
+            "unit": "USD",
+            "measured": 33600000.0,
+            "package": 65387501.9390586,
+            "rtol": 0.05,
+            "relDiff": 0.48614033257738876,
+            "within": false
+          },
+          {
+            "expression": "tea.utility_cost",
+            "label": "utility cost",
+            "unit": "USD/yr",
+            "measured": 7200000.0,
+            "package": 10442066.327145828,
+            "rtol": 0.05,
+            "relDiff": 0.31048129992409224,
+            "within": false
+          },
+          {
+            "expression": "units.get_heating_duty()",
+            "label": "heating duty",
+            "unit": "GJ/hr",
+            "measured": 9.0,
+            "package": 111.3588815958425,
+            "rtol": 0.05,
+            "relDiff": 0.9191802227983582,
+            "within": false
+          },
+          {
+            "expression": "units.get_cooling_duty()",
+            "label": "cooling duty",
+            "unit": "GJ/hr",
+            "measured": 13.0,
+            "package": 105.08735576937576,
+            "rtol": 0.05,
+            "relDiff": 0.8762933951014075,
+            "within": false
+          },
+          {
+            "expression": "units.get_electricity_consumption()",
+            "label": "electricity consumption",
+            "unit": "MW",
+            "measured": 0.46,
+            "package": 1.6248530112233648,
+            "rtol": 0.05,
+            "relDiff": 0.7168974689878795,
+            "within": false
+          },
+          {
+            "expression": "units.get_electricity_production()",
+            "label": "electricity production",
+            "unit": "MW",
+            "measured": 0.0,
+            "package": 0.0,
+            "rtol": 0.05,
+            "relDiff": null,
+            "within": true
+          }
+        ]
+      },
+      "outputHash": "a9f55e2a4756d6b907a3e7bb78dfab1939ace2991056c6172646b0306f47052f",
+      "provenance": "computed",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "durationMs": 0,
+      "seed": null
+    },
+    "regression": {
+      "package": "biorefineries 2.35.1",
+      "file": "biorefineries/tests/test_biorefineries.py",
+      "test": "test_corn",
+      "values": [
+        {
+          "expression": "tea.IRR",
+          "label": "internal rate of return",
+          "unit": "",
+          "package": 0.05381572438333119,
+          "rtol": 0.05
+        },
+        {
+          "expression": "feedstock.price",
+          "label": "feedstock price",
+          "unit": "USD/kg",
+          "package": 0.13227735731092652,
+          "rtol": 0.05
+        },
+        {
+          "expression": "product.price",
+          "label": "product price",
+          "unit": "USD/kg",
+          "package": 0.48547915353569393,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.sales",
+          "label": "sales",
+          "unit": "USD/yr",
+          "package": 74992038.8556337,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.material_cost",
+          "label": "material cost",
+          "unit": "USD/yr",
+          "package": 52925382.42511212,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.installed_equipment_cost",
+          "label": "installed equipment cost",
+          "unit": "USD",
+          "package": 65387501.9390586,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.utility_cost",
+          "label": "utility cost",
+          "unit": "USD/yr",
+          "package": 10442066.327145828,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_heating_duty()",
+          "label": "heating duty",
+          "unit": "GJ/hr",
+          "package": 111.3588815958425,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_cooling_duty()",
+          "label": "cooling duty",
+          "unit": "GJ/hr",
+          "package": 105.08735576937576,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_consumption()",
+          "label": "electricity consumption",
+          "unit": "MW",
+          "package": 1.6248530112233648,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "label": "electricity production",
+          "unit": "MW",
+          "package": 0.0,
+          "rtol": 0.05
+        }
+      ]
+    },
+    "simulator": {
+      "status": "cold",
+      "error": null
+    }
+  }
+}

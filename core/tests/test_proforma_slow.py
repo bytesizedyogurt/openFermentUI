@@ -110,3 +110,70 @@ def test_a_whole_run_through_the_worker(store):
     again = proforma.run(ProformaRunRequest(scenarioId="sc-pha-1", assumptions=a, seed=3), pool=pool)
     assert again.artifactId == out.artifactId and again.quantiles == out.quantiles
     assert artifacts.replay(out.artifactId).identical
+
+
+# ── the dry-grind corn plant (OF-BLD-019 §2.2) ─────────────────────────
+# The authority is the installed package's own test file: each value below
+# is read from biorefineries/tests/test_biorefineries.py, test_corn, by
+# flowsheets/shelf.py's `package_regression` (test_proforma holds that
+# parser to the eleven values the file writes). This installation must
+# reproduce every one of them within the test's own rtol (5 %).
+
+CORN_TEST = (
+    "tea.IRR", "feedstock.price", "product.price", "tea.sales", "tea.material_cost", "tea.installed_equipment_cost",
+    "tea.utility_cost", "units.get_heating_duty()", "units.get_cooling_duty()",
+    "units.get_electricity_consumption()", "units.get_electricity_production()",
+)
+
+
+def test_the_corn_plant_reproduces_its_package_test(store):
+    import numpy as np
+
+    from openferment_core.flowsheets import shelf
+
+    regression = shelf.package_regression("corn_drygrind")
+    assert regression is not None and regression.test == "test_corn"
+    assert tuple(v.expression for v in regression.values) == CORN_TEST
+    art = proforma.run_reference("corn_drygrind")
+    measured = art.output["measured"]
+    for v in regression.values:
+        # as the package's test asserts it: numpy.allclose(measured, value, rtol=5e-2)
+        assert np.allclose(measured[v.expression], v.package, rtol=v.rtol), (v.expression, measured[v.expression], v.package)
+    assert all(c["within"] for c in art.output["checks"])
+    assert art.output["ethanolPriceUsdPerKg"] == pytest.approx(regression.values[2].package, rel=1e-9)
+    assert art.output["IRR"] == pytest.approx(measured["tea.IRR"])
+    assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model", "convention"}
+    # A fresh build of the plant replays to the same output, digit for digit.
+    assert artifacts.replay(art.id).identical
+    assert proforma.stored_reference("corn_drygrind").id == art.id
+
+
+def test_the_corn_stover_plant_answers_through_the_reference_endpoint_too(store):
+    # The benchmark's own endpoints answer as before; the same plant's
+    # reference run gives the benchmark's price and every table.
+    from fastapi.testclient import TestClient
+
+    from openferment_core import api
+
+    c = TestClient(api.app, base_url="http://127.0.0.1")
+    bench = c.post("/api/proforma/benchmark").json()["artifact"]
+    assert bench["tool"] == proforma.BENCHMARK and bench["output"]["mespUsdPerGal"] == pytest.approx(1.968, rel=0.005)
+    ref = c.post("/api/proforma/reference/cornstover_benchmark").json()
+    art = ref["artifact"]
+    assert art["tool"] == proforma.REFERENCE and ref["regression"]["test"] == "test_cornstover"
+    assert art["output"]["mespUsdPerGal"] == pytest.approx(bench["output"]["mespUsdPerGal"], rel=1e-9)
+    assert art["output"]["tea"]["product"] == "ethanol" and art["output"]["units"]
+    assert c.get("/api/proforma/benchmark").json()["artifact"]["id"] == bench["id"]
+    assert proforma.run_benchmark().output == bench["output"]
+    # MEASURED 2026-10-20 (biosteam 2.54.0, biorefineries 2.35.1): the
+    # package's own test_cornstover does not hold on these versions for two
+    # of its eleven values, installed equipment cost and electricity
+    # consumption; the run says so in its checks, and this pins the finding.
+    outside = {k["expression"] for k in art["output"]["checks"] if not k["within"]}
+    assert outside == {"tea.installed_equipment_cost", "units.get_electricity_consumption()"}
+    # The corn stover plant's facilities are built from a set, so their order
+    # and the names BioSTEAM gives unnamed streams change from one build to
+    # the next; its numbers do not.
+    replay = artifacts.replay(art["id"])
+    moved = {d.path.split("[")[0].split(".")[0] for d in replay.differences}
+    assert moved <= {"streams", "units", "unitOrder", "…"}, moved
