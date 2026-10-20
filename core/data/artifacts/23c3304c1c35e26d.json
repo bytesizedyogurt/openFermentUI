@@ -1,0 +1,1273 @@
+{
+  "id": "23c3304c1c35e26d",
+  "tool": "proforma.run",
+  "toolVersion": "pha_sugar_v0 · biosteam 2.54.0 · biorefineries 2.35.1",
+  "inputs": [
+    {
+      "name": "flowsheet",
+      "value": "pha_sugar_v0",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "draft v0: fermentation, harvest and drying only; feedstock pretreatment and hydrolysis; polymer extraction and purification; wastewater treatment; co-products left out",
+        "by": null
+      }
+    },
+    {
+      "name": "finance and properties",
+      "value": "biorefineries.cornstover@2.35.1",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.cornstover@2.35.1",
+        "note": "create_tea and create_chemicals; PHB borrows Lignin's volume and heat capacity",
+        "by": null
+      }
+    },
+    {
+      "name": "samples",
+      "value": "500 Latin hypercube",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "yield cap",
+      "value": 0.5931326473577976,
+      "unit": "g g-1",
+      "source": {
+        "kind": "artifact",
+        "id": "7c399b414f823553",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 1.6,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-00da010f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 1.9,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-63674d79",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 4.86,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-6efa5b8a",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 5.54,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-1ccda19f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 2.08,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-f669a728",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.6373,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P2-a93b93f1",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.252,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P20-7183fa4f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.1017,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-38157845",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.045,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-773555fb",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.1017,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-c49eb5b3",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 5.3,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P29-5bcd6003",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 2.31,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-33381478",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 7.86,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-a9c4a9f7",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "titre record",
+      "value": 0.45,
+      "unit": "g L-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-c9cf4c28",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "yield",
+      "value": 0.3,
+      "unit": "g g-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "yield low",
+      "value": 0.3,
+      "unit": "g g-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "yield high",
+      "value": 0.3,
+      "unit": "g g-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.504,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-c041c639",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.457,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-276cde6a",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.8109999999999999,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-47809509",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.54,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-cac713f7",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.772,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-ec5643d0",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.6759999999999999,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-b6ed8f48",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.67,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-92c6089b",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.691,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-1d3b616d",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.8109999999999999,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-6428cbf0",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.47500000000000003,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-ab0991a8",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.6809999999999999,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-ec3cb687",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.688,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P17-52440b4d",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.58,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P19-4b7c04e3",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.14,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P20-d0694c2a",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.147,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P20-e58c1162",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.094,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P20-b5d6db3f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.142,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P20-17bacab9",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.018000000000000002,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P24-1d8ac575",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.024,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P24-fc73d76a",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.061,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P24-847a455e",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.16399999999999998,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P24-076a636f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.7808,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P26-79fe9e60",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.0049,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-3e9e9b6a",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.010400000000000001,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-5e4c0205",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.0049,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P27-0e5d641b",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.363,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P29-08ab6089",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.64,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-4e6f0b2c",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.32,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-57abd8f6",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.19,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-b3786d5f",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.23,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-ec8e3165",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.19,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-873162ee",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.7000000000000001,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P30-0a894b30",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.42310000000000003,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P31-0907a326",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.2,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-28358afd",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.14,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-01e5ee07",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.32299999999999995,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-0f14e813",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.13699999999999998,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-5e786bd7",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.09300000000000001,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-9a7e2b2c",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.32299999999999995,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-c0aa4cfe",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.252,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P34-f6ec8b8c",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.003,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P5-e82c50f0",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.287,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P5-d811621d",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.3095,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-90586f71",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.7253000000000001,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-6baecad7",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.7258,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P6-8c38f406",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content record",
+      "value": 0.78,
+      "unit": "g g-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P9-61f4a0a7",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "content scale",
+      "value": 0.01,
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "% CDW to a share",
+        "by": null
+      }
+    },
+    {
+      "name": "productivity record",
+      "value": 0.0095,
+      "unit": "g L-1 h-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-db6e358d",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "productivity record",
+      "value": 0.0113,
+      "unit": "g L-1 h-1",
+      "source": {
+        "kind": "record",
+        "id": "cl1-P11-9d2cec95",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "recovery",
+      "value": 0.95,
+      "unit": "",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "recovery low",
+      "value": 0.9,
+      "unit": "",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "recovery high",
+      "value": 0.98,
+      "unit": "",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarPrice",
+      "value": 0.4,
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarPrice low",
+      "value": 0.3,
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarPrice high",
+      "value": 0.5,
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarFeed",
+      "value": 10000.0,
+      "unit": "kg h-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarFeed low",
+      "value": 10000.0,
+      "unit": "kg h-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    },
+    {
+      "name": "sugarFeed high",
+      "value": 10000.0,
+      "unit": "kg h-1",
+      "source": {
+        "kind": "assumption",
+        "id": null,
+        "note": "typed on 2026-10-20: OF-BLD-019 §1.2 diagnosis: the stand-in of core/tests/test_proforma_slow.py, a test entry",
+        "by": "OF-BLD-019 session"
+      }
+    }
+  ],
+  "output": {
+    "base": {
+      "titre": 1.75,
+      "content": 0.3215,
+      "productivity": 0.0104,
+      "yield": 0.3,
+      "recovery": 0.95,
+      "sugarPrice": 0.4,
+      "sugarFeed": 10000.0
+    },
+    "basePrice": null,
+    "baseCostLines": null,
+    "baseInfeasible": "Infeasible: this yield and content leave no sugar for respiration",
+    "readBack": {
+      "cakeMoisture": 0.4,
+      "dryerMoisture": 0.15,
+      "vesselLimitM3": 355.0,
+      "oxygenTarget": 0.5,
+      "temperatureK": 305.15,
+      "rateOfReturn": 0.1,
+      "operatingDays": 350.3999999999999,
+      "startYear": 2007.0,
+      "endYear": 2037.0,
+      "incomeTax": 0.35,
+      "ammoniaPriceUsdPerKg": 0.4485966110937889,
+      "packageGlucosePriceUsdPerKg": 0.5803889514279087
+    },
+    "quantiles": {
+      "p5": 11.819554297122778,
+      "p25": 12.366435822184464,
+      "p50": 12.927829778616937,
+      "p75": 13.541817824192357,
+      "p95": 14.33857108457647
+    },
+    "histogram": [
+      {
+        "low": 11.608825812031919,
+        "high": 11.807410818723971,
+        "count": 5
+      },
+      {
+        "low": 11.807410818723971,
+        "high": 12.005995825416024,
+        "count": 8
+      },
+      {
+        "low": 12.005995825416024,
+        "high": 12.204580832108077,
+        "count": 8
+      },
+      {
+        "low": 12.204580832108077,
+        "high": 12.40316583880013,
+        "count": 11
+      },
+      {
+        "low": 12.40316583880013,
+        "high": 12.60175084549218,
+        "count": 6
+      },
+      {
+        "low": 12.60175084549218,
+        "high": 12.800335852184233,
+        "count": 14
+      },
+      {
+        "low": 12.800335852184233,
+        "high": 12.998920858876286,
+        "count": 14
+      },
+      {
+        "low": 12.998920858876286,
+        "high": 13.197505865568338,
+        "count": 8
+      },
+      {
+        "low": 13.197505865568338,
+        "high": 13.396090872260391,
+        "count": 5
+      },
+      {
+        "low": 13.396090872260391,
+        "high": 13.594675878952444,
+        "count": 9
+      },
+      {
+        "low": 13.594675878952444,
+        "high": 13.793260885644496,
+        "count": 9
+      },
+      {
+        "low": 13.793260885644496,
+        "high": 13.99184589233655,
+        "count": 7
+      },
+      {
+        "low": 13.99184589233655,
+        "high": 14.190430899028602,
+        "count": 4
+      },
+      {
+        "low": 14.190430899028602,
+        "high": 14.389015905720655,
+        "count": 2
+      },
+      {
+        "low": 14.389015905720655,
+        "high": 14.587600912412707,
+        "count": 1
+      },
+      {
+        "low": 14.587600912412707,
+        "high": 14.78618591910476,
+        "count": 1
+      },
+      {
+        "low": 14.78618591910476,
+        "high": 14.984770925796813,
+        "count": 1
+      },
+      {
+        "low": 14.984770925796813,
+        "high": 15.183355932488864,
+        "count": 0
+      },
+      {
+        "low": 15.183355932488864,
+        "high": 15.381940939180916,
+        "count": 1
+      },
+      {
+        "low": 15.381940939180916,
+        "high": 15.580525945872969,
+        "count": 1
+      }
+    ],
+    "sensitivity": [
+      {
+        "key": "productivity",
+        "rho": -0.7993292827270576,
+        "sourceKind": "record"
+      },
+      {
+        "key": "recovery",
+        "rho": -0.4892053973013493,
+        "sourceKind": "assumption"
+      },
+      {
+        "key": "titre",
+        "rho": -0.3877456008837687,
+        "sourceKind": "record"
+      },
+      {
+        "key": "sugarPrice",
+        "rho": 0.2891817249270102,
+        "sourceKind": "assumption"
+      },
+      {
+        "key": "content",
+        "rho": 0.04276019884794445,
+        "sourceKind": "record"
+      }
+    ],
+    "samples": 500,
+    "feasible": 115,
+    "infeasible": {
+      "carbon": 384,
+      "balance": 1
+    },
+    "grid": {
+      "dims": [
+        {
+          "key": "titre",
+          "values": [
+            0.045,
+            1.99875,
+            3.9525,
+            5.90625,
+            7.86
+          ]
+        },
+        {
+          "key": "yield",
+          "values": [
+            0.3
+          ]
+        },
+        {
+          "key": "sugarPrice",
+          "values": [
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5
+          ]
+        }
+      ],
+      "msp": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "costLines": {
+        "capex": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "media": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "utilities": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "labor": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "downstream": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "other": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "infeasible": 25
+    }
+  },
+  "outputHash": "de08bbbe7785c0f66f2cfcddec6207668baeb7e30e4f31f6d110bfec182f3697",
+  "provenance": "demo",
+  "createdAt": "2026-10-20T12:41:24Z",
+  "durationMs": 26834,
+  "seed": 0
+}

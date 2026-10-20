@@ -1,0 +1,4473 @@
+{
+  "id": "42f80a77d306f673",
+  "tool": "proforma.reference",
+  "toolVersion": "reference run 2 · biosteam 2.54.0 · biorefineries 2.35.1",
+  "inputs": [
+    {
+      "name": "flowsheet",
+      "value": "cornstover_benchmark",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.cornstover@2.35.1",
+        "note": "Corn stover to ethanol, the NREL 2011 design, every setting the package's own",
+        "by": null
+      }
+    },
+    {
+      "name": "simulator",
+      "value": "biosteam 2.54.0",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "the process simulator the package runs on",
+        "by": null
+      }
+    },
+    {
+      "name": "thermodynamics",
+      "value": "thermosteam 0.54.2",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "BioSTEAM's property engine",
+        "by": null
+      }
+    },
+    {
+      "name": "settings",
+      "value": "bst.process_tools.default()",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets its own, and the worker puts back what it held before",
+        "by": null
+      }
+    },
+    {
+      "name": "precision",
+      "value": "10 significant digits",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+        "by": null
+      }
+    },
+    {
+      "name": "diagram",
+      "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "flowsheet": "cornstover_benchmark",
+    "simulator": "biosteam 2.54.0",
+    "package": "biorefineries.cornstover@2.35.1",
+    "mespUsdPerGal": 1.967671122,
+    "mespUsdPerKg": 0.658813642,
+    "ethanolDensityKgPerGal": 2.98668849,
+    "settings": {
+      "rateOfReturn": 0.1,
+      "operatingDays": 350.4,
+      "incomeTax": 0.35,
+      "startYear": 2007,
+      "endYear": 2037
+    },
+    "references": [
+      "Humbird, D. et al. Process Design and Economics for Biochemical Conversion of Lignocellulosic Biomass to Ethanol: Dilute-Acid Pretreatment and Enzymatic Hydrolysis of Corn Stover. NREL/TP-5100-47764, 2011. doi:10.2172/1013269",
+      "Cortes-Peña, Y.; Kumar, D.; Singh, V.; Guest, J. S. BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020. doi:10.1021/acssuschemeng.9b07040"
+    ],
+    "measured": {
+      "tea.IRR": 0.1,
+      "feedstock.price": 0.05158816935,
+      "product.price": 0.658813642,
+      "tea.sales": 121768094.1,
+      "tea.material_cost": 82272670.8,
+      "tea.installed_equipment_cost": 192647846.3,
+      "tea.utility_cost": -11189195.65,
+      "units.get_heating_duty()": 352.1682186,
+      "units.get_cooling_duty()": 347.6878866,
+      "units.get_electricity_consumption()": 20.91491945,
+      "units.get_electricity_production()": 47.8633781
+    },
+    "readBack": {},
+    "tablesSource": "BioSTEAM 2.54.0, thermosteam 0.54.2",
+    "tea": {
+      "teaClass": "CellulosicEthanolTEA",
+      "product": "ethanol",
+      "feedstock": "cornstover",
+      "productPrice": 0.658813642,
+      "basisFlow": 21978.37533,
+      "basis": "kg of the ethanol product stream",
+      "operatingHours": 8409.6,
+      "sales": 121768094.1,
+      "materialCost": 82272670.8,
+      "feedstockCost": 45218348.2,
+      "otherMaterialCost": 37054322.6,
+      "utilityCost": -11189195.65,
+      "purchaseCost": 129537439.8,
+      "installedEquipmentCost": 192647846.3,
+      "FCI": 327521096.7,
+      "TCI": 343897151.5,
+      "FOC": 9108848.662,
+      "laborCost": 2500000.0,
+      "capitalRecovery": 41575770.25,
+      "coproductCredits": 0.0,
+      "IRR": 0.1,
+      "incomeTax": 0.35,
+      "lines": [
+        {
+          "key": "feedstock",
+          "label": "Main feedstock",
+          "usdPerYear": 45218348.2,
+          "perUnit": 0.2446491825,
+          "reads": "the system's market value of the feedstock stream (System.get_market_value)"
+        },
+        {
+          "key": "otherMaterials",
+          "label": "Other materials",
+          "usdPerYear": 37054322.6,
+          "perUnit": 0.2004785688,
+          "reads": "TEA.material_cost less the main feedstock"
+        },
+        {
+          "key": "utilities",
+          "label": "Utilities",
+          "usdPerYear": -11189195.65,
+          "perUnit": -0.06053798244,
+          "reads": "TEA.utility_cost"
+        },
+        {
+          "key": "fixedOperating",
+          "label": "Fixed operating, labour included",
+          "usdPerYear": 9108848.662,
+          "perUnit": 0.04928248083,
+          "reads": "TEA.FOC"
+        },
+        {
+          "key": "capitalRecovery",
+          "label": "Capital recovery",
+          "usdPerYear": 41575770.25,
+          "perUnit": 0.2249413923,
+          "reads": "TEA.sales less TEA.AOC: the return on and of the capital, and its tax"
+        }
+      ]
+    },
+    "streams": [
+      {
+        "id": "cornstover",
+        "source": null,
+        "sink": "U101",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 104229.16,
+        "massFlows": {
+          "Water": 21070.35773,
+          "Sucrose": 648.9670181,
+          "Extract": 12347.22963,
+          "Acetate": 1525.4939,
+          "Ash": 4155.074545,
+          "Lignin": 13282.75351,
+          "Protein": 2612.724359,
+          "Glucan": 29498.50082,
+          "Xylan": 16455.94939,
+          "Arabinan": 2005.898056,
+          "Mannan": 505.6885856,
+          "Galactan": 120.5224462
+        },
+        "price": 0.05158816935
+      },
+      {
+        "id": "s1",
+        "source": "U101",
+        "sink": "M203",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 104229.16,
+        "massFlows": {
+          "Water": 21070.35773,
+          "Sucrose": 648.9670181,
+          "Extract": 12347.22963,
+          "Acetate": 1525.4939,
+          "Ash": 4155.074545,
+          "Lignin": 13282.75351,
+          "Protein": 2612.724359,
+          "Glucan": 29498.50082,
+          "Xylan": 16455.94939,
+          "Arabinan": 2005.898056,
+          "Mannan": 505.6885856,
+          "Galactan": 120.5224462
+        },
+        "price": null
+      },
+      {
+        "id": "sulfuric_acid",
+        "source": null,
+        "sink": "H2SO4_storage",
+        "phase": "l",
+        "T": 294.15,
+        "P": 547155.0,
+        "massFlow": 1925.957861,
+        "massFlows": {
+          "Water": 129.7277315,
+          "H2SO4": 1796.230129
+        },
+        "price": 0.0897171176
+      },
+      {
+        "id": "s2",
+        "source": "H2SO4_storage",
+        "sink": "T201",
+        "phase": "l",
+        "T": 294.15,
+        "P": 547155.0,
+        "massFlow": 1925.957861,
+        "massFlows": {
+          "Water": 129.7277315,
+          "H2SO4": 1796.230129
+        },
+        "price": null
+      },
+      {
+        "id": "s3",
+        "source": "T201",
+        "sink": "M201",
+        "phase": "l",
+        "T": 294.15,
+        "P": 547155.0,
+        "massFlow": 1925.957861,
+        "massFlows": {
+          "Water": 129.7277315,
+          "H2SO4": 1796.230129
+        },
+        "price": null
+      },
+      {
+        "id": "warm_process_water_1",
+        "source": null,
+        "sink": "M201",
+        "phase": "l",
+        "T": 368.15,
+        "P": 476227.5,
+        "massFlow": 23450.78224,
+        "massFlows": {
+          "Water": 23450.78224
+        },
+        "price": null
+      },
+      {
+        "id": "s4",
+        "source": "M201",
+        "sink": "M203",
+        "phase": "l",
+        "T": 366.4272076,
+        "P": 476227.5,
+        "massFlow": 25376.7401,
+        "massFlows": {
+          "Water": 23580.50997,
+          "H2SO4": 1796.230129
+        },
+        "price": null
+      },
+      {
+        "id": "pretreatment_steam",
+        "source": null,
+        "sink": "M203",
+        "phase": "g",
+        "T": 541.15,
+        "P": 1317225.0,
+        "massFlow": 32610.7335,
+        "massFlows": {
+          "Water": 32610.7335
+        },
+        "price": null
+      },
+      {
+        "id": "warm_process_water_2",
+        "source": null,
+        "sink": "M203",
+        "phase": "l",
+        "T": 368.15,
+        "P": 476227.5,
+        "massFlow": 153577.5412,
+        "massFlows": {
+          "Water": 153577.5412
+        },
+        "price": null
+      },
+      {
+        "id": "s5",
+        "source": "M203",
+        "sink": "R201",
+        "phase": "l",
+        "T": 431.1499985,
+        "P": 557287.5,
+        "massFlow": 315794.1748,
+        "massFlows": {
+          "Water": 230839.1424,
+          "H2SO4": 1796.230129,
+          "Sucrose": 648.9670181,
+          "Extract": 12347.22963,
+          "Acetate": 1525.4939,
+          "Ash": 4155.074545,
+          "Lignin": 13282.75351,
+          "Protein": 2612.724359,
+          "Glucan": 29498.50082,
+          "Xylan": 16455.94939,
+          "Arabinan": 2005.898056,
+          "Mannan": 505.6885856,
+          "Galactan": 120.5224462
+        },
+        "price": null
+      },
+      {
+        "id": "s6",
+        "source": "R201",
+        "sink": "M204",
+        "phase": "g",
+        "T": 403.15,
+        "P": 272462.0422,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "s7",
+        "source": "R201",
+        "sink": "P201",
+        "phase": "l",
+        "T": 403.15,
+        "P": 272462.0422,
+        "massFlow": 315723.4328,
+        "massFlows": {
+          "Water": 228493.719,
+          "AceticAcid": 1525.4939,
+          "Furfural": 605.696747,
+          "H2SO4": 1796.230129,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "s8",
+        "source": "P201",
+        "sink": "T202",
+        "phase": "l",
+        "T": 403.15,
+        "P": 272462.0422,
+        "massFlow": 315723.4328,
+        "massFlows": {
+          "Water": 228493.719,
+          "AceticAcid": 1525.4939,
+          "Furfural": 605.696747,
+          "H2SO4": 1796.230129,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "s9",
+        "source": "T202",
+        "sink": "F201",
+        "phase": "l",
+        "T": 403.15,
+        "P": 272462.0422,
+        "massFlow": 315723.4328,
+        "massFlows": {
+          "Water": 228493.719,
+          "AceticAcid": 1525.4939,
+          "Furfural": 605.696747,
+          "H2SO4": 1796.230129,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "s10",
+        "source": "F201",
+        "sink": "M204",
+        "phase": "g",
+        "T": 373.2394155,
+        "P": 101325.0,
+        "massFlow": 15000.54442,
+        "massFlows": {
+          "Water": 14656.90138,
+          "AceticAcid": 159.1937605,
+          "Furfural": 184.4492851
+        },
+        "price": null
+      },
+      {
+        "id": "s11",
+        "source": "F201",
+        "sink": "T203",
+        "phase": "l",
+        "T": 373.2394155,
+        "P": 101325.0,
+        "massFlow": 300722.8884,
+        "massFlows": {
+          "Water": 213836.8176,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "H2SO4": 1796.230129,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "ammonia",
+        "source": null,
+        "sink": "Ammonia_storage",
+        "phase": "l",
+        "T": 298.15,
+        "P": 1215900.0,
+        "massFlow": 1300.70298,
+        "massFlows": {
+          "NH3": 17.03052,
+          "NH4OH": 1283.67246
+        },
+        "price": 0.4485966111
+      },
+      {
+        "id": "s13",
+        "source": "Ammonia_storage",
+        "sink": "M205",
+        "phase": "l",
+        "T": 298.15,
+        "P": 1215900.0,
+        "massFlow": 1300.70298,
+        "massFlows": {
+          "NH3": 17.03052,
+          "NH4OH": 1283.67246
+        },
+        "price": null
+      },
+      {
+        "id": "ammonia_process_water",
+        "source": null,
+        "sink": "M205",
+        "phase": "l",
+        "T": 368.15,
+        "P": 476227.5,
+        "massFlow": 89212.19216,
+        "massFlows": {
+          "Water": 89212.19216
+        },
+        "price": null
+      },
+      {
+        "id": "s14",
+        "source": "M205",
+        "sink": "T203",
+        "phase": "l",
+        "T": 367.623205,
+        "P": 476227.5,
+        "massFlow": 90512.89514,
+        "massFlows": {
+          "Water": 89212.19216,
+          "NH3": 17.03052,
+          "NH4OH": 1283.67246
+        },
+        "price": null
+      },
+      {
+        "id": "s15",
+        "source": "T203",
+        "sink": "P202",
+        "phase": "l",
+        "T": 374.4142763,
+        "P": 101325.0,
+        "massFlow": 391235.7835,
+        "massFlows": {
+          "Water": 303708.8811,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "NH3": 17.03052,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "pretreated_biomass",
+        "source": "P202",
+        "sink": "M301",
+        "phase": "l",
+        "T": 374.4142763,
+        "P": 101325.0,
+        "massFlow": 391235.7835,
+        "massFlows": {
+          "Water": 303708.8811,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "NH3": 17.03052,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402
+        },
+        "price": null
+      },
+      {
+        "id": "cellulase",
+        "source": null,
+        "sink": "M301",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12672.55595,
+        "massFlows": {
+          "Water": 12038.92816,
+          "Cellulase": 633.6277977
+        },
+        "price": 0.212
+      },
+      {
+        "id": "saccharification_water",
+        "source": null,
+        "sink": "M301",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 26324.49103,
+        "massFlows": {
+          "Water": 26324.49103
+        },
+        "price": null
+      },
+      {
+        "id": "s16",
+        "source": "M301",
+        "sink": "H301",
+        "phase": "l",
+        "T": 366.5557656,
+        "P": 101325.0,
+        "massFlow": 430232.8305,
+        "massFlows": {
+          "Water": 342072.3003,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "NH3": 17.03052,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "s17",
+        "source": "H301",
+        "sink": "R301",
+        "phase": "l",
+        "T": 321.15,
+        "P": 101325.0,
+        "massFlow": 430232.8305,
+        "massFlows": {
+          "Water": 342072.3003,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "NH3": 17.03052,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "slurry",
+        "source": "R301",
+        "sink": "R303",
+        "phase": "l",
+        "T": 321.15,
+        "P": 101325.0,
+        "massFlow": 430232.8305,
+        "massFlows": {
+          "Water": 342072.3003,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "NH3": 17.03052,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 3586.390208,
+          "Xylose": 16829.909,
+          "Arabinose": 2051.481866,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 88.49550247,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Protein": 2612.724359,
+          "Glucan": 26401.15824,
+          "Xylan": 427.8546841,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "CSL",
+        "source": null,
+        "sink": "CSL_storage",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1290.698492,
+        "massFlows": {
+          "CSL": 1290.698492
+        },
+        "price": 0.05682414808
+      },
+      {
+        "id": "s19",
+        "source": "CSL_storage",
+        "sink": "S302",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1290.698492,
+        "massFlows": {
+          "CSL": 1290.698492
+        },
+        "price": null
+      },
+      {
+        "id": "CSL1",
+        "source": "S302",
+        "sink": "R302",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 215.1164153,
+        "massFlows": {
+          "CSL": 215.1164153
+        },
+        "price": null
+      },
+      {
+        "id": "CSL2",
+        "source": "S302",
+        "sink": "R303",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1075.582076,
+        "massFlows": {
+          "CSL": 1075.582076
+        },
+        "price": null
+      },
+      {
+        "id": "DAP",
+        "source": null,
+        "sink": "DAP_storage",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 158.8578934,
+        "massFlows": {
+          "DAP": 158.8578934
+        },
+        "price": 0.9869213629
+      },
+      {
+        "id": "s18",
+        "source": "DAP_storage",
+        "sink": "S301",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 158.8578934,
+        "massFlows": {
+          "DAP": 158.8578934
+        },
+        "price": null
+      },
+      {
+        "id": "DAP1",
+        "source": "S301",
+        "sink": "R302",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 25.1726165,
+        "massFlows": {
+          "DAP": 25.1726165
+        },
+        "price": null
+      },
+      {
+        "id": "DAP2",
+        "source": "S301",
+        "sink": "R303",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 133.6852769,
+        "massFlows": {
+          "DAP": 133.6852769
+        },
+        "price": null
+      },
+      {
+        "id": "s22",
+        "source": "T301",
+        "sink": "R303",
+        "phase": "l",
+        "T": 305.15,
+        "P": 101325.0,
+        "massFlow": 41293.17496,
+        "massFlows": {
+          "Water": 33973.70867,
+          "Ethanol": 2068.865764,
+          "AceticAcid": 136.6300139,
+          "Furfural": 42.12474619,
+          "Glycerol": 17.42540395,
+          "NH3": 1.703052,
+          "SuccinicAcid": 43.44425294,
+          "DAP": 22.7017443,
+          "AmmoniumSulfate": 242.0031255,
+          "HMF": 30.93860245,
+          "Glucose": 149.9374915,
+          "Xylose": 171.6650718,
+          "Arabinose": 205.1481866,
+          "Extract": 1234.722963,
+          "Ash": 415.5074545,
+          "Lignin": 1261.861584,
+          "SolubleLignin": 66.41376757,
+          "GlucoseOligomer": 114.4541832,
+          "GalactoseOligomer": 0.2892538709,
+          "MannoseOligomer": 0.1517065757,
+          "XyloseOligomer": 39.49427853,
+          "ArabinoseOligomer": 4.814155335,
+          "Z_mobilis": 153.5905866,
+          "Protein": 261.2724359,
+          "Glucan": 126.7255595,
+          "Xylan": 42.78546841,
+          "Xylitol": 78.45711154,
+          "Cellobiose": 33.44143367,
+          "CSL": 213.2999536,
+          "Arabinan": 14.2418762,
+          "Mannan": 50.26544541,
+          "Galactan": 11.72683402,
+          "Cellulase": 63.36277977
+        },
+        "price": null
+      },
+      {
+        "id": "s23",
+        "source": "R303",
+        "sink": "M304",
+        "phase": "g",
+        "T": 305.15,
+        "P": 101325.0,
+        "massFlow": 18864.24626,
+        "massFlows": {
+          "Water": 275.8517851,
+          "Ethanol": 182.7205552,
+          "AceticAcid": 2.146157321,
+          "Furfural": 2.100246726,
+          "Glycerol": 0.00001398990691,
+          "NH3": 3.584095702,
+          "LacticAcid": 0.0008433798515,
+          "SuccinicAcid": 2.909773845e-6,
+          "O2": 151.2700194,
+          "CO2": 18246.57254
+        },
+        "price": null
+      },
+      {
+        "id": "s24",
+        "source": "R303",
+        "sink": "M401",
+        "phase": "l",
+        "T": 305.15,
+        "P": 101325.0,
+        "massFlow": 410877.8791,
+        "massFlows": {
+          "Water": 339893.6625,
+          "Ethanol": 21135.5379,
+          "AceticAcid": 1364.153982,
+          "Furfural": 419.1472152,
+          "Glycerol": 170.654668,
+          "NH3": 13.4464243,
+          "LacticAcid": 1655.520796,
+          "SuccinicAcid": 425.8212072,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "recycle",
+        "source": "R303",
+        "sink": "R302",
+        "phase": "l",
+        "T": 305.15,
+        "P": 101325.0,
+        "massFlow": 43023.28305,
+        "massFlows": {
+          "Water": 33941.46342,
+          "AceticAcid": 136.6300139,
+          "Furfural": 42.12474619,
+          "NH3": 1.703052,
+          "AmmoniumSulfate": 242.0031255,
+          "HMF": 30.93860245,
+          "Glucose": 2998.749829,
+          "Xylose": 1682.9909,
+          "Arabinose": 205.1481866,
+          "Extract": 1234.722963,
+          "Ash": 415.5074545,
+          "Lignin": 1261.861584,
+          "SolubleLignin": 66.41376757,
+          "GlucoseOligomer": 114.4541832,
+          "GalactoseOligomer": 0.2892538709,
+          "MannoseOligomer": 0.1517065757,
+          "XyloseOligomer": 39.49427853,
+          "ArabinoseOligomer": 4.814155335,
+          "Protein": 261.2724359,
+          "Glucan": 126.7255595,
+          "Xylan": 42.78546841,
+          "Cellobiose": 33.44143367,
+          "Arabinan": 14.2418762,
+          "Mannan": 50.26544541,
+          "Galactan": 11.72683402,
+          "Cellulase": 63.36277977
+        },
+        "price": null
+      },
+      {
+        "id": "s20",
+        "source": "R302",
+        "sink": "M304",
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1977.374692,
+        "massFlows": {
+          "O2": 17.16385862,
+          "CO2": 1960.210833
+        },
+        "price": null
+      },
+      {
+        "id": "s21",
+        "source": "R302",
+        "sink": "T301",
+        "phase": "l",
+        "T": 305.15,
+        "P": 101325.0,
+        "massFlow": 41293.17496,
+        "massFlows": {
+          "Water": 33973.70867,
+          "Ethanol": 2068.865764,
+          "AceticAcid": 136.6300139,
+          "Furfural": 42.12474619,
+          "Glycerol": 17.42540395,
+          "NH3": 1.703052,
+          "SuccinicAcid": 43.44425294,
+          "DAP": 22.7017443,
+          "AmmoniumSulfate": 242.0031255,
+          "HMF": 30.93860245,
+          "Glucose": 149.9374915,
+          "Xylose": 171.6650718,
+          "Arabinose": 205.1481866,
+          "Extract": 1234.722963,
+          "Ash": 415.5074545,
+          "Lignin": 1261.861584,
+          "SolubleLignin": 66.41376757,
+          "GlucoseOligomer": 114.4541832,
+          "GalactoseOligomer": 0.2892538709,
+          "MannoseOligomer": 0.1517065757,
+          "XyloseOligomer": 39.49427853,
+          "ArabinoseOligomer": 4.814155335,
+          "Z_mobilis": 153.5905866,
+          "Protein": 261.2724359,
+          "Glucan": 126.7255595,
+          "Xylan": 42.78546841,
+          "Xylitol": 78.45711154,
+          "Cellobiose": 33.44143367,
+          "CSL": 213.2999536,
+          "Arabinan": 14.2418762,
+          "Mannan": 50.26544541,
+          "Galactan": 11.72683402,
+          "Cellulase": 63.36277977
+        },
+        "price": null
+      },
+      {
+        "id": "s26",
+        "source": "M304",
+        "sink": "D401",
+        "phase": "g",
+        "T": 304.5026986,
+        "P": 101325.0,
+        "massFlow": 20841.62096,
+        "massFlows": {
+          "Water": 275.8517851,
+          "Ethanol": 182.7205552,
+          "AceticAcid": 2.146157321,
+          "Furfural": 2.100246726,
+          "Glycerol": 0.00001398990691,
+          "NH3": 3.584095702,
+          "LacticAcid": 0.0008433798515,
+          "SuccinicAcid": 2.909773845e-6,
+          "O2": 168.433878,
+          "CO2": 20206.78338
+        },
+        "price": null
+      },
+      {
+        "id": "stripping_water",
+        "source": null,
+        "sink": "D401",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 26379.24734,
+        "massFlows": {
+          "Water": 26379.24734
+        },
+        "price": null
+      },
+      {
+        "id": "vent",
+        "source": "D401",
+        "sink": null,
+        "phase": "g",
+        "T": 304.5026986,
+        "P": 101325.0,
+        "massFlow": 20378.80135,
+        "massFlows": {
+          "NH3": 3.584095702,
+          "O2": 168.433878,
+          "CO2": 20206.78338
+        },
+        "price": null
+      },
+      {
+        "id": "s27",
+        "source": "D401",
+        "sink": "M401",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 26842.06694,
+        "massFlows": {
+          "Water": 26655.09913,
+          "Ethanol": 182.7205552,
+          "AceticAcid": 2.146157321,
+          "Furfural": 2.100246726,
+          "Glycerol": 0.00001398990691,
+          "LacticAcid": 0.0008433798515,
+          "SuccinicAcid": 2.909773845e-6
+        },
+        "price": null
+      },
+      {
+        "id": "s25",
+        "source": "M401",
+        "sink": "T302",
+        "phase": "l",
+        "T": 304.6808309,
+        "P": 101325.0,
+        "massFlow": 437719.946,
+        "massFlows": {
+          "Water": 366548.7616,
+          "Ethanol": 21318.25846,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "NH3": 13.4464243,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "beer",
+        "source": "T302",
+        "sink": "P401",
+        "phase": "l",
+        "T": 304.6808309,
+        "P": 101325.0,
+        "massFlow": 437719.946,
+        "massFlows": {
+          "Water": 366548.7616,
+          "Ethanol": 21318.25846,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "NH3": 13.4464243,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "s28",
+        "source": "P401",
+        "sink": "H401",
+        "phase": "l",
+        "T": 304.6808309,
+        "P": 607950.0,
+        "massFlow": 437719.946,
+        "massFlows": {
+          "Water": 366548.7616,
+          "Ethanol": 21318.25846,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "NH3": 13.4464243,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "s30",
+        "source": "P402",
+        "sink": "H401",
+        "phase": "l",
+        "T": 395.3110751,
+        "P": 607950.0,
+        "massFlow": 394958.178,
+        "massFlows": {
+          "Water": 345115.2473,
+          "Ethanol": 3.45121274,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "s31",
+        "source": "H401",
+        "sink": "D402",
+        "phase": "l",
+        "T": 378.3223238,
+        "P": 607950.0,
+        "massFlow": 437719.946,
+        "massFlows": {
+          "Water": 366548.7616,
+          "Ethanol": 21318.25846,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "NH3": 13.4464243,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "stillage",
+        "source": "H401",
+        "sink": "S401",
+        "phase": "l",
+        "T": 314.6808309,
+        "P": 607950.0,
+        "massFlow": 394958.178,
+        "massFlows": {
+          "Water": 345115.2473,
+          "Ethanol": 3.45121274,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "distilled_beer",
+        "source": "D402",
+        "sink": "M402",
+        "phase": "g",
+        "T": 386.1424023,
+        "P": 212782.5,
+        "massFlow": 42761.76797,
+        "massFlows": {
+          "Water": 21433.5143,
+          "Ethanol": 21314.80724,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s29",
+        "source": "D402",
+        "sink": "P402",
+        "phase": "l",
+        "T": 395.3110751,
+        "P": 212782.5,
+        "massFlow": 394958.178,
+        "massFlows": {
+          "Water": 345115.2473,
+          "Ethanol": 3.45121274,
+          "AceticAcid": 1366.300139,
+          "Furfural": 421.2474619,
+          "Glycerol": 170.654682,
+          "LacticAcid": 1655.521639,
+          "SuccinicAcid": 425.8212101,
+          "DAP": 145.7153972,
+          "AmmoniumSulfate": 2420.031255,
+          "HMF": 309.3860245,
+          "Glucose": 526.4905076,
+          "Xylose": 1084.708875,
+          "Arabinose": 1989.93741,
+          "Extract": 12347.22963,
+          "Ash": 4155.074545,
+          "Lignin": 12618.61584,
+          "SolubleLignin": 664.1376757,
+          "GlucoseOligomer": 1144.541832,
+          "GalactoseOligomer": 2.892538709,
+          "MannoseOligomer": 1.517065757,
+          "XyloseOligomer": 394.9427853,
+          "ArabinoseOligomer": 48.14155335,
+          "Z_mobilis": 816.9437921,
+          "Protein": 2932.983468,
+          "Glucan": 1267.255595,
+          "Xylan": 427.8546841,
+          "Xylitol": 771.1502419,
+          "Cellobiose": 334.4143367,
+          "Arabinan": 142.418762,
+          "Mannan": 502.6544541,
+          "Galactan": 117.2683402,
+          "Cellulase": 633.6277977
+        },
+        "price": null
+      },
+      {
+        "id": "recycled_water",
+        "source": null,
+        "sink": "S401",
+        "phase": "l",
+        "T": 320.15,
+        "P": 395167.5,
+        "massFlow": 1.0,
+        "massFlows": {
+          "Water": 1.0
+        },
+        "price": null
+      },
+      {
+        "id": "s44",
+        "source": "S401",
+        "sink": "slurry_mixer",
+        "phase": "l",
+        "T": 314.6808458,
+        "P": 395167.5,
+        "massFlow": 36180.06146,
+        "massFlows": {
+          "Water": 12663.02151,
+          "Ethanol": 0.1281780412,
+          "AceticAcid": 50.74438718,
+          "Furfural": 15.04274687,
+          "Glycerol": 6.33811489,
+          "LacticAcid": 61.70129149,
+          "SuccinicAcid": 15.81499974,
+          "DAP": 5.41478416,
+          "AmmoniumSulfate": 89.92836144,
+          "HMF": 11.04817493,
+          "Glucose": 19.20110881,
+          "Xylose": 40.85013622,
+          "Arabinose": 71.43875301,
+          "Extract": 460.1812483,
+          "Ash": 4071.557546,
+          "Lignin": 12366.24352,
+          "SolubleLignin": 24.75241117,
+          "GlucoseOligomer": 42.59984699,
+          "GalactoseOligomer": 0.1076602908,
+          "MannoseOligomer": 0.05646518746,
+          "XyloseOligomer": 14.69977047,
+          "ArabinoseOligomer": 1.791828616,
+          "Z_mobilis": 800.5232219,
+          "Protein": 2874.323799,
+          "Glucan": 1242.037209,
+          "Xylan": 419.7682306,
+          "Xylitol": 28.64051998,
+          "Cellobiose": 12.00547469,
+          "Arabinan": 139.4564517,
+          "Mannan": 492.1992414,
+          "Galactan": 114.8291587,
+          "Cellulase": 23.61530802
+        },
+        "price": null
+      },
+      {
+        "id": "s45",
+        "source": "S401",
+        "sink": "M601",
+        "phase": "l",
+        "T": 314.6808458,
+        "P": 395167.5,
+        "massFlow": 358779.1166,
+        "massFlows": {
+          "Water": 332453.2258,
+          "Ethanol": 3.323034699,
+          "AceticAcid": 1315.555752,
+          "Furfural": 406.2047151,
+          "Glycerol": 164.3165671,
+          "LacticAcid": 1593.820348,
+          "SuccinicAcid": 410.0062103,
+          "DAP": 140.300613,
+          "AmmoniumSulfate": 2330.102894,
+          "HMF": 298.3378495,
+          "Glucose": 507.2893988,
+          "Xylose": 1043.858738,
+          "Arabinose": 1918.498657,
+          "Extract": 11887.04838,
+          "Ash": 83.51699835,
+          "Lignin": 252.3723168,
+          "SolubleLignin": 639.3852645,
+          "GlucoseOligomer": 1101.941985,
+          "GalactoseOligomer": 2.784878419,
+          "MannoseOligomer": 1.460600569,
+          "XyloseOligomer": 380.2430149,
+          "ArabinoseOligomer": 46.34972473,
+          "Z_mobilis": 16.42057022,
+          "Protein": 58.65966936,
+          "Glucan": 25.21838635,
+          "Xylan": 8.08645353,
+          "Xylitol": 742.5097219,
+          "Cellobiose": 322.408862,
+          "Arabinan": 2.962310249,
+          "Mannan": 10.45521264,
+          "Galactan": 2.439181476,
+          "Cellulase": 610.0124897
+        },
+        "price": null
+      },
+      {
+        "id": "s12",
+        "source": "M204",
+        "sink": "H201",
+        "phase": "g",
+        "T": 373.2394155,
+        "P": 101325.0,
+        "massFlow": 15000.54442,
+        "massFlows": {
+          "Water": 14656.90138,
+          "AceticAcid": 159.1937605,
+          "Furfural": 184.4492851
+        },
+        "price": null
+      },
+      {
+        "id": "pretreatment_wastewater",
+        "source": "H201",
+        "sink": "M601",
+        "phase": "l",
+        "T": 373.15,
+        "P": 101325.0,
+        "massFlow": 15000.54442,
+        "massFlows": {
+          "Water": 14656.90138,
+          "AceticAcid": 159.1937605,
+          "Furfural": 184.4492851
+        },
+        "price": null
+      },
+      {
+        "id": "s46",
+        "source": "M601",
+        "sink": "WWTC",
+        "phase": "l",
+        "T": 317.1069009,
+        "P": 101325.0,
+        "massFlow": 373779.661,
+        "massFlows": {
+          "Water": 347110.1272,
+          "Ethanol": 3.323034699,
+          "AceticAcid": 1474.749513,
+          "Furfural": 590.6540002,
+          "Glycerol": 164.3165671,
+          "LacticAcid": 1593.820348,
+          "SuccinicAcid": 410.0062103,
+          "DAP": 140.300613,
+          "AmmoniumSulfate": 2330.102894,
+          "HMF": 298.3378495,
+          "Glucose": 507.2893988,
+          "Xylose": 1043.858738,
+          "Arabinose": 1918.498657,
+          "Extract": 11887.04838,
+          "Ash": 83.51699835,
+          "Lignin": 252.3723168,
+          "SolubleLignin": 639.3852645,
+          "GlucoseOligomer": 1101.941985,
+          "GalactoseOligomer": 2.784878419,
+          "MannoseOligomer": 1.460600569,
+          "XyloseOligomer": 380.2430149,
+          "ArabinoseOligomer": 46.34972473,
+          "Z_mobilis": 16.42057022,
+          "Protein": 58.65966936,
+          "Glucan": 25.21838635,
+          "Xylan": 8.08645353,
+          "Xylitol": 742.5097219,
+          "Cellobiose": 322.408862,
+          "Arabinan": 2.962310249,
+          "Mannan": 10.45521264,
+          "Galactan": 2.439181476,
+          "Cellulase": 610.0124897
+        },
+        "price": null
+      },
+      {
+        "id": "s47",
+        "source": "WWTC",
+        "sink": "R601",
+        "phase": "l",
+        "T": 317.1069009,
+        "P": 101325.0,
+        "massFlow": 373779.661,
+        "massFlows": {
+          "Water": 347110.1272,
+          "Ethanol": 3.323034699,
+          "AceticAcid": 1474.749513,
+          "Furfural": 590.6540002,
+          "Glycerol": 164.3165671,
+          "LacticAcid": 1593.820348,
+          "SuccinicAcid": 410.0062103,
+          "DAP": 140.300613,
+          "AmmoniumSulfate": 2330.102894,
+          "HMF": 298.3378495,
+          "Glucose": 507.2893988,
+          "Xylose": 1043.858738,
+          "Arabinose": 1918.498657,
+          "Extract": 11887.04838,
+          "Ash": 83.51699835,
+          "Lignin": 252.3723168,
+          "SolubleLignin": 639.3852645,
+          "GlucoseOligomer": 1101.941985,
+          "GalactoseOligomer": 2.784878419,
+          "MannoseOligomer": 1.460600569,
+          "XyloseOligomer": 380.2430149,
+          "ArabinoseOligomer": 46.34972473,
+          "Z_mobilis": 16.42057022,
+          "Protein": 58.65966936,
+          "Glucan": 25.21838635,
+          "Xylan": 8.08645353,
+          "Xylitol": 742.5097219,
+          "Cellobiose": 322.408862,
+          "Arabinan": 2.962310249,
+          "Mannan": 10.45521264,
+          "Galactan": 2.439181476,
+          "Cellulase": 610.0124897
+        },
+        "price": null
+      },
+      {
+        "id": "biogas",
+        "source": "R601",
+        "sink": "gas_mixer",
+        "phase": "g",
+        "T": 307.6342448,
+        "P": 101325.0,
+        "massFlow": 21148.60115,
+        "massFlows": {
+          "Water": 667.1033391,
+          "Ethanol": 0.007010453186,
+          "AceticAcid": 0.5433430559,
+          "Furfural": 0.8388700557,
+          "Glycerol": 4.066693664e-6,
+          "LacticAcid": 0.0002345718572,
+          "SuccinicAcid": 8.184832252e-7,
+          "CH4": 5633.007084,
+          "CO2": 14847.10127
+        },
+        "price": null
+      },
+      {
+        "id": "s48",
+        "source": "R601",
+        "sink": "M602",
+        "phase": "l",
+        "T": 307.6342448,
+        "P": 101325.0,
+        "massFlow": 326557.3321,
+        "massFlows": {
+          "Water": 321869.6525,
+          "Ethanol": 0.2736087128,
+          "AceticAcid": 122.7994992,
+          "Furfural": 48.80771528,
+          "Glycerol": 13.69754007,
+          "LacticAcid": 133.2820406,
+          "SuccinicAcid": 34.1784039,
+          "DAP": 130.7882315,
+          "AmmoniumSulfate": 2172.121917,
+          "HMF": 25.06028986,
+          "Glucose": 42.61215731,
+          "Xylose": 86.79883743,
+          "Arabinose": 160.7251027,
+          "Extract": 994.0472888,
+          "Ash": 21.10474548,
+          "Lignin": 64.60731309,
+          "SolubleLignin": 53.46820912,
+          "GlucoseOligomer": 92.09072421,
+          "GalactoseOligomer": 0.2327359098,
+          "MannoseOligomer": 0.1220642884,
+          "XyloseOligomer": 31.77740307,
+          "ArabinoseOligomer": 3.87350675,
+          "Z_mobilis": 0.3786255082,
+          "Protein": 1.377387696,
+          "Glucan": 6.455906905,
+          "Xylan": 2.021613382,
+          "Xylitol": 61.89613017,
+          "Cellobiose": 27.01028603,
+          "WWTsludge": 305.0583581,
+          "Cellulase": 51.01192844
+        },
+        "price": null
+      },
+      {
+        "id": "s49",
+        "source": "R601",
+        "sink": "M603",
+        "phase": "l",
+        "T": 308.15,
+        "P": 101325.0,
+        "massFlow": 26073.72773,
+        "massFlows": {
+          "Water": 24573.37127,
+          "Ethanol": 0.01845395691,
+          "AceticAcid": 9.384613852,
+          "Furfural": 3.512274676,
+          "Glycerol": 1.090946904,
+          "LacticAcid": 10.16155615,
+          "SuccinicAcid": 2.722154213,
+          "DAP": 9.512381564,
+          "AmmoniumSulfate": 157.9809762,
+          "HMF": 1.790116599,
+          "Glucose": 3.043888579,
+          "Xylose": 7.148449026,
+          "Arabinose": 11.93977639,
+          "Extract": 75.78706567,
+          "Ash": 62.41225287,
+          "Lignin": 187.7650037,
+          "SolubleLignin": 4.076464693,
+          "GlucoseOligomer": 7.084054439,
+          "GalactoseOligomer": 0.01790314789,
+          "MannoseOligomer": 0.009389762879,
+          "XyloseOligomer": 2.44446827,
+          "ArabinoseOligomer": 0.2979684754,
+          "Z_mobilis": 1.099225812,
+          "Protein": 3.901982546,
+          "Glucan": 18.76247944,
+          "Xylan": 6.064840147,
+          "Xylitol": 4.929744797,
+          "Cellobiose": 2.006511553,
+          "Arabinan": 2.962310249,
+          "Mannan": 10.45521264,
+          "Galactan": 2.439181476,
+          "WWTsludge": 885.6456159,
+          "Cellulase": 3.889195629
+        },
+        "price": null
+      },
+      {
+        "id": "s50",
+        "source": "M604",
+        "sink": "M602",
+        "phase": "l",
+        "T": 307.6758855,
+        "P": 101325.0,
+        "massFlow": 1907787.251,
+        "massFlows": {
+          "Water": 1877523.411,
+          "Ethanol": 0.02765029584,
+          "AceticAcid": 13.47037654,
+          "Furfural": 5.409890892,
+          "Glycerol": 1.499267247,
+          "LacticAcid": 14.54354539,
+          "SuccinicAcid": 3.741004178,
+          "DAP": 806.0546651,
+          "AmmoniumSulfate": 13386.90022,
+          "HMF": 2.763965537,
+          "SO2": 6.298245093,
+          "Glucose": 4.699807342,
+          "Xylose": 10.0540352,
+          "Arabinose": 17.30037256,
+          "Extract": 108.4689252,
+          "Ash": 115.4946281,
+          "NaOH": 10887.65154,
+          "Lignin": 350.2045717,
+          "SolubleLignin": 5.834369491,
+          "GlucoseOligomer": 9.856838556,
+          "GalactoseOligomer": 0.02491065532,
+          "MannoseOligomer": 0.01306502901,
+          "XyloseOligomer": 3.401262553,
+          "ArabinoseOligomer": 0.4145969207,
+          "Z_mobilis": 0.06996639306,
+          "Protein": 0.2682730273,
+          "Glucan": 35.04862122,
+          "Xylan": 11.02829258,
+          "Xylitol": 6.774853493,
+          "Cellobiose": 2.907374165,
+          "Arabinan": 0.8301021253,
+          "Mannan": 2.929772207,
+          "Galactan": 0.6835103539,
+          "WWTsludge": 4443.605641,
+          "Cellulase": 5.566343887
+        },
+        "price": null
+      },
+      {
+        "id": "s51",
+        "source": "M602",
+        "sink": "R602",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 2231127.465,
+        "massFlows": {
+          "Water": 2196300.095,
+          "Ethanol": 0.3012590086,
+          "AceticAcid": 136.2698758,
+          "Furfural": 54.21760617,
+          "Glycerol": 15.19680732,
+          "LacticAcid": 147.825586,
+          "SuccinicAcid": 37.91940808,
+          "DAP": 935.2487285,
+          "AmmoniumSulfate": 15532.5463,
+          "HMF": 27.8242554,
+          "SO2": 6.286916362,
+          "Glucose": 47.31196465,
+          "Xylose": 96.85287263,
+          "Arabinose": 178.0254753,
+          "Extract": 1102.516214,
+          "Ash": 136.4968702,
+          "NaOH": 10798.7682,
+          "Lignin": 414.5012557,
+          "SolubleLignin": 59.30257861,
+          "GlucoseOligomer": 101.9475628,
+          "GalactoseOligomer": 0.2576465651,
+          "MannoseOligomer": 0.1351293174,
+          "XyloseOligomer": 35.17866562,
+          "ArabinoseOligomer": 4.288103671,
+          "Z_mobilis": 0.4485919012,
+          "Protein": 1.645660724,
+          "Glucan": 41.47343318,
+          "Xylan": 13.04012905,
+          "Xylitol": 68.67098367,
+          "Cellobiose": 29.91766019,
+          "Arabinan": 0.8294802177,
+          "Mannan": 2.927577239,
+          "Galactan": 0.6829982721,
+          "WWTsludge": 4741.936551,
+          "Cellulase": 56.57827233
+        },
+        "price": null
+      },
+      {
+        "id": "air_lagoon",
+        "source": null,
+        "sink": "R602",
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 10053.05155,
+        "massFlows": {
+          "N2": 7841.380206,
+          "O2": 2211.67134
+        },
+        "price": null
+      },
+      {
+        "id": "caustic",
+        "source": null,
+        "sink": "R602",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 3949.610562,
+        "massFlows": {
+          "Water": 1974.805281,
+          "NaOH": 1974.805281
+        },
+        "price": 0.07476
+      },
+      {
+        "id": "evaporated_water",
+        "source": "R602",
+        "sink": null,
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 35575.07583,
+        "massFlows": {
+          "Water": 24851.33308,
+          "N2": 7847.495121,
+          "O2": 368.61189,
+          "CO2": 2507.63574
+        },
+        "price": null
+      },
+      {
+        "id": "s52",
+        "source": "R602",
+        "sink": "S601",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 2209555.051,
+        "massFlows": {
+          "Water": 2174381.683,
+          "Ethanol": 0.01205036034,
+          "AceticAcid": 5.450795031,
+          "Furfural": 2.168704247,
+          "Glycerol": 0.6078722927,
+          "LacticAcid": 5.913023438,
+          "SuccinicAcid": 1.516776323,
+          "DAP": 935.2487285,
+          "AmmoniumSulfate": 15532.5463,
+          "HMF": 1.112970216,
+          "SO2": 7.427704867,
+          "Glucose": 1.892478586,
+          "Xylose": 3.874114905,
+          "Arabinose": 7.121019011,
+          "Extract": 44.10064856,
+          "Ash": 136.4968702,
+          "NaOH": 12773.57349,
+          "Lignin": 414.5012557,
+          "SolubleLignin": 2.372103144,
+          "GlucoseOligomer": 4.077902511,
+          "GalactoseOligomer": 0.0103058626,
+          "MannoseOligomer": 0.005405172695,
+          "XyloseOligomer": 1.407146625,
+          "ArabinoseOligomer": 0.1715241468,
+          "Z_mobilis": 0.01794367605,
+          "Protein": 0.06582642894,
+          "Glucan": 41.47343318,
+          "Xylan": 13.04012905,
+          "Xylitol": 2.746839347,
+          "Cellobiose": 1.196706408,
+          "Arabinan": 0.8294802177,
+          "Mannan": 2.927577239,
+          "Galactan": 0.6829982721,
+          "WWTsludge": 5226.515631,
+          "Cellulase": 2.263130893
+        },
+        "price": null
+      },
+      {
+        "id": "s53",
+        "source": "S601",
+        "sink": "S604",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 321162.3552,
+        "massFlows": {
+          "Water": 316155.0966,
+          "Ethanol": 0.001506295043,
+          "AceticAcid": 0.6813493788,
+          "Furfural": 0.2710880309,
+          "Glycerol": 0.07598403659,
+          "LacticAcid": 0.8573883985,
+          "SuccinicAcid": 0.1895970404,
+          "DAP": 135.9851651,
+          "AmmoniumSulfate": 2258.432233,
+          "HMF": 0.139121277,
+          "SO2": 1.11415573,
+          "Glucose": 0.2365598233,
+          "Xylose": 0.9685287263,
+          "Arabinose": 0.8901273764,
+          "Extract": 6.394594041,
+          "Ash": 19.79204618,
+          "NaOH": 1857.277585,
+          "Lignin": 60.10268208,
+          "SolubleLignin": 0.3439549559,
+          "GlucoseOligomer": 0.5827322688,
+          "GalactoseOligomer": 0.001472707766,
+          "MannoseOligomer": 0.0007723991781,
+          "XyloseOligomer": 0.2010812527,
+          "ArabinoseOligomer": 0.02451080058,
+          "Z_mobilis": 0.002242959506,
+          "Protein": 0.008228303618,
+          "Glucan": 6.013647811,
+          "Xylan": 1.890818712,
+          "Xylitol": 0.3433549183,
+          "Cellobiose": 0.149588301,
+          "Arabinan": 0.1202746316,
+          "Mannan": 0.4244986997,
+          "Galactan": 0.09903474945,
+          "WWTsludge": 653.3144538,
+          "Cellulase": 0.3281539795
+        },
+        "price": null
+      },
+      {
+        "id": "s54",
+        "source": "S601",
+        "sink": "S602",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 1888392.696,
+        "massFlows": {
+          "Water": 1858226.586,
+          "Ethanol": 0.0105440653,
+          "AceticAcid": 4.769445652,
+          "Furfural": 1.897616216,
+          "Glycerol": 0.5318882561,
+          "LacticAcid": 5.05563504,
+          "SuccinicAcid": 1.327179283,
+          "DAP": 799.2635634,
+          "AmmoniumSulfate": 13274.11407,
+          "HMF": 0.9738489389,
+          "SO2": 6.313549137,
+          "Glucose": 1.655918763,
+          "Xylose": 2.905586179,
+          "Arabinose": 6.230891635,
+          "Extract": 37.70605452,
+          "Ash": 116.704824,
+          "NaOH": 10916.2959,
+          "Lignin": 354.3985736,
+          "SolubleLignin": 2.028148188,
+          "GlucoseOligomer": 3.495170242,
+          "GalactoseOligomer": 0.008833154838,
+          "MannoseOligomer": 0.004632773517,
+          "XyloseOligomer": 1.206065372,
+          "ArabinoseOligomer": 0.1470133463,
+          "Z_mobilis": 0.01570071654,
+          "Protein": 0.05759812532,
+          "Glucan": 35.45978537,
+          "Xylan": 11.14931034,
+          "Xylitol": 2.403484428,
+          "Cellobiose": 1.047118107,
+          "Arabinan": 0.7092055861,
+          "Mannan": 2.503078539,
+          "Galactan": 0.5839635226,
+          "WWTsludge": 4573.201177,
+          "Cellulase": 1.934976914
+        },
+        "price": null
+      },
+      {
+        "id": "s55",
+        "source": "S602",
+        "sink": "M604",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 1812856.988,
+        "massFlows": {
+          "Water": 1783897.522,
+          "Ethanol": 0.01012230269,
+          "AceticAcid": 4.578667826,
+          "Furfural": 1.821711567,
+          "Glycerol": 0.5106127259,
+          "LacticAcid": 4.853409638,
+          "SuccinicAcid": 1.274092111,
+          "DAP": 767.2930208,
+          "AmmoniumSulfate": 12743.14951,
+          "HMF": 0.9348949813,
+          "SO2": 6.061007171,
+          "Glucose": 1.589682012,
+          "Xylose": 2.789362732,
+          "Arabinose": 5.981655969,
+          "Extract": 36.19781234,
+          "Ash": 112.0366311,
+          "NaOH": 10479.64406,
+          "Lignin": 340.2226307,
+          "SolubleLignin": 1.947022261,
+          "GlucoseOligomer": 3.355363432,
+          "GalactoseOligomer": 0.008479828645,
+          "MannoseOligomer": 0.004447462576,
+          "XyloseOligomer": 1.157822757,
+          "ArabinoseOligomer": 0.1411328124,
+          "Z_mobilis": 0.01507268788,
+          "Protein": 0.05529420031,
+          "Glucan": 34.04139395,
+          "Xylan": 10.70333792,
+          "Xylitol": 2.307345051,
+          "Cellobiose": 1.005233382,
+          "Arabinan": 0.6808373627,
+          "Mannan": 2.402955398,
+          "Galactan": 0.5606049817,
+          "WWTsludge": 4390.27313,
+          "Cellulase": 1.857577837
+        },
+        "price": null
+      },
+      {
+        "id": "s56",
+        "source": "S602",
+        "sink": "M603",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 75535.70785,
+        "massFlows": {
+          "Water": 74329.06344,
+          "Ethanol": 0.0004217626121,
+          "AceticAcid": 0.1907778261,
+          "Furfural": 0.07590464864,
+          "Glycerol": 0.02127553025,
+          "LacticAcid": 0.2022254016,
+          "SuccinicAcid": 0.05308717131,
+          "DAP": 31.97054253,
+          "AmmoniumSulfate": 530.9645629,
+          "HMF": 0.03895395756,
+          "SO2": 0.2525419655,
+          "Glucose": 0.06623675051,
+          "Xylose": 0.1162234472,
+          "Arabinose": 0.2492356654,
+          "Extract": 1.508242181,
+          "Ash": 4.668192962,
+          "NaOH": 436.651836,
+          "Lignin": 14.17594294,
+          "SolubleLignin": 0.08112592753,
+          "GlucoseOligomer": 0.1398068097,
+          "GalactoseOligomer": 0.0003533261935,
+          "MannoseOligomer": 0.0001853109407,
+          "XyloseOligomer": 0.04824261489,
+          "ArabinoseOligomer": 0.00588053385,
+          "Z_mobilis": 0.0006280286617,
+          "Protein": 0.002303925013,
+          "Glucan": 1.418391415,
+          "Xylan": 0.4459724135,
+          "Xylitol": 0.09613937714,
+          "Cellobiose": 0.04188472427,
+          "Arabinan": 0.02836822345,
+          "Mannan": 0.1001231416,
+          "Galactan": 0.0233585409,
+          "WWTsludge": 182.9280471,
+          "Cellulase": 0.07739907655
+        },
+        "price": null
+      },
+      {
+        "id": "s57",
+        "source": "M603",
+        "sink": "S603",
+        "phase": "l",
+        "T": 307.7920496,
+        "P": 101325.0,
+        "massFlow": 101609.4356,
+        "massFlows": {
+          "Water": 98902.4347,
+          "Ethanol": 0.01887571953,
+          "AceticAcid": 9.575391678,
+          "Furfural": 3.588179325,
+          "Glycerol": 1.112222434,
+          "LacticAcid": 10.36378155,
+          "SuccinicAcid": 2.775241385,
+          "DAP": 41.4829241,
+          "AmmoniumSulfate": 688.9455391,
+          "HMF": 1.829070556,
+          "SO2": 0.2525419655,
+          "Glucose": 3.11012533,
+          "Xylose": 7.264672473,
+          "Arabinose": 12.18901206,
+          "Extract": 77.29530785,
+          "Ash": 67.08044583,
+          "NaOH": 436.651836,
+          "Lignin": 201.9409466,
+          "SolubleLignin": 4.15759062,
+          "GlucoseOligomer": 7.223861249,
+          "GalactoseOligomer": 0.01825647408,
+          "MannoseOligomer": 0.00957507382,
+          "XyloseOligomer": 2.492710885,
+          "ArabinoseOligomer": 0.3038490092,
+          "Z_mobilis": 1.09985384,
+          "Protein": 3.904286471,
+          "Glucan": 20.18087086,
+          "Xylan": 6.510812561,
+          "Xylitol": 5.025884174,
+          "Cellobiose": 2.048396277,
+          "Arabinan": 2.990678473,
+          "Mannan": 10.55533579,
+          "Galactan": 2.462540017,
+          "WWTsludge": 1068.573663,
+          "Cellulase": 3.966594706
+        },
+        "price": null
+      },
+      {
+        "id": "s58",
+        "source": "S603",
+        "sink": "M604",
+        "phase": "l",
+        "T": 307.7920496,
+        "P": 101325.0,
+        "massFlow": 94930.26269,
+        "massFlows": {
+          "Water": 93625.88812,
+          "Ethanol": 0.01752799315,
+          "AceticAcid": 8.891708712,
+          "Furfural": 3.588179325,
+          "Glycerol": 0.9886545215,
+          "LacticAcid": 9.690135752,
+          "SuccinicAcid": 2.466912067,
+          "DAP": 38.76164428,
+          "AmmoniumSulfate": 643.7507117,
+          "HMF": 1.829070556,
+          "SO2": 0.2372379224,
+          "Glucose": 3.11012533,
+          "Xylose": 7.264672473,
+          "Arabinose": 11.31871659,
+          "Extract": 72.27111284,
+          "Ash": 3.457996982,
+          "NaOH": 408.0074756,
+          "Lignin": 9.981940992,
+          "SolubleLignin": 3.88734723,
+          "GlucoseOligomer": 6.501475124,
+          "GalactoseOligomer": 0.01643082668,
+          "MannoseOligomer": 0.008617566438,
+          "XyloseOligomer": 2.243439796,
+          "ArabinoseOligomer": 0.2734641083,
+          "Z_mobilis": 0.05489370518,
+          "Protein": 0.212978827,
+          "Glucan": 1.007227265,
+          "Xylan": 0.3249546549,
+          "Xylitol": 4.467508442,
+          "Cellobiose": 1.902140783,
+          "Arabinan": 0.1492647626,
+          "Mannan": 0.5268168091,
+          "Galactan": 0.1229053722,
+          "WWTsludge": 53.33251152,
+          "Cellulase": 3.70876605
+        },
+        "price": null
+      },
+      {
+        "id": "sludge",
+        "source": "S603",
+        "sink": "slurry_mixer",
+        "phase": "l",
+        "T": 307.7920496,
+        "P": 101325.0,
+        "massFlow": 6679.17289,
+        "massFlows": {
+          "Water": 5276.546583,
+          "Ethanol": 0.001347726374,
+          "AceticAcid": 0.6836829658,
+          "Glycerol": 0.1235679124,
+          "LacticAcid": 0.6736458009,
+          "SuccinicAcid": 0.3083293178,
+          "DAP": 2.721279821,
+          "AmmoniumSulfate": 45.19482736,
+          "SO2": 0.01530404311,
+          "Arabinose": 0.8702954607,
+          "Extract": 5.02419501,
+          "Ash": 63.62244885,
+          "NaOH": 28.64436044,
+          "Lignin": 191.9590056,
+          "SolubleLignin": 0.2702433903,
+          "GlucoseOligomer": 0.7223861249,
+          "GalactoseOligomer": 0.001825647408,
+          "MannoseOligomer": 0.000957507382,
+          "XyloseOligomer": 0.2492710885,
+          "ArabinoseOligomer": 0.03038490092,
+          "Z_mobilis": 1.044960135,
+          "Protein": 3.691307644,
+          "Glucan": 19.17364359,
+          "Xylan": 6.185857906,
+          "Xylitol": 0.5583757317,
+          "Cellobiose": 0.1462554942,
+          "Arabinan": 2.84141371,
+          "Mannan": 10.02851898,
+          "Galactan": 2.339634644,
+          "WWTsludge": 1015.241151,
+          "Cellulase": 0.2578286559
+        },
+        "price": null
+      },
+      {
+        "id": "to_boiler",
+        "source": "slurry_mixer",
+        "sink": "BT",
+        "phase": "l",
+        "T": 313.1198698,
+        "P": 101325.0,
+        "massFlow": 42859.23435,
+        "massFlows": {
+          "Water": 17939.5681,
+          "Ethanol": 0.1295257675,
+          "AceticAcid": 51.42807014,
+          "Furfural": 15.04274687,
+          "Glycerol": 6.461682802,
+          "LacticAcid": 62.37493729,
+          "SuccinicAcid": 16.12332906,
+          "DAP": 8.136063981,
+          "AmmoniumSulfate": 135.1231888,
+          "HMF": 11.04817493,
+          "SO2": 0.01530404311,
+          "Glucose": 19.20110881,
+          "Xylose": 40.85013622,
+          "Arabinose": 72.30904847,
+          "Extract": 465.2054434,
+          "Ash": 4135.179995,
+          "NaOH": 28.64436044,
+          "Lignin": 12558.20253,
+          "SolubleLignin": 25.02265456,
+          "GlucoseOligomer": 43.32223311,
+          "GalactoseOligomer": 0.1094859382,
+          "MannoseOligomer": 0.05742269485,
+          "XyloseOligomer": 14.94904156,
+          "ArabinoseOligomer": 1.822213516,
+          "Z_mobilis": 801.568182,
+          "Protein": 2878.015106,
+          "Glucan": 1261.210853,
+          "Xylan": 425.9540885,
+          "Xylitol": 29.19889572,
+          "Cellobiose": 12.15173018,
+          "Arabinan": 142.2978654,
+          "Mannan": 502.2277604,
+          "Galactan": 117.1687933,
+          "WWTsludge": 1015.241151,
+          "Cellulase": 23.87313668
+        },
+        "price": null
+      },
+      {
+        "id": "RO_treated_water_1",
+        "source": "S604",
+        "sink": "treated_water_mixer",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 312045.0804,
+        "massFlows": {
+          "Water": 312045.0804
+        },
+        "price": null
+      },
+      {
+        "id": "brine",
+        "source": "S604",
+        "sink": null,
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 9117.274789,
+        "massFlows": {
+          "Water": 4110.016256,
+          "Ethanol": 0.001506295043,
+          "AceticAcid": 0.6813493788,
+          "Furfural": 0.2710880309,
+          "Glycerol": 0.07598403659,
+          "LacticAcid": 0.8573883985,
+          "SuccinicAcid": 0.1895970404,
+          "DAP": 135.9851651,
+          "AmmoniumSulfate": 2258.432233,
+          "HMF": 0.139121277,
+          "SO2": 1.11415573,
+          "Glucose": 0.2365598233,
+          "Xylose": 0.9685287263,
+          "Arabinose": 0.8901273764,
+          "Extract": 6.394594041,
+          "Ash": 19.79204618,
+          "NaOH": 1857.277585,
+          "Lignin": 60.10268208,
+          "SolubleLignin": 0.3439549559,
+          "GlucoseOligomer": 0.5827322688,
+          "GalactoseOligomer": 0.001472707766,
+          "MannoseOligomer": 0.0007723991781,
+          "XyloseOligomer": 0.2010812527,
+          "ArabinoseOligomer": 0.02451080058,
+          "Z_mobilis": 0.002242959506,
+          "Protein": 0.008228303618,
+          "Glucan": 6.013647811,
+          "Xylan": 1.890818712,
+          "Xylitol": 0.3433549183,
+          "Cellobiose": 0.149588301,
+          "Arabinan": 0.1202746316,
+          "Mannan": 0.4244986997,
+          "Galactan": 0.09903474945,
+          "WWTsludge": 653.3144538,
+          "Cellulase": 0.3281539795
+        },
+        "price": null
+      },
+      {
+        "id": "s61",
+        "source": "treated_water_mixer",
+        "sink": "PWC",
+        "phase": "l",
+        "T": 307.6698064,
+        "P": 101325.0,
+        "massFlow": 312045.0804,
+        "massFlows": {
+          "Water": 312045.0804
+        },
+        "price": null
+      },
+      {
+        "id": "s36",
+        "source": "U401",
+        "sink": "M402",
+        "phase": "g",
+        "T": 388.15,
+        "P": 162120.0,
+        "massFlow": 6309.644833,
+        "massFlows": {
+          "Water": 2185.840535,
+          "Ethanol": 4123.804298
+        },
+        "price": null
+      },
+      {
+        "id": "s32",
+        "source": "M402",
+        "sink": "D403",
+        "phase": "g",
+        "T": 386.397363,
+        "P": 162120.0,
+        "massFlow": 49071.4128,
+        "massFlows": {
+          "Water": 23619.35483,
+          "Ethanol": 25438.61154,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s33",
+        "source": "D403",
+        "sink": "H402",
+        "phase": "g",
+        "T": 363.9161287,
+        "P": 162120.0,
+        "massFlow": 27814.91856,
+        "massFlows": {
+          "Water": 2363.073156,
+          "Ethanol": 25438.39898,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s34",
+        "source": "D403",
+        "sink": "P403",
+        "phase": "l",
+        "T": 386.8460291,
+        "P": 162120.0,
+        "massFlow": 21256.49424,
+        "massFlows": {
+          "Water": 21256.28168,
+          "Ethanol": 0.2125665287
+        },
+        "price": null
+      },
+      {
+        "id": "s35",
+        "source": "H402",
+        "sink": "U401",
+        "phase": "g",
+        "T": 388.15,
+        "P": 162120.0,
+        "massFlow": 27814.91856,
+        "massFlows": {
+          "Water": 2363.073156,
+          "Ethanol": 25438.39898,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s37",
+        "source": "U401",
+        "sink": "H403",
+        "phase": "g",
+        "T": 388.15,
+        "P": 162120.0,
+        "massFlow": 21505.27372,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s38",
+        "source": "H403",
+        "sink": "T701",
+        "phase": "l",
+        "T": 340.0,
+        "P": 162120.0,
+        "massFlow": 21505.27372,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s39",
+        "source": "T701",
+        "sink": "P701",
+        "phase": "l",
+        "T": 340.0,
+        "P": 162120.0,
+        "massFlow": 21505.27372,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "s40",
+        "source": "P701",
+        "sink": "M701",
+        "phase": "l",
+        "T": 340.0,
+        "P": 162120.0,
+        "massFlow": 21505.27372,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243
+        },
+        "price": null
+      },
+      {
+        "id": "denaturant",
+        "source": null,
+        "sink": "T702",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 473.1016088,
+        "massFlows": {
+          "Denaturant": 473.1016088
+        },
+        "price": 0.756
+      },
+      {
+        "id": "s41",
+        "source": "T702",
+        "sink": "P702",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 473.1016088,
+        "massFlows": {
+          "Denaturant": 473.1016088
+        },
+        "price": null
+      },
+      {
+        "id": "s42",
+        "source": "P702",
+        "sink": "M701",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 473.1016088,
+        "massFlows": {
+          "Denaturant": 473.1016088
+        },
+        "price": null
+      },
+      {
+        "id": "s43",
+        "source": "M701",
+        "sink": "T703",
+        "phase": "l",
+        "T": 339.2608498,
+        "P": 101325.0,
+        "massFlow": 21978.37533,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243,
+          "Denaturant": 473.1016088
+        },
+        "price": null
+      },
+      {
+        "id": "ethanol",
+        "source": "T703",
+        "sink": null,
+        "phase": "l",
+        "T": 339.2608498,
+        "P": 101325.0,
+        "massFlow": 21978.37533,
+        "massFlows": {
+          "Water": 177.2326212,
+          "Ethanol": 21314.59468,
+          "NH3": 13.4464243,
+          "Denaturant": 473.1016088
+        },
+        "price": 0.658813642
+      },
+      {
+        "id": "gas_to_boiler",
+        "source": "gas_mixer",
+        "sink": "BT",
+        "phase": "g",
+        "T": 307.6342448,
+        "P": 101325.0,
+        "massFlow": 21148.60115,
+        "massFlows": {
+          "Water": 667.1033391,
+          "Ethanol": 0.007010453186,
+          "AceticAcid": 0.5433430559,
+          "Furfural": 0.8388700557,
+          "Glycerol": 4.066693664e-6,
+          "LacticAcid": 0.0002345718572,
+          "SuccinicAcid": 8.184832252e-7,
+          "CH4": 5633.007084,
+          "CO2": 14847.10127
+        },
+        "price": null
+      },
+      {
+        "id": "recycle_process_water",
+        "source": "P403",
+        "sink": "process_water_mixer",
+        "phase": "l",
+        "T": 386.8460291,
+        "P": 162120.0,
+        "massFlow": 21256.49424,
+        "massFlows": {
+          "Water": 21256.28168,
+          "Ethanol": 0.2125665287
+        },
+        "price": null
+      },
+      {
+        "id": "s60",
+        "source": "process_water_mixer",
+        "sink": "PWC",
+        "phase": "l",
+        "T": 386.8460291,
+        "P": 162120.0,
+        "massFlow": 21256.49424,
+        "massFlows": {
+          "Water": 21256.28168,
+          "Ethanol": 0.2125665287
+        },
+        "price": null
+      },
+      {
+        "id": "cooling_tower_makeup_water",
+        "source": null,
+        "sink": "CT",
+        "phase": "l",
+        "T": 301.15,
+        "P": 101325.0,
+        "massFlow": 79743.43593,
+        "massFlows": {
+          "Water": 79743.43593
+        },
+        "price": null
+      },
+      {
+        "id": "cooling_tower_chemicals",
+        "source": null,
+        "sink": "CT",
+        "phase": "l",
+        "T": 301.15,
+        "P": 101325.0,
+        "massFlow": 1.829104684,
+        "massFlows": {
+          "Water": 1.829104684
+        },
+        "price": 3.0
+      },
+      {
+        "id": "cooling_tower_blowdown",
+        "source": "CT",
+        "sink": null,
+        "phase": "l",
+        "T": 310.15,
+        "P": 101325.0,
+        "massFlow": 7249.403266,
+        "massFlows": {
+          "Water": 7249.403266
+        },
+        "price": null
+      },
+      {
+        "id": "cooling_tower_evaporation",
+        "source": "CT",
+        "sink": null,
+        "phase": "g",
+        "T": 310.15,
+        "P": 101325.0,
+        "massFlow": 72494.03266,
+        "massFlows": {
+          "Water": 72494.03266
+        },
+        "price": null
+      },
+      {
+        "id": "plant_air",
+        "source": null,
+        "sink": "ADP",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 83383.328,
+        "massFlows": {
+          "N2": 83383.328
+        },
+        "price": null
+      },
+      {
+        "id": "s59",
+        "source": "ADP",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 83383.328,
+        "massFlows": {
+          "N2": 83383.328
+        },
+        "price": null
+      },
+      {
+        "id": "bioreactor_cleaning_chemicals",
+        "source": null,
+        "sink": "CIP",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 126.1172836,
+        "massFlows": {
+          "Water": 126.1172836
+        },
+        "price": null
+      },
+      {
+        "id": "bioreactor_cleaning_wastewater",
+        "source": "CIP",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 126.1172836,
+        "massFlows": {
+          "Water": 126.1172836
+        },
+        "price": null
+      },
+      {
+        "id": "boiler_makeup_water",
+        "source": null,
+        "sink": "BT",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 7689.527127,
+        "massFlows": {
+          "Water": 7689.527127
+        },
+        "price": null
+      },
+      {
+        "id": "natural_gas",
+        "source": null,
+        "sink": "BT",
+        "phase": "g",
+        "T": 288.7055556,
+        "P": 101559.7749,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "FGD_lime",
+        "source": null,
+        "sink": "BT",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 362.6519286,
+        "massFlows": {
+          "Water": 178.8055059,
+          "Lime": 183.8464227
+        },
+        "price": 0.1993750468
+      },
+      {
+        "id": "boiler_chemicals",
+        "source": null,
+        "sink": "BT",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.4958463409,
+        "massFlows": {
+          "Ash": 0.4958463409
+        },
+        "price": 4.995862254
+      },
+      {
+        "id": "air",
+        "source": null,
+        "sink": "BT",
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1275419.769,
+        "massFlows": {
+          "N2": 1007581.617,
+          "O2": 267838.1514
+        },
+        "price": null
+      },
+      {
+        "id": "emissions",
+        "source": "BT",
+        "sink": null,
+        "phase": "g",
+        "T": 397.7722859,
+        "P": 101325.0,
+        "massFlow": 1333834.586,
+        "massFlows": {
+          "Water": 40849.62604,
+          "P4O10": 4.372644134,
+          "N2": 1008359.113,
+          "O2": 210942.359,
+          "SO2": 10.59744854,
+          "CO2": 73668.51822
+        },
+        "price": null
+      },
+      {
+        "id": "boiler_blowdown_water",
+        "source": "BT",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 7689.527127,
+        "massFlows": {
+          "Water": 7689.527127
+        },
+        "price": null
+      },
+      {
+        "id": "ash",
+        "source": "BT",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 5734.462397,
+        "massFlows": {
+          "Water": 1323.337476,
+          "CaSO4": 258.984708,
+          "Ash": 4152.140213
+        },
+        "price": null
+      },
+      {
+        "id": "makeup_RO_water",
+        "source": null,
+        "sink": "PWC",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "makeup_process_water",
+        "source": null,
+        "sink": "PWC",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 105812.7058,
+        "massFlows": {
+          "Water": 105812.7058
+        },
+        "price": null
+      },
+      {
+        "id": "RO_treated_water_2",
+        "source": "PWC",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 87432.96306,
+        "massFlows": {
+          "Water": 87432.96306
+        },
+        "price": null
+      },
+      {
+        "id": "recycled_process_water",
+        "source": "PWC",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 351681.1048,
+        "massFlows": {
+          "Water": 351681.1048
+        },
+        "price": null
+      },
+      {
+        "id": "excess_water",
+        "source": "PWC",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      }
+    ],
+    "units": [
+      {
+        "id": "U101",
+        "unitClass": "FeedStockHandling",
+        "line": "Feed stock handling",
+        "order": 0,
+        "ins": [
+          "cornstover"
+        ],
+        "outs": [
+          "s1"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 861.8164491
+      },
+      {
+        "id": "H2SO4_storage",
+        "unitClass": "SulfuricAcidStorageTank",
+        "line": "Sulfuric acid storage tank",
+        "order": 1,
+        "ins": [
+          "sulfuric_acid"
+        ],
+        "outs": [
+          "s2"
+        ],
+        "installedCost": 159066.5628,
+        "purchaseCost": 102111.7381,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.4861074863
+      },
+      {
+        "id": "T201",
+        "unitClass": "SulfuricAcidTank",
+        "line": "Sulfuric acid tank",
+        "order": 2,
+        "ins": [
+          "s2"
+        ],
+        "outs": [
+          "s3"
+        ],
+        "installedCost": 22549.20343,
+        "purchaseCost": 10561.28256,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.5177306077
+      },
+      {
+        "id": "M201",
+        "unitClass": "SulfuricAcidMixer",
+        "line": "Sulfuric acid mixer",
+        "order": 3,
+        "ins": [
+          "warm_process_water_1",
+          "s3"
+        ],
+        "outs": [
+          "s4"
+        ],
+        "installedCost": 2606.180791,
+        "purchaseCost": 2606.180791,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M203",
+        "unitClass": "SteamMixer",
+        "line": "Steam mixer",
+        "order": 4,
+        "ins": [
+          "s1",
+          "pretreatment_steam",
+          "warm_process_water_2",
+          "s4"
+        ],
+        "outs": [
+          "s5"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": 154937281.0,
+        "coolingDuty": 0,
+        "power": null
+      },
+      {
+        "id": "R201",
+        "unitClass": "PretreatmentReactorSystem",
+        "line": "Pretreatment reactor system",
+        "order": 5,
+        "ins": [
+          "s5"
+        ],
+        "outs": [
+          "s6",
+          "s7"
+        ],
+        "installedCost": 30271319.73,
+        "purchaseCost": 20146766.01,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 4667.108328
+      },
+      {
+        "id": "P201",
+        "unitClass": "BlowdownDischargePump",
+        "line": "Blowdown discharge pump",
+        "order": 6,
+        "ins": [
+          "s7"
+        ],
+        "outs": [
+          "s8"
+        ],
+        "installedCost": 59150.22666,
+        "purchaseCost": 25717.48985,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 100.6452324
+      },
+      {
+        "id": "T202",
+        "unitClass": "OligomerConversionTank",
+        "line": "Oligomer conversion tank",
+        "order": 7,
+        "ins": [
+          "s8"
+        ],
+        "outs": [
+          "s9"
+        ],
+        "installedCost": 644271.4202,
+        "purchaseCost": 349780.0417,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 270.040147
+      },
+      {
+        "id": "F201",
+        "unitClass": "PretreatmentFlash",
+        "line": "Pretreatment flash",
+        "order": 8,
+        "ins": [
+          "s9"
+        ],
+        "outs": [
+          "s10",
+          "s11"
+        ],
+        "installedCost": 1414650.222,
+        "purchaseCost": 738038.2618,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 282.0263413
+      },
+      {
+        "id": "Ammonia_storage",
+        "unitClass": "AmmoniaStorageTank",
+        "line": "Ammonia storage tank",
+        "order": 9,
+        "ins": [
+          "ammonia"
+        ],
+        "outs": [
+          "s13"
+        ],
+        "installedCost": 424659.1642,
+        "purchaseCost": 212329.5821,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M205",
+        "unitClass": "AmmoniaMixer",
+        "line": "Ammonia mixer",
+        "order": 10,
+        "ins": [
+          "s13",
+          "ammonia_process_water"
+        ],
+        "outs": [
+          "s14"
+        ],
+        "installedCost": 3815.354118,
+        "purchaseCost": 3815.354118,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T203",
+        "unitClass": "AmmoniaAdditionTank",
+        "line": "Ammonia addition tank",
+        "order": 11,
+        "ins": [
+          "s11",
+          "s14"
+        ],
+        "outs": [
+          "s15"
+        ],
+        "installedCost": 721471.8645,
+        "purchaseCost": 480981.243,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 7.109321703
+      },
+      {
+        "id": "P202",
+        "unitClass": "HydrolyzatePump",
+        "line": "Hydrolyzate pump",
+        "order": 12,
+        "ins": [
+          "s15"
+        ],
+        "outs": [
+          "pretreated_biomass"
+        ],
+        "installedCost": 50948.60595,
+        "purchaseCost": 22151.56781,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 72.5382586
+      },
+      {
+        "id": "M301",
+        "unitClass": "EnzymeHydrolysateMixer",
+        "line": "Enzyme hydrolysate mixer",
+        "order": 13,
+        "ins": [
+          "pretreated_biomass",
+          "cellulase",
+          "saccharification_water"
+        ],
+        "outs": [
+          "s16"
+        ],
+        "installedCost": 198451.7625,
+        "purchaseCost": 116736.3309,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 84.42753203
+      },
+      {
+        "id": "H301",
+        "unitClass": "HydrolysateHeatExchanger",
+        "line": "Hydrolysate heat exchanger",
+        "order": 14,
+        "ins": [
+          "s16"
+        ],
+        "outs": [
+          "s17"
+        ],
+        "installedCost": 320292.4833,
+        "purchaseCost": 145587.4924,
+        "heatingDuty": 0,
+        "coolingDuty": 71534936.85,
+        "power": null
+      },
+      {
+        "id": "R301",
+        "unitClass": "ContinuousPresaccharification",
+        "line": "Continuous presaccharification",
+        "order": 15,
+        "ins": [
+          "s17"
+        ],
+        "outs": [
+          "slurry"
+        ],
+        "installedCost": 10025389.58,
+        "purchaseCost": 5005492.211,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 293.8948271
+      },
+      {
+        "id": "CSL_storage",
+        "unitClass": "CSLStorageTank",
+        "line": "CSLStorage tank",
+        "order": 16,
+        "ins": [
+          "CSL"
+        ],
+        "outs": [
+          "s19"
+        ],
+        "installedCost": 213276.9768,
+        "purchaseCost": 90173.13641,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 7.254828129
+      },
+      {
+        "id": "S302",
+        "unitClass": "MockSplitter",
+        "line": "Splitter",
+        "order": 17,
+        "ins": [
+          "s19"
+        ],
+        "outs": [
+          "CSL1",
+          "CSL2"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "DAP_storage",
+        "unitClass": "DAPStorageTank",
+        "line": "DAPStorage tank",
+        "order": 18,
+        "ins": [
+          "DAP"
+        ],
+        "outs": [
+          "s18"
+        ],
+        "installedCost": 255817.8407,
+        "purchaseCost": 143259.4542,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 4.364888633
+      },
+      {
+        "id": "S301",
+        "unitClass": "MockSplitter",
+        "line": "Splitter",
+        "order": 19,
+        "ins": [
+          "s18"
+        ],
+        "outs": [
+          "DAP1",
+          "DAP2"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "R303",
+        "unitClass": "SaccharificationAndCoFermentation",
+        "line": "Saccharification and co fermentation",
+        "order": 20,
+        "ins": [
+          "slurry",
+          "s22",
+          "CSL2",
+          "DAP2"
+        ],
+        "outs": [
+          "s23",
+          "s24",
+          "recycle"
+        ],
+        "installedCost": 1684979.297,
+        "purchaseCost": 823077.9225,
+        "heatingDuty": 0,
+        "coolingDuty": 42646390.56,
+        "power": 154.1483485
+      },
+      {
+        "id": "R302",
+        "unitClass": "SeedTrain",
+        "line": "Seed train",
+        "order": 21,
+        "ins": [
+          "recycle",
+          "CSL1",
+          "DAP1"
+        ],
+        "outs": [
+          "s20",
+          "s21"
+        ],
+        "installedCost": 633104.6087,
+        "purchaseCost": 340729.9065,
+        "heatingDuty": 0,
+        "coolingDuty": 1941389.711,
+        "power": 82.42824388
+      },
+      {
+        "id": "T301",
+        "unitClass": "SeedHoldTank",
+        "line": "Seed hold tank",
+        "order": 22,
+        "ins": [
+          "s21"
+        ],
+        "outs": [
+          "s22"
+        ],
+        "installedCost": 874276.1726,
+        "purchaseCost": 488887.8329,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 18.70304538
+      },
+      {
+        "id": "M304",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 23,
+        "ins": [
+          "s20",
+          "s23"
+        ],
+        "outs": [
+          "s26"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "D401",
+        "unitClass": "VentScrubber",
+        "line": "Vent scrubber",
+        "order": 24,
+        "ins": [
+          "stripping_water",
+          "s26"
+        ],
+        "outs": [
+          "vent",
+          "s27"
+        ],
+        "installedCost": 494619.0925,
+        "purchaseCost": 206091.2885,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M401",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 25,
+        "ins": [
+          "s24",
+          "s27"
+        ],
+        "outs": [
+          "s25"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T302",
+        "unitClass": "BeerTank",
+        "line": "Beer tank",
+        "order": 26,
+        "ins": [
+          "s25"
+        ],
+        "outs": [
+          "beer"
+        ],
+        "installedCost": 1342550.732,
+        "purchaseCost": 749818.0432,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 111.133061
+      },
+      {
+        "id": "P401",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 27,
+        "ins": [
+          "beer"
+        ],
+        "outs": [
+          "s28"
+        ],
+        "installedCost": 62137.29808,
+        "purchaseCost": 23041.60848,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 80.70352718
+      },
+      {
+        "id": "H401",
+        "unitClass": "HXprocess",
+        "line": "Heat exchanger",
+        "order": 28,
+        "ins": [
+          "s28",
+          "s30"
+        ],
+        "outs": [
+          "s31",
+          "stillage"
+        ],
+        "installedCost": 660534.6175,
+        "purchaseCost": 207811.3027,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "D402",
+        "unitClass": "BinaryDistillation",
+        "line": "Distillation Column",
+        "order": 29,
+        "ins": [
+          "s31"
+        ],
+        "outs": [
+          "distilled_beer",
+          "s29"
+        ],
+        "installedCost": 1614207.315,
+        "purchaseCost": 565783.8553,
+        "heatingDuty": 132227996.9,
+        "coolingDuty": 26648953.98,
+        "power": 17.05504616
+      },
+      {
+        "id": "P402",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 30,
+        "ins": [
+          "s29"
+        ],
+        "outs": [
+          "s30"
+        ],
+        "installedCost": 52594.55496,
+        "purchaseCost": 19732.27225,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 59.31098356
+      },
+      {
+        "id": "S401",
+        "unitClass": "PressureFilter",
+        "line": "Pressure filter",
+        "order": 31,
+        "ins": [
+          "stillage",
+          "recycled_water"
+        ],
+        "outs": [
+          "s44",
+          "s45"
+        ],
+        "installedCost": 7833731.183,
+        "purchaseCost": 4539183.972,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1641.327475
+      },
+      {
+        "id": "M204",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 32,
+        "ins": [
+          "s6",
+          "s10"
+        ],
+        "outs": [
+          "s12"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "H201",
+        "unitClass": "WasteVaporCondenser",
+        "line": "Waste vapor condenser",
+        "order": 33,
+        "ins": [
+          "s12"
+        ],
+        "outs": [
+          "pretreatment_wastewater"
+        ],
+        "installedCost": 197679.6792,
+        "purchaseCost": 89854.39966,
+        "heatingDuty": 0,
+        "coolingDuty": 33230524.19,
+        "power": null
+      },
+      {
+        "id": "M601",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 34,
+        "ins": [
+          "s45",
+          "pretreatment_wastewater"
+        ],
+        "outs": [
+          "s46"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "WWTC",
+        "unitClass": "WastewaterSystemCost",
+        "line": "Wastewater system cost",
+        "order": 35,
+        "ins": [
+          "s46"
+        ],
+        "outs": [
+          "s47"
+        ],
+        "installedCost": 46515961.54,
+        "purchaseCost": 46515961.54,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 6464.883526
+      },
+      {
+        "id": "R601",
+        "unitClass": "AnaerobicDigestion",
+        "line": "Anaerobic digestion",
+        "order": 36,
+        "ins": [
+          "s47"
+        ],
+        "outs": [
+          "biogas",
+          "s48",
+          "s49"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M602",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 37,
+        "ins": [
+          "s50",
+          "s48"
+        ],
+        "outs": [
+          "s51"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "R602",
+        "unitClass": "AerobicDigestion",
+        "line": "Aerobic digestion",
+        "order": 38,
+        "ins": [
+          "s51",
+          "air_lagoon",
+          "caustic"
+        ],
+        "outs": [
+          "evaporated_water",
+          "s52"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "S601",
+        "unitClass": "MembraneBioreactor",
+        "line": "Membrane bioreactor",
+        "order": 39,
+        "ins": [
+          "s52"
+        ],
+        "outs": [
+          "s53",
+          "s54"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "S602",
+        "unitClass": "Splitter",
+        "line": "Splitter",
+        "order": 40,
+        "ins": [
+          "s54"
+        ],
+        "outs": [
+          "s55",
+          "s56"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M603",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 41,
+        "ins": [
+          "s49",
+          "s56"
+        ],
+        "outs": [
+          "s57"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "S603",
+        "unitClass": "SludgeCentrifuge",
+        "line": "Sludge centrifuge",
+        "order": 42,
+        "ins": [
+          "s57"
+        ],
+        "outs": [
+          "s58",
+          "sludge"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M604",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 43,
+        "ins": [
+          "s55",
+          "s58"
+        ],
+        "outs": [
+          "s50"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "slurry_mixer",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 44,
+        "ins": [
+          "sludge",
+          "s44"
+        ],
+        "outs": [
+          "to_boiler"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "S604",
+        "unitClass": "ReverseOsmosis",
+        "line": "Reverse osmosis",
+        "order": 45,
+        "ins": [
+          "s53"
+        ],
+        "outs": [
+          "RO_treated_water_1",
+          "brine"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "treated_water_mixer",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 46,
+        "ins": [
+          "RO_treated_water_1"
+        ],
+        "outs": [
+          "s61"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M402",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 47,
+        "ins": [
+          "distilled_beer",
+          "s36"
+        ],
+        "outs": [
+          "s32"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "D403",
+        "unitClass": "BinaryDistillation",
+        "line": "Divided Distillation Column",
+        "order": 48,
+        "ins": [
+          "s32"
+        ],
+        "outs": [
+          "s33",
+          "s34"
+        ],
+        "installedCost": 1507166.62,
+        "purchaseCost": 538622.1389,
+        "heatingDuty": 29568806.41,
+        "coolingDuty": 74939263.86,
+        "power": 2.127971901
+      },
+      {
+        "id": "H402",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 49,
+        "ins": [
+          "s33"
+        ],
+        "outs": [
+          "s35"
+        ],
+        "installedCost": 7032.075612,
+        "purchaseCost": 5038.387483,
+        "heatingDuty": 1273007.092,
+        "coolingDuty": 0,
+        "power": null
+      },
+      {
+        "id": "U401",
+        "unitClass": "MolecularSieve",
+        "line": "Molecular sieve",
+        "order": 50,
+        "ins": [
+          "s35"
+        ],
+        "outs": [
+          "s36",
+          "s37"
+        ],
+        "installedCost": 4564323.009,
+        "purchaseCost": 2535735.005,
+        "heatingDuty": 34161127.31,
+        "coolingDuty": 1193757.744,
+        "power": 143.1346733
+      },
+      {
+        "id": "H403",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 51,
+        "ins": [
+          "s37"
+        ],
+        "outs": [
+          "s38"
+        ],
+        "installedCost": 124827.0457,
+        "purchaseCost": 38923.20976,
+        "heatingDuty": 0,
+        "coolingDuty": 20557566.9,
+        "power": null
+      },
+      {
+        "id": "T701",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 52,
+        "ins": [
+          "s38"
+        ],
+        "outs": [
+          "s39"
+        ],
+        "installedCost": 330845.5773,
+        "purchaseCost": 143845.9032,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P701",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 53,
+        "ins": [
+          "s39"
+        ],
+        "outs": [
+          "s40"
+        ],
+        "installedCost": 14680.80824,
+        "purchaseCost": 4448.72977,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.743168584
+      },
+      {
+        "id": "T702",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 54,
+        "ins": [
+          "denaturant"
+        ],
+        "outs": [
+          "s41"
+        ],
+        "installedCost": 188628.7924,
+        "purchaseCost": 82012.51845,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P702",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 55,
+        "ins": [
+          "s41"
+        ],
+        "outs": [
+          "s42"
+        ],
+        "installedCost": 13277.29452,
+        "purchaseCost": 4023.422583,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.054145907
+      },
+      {
+        "id": "M701",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 56,
+        "ins": [
+          "s42",
+          "s40"
+        ],
+        "outs": [
+          "s43"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T703",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 57,
+        "ins": [
+          "s43"
+        ],
+        "outs": [
+          "ethanol"
+        ],
+        "installedCost": 1729815.636,
+        "purchaseCost": 752093.7549,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "gas_mixer",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 58,
+        "ins": [
+          "biogas"
+        ],
+        "outs": [
+          "gas_to_boiler"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P403",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 59,
+        "ins": [
+          "s34"
+        ],
+        "outs": [
+          "recycle_process_water"
+        ],
+        "installedCost": 14407.94116,
+        "purchaseCost": 4366.042776,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.451267149
+      },
+      {
+        "id": "process_water_mixer",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 60,
+        "ins": [
+          "recycle_process_water"
+        ],
+        "outs": [
+          "s60"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "CWP",
+        "unitClass": "ChilledWaterPackage",
+        "line": "Chilled water package",
+        "order": 61,
+        "ins": [],
+        "outs": [],
+        "installedCost": 1624724.485,
+        "purchaseCost": 1083149.656,
+        "heatingDuty": 0,
+        "coolingDuty": -0.0,
+        "power": 1929.919529
+      },
+      {
+        "id": "CT",
+        "unitClass": "CoolingTower",
+        "line": "Cooling tower",
+        "order": 62,
+        "ins": [
+          "cooling_tower_makeup_water",
+          "cooling_tower_chemicals"
+        ],
+        "outs": [
+          "cooling_tower_blowdown",
+          "cooling_tower_evaporation"
+        ],
+        "installedCost": 2167461.138,
+        "purchaseCost": 1238025.974,
+        "heatingDuty": 0,
+        "coolingDuty": -272692783.8,
+        "power": 1828.037016
+      },
+      {
+        "id": "FWT",
+        "unitClass": "FireWaterTank",
+        "line": "Fire water tank",
+        "order": 63,
+        "ins": [],
+        "outs": [],
+        "installedCost": 1479899.348,
+        "purchaseCost": 823004.6904,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 94.28472618
+      },
+      {
+        "id": "ADP",
+        "unitClass": "AirDistributionPackage",
+        "line": "Air distribution package",
+        "order": 64,
+        "ins": [
+          "plant_air"
+        ],
+        "outs": [
+          "s59"
+        ],
+        "installedCost": 119860.8875,
+        "purchaseCost": 57921.98692,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 111.9225535
+      },
+      {
+        "id": "CIP",
+        "unitClass": "CIPpackage",
+        "line": "CIP Package",
+        "order": 65,
+        "ins": [
+          "bioreactor_cleaning_chemicals"
+        ],
+        "outs": [
+          "bioreactor_cleaning_wastewater"
+        ],
+        "installedCost": 1156736.931,
+        "purchaseCost": 642631.6284,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "BT",
+        "unitClass": "BoilerTurbogenerator",
+        "line": "Boiler turbogenerator",
+        "order": 66,
+        "ins": [
+          "to_boiler",
+          "gas_to_boiler",
+          "boiler_makeup_water",
+          "natural_gas",
+          "FGD_lime",
+          "boiler_chemicals",
+          "air"
+        ],
+        "outs": [
+          "emissions",
+          "boiler_blowdown_water",
+          "ash"
+        ],
+        "installedCost": 70442930.2,
+        "purchaseCost": 39190792.4,
+        "heatingDuty": -352168218.6,
+        "coolingDuty": 30407322.56,
+        "power": -46391.10327
+      },
+      {
+        "id": "PWC",
+        "unitClass": "ProcessWaterCenter",
+        "line": "Process water center",
+        "order": 67,
+        "ins": [
+          "s61",
+          "makeup_RO_water",
+          "s60",
+          "makeup_process_water"
+        ],
+        "outs": [
+          "RO_treated_water_2",
+          "recycled_process_water",
+          "excess_water"
+        ],
+        "installedCost": 407115.2856,
+        "purchaseCost": 226723.0484,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 48.0463181
+      }
+    ],
+    "utilities": {
+      "group": "the units the TEA costs",
+      "heating": 352.1682186,
+      "heatingUnit": "GJ/hr",
+      "cooling": 347.6878866,
+      "coolingUnit": "GJ/hr",
+      "electricityConsumption": 20.91491945,
+      "electricityConsumptionUnit": "MW",
+      "electricityProduction": 47.8633781,
+      "electricityProductionUnit": "MW"
+    },
+    "diagram": null,
+    "diagramNote": "Graphviz was not on the host that made this run, so it has no diagram; a host that has it (brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.",
+    "unitOrder": [
+      "U101",
+      "H2SO4_storage",
+      "T201",
+      "M201",
+      "M203",
+      "R201",
+      "P201",
+      "T202",
+      "F201",
+      "Ammonia_storage",
+      "M205",
+      "T203",
+      "P202",
+      "M301",
+      "H301",
+      "R301",
+      "CSL_storage",
+      "S302",
+      "DAP_storage",
+      "S301",
+      "R303",
+      "R302",
+      "T301",
+      "M304",
+      "D401",
+      "M401",
+      "T302",
+      "P401",
+      "H401",
+      "D402",
+      "P402",
+      "S401",
+      "M204",
+      "H201",
+      "M601",
+      "WWTC",
+      "R601",
+      "M602",
+      "R602",
+      "S601",
+      "S602",
+      "M603",
+      "S603",
+      "M604",
+      "slurry_mixer",
+      "S604",
+      "treated_water_mixer",
+      "M402",
+      "D403",
+      "H402",
+      "U401",
+      "H403",
+      "T701",
+      "P701",
+      "T702",
+      "P702",
+      "M701",
+      "T703",
+      "gas_mixer",
+      "P403",
+      "process_water_mixer",
+      "CWP",
+      "CT",
+      "FWT",
+      "ADP",
+      "CIP",
+      "BT",
+      "PWC"
+    ],
+    "tableUnits": {
+      "T": "K",
+      "P": "Pa",
+      "massFlow": "kg/hr",
+      "price": "USD/kg",
+      "cost": "USD",
+      "duty": "kJ/hr",
+      "power": "kW",
+      "annual": "USD/yr",
+      "perUnit": "USD per unit of the price's basis"
+    },
+    "regression": {
+      "package": "biorefineries 2.35.1",
+      "file": "biorefineries/tests/test_biorefineries.py",
+      "test": "test_cornstover",
+      "values": [
+        {
+          "expression": "tea.IRR",
+          "label": "internal rate of return",
+          "unit": "",
+          "package": 0.1,
+          "rtol": 0.05
+        },
+        {
+          "expression": "feedstock.price",
+          "label": "feedstock price",
+          "unit": "USD/kg",
+          "package": 0.05158816935126135,
+          "rtol": 0.05
+        },
+        {
+          "expression": "product.price",
+          "label": "product price",
+          "unit": "USD/kg",
+          "package": 0.6865466977048817,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.sales",
+          "label": "sales",
+          "unit": "USD/yr",
+          "package": 126814634.63623773,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.material_cost",
+          "label": "material cost",
+          "unit": "USD/yr",
+          "package": 82270811.86953875,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.installed_equipment_cost",
+          "label": "installed equipment cost",
+          "unit": "USD",
+          "package": 209112840.52373964,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.utility_cost",
+          "label": "utility cost",
+          "unit": "USD/yr",
+          "package": -10675099.091695543,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_heating_duty()",
+          "label": "heating duty",
+          "unit": "GJ/hr",
+          "package": 351.9303289817331,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_cooling_duty()",
+          "label": "cooling duty",
+          "unit": "GJ/hr",
+          "package": 347.548288866479,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_consumption()",
+          "label": "electricity consumption",
+          "unit": "MW",
+          "package": 22.05578511575179,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "label": "electricity production",
+          "unit": "MW",
+          "package": 47.93524983359892,
+          "rtol": 0.05
+        }
+      ]
+    },
+    "checks": [
+      {
+        "expression": "tea.IRR",
+        "label": "internal rate of return",
+        "unit": "",
+        "measured": 0.1,
+        "package": 0.1,
+        "rtol": 0.05,
+        "relDiff": 0.0,
+        "within": true
+      },
+      {
+        "expression": "feedstock.price",
+        "label": "feedstock price",
+        "unit": "USD/kg",
+        "measured": 0.05158816935,
+        "package": 0.05158816935126135,
+        "rtol": 0.05,
+        "relDiff": 2.445041469224795e-11,
+        "within": true
+      },
+      {
+        "expression": "product.price",
+        "label": "product price",
+        "unit": "USD/kg",
+        "measured": 0.658813642,
+        "package": 0.6865466977048817,
+        "rtol": 0.05,
+        "relDiff": 0.040395002696237595,
+        "within": true
+      },
+      {
+        "expression": "tea.sales",
+        "label": "sales",
+        "unit": "USD/yr",
+        "measured": 121768094.1,
+        "package": 126814634.63623773,
+        "rtol": 0.05,
+        "relDiff": 0.03979462268462559,
+        "within": true
+      },
+      {
+        "expression": "tea.material_cost",
+        "label": "material cost",
+        "unit": "USD/yr",
+        "measured": 82272670.8,
+        "package": 82270811.86953875,
+        "rtol": 0.05,
+        "relDiff": 0.000022595260931551288,
+        "within": true
+      },
+      {
+        "expression": "tea.installed_equipment_cost",
+        "label": "installed equipment cost",
+        "unit": "USD",
+        "measured": 192647846.3,
+        "package": 209112840.52373964,
+        "rtol": 0.05,
+        "relDiff": 0.07873736582842902,
+        "within": false
+      },
+      {
+        "expression": "tea.utility_cost",
+        "label": "utility cost",
+        "unit": "USD/yr",
+        "measured": -11189195.65,
+        "package": -10675099.091695543,
+        "rtol": 0.05,
+        "relDiff": 0.04815848114275464,
+        "within": true
+      },
+      {
+        "expression": "units.get_heating_duty()",
+        "label": "heating duty",
+        "unit": "GJ/hr",
+        "measured": 352.1682186,
+        "package": 351.9303289817331,
+        "rtol": 0.05,
+        "relDiff": 0.0006759565705950409,
+        "within": true
+      },
+      {
+        "expression": "units.get_cooling_duty()",
+        "label": "cooling duty",
+        "unit": "GJ/hr",
+        "measured": 347.6878866,
+        "package": 347.548288866479,
+        "rtol": 0.05,
+        "relDiff": 0.0004016642808867834,
+        "within": true
+      },
+      {
+        "expression": "units.get_electricity_consumption()",
+        "label": "electricity consumption",
+        "unit": "MW",
+        "measured": 20.91491945,
+        "package": 22.05578511575179,
+        "rtol": 0.05,
+        "relDiff": 0.0517263683774742,
+        "within": false
+      },
+      {
+        "expression": "units.get_electricity_production()",
+        "label": "electricity production",
+        "unit": "MW",
+        "measured": 47.8633781,
+        "package": 47.93524983359892,
+        "rtol": 0.05,
+        "relDiff": 0.001499350349657336,
+        "within": true
+      }
+    ]
+  },
+  "outputHash": "f468a540586d93276d1244c6591582d1b8ddcc6949c6fd19a23d61cb9b7876d5",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T18:09:08Z",
+  "durationMs": 568,
+  "seed": null
+}

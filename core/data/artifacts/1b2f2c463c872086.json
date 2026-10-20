@@ -1,0 +1,3865 @@
+{
+  "id": "1b2f2c463c872086",
+  "tool": "proforma.reference",
+  "toolVersion": "reference run 2 · biosteam 2.54.0 · biorefineries 2.35.1",
+  "inputs": [
+    {
+      "name": "flowsheet",
+      "value": "corn_drygrind",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "Dry-grind corn to ethanol, the conventional plant, every setting the package's own",
+        "by": null
+      }
+    },
+    {
+      "name": "simulator",
+      "value": "biosteam 2.54.0",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "the process simulator the package runs on",
+        "by": null
+      }
+    },
+    {
+      "name": "thermodynamics",
+      "value": "thermosteam 0.54.2",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "BioSTEAM's property engine",
+        "by": null
+      }
+    },
+    {
+      "name": "settings",
+      "value": "bst.process_tools.default()",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biosteam@2.54.0",
+        "note": "BioSTEAM's default utilities and plant cost index before the plant builds, as the package's own test builds it (default_settings, biorefineries/tests/test_biorefineries.py); the plant then sets its own, and the worker puts back what it held before",
+        "by": null
+      }
+    },
+    {
+      "name": "cornFeed",
+      "value": "the package's default",
+      "unit": "kg h-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: BiorefinerySettings.feedstock_hourly_mass_flow",
+        "by": null
+      }
+    },
+    {
+      "name": "cornPrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['Corn']",
+        "by": null
+      }
+    },
+    {
+      "name": "ethanolPrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['Ethanol'], the price at which the package's TEA solves the internal rate of return",
+        "by": null
+      }
+    },
+    {
+      "name": "ddgsPrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['DDGS']",
+        "by": null
+      }
+    },
+    {
+      "name": "crudeOilPrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['Crude oil']",
+        "by": null
+      }
+    },
+    {
+      "name": "enzymePrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['Enzyme']",
+        "by": null
+      }
+    },
+    {
+      "name": "yeastPrice",
+      "value": "the package's default",
+      "unit": "USD kg-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_stream_prices['Yeast']",
+        "by": null
+      }
+    },
+    {
+      "name": "electricityPrice",
+      "value": "the package's default",
+      "unit": "USD kWh-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_load_utility_settings(power_price=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "ssfYield",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(yield_=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "ssfTime",
+      "value": "the package's default",
+      "unit": "h",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(tau=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "ssfTemperature",
+      "value": "the package's default",
+      "unit": "K",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(T=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "ssfWorkingVolume",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: SimultaneousSaccharificationFermentation(V_wf=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "solidsContent",
+      "value": "the package's default",
+      "unit": "g g-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_process_parameters['slurry_solids_content']",
+        "by": null
+      }
+    },
+    {
+      "name": "yeastLoading",
+      "value": "the package's default",
+      "unit": "g g-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_process_parameters['yeast_loading']",
+        "by": null
+      }
+    },
+    {
+      "name": "operatingDays",
+      "value": "the package's default",
+      "unit": "d",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['operating_days']",
+        "by": null
+      }
+    },
+    {
+      "name": "incomeTax",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['income_tax']",
+        "by": null
+      }
+    },
+    {
+      "name": "langFactor",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['lang_factor']",
+        "by": null
+      }
+    },
+    {
+      "name": "laborCost",
+      "value": "the package's default",
+      "unit": "USD yr-1",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['labor_cost']",
+        "by": null
+      }
+    },
+    {
+      "name": "startYear",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+        "by": null
+      }
+    },
+    {
+      "name": "endYear",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['duration']",
+        "by": null
+      }
+    },
+    {
+      "name": "depreciation",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: default_tea_parameters['depreciation']",
+        "by": null
+      }
+    },
+    {
+      "name": "cepci",
+      "value": "the package's default",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "biorefineries.corn@2.35.1",
+        "note": "the package's own default, read back after the run: BiorefinerySettings(CEPCI=…)",
+        "by": null
+      }
+    },
+    {
+      "name": "compatibility",
+      "value": "SimultaneousSaccharificationFermentation._ins_size_is_fixed = False",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "biorefineries.corn's SimultaneousSaccharificationFermentation passes its two inlets (the mash and the yeast) to bst.BatchBioreactor, which declares one fixed inlet in biosteam 2.54.0, so corn.load() stops with 'at most 1 streams expected; 2 given'. The flowsheet lets the unit take them, as biosteam's own NRELEthanolFermentation declares; the unit's _run already mixes every inlet. No number of the package's is changed, and the package's own test values hold within its tolerance.",
+        "by": null
+      }
+    },
+    {
+      "name": "precision",
+      "value": "10 significant digits",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+        "by": null
+      }
+    },
+    {
+      "name": "diagram",
+      "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "flowsheet": "corn_drygrind",
+    "simulator": "biosteam 2.54.0",
+    "package": "biorefineries.corn@2.35.1",
+    "ethanolPriceUsdPerKg": 0.4854791535,
+    "IRR": 0.0538147535,
+    "ethanolKgPerH": 15781.98654,
+    "cornKgPerH": 46375.0,
+    "references": [
+      "Kwiatkowski, J. R.; McAloon, A. J.; Taylor, F.; Johnston, D. B. Modeling the process and costs of fuel ethanol production by the corn dry-grind process. Industrial Crops and Products 2006, 23, 288–296. https://www.sciencedirect.com/science/article/pii/S0926669005000944",
+      "Kurambhatti, C.; Kumar, D.; Singh, V. Impact of Fractionation Process on the Technical and Economic Viability of Corn Dry Grind Ethanol Process. Processes 2019, 7, 578. https://www.mdpi.com/2227-9717/7/9/578",
+      "Cortes-Peña, Y.; Kumar, D.; Singh, V.; Guest, J. S. BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020. doi:10.1021/acssuschemeng.9b07040"
+    ],
+    "measured": {
+      "tea.IRR": 0.0538147535,
+      "feedstock.price": 0.1322773573,
+      "product.price": 0.4854791535,
+      "tea.sales": 74992038.86,
+      "tea.material_cost": 52925382.43,
+      "tea.installed_equipment_cost": 65388016.47,
+      "tea.utility_cost": 10442068.46,
+      "units.get_heating_duty()": 111.3588816,
+      "units.get_cooling_duty()": 105.0873558,
+      "units.get_electricity_consumption()": 1.62485686,
+      "units.get_electricity_production()": 0.0
+    },
+    "readBack": {
+      "cornFeed": 46375.0,
+      "cornPrice": 0.1322773573,
+      "ethanolPrice": 0.4854791535,
+      "ddgsPrice": 0.12026,
+      "crudeOilPrice": 0.56,
+      "enzymePrice": 2.25,
+      "yeastPrice": 1.86,
+      "electricityPrice": 0.07,
+      "ssfYield": 0.95,
+      "ssfTime": 60.0,
+      "ssfTemperature": 305.15,
+      "ssfWorkingVolume": 0.83,
+      "solidsContent": 0.311,
+      "yeastLoading": 0.00008,
+      "operatingDays": 330.0,
+      "incomeTax": 0.35,
+      "langFactor": 4.0,
+      "laborCost": 2300000.0,
+      "startYear": 2018.0,
+      "endYear": 2038.0,
+      "depreciation": "MACRS7",
+      "cepci": 567.0
+    },
+    "tablesSource": "BioSTEAM 2.54.0, thermosteam 0.54.2",
+    "tea": {
+      "teaClass": "ConventionalEthanolTEA",
+      "product": "ethanol",
+      "feedstock": "corn",
+      "productPrice": 0.4854791535,
+      "basisFlow": 15781.98654,
+      "basis": "kg of the ethanol product stream as the package makes it (ethanol with its denaturant)",
+      "operatingHours": 7920.0,
+      "sales": 74992038.86,
+      "materialCost": 52925382.43,
+      "feedstockCost": 48584150.57,
+      "otherMaterialCost": 4341231.858,
+      "utilityCost": 10442068.46,
+      "purchaseCost": 16347004.12,
+      "installedEquipmentCost": 65388016.47,
+      "FCI": 65388016.47,
+      "TCI": 68657417.29,
+      "FOC": 5053148.346,
+      "laborCost": 2300000.0,
+      "capitalRecovery": 6571439.624,
+      "coproductCredits": 14310381.17,
+      "IRR": 0.0538147535,
+      "incomeTax": 0.35,
+      "lines": [
+        {
+          "key": "feedstock",
+          "label": "Main feedstock",
+          "usdPerYear": 48584150.57,
+          "perUnit": 0.3886939347,
+          "reads": "the system's market value of the feedstock stream (System.get_market_value)"
+        },
+        {
+          "key": "otherMaterials",
+          "label": "Other materials",
+          "usdPerYear": 4341231.858,
+          "perUnit": 0.03473170721,
+          "reads": "TEA.material_cost less the main feedstock"
+        },
+        {
+          "key": "utilities",
+          "label": "Utilities",
+          "usdPerYear": 10442068.46,
+          "perUnit": 0.08354100317,
+          "reads": "TEA.utility_cost"
+        },
+        {
+          "key": "fixedOperating",
+          "label": "Fixed operating, labour included",
+          "usdPerYear": 5053148.346,
+          "perUnit": 0.04042734287,
+          "reads": "TEA.FOC"
+        },
+        {
+          "key": "capitalRecovery",
+          "label": "Capital recovery",
+          "usdPerYear": 6571439.624,
+          "perUnit": 0.05257432093,
+          "reads": "TEA.sales less TEA.AOC: the return on and of the capital, and its tax"
+        },
+        {
+          "key": "coproductCredits",
+          "label": "Co-product credits",
+          "usdPerYear": -14310381.17,
+          "perUnit": -0.1144891554,
+          "reads": "TEA.sales less the main product's market value, as a credit"
+        }
+      ]
+    },
+    "streams": [
+      {
+        "id": "corn",
+        "source": null,
+        "sink": "MH101",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46375.0,
+        "massFlows": {
+          "Water": 6956.25,
+          "Ash": 649.25,
+          "TriOlein": 1576.75,
+          "Starch": 28381.5,
+          "Fiber": 4948.2125,
+          "SolubleProtein": 1576.75,
+          "InsolubleProtein": 2286.2875
+        },
+        "price": 0.1322773573
+      },
+      {
+        "id": "s1",
+        "source": "MH101",
+        "sink": "V102",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46375.0,
+        "massFlows": {
+          "Water": 6956.25,
+          "Ash": 649.25,
+          "TriOlein": 1576.75,
+          "Starch": 28381.5,
+          "Fiber": 4948.2125,
+          "SolubleProtein": 1576.75,
+          "InsolubleProtein": 2286.2875
+        },
+        "price": null
+      },
+      {
+        "id": "s2",
+        "source": "V102",
+        "sink": "MH103",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46375.0,
+        "massFlows": {
+          "Water": 6956.25,
+          "Ash": 649.25,
+          "TriOlein": 1576.75,
+          "Starch": 28381.5,
+          "Fiber": 4948.2125,
+          "SolubleProtein": 1576.75,
+          "InsolubleProtein": 2286.2875
+        },
+        "price": null
+      },
+      {
+        "id": "s3",
+        "source": "MH103",
+        "sink": "M104",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46235.875,
+        "massFlows": {
+          "Water": 6935.38125,
+          "Ash": 647.30225,
+          "TriOlein": 1572.01975,
+          "Starch": 28296.3555,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.01975,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "s4",
+        "source": "MH103",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 139.125,
+        "massFlows": {
+          "Water": 20.86875,
+          "Ash": 1.94775,
+          "TriOlein": 4.73025,
+          "Starch": 85.1445,
+          "Fiber": 14.8446375,
+          "SolubleProtein": 4.73025,
+          "InsolubleProtein": 6.8588625
+        },
+        "price": null
+      },
+      {
+        "id": "s5",
+        "source": "M104",
+        "sink": "V105",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46235.875,
+        "massFlows": {
+          "Water": 6935.38125,
+          "Ash": 647.30225,
+          "TriOlein": 1572.01975,
+          "Starch": 28296.3555,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.01975,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "s6",
+        "source": "V105",
+        "sink": "W106",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46235.875,
+        "massFlows": {
+          "Water": 6935.38125,
+          "Ash": 647.30225,
+          "TriOlein": 1572.01975,
+          "Starch": 28296.3555,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.01975,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "s7",
+        "source": "W106",
+        "sink": "V107",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46235.875,
+        "massFlows": {
+          "Water": 6935.38125,
+          "Ash": 647.30225,
+          "TriOlein": 1572.01975,
+          "Starch": 28296.3555,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.01975,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "s8",
+        "source": "V107",
+        "sink": "V307",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46235.875,
+        "massFlows": {
+          "Water": 6935.38125,
+          "Ash": 647.30225,
+          "TriOlein": 1572.01975,
+          "Starch": 28296.3555,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.01975,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "yeast",
+        "source": null,
+        "sink": "V403",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12.41785153,
+        "massFlows": {
+          "Water": 11.84821673,
+          "Yeast": 0.5696347982
+        },
+        "price": 1.86
+      },
+      {
+        "id": "s34",
+        "source": "V403",
+        "sink": "P404",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12.41785153,
+        "massFlows": {
+          "Water": 11.84821673,
+          "Yeast": 0.5696347982
+        },
+        "price": null
+      },
+      {
+        "id": "s35",
+        "source": "P404",
+        "sink": "V405",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 66.38,
+        "massFlows": {
+          "Water": 63.335,
+          "Yeast": 3.045
+        },
+        "price": null
+      },
+      {
+        "id": "gluco_amylase",
+        "source": null,
+        "sink": "V317",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 48.13155768,
+        "massFlows": {
+          "Water": 48.07861297,
+          "SolubleProtein": 0.05294471345
+        },
+        "price": 2.25
+      },
+      {
+        "id": "s25",
+        "source": "V317",
+        "sink": "P318",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 48.13155768,
+        "massFlows": {
+          "Water": 48.07861297,
+          "SolubleProtein": 0.05294471345
+        },
+        "price": null
+      },
+      {
+        "id": "s26",
+        "source": "P318",
+        "sink": "V321",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 46.895,
+        "massFlows": {
+          "Water": 46.8434155,
+          "SolubleProtein": 0.0515845
+        },
+        "price": null
+      },
+      {
+        "id": "alpha_amylase",
+        "source": null,
+        "sink": "V301",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 32.323375,
+        "massFlows": {
+          "Water": 32.29686983,
+          "SolubleProtein": 0.0265051675
+        },
+        "price": 2.25
+      },
+      {
+        "id": "s9",
+        "source": "V301",
+        "sink": "P302",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 32.323375,
+        "massFlows": {
+          "Water": 32.29686983,
+          "SolubleProtein": 0.0265051675
+        },
+        "price": null
+      },
+      {
+        "id": "s10",
+        "source": "P302",
+        "sink": "V307",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 32.323375,
+        "massFlows": {
+          "Water": 32.29686983,
+          "SolubleProtein": 0.0265051675
+        },
+        "price": null
+      },
+      {
+        "id": "sulfuric_acid",
+        "source": null,
+        "sink": "V319",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 39.41875,
+        "massFlows": {
+          "H2SO4": 39.41875
+        },
+        "price": 0.0897171176
+      },
+      {
+        "id": "s27",
+        "source": "V319",
+        "sink": "P320",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 39.41875,
+        "massFlows": {
+          "H2SO4": 39.41875
+        },
+        "price": null
+      },
+      {
+        "id": "s28",
+        "source": "P320",
+        "sink": "V321",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 39.41875,
+        "massFlows": {
+          "H2SO4": 39.41875
+        },
+        "price": null
+      },
+      {
+        "id": "ammonia",
+        "source": null,
+        "sink": "V303",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 78.8375,
+        "massFlows": {
+          "NH3": 78.8375
+        },
+        "price": 0.4485966111
+      },
+      {
+        "id": "s11",
+        "source": "V303",
+        "sink": "P304",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 78.8375,
+        "massFlows": {
+          "NH3": 78.8375
+        },
+        "price": null
+      },
+      {
+        "id": "s12",
+        "source": "P304",
+        "sink": "V307",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 78.8375,
+        "massFlows": {
+          "NH3": 78.8375
+        },
+        "price": null
+      },
+      {
+        "id": "lime",
+        "source": null,
+        "sink": "V305",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 4.73025,
+        "massFlows": {
+          "CaO": 4.73025
+        },
+        "price": 0.1993750468
+      },
+      {
+        "id": "s13",
+        "source": "V305",
+        "sink": "V307",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 4.73025,
+        "massFlows": {
+          "CaO": 4.73025
+        },
+        "price": null
+      },
+      {
+        "id": "recycled_process_water",
+        "source": null,
+        "sink": "V307",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 87126.20083,
+        "massFlows": {
+          "Water": 87126.20083
+        },
+        "price": null
+      },
+      {
+        "id": "backwater",
+        "source": "S1",
+        "sink": "V307",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 20261.26401,
+        "massFlows": {
+          "Water": 19072.83612,
+          "Ethanol": 0.1658370171,
+          "Yeast": 16.82425308,
+          "TriOlein": 182.4665781,
+          "H2SO4": 8.207302349,
+          "Fiber": 614.8689155,
+          "SolubleProtein": 327.3234766,
+          "InsolubleProtein": 38.57152267
+        },
+        "price": null
+      },
+      {
+        "id": "s14",
+        "source": "V307",
+        "sink": "P311",
+        "phase": "l",
+        "T": 307.7081151,
+        "P": 101325.0,
+        "massFlow": 153739.1991,
+        "massFlows": {
+          "Water": 113166.6877,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s15",
+        "source": "P311",
+        "sink": "E312",
+        "phase": "l",
+        "T": 307.7081151,
+        "P": 2000000.0,
+        "massFlow": 153739.1991,
+        "massFlows": {
+          "Water": 113166.6877,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s20",
+        "source": "P308",
+        "sink": "E312",
+        "phase": "l",
+        "T": 483.1499502,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 114564.3189,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s16",
+        "source": "E312",
+        "sink": "E313",
+        "phase": "l",
+        "T": 478.1499502,
+        "P": 2000000.0,
+        "massFlow": 153739.1991,
+        "massFlows": {
+          "Water": 113166.6877,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s17",
+        "source": "E312",
+        "sink": "HX101",
+        "phase": "l",
+        "T": 315.0020606,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 114564.3189,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "steam",
+        "source": null,
+        "sink": "E313",
+        "phase": "g",
+        "T": 508.991,
+        "P": 3110000.0,
+        "massFlow": 1397.631244,
+        "massFlows": {
+          "Water": 1397.631244
+        },
+        "price": 0.01286
+      },
+      {
+        "id": "s18",
+        "source": "E313",
+        "sink": "V314",
+        "phase": "l",
+        "T": 483.1499502,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 114564.3189,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s19",
+        "source": "V314",
+        "sink": "P308",
+        "phase": "l",
+        "T": 483.1499502,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 114564.3189,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s21",
+        "source": "HX101",
+        "sink": "V310",
+        "phase": "l",
+        "T": 360.15,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 114564.3189,
+          "Ethanol": 0.1613652759,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Starch": 28296.3555,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s22",
+        "source": "V310",
+        "sink": "E316",
+        "phase": "l",
+        "T": 360.15,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 111420.3392,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s38",
+        "source": "P407",
+        "sink": "E316",
+        "phase": "l",
+        "T": 355.027713,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s23",
+        "source": "E316",
+        "sink": "V321",
+        "phase": "l",
+        "T": 360.0303913,
+        "P": 1555000.0,
+        "massFlow": 155136.8304,
+        "massFlows": {
+          "Water": 111420.3392,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 8.207302349,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.369732,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s24",
+        "source": "E316",
+        "sink": "V412",
+        "phase": "l",
+        "T": 355.15,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s29",
+        "source": "V321",
+        "sink": "P322",
+        "phase": "l",
+        "T": 360.027713,
+        "P": 101325.0,
+        "massFlow": 155223.1441,
+        "massFlows": {
+          "Water": 111467.1826,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s30",
+        "source": "P322",
+        "sink": "E401",
+        "phase": "l",
+        "T": 360.027713,
+        "P": 101325.0,
+        "massFlow": 155223.1441,
+        "massFlows": {
+          "Water": 111467.1826,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s44",
+        "source": "MX",
+        "sink": "E401",
+        "phase": "l",
+        "T": 303.9081395,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s31",
+        "source": "E401",
+        "sink": "E402",
+        "phase": "l",
+        "T": 310.1426652,
+        "P": 101325.0,
+        "massFlow": 155223.1441,
+        "massFlows": {
+          "Water": 111467.1826,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s32",
+        "source": "E401",
+        "sink": "P407",
+        "phase": "l",
+        "T": 355.027713,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s33",
+        "source": "E402",
+        "sink": "V405",
+        "phase": "l",
+        "T": 305.35,
+        "P": 101325.0,
+        "massFlow": 155223.1441,
+        "massFlows": {
+          "Water": 111467.1826,
+          "Ethanol": 0.1613652759,
+          "Glucose": 31440.33528,
+          "Ash": 647.30225,
+          "Yeast": 16.82425308,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "NH3": 78.8375,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "CO2",
+        "source": "V405",
+        "sink": "V409",
+        "phase": "g",
+        "T": 303.9081395,
+        "P": 101325.0,
+        "massFlow": 15082.31,
+        "massFlows": {
+          "Water": 215.0475094,
+          "Ethanol": 274.4580389,
+          "CO2": 14592.80445
+        },
+        "price": null
+      },
+      {
+        "id": "s36",
+        "source": "V405",
+        "sink": "P406",
+        "phase": "l",
+        "T": 303.9081395,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s37",
+        "source": "P406",
+        "sink": "MX",
+        "phase": "l",
+        "T": 303.9081395,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s39",
+        "source": "V412",
+        "sink": "PX",
+        "phase": "l",
+        "T": 355.15,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s40",
+        "source": "PX",
+        "sink": "P301",
+        "phase": "l",
+        "T": 355.15,
+        "P": 101325.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s45",
+        "source": "P301",
+        "sink": "E413",
+        "phase": "l",
+        "T": 355.15,
+        "P": 607950.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s47",
+        "source": "P502",
+        "sink": "E413",
+        "phase": "l",
+        "T": 373.1229684,
+        "P": 607950.0,
+        "massFlow": 108748.2922,
+        "massFlows": {
+          "Water": 96231.67516,
+          "Ethanol": 0.9623335564,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s48",
+        "source": "E413",
+        "sink": "T501",
+        "phase": "l",
+        "T": 365.4788105,
+        "P": 607950.0,
+        "massFlow": 138832.3422,
+        "massFlows": {
+          "Water": 111315.4701,
+          "Ethanol": 15001.21739,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "stillage",
+        "source": "E413",
+        "sink": "V601",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 108748.2922,
+        "massFlows": {
+          "Water": 96231.67516,
+          "Ethanol": 0.9623335564,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "distilled_beer",
+        "source": "T501",
+        "sink": "MX3",
+        "phase": "g",
+        "T": 365.0473214,
+        "P": 101325.0,
+        "massFlow": 30084.04998,
+        "massFlows": {
+          "Water": 15083.79492,
+          "Ethanol": 15000.25506
+        },
+        "price": null
+      },
+      {
+        "id": "s46",
+        "source": "T501",
+        "sink": "P502",
+        "phase": "l",
+        "T": 373.1229684,
+        "P": 101325.0,
+        "massFlow": 108748.2922,
+        "massFlows": {
+          "Water": 96231.67516,
+          "Ethanol": 0.9623335564,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s61",
+        "source": "V601",
+        "sink": "P602",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 108748.2922,
+        "massFlows": {
+          "Water": 96231.67516,
+          "Ethanol": 0.9623335564,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s62",
+        "source": "P602",
+        "sink": "C603",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 108748.2922,
+        "massFlows": {
+          "Water": 96231.67516,
+          "Ethanol": 0.9623335564,
+          "Ash": 647.30225,
+          "Yeast": 295.8516171,
+          "CaO": 4.73025,
+          "TriOlein": 1754.486328,
+          "H2SO4": 47.62605235,
+          "Fiber": 5548.236778,
+          "SolubleProtein": 1899.421316,
+          "InsolubleProtein": 2318.00016
+        },
+        "price": null
+      },
+      {
+        "id": "s63",
+        "source": "C603",
+        "sink": "MH604",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 11338.36914,
+        "massFlows": {
+          "Water": 4535.347655,
+          "Ethanol": 0.1650402049,
+          "Ash": 647.30225,
+          "Yeast": 214.965785,
+          "CaO": 4.73025,
+          "TriOlein": 877.2431641,
+          "H2SO4": 8.167867978,
+          "Fiber": 2592.136223,
+          "SolubleProtein": 325.7507557,
+          "InsolubleProtein": 2132.560147
+        },
+        "price": null
+      },
+      {
+        "id": "s64",
+        "source": "C603",
+        "sink": "S1",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 97409.92311,
+        "massFlows": {
+          "Water": 91696.32751,
+          "Ethanol": 0.7972933515,
+          "Yeast": 80.88583211,
+          "TriOlein": 877.2431641,
+          "H2SO4": 39.45818437,
+          "Fiber": 2956.100555,
+          "SolubleProtein": 1573.670561,
+          "InsolubleProtein": 185.4400128
+        },
+        "price": null
+      },
+      {
+        "id": "s66",
+        "source": "S1",
+        "sink": "V605",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 77148.6591,
+        "massFlows": {
+          "Water": 72623.49138,
+          "Ethanol": 0.6314563344,
+          "Yeast": 64.06157903,
+          "TriOlein": 694.7765859,
+          "H2SO4": 31.25088202,
+          "Fiber": 2341.23164,
+          "SolubleProtein": 1246.347084,
+          "InsolubleProtein": 146.8684901
+        },
+        "price": null
+      },
+      {
+        "id": "s67",
+        "source": "V605",
+        "sink": "P606",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 77148.6591,
+        "massFlows": {
+          "Water": 72623.49138,
+          "Ethanol": 0.6314563344,
+          "Yeast": 64.06157903,
+          "TriOlein": 694.7765859,
+          "H2SO4": 31.25088202,
+          "Fiber": 2341.23164,
+          "SolubleProtein": 1246.347084,
+          "InsolubleProtein": 146.8684901
+        },
+        "price": null
+      },
+      {
+        "id": "s68",
+        "source": "P606",
+        "sink": "Ev607",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 77148.6591,
+        "massFlows": {
+          "Water": 72623.49138,
+          "Ethanol": 0.6314563344,
+          "Yeast": 64.06157903,
+          "TriOlein": 694.7765859,
+          "H2SO4": 31.25088202,
+          "Fiber": 2341.23164,
+          "SolubleProtein": 1246.347084,
+          "InsolubleProtein": 146.8684901
+        },
+        "price": null
+      },
+      {
+        "id": "s69",
+        "source": "Ev607",
+        "sink": "C603_2",
+        "phase": "l",
+        "T": 332.9701523,
+        "P": 19781.0,
+        "massFlow": 11786.91332,
+        "massFlows": {
+          "Water": 7262.371657,
+          "Ethanol": 0.005405644095,
+          "Yeast": 64.06157903,
+          "TriOlein": 694.7765859,
+          "H2SO4": 31.25088202,
+          "Fiber": 2341.23164,
+          "SolubleProtein": 1246.347084,
+          "InsolubleProtein": 146.8684901
+        },
+        "price": null
+      },
+      {
+        "id": "s70",
+        "source": "Ev607",
+        "sink": "MX5",
+        "phase": "l",
+        "T": 352.0189241,
+        "P": 19781.0,
+        "massFlow": 65361.74578,
+        "massFlows": {
+          "Water": 65361.11973,
+          "Ethanol": 0.6260506903
+        },
+        "price": null
+      },
+      {
+        "id": "crude_oil",
+        "source": "C603_2",
+        "sink": null,
+        "phase": "l",
+        "T": 332.9701523,
+        "P": 19781.0,
+        "massFlow": 687.8288201,
+        "massFlows": {
+          "TriOlein": 687.8288201
+        },
+        "price": 0.56
+      },
+      {
+        "id": "s71",
+        "source": "C603_2",
+        "sink": "MX6",
+        "phase": "l",
+        "T": 332.9701523,
+        "P": 19781.0,
+        "massFlow": 11099.0845,
+        "massFlows": {
+          "Water": 7262.371657,
+          "Ethanol": 0.005405644095,
+          "Yeast": 64.06157903,
+          "TriOlein": 6.947765859,
+          "H2SO4": 31.25088202,
+          "Fiber": 2341.23164,
+          "SolubleProtein": 1246.347084,
+          "InsolubleProtein": 146.8684901
+        },
+        "price": null
+      },
+      {
+        "id": "s65",
+        "source": "MH604",
+        "sink": "MX6",
+        "phase": "l",
+        "T": 360.15,
+        "P": 607950.0,
+        "massFlow": 11338.36914,
+        "massFlows": {
+          "Water": 4535.347655,
+          "Ethanol": 0.1650402049,
+          "Ash": 647.30225,
+          "Yeast": 214.965785,
+          "CaO": 4.73025,
+          "TriOlein": 877.2431641,
+          "H2SO4": 8.167867978,
+          "Fiber": 2592.136223,
+          "SolubleProtein": 325.7507557,
+          "InsolubleProtein": 2132.560147
+        },
+        "price": null
+      },
+      {
+        "id": "s73",
+        "source": "MX6",
+        "sink": "D610",
+        "phase": "l",
+        "T": 344.9996791,
+        "P": 19781.0,
+        "massFlow": 22437.45364,
+        "massFlows": {
+          "Water": 11797.71931,
+          "Ethanol": 0.170445849,
+          "Ash": 647.30225,
+          "Yeast": 279.027364,
+          "CaO": 4.73025,
+          "TriOlein": 884.1909299,
+          "H2SO4": 39.41875,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.09784,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "dryer_air",
+        "source": null,
+        "sink": "D610",
+        "phase": "g",
+        "T": 298.15,
+        "P": 1013250.0,
+        "massFlow": 535078.8637,
+        "massFlows": {
+          "O2": 124629.2374,
+          "N2": 410449.6263
+        },
+        "price": null
+      },
+      {
+        "id": "natural_gas",
+        "source": null,
+        "sink": "D610",
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 1110.811306,
+        "massFlows": {
+          "CH4": 1110.811306
+        },
+        "price": null
+      },
+      {
+        "id": "s74",
+        "source": "D610",
+        "sink": "MH612",
+        "phase": "l",
+        "T": 343.15,
+        "P": 19781.0,
+        "massFlow": 11821.73765,
+        "massFlows": {
+          "Water": 1182.173765,
+          "Ash": 647.30225,
+          "Yeast": 279.027364,
+          "CaO": 4.73025,
+          "TriOlein": 884.1909299,
+          "H2SO4": 39.41875,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.09784,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": null
+      },
+      {
+        "id": "s75",
+        "source": "D610",
+        "sink": "X611",
+        "phase": "g",
+        "T": 343.15,
+        "P": 1013250.0,
+        "massFlow": 545694.5797,
+        "massFlows": {
+          "Water": 10615.54555,
+          "Ethanol": 0.170445849,
+          "O2": 124629.2374,
+          "N2": 410449.6263
+        },
+        "price": null
+      },
+      {
+        "id": "s76",
+        "source": "D610",
+        "sink": null,
+        "phase": "g",
+        "T": 373.15,
+        "P": 101325.0,
+        "massFlow": 5542.130297,
+        "massFlows": {
+          "Water": 2494.826443,
+          "CO2": 3047.303854
+        },
+        "price": null
+      },
+      {
+        "id": "DDGS",
+        "source": "MH612",
+        "sink": null,
+        "phase": "l",
+        "T": 343.15,
+        "P": 19781.0,
+        "massFlow": 11821.73765,
+        "massFlows": {
+          "Water": 1182.173765,
+          "Ash": 647.30225,
+          "Yeast": 279.027364,
+          "CaO": 4.73025,
+          "TriOlein": 884.1909299,
+          "H2SO4": 39.41875,
+          "Fiber": 4933.367863,
+          "SolubleProtein": 1572.09784,
+          "InsolubleProtein": 2279.428637
+        },
+        "price": 0.12026
+      },
+      {
+        "id": "oxidizer_air",
+        "source": null,
+        "sink": "X611",
+        "phase": "g",
+        "T": 298.15,
+        "P": 1013250.0,
+        "massFlow": 11396.19098,
+        "massFlows": {
+          "O2": 2654.372443,
+          "N2": 8741.818535
+        },
+        "price": null
+      },
+      {
+        "id": "s77",
+        "source": null,
+        "sink": "X611",
+        "phase": "g",
+        "T": 298.15,
+        "P": 1013250.0,
+        "massFlow": 665.3790726,
+        "massFlows": {
+          "CH4": 665.3790726
+        },
+        "price": null
+      },
+      {
+        "id": "s78",
+        "source": "X611",
+        "sink": null,
+        "phase": "g",
+        "T": 399.7536349,
+        "P": 1013250.0,
+        "massFlow": 557756.1497,
+        "massFlows": {
+          "Water": 12110.15351,
+          "CO2": 1825.669169,
+          "O2": 124628.8822,
+          "N2": 419191.4449
+        },
+        "price": null
+      },
+      {
+        "id": "s53",
+        "source": "X504",
+        "sink": "MX3",
+        "phase": "g",
+        "T": 388.15,
+        "P": 101325.0,
+        "massFlow": 4440.40055,
+        "massFlows": {
+          "Water": 1538.281119,
+          "Ethanol": 2902.119431
+        },
+        "price": null
+      },
+      {
+        "id": "s49",
+        "source": "MX3",
+        "sink": "T503_T507",
+        "phase": "g",
+        "T": 368.0050524,
+        "P": 101325.0,
+        "massFlow": 34524.45053,
+        "massFlows": {
+          "Water": 16622.07604,
+          "Ethanol": 17902.37449
+        },
+        "price": null
+      },
+      {
+        "id": "s50",
+        "source": "T503_T507",
+        "sink": "HX500",
+        "phase": "g",
+        "T": 351.5541657,
+        "P": 101325.0,
+        "massFlow": 19565.23313,
+        "massFlows": {
+          "Water": 1663.008239,
+          "Ethanol": 17902.22489
+        },
+        "price": null
+      },
+      {
+        "id": "s51",
+        "source": "T503_T507",
+        "sink": "P508",
+        "phase": "l",
+        "T": 373.1229684,
+        "P": 101325.0,
+        "massFlow": 14959.21739,
+        "massFlows": {
+          "Water": 14959.0678,
+          "Ethanol": 0.1495932903
+        },
+        "price": null
+      },
+      {
+        "id": "s52",
+        "source": "HX500",
+        "sink": "X504",
+        "phase": "g",
+        "T": 388.15,
+        "P": 101325.0,
+        "massFlow": 19565.23313,
+        "massFlows": {
+          "Water": 1663.008239,
+          "Ethanol": 17902.22489
+        },
+        "price": null
+      },
+      {
+        "id": "s54",
+        "source": "X504",
+        "sink": "HX501",
+        "phase": "g",
+        "T": 388.15,
+        "P": 101325.0,
+        "massFlow": 15124.83258,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546
+        },
+        "price": null
+      },
+      {
+        "id": "s55",
+        "source": "HX501",
+        "sink": "V511",
+        "phase": "l",
+        "T": 340.0,
+        "P": 101325.0,
+        "massFlow": 15124.83258,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546
+        },
+        "price": null
+      },
+      {
+        "id": "s56",
+        "source": "V511",
+        "sink": "P512",
+        "phase": "l",
+        "T": 340.0,
+        "P": 101325.0,
+        "massFlow": 15124.83258,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546
+        },
+        "price": null
+      },
+      {
+        "id": "s57",
+        "source": "P512",
+        "sink": "MX4",
+        "phase": "l",
+        "T": 340.0,
+        "P": 101325.0,
+        "massFlow": 15124.83258,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546
+        },
+        "price": null
+      },
+      {
+        "id": "denaturant",
+        "source": null,
+        "sink": "V509",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 657.1539554,
+        "massFlows": {
+          "Octane": 657.1539554
+        },
+        "price": 0.4355069727
+      },
+      {
+        "id": "s58",
+        "source": "V509",
+        "sink": "P510",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 657.1539554,
+        "massFlows": {
+          "Octane": 657.1539554
+        },
+        "price": null
+      },
+      {
+        "id": "s59",
+        "source": "P510",
+        "sink": "MX4",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 657.1539554,
+        "massFlows": {
+          "Octane": 657.1539554
+        },
+        "price": null
+      },
+      {
+        "id": "s60",
+        "source": "MX4",
+        "sink": "V513",
+        "phase": "l",
+        "T": 338.5632211,
+        "P": 101325.0,
+        "massFlow": 15781.98654,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546,
+          "Octane": 657.1539554
+        },
+        "price": null
+      },
+      {
+        "id": "ethanol",
+        "source": "V513",
+        "sink": null,
+        "phase": "l",
+        "T": 338.5632211,
+        "P": 101325.0,
+        "massFlow": 15781.98654,
+        "massFlows": {
+          "Water": 124.7271201,
+          "Ethanol": 15000.10546,
+          "Octane": 657.1539554
+        },
+        "price": 0.4854791535
+      },
+      {
+        "id": "recycle_process_water",
+        "source": "P508",
+        "sink": "MX5",
+        "phase": "l",
+        "T": 373.1229684,
+        "P": 101325.0,
+        "massFlow": 14959.21739,
+        "massFlows": {
+          "Water": 14959.0678,
+          "Ethanol": 0.1495932903
+        },
+        "price": null
+      },
+      {
+        "id": "scrubber_water",
+        "source": null,
+        "sink": "V409",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 18249.5951,
+        "massFlows": {
+          "Water": 18249.5951
+        },
+        "price": null
+      },
+      {
+        "id": "s41",
+        "source": "V409",
+        "sink": null,
+        "phase": "g",
+        "T": 303.9081395,
+        "P": 101325.0,
+        "massFlow": 14592.80445,
+        "massFlows": {
+          "CO2": 14592.80445
+        },
+        "price": null
+      },
+      {
+        "id": "s42",
+        "source": "V409",
+        "sink": "P410",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 18739.10064,
+        "massFlows": {
+          "Water": 18464.64261,
+          "Ethanol": 274.4580389
+        },
+        "price": null
+      },
+      {
+        "id": "s43",
+        "source": "P410",
+        "sink": "MX5",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 18739.10064,
+        "massFlows": {
+          "Water": 18464.64261,
+          "Ethanol": 274.4580389
+        },
+        "price": null
+      },
+      {
+        "id": "s72",
+        "source": "MX5",
+        "sink": "T608",
+        "phase": "l",
+        "T": 345.0951975,
+        "P": 19781.0,
+        "massFlow": 99060.06381,
+        "massFlows": {
+          "Water": 98784.83013,
+          "Ethanol": 275.2336829
+        },
+        "price": null
+      },
+      {
+        "id": "0-other_facilities",
+        "source": null,
+        "sink": "other_facilities",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "s79",
+        "source": "other_facilities",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "makeup_water",
+        "source": null,
+        "sink": "T608",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "2-T608",
+        "source": null,
+        "sink": "T608",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "3-T608",
+        "source": null,
+        "sink": "T608",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "process_water",
+        "source": "T608",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 0.0,
+        "massFlows": {},
+        "price": null
+      },
+      {
+        "id": "wastewater",
+        "source": "T608",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 87126.20083,
+        "massFlows": {
+          "Water": 87126.20083
+        },
+        "price": null
+      },
+      {
+        "id": "T608-2",
+        "source": "T608",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 11658.6293,
+        "massFlows": {
+          "Water": 11658.6293
+        },
+        "price": null
+      }
+    ],
+    "units": [
+      {
+        "id": "MH101",
+        "unitClass": "GrainHandling",
+        "line": "Grain handling",
+        "order": 0,
+        "ins": [
+          "corn"
+        ],
+        "outs": [
+          "s1"
+        ],
+        "installedCost": 198367.6007,
+        "purchaseCost": 49591.90017,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 97.05081172
+      },
+      {
+        "id": "V102",
+        "unitClass": "CornStorage",
+        "line": "Corn storage",
+        "order": 1,
+        "ins": [
+          "s1"
+        ],
+        "outs": [
+          "s2"
+        ],
+        "installedCost": 83162.66046,
+        "purchaseCost": 20790.66512,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "MH103",
+        "unitClass": "CleaningSystem",
+        "line": "Cleaning system",
+        "order": 2,
+        "ins": [
+          "s2"
+        ],
+        "outs": [
+          "s3",
+          "s4"
+        ],
+        "installedCost": 264012.8332,
+        "purchaseCost": 66003.2083,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "M104",
+        "unitClass": "HammerMill",
+        "line": "Hammer mill",
+        "order": 3,
+        "ins": [
+          "s3"
+        ],
+        "outs": [
+          "s5"
+        ],
+        "installedCost": 161256.4887,
+        "purchaseCost": 40314.12217,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 314.403906
+      },
+      {
+        "id": "V105",
+        "unitClass": "MilledCornSurgeTank",
+        "line": "Milled corn surge tank",
+        "order": 4,
+        "ins": [
+          "s5"
+        ],
+        "outs": [
+          "s6"
+        ],
+        "installedCost": 52042.96106,
+        "purchaseCost": 13010.74026,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "W106",
+        "unitClass": "MilledCornHopper",
+        "line": "Milled corn hopper",
+        "order": 5,
+        "ins": [
+          "s6"
+        ],
+        "outs": [
+          "s7"
+        ],
+        "installedCost": 181487.4673,
+        "purchaseCost": 45371.86683,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V107",
+        "unitClass": "MilledCornWeighTank",
+        "line": "Milled corn weigh tank",
+        "order": 6,
+        "ins": [
+          "s7"
+        ],
+        "outs": [
+          "s8"
+        ],
+        "installedCost": 69817.63391,
+        "purchaseCost": 17454.40848,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V403",
+        "unitClass": "YeastTank",
+        "line": "Yeast tank",
+        "order": 7,
+        "ins": [
+          "yeast"
+        ],
+        "outs": [
+          "s34"
+        ],
+        "installedCost": 179072.5779,
+        "purchaseCost": 44768.14449,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.2722887232
+      },
+      {
+        "id": "P404",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 8,
+        "ins": [
+          "s34"
+        ],
+        "outs": [
+          "s35"
+        ],
+        "installedCost": 14416.67994,
+        "purchaseCost": 4368.690891,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.000979794642
+      },
+      {
+        "id": "V317",
+        "unitClass": "AlphaAmylaseTank",
+        "line": "Alpha amylase tank",
+        "order": 9,
+        "ins": [
+          "gluco_amylase"
+        ],
+        "outs": [
+          "s25"
+        ],
+        "installedCost": 369244.2759,
+        "purchaseCost": 92311.06896,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P318",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 10,
+        "ins": [
+          "s25"
+        ],
+        "outs": [
+          "s26"
+        ],
+        "installedCost": 14407.83189,
+        "purchaseCost": 4366.009663,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.003858611963
+      },
+      {
+        "id": "V301",
+        "unitClass": "AlphaAmylaseTank",
+        "line": "Alpha amylase tank",
+        "order": 11,
+        "ins": [
+          "alpha_amylase"
+        ],
+        "outs": [
+          "s9"
+        ],
+        "installedCost": 207866.4452,
+        "purchaseCost": 51966.61131,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P302",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 12,
+        "ins": [
+          "s9"
+        ],
+        "outs": [
+          "s10"
+        ],
+        "installedCost": 14407.7775,
+        "purchaseCost": 4365.993181,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.002591557065
+      },
+      {
+        "id": "V319",
+        "unitClass": "AlphaAmylaseTank",
+        "line": "Alpha amylase tank",
+        "order": 13,
+        "ins": [
+          "sulfuric_acid"
+        ],
+        "outs": [
+          "s27"
+        ],
+        "installedCost": 18990.47552,
+        "purchaseCost": 4747.61888,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P320",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 14,
+        "ins": [
+          "s27"
+        ],
+        "outs": [
+          "s28"
+        ],
+        "installedCost": 13317.02211,
+        "purchaseCost": 4035.461244,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.001722212227
+      },
+      {
+        "id": "V303",
+        "unitClass": "AmmoniaTank",
+        "line": "Ammonia tank",
+        "order": 15,
+        "ins": [
+          "ammonia"
+        ],
+        "outs": [
+          "s11"
+        ],
+        "installedCost": 63111.28069,
+        "purchaseCost": 15777.82017,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P304",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 16,
+        "ins": [
+          "s11"
+        ],
+        "outs": [
+          "s12"
+        ],
+        "installedCost": 14210.66223,
+        "purchaseCost": 4306.261283,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.01045531632
+      },
+      {
+        "id": "V305",
+        "unitClass": "LimeHopper",
+        "line": "Lime hopper",
+        "order": 17,
+        "ins": [
+          "lime"
+        ],
+        "outs": [
+          "s13"
+        ],
+        "installedCost": 514.3180907,
+        "purchaseCost": 128.5795227,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V307",
+        "unitClass": "SlurryMixTank",
+        "line": "Slurry mix tank",
+        "order": 18,
+        "ins": [
+          "s8",
+          "s10",
+          "s12",
+          "s13",
+          "recycled_process_water",
+          "backwater"
+        ],
+        "outs": [
+          "s14"
+        ],
+        "installedCost": 641761.7733,
+        "purchaseCost": 160440.4433,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 62.97640853
+      },
+      {
+        "id": "P311",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 19,
+        "ins": [
+          "s14"
+        ],
+        "outs": [
+          "s15"
+        ],
+        "installedCost": 64857.66197,
+        "purchaseCost": 23222.83046,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 111.2577037
+      },
+      {
+        "id": "E312",
+        "unitClass": "HXprocess",
+        "line": "Heat exchanger",
+        "order": 20,
+        "ins": [
+          "s15",
+          "s20"
+        ],
+        "outs": [
+          "s16",
+          "s17"
+        ],
+        "installedCost": 2792003.381,
+        "purchaseCost": 907718.3302,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "E313",
+        "unitClass": "JetCooker",
+        "line": "Jet cooker",
+        "order": 21,
+        "ins": [
+          "s16",
+          "steam"
+        ],
+        "outs": [
+          "s18"
+        ],
+        "installedCost": 61628.82262,
+        "purchaseCost": 15407.20566,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V314",
+        "unitClass": "CookedSlurrySurgeTank",
+        "line": "Cooked slurry surge tank",
+        "order": 22,
+        "ins": [
+          "s18"
+        ],
+        "outs": [
+          "s19"
+        ],
+        "installedCost": 1350091.255,
+        "purchaseCost": 337522.8138,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P308",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 23,
+        "ins": [
+          "s19"
+        ],
+        "outs": [
+          "s20"
+        ],
+        "installedCost": 21555.2265,
+        "purchaseCost": 6531.886817,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 7.120689437
+      },
+      {
+        "id": "HX101",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 24,
+        "ins": [
+          "s17"
+        ],
+        "outs": [
+          "s21"
+        ],
+        "installedCost": 80025.71658,
+        "purchaseCost": 25726.02671,
+        "heatingDuty": 24201786.8,
+        "coolingDuty": 0,
+        "power": null
+      },
+      {
+        "id": "V310",
+        "unitClass": "Liquefaction",
+        "line": "Liquefaction",
+        "order": 25,
+        "ins": [
+          "s21"
+        ],
+        "outs": [
+          "s22"
+        ],
+        "installedCost": 643784.9264,
+        "purchaseCost": 160946.2316,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 74.60966681
+      },
+      {
+        "id": "E316",
+        "unitClass": "HXprocess",
+        "line": "Heat exchanger",
+        "order": 26,
+        "ins": [
+          "s22",
+          "s38"
+        ],
+        "outs": [
+          "s23",
+          "s24"
+        ],
+        "installedCost": 6903.545524,
+        "purchaseCost": 4783.255273,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V321",
+        "unitClass": "AlphaAmylaseTank",
+        "line": "Alpha amylase tank",
+        "order": 27,
+        "ins": [
+          "s26",
+          "s28",
+          "s23"
+        ],
+        "outs": [
+          "s29"
+        ],
+        "installedCost": 370994.9431,
+        "purchaseCost": 92748.73578,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.659303035
+      },
+      {
+        "id": "P322",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 28,
+        "ins": [
+          "s29"
+        ],
+        "outs": [
+          "s30"
+        ],
+        "installedCost": 19587.74567,
+        "purchaseCost": 5935.680506,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 5.68801597
+      },
+      {
+        "id": "E401",
+        "unitClass": "HXprocess",
+        "line": "Heat exchanger",
+        "order": 29,
+        "ins": [
+          "s30",
+          "s44"
+        ],
+        "outs": [
+          "s31",
+          "s32"
+        ],
+        "installedCost": 561137.4349,
+        "purchaseCost": 174770.9931,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "E402",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 30,
+        "ins": [
+          "s31"
+        ],
+        "outs": [
+          "s33"
+        ],
+        "installedCost": 106641.4487,
+        "purchaseCost": 33214.37982,
+        "heatingDuty": 0,
+        "coolingDuty": 2555310.518,
+        "power": null
+      },
+      {
+        "id": "V405",
+        "unitClass": "SimultaneousSaccharificationFermentation",
+        "line": "Simultaneous saccharification fermentation",
+        "order": 31,
+        "ins": [
+          "s33",
+          "s35"
+        ],
+        "outs": [
+          "CO2",
+          "s36"
+        ],
+        "installedCost": 8111395.171,
+        "purchaseCost": 5217998.332,
+        "heatingDuty": 0,
+        "coolingDuty": 14832438.15,
+        "power": 127.6480342
+      },
+      {
+        "id": "P406",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 32,
+        "ins": [
+          "s36"
+        ],
+        "outs": [
+          "s37"
+        ],
+        "installedCost": 20524.13989,
+        "purchaseCost": 6219.43633,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 6.289086751
+      },
+      {
+        "id": "MX",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 33,
+        "ins": [
+          "s37"
+        ],
+        "outs": [
+          "s44"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P407",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 34,
+        "ins": [
+          "s32"
+        ],
+        "outs": [
+          "s38"
+        ],
+        "installedCost": 20784.70451,
+        "purchaseCost": 6298.395305,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 6.446628625
+      },
+      {
+        "id": "V412",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 35,
+        "ins": [
+          "s24"
+        ],
+        "outs": [
+          "s39"
+        ],
+        "installedCost": 278617.3528,
+        "purchaseCost": 168859.0017,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "PX",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 36,
+        "ins": [
+          "s39"
+        ],
+        "outs": [
+          "s40"
+        ],
+        "installedCost": 20785.50754,
+        "purchaseCost": 6298.638649,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 6.447111872
+      },
+      {
+        "id": "P301",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 37,
+        "ins": [
+          "s40"
+        ],
+        "outs": [
+          "s45"
+        ],
+        "installedCost": 31423.44022,
+        "purchaseCost": 9522.254613,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 30.97368851
+      },
+      {
+        "id": "E413",
+        "unitClass": "HXprocess",
+        "line": "Heat exchanger",
+        "order": 38,
+        "ins": [
+          "s45",
+          "s47"
+        ],
+        "outs": [
+          "s48",
+          "stillage"
+        ],
+        "installedCost": 169449.3432,
+        "purchaseCost": 53310.58786,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T501",
+        "unitClass": "BinaryDistillation",
+        "line": "Distillation Column",
+        "order": 39,
+        "ins": [
+          "s48"
+        ],
+        "outs": [
+          "distilled_beer",
+          "s46"
+        ],
+        "installedCost": 1046160.408,
+        "purchaseCost": 356465.6258,
+        "heatingDuty": 49974621.87,
+        "coolingDuty": 5036.345848,
+        "power": 5.904010002
+      },
+      {
+        "id": "P502",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 40,
+        "ins": [
+          "s46"
+        ],
+        "outs": [
+          "s47"
+        ],
+        "installedCost": 27416.56185,
+        "purchaseCost": 8308.049046,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 24.44188277
+      },
+      {
+        "id": "V601",
+        "unitClass": "MixTank",
+        "line": "Mix tank",
+        "order": 41,
+        "ins": [
+          "stillage"
+        ],
+        "outs": [
+          "s61"
+        ],
+        "installedCost": 608034.5447,
+        "purchaseCost": 368505.7847,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 13.34707213
+      },
+      {
+        "id": "P602",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 42,
+        "ins": [
+          "s61"
+        ],
+        "outs": [
+          "s62"
+        ],
+        "installedCost": 19121.37091,
+        "purchaseCost": 5794.354823,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 5.060107111
+      },
+      {
+        "id": "C603",
+        "unitClass": "DDGSCentrifuge",
+        "line": "DDGSCentrifuge",
+        "order": 43,
+        "ins": [
+          "s62"
+        ],
+        "outs": [
+          "s63",
+          "s64"
+        ],
+        "installedCost": 1913352.563,
+        "purchaseCost": 942538.2082,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.07328986211
+      },
+      {
+        "id": "S1",
+        "unitClass": "Splitter",
+        "line": "Splitter",
+        "order": 44,
+        "ins": [
+          "s64"
+        ],
+        "outs": [
+          "backwater",
+          "s66"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V605",
+        "unitClass": "MixTank",
+        "line": "Mix tank",
+        "order": 45,
+        "ins": [
+          "s66"
+        ],
+        "outs": [
+          "s67"
+        ],
+        "installedCost": 461104.0403,
+        "purchaseCost": 279456.9941,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 9.6438119
+      },
+      {
+        "id": "P606",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 46,
+        "ins": [
+          "s67"
+        ],
+        "outs": [
+          "s68"
+        ],
+        "installedCost": 17812.39898,
+        "purchaseCost": 5397.696662,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 3.857699215
+      },
+      {
+        "id": "Ev607",
+        "unitClass": "MultiEffectEvaporator",
+        "line": "Multi-effect evaporator",
+        "order": 47,
+        "ins": [
+          "s68"
+        ],
+        "outs": [
+          "s69",
+          "s70"
+        ],
+        "installedCost": 678187.8178,
+        "purchaseCost": 251749.0879,
+        "heatingDuty": 30035858.5,
+        "coolingDuty": 33154123.72,
+        "power": 5.718970216
+      },
+      {
+        "id": "C603_2",
+        "unitClass": "LiquidsSplitCentrifuge",
+        "line": "Liquids centrifuge",
+        "order": 48,
+        "ins": [
+          "s69"
+        ],
+        "outs": [
+          "crude_oil",
+          "s71"
+        ],
+        "installedCost": 239217.569,
+        "purchaseCost": 117841.167,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 14.89798578
+      },
+      {
+        "id": "MH604",
+        "unitClass": "WetDDGSConveyor",
+        "line": "Wet ddgsconveyor",
+        "order": 49,
+        "ins": [
+          "s63"
+        ],
+        "outs": [
+          "s65"
+        ],
+        "installedCost": 152838.4804,
+        "purchaseCost": 38209.6201,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 6.148382967
+      },
+      {
+        "id": "MX6",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 50,
+        "ins": [
+          "s71",
+          "s65"
+        ],
+        "outs": [
+          "s73"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "D610",
+        "unitClass": "DrumDryer",
+        "line": "Drum dryer",
+        "order": 51,
+        "ins": [
+          "s73",
+          "dryer_air",
+          "natural_gas"
+        ],
+        "outs": [
+          "s74",
+          "s75",
+          "s76"
+        ],
+        "installedCost": 1877902.538,
+        "purchaseCost": 911603.1739,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 537.6459895
+      },
+      {
+        "id": "MH612",
+        "unitClass": "DDGSHandling",
+        "line": "DDGSHandling",
+        "order": 52,
+        "ins": [
+          "s74"
+        ],
+        "outs": [
+          "DDGS"
+        ],
+        "installedCost": 454376.4918,
+        "purchaseCost": 113594.1229,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 28.81365814
+      },
+      {
+        "id": "X611",
+        "unitClass": "ThermalOxidizer",
+        "line": "Thermal oxidizer",
+        "order": 53,
+        "ins": [
+          "s75",
+          "oxidizer_air",
+          "s77"
+        ],
+        "outs": [
+          "s78"
+        ],
+        "installedCost": 1348853.291,
+        "purchaseCost": 654783.1508,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "MX3",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 54,
+        "ins": [
+          "distilled_beer",
+          "s53"
+        ],
+        "outs": [
+          "s49"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T503_T507",
+        "unitClass": "BinaryDistillation",
+        "line": "Divided Distillation Column",
+        "order": 55,
+        "ins": [
+          "s49"
+        ],
+        "outs": [
+          "s50",
+          "s51"
+        ],
+        "installedCost": 1441154.688,
+        "purchaseCost": 510475.868,
+        "heatingDuty": 5943858.659,
+        "coolingDuty": 40084499.71,
+        "power": 1.301227844
+      },
+      {
+        "id": "HX500",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 56,
+        "ins": [
+          "s50"
+        ],
+        "outs": [
+          "s52"
+        ],
+        "installedCost": 7995.194848,
+        "purchaseCost": 5471.025284,
+        "heatingDuty": 1202755.767,
+        "coolingDuty": 0,
+        "power": null
+      },
+      {
+        "id": "X504",
+        "unitClass": "MolecularSieve",
+        "line": "Molecular sieve",
+        "order": 57,
+        "ins": [
+          "s52"
+        ],
+        "outs": [
+          "s53",
+          "s54"
+        ],
+        "installedCost": 3988014.442,
+        "purchaseCost": 2215563.579,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 100.667771
+      },
+      {
+        "id": "HX501",
+        "unitClass": "HXutility",
+        "line": "Heat exchanger",
+        "order": 58,
+        "ins": [
+          "s54"
+        ],
+        "outs": [
+          "s55"
+        ],
+        "installedCost": 118617.9624,
+        "purchaseCost": 36944.56615,
+        "heatingDuty": 0,
+        "coolingDuty": 14455947.32,
+        "power": null
+      },
+      {
+        "id": "V511",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 59,
+        "ins": [
+          "s55"
+        ],
+        "outs": [
+          "s56"
+        ],
+        "installedCost": 298656.8393,
+        "purchaseCost": 129850.7997,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P512",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 60,
+        "ins": [
+          "s56"
+        ],
+        "outs": [
+          "s57"
+        ],
+        "installedCost": 15549.16007,
+        "purchaseCost": 4711.866688,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.345434014
+      },
+      {
+        "id": "V509",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 61,
+        "ins": [
+          "denaturant"
+        ],
+        "outs": [
+          "s58"
+        ],
+        "installedCost": 240467.4592,
+        "purchaseCost": 104551.0692,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P510",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 62,
+        "ins": [
+          "s58"
+        ],
+        "outs": [
+          "s59"
+        ],
+        "installedCost": 14419.79901,
+        "purchaseCost": 4369.636063,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 0.0752104755
+      },
+      {
+        "id": "MX4",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 63,
+        "ins": [
+          "s59",
+          "s57"
+        ],
+        "outs": [
+          "s60"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "V513",
+        "unitClass": "StorageTank",
+        "line": "Storage tank",
+        "order": 64,
+        "ins": [
+          "s60"
+        ],
+        "outs": [
+          "ethanol"
+        ],
+        "installedCost": 1122220.154,
+        "purchaseCost": 487921.806,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P508",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 65,
+        "ins": [
+          "s51"
+        ],
+        "outs": [
+          "recycle_process_water"
+        ],
+        "installedCost": 15512.15855,
+        "purchaseCost": 4700.654105,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.122966444
+      },
+      {
+        "id": "V409",
+        "unitClass": "VentScrubber",
+        "line": "Vent scrubber",
+        "order": 66,
+        "ins": [
+          "scrubber_water",
+          "CO2"
+        ],
+        "outs": [
+          "s41",
+          "s42"
+        ],
+        "installedCost": 439628.3478,
+        "purchaseCost": 183178.4783,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "P410",
+        "unitClass": "Pump",
+        "line": "Pump",
+        "order": 67,
+        "ins": [
+          "s42"
+        ],
+        "outs": [
+          "s43"
+        ],
+        "installedCost": 15501.06547,
+        "purchaseCost": 4697.292568,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 1.281980454
+      },
+      {
+        "id": "MX5",
+        "unitClass": "Mixer",
+        "line": "Mixer",
+        "order": 68,
+        "ins": [
+          "s70",
+          "s43",
+          "recycle_process_water"
+        ],
+        "outs": [
+          "s72"
+        ],
+        "installedCost": 0.0,
+        "purchaseCost": 0.0,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "other_facilities",
+        "unitClass": "PlantAir_CIP_WasteWater_Facilities",
+        "line": "Plant air CIP waste water facilities",
+        "order": 69,
+        "ins": [
+          "0-other_facilities"
+        ],
+        "outs": [
+          "s79"
+        ],
+        "installedCost": 601271.464,
+        "purchaseCost": 601271.464,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": null
+      },
+      {
+        "id": "T608",
+        "unitClass": "ProcessWaterCenter",
+        "line": "Process water center",
+        "order": 70,
+        "ins": [
+          "s72",
+          "makeup_water",
+          "2-T608",
+          "3-T608"
+        ],
+        "outs": [
+          "process_water",
+          "wastewater",
+          "T608-2"
+        ],
+        "installedCost": 172264.0816,
+        "purchaseCost": 97894.34471,
+        "heatingDuty": null,
+        "coolingDuty": null,
+        "power": 10.64645828
+      }
+    ],
+    "utilities": {
+      "group": "the units the TEA costs",
+      "heating": 111.3588816,
+      "heatingUnit": "GJ/hr",
+      "cooling": 105.0873558,
+      "coolingUnit": "GJ/hr",
+      "electricityConsumption": 1.62485686,
+      "electricityConsumptionUnit": "MW",
+      "electricityProduction": 0.0,
+      "electricityProductionUnit": "MW"
+    },
+    "diagram": null,
+    "diagramNote": "Graphviz was not on the host that made this run, so it has no diagram; a host that has it (brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.",
+    "unitOrder": [
+      "MH101",
+      "V102",
+      "MH103",
+      "M104",
+      "V105",
+      "W106",
+      "V107",
+      "V403",
+      "P404",
+      "V317",
+      "P318",
+      "V301",
+      "P302",
+      "V319",
+      "P320",
+      "V303",
+      "P304",
+      "V305",
+      "V307",
+      "P311",
+      "E312",
+      "E313",
+      "V314",
+      "P308",
+      "HX101",
+      "V310",
+      "E316",
+      "V321",
+      "P322",
+      "E401",
+      "E402",
+      "V405",
+      "P406",
+      "MX",
+      "P407",
+      "V412",
+      "PX",
+      "P301",
+      "E413",
+      "T501",
+      "P502",
+      "V601",
+      "P602",
+      "C603",
+      "S1",
+      "V605",
+      "P606",
+      "Ev607",
+      "C603_2",
+      "MH604",
+      "MX6",
+      "D610",
+      "MH612",
+      "X611",
+      "MX3",
+      "T503_T507",
+      "HX500",
+      "X504",
+      "HX501",
+      "V511",
+      "P512",
+      "V509",
+      "P510",
+      "MX4",
+      "V513",
+      "P508",
+      "V409",
+      "P410",
+      "MX5",
+      "other_facilities",
+      "T608"
+    ],
+    "tableUnits": {
+      "T": "K",
+      "P": "Pa",
+      "massFlow": "kg/hr",
+      "price": "USD/kg",
+      "cost": "USD",
+      "duty": "kJ/hr",
+      "power": "kW",
+      "annual": "USD/yr",
+      "perUnit": "USD per unit of the price's basis"
+    },
+    "regression": {
+      "package": "biorefineries 2.35.1",
+      "file": "biorefineries/tests/test_biorefineries.py",
+      "test": "test_corn",
+      "values": [
+        {
+          "expression": "tea.IRR",
+          "label": "internal rate of return",
+          "unit": "",
+          "package": 0.05381572438333119,
+          "rtol": 0.05
+        },
+        {
+          "expression": "feedstock.price",
+          "label": "feedstock price",
+          "unit": "USD/kg",
+          "package": 0.13227735731092652,
+          "rtol": 0.05
+        },
+        {
+          "expression": "product.price",
+          "label": "product price",
+          "unit": "USD/kg",
+          "package": 0.48547915353569393,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.sales",
+          "label": "sales",
+          "unit": "USD/yr",
+          "package": 74992038.8556337,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.material_cost",
+          "label": "material cost",
+          "unit": "USD/yr",
+          "package": 52925382.42511212,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.installed_equipment_cost",
+          "label": "installed equipment cost",
+          "unit": "USD",
+          "package": 65387501.9390586,
+          "rtol": 0.05
+        },
+        {
+          "expression": "tea.utility_cost",
+          "label": "utility cost",
+          "unit": "USD/yr",
+          "package": 10442066.327145828,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_heating_duty()",
+          "label": "heating duty",
+          "unit": "GJ/hr",
+          "package": 111.3588815958425,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_cooling_duty()",
+          "label": "cooling duty",
+          "unit": "GJ/hr",
+          "package": 105.08735576937576,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_consumption()",
+          "label": "electricity consumption",
+          "unit": "MW",
+          "package": 1.6248530112233648,
+          "rtol": 0.05
+        },
+        {
+          "expression": "units.get_electricity_production()",
+          "label": "electricity production",
+          "unit": "MW",
+          "package": 0.0,
+          "rtol": 0.05
+        }
+      ]
+    },
+    "checks": [
+      {
+        "expression": "tea.IRR",
+        "label": "internal rate of return",
+        "unit": "",
+        "measured": 0.0538147535,
+        "package": 0.05381572438333119,
+        "rtol": 0.05,
+        "relDiff": 0.000018040885676336036,
+        "within": true
+      },
+      {
+        "expression": "feedstock.price",
+        "label": "feedstock price",
+        "unit": "USD/kg",
+        "measured": 0.1322773573,
+        "package": 0.13227735731092652,
+        "rtol": 0.05,
+        "relDiff": 8.260302382172292e-11,
+        "within": true
+      },
+      {
+        "expression": "product.price",
+        "label": "product price",
+        "unit": "USD/kg",
+        "measured": 0.4854791535,
+        "package": 0.48547915353569393,
+        "rtol": 0.05,
+        "relDiff": 7.352313181214816e-11,
+        "within": true
+      },
+      {
+        "expression": "tea.sales",
+        "label": "sales",
+        "unit": "USD/yr",
+        "measured": 74992038.86,
+        "package": 74992038.8556337,
+        "rtol": 0.05,
+        "relDiff": 5.822342766201035e-11,
+        "within": true
+      },
+      {
+        "expression": "tea.material_cost",
+        "label": "material cost",
+        "unit": "USD/yr",
+        "measured": 52925382.43,
+        "package": 52925382.42511212,
+        "rtol": 0.05,
+        "relDiff": 9.23541535429076e-11,
+        "within": true
+      },
+      {
+        "expression": "tea.installed_equipment_cost",
+        "label": "installed equipment cost",
+        "unit": "USD",
+        "measured": 65388016.47,
+        "package": 65387501.9390586,
+        "rtol": 0.05,
+        "relDiff": 7.868949357883352e-6,
+        "within": true
+      },
+      {
+        "expression": "tea.utility_cost",
+        "label": "utility cost",
+        "unit": "USD/yr",
+        "measured": 10442068.46,
+        "package": 10442066.327145828,
+        "rtol": 0.05,
+        "relDiff": 2.0425594955427806e-7,
+        "within": true
+      },
+      {
+        "expression": "units.get_heating_duty()",
+        "label": "heating duty",
+        "unit": "GJ/hr",
+        "measured": 111.3588816,
+        "package": 111.3588815958425,
+        "rtol": 0.05,
+        "relDiff": 3.733424019881037e-11,
+        "within": true
+      },
+      {
+        "expression": "units.get_cooling_duty()",
+        "label": "cooling duty",
+        "unit": "GJ/hr",
+        "measured": 105.0873558,
+        "package": 105.08735576937576,
+        "rtol": 0.05,
+        "relDiff": 2.914169394371884e-10,
+        "within": true
+      },
+      {
+        "expression": "units.get_electricity_consumption()",
+        "label": "electricity consumption",
+        "unit": "MW",
+        "measured": 1.62485686,
+        "package": 1.6248530112233648,
+        "rtol": 0.05,
+        "relDiff": 2.368692188517289e-6,
+        "within": true
+      },
+      {
+        "expression": "units.get_electricity_production()",
+        "label": "electricity production",
+        "unit": "MW",
+        "measured": 0.0,
+        "package": 0.0,
+        "rtol": 0.05,
+        "relDiff": null,
+        "within": true
+      }
+    ]
+  },
+  "outputHash": "36d6385bcf89f71701e8b9b198cf141abd74a1308afa4a7bfc3851c51a2f7897",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T18:08:56Z",
+  "durationMs": 20941,
+  "seed": null
+}

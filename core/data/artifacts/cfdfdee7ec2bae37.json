@@ -1,0 +1,116 @@
+{
+  "id": "cfdfdee7ec2bae37",
+  "tool": "thermo_props",
+  "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+  "inputs": [
+    {
+      "name": "question",
+      "value": "beer-at-titre-of",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "water and ethanol at the record's titre: the record's value through units.py into kg m⁻³, and the ethanol mass fraction at which that much ethanol stands in a cubic metre of the mixture at the mixture's own density as the library computes it; the beer here is water and ethanol at the record's titre: its cells, residual sugar and dissolved CO2 are not in it",
+        "by": null
+      }
+    },
+    {
+      "name": "titre",
+      "value": 78.51,
+      "unit": "g L⁻¹",
+      "source": {
+        "kind": "record",
+        "id": "cl1-Q18-310f0b42",
+        "note": null,
+        "by": null
+      }
+    },
+    {
+      "name": "T",
+      "value": "thermosteam's Stream default",
+      "unit": "K",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "the library's own default for a Stream nobody set it on",
+        "by": null
+      }
+    },
+    {
+      "name": "P",
+      "value": "thermosteam's Stream default",
+      "unit": "Pa",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "the library's own default for a Stream nobody set it on",
+        "by": null
+      }
+    },
+    {
+      "name": "library",
+      "value": "thermosteam 0.54.2",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "thermosteam@0.54.2",
+        "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "kind": "beer-at-titre-of",
+    "subject": "water and ethanol at the titre of record cl1-Q18-310f0b42",
+    "runArtifactId": null,
+    "streamId": null,
+    "preset": "beer-at-titre-of",
+    "recordId": "cl1-Q18-310f0b42",
+    "library": "thermosteam 0.54.2",
+    "T": 298.15,
+    "P": 101325.0,
+    "phase": "l",
+    "TSource": "thermosteam's Stream default",
+    "PSource": "thermosteam's Stream default",
+    "massFractions": {
+      "Ethanol": 0.08045079821639316,
+      "Water": 0.9195492017836069
+    },
+    "density": 975.8759607185492,
+    "Cp": 4.04077934415069,
+    "viscosity": 0.0008965767803197186,
+    "bubblePoint": 365.5926968095696,
+    "dewPoint": 372.2577949036282,
+    "vapourAtBubble": {
+      "Ethanol": 0.2629287898019399,
+      "Water": 0.7370712101980601
+    },
+    "units": {
+      "density": "kg/m^3",
+      "Cp": "J/g/K",
+      "viscosity": "Pa*s",
+      "T": "K",
+      "P": "Pa",
+      "bubblePoint": "K",
+      "dewPoint": "K",
+      "massFractions": "kg/kg",
+      "vapourAtBubble": "mol/mol"
+    },
+    "solved": {
+      "kind": "titre",
+      "solute": "Ethanol",
+      "solvent": "Water",
+      "kgPerM3": 78.51,
+      "iterations": 8,
+      "how": "the mass fraction at which the solute per volume of the mixture, at the mixture's own density as thermosteam computes it, equals the titre (a fixed point)"
+    },
+    "notes": [
+      "the beer here is water and ethanol at the record's titre: its cells, residual sugar and dissolved CO2 are not in it"
+    ]
+  },
+  "outputHash": "b9375122ec64802a9da9d8c82730f988b6475c9162d8c69119deecf274dcaba9",
+  "provenance": "unverified",
+  "createdAt": "2026-10-20T18:10:09Z",
+  "durationMs": 9,
+  "seed": null
+}
