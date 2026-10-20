@@ -774,8 +774,9 @@ Mini, which serves `main` (D8).
   `proforma.py` keeps one warm `SimWorker`; `GET /api/proforma/status`
   answers cold, starting, ready or failed, and `OPENFERMENT_WARM_PROFORMA=1`
   starts it with the service. `pnpm test:sim` (marker `sim`) runs the real
-  worker in verify; `pnpm test:slow` (marker `slow`) holds the benchmark and
-  the PHA flowsheet, outside verify.
+  worker in verify; `pnpm test:slow` (marker `slow`) holds the benchmark, the
+  corn plant to its package's test, and the PHA and glucose-to-ethanol
+  flowsheets, outside verify.
 - **The benchmark comes first.** `biorefineries.cornstover` with its own
   defaults must give 1.968 USD per gallon within 0.5 % (B.3); it is an
   artifact sourced `model`. `GET /api/proforma/benchmark` reads, POST runs.
@@ -785,9 +786,10 @@ Mini, which serves `main` (D8).
   price would otherwise depend on run order. An infeasible case names its
   reason: carbon, oxygen (BioSTEAM's own "infinite flow rate of gas"), or
   the fermenter's balance.
-- **Every input names its source.** `proforma.bind` takes thread P records
-  of a sugar or hydrolysate feed through the aggregate gate and `units.py`,
-  or a named person's assumption (kept in the Durable tier, merged by input
+- **Every input names its source.** `proforma.bind` binds the PHA draft to
+  thread P records of a sugar or hydrolysate feed through the aggregate gate
+  and `units.py` (every other flowsheet binds by its shelf entry, below), or
+  to a named person's assumption (kept in the Durable tier, merged by input
   key); an input with neither refuses the run with a 422. A run is one
   artifact, `demo` while any assumption remains. Spearman uses averaged ranks
   and skips an input with no spread. `selling_price` is the sixth tool and
@@ -808,6 +810,106 @@ Mini, which serves `main` (D8).
   whole table in `ToolResult.data`, which no model reads. Both return the run
   as one `Evidence` whose id is the artifact's, so a claim cites the run as it
   cites a ceiling, and `proforma_read` lists reference runs too.
+
+## The shelf (OF-BLD-019 Phase 2)
+
+- **The shelf is data, served without BioSTEAM.** `flowsheets/shelf.py` (a
+  subprocess test holds it free of BioSTEAM) declares a `FlowsheetInfo` for
+  each of four: `cornstover_benchmark` (a reference, no program),
+  `corn_drygrind` (a reference, yeast), `ethanol_glucose_v0` (yeast) and
+  `pha_sugar_v0` (pha). `toy` sits in `TEST_ONLY`, is never served, and
+  `shelf.info` refuses it without `allow_toy`; `flowsheets.KNOWN` is the
+  shelf's ids and the toy's. `GET /api/proforma/shelf?includeArchived=`
+  serves it, an archived program's entry left out unless asked. The shelf's
+  models and the table models are in `types.ts` and `PAIRS`. A seed scenario
+  names its flowsheet by `modelId`, and `check:seed` holds it to
+  `BIOSTEAM_FLOWSHEETS`.
+- **One artifact per run (D1), read through `tables_of`.** A scenario's run is
+  one `proforma.run` artifact (D1 calls it `proforma_run`; the tree kept the
+  tool's name), versioned `RUN_VERSION` with the biosteam and biorefineries
+  versions: quantiles, histogram, Spearman, grid, and the base case's `tea`,
+  `streams`, `units`, `utilities`, `diagram`, `diagramNote`, `unitOrder` and
+  `tableUnits`, which the worker's `run` op reads from BioSTEAM's objects
+  with the product at its solved price. The TEA lines sum to the price;
+  capital recovery is `TEA.sales − TEA.AOC` at that price, because the TEA
+  keeps no annualised figure. `proforma.tables_of(art)` is the one reader;
+  nothing recomputes on read. `ProformaRunRequest.samples` defaults to
+  `proforma.SAMPLES` and is refused past `MAX_SAMPLES` (D7).
+- **A reference biorefinery runs whole** (`proforma.reference`,
+  `REFERENCE_VERSION`): the worker's `reference` op builds the package's plant
+  afresh, reads every table and the quantities its package's test asserts,
+  and rounds every number to `REFERENCE_DIGITS` significant digits (the
+  basis's `precision` convention: BioSTEAM sums a set of units in an order
+  that moves the last digits). `GET /api/proforma/reference/{id}` reads and
+  starts nothing, `POST` runs; 404 for an id that is not a reference on the
+  shelf, 503 on a worker error. The worker, `runnable` and `run_flowsheet`
+  refuse a reference case by case. The benchmark's endpoints and artifact are
+  unchanged. A reference run's inputs are `model` and `convention` sources, so
+  its provenance is `computed` (D3's `model` is a basis source kind here).
+- **The package's own test is the authority.** `shelf.package_regression(id)`
+  parses the installed `biorefineries/tests/test_biorefineries.py` with `ast`,
+  found through the distribution's metadata and never imported; no package
+  number is typed in Python or TypeScript outside the parser's own test.
+  `regression_checks` holds each value as `numpy.allclose` does (`ALLCLOSE_ATOL`
+  plus the test's rtol). `test:slow` holds `corn_drygrind` to all of
+  `test_corn`; `test_cornstover` misses two of its values on these versions
+  (installed equipment cost, electricity consumption), the run's checks say
+  so, and the slow test pins it.
+- **One compatibility line, stated in every basis.** `corn_drygrind._compat`
+  sets `SimultaneousSaccharificationFermentation._ins_size_is_fixed = False`:
+  the package's unit hands `bst.BatchBioreactor` two inlets and biosteam
+  2.54.0 declares one, so `corn.load()` stops without it. No number of the
+  package's changes; `shelf.REFERENCE_COMPAT` puts it in every corn run's
+  basis as the `compatibility` convention.
+- **The warm worker keeps no plant's settings** (§2.R). `package_defaults()`
+  gives every loaded `biorefineries` `chemical_cache` function an empty cache
+  (the packages share Chemical objects by name), runs
+  `bst.process_tools.default()` (tickets cleared too), and on exit puts back
+  what the worker held: CEPCI, the power price and factors, the heat agents,
+  the tickets, thermosteam's chemical cache, the main flowsheet, the thermo
+  and each package's chemicals. Every plant builds inside it: a reference
+  run, the benchmark (afresh, `cs.Biorefinery(load=False, save=False)`), and
+  a scenario flowsheet's first build (`built`). A scenario flowsheet sets
+  `default_utilities()` and `default_CEPCI()` at the start of every case and
+  reads them back (`flowsheets.utility_settings`); every priced run's basis
+  carries `utility prices and cost index` (`model`, BioSTEAM's version).
+  `test_the_warm_worker_keeps_no_plants_settings` (sim) holds three orders
+  in three workers to 1e-9.
+- **The diagram is a basis input** (D8). `diagram` (`convention`) says "drawn
+  by Graphviz" when `dot` is on the path of the host that made the run
+  (`proforma.drawn_here()`), else not drawn; the worker draws as the basis
+  says, so a host with Graphviz keeps a run of its own. `NO_GRAPHVIZ` and
+  `DOT_MISSING` speak of the host that made the run. `ready.py`'s `graphviz`
+  row warns at most. `demo.rebuild_prototype` pins `drawn_here` to False, so
+  the fixtures are the same on every host.
+- **The run contract** (§2.3). `GET /api/proforma/scenarios` binds each seed
+  BioSTEAM scenario the switch shows (`seed_scenarios`, read from
+  `modules.json`) over its own program's records whatever the switch says;
+  `GET /api/proforma/bind?flowsheet=` binds a shelf flowsheet as a scenario
+  made in the browser shows it, id and name empty; `POST /api/proforma/run`
+  takes `scenarioId` and, for a scenario made in the browser, `flowsheet` (a
+  seed scenario runs its own, and naming another is refused), with
+  `assumptions`, `fits` (§5.1), `samples`, `seed` and `host`. Every refusal is
+  a 422 in words: a reference, the toy, an unknown id, an authored seed
+  scenario, an archived program's flowsheet on `bind` with the switch off, a
+  non-finite assumption, a negative seed, an input that waits, and a run
+  with no feasible sample (each reason counted, the kept artifact named).
+  Every run's basis carries `scenario`, a `convention`, which
+  `basis_provenance` ignores; `latest_run` keeps to its scenario.
+- **Glucose to ethanol holds no number** (`ethanol_glucose_v0.py`; an AST
+  test allows 0 and 1). `bind_inputs` binds every flowsheet but the PHA draft
+  by its shelf entry: the input's fields in order, on its program's papers,
+  through the aggregate gate, a carbon source in `FEED_CARBON` (glucose; a
+  record naming none is counted out), `units.py` into the input's unit; else
+  a named person's assumption; else it waits. The feed binds
+  `medium_component_conc` (there is no `glucose_initial_conc` field), titre,
+  yield and productivity their `ethanol_*` fields, plant scale and glucose
+  price are assumptions, and `ethanol_purity` is a convention in every basis,
+  never a scenario input. The theoretical yield (`Glucose -> 2 Ethanol + 2
+  CO2` at thermosteam's molecular weights), the vessel limit
+  (`AnaerobicBioreactor.V_max_default`), the TEA settings and the purity are
+  read back, never typed. Each case empties the train's recycle first; a
+  replay is held to the last digits (1e-9), not bitwise.
 
 ## pureOS reads the train, thermosteam answers (OF-BLD-019 Phase 4)
 

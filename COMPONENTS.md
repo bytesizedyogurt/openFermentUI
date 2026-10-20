@@ -107,6 +107,19 @@ is already loaded. The service names a run's stream or a preset, never a
 number, and keeps the answer as a `thermo_props` artifact; fermOS asks the same
 worker about water and ethanol at a measured titre.
 
+One more carries records into a flowsheet, and it is built too (OF-BLD-019
+Phase 2).
+
+**BioRepo → Proforma is the binding.** A scenario's flowsheet holds no input
+value of its own: for each input records can set, Proforma's shelf names the
+ontology fields that bind it, and the service binds it to the records of those
+fields on its program's papers that pass the aggregate gate and name a feed the flowsheet
+takes as their carbon source, converted by `units.py`. Glucose to ethanol binds
+its feed concentration, titre and yield to thread Q's records today; its
+productivity waits, because no thread Q productivity record names a carbon
+source. What no record binds waits for a named person's assumption, and the
+run's basis names every record and assumption it used.
+
 **fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
 real runs in a specific vessel, so they come from Deposition. fermOS is the
 component that most needs the Assay loop and the one that cannot be built out of
@@ -215,6 +228,8 @@ Views: [Train](#) `/pureos/train`
 Techno-economics over authored response surfaces. Prices a process; does not choose one.
 
 Views: [Corn ethanol reference](#) `/proforma/reference/corn_drygrind` · [Corn stover benchmark](#) `/proforma/reference/cornstover_benchmark`
+
+**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers, any other waits for a named person's assumption, and a run is `demo` while an assumption remains.
 
 **A reference biorefinery has a page** (OF-BLD-019 §3.3): `/proforma/reference/:id` (`src/screens/ProformaReference.tsx`) shows a published biorefinery from the `biorefineries` package run whole on its own defaults, its price as the shelf names it, and each value of the package's own regression test beside what the run measured, read from the run's `proforma.reference` artifact, then the same tables a scenario page shows. BioRepo → Compare (`/biorepo/compare`) sets two or more pinned BioSTEAM scenarios side by side from each one's newest run.
 
