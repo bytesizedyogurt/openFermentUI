@@ -4,7 +4,15 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-016)
+## The active build (OF-BLD-019)
+
+OF-BLD-019 (Proforma stands on BioSTEAM) runs on `claude/of-bld-019-proforma`, cut from
+`main` at `a261f30`. Its document is `docs/build/OF-BLD-019.md` (prompt
+`docs/build/PROMPT-019.md`); its commits are `OF-BLD-019 §n.m: <what>`; it follows
+OF-BLD-014 Part A with OF-BLD-016's amendments below, a nine-hour clock and a 2.00 USD cap.
+"Next phase" on this branch means the first `OF-BLD-019 §` step missing from its log.
+
+## The previous build (OF-BLD-016)
 
 OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
 tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`, with
