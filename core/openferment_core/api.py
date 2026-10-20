@@ -900,7 +900,10 @@ def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N8
     """Every value this service computed and kept, newest first. A value
     computed from an archived program's records, models, products or strains
     is left out unless `?includeArchived=true` asks for it (OF-BLD-016 §2.R),
-    as the evidence pool leaves it out of Postdoc."""
+    as the evidence pool leaves it out of Postdoc; a Proforma run by its
+    scenario and flowsheet too, as every reader decides it (OF-BLD-019 §6.R)."""
+    from . import module_stores
+
     kept = artifacts.all_artifacts()
     if includeArchived:
         return kept
@@ -908,7 +911,7 @@ def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N8
         lookup = load_corpus().record
     except FileNotFoundError:
         lookup = None
-    return [a for a in kept if not programs.hides(programs.program_of_artifact(a, lookup))]
+    return [a for a in kept if not programs.hides(module_stores.artifact_program(a, lookup))]
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)

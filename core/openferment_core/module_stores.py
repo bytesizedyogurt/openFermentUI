@@ -259,6 +259,47 @@ ARTIFACT_MODULE = {
 }
 
 
+# A Proforma run: a scenario's (`proforma.run`) or a reference biorefinery's
+# (`proforma.reference`). Its program is decided by one rule (OF-BLD-019 §6.R).
+RUN_TOOLS = ("proforma.run", "proforma.reference")
+
+
+def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict[str, Any]] | None = None) -> str | None:
+    """The program a kept artifact belongs to, one rule for every reader
+    (OF-BLD-019 §6.R): proforma_read and biorepo_read here, the artifacts
+    endpoint behind BioRepo → Artifacts, pureOS's trains, stream_table and
+    thermo_props. A Proforma run's is `pureos.program_of`'s: its scenario's,
+    its flowsheet's on the shelf and what its basis names, an archived one
+    winning, so a PHA run that bound no record is PHA's everywhere. Any other
+    artifact's is `programs.program_of_artifact`'s, from what its inputs name.
+    `scenarios` are the seed's (modules.json) when not given."""
+    from . import pureos
+
+    tool = getattr(a, "tool", None)
+    if tool not in RUN_TOOLS:
+        return programs.program_of_artifact(a, record_lookup)
+    scenarios = list(pureos.seed_scenarios() if scenarios is None else scenarios)
+    scenario_id = pureos.scenario_of(a, scenarios)[0] if tool == pureos.RUN else None
+    return pureos.program_of(a, scenario_id, scenarios, record_lookup)
+
+
+def hidden_run_refusal(tool: str, a: Any, include_archived: bool = False) -> str | None:
+    """A read by id of a Proforma run of an archived program, refused in words
+    with the switch off, as a read tool's hidden rows are named (OF-BLD-016
+    §2.R): the program and the switch. None when the read may go on, or when
+    nothing is known to be archived here (no projection)."""
+    if include_archived or getattr(a, "tool", None) not in RUN_TOOLS:
+        return None
+    try:
+        program = artifact_program(a)
+        if not programs.hides(program, include_archived):
+            return None
+    except FileNotFoundError:
+        return None
+    p = programs.program_by_id(program)
+    return f"{tool} refused: run {a.id} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}"
+
+
 HEADLINE_VALUES = 8
 
 
@@ -347,10 +388,16 @@ class Stores:
         return pool.record(record_id) or pool.corpus.record(record_id)
 
     def _artifact_program(self, a: Any) -> str | None:
+        """`artifact_program`, the one rule (OF-BLD-019 §6.R), over this
+        store's own projection of the seed's scenarios."""
         try:
-            return programs.program_of_artifact(a, self._record_lookup)
+            scenarios = self._get("projection")["proforma"]["scenarios"]
+        except Exception:  # no projection here: a run's own basis names its scenario
+            scenarios = []
+        try:
+            return artifact_program(a, self._record_lookup, scenarios)
         except Exception:  # a pool that cannot load leaves the id to speak
-            return programs.program_of_artifact(a)
+            return artifact_program(a, None, scenarios)
 
     def error(self, module: str) -> str | None:
         self.rows(module)

@@ -246,8 +246,9 @@ def test_selling_price_refuses_with_no_run_and_names_what_waits(monkeypatch, tmp
     # test_programs holds the refusal with it off (OF-BLD-016 §2.R).
     ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[], records_by_id={}), include_archived=True)
     r = tools.run("selling_price", {"scenarioId": "sc-pha-1"}, ctx)
-    assert r.error and "no run of sc-pha-1 exists" in r.error and "price of fermentable sugar" in r.error
-    assert "no BioSTEAM scenario" in tools.run("selling_price", {"scenarioId": "sc-s1"}, ctx).error
+    assert r.error and "no run of sc-pha-1 is on file" in r.error and "price of fermentable sugar" in r.error
+    # An authored cost surface is no BioSTEAM scenario, and no run of it is kept (§6.R).
+    assert "authored cost surface, not a BioSTEAM scenario" in tools.run("selling_price", {"scenarioId": "sc-s1"}, ctx).error
 
 
 def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_path):
@@ -268,6 +269,89 @@ def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_p
     assert r.error is None and r.evidence[0].id == run.artifactId and r.evidence[0].figure == "distribution"
     assert r.summary["provenance"] == "demo" and r.summary["assumedInputs"] == ["recovery", "sugarFeed", "sugarPrice"]
     assert r.evidence[0].interval.low <= r.evidence[0].value <= r.evidence[0].interval.high
+    assert r.summary["leavesOut"] == proforma.LEAVES_OUT and r.summary["flowsheet"] == "pha_sugar_v0"
+
+
+def _yeast_pool(drop=()):
+    """demo.py's STAND-IN yeast records (thread Q paper ids), less the fields
+    a test drops."""
+    from types import SimpleNamespace
+
+    from openferment_core import demo
+
+    rs = [r for r in demo._standin_yeast_records() if r["field"] not in drop]
+    return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+
+
+def _yeast_assumed():
+    from openferment_core.models import InputAssumption
+
+    return [InputAssumption(key="plant_scale", value=100000.0, low=100000.0, high=100000.0, by="Sean Creighton",
+                            at="2026-10-20", note=STAND_IN),
+            InputAssumption(key="glucose_price", value=0.4, low=0.3, high=0.5, by="Sean Creighton", at="2026-10-20",
+                            note=STAND_IN)]
+
+
+def test_selling_price_cites_the_newest_run_of_the_yeast_scenario_with_the_switch_off(proforma_store, monkeypatch):
+    """OF-BLD-019 §6.R (review findings 2 and 15): sc-yeast-1 is the active
+    program's seed scenario; selling_price read sc-pha-1 alone and called it
+    a scenario that does not exist."""
+    from openferment_core import proforma
+    from openferment_core.flowsheets import shelf
+    from openferment_core.models import ProformaRunRequest
+
+    pool = _yeast_pool()
+    stamps = iter(["2026-10-20T10:00:00Z", "2026-10-20T11:00:00Z"])
+    monkeypatch.setattr(artifacts, "_now", lambda: next(stamps))
+    older = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=_yeast_assumed(), samples=8), pool=pool)
+    newer = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=_yeast_assumed(), samples=12), pool=pool)
+    assert older.artifactId != newer.artifactId
+    monkeypatch.setattr(proforma, "call", lambda op, args: pytest.fail("selling_price ran something"))
+    r = tools.run("selling_price", {"scenarioId": "sc-yeast-1"}, _pcx(pool, archived=False))
+    assert r.error is None, r.error
+    (ev,) = r.evidence
+    assert ev.id == newer.artifactId == r.summary["evidenceId"] and ev.figure == "distribution"
+    assert ev.unit == shelf.ETHANOL_PRICE_BASIS and ev.provenance == "demo" == r.summary["provenance"]
+    assert r.summary["scenarioId"] == "sc-yeast-1" and r.summary["flowsheet"] == "ethanol_glucose_v0"
+    assert r.summary["leavesOut"] == shelf.ETHANOL_LEAVES_OUT
+    assert r.summary["assumedInputs"] == ["glucose_price", "plant_scale"]
+    assert "PHA" not in json.dumps(r.summary, ensure_ascii=False)
+    # The schema offers the active program's scenario, and no archived one.
+    described = json.dumps(tools.REGISTRY["selling_price"].input_model.model_json_schema())
+    assert "sc-yeast-1" in described and "sc-pha-1" not in described
+
+
+def test_selling_price_with_no_run_of_the_yeast_scenario_names_what_waits_and_how_a_run_is_made(proforma_store):
+    from openferment_core import audit
+
+    r = tools.run("selling_price", {"scenarioId": "sc-yeast-1"}, _pcx(_yeast_pool(drop=("ethanol_productivity",)),
+                                                                     archived=False))
+    assert r.error and "no BioSTEAM scenario" not in r.error and "no run of sc-yeast-1 is on file" in r.error
+    assert "productivity" in r.error and "plant_scale" in r.error and "glucose_price" in r.error
+    assert "feed_glucose_conc" not in r.error and "titre " not in r.error  # bound to records, they wait for nothing
+    assert "Proforma" in r.error and "named person's assumption" in r.error and "runs nothing" in r.error
+    assert r.evidence == [] and artifacts.all_artifacts() == [] and audit.read() == []
+    # Every process input bound, and still no run on file: said so.
+    every = tools.run("selling_price", {"scenarioId": "sc-yeast-1"}, _pcx(_yeast_pool(), archived=False))
+    assert "plant_scale" in every.error and "productivity" not in every.error
+
+
+def test_selling_price_refuses_what_is_no_seed_biosteam_scenario_in_words(proforma_store, monkeypatch):
+    from openferment_core import proforma
+
+    seed = [{"id": "sc-yeast-1", "kind": "biosteam", "modelId": "ethanol_glucose_v0", "program": "yeast"},
+            {"id": "sc-x9", "kind": "biosteam", "modelId": "ethanol_glucose_v0", "program": None, "example": True}]
+    monkeypatch.setattr(proforma, "seed_scenarios", lambda: seed)
+    c = _pcx(_yeast_pool(), archived=False)
+    made_here = tools.run("selling_price", {"scenarioId": "sc-mg2k1-1"}, c).error
+    assert "is not a scenario this service holds" in made_here and "sc-yeast-1" in made_here
+    assert "name the scenario" in tools.run("selling_price", {"scenarioId": " "}, c).error
+    # A reference biorefinery's run is read where it is kept, and the words say where.
+    corn = tools.run("selling_price", {"scenarioId": "corn_drygrind"}, c).error
+    assert "is a reference biorefinery, not a scenario" in corn and "stream_table" in corn
+    # An example hides with the archive, as Proforma's list hides it; with the switch on it is read.
+    assert "an example, hidden" in tools.run("selling_price", {"scenarioId": "sc-x9"}, c).error
+    assert "no run of sc-x9 is on file" in tools.run("selling_price", {"scenarioId": "sc-x9"}, _pcx(_yeast_pool())).error
 
 
 def test_selling_price_cites_the_stored_benchmark_and_runs_nothing(monkeypatch, tmp_path):
@@ -523,3 +607,49 @@ def test_stream_table_refuses_an_archived_run_with_the_switch_off(proforma_store
     off = tools.run("stream_table", {"artifactId": aid}, _pcx(proforma_store, archived=False))
     assert off.error and "PHA, archived (hidden)" in off.error and "Settings → Programs" in off.error
     assert off.evidence == [] and off.data is None
+
+
+def _pha_run_on_assumptions_alone(scenario_id):
+    """A PHA run whose basis names no record: every input a named person's
+    STAND-IN assumption, as on a machine with no thread P candidates."""
+    from openferment_core import proforma
+    from openferment_core.models import InputAssumption
+
+    kept = [InputAssumption(key=k, value=v, low=v, high=v, by="Sean Creighton", at="2026-10-15", note=STAND_IN)
+            for k, v in (("titre", 30.0), ("yield", 0.3), ("content", 0.6), ("productivity", 0.5),
+                         ("recovery", 0.95), ("sugarPrice", 0.4), ("sugarFeed", 1000.0))]
+    return proforma.run_flowsheet("pha_sugar_v0", kept, samples=8, scenario_id=scenario_id)
+
+
+@pytest.mark.parametrize("scenario_id", ["sc-pha-1", None])
+def test_an_archived_run_that_names_no_record_is_hidden_from_every_reader_with_the_switch_off(proforma_store,
+                                                                                               scenario_id):
+    """OF-BLD-019 §6.R (review finding 16): a run's program is its scenario's,
+    its flowsheet's on the shelf and what its basis names, an archived one
+    winning (`pureos.program_of`), for every reader alike. proforma_read and
+    biorepo_read read the basis alone, found no program in a run that bound
+    no record, and listed the PHA run stream_table refused."""
+    from openferment_core import api, module_stores
+
+    art = _pha_run_on_assumptions_alone(scenario_id)
+    assert not [i for i in art.inputs if i.source.kind == "record"]
+    off, on = _pcx(proforma_store, archived=False), _pcx(proforma_store, archived=True)
+    listing = {"ids": [], "words": "", "kind": "artifact", "state": "", "limit": 20}
+    for module in ("proforma", "biorepo"):
+        ref = f"{module}/artifact/{art.id}"
+        hidden = tools.run(f"{module}_read", listing, off)
+        assert hidden.error is None and ref not in [r.ref for r in hidden.rows], module
+        by_id = tools.run(f"{module}_read", {**listing, "ids": [art.id]}, off)
+        assert by_id.rows == [] and "archived programs (PHA)" in by_id.summary["hidden"], module
+        assert ref in [r.ref for r in tools.run(f"{module}_read", listing, on).rows], module
+    assert art.id in [r.id for r in off.stores.hidden("proforma")]
+    assert module_stores.artifact_program(art) == "pha"
+    # pureOS's train rows, stream_table and thermo_props say the same of it.
+    train = tools.run("pureos_read", {**listing, "kind": "train", "ids": [art.id]}, off)
+    assert train.rows == [] and "PHA" in train.summary["hidden"]
+    assert "PHA, archived (hidden)" in tools.run("stream_table", {"artifactId": art.id}, off).error
+    props = {"artifactId": art.id, "streamId": "sugar", "preset": "", "recordId": ""}
+    assert "PHA, archived (hidden)" in tools.run("thermo_props", props, off).error
+    # BioRepo → Artifacts asks the endpoint with the switch, and the endpoint agrees.
+    assert art.id not in [a.id for a in api.artifacts_list()]
+    assert art.id in [a.id for a in api.artifacts_list(includeArchived=True)]

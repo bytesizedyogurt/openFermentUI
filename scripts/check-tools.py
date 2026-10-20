@@ -11,10 +11,18 @@ Fails when:
    `from .. import guild as g` is the module it is; a store's exception or
    constant may be named, a store module handed around bare or a dynamic
    import may not;
-2b. a tool file other than `tools/writes.py` reaches `proforma.run` or
-   `audit.append` itself (OF-BLD-019 §6.1): `run_flowsheet` is a free,
-   audited write, and runs through `writes.run_scenario`, so rule 2 reads its
-   one call to `proforma.run`;
+2b. a tool file other than `tools/writes.py` reaches what keeps a Proforma
+   run or writes an audit line itself (OF-BLD-019 §6.1, §6.R): `run_flowsheet`
+   is a free, audited write, and runs through `writes.run_scenario`, so rule 2
+   reads its one call to `proforma.run`. What keeps a run is found, not
+   listed: every function of the service that calls `artifacts.compute` for a
+   `proforma.run`, `proforma.reference` or `proforma_benchmark` artifact (or
+   for a tool it cannot name) or `audit.append`, and every function that
+   reaches one of those, to a fixed point, each name followed through its
+   import as rule 2 follows it. A tool file may reach none of them but
+   through writes.py, may not call `artifacts.compute` for a run, and, as in
+   rule 2, may not hand a store module around bare or import by name at run
+   time;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -39,7 +47,14 @@ guild as g; g.write_evidence(d)`, a plain `from ..guild import
 write_evidence`, `import openferment_core.checks as c`, a store module handed
 to `getattr`, and `importlib`, each planted in the copy's writes.py, each
 passed the text rule and each was named by this one; an exception and a
-constant of a store passed, as did writes.py restored.
+constant of a store passed, as did writes.py restored. Rule 2b caught two
+names until the review of OF-BLD-019 §6.R found that
+`proforma.run_flowsheet(...)`, `artifacts.compute(proforma.RUN, …)` and
+`getattr(proforma, "run")` each kept a run past it; `test_check_tools` plants
+those and four more (an aliased `compute` with the tool spelled out,
+`importlib`, an aliased `audit.append`, and a function outside tools/ that
+calls `proforma.run`) in a copy's tools/, and holds that each is named and
+nothing else is.
 """
 from __future__ import annotations
 
@@ -240,20 +255,244 @@ for fn in ALLOWED_WRITES:
     if fn not in reached:
         fail(f"tools/writes.py no longer calls {fn}(): the action it served has lost its write function, or the table is stale")
 
-# 2b. an audited write outside writes.py goes through it (OF-BLD-019 §6.1)
-THROUGH_WRITES = ("proforma.run", "audit.append")
-for other in sorted(Path(writes.__file__).parent.glob("*.py")):
-    if other.name == "writes.py":
+# 2b. what keeps a Proforma run or writes an audit line, a tool file reaches
+#     only through writes.py (OF-BLD-019 §6.1, §6.R). The writers are found,
+#     not listed: every function of the service that calls `artifacts.compute`
+#     for a Proforma run (or for a tool it cannot name) or `audit.append`,
+#     then every function that reaches one of those, to a fixed point, each
+#     name followed through its import as rule 2 follows it. writes.py is the
+#     way through and passes nothing on. The worker side (workers/,
+#     flowsheets/) runs in the worker's own process and holds no store.
+from openferment_core import proforma as _proforma_mod  # noqa: E402
+
+PACKAGE_DIR = Path(writes.__file__).resolve().parent.parent
+TOOLS_DIR = Path(writes.__file__).resolve().parent
+WORKER_SIDE = ("workers", "flowsheets")
+RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod.BENCHMARK})
+COMPUTE = "openferment_core.artifacts.compute"
+APPEND = "openferment_core.audit.append"
+WRITES = f"{writes.__name__}."
+_UNKNOWN = object()
+
+
+def _module_name(path: Path) -> str:
+    parts = list(path.relative_to(PACKAGE_DIR.parent).with_suffix("").parts)
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def _locals(node: ast.AST) -> set[str]:
+    """The names a function, lambda, class or comprehension binds itself: a
+    root among them is never the module's global of that name."""
+    if not isinstance(node, _SCOPES):
+        return set()
+    names: set[str] = set()
+    declared: set[str] = set()
+    for n in _own(node):
+        if isinstance(n, ast.Name) and not isinstance(n.ctx, ast.Load):
+            names.add(n.id)
+        elif isinstance(n, ast.arg):
+            names.add(n.arg)
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(n.name)
+        elif isinstance(n, ast.ExceptHandler) and n.name:
+            names.add(n.name)
+        elif isinstance(n, (ast.Global, ast.Nonlocal)):
+            declared.update(n.names)
+    return names - declared
+
+
+def _refs(node: ast.AST, imports: dict[str, set[str]], local: set[str], package: str, out: list) -> None:
+    """`_chains`, with each chain's head node and whether its root is a name
+    its scope binds itself: (node, root, attrs, line, targets, local)."""
+    inner: set[int] = set()
+    for n in _own(node):
+        if isinstance(n, _SCOPES):
+            _refs(n, _scope(n, imports, package), local | _locals(n), package, out)
+        elif id(n) in inner:
+            continue
+        elif isinstance(n, ast.Attribute):
+            attrs, cur = [], n
+            while isinstance(cur, ast.Attribute):
+                inner.add(id(cur))
+                attrs.append(cur.attr)
+                cur = cur.value
+            if isinstance(cur, ast.Name):
+                inner.add(id(cur))
+                out.append((n, cur.id, attrs[::-1], n.lineno, imports.get(cur.id, set()), cur.id in local))
+        elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+            out.append((n, n.id, [], n.lineno, imports.get(n.id, set()), n.id in local))
+
+
+def _follow(path: tuple[str, ...]) -> object:
+    """What a dotted path inside the service names, through its imports; a
+    path outside openferment_core is not followed."""
+    if path[0] != "openferment_core":
+        return _UNKNOWN
+    obj, rest = None, []
+    for i in range(len(path), 0, -1):
+        try:
+            obj, rest = importlib.import_module(".".join(path[:i])), list(path[i:])
+            break
+        except Exception:
+            continue
+    if obj is None:
+        return _UNKNOWN
+    for attr in rest:
+        if not hasattr(obj, attr):
+            return _UNKNOWN
+        obj = getattr(obj, attr)
+    return obj
+
+
+def _key(obj: object) -> str | None:
+    """A function of the service by its module and qualified name."""
+    import inspect
+
+    obj = getattr(obj, "__func__", obj)
+    try:
+        obj = inspect.unwrap(obj)
+    except Exception:
+        return None
+    if not inspect.isfunction(obj) or not str(obj.__module__).startswith("openferment_core"):
+        return None
+    return f"{obj.__module__}.{obj.__qualname__}"
+
+
+class _Module:
+    """One file of the service: its syntax tree, its module-level imports, and
+    the functions, classes and literal constants it defines."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.name = _module_name(path)
+        self.package = self.name if path.name == "__init__.py" else self.name.rpartition(".")[0]
+        self.tree = ast.parse(path.read_text(encoding="utf-8"))
+        self.imports = _scope(self.tree, {}, self.package)
+        self.defs: set[str] = set()
+        self.classes: set[str] = set()
+        self.consts: dict[str, object] = {}
+        for n in self.tree.body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.defs.add(n.name)
+            elif isinstance(n, ast.ClassDef):
+                self.classes.add(n.name)
+            elif isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None:
+                try:
+                    value = ast.literal_eval(n.value)
+                except Exception:
+                    continue
+                for t in n.targets if isinstance(n, ast.Assign) else [n.target]:
+                    if isinstance(t, ast.Name):
+                        self.consts[t.id] = value
+                    elif isinstance(t, ast.Tuple) and isinstance(value, tuple) and len(value) == len(t.elts):
+                        # `CEILING, FRONTIER, MIX = "geneos.ceiling", …`
+                        self.consts.update({e.id: v for e, v in zip(t.elts, value) if isinstance(e, ast.Name)})
+
+    def functions(self) -> Iterable[tuple[str, ast.AST]]:
+        for n in self.tree.body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield f"{self.name}.{n.name}", n
+            elif isinstance(n, ast.ClassDef):
+                for m in n.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        yield f"{self.name}.{n.name}.{m.name}", m
+
+    def resolve(self, root: str, attrs: list[str], targets: set[str], local: bool) -> tuple[str | None, object]:
+        """(the function's key, or None; the object or constant named, or
+        _UNKNOWN) for one chain read in this file."""
+        if targets:
+            for t in sorted(targets):
+                obj = _follow(tuple(t.split(".") + attrs))
+                if obj is not _UNKNOWN:
+                    return _key(obj), obj
+            return None, _UNKNOWN
+        if local:
+            return None, _UNKNOWN
+        if root in self.defs and not attrs:
+            return f"{self.name}.{root}", _UNKNOWN
+        if root in self.classes and len(attrs) == 1:
+            return f"{self.name}.{root}.{attrs[0]}", _UNKNOWN
+        if root in self.consts and not attrs:
+            return None, self.consts[root]
+        return None, _UNKNOWN
+
+    def refs(self, node: ast.AST | None = None) -> list:
+        out: list = []
+        if node is None:
+            _refs(self.tree, self.imports, set(), self.package, out)
+        else:
+            _refs(node, _scope(node, self.imports, self.package), _locals(node), self.package, out)
+        return out
+
+    def run_computes(self, node: ast.AST, refs: list) -> list[tuple[int, str]]:
+        """Each call of `artifacts.compute` under `node` that keeps a Proforma
+        run, or a tool this cannot name: (line, what it keeps)."""
+        heads = {id(r[0]): r for r in refs}
+        found = []
+        for call in ast.walk(node):
+            if not isinstance(call, ast.Call) or id(call.func) not in heads:
+                continue
+            _, root, attrs, line, targets, local = heads[id(call.func)]
+            if self.resolve(root, attrs, targets, local)[0] != COMPUTE:
+                continue
+            arg = call.args[0] if call.args else next((k.value for k in call.keywords if k.arg == "tool"), None)
+            if isinstance(arg, ast.Constant):
+                tool = arg.value
+            elif arg is not None and id(arg) in heads:
+                _, r, a, _, t, lc = heads[id(arg)]
+                tool = self.resolve(r, a, t, lc)[1]
+            else:
+                tool = _UNKNOWN
+            if tool is _UNKNOWN or tool in RUN_KINDS:
+                found.append((line, "a tool it cannot name" if tool is _UNKNOWN else f"a {tool} artifact"))
+        return found
+
+
+service = [_Module(p) for p in sorted(PACKAGE_DIR.rglob("*.py"))
+           if p.relative_to(PACKAGE_DIR).parts[0] not in WORKER_SIDE]
+# What each function reaches, and the ones that keep a run or append to the audit log themselves.
+edges: dict[str, set[str]] = {}
+WRITERS: set[str] = {APPEND}
+for mod in service:
+    for key, fn in mod.functions():
+        fn_refs = mod.refs(fn)
+        reached = {k for _, r, a, _, t, lc in fn_refs for k in [mod.resolve(r, a, t, lc)[0]] if k}
+        edges[key] = {k for k in reached if not k.startswith(WRITES)}
+        if APPEND in reached or mod.run_computes(fn, fn_refs):
+            WRITERS.add(key)
+grew = True
+while grew:
+    grew = False
+    for key, reached in edges.items():
+        if key not in WRITERS and reached & WRITERS:
+            WRITERS.add(key)
+            grew = True
+if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND} <= WRITERS:
+    fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet and audit.append among the writers: it has "
+         "stopped reading the service")
+
+for mod in service:
+    if mod.path.parent != TOOLS_DIR or mod.path.name == "writes.py":
         continue
-    other_tree = ast.parse(other.read_text(encoding="utf-8"))
-    other_chains: list[tuple[str, list[str], int, set[str]]] = []
-    _chains(other_tree, _scope(other_tree, {}, package), package, other_chains)
-    for root, attrs, line, targets in other_chains:
-        for target in sorted(targets):
-            member, _ = _reach(target.split(".") + attrs)
-            if member in THROUGH_WRITES:
-                fail(f"tools/{other.name} line {line} reaches {member} itself: a tool that writes and audits goes "
-                     f"through tools/writes.py, where rule 2 reads it")
+    where = f"tools/{mod.path.name}"
+    tool_refs = mod.refs()
+    own = {key for key, _ in mod.functions()}
+    for _, root, attrs, line, targets, local in tool_refs:
+        if root == "__import__" or any(t.split(".")[0] == "importlib" for t in targets):
+            fail(f"{where} line {line} imports by name at run time ({root}): every module a tool file reaches is "
+                 "named by an import")
+            continue
+        key, obj = mod.resolve(root, attrs, targets, local)
+        spelled = ".".join([root, *attrs])
+        if isinstance(obj, types.ModuleType) and obj.__name__ in _STORE_NAMES:
+            fail(f"{where} line {line} hands the store module {_STORE_NAMES[obj.__name__]} around bare ({spelled}): "
+                 "a tool file names what it reads of a store")
+        elif key in WRITERS and key not in own and not key.startswith(WRITES):
+            fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run or writes an audit "
+                 "line: a tool that does goes through tools/writes.py, where rule 2 reads it")
+    for line, kept in mod.run_computes(mod.tree, tool_refs):
+        fail(f"{where} line {line} keeps {kept} through artifacts.compute itself: a tool that keeps a run goes "
+             "through tools/writes.py, where rule 2 reads it")
 
 # 3. a gated action completes only with a person's name on it
 data = Path(os.environ["OPENFERMENT_DATA_DIR"])
@@ -310,6 +549,6 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches {' or '.join(THROUGH_WRITES)}; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a Proforma run or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
       f"written down")

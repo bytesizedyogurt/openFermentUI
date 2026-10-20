@@ -25,7 +25,7 @@ underscore.
 | `search_passages` | words, k | up to six passages, each citable by a whole sentence |
 | `yield_ceiling` | a model on geneOS's shelf, a product, a sugar | one evidence id, or a finding in words |
 | `growth_forecast` | a kept kinetic fit's artifact id | one evidence id and the final values as intervals |
-| `selling_price` | a scenario id | the kept run's price, or which inputs wait for a source; never runs a scenario |
+| `selling_price` | a seed BioSTEAM scenario's id the switch shows (`sc-yeast-1`; `sc-pha-1` too with it on), or `proforma_benchmark` | the newest kept run's price as one evidence id (the run's artifact id), with what its flowsheet leaves out; with no run on file, which inputs wait for a source as the service binds them and how a run is made; never runs a scenario |
 | `draft_runbook` | a title, a product, a strain, items by evidence or field, measures | a draft whose numbers the service wrote |
 
 ## Proforma's two (OF-BLD-019 §6.1)
@@ -47,8 +47,25 @@ scenario lives in the browser that made it and is refused in words, as is an
 authored cost surface and, with the switch off, an archived scenario. The run
 is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
 `run` calls, so `check:tools` reads the one call to `proforma.run` there; its
-rule 2b fails when any other tool file reaches `proforma.run` or
-`audit.append` itself.
+rule 2b fails when any other tool file reaches what keeps a Proforma run or
+writes an audit line itself. What does is found, not listed (§6.R): every
+function of the service that calls `artifacts.compute` for a `proforma.run`,
+`proforma.reference` or `proforma_benchmark` artifact (or for a tool the check
+cannot name) or `audit.append`, and every function that reaches one of those,
+followed through imports as rule 2 follows them; `proforma.run_flowsheet`,
+the run endpoints and `proposals.propose` are among them. A tool file may
+also not call `artifacts.compute` for a run, hand a store module around bare
+or import by name at run time. `core/tests/test_check_tools.py` plants each
+way round in a copy of the package.
+
+`selling_price` reads, and never runs: the newest kept run of a seed BioSTEAM
+scenario (`proforma.latest_run`), cited by its artifact id, with what the
+run's flowsheet leaves out read from the shelf. With no run on file it names
+the inputs that wait as `proforma.bound` binds them now and says a person
+makes the run in Proforma (or `run_flowsheet`, when nothing waits). An
+authored cost surface keeps no run, an id the seed lacks lives in the browser
+that made it, and a reference biorefinery's run is read through
+`proforma_read` and `stream_table`; each is refused in words that say so.
 
 `stream_table` reads through `proforma.tables_of`, so a scenario's run and a
 reference biorefinery's (§2.2) read alike; anything else is refused in words,
@@ -181,7 +198,15 @@ take. With the switch off:
   belong to (`module_stores.Row.program`, as the browser's `programOf`
   resolves it; an artifact by what its inputs name: a record's paper, a
   model's host, a product), and archived rows are left out. A row asked for
-  by id says which archived program holds it.
+  by id says which archived program holds it. A Proforma run (a scenario's
+  or a reference biorefinery's) belongs to its scenario's program, its
+  flowsheet's on the shelf and what its basis names, an archived one winning
+  (`module_stores.artifact_program`, which asks `pureos.program_of`; §6.R).
+  It is one rule for every reader of a run: `proforma_read`, `biorepo_read`,
+  `GET /api/biorepo/artifacts`, pureOS's trains, `stream_table` and
+  `thermo_props` (the last two refuse it by id through
+  `module_stores.hidden_run_refusal`), so a PHA run that bound no record is
+  PHA's everywhere.
 - The coverage pass before round one fills `CoverageMap.archived` when the
   question names something archived; the trace reads *found in archived
   program PHA (hidden)*, no hidden row's ref reaches the model, and the

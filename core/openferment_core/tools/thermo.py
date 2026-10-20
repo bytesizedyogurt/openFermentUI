@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import programs, thermo
+from .. import thermo
 from ..models import ThermoPropsRequest, ToolResult
 from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 from . import Tool, ToolContext, register
@@ -41,8 +41,9 @@ class ThermoPropsInput(BaseModel):
 
 def _hidden_run(aid: str, ctx: ToolContext) -> str | None:
     """With the switch off, a run of an archived program is refused as its
-    train is hidden (OF-BLD-016 §2.R); the switch is never an input."""
-    from .. import artifacts, pureos
+    train is hidden (OF-BLD-016 §2.R); the switch is never an input. The rule
+    is every reader's (`module_stores.hidden_run_refusal`, OF-BLD-019 §6.R)."""
+    from .. import artifacts, module_stores
 
     if ctx.include_archived or not aid:
         return None
@@ -52,17 +53,7 @@ def _hidden_run(aid: str, ctx: ToolContext) -> str | None:
         return None  # said by the service below, in its words
     if art.tool != thermo.RUN:
         return None
-    scenarios = pureos.seed_scenarios()
-    sid, _ = pureos.scenario_of(art, scenarios)
-    try:
-        program = pureos.program_of(art, sid, scenarios)
-        hidden = programs.hides(program, False)
-    except FileNotFoundError:
-        return None
-    if not hidden:
-        return None
-    p = programs.program_by_id(program)
-    return f"{NAME} refused: run {aid} belongs to {p.name if p else program}, archived (hidden). {programs.SWITCH}"
+    return module_stores.hidden_run_refusal(NAME, art, ctx.include_archived)
 
 
 def _run(inp: ThermoPropsInput, ctx: ToolContext) -> ToolResult:
