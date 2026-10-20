@@ -180,37 +180,92 @@ def test_wall_time_ends_the_loop(pool):  # noqa: F811
     assert out.stopped == "time"
 
 
-def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, monkeypatch):  # noqa: F811
+@pytest.fixture()
+def two_models(monkeypatch):
+    """A chain of two rungs, whatever this machine's core/.env names. A
+    restart needs a second model to go to; a session whose primary and
+    fallback name one model would otherwise test no restart at all
+    (OF-BLD-016 §1.R)."""
+    monkeypatch.setenv("OPENFERMENT_MODEL", llm.DEFAULT_PRIMARY)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", llm.DEFAULT_FALLBACK)
     chain = llm.chain("answer")
-    first = chain[0]
+    assert len(chain) == 2, chain
+    return chain
+
+
+def test_a_refusal_on_the_first_model_restarts_on_the_second(pool, two_models):  # noqa: F811
+    first, second = two_models
     refused = llm.ModelRefused("cyber", [first], Usage(costUsd=0.002, models=[first]))
     script = Script([records()], refused, [records()], plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    if len(chain) == 1:
-        # Primary and fallback name the same model, so the chain has one rung:
-        # there is nothing to restart on, and the refusal declines the question.
-        assert [c["model"] for c in script.calls] == [first, first]
-        assert [s.kind for s in out.trace] == ["coverage", "tool", "final"]
-        assert out.claims == [] and out.declined
-        assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
-        return
-    second = chain[1]
     assert [c["model"] for c in script.calls] == [first, first, second, second]
     assert [s.kind for s in out.trace] == ["coverage", "tool", "restart", "tool", "final"]
     assert f"{first} declined; asked again on {second}" == out.trace[2].summary
     assert len(out.claims) == 1
     assert out.usage.costUsd == pytest.approx(0.002 + 0.001 * 3)
-    # The second conversation starts fresh: only the question.
-    assert script.calls[2]["messages"] == [{"role": "user", "content": "How much PHB from xylose?"}]
+    # The second conversation starts fresh: the question, then the same map.
+    opening = script.calls[0]["messages"]
+    assert script.calls[2]["messages"] == opening
+    [only] = opening
+    asked, cmap = only["content"]
+    assert only["role"] == "user" and asked == {"type": "text", "text": "How much PHB from xylose?"}
+    assert cmap["type"] == "text" and cmap["text"].startswith("COVERAGE MAP")
 
 
-def test_the_restart_forgets_what_the_first_conversation_retrieved(pool):  # noqa: F811
+def test_a_refusal_with_one_model_in_the_chain_declines(pool, monkeypatch):  # noqa: F811
+    # Primary and fallback name the same model, so the chain has one rung:
+    # there is nothing to restart on, and the refusal declines the question.
+    monkeypatch.setenv("OPENFERMENT_MODEL", llm.DEFAULT_FALLBACK)
+    monkeypatch.setenv("OPENFERMENT_FALLBACK_MODEL", llm.DEFAULT_FALLBACK)
+    [only] = llm.chain("answer")
+    refused = llm.ModelRefused("cyber", [only], Usage(costUsd=0.002, models=[only]))
+    script = Script([records()], refused, [records()], plan(claim(records=["r-X1-1"])))
+    out = ask(script, pool)
+    assert [c["model"] for c in script.calls] == [only, only]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "final"]
+    assert out.claims == [] and out.declined
+    assert out.usage.costUsd == pytest.approx(0.002 + 0.001)
+
+
+def test_a_restart_reopens_a_follow_up_with_its_earlier_turns_and_the_map(pool, two_models, monkeypatch):  # noqa: F811
+    first, second = two_models
+    earlier = PriorTurn(question="Which hosts make PHB on xylose?",
+                        claims=["Cupriavidus necator makes polyhydroxybutyrate.",
+                                "A strain reached a titre of 3 grams per litre."])  # a number: never sent back
+    ran_as: list[tuple[str, str]] = []
+    run = tools.run
+
+    def spy(name, inp, ctx):
+        ran_as.append((ctx.model, ctx.ask_id))
+        return run(name, inp, ctx)
+
+    monkeypatch.setattr(tools, "run", spy)
+    script = Script([records()], llm.ModelUnavailable("overloaded"), [records("titre")], plan(claim(records=["r-X1-1"])))
+    out = postdoc_agent.ask("And from glucose?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool), history=[earlier])
+    assert [c["model"] for c in script.calls] == [first, first, second, second]
+    assert [s.kind for s in out.trace] == ["coverage", "tool", "restart", "tool", "final"]
+    # The second conversation opens as the first did: the earlier turn in
+    # words, then the follow-up with the map.
+    again = script.calls[2]["messages"]
+    assert again == script.calls[0]["messages"]
+    assert [m["role"] for m in again] == ["user", "assistant", "user"]
+    assert again[0]["content"] == earlier.question
+    assert "Cupriavidus necator makes polyhydroxybutyrate." in again[1]["content"]
+    assert "3 grams" not in again[1]["content"]
+    asked, cmap = again[2]["content"]
+    assert asked["text"] == f"{postdoc_agent.FOLLOW_UP}\n\nAnd from glucose?"
+    assert cmap["text"].startswith("COVERAGE MAP")
+    # Each conversation's tools run as its own model, under the one question's id.
+    assert [m for m, _ in ran_as] == [first, second]
+    assert len({a for _, a in ran_as}) == 1 and ran_as[0][1].startswith("ask-")
+    # What the second conversation cites, its own tools returned.
+    assert [c.recordIds for c in out.claims] == [["r-X1-1"]] and out.rejected == 0
+
+
+def test_the_restart_forgets_what_the_first_conversation_retrieved(pool, two_models):  # noqa: F811
     script = Script([records()], llm.ModelUnavailable("overloaded"), plan(claim(records=["r-X1-1"])))
     out = ask(script, pool)
-    if len(llm.chain("answer")) == 1:
-        # One rung: the outage declines the question, and nothing is kept.
-        assert out.claims == [] and out.rejected == 0 and out.declined
-        return
     assert out.claims == [] and out.rejected == 1, "the second model never retrieved r-X1-1"
 
 

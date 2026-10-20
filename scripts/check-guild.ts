@@ -46,8 +46,9 @@ import {
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson } from '../src/data/types';
+import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, Proposal } from '../src/data/types';
 import { mayQueue, proposeChecks, shownTo } from '../src/engine/checks';
+import { needsActing, shownProposals } from '../src/lib/proposals';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -772,6 +773,29 @@ async function main() {
   (globalThis as any).fetch = async () => ({ ok: true, status: 200, json: async () => ({ version: 1, people: [], evidence: [] }) }) as Response;
   await s().loadChecks();
   check('an answer with no list of checks is no answer about checks', s().checks === null);
+
+  // ── 11. a check proposed on Home follows the check rules (OF-BLD-016 §1.R) ──
+  // A model's proposal to check a person shows where the check would: to the
+  // lead and assessors, never to the person it names, and to nobody while the
+  // sample team is shown. Every other proposal shows to everyone.
+  {
+    const base = { at: '', why: '', how: 'h', route: null, target: null, note: '', by: 'm', askId: null, state: 'proposed',
+      carriedOutBy: null, carriedOutAt: null, result: null } as const;
+    const checkP = { ...base, id: 'pr-g', module: 'guild', action: 'propose_check', gate: 'personnel', title: 'Guild', server: true,
+      fields: { personId: 'p-alex', skillIds: 'SK-OD' } } as unknown as Proposal;
+    const lockP = { ...base, id: 'pr-l', module: 'runbooks', action: 'lock', gate: 'lock', title: 'Runbooks', server: false,
+      fields: {} } as unknown as Proposal;
+    const who = (id: string, role: GuildPerson['role']) =>
+      ({ id, name: id, role, active: true, joinedAt: '2026-01-01', addedBy: null, addedAt: '' }) as GuildPerson;
+    const seen = (acting: GuildPerson | null, sample = false) =>
+      shownProposals([checkP, lockP], acting, new Map(), sample).map((p) => p.id).join(',');
+    check('a check proposal shows to nobody when nobody is acting', seen(null) === 'pr-l', seen(null));
+    check('a check proposal shows to no member who is not an assessor', seen(who('p-bo', 'member')) === 'pr-l');
+    check('a check proposal shows to the lead', seen(who('p-sean', 'lead')) === 'pr-g,pr-l');
+    check('a check proposal never shows to the person it names', seen(who('p-alex', 'lead')) === 'pr-l');
+    check('a check proposal shows to nobody while the sample team is shown', seen(who('p-sean', 'lead'), true) === 'pr-l');
+    check('carrying out a check proposal needs who is acting, and a lock does not', needsActing(checkP) && !needsActing(lockP));
+  }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
   process.exit(fails ? 1 : 0);

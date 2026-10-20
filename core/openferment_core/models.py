@@ -239,6 +239,10 @@ class ProposalAction(BaseModel):
 
     person: str
     reason: str = ""
+    # The Guild person id the browser is acting as: a check is asked for by a
+    # person on Guild, which knows people by id, never by the reviewer name
+    # (OF-BLD-016 §1.R finding 11). None when nobody is chosen.
+    actingId: str | None = None
 
 
 class CoverageMap(BaseModel):

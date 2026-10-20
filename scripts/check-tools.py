@@ -5,7 +5,12 @@ Fails when:
 1. a module store has no read tool or no write tool in the registry;
 2. a write tool reaches a store without going through its module's write
    function: `tools/writes.py` may name only the write functions listed in
-   `ALLOWED_WRITES`, and no file write of its own;
+   `ALLOWED_WRITES`, and no file write of its own. The file is parsed, and
+   every name is followed through its import, aliases included, to the
+   object it names, so `from ..biorepo import write as keep` or
+   `from .. import guild as g` is the module it is; a store's exception or
+   constant may be named, a store module handed around bare or a dynamic
+   import may not;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -17,15 +22,27 @@ Fails when:
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
 `atomic.write_text` planted in writes.py, and a gate row deleted from one
-table each made it fail (STATE.md).
+table each made it fail (STATE.md). Rule 2 read text until the review of
+OF-BLD-016 §1.R found that a write reached through an aliased import passed
+it. It parses now, and was negative-tested the same day on a copy of the
+package: `from ..biorepo import write as keep_decision`, `from .. import
+guild as g; g.write_evidence(d)`, a plain `from ..guild import
+write_evidence`, `import openferment_core.checks as c`, a store module handed
+to `getattr`, and `importlib`, each planted in the copy's writes.py, each
+passed the text rule and each was named by this one; an exception and a
+constant of a store passed, as did writes.py restored.
 """
 from __future__ import annotations
 
+import ast
+import importlib
 import os
 import re
 import sys
 import tempfile
+import types
 from pathlib import Path
+from typing import Iterable
 
 CORE = Path(__file__).resolve().parent.parent / "core"
 sys.path.insert(0, str(CORE))
@@ -52,6 +69,10 @@ ALLOWED_WRITES = (
     "proposals.propose",
     "audit.append",
 )
+# The modules that keep a store: anything of theirs a write tool names is a
+# write function in ALLOWED_WRITES, an exception, or a constant.
+STORES = ("geneos", "fermos", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild", "biorepo",
+          "artifacts", "atomic")
 # What a write tool may never do itself.
 FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(")
 
@@ -75,14 +96,137 @@ body = src.split('"""', 2)[-1]  # past the module docstring
 for token in FORBIDDEN:
     if token in body:
         fail(f"tools/writes.py holds {token!r}: a write tool never touches a store itself")
-called = set(re.findall(r"\b([a-z_]+\.[a-z_]+)\(", body))
-writers = {c for c in called if c.split(".")[0] in {"geneos", "fermos", "proforma", "extract", "intake", "proposals", "audit",
-                                                   "checks", "guild", "biorepo", "artifacts", "atomic"}}
-for c in sorted(writers):
-    if c not in ALLOWED_WRITES and not c.startswith(("intake.NetworkRefused", "intake.Transient")):
-        fail(f"tools/writes.py calls {c}(), which is not one of the module write functions ALLOWED_WRITES names")
+
+
+def _absolute(node: ast.ImportFrom, package: str) -> str:
+    """The module a `from … import` names, a relative one resolved against
+    the importing file's package."""
+    if not node.level:
+        return node.module or ""
+    parts = package.split(".")
+    parts = parts[: len(parts) - (node.level - 1)]
+    return ".".join(parts + ([node.module] if node.module else []))
+
+
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef, ast.ListComp, ast.SetComp, ast.DictComp,
+           ast.GeneratorExp)
+
+
+def _own(node: ast.AST) -> Iterable[ast.AST]:
+    """A scope's nodes, parents before children, without its nested scopes'
+    insides (the nested scope's own node is yielded: its name is bound here)."""
+    stack = list(ast.iter_child_nodes(node))[::-1]
+    while stack:
+        n = stack.pop()
+        yield n
+        if not isinstance(n, _SCOPES):
+            stack.extend(list(ast.iter_child_nodes(n))[::-1])
+
+
+def _scope(node: ast.AST, outer: dict[str, set[str]], package: str) -> dict[str, set[str]]:
+    """The names an import binds as seen inside `node`, to the dotted path
+    each stands for. An import inside a function binds its name for the whole
+    function; a name the function assigns otherwise hides the outer import."""
+    imported: dict[str, set[str]] = {}
+    local: set[str] = set()
+    declared: set[str] = set()
+    for n in _own(node):
+        if isinstance(n, ast.Import):
+            for a in n.names:
+                imported.setdefault(a.asname or a.name.split(".")[0], set()).add(a.name if a.asname else a.name.split(".")[0])
+        elif isinstance(n, ast.ImportFrom):
+            base = _absolute(n, package)
+            for a in n.names:
+                imported.setdefault(a.asname or a.name, set()).add(f"{base}.{a.name}")
+        elif isinstance(n, ast.Name) and not isinstance(n.ctx, ast.Load):
+            local.add(n.id)
+        elif isinstance(n, ast.arg):
+            local.add(n.arg)
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            local.add(n.name)
+        elif isinstance(n, ast.ExceptHandler) and n.name:
+            local.add(n.name)
+        elif isinstance(n, (ast.Global, ast.Nonlocal)):
+            declared.update(n.names)
+    hidden = local - declared - set(imported) if isinstance(node, _SCOPES) else set()
+    return {**{k: v for k, v in outer.items() if k not in hidden}, **imported}
+
+
+def _chains(node: ast.AST, scope: dict[str, set[str]], package: str,
+            out: list[tuple[str, list[str], int, set[str]]]) -> None:
+    """Every name read in `node`'s scope and the ones inside it, with the
+    attributes taken from it and what an import bound it to there:
+    `g.write_evidence` is ("g", ["write_evidence"], line, {"…guild"})."""
+    inner: set[int] = set()
+    for n in _own(node):
+        if isinstance(n, _SCOPES):
+            _chains(n, _scope(n, scope, package), package, out)
+        elif id(n) in inner:
+            continue
+        elif isinstance(n, ast.Attribute):
+            attrs, cur = [], n
+            while isinstance(cur, ast.Attribute):
+                inner.add(id(cur))
+                attrs.append(cur.attr)
+                cur = cur.value
+            if isinstance(cur, ast.Name):
+                inner.add(id(cur))
+                out.append((cur.id, attrs[::-1], n.lineno, scope.get(cur.id, set())))
+        elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+            out.append((n.id, [], n.lineno, scope.get(n.id, set())))
+
+
+_STORE_NAMES = {f"openferment_core.{m}": m for m in STORES}
+
+
+def _reach(path: list[str]) -> tuple[str | None, object]:
+    """Follow a dotted path to what it names: the store member it reaches
+    ("guild.write_evidence") with the object, a store module named bare
+    ("guild", the module), or (None, None) for anything else."""
+    obj, rest = None, []
+    for i in range(len(path), 0, -1):
+        try:
+            obj, rest = importlib.import_module(".".join(path[:i])), path[i:]
+            break
+        except ImportError:
+            continue
+    if obj is None:
+        return None, None
+    while True:
+        store = _STORE_NAMES.get(getattr(obj, "__name__", "")) if isinstance(obj, types.ModuleType) else None
+        if store and rest:
+            return f"{store}.{rest[0]}", getattr(obj, rest[0], None)
+        if store:
+            return store, obj
+        if not rest or not hasattr(obj, rest[0]):
+            return None, None
+        obj, rest = getattr(obj, rest[0]), rest[1:]
+
+
+tree = ast.parse(src)
+package = writes.__package__ or "openferment_core.tools"
+chains: list[tuple[str, list[str], int, set[str]]] = []
+_chains(tree, _scope(tree, {}, package), package, chains)
+reached: set[str] = set()
+for root, attrs, line, targets in chains:
+    if root == "__import__" or any(t.split(".")[0] == "importlib" for t in targets):
+        fail(f"tools/writes.py line {line} imports by name at run time ({root}): every module it reaches is named by an import")
+        continue
+    for target in sorted(targets):
+        member, obj = _reach(target.split(".") + attrs)
+        if member is None:
+            continue
+        spelled = ".".join([root, *attrs])
+        if "." not in member:
+            fail(f"tools/writes.py line {line} hands the store module {member} around bare ({spelled}): "
+                 f"a write tool names one of its write functions or nothing")
+        elif member in ALLOWED_WRITES:
+            reached.add(member)
+        elif not (isinstance(obj, type) and issubclass(obj, BaseException)) and callable(obj):
+            fail(f"tools/writes.py line {line} reaches {member} (as {spelled}), which is not one of the module write "
+                 f"functions ALLOWED_WRITES names")
 for fn in ALLOWED_WRITES:
-    if fn not in body:
+    if fn not in reached:
         fail(f"tools/writes.py no longer calls {fn}(): the action it served has lost its write function, or the table is stale")
 
 # 3. a gated action completes only with a person's name on it

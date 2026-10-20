@@ -12,6 +12,7 @@ import json
 import pytest
 
 from openferment_core import module_stores, postdoc_agent, tools
+from openferment_core.models import PriorTurn
 from test_postdoc_agent import Script, plan
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
@@ -99,3 +100,57 @@ def test_the_map_says_its_refs_are_for_reading_not_for_citing(pool):  # noqa: F8
     text = module_stores.for_model(module_stores.coverage("brazzein", stores(pool)))
     assert "not citable" in text and "read tool returns" in text
     assert "not citable" in postdoc_agent.AGENT_SYSTEM
+
+
+# OF-BLD-016 §1.R — a follow-up is swept with the questions it follows.
+FOLLOW_UP = "Which of those are fenced, and why?"
+
+
+def _ask(pool_, question, history):  # noqa: F811
+    script = Script(plan())
+    ctx = tools.ToolContext(pool_factory=lambda: pool_, stores_factory=lambda: stores(pool_))
+    return postdoc_agent.ask(question, converse=script, ctx=ctx, history=history), script
+
+
+def test_a_follow_up_is_swept_with_the_questions_it_follows(pool):  # noqa: F811
+    """"Which of those are fenced, and why?" names nothing by itself; the
+    question it follows named brazzein in Dominion. The map, the trace, the
+    footer and the decline follow the conversation, never calling absent what
+    Dominion shows (OF-BLD-015 §7.1)."""
+    alone, _ = _ask(pool, FOLLOW_UP, [])
+    assert alone.coverage.found == 0, "the follow-up's own words name nothing"
+    earlier = PriorTurn(question="What is open in Dominion on brazzein?", claims=["Dominion holds a clearance row for it."])
+    out, script = _ask(pool, FOLLOW_UP, [earlier])
+    assert "brazzein" in out.coverage.entities and out.coverage.found >= 1
+    assert any(h.ref == "dominion/molecule/brazzein" for h in by_module(out.coverage)["dominion"].hits)
+    assert out.trace[0].summary.startswith("Swept the modules for what the conversation names · searched eleven, found in ")
+    asked, cmap = script.calls[0]["messages"][-1]["content"]
+    assert asked["text"].endswith(FOLLOW_UP), "the model answers the follow-up; only the sweep reads the earlier question"
+    assert "dominion/molecule/brazzein" in cmap["text"]
+    assert "Names found in the conversation: brazzein" in cmap["text"] and "this conversation names" in cmap["text"]
+    assert out.declined and "corpus does not contain" not in out.declined and "Dominion" in out.declined
+
+
+def test_a_follow_up_sweeps_the_earlier_questions_and_not_the_earlier_answers(pool):  # noqa: F811
+    # An earlier answer is the model's words: it never steers the map.
+    said = PriorTurn(question="Say more.", claims=["Brazzein sits in Dominion."], gaps=["Brazzein has no runbook here."])
+    out, _ = _ask(pool, FOLLOW_UP, [said])
+    assert out.coverage.found == 0 and "corpus does not contain" in out.declined
+
+
+def test_a_follow_up_sweeps_only_the_turns_it_reads(pool):  # noqa: F811
+    named = PriorTurn(question="What is open in Dominion on brazzein?")
+    later = [PriorTurn(question="Say more.") for _ in range(postdoc_agent.MAX_HISTORY_TURNS)]
+    out, script = _ask(pool, FOLLOW_UP, [named, *later])
+    assert named.question not in json.dumps(script.calls[0]["messages"])
+    assert out.coverage.found == 0
+    out, _ = _ask(pool, FOLLOW_UP, [named, *later[1:]])
+    assert out.coverage.found >= 1
+
+
+def test_a_first_question_is_swept_by_itself(pool):  # noqa: F811
+    q = "Is brazzein open in Dominion?"
+    out, _ = _ask(pool, q, [])
+    assert out.coverage == module_stores.coverage(q, stores(pool))
+    assert out.trace[0].summary.startswith("Swept the modules for what the question names · ")
+    assert module_stores.for_model(out.coverage).count("Names found in the question: brazzein") == 1

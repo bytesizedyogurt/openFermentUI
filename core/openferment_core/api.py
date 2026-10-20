@@ -209,13 +209,15 @@ def ask(request: AskRequest) -> AnswerPlan:
             "; ".join(result.reasons),
         )
 
-    gaps = [str(g) for g in (raw.get("gaps") or []) if str(g).strip()]
+    # Gaps and the decline are model prose, held to Rule 1 as the loop holds
+    # them: one with a number is dropped and named (OF-BLD-016 §1.R).
+    gaps, said = postdoc_agent.held_to_rule_one(raw.get("gaps"), raw.get("declined"), result.reasons)
 
     return AnswerPlan(
         question=question,
         claims=result.claims,
         gaps=gaps,
-        declined=decline_reason(result, raw.get("declined")),
+        declined=decline_reason(result, said),
         usage=usage,
         rejected=result.rejected,
         rejectionReasons=result.reasons,
@@ -786,8 +788,9 @@ def proposals_list(state: str | None = None) -> list[Proposal]:
     """Every proposal, or those in one state; Home shows the `proposed`."""
     from . import proposals
 
-    every = proposals.read().proposals
-    return [p for p in every if state is None or p.state == state]
+    # As a reader sees them: a Guild proposal without its words, since who a
+    # check names is never shown before it is run (OF-BLD-016 §1.R).
+    return proposals.listed(state)
 
 
 @app.post("/api/proposals/{proposal_id}/carry-out", response_model=Proposal)
@@ -797,7 +800,7 @@ def proposals_carry_out(proposal_id: str, action: ProposalAction) -> Proposal:
     from . import checks, extract, proposals
 
     try:
-        return proposals.carry_out(proposal_id, action.person)
+        return proposals.carry_out(proposal_id, action.person, action.actingId)
     except proposals.ProposalRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except checks.CheckRefused as e:

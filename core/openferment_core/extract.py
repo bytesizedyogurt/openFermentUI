@@ -47,8 +47,10 @@ from .validate import anchor_all, anchor_candidate
 log = logging.getLogger("openferment.extract")
 
 CANDIDATES_DIR = intake.DATA_DIR / "candidates"
-# A candidate a model wrote by hand (§7.3) is named apart from the extractor's.
+# A candidate a model wrote by hand (§7.3) is named apart from the extractor's,
+# and kept apart from it, in candidates/hand/ (OF-BLD-016 §1.R finding 3).
 MODEL_PREFIX = "mw1"
+HAND_DIR = "hand"
 _WRITE_LOCK = threading.Lock()
 FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
 # The first extraction run that runs for real. Named for the pipeline and not
@@ -402,7 +404,8 @@ def cached(paper_id: str) -> ExtractResponse | None:
     return ExtractResponse.model_validate_json(text)
 
 
-def all_cached() -> list[ExtractResponse]:
+def all_extracted() -> list[ExtractResponse]:
+    """This run's extractions, one per paper: what Witness scores."""
     if not CANDIDATES_DIR.exists():
         return []
     out = []
@@ -411,6 +414,47 @@ def all_cached() -> list[ExtractResponse]:
         if r is not None:
             out.append(r)
     return out
+
+
+# ── candidates a model wrote by hand (OF-BLD-015 §7.3) ─────────────────
+#
+# Kept in candidates/hand/<paper>.json and never in the extractor's file
+# (OF-BLD-016 §1.R finding 3). A hand-written candidate is not an
+# extraction: in the extractor's file it made `cached` answer for a paper the
+# extractor never ran over, so the batch skipped the paper for good and
+# Witness scored a run that never happened. The file has the extractor's
+# shape and is read by `hand` alone, never by `cached`.
+
+
+def _hand_path(paper_id: str) -> Path:
+    return CANDIDATES_DIR / HAND_DIR / f"{paper_id}.json"
+
+
+def by_hand(candidate_id: str) -> bool:
+    """Whether this id names a candidate a model wrote by hand."""
+    return candidate_id.startswith(f"{MODEL_PREFIX}-")
+
+
+def hand(paper_id: str) -> ExtractResponse | None:
+    """The candidates a model wrote by hand on a paper, or None."""
+    path = _hand_path(paper_id)
+    if not path.exists():
+        return None
+    return ExtractResponse.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def all_hand() -> list[ExtractResponse]:
+    folder = CANDIDATES_DIR / HAND_DIR
+    if not folder.exists():
+        return []
+    return [r for path in sorted(folder.glob("*.json")) if (r := hand(path.stem)) is not None]
+
+
+def all_cached() -> list[ExtractResponse]:
+    """Every cached candidate's file: this run's extractions, then the
+    candidates written by hand. The evidence pool reads all of them; Witness
+    scores `all_extracted` alone."""
+    return all_extracted() + all_hand()
 
 
 def _persist(result: ExtractResponse) -> ExtractResponse:
@@ -602,24 +646,27 @@ def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Cand
     """One candidate a model wrote by hand (OF-BLD-015 §7.3), held to §2.4
     like one the extractor emitted: anchored to a sentence of the fetched
     paper, refused with the rule it broke, and appended to the paper's
-    cached candidates under the lock, with an audit line naming `who`. A
-    paper never extracted gets a file holding this candidate alone."""
+    hand-written candidates under the lock, with an audit line naming `who`.
+    The extractor's file is never created, read or replaced here (§1.R
+    finding 3): the paper stays as extracted, or as unextracted, as it was."""
     fetched = intake.cached(paper_id)
     if fetched is None or fetched.status != "complete" or not fetched.sections:
         raise ExtractUnavailable(f"{paper_id} has no cached full text. Fetch it first — there is nothing to anchor to.")
     sections = [s.model_dump() for s in fetched.sections]
-    with _WRITE_LOCK, atomic.held(_path(paper_id)):
-        current = cached(paper_id)
+    path = _hand_path(paper_id)
+    with _WRITE_LOCK, atomic.held(path):
+        current = hand(paper_id)
         n = len(current.candidates) if current else 0
         made, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, candidate_id=f"{MODEL_PREFIX}-{paper_id}-{n:04d}")
         if made is None:
             return None, rule, detail
         now = datetime.now(timezone.utc).isoformat()
         if current is None:
-            current = ExtractResponse(paperId=paper_id, run=RUN, extractedAt=now, candidates=[], audit=[], usage=Usage())
+            # No model call made this file: no usage, and no calls.
+            current = ExtractResponse(paperId=paper_id, extractedAt=now, candidates=[], audit=[], usage=Usage(), calls=0)
         current.candidates.append(made)
         current.audit.append(AuditEvent(at=now, who=who, action=f"candidate {made.id} written by hand"))
-        _persist(current)
+        atomic.write_text(path, current.model_dump_json(indent=2) + "\n")
     return made, None, None
 
 

@@ -17,10 +17,11 @@ ONE DAILY CAP. Every response is charged to `spend.py` under its role, and a
 call whose worst case could take the UTC day past `OPENFERMENT_DAILY_BUDGET_USD`
 is refused before it is sent (`BudgetExhausted`).
 
-TOOL TURNS. `converse` runs one turn of a conversation the caller owns, with
-strict tools, `tool_choice` `auto` or `none` and nothing else, the answer
-schema in `output_config.format`, and top-level `cache_control`. It falls
-back nowhere; the loop that owns the conversation decides (§5.2).
+TOOL TURNS. `converse` runs one turn of a conversation the caller owns, each
+tool strict unless the registry marks it loose (the module tools, OF-BLD-015
+§7.2), `tool_choice` `auto` or `none` and nothing else, the answer schema in
+`output_config.format`, and top-level `cache_control`. It falls back
+nowhere; the loop that owns the conversation decides (§5.2).
 
 STRUCTURED OUTPUT BY CONSTRUCTION. Both callers used to pin `tool_choice` to a
 single tool, so the model had exactly one way to answer. Claude Opus 5.5 and

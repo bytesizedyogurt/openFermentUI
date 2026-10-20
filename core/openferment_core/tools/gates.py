@@ -49,8 +49,10 @@ GATES: tuple[Gate, ...] = (
     Gate("sign", "sign a Guild entry",
          (("guild", "evidence"), ("guild", "person"), ("guild", "policy")),
          "record it on Guild in your name", "/guild", False),
+    # A check's outcome is never proposed: an assessor runs it at the bench,
+    # and guild record_check is refused in words (OF-BLD-016 §1.R finding 12).
     Gate("personnel", "mark a personnel check",
-         (("guild", "propose_check"), ("guild", "record_check")),
+         (("guild", "propose_check"),),
          "ask for the check in your name", None, True),
     Gate("bench", "send a protocol to the bench",
          (("runbooks", "deposit"), ("runbooks", "run")),

@@ -77,7 +77,7 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     },
     "guild": {
         "propose_check": ("propose a competence check on a person's skills (gated: a person asks for it)", ("personId", "skillIds")),
-        "record_check": ("mark a check's outcome (gated: an assessor runs it)", ("checkId",)),
+        "record_check": ("mark a check's outcome (refused: an assessor runs a check at the bench)", ("checkId",)),
         "evidence": ("record evidence on the ledger (gated: a person signs it)", ("personId", "skillId", "kind")),
         "person": ("add or change a person on the ledger (gated)", ("personId", "name")),
         "policy": ("change the lead's Guild policy (gated)", ("criticality", "mode")),
@@ -117,6 +117,9 @@ NO_WRITE_ACTION = {
     ("intake", "add"): "a source enters the corpus through a person's approval (pnpm thread:propose, thread:apply); "
                        "the service has no write function for a new paper",
     ("primer", "lesson"): "Primer's lessons are curated seed (src/data/learn.ts); the service has no write function for them",
+    ("guild", "record_check"): "a check is run by an assessor at the bench (/guild/checks/:id/run), one criterion at a "
+                               "time, and its entries are written in their name; a model may propose a check and never "
+                               "record one",
 }
 
 
@@ -149,9 +152,14 @@ def _propose(ctx: ToolContext, module: str, action: str, gate: gates.Gate, inp: 
     from .. import proposals
 
     model, effort = _who(ctx)
-    made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=model,
-                             target=inp.target or None, fields=inp.fields, note=inp.note,
-                             ask_id=getattr(ctx, "ask_id", None), effort=effort)
+    try:
+        # The store holds a proposal's words to Rule 1 and refuses an open
+        # twin in the same ask (OF-BLD-016 §1.R findings 2, 5 and 8).
+        made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=model,
+                                 target=inp.target or None, fields=inp.fields, note=inp.note,
+                                 ask_id=getattr(ctx, "ask_id", None), effort=effort)
+    except proposals.ProposalRefused as e:
+        return ToolResult(error=f"{module}_write refused {action}: {e}. Nothing was proposed. Say so in gaps.")
     return ToolResult(summary={
         "state": "proposed",
         "proposalId": made.id,
@@ -250,8 +258,24 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     need = _need(inp, "paperId", "sectionId", "field", "value", "unit", "quote")
     if need:
         return ToolResult(error=f"biorepo_write refused: {need}")
+    # Only the fields the action lists reach anchoring, and the two flags it
+    # reads, as the word true or false: every field is a string, and
+    # bool('false') is True (OF-BLD-016 §1.R finding 7). Anything else is
+    # refused, never passed on and never guessed at.
+    listed = ACTIONS["biorepo"]["candidate"][1]
+    flags = ("negativeResult", "isPrimary")
+    unknown = [k for k in inp.fields if k not in listed and k not in flags]
+    if unknown:
+        return ToolResult(error=f"biorepo_write refused: {', '.join(unknown)} {'is' if len(unknown) == 1 else 'are'} not a "
+                                f"field of a candidate; the fields are {', '.join(listed + flags)}")
+    raw: dict[str, Any] = {k: v for k, v in inp.fields.items() if k in listed and k != "paperId"}
+    for flag in flags:
+        if flag in inp.fields:
+            word = inp.fields[flag].strip().lower()
+            if word not in ("true", "false"):
+                return ToolResult(error=f"biorepo_write refused: {flag} is the word true or false, or left out")
+            raw[flag] = word == "true"
     model, _ = _who(ctx)
-    raw = {k: v for k, v in inp.fields.items() if k != "paperId"}
     try:
         made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=model)
     except extract.ExtractUnavailable as e:
@@ -293,7 +317,11 @@ def _intake_extract(inp: ModuleWriteInput, ctx: ToolContext, gate: gates.Gate) -
     try:
         r = extract.extract_paper(inp.target)
     except llm.BudgetExhausted as e:
-        return _propose(ctx, "intake", "extract", gate, inp, f"Extract {inp.target} when the budget allows", str(e))
+        # The why is the code's words: the budget's message carries its
+        # figures, and a proposal's words hold no number (§1.R finding 5).
+        return _propose(ctx, "intake", "extract", gate, inp, f"Extract {inp.target} when the budget allows",
+                        "the model budget refused the extraction when it was asked for; it runs when a person presses "
+                        "the button and the budget allows")
     except (extract.ExtractUnavailable, extract.ExtractTruncated, llm.ModelRefused, llm.ModelUnavailable) as e:
         return ToolResult(error=f"intake_write could not extract {inp.target}: {e}")
     _audit(ctx, "intake", "extract", "proposed", inp.target, {"candidates": len(r.candidates), "rejected": r.rejected,
@@ -325,9 +353,13 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
         if (module, action) in NO_WRITE_ACTION:
             return ToolResult(error=f"{name} refused {action}: {NO_WRITE_ACTION[(module, action)]}. Say so in gaps.")
         if gate is not None and gate.id != "spend":
+            # The title is the code's words and the target's id (§1.R finding
+            # 8); a Guild proposal's names nobody, because who a check names
+            # is never shown before it is run (finding 9).
             what, _ = actions[action]
-            title = f"{module_stores.LABEL[module]}: {what.split(' (')[0]}" + (f" — {inp.target}" if inp.target else "")
-            return _propose(ctx, module, action, gate, inp, title, inp.note or what)
+            words = what.split(" (")[0]
+            title = f"{module_stores.LABEL[module]}: {words}" + (f" — {inp.target}" if inp.target and module != "guild" else "")
+            return _propose(ctx, module, action, gate, inp, title, inp.note or words)
         if module == "geneos":
             return _geneos(action, inp, ctx)
         if module == "fermos":

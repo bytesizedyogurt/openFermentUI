@@ -204,3 +204,47 @@ def test_a_molecule_row_names_its_train_and_pathways(pool):  # noqa: F811
     [row] = read("dominion", ctx_for(pool), ids=["taq-dna-polymerase"]).rows
     assert row.detail["processCode"] == "P9" and "heat-step" in row.detail["unitOperationIds"]
     assert read("dominion", ctx_for(pool), words="heat-step").summary["count"] >= 1
+
+
+def test_an_artifact_row_is_worth_what_its_inputs_are_worth_now(pool):  # noqa: F811
+    """An artifact computed while its record was verified is stored as
+    `computed`. When the record is worth less now (a candidate no one has
+    decided, or one a reviewer rejected, which leaves the pool), the row and
+    a claim citing it say so: the mark is `basis_provenance` over the inputs
+    as they stand, read at read time, as `artifacts.compute` does for a
+    repeat, and never the stored file's word (review of OF-BLD-016 §1.R)."""
+    from openferment_core.models import Artifact, BasisInput, BasisSource
+
+    def art(aid, record_id):
+        return Artifact(id=aid, tool="convert_units", toolVersion="1", provenance="computed",
+                        createdAt="2026-10-20T00:00:00Z", outputHash="x", durationMs=1,
+                        inputs=[BasisInput(name="record", value=record_id, unit="",
+                                           source=BasisSource(kind="record", id=record_id))],
+                        output={"value": 900.0, "unit": "mg L-1"})
+
+    undecided = art("00000000000000aa", "cl1-X1-0000000a")  # anchored, decided by nobody: unverified
+    rejected = art("00000000000000bb", "cl1-X1-0000000b")  # a reviewer rejected it: not in the pool
+    curated = art("00000000000000cc", "r-X1-1")  # the seed's curated record
+    forecast = Artifact(id="00000000000000dd", tool="growth_forecast", toolVersion="1", provenance="computed",
+                        createdAt="2026-10-20T00:00:00Z", outputHash="x", durationMs=1,
+                        inputs=[BasisInput(name="fit", value="00000000000000aa", unit="",
+                                           source=BasisSource(kind="artifact", id="00000000000000aa"))],
+                        output={"hours": 12.0})
+    ctx = ctx_for(pool, artifacts=lambda: [undecided, rejected, curated, forecast])
+    r = read("biorepo", ctx, kind="artifact")
+    marks = {row.id: row.provenance for row in r.rows}
+    assert marks == {"00000000000000aa": "unverified", "00000000000000bb": "demo", "00000000000000cc": "computed",
+                     "00000000000000dd": "computed"}  # an artifact input is read as stored, as compute reads it
+    seen = SeenSet()
+    seen.add(r)
+    cites = {"id": "c1", "text": "The conversion is kept as a computed value.", "recordIds": [], "support": "direct",
+             "passages": [], "evidenceIds": [], "moduleRefs": ["biorepo/artifact/00000000000000aa"]}
+    [c] = validate_plan([cites], seen, pool).claims
+    assert c.provenance == "unverified"
+    # A module that holds no record input never reads the pool.
+    def no_pool():
+        raise AssertionError("the pool was read for an artifact with no record input")
+
+    fermos = module_stores.Stores(module_stores.Sources(**{**vars(module_stores.seed_sources(no_pool)),
+                                                           "artifacts": lambda: [forecast, undecided]}))
+    assert {row.id: row.provenance for row in fermos.rows("fermos")} == {"00000000000000dd": "computed"}

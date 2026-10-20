@@ -1,6 +1,5 @@
 """Eval set O (OF-BLD-015 §7.6): ten cross-module questions, each scored on
-whether Postdoc searched the right modules and whether the footer names
-them.
+whether Postdoc searched the right modules.
 
     python -m openferment_core.evalo keys     # the answer keys, from the stores, no model
     python -m openferment_core.evalo run      # the ten questions live; writes core/data/live/eval-o.json
@@ -12,11 +11,18 @@ names, or one holding a row the question names. No answer key is written by
 hand or by a model.
 
 THE SCORE. `searched`: every key module was read by its read tool (or
-`search_records`/`search_passages` for BioRepo) in the trace. `footer`: the
-plan's coverage map names every key module as found. A question scores one
-point for each; the set's score is the mean over ten. The report keeps the
-tools called, the claims kept and dropped, the cost and the model, so a
-later run on another model is compared on the same keys.
+`search_records`/`search_passages` for BioRepo) in the trace. A question
+scores one point for it; the set's score is the mean over ten. The report
+keeps the tools called, the claims kept and dropped, the cost and the model,
+so a later run on another model is compared on the same keys.
+
+THE FOOTER IS NOT SCORED. §7.6 asks whether the footer names the key
+modules, but the key is `coverage(question)` and the footer is the map the
+loop's sweep drew with the same call before its first turn, so it held by
+construction: a stand-in that called no tool and wrote nothing scored ten of
+ten on it (review of OF-BLD-016 §1.R). A score the model cannot miss
+measures nothing; that the plan carries its sweep is `test_coverage`'s to
+hold.
 """
 from __future__ import annotations
 
@@ -69,16 +75,8 @@ def modules_read(trace: list[Any]) -> set[str]:
 
 def score(plan: Any, key: list[str]) -> dict[str, Any]:
     read = modules_read(plan.trace)
-    named = {m.module for m in (plan.coverage.modules if plan.coverage else []) if m.count}
     missed_read = [m for m in key if m not in read]
-    missed_named = [m for m in key if m not in named]
-    return {
-        "searched": not missed_read,
-        "footer": not missed_named,
-        "read": sorted(read),
-        "missedRead": missed_read,
-        "missedNamed": missed_named,
-    }
+    return {"searched": not missed_read, "read": sorted(read), "missedRead": missed_read}
 
 
 def run(ask=None) -> dict[str, Any]:
@@ -98,20 +96,19 @@ def run(ask=None) -> dict[str, Any]:
             "declined": plan.declined, "costUsd": plan.usage.costUsd, "models": plan.usage.models,
             "seconds": round(time.monotonic() - t, 1),
         })
-        print(f"{'✓' if s['searched'] else '✗'}{'✓' if s['footer'] else '✗'} {q[:70]}  key={key} read={s['read']} ${plan.usage.costUsd:.4f}")
+        print(f"{'✓' if s['searched'] else '✗'} {q[:70]}  key={key} read={s['read']} ${plan.usage.costUsd:.4f}")
     report = {
         "set": "O",
         "at": datetime.now(timezone.utc).isoformat(),
         "n": len(rows),
         "searched": sum(r["searched"] for r in rows) / len(rows),
-        "footer": sum(r["footer"] for r in rows) / len(rows),
         "costUsd": round(sum(r["costUsd"] for r in rows), 4),
         "models": sorted({m for r in rows for m in r["models"]}),
         "questions": rows,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\nset O: searched {report['searched']:.0%}, footer {report['footer']:.0%}, ${report['costUsd']} on {', '.join(report['models'])} → {OUT}")
+    print(f"\nset O: searched {report['searched']:.0%}, ${report['costUsd']} on {', '.join(report['models'])} → {OUT}")
     return report
 
 

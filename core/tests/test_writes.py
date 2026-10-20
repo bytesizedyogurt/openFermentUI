@@ -159,8 +159,11 @@ def test_a_check_proposal_is_asked_for_in_the_persons_name(pool, store, monkeypa
     monkeypatch.setattr(checks, "request", request)
     write("guild", ctx(pool), "propose_check", fields={"personId": "p-ada", "skillIds": "SK-OD, SK-DCW"})
     [p] = proposals.open_ones()
-    done = proposals.carry_out(p.id, "Grace Hopper")
-    assert asked[0].by == "Grace Hopper" and asked[0].skillIds == ["SK-OD", "SK-DCW"] and "chk-1" in done.result
+    # Asked for by the Guild person the browser acts as, by id; the reviewer
+    # name goes on the proposal (OF-BLD-016 §1.R finding 11).
+    done = proposals.carry_out(p.id, "Grace Hopper", acting="p-grace")
+    assert asked[0].by == "p-grace" and asked[0].skillIds == ["SK-OD", "SK-DCW"] and "chk-1" in done.result
+    assert done.carriedOutBy == "Grace Hopper"
 
 
 # ── the free writes ───────────────────────────────────────────────────────
@@ -182,7 +185,7 @@ def test_a_candidate_written_by_hand_is_anchored_and_marked(pool, store):  # noq
     assert r.summary["state"] == "proposed" and r.summary["candidateId"].startswith("mw1-X1-")
     [row] = r.rows
     assert row.ref == f"biorepo/candidate/{r.summary['candidateId']}" and row.provenance == "unverified"
-    kept = extract.cached("X1")
+    kept = extract.hand("X1")
     assert [c.id for c in kept.candidates] == [r.summary["candidateId"]] and kept.candidates[0].provenance == "unverified"
     assert kept.audit[-1].who == "claude-haiku-5-5" and "by hand" in kept.audit[-1].action
     [line] = audit.read()
@@ -194,13 +197,125 @@ def test_a_candidate_whose_value_is_not_in_the_sentence_is_refused_on_the_rule(p
     r = write("biorepo", ctx(pool), "candidate", fields={"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "9",
                                                        "unit": "g/L", "quote": "The culture reached a titre of 7 g/L of PHB on day three."})
     assert r.error and "refused on rule value" in r.error
-    assert extract.cached("X1") is None and audit.read() == []
+    assert extract.all_cached() == [] and audit.read() == []
 
 
 def test_a_candidate_on_an_unfetched_paper_is_refused(pool, store):  # noqa: F811
     r = write("biorepo", ctx(pool), "candidate", fields={"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7",
                                                        "unit": "g/L", "quote": "q"})
     assert "no cached full text" in r.error
+
+
+HAND = {"paperId": "X1", "sectionId": "s1", "field": "titer_secreted", "value": "7", "unit": "g/L",
+        "quote": "The culture reached a titre of 7 g/L of PHB on day three."}
+
+
+def _every_cached_id() -> list[str]:
+    return [c.id for r in extract.all_cached() for c in r.candidates]
+
+
+def test_a_candidate_written_by_hand_is_not_an_extraction(pool, store, monkeypatch):  # noqa: F811
+    """OF-BLD-016 §1.R finding 3: a hand-written candidate never makes the
+    extractor's file, so the extractor still runs on the paper and the
+    evidence pool still reads the candidate."""
+    from openferment_core import biorepo, evidence_pool
+
+    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
+    _fetched(store)
+    r = write("biorepo", ctx(pool), "candidate", fields=HAND)
+    assert r.error is None, r.error
+    cid = r.summary["candidateId"]
+    assert not (store / "candidates" / "X1.json").exists() and extract.cached("X1") is None
+    assert _every_cached_id() == [cid] and cid in evidence_pool.load().records_by_id
+
+    asked = []
+
+    def model(paper_id, user_text, tool):
+        asked.append(paper_id)
+        return {"candidates": []}, extract.Usage()
+
+    monkeypatch.setattr(extract, "call_model", model)
+    got = extract.extract_paper("X1")
+    assert asked == ["X1"] and got.candidates == [] and extract.cached("X1") == got
+    # A forced run replaces the extractor's file, and the hand-written one stays.
+    extract.extract_paper("X1", force=True)
+    assert asked == ["X1", "X1"] and _every_cached_id() == [cid]
+    # A second one by hand is numbered after the first, and the extractor's file is untouched.
+    again = write("biorepo", ctx(pool), "candidate", fields={**HAND, "unit": "g L-1"})
+    assert again.error is None and again.summary["candidateId"] != cid
+    assert extract.cached("X1").candidates == [] and len(_every_cached_id()) == 2
+
+
+def test_a_decision_on_a_candidate_written_by_hand_finds_it(pool, store, monkeypatch):  # noqa: F811
+    """The tool says a person accepts or rejects a hand-written candidate on
+    Guild, so biorepo.write resolves its id (OF-BLD-016 §1.R, beside finding
+    3): it was refused on rule `record` for every such id, whose tail is four
+    digits and not the extractor's eight hex. X1 is no corpus paper, so the
+    rule that holds now is the next one, `paper`."""
+    from openferment_core import biorepo
+    from openferment_core.models import ReviewDecision
+
+    monkeypatch.setattr(biorepo, "PATH", store / "biorepo.json")
+    _fetched(store)
+    cid = write("biorepo", ctx(pool), "candidate", fields=HAND).summary["candidateId"]
+    assert biorepo._resolve(cid).id == cid
+    with pytest.raises(biorepo.WriteRefused) as refused:
+        biorepo.write(ReviewDecision(status="rejected", provenance="unverified", reviewer="Sean Creighton", recordId=cid,
+                                     at="2026-10-20T01:00:00Z", rejectReason="wrong sentence"), dry_run=True)
+    assert refused.value.rule == "paper", refused.value
+    assert biorepo._resolve("mw1-X1-0009") is None
+
+
+def test_a_candidate_written_by_hand_leaves_an_earlier_runs_file_alone(pool, store):  # noqa: F811
+    _fetched(store)
+    (store / "candidates").mkdir()
+    old = json.dumps({"paperId": "X1", "run": "haiku-1", "extractedAt": "2026-01-01T00:00:00Z", "candidates": [], "audit": []})
+    (store / "candidates" / "X1.json").write_text(old)
+    r = write("biorepo", ctx(pool), "candidate", fields=HAND)
+    assert r.error is None, r.error
+    assert (store / "candidates" / "X1.json").read_text() == old and extract.cached("X1") is None
+    assert _every_cached_id() == [r.summary["candidateId"]]
+
+
+@pytest.mark.parametrize("flags, negative, primary", [
+    ({}, None, True),
+    ({"negativeResult": "false", "isPrimary": "false"}, None, False),
+    ({"negativeResult": " False", "isPrimary": "TRUE "}, None, True),
+])
+def test_a_hand_candidates_flags_are_read_as_the_words_true_and_false(pool, store, flags, negative, primary):  # noqa: F811
+    """OF-BLD-016 §1.R finding 7: fields are strings, and bool('false') is True."""
+    _fetched(store)
+    r = write("biorepo", ctx(pool), "candidate", fields={**HAND, **flags})
+    assert r.error is None, r.error
+    [c] = [c for x in extract.all_cached() for c in x.candidates]
+    assert (c.negativeResult, c.isPrimary, c.value) == (negative, primary, 7)
+
+
+def test_a_hand_candidates_absence_anchors_on_true_and_is_refused_on_false(pool, store):  # noqa: F811
+    quote = "Non-growth-associated ethanol production was not detected in the batch culture."
+    _fetched(store, text=quote + " Growth was slow.")
+    absent = {**HAND, "field": "ethanol_lp_beta", "value": "0", "unit": "g g-1 h-1", "quote": quote}
+    no = write("biorepo", ctx(pool), "candidate", fields={**absent, "negativeResult": "false"})
+    assert no.error and "refused on rule value" in no.error and extract.all_cached() == []
+    yes = write("biorepo", ctx(pool), "candidate", fields={**absent, "negativeResult": "true"})
+    assert yes.error is None, yes.error
+    [c] = [c for x in extract.all_cached() for c in x.candidates]
+    assert (c.negativeResult, c.value, c.valueBasis) == (True, 0, "negation")
+
+
+@pytest.mark.parametrize("extra, named", [
+    ({"negativeResult": "no"}, "negativeResult"),
+    ({"isPrimary": ""}, "isPrimary"),
+    ({"isPrimary": "yes"}, "isPrimary"),
+    ({"confidence": "high"}, "confidence"),
+    ({"status": "verified"}, "status"),
+    ({"provenance": "gold", "valueBasis": "exact"}, "provenance, valueBasis"),
+])
+def test_a_hand_candidate_refuses_a_field_it_does_not_list_or_a_flag_that_is_not_true_or_false(pool, store, extra, named):  # noqa: F811
+    _fetched(store)
+    r = write("biorepo", ctx(pool), "candidate", fields={**HAND, **extra})
+    assert r.error and r.error.startswith("biorepo_write refused") and named in r.error, r.error
+    assert extract.all_cached() == [] and audit.read() == []
 
 
 def test_a_ceiling_written_by_the_model_is_an_artifact_in_the_open_lane(pool, store, monkeypatch):  # noqa: F811

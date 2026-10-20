@@ -99,3 +99,20 @@ def test_the_guard_covers_the_stream(client):
     r = client.post("/api/ask/stream", json={"question": "q?"}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
 
+
+
+def test_single_mode_holds_its_gaps_and_its_decline_to_rule_one(client, monkeypatch):
+    """OF-BLD-016 §1.R: the one-call path drops a gap or a decline holding a
+    number and names it, as the loop does; the code-written decline stands in."""
+    said = "Titres near 4.2 g/L are typical."
+
+    def one_call(question, records, corpus):
+        return {"claims": [], "gaps": ["No study ran past 72 hours.", "No study names the reactor."], "declined": said}, llm.Usage()
+
+    monkeypatch.setattr(api, "ask_model", one_call)
+    monkeypatch.setattr(api, "load_corpus", lambda: evidence_pool.load().corpus)
+    body = client.post("/api/ask", json={"question": "How much PHB?", "mode": "single"}).json()
+    assert body["gaps"] == ["No study names the reactor."]
+    assert body["declined"] and body["declined"] != said and not any(ch.isdigit() for ch in body["declined"])
+    assert "a gap dropped: it holds a number" in body["rejectionReasons"]
+    assert "the decline dropped: it holds a number" in body["rejectionReasons"]

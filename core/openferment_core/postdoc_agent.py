@@ -15,6 +15,8 @@
 THE COVERAGE PASS. Before round one, code sweeps all eleven module stores for
 what the question names and puts the map in round one, after the question;
 the trace shows it as its first step and the plan carries it for the footer.
+A follow-up is swept with the earlier questions it reads (`_swept`), never
+with the earlier answers.
 
 THE BUDGET. `MAX_ROUNDS` model turns, `MAX_TOOL_CALLS` tool calls,
 `OPENFERMENT_ASK_BUDGET_USD` (spend.ask_budget) and `MAX_SECONDS` of wall
@@ -35,6 +37,9 @@ A FOLLOW-UP opens with the conversation's last few turns as words (`_opening`):
 each earlier question, then that plan's claims, gaps and decline as code
 writes them. No id, value or quote from an earlier turn is carried, and
 `seen` starts empty, so whatever the follow-up cites, its own tools returned.
+
+A plan's gaps and its decline are held to Rule 1 like its claims
+(`held_to_rule_one`): one holding a number is dropped and named.
 """
 from __future__ import annotations
 
@@ -191,17 +196,20 @@ def _earlier_answer(turn: PriorTurn) -> str:
     return text if len(text) <= MAX_TURN_CHARS else text[: MAX_TURN_CHARS - 1].rstrip() + "…"
 
 
+def _recent(history: list[PriorTurn]) -> list[PriorTurn]:
+    """The earlier turns a follow-up reads: of the last few, those that asked
+    something."""
+    return [turn for turn in history[-MAX_HISTORY_TURNS:] if turn.question.strip()]
+
+
 def _opening(question: str, history: list[PriorTurn], coverage: str | None = None) -> list[dict[str, Any]]:
     """The conversation a question opens: the last few earlier turns as user
     and assistant text, then the question, with the coverage map after it
     when the sweep made one. With no history and no map, the question alone,
     exactly as before."""
     messages: list[dict[str, Any]] = []
-    for turn in history[-MAX_HISTORY_TURNS:]:
-        asked = turn.question.strip()
-        if not asked:
-            continue
-        messages.append({"role": "user", "content": asked[:MAX_TURN_CHARS]})
+    for turn in _recent(history):
+        messages.append({"role": "user", "content": turn.question.strip()[:MAX_TURN_CHARS]})
         messages.append({"role": "assistant", "content": _earlier_answer(turn)})
     text = f"{FOLLOW_UP}\n\n{question}" if messages else question
     content: Any = text if coverage is None else [{"type": "text", "text": text}, {"type": "text", "text": coverage}]
@@ -323,7 +331,8 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
     loop stopped. Raises what `converse` raises."""
     # The map rides in round one, after the question (§7.1); a follow-up's
     # earlier turns come before both.
-    coverage = module_stores.for_model(run.coverage) if run.coverage is not None else None
+    said_in = "conversation" if _recent(run.history) else "question"
+    coverage = module_stores.for_model(run.coverage, said_in) if run.coverage is not None else None
     messages = _opening(run.question, run.history, coverage)
     run.ctx.model = model
     defs = _tool_defs()
@@ -361,20 +370,50 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
         messages.append({"role": "user", "content": blocks})
 
 
+def _swept(question: str, history: list[PriorTurn]) -> str:
+    """What the coverage pass reads. A follow-up ("which of those are
+    fenced?") often names nothing itself, so it is swept with the earlier
+    questions `_opening` sends, each its own clause (OF-BLD-016 §1.R). The
+    earlier answers are the model's words and are never swept."""
+    return " ; ".join([*(t.question.strip()[:MAX_TURN_CHARS] for t in _recent(history)), question])
+
+
 def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
     """The coverage pass (§7.1): code, no model, before round one. A sweep
     that fails is said in the trace and the loop goes on without a map."""
     started = run.clock()
+    named = "the conversation" if _recent(run.history) else "the question"
     try:
-        run.coverage = module_stores.coverage(run.question, ctx.stores)
+        run.coverage = module_stores.coverage(_swept(run.question, run.history), ctx.stores)
     except Exception as e:  # the sweep is a help to the answer, never a reason to refuse one
         log.exception("coverage sweep failed")
         run.step(kind="coverage", tool=None, input=None, summary=f"Could not sweep the modules: {type(e).__name__}",
                  ms=int(round((run.clock() - started) * 1000)), ok=False)
         return
     run.step(kind="coverage", tool=None, input={"modules": module_stores.trace_lines(run.coverage)},
-             summary=f"Swept the modules for what the question names · {module_stores.footer(run.coverage)}",
+             summary=f"Swept the modules for what {named} names · {module_stores.footer(run.coverage)}",
              ms=int(round((run.clock() - started) * 1000)), ok=True)
+
+
+def held_to_rule_one(gaps: Any, declined: Any, reasons: list[str]) -> tuple[list[str], str | None]:
+    """A plan's gaps and its decline are model prose like a claim's text, and
+    held to Rule 1 the same way: one with a number is dropped and named in
+    `reasons`, never repaired (§5.R; the decline, OF-BLD-016 §1.R). Returns
+    the gaps kept and the model's decline, or None when it held a number, so
+    the decline code writes stands in. The single path holds its plan to it
+    too."""
+    kept: list[str] = []
+    for g in (str(g) for g in (gaps or [])):
+        if not g.strip():
+            continue
+        if find_number(g):
+            reasons.append("a gap dropped: it holds a number")
+            continue
+        kept.append(g)
+    if declined and find_number(str(declined)):
+        reasons.append("the decline dropped: it holds a number")
+        declined = None
+    return kept, declined
 
 
 def _declined(result: Any, model_declined: str | None, cmap: CoverageMap | None) -> str | None:
@@ -472,16 +511,7 @@ def ask(
     result = validate_plan(data.get("claims") or [], run.seen, ctx.pool)
     if result.rejected:
         log.warning("agent: validator dropped %d/%d claims: %s", result.rejected, result.rejected + len(result.claims), "; ".join(result.reasons))
-    # A gap is model prose like a claim's text, and held to Rule 1 the same
-    # way: one with a number is dropped and named, never repaired (§5.R).
-    gaps: list[str] = []
-    for g in (str(g) for g in (data.get("gaps") or [])):
-        if not g.strip():
-            continue
-        if find_number(g):
-            result.reasons.append("a gap dropped: it holds a number")
-            continue
-        gaps.append(g)
+    gaps, said = held_to_rule_one(data.get("gaps"), data.get("declined"), result.reasons)
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
     cited_rows = {m for c in result.claims for m in c.moduleRefs}
@@ -491,7 +521,7 @@ def ask(
         question=question,
         claims=result.claims,
         gaps=gaps,
-        declined=_declined(result, data.get("declined"), run.coverage),
+        declined=_declined(result, said, run.coverage),
         usage=run.spent,
         rejected=result.rejected,
         rejectionReasons=result.reasons,

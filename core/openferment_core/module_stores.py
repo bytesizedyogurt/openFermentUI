@@ -253,10 +253,10 @@ def _headline(output: Any) -> dict[str, Any]:
     return out
 
 
-def _artifact_row(module: str, a: Any) -> Row:
+def _artifact_row(module: str, a: Any, provenance: str) -> Row:
     inputs = [f"{i.name}={i.value}" for i in a.inputs if isinstance(getattr(i, "value", None), str)][:MAX_ITEMS]
     return Row(module=module, kind="artifact", id=a.id, label=f"{a.tool} artifact", state="open", status="computed",
-               provenance=a.provenance, words=" ".join([a.tool, *inputs]),
+               provenance=provenance, words=" ".join([a.tool, *inputs]),
                detail={"tool": a.tool, "createdAt": a.createdAt, "inputs": inputs, "output": _headline(a.output),
                        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"})
 
@@ -291,10 +291,24 @@ class Stores:
         self.rows(module)
         return self._errors.get(module)
 
+    def _artifact_mark(self, a: Any) -> str:
+        """What an artifact is worth now: `basis_provenance` over its inputs
+        as they stand (the pool's records, the store's artifacts as stored),
+        as `artifacts.compute` reads a repeat. The stored file's word is what
+        they were worth when it was computed; a record demoted or rejected
+        since would leave a claim citing the row ranked too high."""
+        from .artifacts import basis_of
+        from .basis import basis_provenance
+
+        kinds = {i.source.kind for i in a.inputs}
+        records = self.pool().records_by_id if "record" in kinds else {}
+        stored = {x.id: x for x in self._get("artifacts")} if "artifact" in kinds else {}
+        return basis_provenance(basis_of(a), records, stored)
+
     def _artifacts(self, module: str) -> Iterable[Row]:
         for a in self._get("artifacts"):
             if ARTIFACT_MODULE.get(a.tool) == module:
-                yield _artifact_row(module, a)
+                yield _artifact_row(module, a, self._artifact_mark(a))
 
     def _dominion(self) -> Iterable[Row]:
         p = self._get("projection")["dominion"]
@@ -378,7 +392,7 @@ class Stores:
                                                                    "carbonSource")),
                       detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")})
         for a in self._get("artifacts"):
-            yield _artifact_row("biorepo", a)
+            yield _artifact_row("biorepo", a, self._artifact_mark(a))
         for run in self._get("witness"):
             outcomes: dict[str, int] = {}
             for x in run.results:
@@ -427,8 +441,13 @@ class Stores:
                 # Who a check names is never shown before it is run.
                 yield Row("home", "check", c.id, f"Open check on {', '.join(c.skillIds)}", check_state(c.state), c.state,
                           detail={"skillIds": c.skillIds})
-        for p in self._get("proposals"):
-            # What a model asked for at a gate (§7.4), waiting for a person.
+        from .proposals import shown
+
+        for p in map(shown, self._get("proposals")):
+            # What a model asked for at a gate (§7.4), waiting for a person,
+            # as a reader sees it: a Guild proposal without its words, since
+            # who a check names is never shown before it is run (OF-BLD-016
+            # §1.R finding 9).
             yield Row("home", "proposal", p.id, p.title, "proposed", p.gate, words=" ".join([p.module, p.action, p.why]),
                       detail={"module": p.module, "action": p.action, "gate": p.gate, "how": p.how, "by": p.by, "at": p.at})
 
@@ -577,16 +596,17 @@ def footer(cmap: CoverageMap) -> str:
     return f"searched {in_words(cmap.searched)}, found in {in_words(cmap.found) if cmap.found else 'none'}"
 
 
-def for_model(cmap: CoverageMap) -> str:
+def for_model(cmap: CoverageMap, said_in: str = "question") -> str:
     """The map as the first turn reads it: one line a module, ids and states,
-    and what was read only in part."""
+    and what was read only in part. `said_in` is "conversation" for a
+    follow-up, which is swept with the questions it follows."""
     lines = [
-        "COVERAGE MAP, built by code before you began. It says which of the app's modules hold what this question "
-        "names. When a module below found something, do not say the app or the corpus holds nothing about it: "
-        "read that module with its tool and answer from what it returns, or say in `gaps` why you could not. "
+        "COVERAGE MAP, built by code before you began. It says which of the app's modules hold what this "
+        f"{said_in} names. When a module below found something, do not say the app or the corpus holds nothing "
+        "about it: read that module with its tool and answer from what it returns, or say in `gaps` why you could not. "
         "The refs below are for reading and are not citable: a ref goes in a claim's moduleRefs only after a "
         "read tool returns it in this conversation, and a claim citing one no read tool returned is discarded.",
-        f"Names found in the question: {', '.join(cmap.entities) or 'none'}.",
+        f"Names found in the {said_in}: {', '.join(cmap.entities) or 'none'}.",
     ]
     for m in cmap.modules:
         if m.error:
