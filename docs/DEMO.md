@@ -166,6 +166,9 @@ cost $0.0499 (a), $0.0574 (b) and $0.0316 (batch).
 - Gist: the corn stover benchmark is Proforma's only artifact, and it prices a cellulosic plant, not glucose; no ethanol
   scenario exists; one would need the sugar fed, a sugar price, and a titre, yield and productivity from a run.
 - Reliable; drops a claim that cites nothing. Tonight's runs named the archived PHA draft scenario `sc-pha-1` through the price tool; with the switch off `selling_price` now refuses an archived scenario (§2.R, fixed after the runs and not asked live again).
+- Since OF-BLD-019 (not asked again): Proforma now holds the yeast scenario `sc-yeast-1` on the glucose-to-ethanol
+  flowsheet and the dry-grind corn reference plant, and `selling_price` reads any seed scenario's newest run; §6 says what
+  binds and what still waits.
 
 **11. What is archived in this corpus, and how would I see the PHA work?**
 - Reaches: nothing but the sweep, which reads *found in none · found in archived program PHA (hidden)*.
@@ -177,7 +180,7 @@ cost $0.0499 (a), $0.0574 (b) and $0.0316 (batch).
 
 - **The archive switch.** Settings → Programs (`/settings/programs`), *Show archived programs and examples*, off. With it
   off, BioRepo lists 22 papers (thread Q) and says 167 in Casein and PHA are hidden; Hosts shows 13 strains; Molecules 116
-  of 119; Protocols `PR-OD-01` and `PR-CIP-01`; Primer module m6; Proforma no scenarios; Runbooks none (the ten seed
+  of 119; Protocols `PR-OD-01` and `PR-CIP-01`; Primer module m6; Proforma the yeast scenario `sc-yeast-1`, the two reference plants and the glucose-to-ethanol flowsheet (§6); Runbooks none (the ten seed
   runbooks describe runs nobody made, so they are examples, hidden with the archive), and the Ledger and Home's
   Predictions card count zero. A link to an archived page opens it under a
   banner naming the program. Postdoc sends the switch with every question. With it on, everything shows as before. Nothing was deleted.
@@ -207,6 +210,8 @@ cost $0.0499 (a), $0.0574 (b) and $0.0316 (batch).
 
 ## 5. Steer around
 
+Proforma has its own list at the end of §6.
+
 Questions:
 - Ram's own phone or laptop: it can load pages but not ask (see the top of this sheet). Use your tailnet device.
 - Question 4, when it declines → ask question 10 instead.
@@ -233,6 +238,66 @@ Seed content that describes runs nobody made is marked as examples (§3.3) and h
 runbooks, the seven casein protocols, lessons m0–m5 and scenarios `sc-s1`…`sc-s3`. Postdoc's reads leave them out too
 with the switch off (§4.R; tonight's runs predate this, and question 8's trace then named three of them). One trace remains:
 - With the switch on, run mode opens from any example runbook. Do not start a run from one.
+
+## 6. Proforma on BioSTEAM
+
+Proforma (`/proforma`) prices a process that BioSTEAM, an open-source process simulator, runs: it builds the plant
+unit by unit, balances every stream, sizes and costs the equipment, and solves the selling price with a
+techno-economic analysis (TEA). Every number on these pages is read from a run the service kept, from thread Q
+records, or from an assumption a named person typed. Measured 2026-10-20 at 18:08 UTC on the service of this
+branch, over this checkout's data.
+
+### The five things a person does
+
+1. **New scenario.** Proforma → *New scenario* (or *New scenario from this* on the Glucose to ethanol card in the
+   Flowsheets row) → pick the flowsheet, name it, keep the program (Yeast ethanol) → it opens on its page. It is kept
+   in this browser and survives a reload. The seed's own yeast scenario is `sc-yeast-1` (`/proforma/scenario/sc-yeast-1`).
+2. **Inputs.** The Inputs table says where each value comes from: *N records, low–high* (thread Q, through the
+   aggregate gate), an *assumption by* a named person, a fermOS fit, or *waiting*. On thread Q today three bind and
+   three wait: feed glucose 4 records (20–100 g/L), titre 9 records (57–139 g/L), yield 18 records (0.22–0.518 g/g);
+   productivity waits (its 14 records name no carbon source), and so do plant scale and glucose price. Type each
+   waiting value under your reviewer name with what it rests on (*Keep assumption*). A run with an assumption is
+   marked *Modeled · not measured*.
+3. **Run.** *Run the scenario* sends it to the warm BioSTEAM worker; the status line says cold, starting or ready.
+   The first run after a restart takes about half a minute; a repeat of the same inputs returns the kept run at once.
+4. **Read.** The price with its basis and its 5th to 95th percentile over the samples; the base case (or why it could
+   not run); the cost breakdown from the TEA; the sensitivity (which input moves the price most); the stream table,
+   the equipment with installed costs, the utilities, and the diagram (drawn where Graphviz is installed; otherwise the
+   units in order). *Ceiling check* sets the yield beside the geneOS ceilings of the yeast models: today the high end of
+   the yield records (0.518) sits above both stored *S. cerevisiae* ceilings (0.5114 g/g), so it is flagged, never
+   clamped, and the record above is named. pureOS → Train (`/pureos/train/sc-yeast-1`) reads the same run unit by unit,
+   with the product recovered at each, and a Properties card asks thermosteam for the beer's density and boiling point.
+5. **Compare.** Pin two or more scenarios (the pin on each page) and open Compare (`/biorepo/compare`): price, cost
+   lines and inputs side by side, each read from its own newest run; scenarios on different flowsheets are said to
+   differ in basis.
+
+### What the reference runs showed
+
+- **Dry-grind corn to ethanol** (`/proforma/reference/corn_drygrind`), the yeast program's reference plant, built by the
+  `biorefineries` package on its own defaults: run in 21 s cold. Ethanol 0.4855 USD/kg, the package's own set price
+  (its TEA solves the internal rate of return at it: 5.38 %). All eleven values of the package's own test hold within
+  its 5 % (*Held to its package's own test*). One compatibility line lets the package's fermenter take its two inlets on
+  this BioSTEAM; it changes no number, and the page says so.
+- **Corn stover to ethanol** (`/proforma/reference/cornstover_benchmark`), the NREL 2011 design: 1.9677 USD per gallon
+  against the package's 1.968, unchanged. Nine of its eleven package-test values hold; installed equipment cost (−7.9 %)
+  and electricity consumption (−5.2 %) miss, as the package's own test misses on these versions.
+
+### The two questions (Postdoc)
+
+- *What does the dry-grind corn ethanol reference plant give for its ethanol price, and what does the glucose-to-ethanol
+  scenario still wait for?* — 2 and 4 claims kept in two runs; both name the three inputs that wait. Both say they could
+  not tell whether the corn price is solved or set: it is set (see above).
+- *What is the density and boiling point of the beer at the titre thread Q reports for CEN.PK113-7D?* — declined both
+  times: thermosteam answered, and Haiku wrote the numbers into its claims, which Rule 1 drops. Show the Properties card
+  on pureOS → Train or fermOS instead.
+
+### Steer around (Proforma)
+
+- The beer question above: show the Properties card, do not ask it.
+- `sc-yeast-1` before anyone types the three waiting assumptions: *Run the scenario* stays disabled and says what waits.
+- The corn stover page's two red rows: they are the package's own misses on these versions, not ours.
+- The diagram on the cloud copy: it lists the units in order; it draws on the Mini once `brew install graphviz` is done.
+- The archived PHA scenario (`sc-pha-1`) and the casein cost surfaces (S1–S3): hidden with the switch off; leave it off.
 
 ---
 
