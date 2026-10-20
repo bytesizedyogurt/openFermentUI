@@ -89,6 +89,10 @@ class ToolContext:
     # The ask this run belongs to, on every audit line a write makes (§7.3);
     # empty for a call from the endpoint or the MCP server.
     ask_id: str = ""
+    # The model answering this run, set by the loop before it runs a turn's
+    # tools, so an audit line names the model that asked for the write and
+    # not the chain's first name; empty for a call from outside the app.
+    model: str = ""
 
     @property
     def pool(self) -> Any:

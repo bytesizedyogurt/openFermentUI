@@ -274,3 +274,25 @@ def test_the_log_survives_a_damaged_line(store):
         f.write("{not json\n")
     audit.append(agent="person", who="Ada", module="home", action="note", state="done")
     assert [a.who for a in audit.read()] == ["m", "Ada"]
+
+
+def test_the_audit_names_the_model_that_answered_not_the_chains_first(pool, store, monkeypatch):  # noqa: F811
+    """§7.R finding 7: after a fallback, the writing model is the fallback."""
+    c = ctx(pool)
+    c.model = "claude-sonnet-5-5"
+    write("home", c, "note", note="n")
+    [line] = audit.read()
+    assert line.who == "claude-sonnet-5-5" and proposals.open_ones()[0].by == "claude-sonnet-5-5"
+
+
+def test_a_finding_is_audited_as_a_finding_not_as_open(pool, store, monkeypatch):  # noqa: F811
+    """§7.R finding 3: a sugar the model cannot take up keeps nothing."""
+    from types import SimpleNamespace
+
+    from openferment_core import geneos
+
+    monkeypatch.setattr(geneos, "ceiling", lambda *a, **k: SimpleNamespace(artifactId=None, output={}, evidence=None,
+                                                                            finding="no uptake reaction for xylose"))
+    r = write("geneos", ctx(pool), "ceiling", fields={"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"})
+    assert r.summary["state"] == "finding" and r.evidence == []
+    assert [a.state for a in audit.read()] == ["finding"]

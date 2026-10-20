@@ -257,6 +257,7 @@ def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
         # The map rides in round one, after the question (§7.1).
         first = [{"type": "text", "text": run.question}, {"type": "text", "text": module_stores.for_model(run.coverage)}]
     messages: list[dict[str, Any]] = [{"role": "user", "content": first}]
+    run.ctx.model = model
     defs = _tool_defs()
     rounds = 0
     while True:

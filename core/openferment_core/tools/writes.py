@@ -130,14 +130,17 @@ class ModuleWriteInput(BaseModel):
     note: str = Field(description="Why, in your own words; kept on the audit line and the proposal.")
 
 
-def _who() -> tuple[str, str]:
-    return llm.chain("answer")[0], llm.effort()
+def _who(ctx: ToolContext | None = None) -> tuple[str, str]:
+    """The model this write is marked with: the one answering the run when a
+    loop owns it (§7.R finding 7), else the chain's first name."""
+    model = getattr(ctx, "model", "") or llm.chain("answer")[0]
+    return model, llm.effort()
 
 
 def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str | None, detail: dict[str, Any]) -> None:
     from .. import audit
 
-    model, effort = _who()
+    model, effort = _who(ctx)
     audit.append(agent="model", who=model, module=module, action=action, state=state, target=target,
                  ask_id=getattr(ctx, "ask_id", None), effort=effort, detail=detail)
 
@@ -145,7 +148,7 @@ def _audit(ctx: ToolContext, module: str, action: str, state: str, target: str |
 def _propose(ctx: ToolContext, module: str, action: str, gate: gates.Gate, inp: ModuleWriteInput, title: str, why: str) -> ToolResult:
     from .. import proposals
 
-    model, effort = _who()
+    model, effort = _who(ctx)
     made = proposals.propose(module=module, action=action, gate=gate, title=title, why=why, by=model,
                              target=inp.target or None, fields=inp.fields, note=inp.note,
                              ask_id=getattr(ctx, "ask_id", None), effort=effort)
@@ -188,8 +191,10 @@ def _geneos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         return ToolResult(error=f"geneos_write could not compute it: {e}")
     if r.finding:
-        _audit(ctx, "geneos", action, "open", f["modelId"], {"finding": r.finding, "note": inp.note})
-        return ToolResult(summary={"state": "open", "model": f["modelId"], "finding": r.finding})
+        # A finding stores nothing (§7.R finding 3): the audit line says so.
+        _audit(ctx, "geneos", action, "finding", f["modelId"], {"finding": r.finding, "note": inp.note})
+        return ToolResult(summary={"state": "finding", "model": f["modelId"], "finding": r.finding,
+                                   "meaning": "nothing was kept: the model cannot take this feed up, which is the answer"})
     ev = r.evidence
     assert ev is not None
     _audit(ctx, "geneos", action, "open", f["modelId"], {"artifactId": r.artifactId, "evidenceId": ev.id, "note": inp.note})
@@ -245,7 +250,7 @@ def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
     need = _need(inp, "paperId", "sectionId", "field", "value", "unit", "quote")
     if need:
         return ToolResult(error=f"biorepo_write refused: {need}")
-    model, _ = _who()
+    model, _ = _who(ctx)
     raw = {k: v for k, v in inp.fields.items() if k != "paperId"}
     try:
         made, rule, detail = extract.add_candidate(inp.fields["paperId"], raw, who=model)

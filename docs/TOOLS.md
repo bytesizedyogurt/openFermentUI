@@ -59,8 +59,12 @@ tool never touches a store: each action calls the module's own write
 function, where the module's rules live, and `check:tools` fails when this
 file reaches a file. Every write that goes through lands in the open lane
 and is appended to the audit log (`core/data/audit.jsonl`, `GET /api/audit`)
-with `agent: model`, the model id, the effort and the ask id. A person's
-carry-out or dismissal is appended the same way.
+with `agent: model`, the model id (the one answering the run, after any
+fallback), the effort and the ask id. A call from `POST /api/tools/{name}` or
+the MCP server belongs to no ask, and its line carries `askId: null`. A
+person's carry-out or dismissal is appended the same way. A geneOS write that
+ends in a finding (a feed the model cannot take up) keeps nothing and is
+audited as `finding`.
 
 | Tool | Action | What happens | Through |
 |---|---|---|---|
