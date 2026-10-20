@@ -141,6 +141,19 @@ def run_benchmark():
     return artifacts.compute(BENCHMARK, benchmark_inputs())
 
 
+def benchmark_evidence(art):
+    """The benchmark run as one Evidence: the package's minimum ethanol
+    selling price per gallon, as the stored artifact holds it."""
+    from . import artifacts
+    from .models import Evidence
+
+    return Evidence(
+        id=art.id,
+        label="Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it",
+        value=art.output["mespUsdPerGal"], unit="USD gal⁻¹",
+        provenance=art.provenance, basis=artifacts.basis_of(art), figure=None)
+
+
 # ── The PHA scenario (§8.3) ─────────────────────────────────────────────
 #
 # Its inputs bind to records, or to an assumption a named person typed; the

@@ -30,8 +30,8 @@ log = logging.getLogger("openferment.postdoc")
 # the thinking counts against this limit. Room for both.
 MAX_TOKENS = 8000
 
-SYSTEM = """You are Postdoc, a research assistant for precision fermentation \
-in the openFerment platform.
+SYSTEM = """You are Postdoc, a research assistant for fermentation and \
+bioprocess research in the openFerment platform.
 
 You may only make claims supported by the evidence records you are given. You \
 have no other sources. If you know something from elsewhere and no record \
@@ -47,8 +47,8 @@ it is not corrected and it is not shown.
   bad:   "Titre reached 4.2 g/L in cw15"
   bad:   "Titre roughly doubled under mixotrophic conditions"
 
-Strain and assay names that contain digits are fine — cw15, UVM4, OD600, CK2 \
-are identifiers, not quantities.
+Strain, model and assay names that contain digits are fine — cw15, UVM4, \
+S288C, CEN.PK113-7D, iMM904, OD600, CK2 are identifiers, not quantities.
 
 Cite the record ids you actually used, exactly as given. A citation that does \
 not resolve discards the claim.
