@@ -7,7 +7,6 @@ import {
   ChartScatter,
   Database,
   Download,
-  Gauge,
   Info,
   KeyRound,
   Layers,
@@ -122,7 +121,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'about',
     label: 'About & fidelity',
-    blurb: 'What is real in this build, what follows an authored timeline, and what is only a surface.',
+    blurb: 'What is real in this build, what is written into it by hand, and what is only a surface.',
   },
 ];
 
@@ -277,7 +276,6 @@ function AppearanceSection() {
   const theme = useStore((s) => s.ui.theme);
   const density = useStore((s) => s.ui.density);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
-  const simSpeed = useStore((s) => s.ui.simSpeed);
   const setUI = useStore((s) => s.setUI);
   const allRecords = useStore((s) => s.records);
   const shows = useProgramFilter();
@@ -415,35 +413,6 @@ function AppearanceSection() {
         </Card>
       </section>
 
-      <section>
-        <SectionTitle
-          right={
-            <span className="text-caption text-ink-soft inline-flex items-center gap-1.5">
-              <Gauge size={13} aria-hidden /> rehearsal clock
-            </span>
-          }
-        >
-          Simulation speed
-        </SectionTitle>
-        <RadioCards<number>
-          name="simspeed"
-          label="Simulation speed"
-          value={simSpeed}
-          onChange={(v) => setUI({ simSpeed: v })}
-          className="sm:grid-cols-3"
-          options={[
-            { value: 1, label: '1× — real time', desc: 'Stages and timers run at their authored durations.' },
-            { value: 4, label: '4× — rehearsal', desc: 'Four times faster. Useful when walking someone through a flow.' },
-            { value: Infinity, label: 'Instant', desc: 'Jobs land immediately; run timers burn at 60× so a soak finishes on stage.' },
-          ]}
-        />
-        <p className="text-caption text-ink-soft mt-2 max-w-3xl">
-          This scales <span className="font-medium text-ink">simulated latency only</span> — ingest
-          stages, extraction and solver jobs, and Deposition timers. It changes nothing about the
-          numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so
-          nobody watching is misled about how fast the real thing would be.
-        </p>
-      </section>
     </div>
   );
 }
@@ -456,7 +425,8 @@ function AppearanceSection() {
 // suggested questions leave every list, count and prompt; on, everything
 // shows as it did before programs existed. Nothing is deleted either way
 // (D1), and a link to an archived entity opens it under a banner. The switch
-// is in the Durable tier, so it survives a reload and a reset.
+// is in the Durable tier, so it survives a reload; clearing this browser's
+// data turns it off, because the shipped state hides archived programs.
 
 /** "threads A to O", "thread Q": a program's letters, written out. */
 function lettersLabel(letters: readonly string[]): string {
@@ -1294,9 +1264,9 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Ingest pipeline',
-    fidelity: 'Authored',
+    fidelity: 'Full for Fetch and Parse, through the service when it is running',
     notes:
-      'Fetch, parse, chunk, embed and extract are timed stages over entries already present in the build, including one authored parse failure. No document is retrieved and no text is added: every entry is still catalogued when the run finishes.',
+      'With the service running, Fetch asks Europe PMC for a paper\u2019s open-access text and Parse cuts it into sections, on the machine that runs the service; the text stays there and never enters the build. Extraction is its own step. With the service down, a fetch stops at its first stage and says the service is not running; nothing is retrieved.',
   },
   {
     feature: 'Learn lessons and checkpoints',
@@ -1311,8 +1281,9 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Jobs tray',
-    fidelity: 'Full over authored job timelines',
-    notes: 'Progress, failure surfacing and completion toasts are real; stage durations are authored.',
+    fidelity: 'Full for fetches and extractions',
+    notes:
+      'A fetch or an extraction moves only on the service\u2019s answer, and its failure is the service\u2019s reason. Any other job advances on stage durations set in the browser, not on work done.',
   },
   {
     feature: 'Authentication, API keys, sharing',
@@ -1412,27 +1383,32 @@ function AboutSection() {
               <span className="font-num">{corpus.verify}</span> are flagged for verification.
             </li>
             <li>
-              <span className="font-medium">Every entry is catalogued, not ingested.</span> No full
-              text has been retrieved. Each entry is metadata plus a hand-written curator note, so a
-              highlighted extraction span anchors to the curator&rsquo;s prose, not to the
-              paper&rsquo;s own words. Of the{' '}
-              <span className="font-num">{records.length}</span> extraction records,{' '}
-              <span className="font-num">{prov.curated}</span> are curated: transcribed from the
-              curation document and not yet checked against the source PDF. The remaining{' '}
+              <span className="font-medium">The build carries no paper&rsquo;s full text.</span>{' '}
+              A hand-curated entry is metadata plus a curator&rsquo;s note, so a span highlighted on
+              it anchors to the curator&rsquo;s prose. With the service running, Intake fetches
+              open-access full text onto that machine, where extraction and search read it; it never
+              enters the build. Of the <span className="font-num">{records.length}</span> extraction
+              records showing, <span className="font-num">{prov.curated}</span> are curated:
+              transcribed from the curation document and not yet checked against the source PDF;{' '}
               <span className="font-num">{prov.estimate}</span> are industry estimates, which are
-              not evidence. Read a value against its source before you cite it.
+              not evidence; and <span className="font-num">{records.length - prov.curated - prov.estimate}</span>{' '}
+              carry another provenance, shown on each by its badge. Read a value against its source
+              before you cite it.
             </li>
             <li>
-              <span className="font-medium">No extractor has ever been run.</span> There is no
-              extractor output in this build, so no precision, recall or F1 figure appears anywhere.
-              Validation shows the gold set that is planned, the difficulty cases it has to include,
-              and the values the ontology cannot yet hold — and states that nothing has been scored.
+              <span className="font-medium">The extractor runs in the service, not here.</span>{' '}
+              What it extracts arrives as unverified candidates, each anchored to a sentence of a
+              fetched paper, and waits for a reviewer in Guild. Witness scores a run against the
+              curated records on the papers it fetched and labels the figures provisional; with the
+              service down, or before any run, it shows no figure.
             </li>
             <li>
-              <span className="font-medium">Session state is held in memory only.</span> Reviews,
-              edits, runs, new protocol versions and chat history live in this browser tab and are
-              gone on refresh. There is no database, no account and no server; exporting a CSV is
-              the only way anything leaves.
+              <span className="font-medium">What you do here is kept in this browser.</span>{' '}
+              Depositions, review decisions, runbook locks, the lessons finished here, Postdoc&rsquo;s
+              conversations, this browser&rsquo;s copy of Guild&rsquo;s ledger and the program switch
+              survive a refresh.
+              With the service running, a review decision is also written to the service&rsquo;s
+              files on its machine. There is no account and no sign-in.
             </li>
             <li>
               <span className="font-medium">Simulation economics are illustrative.</span> The cost
@@ -1478,7 +1454,7 @@ function AboutSection() {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-info border-signal-info/45">Authored</span>
-            follows an authored timeline or answer —{' '}
+            is written into the build by hand, not computed —{' '}
             <span className="font-num">{counts.Authored}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -1567,7 +1543,7 @@ function AboutSection() {
             decisions, runbook locks and Postdoc&rsquo;s Live conversations — is written to
             IndexedDB in this browser, because a fermentation at hour 14 with timers running cannot
             be lost to a page reload, and neither can a question somebody is halfway through. Everything
-            else is memory only and resets: open panels, density, theme, simulation speed. No
+            else is memory only and resets: open panels, density, theme. No
             localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
             browser. &ldquo;Clear this browser&rsquo;s data&rdquo; clears the durable store as well as memory.
           </Row>

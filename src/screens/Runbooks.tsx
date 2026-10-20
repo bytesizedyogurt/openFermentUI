@@ -157,6 +157,9 @@ function HandoffPanel({ productId }: { productId: string }) {
                 ? 'Nothing has been assessed here, so every process below it describes work that may or may not be yours to run. A clearance sweep classifies the claims before anything else is worth scheduling.'
                 : 'This molecule is not fenced, so there is nothing to enumerate around. Opening a runbook here will say so and stop, which is a cheap answer worth having on the record.'}
           </p>
+          <p className="text-caption text-ink-soft mt-1 max-w-3xl">
+            Nothing runs behind a research runbook yet: it opens as a draft, with no estimate of time or cost.
+          </p>
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <ClearanceChip state={product.clearanceState} />
             <Button
@@ -166,7 +169,7 @@ function HandoffPanel({ productId }: { productId: string }) {
                 if (id) navigate(`/runbooks/${id}`);
               }}
             >
-              <Sparkles size={14} /> Open the research runbook
+              <Sparkles size={14} /> Draft the research runbook
             </Button>
             <Button onClick={() => navigate('/runbooks')}>Not now</Button>
             <a

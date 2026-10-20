@@ -45,16 +45,16 @@ const STOPS: Stop[] = [
     body: 'The Guild of Applied Life is who may verify. Reviewers triage by keyboard: a accept, r reject, e edit, g flag for gold, u undo. Every decision lands in the record’s audit trail immediately — and propagates to the strain pages and to Witness.',
   },
   {
-    route: '/runbooks/protocols/PR-OD-01',
-    surface: 'Runbooks · Protocols',
-    title: 'Verified numbers become procedures',
-    body: 'Scaling is real arithmetic: change the batch size and every bound quantity, stock volume, and materials row recomputes, rounded to each material’s precision so the recipe stays pipettable. Deposition then executes it at the bench.',
+    route: '/geneos/model',
+    surface: 'geneOS · Model',
+    title: 'A ceiling computed, beside what was reported',
+    body: 'geneOS runs flux balance analysis on published reaction networks: the most product each network can make from a sugar, kept as an artifact with its basis, and drawn beside every reported yield of that product. A yield above a ceiling is ringed for a reviewer to check. With the service down the page says so, and nothing stands in for a result.',
   },
   {
     route: '/biorepo/witness',
     surface: 'BioRepo · Witness',
     title: 'How we know, and how we’re honest when we’re wrong',
-    body: 'Witness asks whether it reproduces. It scores the extractor\'s run against the curated records on the papers the service fetched, labels each figure provisional with the records it stands on, and lists the real values the ontology has no field for. A metric it has not earned is not displayed: with no run, it shows the gold-set plan instead.',
+    body: 'Witness asks whether it reproduces. It scores the extractor\'s run against the curated records on the papers the service fetched, labels each figure provisional with the records it stands on, and lists the real values the ontology has no field for. A metric it has not earned is not displayed: with no run, it says so and shows no figure.',
   },
 ];
 

@@ -334,7 +334,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   );
 
   const subtitle =
-    'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe this demonstration corpus — not the published literature.';
+    'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe the corpus as curated here — not the published literature.';
 
   if (strains.length === 0) {
     return (

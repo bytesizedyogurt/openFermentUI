@@ -7,7 +7,7 @@
 //
 // PROGRAMS (OF-BLD-016 §2.2). The strain itself always opens, so a bookmark
 // to an archived host still lands, under ArchivedBanner. Everything the page
-// lists about it (papers, records, media, protocols, scenarios, collections,
+// lists about it (papers, records, media, protocols, scenarios,
 // products, runbooks) passes the program selector through `useProgramScope`:
 // on a general or active host the archived programs' share is hidden, and on
 // an archived host what belongs to its own program shows with it.
@@ -25,7 +25,6 @@ import {
   ClipboardList,
   Download,
   FlaskConical,
-  Layers,
   LineChart,
   Microscope,
   NotebookPen,
@@ -568,7 +567,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const scenarios = useStore((s) => s.scenarios);
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
-  const collections = useStore((s) => s.collections);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
   const density = useStore((s) => s.ui.density);
@@ -797,20 +795,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
     [hostProducts],
   );
 
-  const linkedCollections = useMemo(() => {
-    const ids = new Set(strainPapers.map((p) => p.id));
-    return collections
-      .map((c) => ({
-        c,
-        hits: c.paperIds.filter((id) => ids.has(id)),
-        size: c.paperIds.filter((id) => inView('paper', id)).length,
-      }))
-      .filter((x) => x.hits.length > 0);
-  }, [collections, strainPapers, inView]);
   const hiddenMedium = hiddenRecords.filter((r) => r.field === 'medium_component_conc');
-  const hiddenCollected = allStrainPapers.filter(
-    (p) => !inView('paper', p.id) && collections.some((c) => c.paperIds.includes(p.id)),
-  );
 
   // ── media ────────────────────────────────────────────────────────────
 
@@ -1593,50 +1578,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
 
           <Card className="p-4">
             <div className="flex items-center gap-2 text-caption uppercase tracking-wide text-ink-soft mb-2">
-              <Layers size={13} /> Collections
-              <span className="font-num">({linkedCollections.length})</span>
+              <BookOpen size={13} /> Library
             </div>
-            {linkedCollections.length === 0 ? (
-              <div className="text-body text-ink-soft">
-                None of this strain&rsquo;s papers sit in a collection yet.{' '}
-                <a className="text-accent hover:underline" href={href('/biorepo')}>
-                  Open the library
-                </a>
-                .
-                {hiddenNote(
-                  'paper',
-                  hiddenCollected.map((p) => p.id),
-                  hiddenCollected.length === 1
-                    ? 'One of its papers that sits in a collection'
-                    : `${hiddenCollected.length} of its papers that sit in a collection`,
-                )}
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {linkedCollections.map(({ c, hits, size }) => (
-                  <li key={c.id} className="border-b border-line/70 last:border-b-0 pb-2 last:pb-0">
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-caption text-ink-soft">
-                      <span className="font-num">{hits.length}</span> of{' '}
-                      <span className="font-num">{size}</span> papers in this collection
-                      cover the strain
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {hits.slice(0, 6).map((id) => (
-                        <CitationChip key={id} paperId={id} />
-                      ))}
-                      {hits.length > 6 && (
-                        <span className="text-caption text-ink-soft font-num self-center">
-                          +{hits.length - 6}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-3 pt-2 border-t border-line text-caption text-ink-soft flex flex-wrap items-center gap-2">
-              <BookOpen size={13} />
+            <div className="text-body text-ink-soft flex flex-wrap items-center gap-2">
               <span>
                 <span className="font-num text-ink">{strainPapers.length}</span> paper
                 {strainPapers.length === 1 ? '' : 's'} list this organism
@@ -1644,9 +1588,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               <a className="text-accent hover:underline" href={href('/biorepo')}>
                 Open the library
               </a>
-              <span className="w-full text-ink-soft">
-                Collection membership is filtered inside the library, not by this link.
-              </span>
             </div>
           </Card>
         </div>

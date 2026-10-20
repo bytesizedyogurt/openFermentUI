@@ -212,8 +212,12 @@ for (const mod of MODULES)
 
 // ── 2c. nothing invented reaches a default view (OF-BLD-016 E.3′) ─────
 //
-// The words demo, sample run, stand-in, placeholder and scripted appear in
-// what src/ shows a person only in `pnpm demo:offline`'s replay label.
+// The words demo, sample run, stand-in, placeholder and scripted (and the
+// phrases that renamed them: a demonstration corpus, an authored timeline,
+// timed stages over what is already there) appear in what src/ and
+// index.html show a person only in `pnpm demo:offline`'s replay label.
+// Whitespace is collapsed before the test, JSX text is never a code token,
+// and a capitalised or spaced word joined by - or / is prose.
 //
 // What a person can see is read from the syntax tree, not the raw text: every
 // string literal, template-literal part and JSX text node in every .ts and
@@ -227,10 +231,15 @@ for (const mod of MODULES)
 //
 // ALLOWED names each exception and why; it stays this short.
 {
-  const WORD = /(?<![\w\-./:@#])(demo|sample run|stand-in|placeholder|scripted)(?![\w\-/:@])/i;
+  const WORD = /(?<![\w\-./:@#])(demo|demonstration (?:corpus|data|purposes)|sample[ -]run|stand-in|placeholder|scripted|authored (?:job )?timelines?|authored durations?|timed stages over)(?![\w\-/:@])/i;
+  // A word joined to another by - or / is prose when it starts with a capital
+  // or the string holds a space (Demo-grade, Demo/preview, a sample-run of it).
+  const JOINED = /(?<![\w.:@#])(demo|sample[\s-]+run|stand-in|placeholder|scripted)(?=[-/][A-Za-z])/i;
   const ALLOWED: { file: string; text: RegExp; why: string }[] = [
     { file: 'src/screens/Postdoc.tsx', text: /^Replay of a recorded test run, made with a scripted stand-in in place of the model\.$/, why: "pnpm demo:offline's replay label (E.3′)" },
     { file: 'src/lib/csv.ts', text: /^#\s+demo\s+modeled, not measured \(simulation outputs\)$/, why: 'an export\'s legend names the provenance code `demo` its rows carry' },
+    { file: 'src/data/learn.ts', text: /^The value was invented for demonstration purposes$/, why: 'a wrong option in a quiz on what "curated" claims: it says what a record is not' },
+    { file: 'src/screens/Home.tsx', text: /^Every number in openFerment carries a provenance tick: .* a dashed amber bar for demonstration data with/, why: 'the tick legend names the provenance `demo` a computed value on an assumption carries' },
     { file: 'src/data/runbooks.ts', text: /^Equipment and CAPEX stage has not run; figure is a placeholder to be tested$/, why: 'a locked prediction\'s basis: its words are in the lock digest check:lock holds (OF-BLD-016 §3.3 marks the runbook an example)' },
   ];
   const CODE_TOKEN = /^[a-z0-9_\-:.\/@#]+$/;
@@ -239,6 +248,14 @@ for (const mod of MODULES)
       const path = join(dir, name);
       return statSync(path).isDirectory() ? walk(path) : /\.tsx?$/.test(name) ? [path] : [];
     });
+  // index.html is read too: its title names every tab and bookmark.
+  {
+    const html = readFileSync('index.html', 'utf8').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+    const shown = [...html.matchAll(/>([^<]+)</g)].map((m) => m[1]).concat([...html.matchAll(/(?:content|title|alt|aria-label)="([^"]*)"/g)].map((m) => m[1]));
+    for (const said of shown) {
+      if (WORD.test(said.replace(/\s+/g, ' '))) fail(`index.html shows "${said.trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
+    }
+  }
   for (const file of walk('src')) {
     const text = readFileSync(file, 'utf8');
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
@@ -246,20 +263,78 @@ for (const mod of MODULES)
       let said: string | null = null;
       if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) said = node.text;
       else if (ts.isJsxText(node)) said = node.text;
-      if (said !== null && WORD.test(said)) {
+      // Whitespace is collapsed first: the formatter wraps JSX text mid-phrase.
+      if (said !== null) said = said.replace(/\s+/g, ' ');
+      if (said !== null && (WORD.test(said) || (/\s|^[A-Z]/.test(said.trim()) && JOINED.test(said)))) {
         const parent = node.parent;
         const code =
           (parent && (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent) || ts.isLiteralTypeNode(parent) || ts.isExternalModuleReference(parent))) ||
-          CODE_TOKEN.test(said.trim());
+          // JSX text is always shown, so a bare token there is prose too.
+          (CODE_TOKEN.test(said.trim()) && !ts.isJsxText(node));
         const allowed = ALLOWED.some((a) => file.replace(/\\/g, '/') === a.file && a.text.test(said!.trim()));
         if (!code && !allowed) {
           const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
-          fail(`${file}:${line + 1} shows "${said.replace(/\s+/g, ' ').trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
+          fail(`${file}:${line + 1} shows "${(said.match(WORD) ?? said.match(JOINED))?.[0]}" in "${said.trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
         }
       }
       ts.forEachChild(node, visit);
     };
     visit(sf);
+  }
+}
+
+// ── 2d. the palette never wipes this browser in one keystroke (OF-BLD-016 §3.R)
+// Clearing this browser's data asks first, in Settings → Corpus & ontology;
+// the palette may take a person there and no further.
+if (/clearBrowserData/.test(readFileSync('src/components/CommandPalette.tsx', 'utf8')))
+  fail('src/components/CommandPalette.tsx calls clearBrowserData — clearing this browser\u2019s data asks first, in Settings (OF-BLD-016 §3.R)');
+
+// ── 2e. no timed job stands in for work on a screen (OF-BLD-016 §3.R) ──
+// A job a screen starts is real (`real: true`, a service call behind it), or
+// the screen does not start one: a clock that ends in "complete" with nothing
+// read, extracted or staged is invented.
+{
+  const screens = readdirSync('src/screens').filter((n) => n.endsWith('.tsx')).map((n) => join('src/screens', n));
+  for (const file of screens) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/startJob\(\{([\s\S]*?)\n\s*\}\);/g)) {
+      if (!/real:\s*true/.test(m[1])) {
+        const line = text.slice(0, m.index).split('\n').length;
+        fail(`${file}:${line} starts a timed job with no work behind it (OF-BLD-016 §3.R)`);
+      }
+    }
+  }
+}
+
+// ── 2f. no simulated-latency control (OF-BLD-016 §3.R) ─────────────────
+// Nothing on a screen offers to speed up a clock, and a bench timer runs at
+// wall-clock speed: the multiplier is store-internal, for the offline jobs.
+{
+  const walkAll = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walkAll(path) : /\.tsx?$/.test(name) ? [path] : [];
+    });
+  for (const file of walkAll('src')) {
+    if (file.replace(/\\/g, '/') === 'src/store.ts') continue;
+    if (/\bsimSpeed\b/.test(readFileSync(file, 'utf8').replace(/\/\/.*$/gm, ''))) fail(`${file} offers a simulated-latency control (OF-BLD-016 §3.R)`);
+  }
+  const store = readFileSync('src/store.ts', 'utf8');
+  const timers = store.slice(store.indexOf('  tickTimers: (dtMs) => {'), store.indexOf('  tickTimers: (dtMs) => {') + 600);
+  if (/simSpeed/.test(timers)) fail('src/store.ts: tickTimers scales a bench timer by the simulated-latency multiplier (OF-BLD-016 §3.R)');
+}
+
+// ── 2g. no control for collections nothing can create (OF-BLD-016 §3.R) ─
+// The seed collections went with §3.1, and no action makes one, so no screen
+// offers to add a paper to one.
+{
+  const store = readFileSync('src/store.ts', 'utf8');
+  if (!/\bcreateCollection\b/.test(store)) {
+    for (const name of readdirSync('src/screens').filter((n) => n.endsWith('.tsx'))) {
+      const text = readFileSync(join('src/screens', name), 'utf8');
+      if (/Add to collection/.test(text)) fail(`src/screens/${name} offers "Add to collection", and nothing can create a collection (OF-BLD-016 §3.R)`);
+      if (/>\s*Collections\s*(?:<|\n)/.test(text)) fail(`src/screens/${name} shows a Collections section, and nothing can create a collection (OF-BLD-016 §3.R)`);
+    }
   }
 }
 

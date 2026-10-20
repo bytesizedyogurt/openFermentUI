@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  FolderPlus,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -34,7 +33,6 @@ import {
   Card,
   EmptyState,
   LinkButton,
-  Popover,
   SectionTitle,
   cx,
 } from '@/components/ui';
@@ -121,25 +119,13 @@ export default function PaperReader({
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
   // OF-BLD-016 §2.2: a link opens any paper, and one in an archived program
-  // opens under the banner that names it; the collection chooser offers the
-  // collections BioRepo lists — empty ones, and those holding a paper that
-  // shows — and any that already hold this paper.
+  // opens under the banner that names it.
   const shows = useProgramFilter();
-  const allCollections = useStore((s) => s.collections);
-  const collections = useMemo(
-    () =>
-      allCollections.filter(
-        (c) => c.paperIds.length === 0 || c.paperIds.includes(paperId) || c.paperIds.some((id) => shows('paper', id)),
-      ),
-    [allCollections, shows, paperId],
-  );
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const setUI = useStore((s) => s.setUI);
-  const startJob = useStore((s) => s.startJob);
   const ingestPaper = useStore((s) => s.ingestPaper);
-  const addCollectionPapers = useStore((s) => s.addCollectionPapers);
   const toast = useStore((s) => s.toast);
 
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
@@ -272,27 +258,6 @@ export default function PaperReader({
   const selectFromRail = (id: string) => {
     setActiveId(id);
     spanRefs.current[id]?.scrollIntoView({ behavior, block: 'center' });
-  };
-
-  const runExtraction = (label: string) => {
-    startJob({
-      title: `${label} — ${paper.id}`,
-      kind: 'extraction',
-      stages: [
-        { label: 'Load sections', ms: 700 },
-        { label: 'Chunk', ms: 600 },
-        { label: 'Extract fields', ms: 1800 },
-        { label: 'Score confidence', ms: 800 },
-        { label: 'Stage for review', ms: 500 },
-      ],
-      href: `#/intake?paper=${paper.id}`,
-    });
-    toast({
-      text: `${label} queued for ${paper.id} — in this browser this paper's seeded records are staged again for review; new values come only from the service's extractor, anchored to the paper's own sentences`,
-      kind: 'info',
-      href: '#/intake',
-      hrefLabel: 'Extract',
-    });
   };
 
   const askQuery = topField
@@ -643,18 +608,12 @@ export default function PaperReader({
             body={
               parseFailed
                 ? 'Nothing can be extracted until the paper parses into sections. Retry the ingest, or continue with abstract-only text from the ingest board.'
-                : 'Nothing has been pulled from this paper yet. Run the extractor to stage candidate records for review.'
+                : 'Nothing has been pulled from this paper yet. Extraction runs through the service: Extract on the ingest board, or pnpm intake:extract.'
             }
             action={
-              parseFailed ? (
-                <LinkButton to="/intake/ingest" size="sm">
-                  Open ingest board
-                </LinkButton>
-              ) : (
-                <Button size="sm" onClick={() => runExtraction('Extraction')}>
-                  Run extraction
-                </Button>
-              )
+              <LinkButton to="/intake/ingest" size="sm">
+                Open ingest board
+              </LinkButton>
             }
           />
         ) : (
@@ -796,55 +755,10 @@ export default function PaperReader({
           >
             <MessageSquare size={13} /> Ask about this paper
           </Button>
-          <Button size="sm" onClick={() => runExtraction('Re-extraction')}>
-            <RefreshCw size={13} /> Queue re-extraction
-          </Button>
-          <Popover
-            openOnHover={false}
-            width={280}
-            label="Add to collection"
-            trigger={(pr) => (
-              <button {...pr} className="btn btn-sm">
-                <FolderPlus size={13} /> Add to collection
-              </button>
-            )}
-          >
-            <div className="space-y-1">
-              <div className="text-caption text-ink-soft mb-1">
-                Add <span className="font-num">{paper.id}</span> to:
-              </div>
-              {collections.length === 0 && (
-                <div className="text-body text-ink-soft">
-                  {allCollections.length > 0
-                    ? 'Every collection in this session holds only papers in archived programs, which are hidden. Settings → Programs shows them.'
-                    : 'No collections exist in this session.'}
-                </div>
-              )}
-              {collections.map((c) => {
-                const already = c.paperIds.includes(paper.id);
-                return (
-                  <button
-                    key={c.id}
-                    className="w-full flex items-center justify-between gap-2 px-1.5 py-1 rounded-input text-left hover:bg-accent-wash disabled:opacity-50 disabled:hover:bg-transparent"
-                    disabled={already}
-                    onClick={() => {
-                      addCollectionPapers(c.id, [paper.id]);
-                      toast({ text: `${paper.id} added to ${c.name}`, kind: 'success' });
-                    }}
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span className="font-num text-caption text-ink-soft shrink-0">
-                      {already ? 'already in' : c.paperIds.filter((id) => shows('paper', id)).length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </Popover>
         </div>
         <p className="text-caption text-ink-soft mt-2">
-          Re-extraction replays this paper&rsquo;s seeded records through the pipeline animation; it does not
-          invent new ones.
+          Extraction runs through the service: Extract on the ingest board, or{' '}
+          <span className="font-mono">pnpm intake:extract</span>.
         </p>
       </Card>
     </aside>

@@ -457,6 +457,42 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   st().clearBrowserData();
 }
 
+// OF-BLD-016 §3.R — a research handoff, a promotion, a resume and an
+// authorisation invent nothing: no ETA, no cost, no progress figure, no
+// locked count, and no timed job with no work behind it.
+{
+  const st = () => useStore.getState();
+  const before = st().jobs.length;
+  const invented = (id: string | null) => {
+    const r = st().runbooks.find((x) => x.id === id);
+    return !r || r.eta !== null || r.estCostUsd !== null || (r.status !== 'complete' && r.progressPct !== 0) ||
+      r.predictions.some((p) => typeof p.value === 'number' && p.value > 0);
+  };
+  const states = [...new Set(st().products.map((p) => p.clearanceState))];
+  const opened = states.map((c) => st().handoffToResearchRunbook(st().products.find((p) => p.clearanceState === c)!.id));
+  check('a research handoff invents no ETA, cost, progress or count', opened.every((id) => !invented(id)), opened.filter(invented));
+  const promoted = opened.map((id) => st().promoteRunbook(id!)).filter(Boolean);
+  check('a promotion invents no ETA, cost, progress or count', promoted.every((id) => !invented(id)), promoted.filter(invented));
+  const blocked = st().runbooks.find((r) => r.status === 'blocked_unverified');
+  if (blocked) {
+    st().resolveRunbookInput(blocked.id, 'source');
+    check('a resume sets no ETA', st().runbooks.find((r) => r.id === blocked.id)!.eta === null);
+  }
+  const waiting = st().runbooks.find((r) => r.status === 'awaiting_budget');
+  if (waiting) st().authoriseRunbookBudget(waiting.id);
+  check('none of them starts a timed job', st().jobs.length === before, st().jobs.slice(before).map((j) => j.title));
+  st().clearBrowserData();
+}
+
+// OF-BLD-016 §3.R — clearing this browser's data returns it to the shipped
+// state, and the shipped state has archived programs hidden.
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(true);
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data turns the archive switch off', st().showArchived === false && snapshotOf(st()).showArchived === false);
+}
+
 // OF-BLD-016 §2.R — a computed artifact follows what its basis names: a
 // record (by its paper, a candidate's id included), a product or a strain.
 // BioRepo → Artifacts and Settings → Figure grammar list through it, so a
@@ -480,6 +516,19 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   st().setShowArchived(true);
   check('with the switch on, every artifact is listed', visibleArtifacts(list, st()).length === list.length);
   st().setShowArchived(false);
+}
+
+// OF-BLD-016 §3.R — Settings → About says what this build does. The
+// sentences a review found false are gone, and the one it now makes about
+// what survives a refresh is held against the snapshot itself.
+{
+  const about = readFileSync(new URL('../src/screens/Settings.tsx', import.meta.url), 'utf8');
+  for (const said of ['No extractor has ever been run', 'held in memory only', 'There is no database, no account and no server', 'No document is retrieved', 'No full\n              text has been retrieved']) {
+    check(`Settings → About no longer says "${said.replace(/\s+/g, ' ')}"`, !about.includes(said));
+  }
+  const snap = snapshotOf(useStore.getState()) as unknown as Record<string, unknown>;
+  const kept = ['depositions', 'liveConversations', 'showArchived'];
+  check('what About says survives a refresh is in the Durable snapshot', kept.every((k) => k in snap), kept.filter((k) => !(k in snap)));
 }
 
 // OF-BLD-016 §2.R — Intake → Ingest's header counts what shows; it never

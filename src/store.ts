@@ -1497,8 +1497,8 @@ export const useStore = create<OFState>()((set, get) => ({
 
   tickTimers: (dtMs) => {
     const s = get();
-    const speed = s.ui.simSpeed === Infinity ? 60 : s.ui.simSpeed;
-    const dt = (dtMs / 1000) * speed;
+    // A bench timer runs at wall-clock speed, always (OF-BLD-016 §3.R).
+    const dt = dtMs / 1000;
     const finishedTimers: TimerState[] = [];
     const runs = { ...s.runs };
     let changed = false;
@@ -1575,76 +1575,64 @@ export const useStore = create<OFState>()((set, get) => ({
       id,
       kind: 'research',
       title: `${product.name} — enumeration around the claim`,
-      status: enumerable ? 'running' : 'complete',
+      // Nothing runs behind an enumeration yet, so it opens as a draft with no
+      // ETA, cost, progress or count (OF-BLD-016 §3.R).
+      status: enumerable ? 'draft' : 'complete',
       stages,
       note: enumerable
         ? 'Handed off from the molecule catalogue. The industrial route is fenced, so this asks the question the fence does not cover: what else does the job, and does any of it fall outside the claim.'
         : 'Handed off from the molecule catalogue and stopped immediately, on purpose. Claim architecture, not molecular diversity, decides whether enumeration is worth paying for — and here it is not. Recorded so nobody funds the same sweep next quarter.',
-      eta: enumerable ? '~3 h' : null,
+      eta: null,
       outputs: enumerable ? [] : ['Claim reading', 'Recommendation not to enumerate'],
       productId: product.id,
-      progressPct: enumerable ? 18 : 100,
-      estCostUsd: enumerable ? 140 : 2,
+      progressPct: enumerable ? 0 : 100,
+      estCostUsd: null,
       strainId: product.defaultStrainId,
       // The prediction IS the claim being handed off. When the claim recites a
       // function rather than a sequence the honest prediction is zero escapes
       // — the same call rb-heme-calib records, reached the same way.
-      predictions: [
-        {
-          id: `${id}-escapes`,
-          label: 'Candidates falling outside the claim',
-          value: enumerable ? 120 : 0,
-          unit: 'candidates',
-          confidence: enumerable ? 'low' : 'high',
-          basis: enumerable
-            ? 'Structure-reciting claim, so the genus around it is enumerable. Count is an opening estimate and is what the sweep will test.'
-            : 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
-        },
-      ],
+      // An enumerable claim gets no count: nobody has one to predict yet.
+      predictions: enumerable
+        ? []
+        : [
+            {
+              id: `${id}-escapes`,
+              label: 'Candidates falling outside the claim',
+              value: 0,
+              unit: 'candidates',
+              confidence: 'high',
+              basis: 'The claim recites a functional class rather than a sequence, so molecular diversity does not escape it.',
+            },
+          ],
       measurementSchema: [
         {
           id: `${id}-ms-escapes`,
           label: 'Candidates outside the claim on counsel review',
           unit: 'candidates',
           timepoint: 'analysis',
-          predictionId: `${id}-escapes`,
+          predictionId: enumerable ? null : `${id}-escapes`,
         },
       ],
-      // Locked at creation: it starts consuming compute immediately, and a
-      // prediction editable after the sweep runs is not a prediction.
-      lockedAt: new Date().toISOString(),
+      // The declined sweep's reasoning is locked at creation; a draft is not.
+      lockedAt: enumerable ? null : new Date().toISOString(),
       lockHash: null,
     };
-    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
+    if (runbook.lockedAt) runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-
-    if (enumerable) {
-      get().startJob({
-        title: `Enumerating around ${product.name}`,
-        kind: 'runbook',
-        stages: [
-          { label: 'Classify', ms: 1200 },
-          { label: 'Retrieve', ms: 2600 },
-          { label: 'Rank', ms: 2200 },
-          { label: 'Package', ms: 1400 },
-        ],
-        href: `#/runbooks/${id}`,
-      });
-    }
 
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
       text: enumerable
-        ? `Research runbook opened — enumerating around the claims on ${product.name}`
+        ? `Research runbook drafted — enumeration around the claims on ${product.name}`
         : `Enumeration declined for ${product.name} — the claim recites a function, not a sequence`,
       href: `#/runbooks/${id}`,
       provenance: 'user',
     });
     get().toast({
       text: enumerable
-        ? `Enumerating around ${product.name}. This is a research lead, not clearance.`
+        ? `Drafted a research runbook for ${product.name}. Nothing runs behind it yet; this is a research lead, not clearance.`
         : `Enumeration would not help ${product.name} — opened the reasoning instead.`,
       kind: enumerable ? 'info' : 'warn',
       href: `#/runbooks/${id}`,
@@ -1675,7 +1663,8 @@ export const useStore = create<OFState>()((set, get) => ({
       id,
       kind: 'industrial',
       title: `${product?.name ?? source.title} — process definition`,
-      status: 'running',
+      // Nothing runs behind the process stages yet: a draft (OF-BLD-016 §3.R).
+      status: 'draft',
       stages: [
         {
           name: 'Clearance sweep',
@@ -1685,7 +1674,7 @@ export const useStore = create<OFState>()((set, get) => ({
         },
         {
           name: 'Host & construct selection',
-          status: 'running',
+          status: 'pending',
           detail: product ? `Starting from ${product.defaultStrainId}` : null,
           value: null,
         },
@@ -1701,11 +1690,11 @@ export const useStore = create<OFState>()((set, get) => ({
         },
       ],
       note: `Promoted from ${source.id}. A research runbook that finds something becomes an industrial one in a single action, and the finding travels with it rather than being retyped.`,
-      eta: '~50 min',
+      eta: null,
       outputs: [],
       productId: source.productId,
-      progressPct: 14,
-      estCostUsd: 52,
+      progressPct: 0,
+      estCostUsd: null,
       strainId: source.strainId ?? product?.defaultStrainId ?? null,
       // Promotion carries the research finding across verbatim. It does NOT
       // invent process predictions: the titre and recovery models have not run,
@@ -1735,23 +1724,11 @@ export const useStore = create<OFState>()((set, get) => ({
           predictionId: null,
         },
       ],
-      lockedAt: new Date().toISOString(),
+      lockedAt: null,
       lockHash: null,
     };
-    runbook.lockHash = runbookLockHash(runbook.predictions, runbook.measurementSchema);
 
     set((st) => ({ runbooks: [runbook, ...st.runbooks] }));
-    get().startJob({
-      title: `Industrial runbook — ${product?.name ?? source.title}`,
-      kind: 'runbook',
-      stages: [
-        { label: 'Host', ms: 1800 },
-        { label: 'Train', ms: 2400 },
-        { label: 'Titre', ms: 2600 },
-        { label: 'CAPEX', ms: 2000 },
-      ],
-      href: `#/runbooks/${id}`,
-    });
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1792,20 +1769,11 @@ export const useStore = create<OFState>()((set, get) => ({
           }
           return st;
         });
-        return { ...r, status: 'running' as const, stages, eta: '~90 min' };
+        return { ...r, status: 'running' as const, stages, eta: null };
       }),
     }));
 
     const r = get().runbooks.find((x) => x.id === runbookId);
-    get().startJob({
-      title: `Resuming ${r?.title ?? 'runbook'}`,
-      kind: 'runbook',
-      stages: [
-        { label: 'Re-check', ms: 1200 },
-        { label: 'Cascade', ms: 3000 },
-      ],
-      href: `#/runbooks/${runbookId}`,
-    });
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -1843,18 +1811,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }));
     const r = get().runbooks.find((x) => x.id === runbookId);
     if (!r) return;
-    // A Job with no stages would divide by zero in tickJobs, so the tray gets
-    // at least one even for a runbook whose stages are all already done.
-    const jobStages = r.stages
-      .filter((st) => st.status !== 'done')
-      .slice(0, 4)
-      .map((st) => ({ label: st.name.split(' ')[0], ms: 2400 }));
-    get().startJob({
-      title: r.title,
-      kind: 'runbook',
-      stages: jobStages.length > 0 ? jobStages : [{ label: 'Run', ms: 2400 }],
-      href: `#/runbooks/${runbookId}`,
-    });
+    // No timed job: nothing runs behind a runbook's stages yet (OF-BLD-016 §3.R).
     get().logActivity({
       at: stamp(),
       icon: 'runbook',
@@ -3209,7 +3166,9 @@ export const useStore = create<OFState>()((set, get) => ({
     // reset the way it survives a reload.
     const overlay = get().overlay;
     const serviceUp = get().serviceUp;
-    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {} });
+    // The shipped state hides archived programs, so the switch goes off too
+    // (it lives outside seedState so that nothing else resets it).
+    set({ ...seedState(), grids: seedGrids(), toasts: [], serviceUp, durableReview: null, decisionAt: {}, refusedDecisions: {}, showArchived: false });
     if (overlay) get().applyOverlay(overlay);
     // Guild's ledger is the service's when there is one, and survives a reset
     // the way the overlay does; what was only ever in this browser goes.
@@ -3221,7 +3180,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished and conversations kept here are gone, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished and conversations kept here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },

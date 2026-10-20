@@ -47,7 +47,7 @@ async function main() {
   // programs are archived: the switch in Settings → Programs goes on first,
   // and the walk passes unchanged with everything showing as before. (The
   // smoke runs with it off.) Every `go` is a same-document navigation, so the
-  // store keeps the switch, as it keeps the sim speed below.
+  // store keeps the switch.
   await go('/settings/programs');
   const archiveSwitch = page.locator('[data-testid="show-archived"]');
   await archiveSwitch.waitFor({ timeout: 8000 }).catch(() => {});
@@ -59,18 +59,6 @@ async function main() {
     'Archived programs show once the switch is on',
     (await archiveSwitch.count()) === 1 && (await archiveSwitch.isChecked()),
   );
-
-  // Run at instant sim speed so scripted timings don't dominate the test.
-  await go('/settings/appearance');
-  const instant = page.locator('label', { hasText: /^Instant/ }).first();
-  let speedSet = false;
-  if (await instant.count()) {
-    await instant.click();
-    await page.waitForTimeout(300);
-    // The top bar shows a speed badge whenever the multiplier is not 1×.
-    speedSet = /instant\s+speed/i.test(await page.locator('header').first().innerText());
-  }
-  check('Sim speed control responds', speedSet);
 
   // ── 1. Home vitals reflect seed data ────────────────────────────────
   await go('/');

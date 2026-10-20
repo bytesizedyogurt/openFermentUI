@@ -254,13 +254,14 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
                   Blocking claims stop the industrial route, not the question. If the claims recite
                   sequence or structure, a research runbook can enumerate the genus around the
                   fence and rank what falls outside it. If they recite a functional class, it will
-                  tell you that instead — and save you the compute.
+                  tell you that instead — and save you the compute. Nothing runs behind it yet: it
+                  opens as a draft.
                 </p>
                 <Button
                   variant="primary"
                   onClick={() => navigate(`/runbooks?handoff=${product.id}`)}
                 >
-                  <Sparkles size={14} /> Enumerate around this fence
+                  <Sparkles size={14} /> Draft a research runbook around this fence
                 </Button>
               </div>
             )}
@@ -271,7 +272,7 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
                   that may or may not be yours to run.
                 </p>
                 <Button onClick={() => navigate(`/runbooks?handoff=${product.id}`)}>
-                  <ScaleIcon size={14} /> Run a clearance sweep
+                  <ScaleIcon size={14} /> Draft a clearance sweep
                 </Button>
               </div>
             )}

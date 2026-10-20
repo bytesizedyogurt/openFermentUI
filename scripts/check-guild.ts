@@ -657,6 +657,25 @@ async function main() {
     check('Practice sends the switch with a draft', /draftScenario\([\s\S]*?showArchived\s*\)/.test(practice) && /\?includeArchived=true/.test(client));
   }
 
+  // OF-BLD-016 review 23: the guided tour stands on nothing an archived
+  // program holds, and promises nothing the default view hides.
+  {
+    const { readFileSync } = await import('node:fs');
+    const { PROTOCOLS } = await import('../src/data/protocols');
+    const { archivedProgramOf } = await import('../src/store');
+    const src = readFileSync(new URL('../src/components/GuidedTour.tsx', import.meta.url), 'utf8');
+    const routes = [...src.matchAll(/route: '([^']+)'/g)].map((m) => m[1]);
+    for (const r of routes) {
+      const pid = /^\/runbooks\/protocols\/([^/?]+)/.exec(r)?.[1];
+      const p = pid ? PROTOCOLS.find((x) => x.id === pid) : undefined;
+      const archived = p
+        ? [...new Set(JSON.stringify(p).match(/\br-[A-Z]\d*-\d+\b/g) ?? [])].filter((id) => archivedProgramOf('record', id))
+        : [];
+      check(`the tour's stop ${r} cites no record of an archived program`, archived.length === 0, archived.join(', '));
+    }
+    check('the tour promises no gold-set plan', !/gold-set plan/.test(src));
+  }
+
   // OF-BLD-016 review 23: a Live conversation or a proposal that names an
   // archived program's record hides by default, on Home and in Postdoc.
   {

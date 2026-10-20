@@ -558,12 +558,6 @@ export default function App() {
 
             <div className="flex-1" />
 
-            {ui.simSpeed !== 1 && (
-              <span className="chip text-signal-info border-signal-info/40" title="Simulated latency multiplier">
-                {ui.simSpeed === Infinity ? 'instant' : `${ui.simSpeed}×`} speed
-              </span>
-            )}
-
             <Popover
               openOnHover={false}
               width={360}
