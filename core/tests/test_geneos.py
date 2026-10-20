@@ -338,7 +338,8 @@ def test_the_endpoints(store):
     for mid in ("RehMBEL1391", "iMM904", "Yeast9"):
         unfetched = next(m for m in listed if m["id"] == mid)
         assert "pnpm geneos:fetch" in unfetched["unavailable"]
-    yeast = {m["id"]: m for m in listed if m["host"] == "s-cerevisiae"}
+    # Both are reconstructions of S288C, so they sit on its strain page.
+    yeast = {m["id"]: m for m in listed if m["host"] == "s-cerevisiae-s288c"}
     assert set(yeast) == {"iMM904", "Yeast9"} and yeast["iMM904"]["source"].startswith("https://bigg.ucsd.edu/")
     assert yeast["Yeast9"]["source"] == "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255)"
     assert c.post("/api/geneos/ceiling", json={"modelId": "Yeast9", "product": "ethanol", "substrate": "glucose"}).status_code == 409

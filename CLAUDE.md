@@ -110,8 +110,8 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 ## The seed, the overlay, and offline verify
 
-- `src/data/*.ts` is the source of truth for the 167 papers (132 hand-curated,
-  35 in thread P) and 134 records.
+- `src/data/*.ts` is the source of truth for the 189 papers (132 hand-curated,
+  35 in thread P, 22 in thread Q) and 134 records.
   Do not edit `src/data/corpus/`, `PAPERS`, or `RECORDS`. There are TWO
   sanctioned exceptions, and in both a machine proposes and a person approves.
   The second is thread P (OF-BLD-014 §2.3): `pnpm thread:propose` asks Europe
@@ -124,6 +124,13 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   writes — an organism, a topic, a licence, a record, another sentence, a
   placeholder approver — and `apply` refuses to build on such a file. A
   changed approver name that is itself acceptable is visible only in git.
+  Thread Q (yeast ethanol, 2026-10-20) is the same rule module with its own
+  `ThreadRule` (`THREAD_Q`): `pnpm thread:propose:q` and `thread:apply:q`,
+  `core/data/thread-q-proposed.tsv`, `docs/thread-q-include.txt`, and
+  `src/data/corpus/threadQ.ts`. Its include file may name `osti:<id>` (an
+  NREL report on OSTI) and `sgd:<id>` (a Saccharomyces Genome Database
+  strain entry) besides PMCIDs; such a row carries a `sourceUrl`, and only an
+  INCLUDE row may stand on one alone. Thread P refuses a `sourceUrl`.
   The first is a DOI a person approved (OF-BLD-012.1 F9): `pnpm ids:propose`
   asks Crossref about every paper carrying no PMCID, DOI or PMID and writes
   `core/data/identifiers-proposed.tsv`, which is gitignored and is not the
@@ -174,7 +181,8 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - `scripts/host/` is the Mac Mini: `install.sh` once, `deploy.sh` after each
   merged session, `nightly.sh` at 03:00. `launchd.py` renders the two
   LaunchDaemons (`com.umutuzo.openferment`, `.nightly`), which run as the
-  checkout's owner and never as root; `test_host` checks them.
+  checkout's owner and never as root; `test_host` checks them. `deploy.sh`
+  syncs every extra: a sync is exact, and the workers need `sim` and `rag`.
 - `pnpm ready` (`core/openferment_core/ready.py`) answers "will the live loop
   work here" without spending: key, model (the free Models API, which is also
   how a retired model shows), corpus, build, data, intake counts, Europe PMC,
@@ -349,10 +357,11 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 ## Thread P and the polymer family (OF-BLD-014 Phase 2)
 
-- **Two programs, one corpus.** Threads A–O are the hand-curated casein
-  program; thread P is PHA from waste cellulosic sugars, proposed by rule and
+- **Three programs, one corpus.** Threads A–O are the hand-curated casein
+  program; thread P is PHA from waste cellulosic sugars and thread Q ethanol
+  from glucose by wild-type *S. cerevisiae*, each proposed by rule and
   approved by a person (see "The seed" above). The thread letters are written
-  as `[A-P]` in three places — `byEntryId` in `src/data/papers.ts`,
+  as `[A-Q]` in three places — `byEntryId` in `src/data/papers.ts`,
   `src/sim/chat.ts` and the chip pattern in `scripts/golden-path.mjs` — and a
   new letter changes all three. Home's Programs strip counts each program
   live from the store.
@@ -472,6 +481,13 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 ## Postdoc's loop (OF-BLD-014 Phase 5)
 
+- **A Live conversation is kept, and a follow-up reads it.** Live turns are
+  `LiveConversation`s in the store and the Durable tier, never `ChatMessage`s.
+  A follow-up posts the earlier turns as `PriorTurn`s (question, claims,
+  gaps, decline: words only); `postdoc_agent._opening` sends the last four as
+  user and assistant text, drops a line holding a number, and `SeenSet`
+  still starts empty, so nothing an earlier turn retrieved is citable.
+
 - **A plan answers to `validate_plan`.** Every claim the loop writes is
   dropped whole and counted when its text holds a number, a record id does
   not resolve in the evidence pool, it cites a record, passage or evidence id
@@ -521,18 +537,23 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 - **geneOS computes a ceiling.** Flux balance analysis on a shelf of
   published reaction networks (`geneos_models.py`, data only): `e_coli_core`
   and `iJO1366` bundled with cobra plus the phaCAB add-on, each added
-  reaction checked for mass balance; and `RehMBEL1391` (*C. necator* H16),
-  which `pnpm geneos:fetch` clones at `00c70c5` into `core/data/models/`
-  (gitignored) and checks against its sha256, setting a mismatch aside. The
-  worker adds `DM_phb_c` where a file lacks it (all three do) and reports
-  each model's counts as its file publishes them. The uptake (10 mmol gDW⁻¹
-  h⁻¹), the repeat unit's formula and the sugars' molar masses are
+  reaction checked for mass balance; `RehMBEL1391` (*C. necator* H16),
+  which `pnpm geneos:fetch` clones at `00c70c5`; and for ethanol two
+  reconstructions of *S. cerevisiae* S288C, `iMM904` (BiGG's file by URL;
+  its non-commercial licence accepted by Sean Creighton) and `Yeast9`
+  (yeast-GEM v9.1.1 by git; CC BY 4.0, its `r_` ids mapped and checked by
+  name). Files land in `core/data/models/` (gitignored) and are checked
+  against their sha256, a mismatch set aside. A product is a metabolite
+  (PHB: the worker adds `DM_phb_c` where a file lacks it) or an exchange
+  (ethanol: `EX_etoh_e`, or the model's own id), and the worker reports each
+  model's counts as its file publishes them. The uptake (10 mmol gDW⁻¹
+  h⁻¹), the product's formula and the sugars' molar masses are
   conventions in every basis; every other bound stays as the file publishes
   it. Ceiling, frontier (twelve growth rates) and sugar mix (eleven
   proportions at equal carbon) are artifacts; a sugar a model cannot take up
   is a finding in words and stores no number. Appendix 2's bundled-model
   values are asserted in `test:core`, the *C. necator* ones in
-  `test_geneos_live.py`.
+  `test_geneos_live.py`, the yeast ones in `test_geneos_yeast_live.py`.
 - **`cobra` lives in `workers/geneos_worker.py` alone**, behind the
   `SimWorker` JSON contract, with `swiglpk` and `python-libsbml`: three
   copyleft libraries accepted under D4 in `core/licences.toml`, where model
@@ -601,7 +622,8 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
   key); an input with neither refuses the run with a 422. A run is one
   artifact, `demo` while any assumption remains. Spearman uses averaged ranks
   and skips an input with no spread. `selling_price` is the sixth tool and
-  never runs a scenario. The double's Proforma fixtures come from
+  never runs a scenario; given `proforma_benchmark` it cites the stored
+  benchmark run (the NREL 2011 corn stover design) in USD per gallon. The double's Proforma fixtures come from
   `demo.py --prototype` with a STAND-IN evaluator in place of BioSTEAM.
 
 ## Runbooks keep score (OF-BLD-014 Phase 9)
@@ -643,7 +665,7 @@ The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
   this browser's copy of Guild's ledger with what it still owes the service,
-  and the lessons finished here across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+  the lessons finished here, and Postdoc's Live conversations across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —

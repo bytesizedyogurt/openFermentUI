@@ -247,7 +247,7 @@ SHELF: dict[str, ShelfModel] = {
         notes=["Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."],
     ),
     "iMM904": ShelfModel(
-        id="iMM904", name="Saccharomyces cerevisiae S288C (iMM904)", host="s-cerevisiae",
+        id="iMM904", name="Saccharomyces cerevisiae S288C (iMM904)", host="s-cerevisiae-s288c",
         scope="genome scale", fetched=BIGG_IMM904, products=("ethanol",),
         route="native: pyruvate decarboxylase (PYRDC) and alcohol dehydrogenase (ALCD2ir); ethanol leaves through EX_etoh_e",
         licence=BIGG_IMM904.licence,
@@ -258,7 +258,7 @@ SHELF: dict[str, ShelfModel] = {
         ],
     ),
     "Yeast9": ShelfModel(
-        id="Yeast9", name="Saccharomyces cerevisiae S288C (Yeast9)", host="s-cerevisiae",
+        id="Yeast9", name="Saccharomyces cerevisiae S288C (Yeast9)", host="s-cerevisiae-s288c",
         scope="genome scale", fetched=YEAST9, products=("ethanol",),
         route="native: pyruvate decarboxylase (r_0959) and alcohol dehydrogenase (r_2115); ethanol leaves through r_1761, the file's ethanol exchange",
         licence=YEAST9.licence,
