@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 import logging
 import sys
 from datetime import datetime, timezone
@@ -39,13 +40,16 @@ from typing import Any
 
 
 from . import atomic, intake, llm
-from .models import Candidate, ExtractResponse, Usage
+from .models import AuditEvent, Candidate, ExtractResponse, Usage
 from .units import tables
-from .validate import anchor_all
+from .validate import anchor_all, anchor_candidate
 
 log = logging.getLogger("openferment.extract")
 
 CANDIDATES_DIR = intake.DATA_DIR / "candidates"
+# A candidate a model wrote by hand (§7.3) is named apart from the extractor's.
+MODEL_PREFIX = "mw1"
+_WRITE_LOCK = threading.Lock()
 FIXTURE_DIR = intake.FIXTURE_ROOT / "extract"
 # The first extraction run that runs for real. Named for the pipeline and not
 # for one model: Opus answers most papers and Sonnet the ones Opus declines,
@@ -592,6 +596,31 @@ def extract_paper(paper_id: str, *, force: bool = False) -> ExtractResponse:
             ", ".join(f"{k}={v}" for k, v in anchored.reasons.items() if v),
         )
     return _persist(result)
+
+
+def add_candidate(paper_id: str, raw: dict[str, Any], *, who: str) -> tuple[Candidate | None, str | None, str | None]:
+    """One candidate a model wrote by hand (OF-BLD-015 §7.3), held to §2.4
+    like one the extractor emitted: anchored to a sentence of the fetched
+    paper, refused with the rule it broke, and appended to the paper's
+    cached candidates under the lock, with an audit line naming `who`. A
+    paper never extracted gets a file holding this candidate alone."""
+    fetched = intake.cached(paper_id)
+    if fetched is None or fetched.status != "complete" or not fetched.sections:
+        raise ExtractUnavailable(f"{paper_id} has no cached full text. Fetch it first — there is nothing to anchor to.")
+    sections = [s.model_dump() for s in fetched.sections]
+    with _WRITE_LOCK, atomic.held(_path(paper_id)):
+        current = cached(paper_id)
+        n = len(current.candidates) if current else 0
+        made, rule, detail = anchor_candidate(raw, sections, paper_id=paper_id, candidate_id=f"{MODEL_PREFIX}-{paper_id}-{n:04d}")
+        if made is None:
+            return None, rule, detail
+        now = datetime.now(timezone.utc).isoformat()
+        if current is None:
+            current = ExtractResponse(paperId=paper_id, run=RUN, extractedAt=now, candidates=[], audit=[], usage=Usage())
+        current.candidates.append(made)
+        current.audit.append(AuditEvent(at=now, who=who, action=f"candidate {made.id} written by hand"))
+        _persist(current)
+    return made, None, None
 
 
 # ── batch ──────────────────────────────────────────────────────────────

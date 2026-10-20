@@ -4,31 +4,45 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-014)
+## The active build (OF-BLD-015 Part B, then OF-BLD-017 Part C)
 
-The prototype build runs on `claude/of-bld-014-prototype`. Its document is
-`docs/build/OF-BLD-014.md`. §10.4 of that document removes this section.
+The branch is `claude/of-bld-015-postdoc`, from `main` at `6097df7` (OF-BLD-014 merged in
+pull request #8). Its documents are `docs/build/OF-BLD-015-phase7.md` (Part B, "Postdoc
+reaches everything") and `docs/build/DEMO-PHASE7.md` (the run sheet for showing it); Part C
+("Postdoc remembers", OF-BLD-017 Phase 5) is committed beside them when it starts. The closing
+truth pass deletes `docs/build/`.
 
 OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
 tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`. Its document
 is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits are
 `OF-BLD-016 §n.m: <what>`, and its Part A amends OF-BLD-014 Part A below.
 
-- **"Next phase", "continue" and "go on"** mean Part A.1 of the document: start the session
-  (`bash scripts/session-start.sh`, once §1.3 has landed), pay what `## Live owed` in `STATE.md`
-  lists and this machine can run, find the first step whose id is missing from
-  `git log --format=%s | grep -o 'OF-BLD-014 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
-  end of that step's phase.
-- **One spec is committed, for the length of this build.** A cloud session starts from a fresh
-  clone, so this build's document lives under `docs/build/` on the work branch. §10.4 deletes
-  the folder before the pull request. Every other spec stays out of git, as "Where the
-  documents live" says.
+- **"Next phase", "continue" and "go on"** mean Part A of `docs/build/OF-BLD-016.md`: start the
+  session (`bash scripts/session-start.sh`), pay what `## Live owed` in `STATE.md` lists and this
+  machine can run, find the first step whose id is missing from
+  `git log --format=%s | grep -o 'OF-BLD-016 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
+  end of that step's phase. One commit per step, `OF-BLD-016 §n.m: <what>`, `pnpm verify` green
+  before each.
+- **The build documents are committed, for the length of the builds.** A cloud session starts
+  from a fresh clone, so `docs/build/` holds OF-BLD-014's document, OF-BLD-015 Phase 7's and
+  OF-BLD-016's on the work branch. OF-BLD-015's closing pass owns the folder's deletion. Every
+  other spec stays out of git, as "Where the documents live" says.
+- **Every model call openFerment makes runs `claude-haiku-5-5` at effort `medium`**: primary,
+  fallback, index, eval. `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`,
+  `OPENFERMENT_INDEX_MODEL` and `OPENFERMENT_EFFORT` carry it (the environment in a cloud
+  session; `core/.env` on the Mini); `llm.py`'s defaults are untouched. Numbers in `STATE.md`
+  dated from 2026-10-16 are Haiku's.
 - **The key in a cloud session** arrives as `OPENFERMENT_API_KEY`, and
   `scripts/session-start.sh` writes it to `core/.env`. Leave `ANTHROPIC_API_KEY` unset in the
-  session's environment: Claude Code reads that name for its own sign-in.
+  session's environment: Claude Code reads that name for its own sign-in. The key never
+  appears in a chat, a log or a response.
 - **Data from live runs** travels on the branch `openferment-data` (`pnpm data:push`,
-  `pnpm data:pull`). Fetched full text stays on the machine that fetched it.
-- **Stop conditions** are Part A.5 of the document. A stated fact that turns out false is one.
+  `pnpm data:pull`). Fetched full text, the audit log and the proposals stay on the machine.
+- **Stop conditions**: verify red for a cause outside the step; a fact the prompt states
+  turns out false when measured; a write tool that would reach a store with no write function
+  and no clean refusal; a key that could reach a response, a log, the browser or git; a
+  change that would let a second account read the owner's conversations with no visibility
+  check in the way.
 
 ## The map is closed
 
@@ -57,13 +71,17 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   `claude-sonnet-5-5` on a refusal or when Opus is unavailable; structured
   outputs (`output_config.format`, schema made strict by `strict_schema`),
   effort `medium`, streamed. Postdoc alone runs a loop
-  (`postdoc_agent.py`): `llm.converse` turns on one model with strict tools
+  (`postdoc_agent.py`): `llm.converse` turns on one model with tools
   and `tool_choice` `auto`, bounded at 6 rounds, 12 tool calls,
   `OPENFERMENT_ASK_BUDGET_USD` and 180 seconds, after which one last turn
   runs with `tool_choice` `none`; a refusal or an outage restarts it once on
   the next model with a fresh conversation. Both models REJECT forced tool
   use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
-  live in `llm.PRICES`; `usage.models` records which model answered.
+  live in `llm.PRICES`; `usage.models` records which model answered. The
+  seven OF-BLD-014 tools go out strict; the twenty-two module tools go out
+  loose, because eighteen strict tools compile to a grammar the API refuses
+  (OF-BLD-015 §7.2, measured 2026-10-19), and `tools.run` validates every
+  input alike before anything runs.
 
 ## Rule 1 and its mirror
 
@@ -158,8 +176,9 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   answered from that field, never by diffing against `RECORDS`.
   `pnpm check:store` is the guard for both this and the overlay's contract.
 - **`pnpm verify` runs with no key, no service and no network, and must stay
-  green.** Twenty-three stages, in order: check:secrets → typecheck →
-  check:plan → check:reference → test:core → test:sim → check:licences → check:seed →
+  green.** Twenty-four stages, in order: check:secrets → typecheck →
+  check:plan → check:reference → test:core → test:sim → check:licences → check:tools →
+  check:seed →
   check:biorepo → test:export → check:anchors → check:store → check:guild →
   check:lock → check:capture → check:figures → build → test:durable → test:deposition →
   test:reconcile → test:smoke → test:golden → test:deep. Live tests are
@@ -421,7 +440,9 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
-- **One tool registry, closed at seven names** (`tools/__init__.py`, E.6).
+- **One tool registry, closed at twenty-nine names** (`tools/__init__.py`, E.6
+  and OF-BLD-015 §7.2–§7.3: the seven below, then one read and one write tool
+  a module, named `<module>_read` and `<module>_write`).
   Postdoc's loop, `GET /api/tools` / `POST /api/tools/{name}` and the MCP
   server all go through `tools.run`. **Tool inputs carry ids and words:** a
   JSON number anywhere in an input outside top-level `k` and `limit` refuses
@@ -525,6 +546,68 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
 - **`pnpm ask:batch <file>`** asks a file of questions through the loop and
   keeps each plan under `core/data/live/` (on the data branch);
   `docs/build/questions-pha.txt` holds Appendix 4's ten.
+
+## Postdoc reaches every module (OF-BLD-015 Phase 7)
+
+- **A coverage pass runs before the first turn, in code.** `module_stores.py`
+  reads all eleven modules into one row shape: the seed's modules through
+  `modules.json`, which `pnpm export:corpus` writes beside `corpus.json`
+  (Dominion's molecules and findings, runbooks, protocols, hosts, pathways,
+  unit operations, scenarios, lessons), and the service's own stores (records
+  and candidates through the evidence pool, artifacts, Guild's ledger and
+  checks, Intake's fetch state, the geneOS shelf, the open proposals).
+  `coverage(question)` finds the rows the question names by label, id or
+  spelling, and every row of a module it names, kept to the states a clause
+  about that module asks for. The map rides in round one after the question,
+  is the trace's first step (one line a module when opened), and the plan
+  carries it: the footer reads "Searched eleven, found in two: … · read in
+  part: Runbooks, fermOS, BioRepo". A plan with no claim never says the
+  corpus is silent when a module found something.
+- **One state enum, computed, never chosen.** `open`, `fenced`, `approved`,
+  `locked`, `proposed`, `retired`, from each module's own word in
+  `module_stores.py` (a clearance of `clear-expired` or `clear-none` is
+  `open`; `watch-*`, `blocked` and `unknown` are `fenced`; a locked runbook is
+  `locked`). The table is in `docs/TOOLS.md`.
+- **A read tool a module** (`tools/modules.py`): one input (ids or refs,
+  words, a kind, a state, a limit), one output, `ModuleRow` (`ref`
+  `<module>/<kind>/<id>`, label, state, the module's status word, the
+  provenance mark or null, a short detail). Guild reads a name, a role and
+  whether the person is active, never a level or a title. A claim cites rows
+  in `moduleRefs`; `SeenSet` keeps them and `validate_plan` drops a claim
+  citing a ref no tool returned; the rows' marks enter the claim's weakest
+  provenance.
+- **A write tool a module** (`tools/writes.py`), and it never touches a
+  store: each action calls the module's own write function (`geneos.ceiling`
+  and kin, `fermos.forecast_run`, `proforma.run`, `extract.add_candidate`
+  under §2.4 with ids `mw1-…`, `intake.fetch_paper`, `extract.extract_paper`)
+  or refuses in words with who makes the change (Dominion, pureOS and Primer
+  are seed; protocols, depositions, assumptions, decisions and new sources
+  are a person's). Every write that goes through is appended to
+  `core/data/audit.jsonl` (`audit.py`, `GET /api/audit`, gitignored) with
+  `agent: model`, the model id, the effort and the ask id
+  (`ToolContext.ask_id`). A person's carry-out or dismissal is appended the
+  same way.
+- **The gates are one table** (`tools/gates.py`, the same rows in
+  `docs/TOOLS.md`): `publish`, `spend`, `lock`, `sign`, `personnel`, `bench`,
+  `notebook`. An action at a gate writes nothing and becomes a proposal
+  (`proposals.py`, `core/data/proposals.json`, gitignored) with
+  `state: proposed`; Home shows every open one as a card with one button,
+  disabled until a reviewer name is set; `POST /api/proposals/{id}/carry-out`
+  and `/dismiss` take a named person (placeholders refused). The server runs
+  what it can in the person's name (`checks.request` by them; an extraction
+  once the budget allows) and records that the person took the rest to the
+  place the gate names. The model may propose a check and may never write a
+  sign-off: no gate's server action signs anything.
+- **`pnpm check:tools`** (`scripts/check-tools.py`, the eighth stage) fails
+  when a module lacks a read or a write tool, when `writes.py` holds a file
+  write or calls a function outside `ALLOWED_WRITES`, when a gated action
+  completes without a named person, or when `gates.py` and `docs/TOOLS.md`
+  name different gates. **Eval set O** (`evalo.py`, `pnpm eval:o`): ten
+  cross-module questions keyed by the coverage code, scored on the modules
+  read and the footer; the report goes to `core/data/live/eval-o.json`.
+- **The MCP server needs no change for any of it**: it lists `tools.infos()`
+  and calls `tools.run`, so the module tools appear there with the same marks
+  and gates; `test_mcp` counts thirty-one.
 
 ## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
 
@@ -702,7 +785,8 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
 - OF-BLD specs arrive as files at repo root for the session (`OF-BLD-0NN.md`,
   `PROMPT.md`) and are deleted before the final commit of that session; they
   live in Notion. Never commit them.
-- OF-BLD-014 is the one exception, for the length of its build (its decision
-  D1): `docs/build/OF-BLD-014.md` and `docs/build/PROMPT.md` are committed on
-  `claude/of-bld-014-prototype`, and its §10.4 deletes `docs/build/` before
-  the pull request.
+- A build's own document is the exception, for the length of its build
+  (OF-BLD-014's decision D1, kept by OF-BLD-015): `docs/build/` holds it on
+  the work branch, and the closing truth pass deletes the folder. OF-BLD-014's
+  `docs/build/OF-BLD-014.md` and `PROMPT.md` are still on `main`, its §10.4
+  having been left undone; the OF-BLD-015 truth pass removes them with its own.

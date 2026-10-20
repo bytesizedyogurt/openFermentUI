@@ -12,7 +12,7 @@
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.
 import { AlertTriangle, ExternalLink, HelpCircle, Quote, SearchX } from 'lucide-react';
-import type { AnswerPlan, Claim, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
+import type { AnswerPlan, Claim, CoverageMap, ModuleRow, Evidence, ExtractionRecord, Paper, Passage, RunbookDraft } from '@/data/types';
 import { useStore, provenanceOf } from '@/store';
 import { navigate } from '@/router';
 import { fmt } from '@/engine/units';
@@ -57,16 +57,58 @@ const SUPPORT_NOTE: Record<Claim['support'], string | null> = {
     'Stated as an absence. No record backs this, which is the point of it — nobody has measured it.',
 };
 
+/** OF-BLD-015 §7.2 — where a module row lives in the app, when it has a page. */
+function rowHref(row: ModuleRow): string {
+  const at: Record<string, string> = {
+    'dominion/molecule': `/dominion/molecules/${row.id}`,
+    'dominion/finding': '/dominion/clearance',
+    'runbooks/runbook': `/runbooks/${row.id}`,
+    'runbooks/protocol': `/runbooks/protocols/${row.id}`,
+    'geneos/host': `/geneos/hosts/${row.id}`,
+    'geneos/model': '/geneos/model',
+    'proforma/scenario': `/proforma/scenario/${row.id}`,
+    'primer/lesson': `/primer/${row.id}`,
+    'intake/source': `/biorepo/paper/${row.id}`,
+    'biorepo/artifact': '/biorepo/artifacts',
+    'biorepo/witness-run': '/biorepo/witness',
+  };
+  return at[`${row.module}/${row.kind}`] ?? `/${row.module === 'home' ? '' : row.module}`;
+}
+
+/** The module rows a claim rests on, each with the state the service computed. */
+function ModuleRowChips({ refs, rows }: { refs: string[]; rows: Map<string, ModuleRow> }) {
+  const cited = refs.map((r) => rows.get(r)).filter((r): r is ModuleRow => Boolean(r));
+  if (cited.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1" data-testid="claim-module-rows">
+      {cited.map((row) => (
+        <a
+          key={row.ref}
+          href={`#${rowHref(row)}`}
+          className="text-caption text-ink-soft hover:text-accent inline-flex items-baseline gap-1"
+          title={`${row.ref} · ${row.status}`}
+        >
+          <span className="font-num">{row.module}</span>
+          <span className="truncate max-w-[28ch]">{row.label}</span>
+          <span className="opacity-70">· {row.state}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function ClaimRow({
   claim,
   index,
   passages,
   evidence,
+  rows,
 }: {
   claim: Claim;
   index: number;
   passages: Map<string, Passage>;
   evidence: Map<string, Evidence>;
+  rows: Map<string, ModuleRow>;
 }) {
   const records = useStore((s) => s.records);
   const papers = useStore((s) => s.papers);
@@ -116,6 +158,8 @@ function ClaimRow({
                 ))}
             </div>
           )}
+
+          <ModuleRowChips refs={claim.moduleRefs ?? []} rows={rows} />
 
           {note && <p className="text-caption text-ink-soft mt-1.5">{note}</p>}
 
@@ -190,6 +234,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
   const hasClaims = plan.claims.length > 0;
   const passages = new Map((plan.passages ?? []).map((p) => [p.id, p]));
   const evidence = new Map((plan.evidence ?? []).map((e) => [e.id, e]));
+  const rows = new Map((plan.rows ?? []).map((r) => [r.ref, r]));
   const toolCalls = (plan.trace ?? []).filter((t) => t.kind === 'tool').length;
   // The loop answered only when its last step is a kept plan; a question no
   // model answered, or an answer that was not a plan, says so (§5.R).
@@ -220,7 +265,7 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
         <Card className="px-4 py-1">
           <ul>
             {plan.claims.map((claim, i) => (
-              <ClaimRow key={claim.id} claim={claim} index={i} passages={passages} evidence={evidence} />
+              <ClaimRow key={claim.id} claim={claim} index={i} passages={passages} evidence={evidence} rows={rows} />
             ))}
           </ul>
         </Card>
@@ -326,8 +371,33 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
             </>
           )}
         </span>
+        {plan.coverage && <CoverageFooter coverage={plan.coverage} />}
       </div>
     </div>
+  );
+}
+
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const inWords = (n: number) => WORDS[n] ?? String(n);
+
+/**
+ * OF-BLD-015 §7.1 — which modules the coverage pass searched and where it
+ * found what the question names, with the modules read only in part.
+ */
+function CoverageFooter({ coverage }: { coverage: CoverageMap }) {
+  const found = coverage.modules.filter((m) => m.count > 0);
+  const partial = coverage.modules.filter((m) => m.partial);
+  return (
+    <span className="text-caption text-ink-soft" data-testid="plan-coverage">
+      Searched {inWords(coverage.searched)}, found in {coverage.found ? inWords(coverage.found) : 'none'}
+      {found.length > 0 && <>: {found.map((m) => `${m.label} (${m.count})`).join(', ')}</>}
+      {partial.length > 0 && (
+        <span title={partial.map((m) => `${m.label}: ${m.partial}`).join('\n')}>
+          {' '}
+          · read in part: {partial.map((m) => m.label).join(', ')}
+        </span>
+      )}
+    </span>
   );
 }
 

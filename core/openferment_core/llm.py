@@ -523,9 +523,10 @@ def _block_dict(block: Any) -> dict[str, Any]:
     return {k: v for k, v in vars(block).items() if v is not None}
 
 
-def tool_param(name: str, description: str, input_schema: dict[str, Any]) -> dict[str, Any]:
-    """A tool as the API takes it: strict, its schema made acceptable."""
-    return {"name": name, "description": description, "input_schema": strict_schema(input_schema), "strict": True}
+def tool_param(name: str, description: str, input_schema: dict[str, Any], strict: bool = True) -> dict[str, Any]:
+    """A tool as the API takes it: strict unless the registry says otherwise,
+    its schema made acceptable either way."""
+    return {"name": name, "description": description, "input_schema": strict_schema(input_schema), "strict": strict}
 
 
 def converse(
@@ -545,8 +546,12 @@ def converse(
     at the top level. Raises ModelRefused (with what was spent) and
     ModelUnavailable as `call` does, and falls back nowhere.
 
-    `tools` are `{"name", "description", "input_schema"}`; `tool_param` is
-    applied here, so a caller cannot send a loose one. `ask` stands in for
+    `tools` are `{"name", "description", "input_schema"}`, and `strict`
+    when a tool is not; `tool_param` is applied here. A tool goes out strict
+    unless its registry entry says otherwise: the API compiles one grammar
+    for every strict tool in a request and refused eighteen as too large
+    (OF-BLD-015 §7.2, 2026-10-19), so the module read tools go out loose and
+    `tools.run` validates their input as it validates every tool's. `ask` stands in for
     the API in offline tests: it receives the request and returns a message.
     """
     if tool_choice not in TOOL_CHOICES:
@@ -565,7 +570,7 @@ def converse(
         "cache_control": {"type": "ephemeral"},
     }
     if tools:
-        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"]) for t in tools]
+        request["tools"] = [tool_param(t["name"], t["description"], t["input_schema"], t.get("strict", True)) for t in tools]
         request["tool_choice"] = {"type": tool_choice}
     held = _reserve(model, request, max_tokens, Usage(), role)
     try:

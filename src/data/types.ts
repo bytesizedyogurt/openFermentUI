@@ -1303,6 +1303,8 @@ export interface Claim {
   passages?: PassageRef[];
   /** Computed values it rests on, by evidence id. Absent on older plans. */
   evidenceIds?: string[];
+  /** OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`. Absent on older plans. */
+  moduleRefs?: string[];
 }
 
 /** A sentence a claim quotes, and the passage it stands in. */
@@ -1311,7 +1313,7 @@ export interface PassageRef {
   quote: string;
 }
 
-export type TraceKind = 'tool' | 'restart' | 'final';
+export type TraceKind = 'coverage' | 'tool' | 'restart' | 'final';
 export type StopReason = 'done' | 'rounds' | 'calls' | 'cost' | 'time';
 
 /** One step of Postdoc's loop, as the browser shows it (OF-BLD-014 §5.1). */
@@ -1324,6 +1326,118 @@ export interface TraceStep {
   summary: string;
   ms: number;
   ok: boolean;
+}
+
+// ── Coverage (OF-BLD-015 §7.1) ─────────────────────────────────────────
+// Mirrors of the Pydantic models in core/openferment_core/models.py. Before
+// Postdoc's first turn, code sweeps every module store for what the question
+// names; the trace shows it as its first step and the footer reports it.
+
+/** The one state every module row reads as, computed by the service. */
+export type ModuleState = 'open' | 'fenced' | 'approved' | 'locked' | 'proposed' | 'retired';
+export type ModuleName =
+  | 'dominion'
+  | 'runbooks'
+  | 'geneos'
+  | 'fermos'
+  | 'pureos'
+  | 'proforma'
+  | 'biorepo'
+  | 'guild'
+  | 'primer'
+  | 'intake'
+  | 'home';
+
+/** One row of one module that the question names. */
+export interface CoverageHit {
+  /** `<module>/<kind>/<id>`, the id a claim cites it by. */
+  ref: string;
+  id: string;
+  kind: string;
+  label: string;
+  state: ModuleState;
+}
+
+/** What the sweep found in one module. */
+export interface ModuleCoverage {
+  module: ModuleName;
+  label: string;
+  count: number;
+  hits: CoverageHit[];
+  /** The question names the module itself. */
+  named: boolean;
+  /** Set when part of the module lives only in a browser, in words. */
+  partial: string | null;
+  /** Set when the module's store could not be read. */
+  error: string | null;
+}
+
+/** One row a module's read tool returns (OF-BLD-015 §7.2). */
+export interface ModuleRow {
+  module: ModuleName;
+  kind: string;
+  id: string;
+  /** `<module>/<kind>/<id>`, what a claim cites. */
+  ref: string;
+  label: string;
+  /** Computed by the service from `status`, never by a model. */
+  state: ModuleState;
+  /** The module's own word for where the row stands. */
+  status: string;
+  /** Null for a seed row that carries no mark. */
+  provenance: Provenance | null;
+  detail: Record<string, unknown>;
+}
+
+/** One line of the audit log (OF-BLD-015 §7.3). */
+export interface AuditEntry {
+  at: string;
+  agent: 'model' | 'person';
+  who: string;
+  module: ModuleName;
+  action: string;
+  state: string;
+  target: string | null;
+  askId: string | null;
+  effort: string | null;
+  detail: Record<string, unknown>;
+}
+
+export type ProposalState = 'proposed' | 'done' | 'dismissed';
+
+/** What a model asked for at a gate (OF-BLD-015 §7.4), until a person acts on Home. */
+export interface Proposal {
+  id: string;
+  at: string;
+  module: ModuleName;
+  action: string;
+  gate: string;
+  title: string;
+  why: string;
+  how: string;
+  route: string | null;
+  server: boolean;
+  target: string | null;
+  fields: Record<string, string>;
+  note: string;
+  by: string;
+  askId: string | null;
+  state: ProposalState;
+  carriedOutBy: string | null;
+  carriedOutAt: string | null;
+  result: string | null;
+}
+
+export interface ProposalAction {
+  person: string;
+  reason: string;
+}
+
+export interface CoverageMap {
+  entities: string[];
+  searched: number;
+  found: number;
+  modules: ModuleCoverage[];
 }
 
 export interface AnswerPlanUsage {
@@ -1367,6 +1481,10 @@ export interface AnswerPlan {
   stopped?: StopReason;
   /** A runbook the agent drafted, its numbers written by the service (OF-BLD-014 §9.2). */
   runbookDraft?: RunbookDraft | null;
+  /** OF-BLD-015 §7.1: the modules swept before the first turn. Absent on older plans and in single mode. */
+  coverage?: CoverageMap | null;
+  /** OF-BLD-015 §7.2: the module rows the claims cite. Absent on older plans. */
+  rows?: ModuleRow[];
 }
 
 /**
@@ -2134,6 +2252,8 @@ export interface ToolResult {
   usage: AnswerPlanUsage;
   /** A runbook draft the service assembled (§9.2). */
   draft: RunbookDraft | null;
+  /** Module rows a plan may cite (OF-BLD-015 §7.2). */
+  rows: ModuleRow[];
 }
 
 // ── Runbook drafts (OF-BLD-014 §9.2) ─────────────────────────────────────

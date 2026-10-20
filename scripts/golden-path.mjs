@@ -311,7 +311,7 @@ async function main() {
   await page.locator('[data-testid="passage-quote"]').first().waitFor({ timeout: 10000 }).catch(() => {});
   const traced = await page.locator('[data-testid="trace-step"]').count();
   const quoted = await page.locator('[data-testid="passage-quote"]').count();
-  check('Live Postdoc shows each step and the sentence it quotes', traced === 3 && quoted === 1, `${traced} steps, ${quoted} quotes`);
+  check('Live Postdoc shows each step and the sentence it quotes', traced === 4 && quoted === 1, `${traced} steps, ${quoted} quotes`);
   // OF-BLD-014 §10.3 — a replay says it is one, with its date.
   const replay = await page.locator('[data-testid="replay-label"]').innerText().catch(() => '');
   // §10.R: a stand-in recording claims no date (its date is fixed so the

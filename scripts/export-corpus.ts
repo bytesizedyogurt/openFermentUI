@@ -30,7 +30,10 @@ import { PROTOCOLS } from '../src/data/protocols';
 import { renderStepText } from '../src/engine/scale';
 import { STRAIN_ALIASES, STRAINS } from '../src/data/strains';
 import { PRODUCTS } from '../src/data/products';
-import { CARBON_SOURCES } from '../src/data/vocabulary';
+import { CARBON_SOURCES, CLEARANCE_STATES_BY_ID, PATHWAYS, UNIT_OPERATIONS } from '../src/data/vocabulary';
+import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
+import { RUNBOOKS } from '../src/data/runbooks';
+import { SCENARIOS } from '../src/data/scenarios';
 import type { BioRepo, ExtractionRecord, ReviewDecision } from '../src/data/types';
 
 /**
@@ -279,6 +282,81 @@ const guildProjection = {
   }),
 };
 writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection, null, 2) + '\n');
+
+/**
+ * The modules' projection (OF-BLD-015 §7.1), written beside the corpus as
+ * modules.json. Postdoc's coverage pass and its read tools sweep every
+ * module, and the modules that live in the TypeScript seed reach Python
+ * here, the same arrangement skills.json uses. Each row carries the module's
+ * own state word (a clearance state, a runbook status); the one `state` enum
+ * Postdoc reads is computed from it in `module_stores.py`, never here. Words
+ * and ids only where a row is matched by name; the values a module shows stay
+ * in the module.
+ */
+const modulesProjection = {
+  dominion: {
+    molecules: PRODUCTS.map((p) => ({
+      id: p.id,
+      name: p.name,
+      aliases: p.aliases,
+      category: p.category,
+      clearanceState: p.clearanceState,
+      clearanceLabel: CLEARANCE_STATES_BY_ID[p.clearanceState]?.label ?? p.clearanceState,
+      defaultStrainId: p.defaultStrainId,
+      pathwayIds: p.pathwayIds,
+      processCode: p.processCode,
+      unitOperationIds: p.unitOperationIds,
+      provenance: p.provenance,
+      note: p.note,
+    })),
+    findings: CLEARANCE_FINDINGS.map((f) => ({
+      productId: f.productId,
+      jurisdictionId: f.jurisdictionId,
+      state: f.state,
+      provenance: f.provenance,
+      summary: f.summary,
+      readAt: f.readAt,
+      patents: f.patents.map((x) => ({ office: x.office, number: x.number, title: x.title, expiresOnTerm: x.expiresOnTerm })),
+    })),
+  },
+  runbooks: {
+    runbooks: RUNBOOKS.map((r) => ({
+      id: r.id,
+      title: r.title,
+      kind: r.kind,
+      status: r.status,
+      productId: r.productId,
+      strainId: r.strainId,
+      lockedAt: r.lockedAt,
+      predictions: r.predictions.map((x) => x.label),
+    })),
+    protocols: PROTOCOLS.map((p) => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      organisms: p.organisms,
+      purpose: p.purpose,
+      currentVersion: p.currentVersion,
+      versions: p.versions.map((v) => v.version),
+    })),
+  },
+  geneos: {
+    hosts: STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim(), bsl: s.bsl, badges: s.badges })),
+    pathways: PATHWAYS.map((x) => ({ id: x.id, label: x.label, products: x.products })),
+  },
+  pureos: {
+    unitOperations: UNIT_OPERATIONS.map((u) => ({ id: u.id, label: u.label, stage: u.stage, note: u.note ?? null })),
+  },
+  proforma: {
+    scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId })),
+  },
+  primer: {
+    lessons: MODULES.flatMap((m) =>
+      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [] })),
+    ),
+  },
+};
+writeFileSync(join(dirname(OUT), 'modules.json'), JSON.stringify(modulesProjection, null, 2) + '\n');
 
 const withConditions = records.filter((r) => r.conditions !== null).length;
 const nonPrimary = records.filter((r) => !r.primary).length;

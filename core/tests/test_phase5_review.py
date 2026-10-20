@@ -88,7 +88,7 @@ def test_a_cancelled_question_stops_before_its_next_turn(pool):  # noqa: F811
     script = Script([records()], [records("b")], [records("c")], plan())
     asked = []
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool),
-                            on_step=asked.append, cancelled=lambda: len(asked) >= 1)
+                            on_step=asked.append, cancelled=lambda: sum(s.kind == "tool" for s in asked) >= 1)
     assert len(script.calls) == 1 and out.declined and "stopped" in out.declined
 
 

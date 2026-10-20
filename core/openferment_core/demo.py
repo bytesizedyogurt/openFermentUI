@@ -383,6 +383,31 @@ def prototype_artifact():
     return art.model_copy(update={"createdAt": AT, "durationMs": 0})
 
 
+# OF-BLD-015 §7.4: one proposal a model made at a gate, through the real
+# store in a scratch directory, so Home's card and the smoke have one to
+# press. The time and the id are fixed, so the file is the same every run.
+PROPOSAL_ID = "pr-standin000001"
+
+
+def prototype_proposals() -> dict[str, Any]:
+    from . import audit, proposals
+    from .tools import gates
+
+    with _scratch() as scratch:
+        saved = (proposals.PATH, audit.PATH)
+        proposals.PATH, audit.PATH = Path(scratch) / "proposals.json", Path(scratch) / "audit.jsonl"
+        try:
+            made = proposals.propose(module="runbooks", action="lock", gate=gates.BY_ID["lock"],
+                                     title="Runbooks: lock a runbook's predictions before a run — rb-brazzein",
+                                     why="the draft's predictions are in hand and a run is planned", by="stand-in model",
+                                     target="rb-brazzein", note="lock before the pilot run so the ledger can score it",
+                                     ask_id="ask-standin", effort="medium")
+        finally:
+            proposals.PATH, audit.PATH = saved
+    made = made.model_copy(update={"id": PROPOSAL_ID, "at": AT})
+    return {"proposals.json": [made.model_dump(mode="json")]}
+
+
 def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     from . import artifacts
 
@@ -402,6 +427,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_geneos().items(),
         *prototype_fermos().items(),
         *prototype_proforma().items(),
+        *prototype_proposals().items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -543,12 +569,22 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
     ]
     events: list[dict[str, Any]] = []
     plan = postdoc_agent.ask(
-        STREAM_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+        STREAM_QUESTION, converse=_stand_in_converse(turns), ctx=_seed_ctx(pool),
         clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
     )
     assert plan.claims and not plan.rejected, f"the stand-in plan no longer passes the validator: {plan.rejectionReasons}"
     events.append({"event": "plan", "data": plan.model_dump(mode="json")})
     return events
+
+
+def _seed_ctx(pool: Any) -> tools.ToolContext:
+    """A context whose coverage pass (OF-BLD-015 §7.1) sweeps the seed and
+    the stand-in pool alone, so the recorded loop is the same on every
+    machine."""
+    from . import module_stores, tools
+
+    return tools.ToolContext(pool_factory=lambda: pool,
+                             stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool)))
 
 
 # §9.4: a second recorded loop, in which the stand-in asks for a forecast and
@@ -610,7 +646,7 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
             ]
             events: list[dict[str, Any]] = []
             plan = postdoc_agent.ask(
-                DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=tools.ToolContext(pool_factory=lambda: pool),
+                DRAFT_QUESTION, converse=_stand_in_converse(turns), ctx=_seed_ctx(pool),
                 clock=lambda: 0.0, on_step=lambda st: events.append({"event": "step", "data": st.model_dump(mode="json")}),
             )
             assert plan.runbookDraft is not None and len(plan.runbookDraft.predictions) == 4, "the stand-in draft no longer assembles"

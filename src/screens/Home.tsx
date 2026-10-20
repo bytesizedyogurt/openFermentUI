@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useStore, provenanceOf } from '@/store';
+import { ProposalsCard } from '@/components/ProposalsCard';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
 import { ELEVEN } from '@/data/nav';
@@ -744,6 +745,11 @@ export default function Home() {
         </section>
 
         {/* ── Band 2 · Your work / cold start ────────────────────────── */}
+        {/* OF-BLD-015 §7.4 — what a model asked for at a gate, each with the
+            one button a person presses. Nothing when the service is down or
+            nothing waits. */}
+        <ProposalsCard />
+
         <section aria-labelledby="home-work" className="mb-7">
           <SectionTitle>
             <span id="home-work">{hasWork ? 'Your work' : 'Three good first questions'}</span>

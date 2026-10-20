@@ -72,6 +72,9 @@ class Claim(BaseModel):
     # against its passage, and computed values it rests on, by evidence id.
     passages: list[PassageRef] = Field(default_factory=list)
     evidenceIds: list[str] = Field(default_factory=list)
+    # OF-BLD-015 §7.2: module rows it rests on, as `<module>/<kind>/<id>`,
+    # each returned by a module's read tool in this run.
+    moduleRefs: list[str] = Field(default_factory=list)
 
 
 class PassageRef(BaseModel):
@@ -81,7 +84,7 @@ class PassageRef(BaseModel):
     quote: str
 
 
-TraceKind = Literal["tool", "restart", "final"]
+TraceKind = Literal["coverage", "tool", "restart", "final"]
 StopReason = Literal["done", "rounds", "calls", "cost", "time"]
 
 
@@ -114,6 +117,140 @@ class Usage(BaseModel):
     models: list[str] = Field(default_factory=list)
 
 
+# ── Coverage (OF-BLD-015 §7.1) ─────────────────────────────────────────
+#
+# Before Postdoc's first turn, code sweeps every module store for what the
+# question names, so Postdoc never calls a thing absent that a screen shows.
+
+# The one state every module row reads as (OF-BLD-015 §7.2). It is computed
+# in `module_stores.py` from the module's own word (a clearance state, a
+# runbook's status and lock, a check's state), never chosen by a model.
+ModuleState = Literal["open", "fenced", "approved", "locked", "proposed", "retired"]
+ModuleName = Literal["dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
+                     "primer", "intake", "home"]
+
+
+class CoverageHit(BaseModel):
+    """One row of one module that the question names."""
+
+    # `<module>/<kind>/<id>`, the id a claim cites it by.
+    ref: str
+    id: str
+    kind: str
+    label: str
+    state: ModuleState
+
+
+class ModuleCoverage(BaseModel):
+    """What the sweep found in one module."""
+
+    module: ModuleName
+    label: str
+    # How many rows match; `hits` lists at most COVERAGE_HITS of them.
+    count: int = 0
+    hits: list[CoverageHit] = Field(default_factory=list)
+    # The question names the module itself ("what is open in Dominion").
+    named: bool = False
+    # Set when part of the module lives only in a browser, in words.
+    partial: str | None = None
+    # Set when the module's store could not be read, in words.
+    error: str | None = None
+
+
+class ModuleRow(BaseModel):
+    """One row a module's read tool returns (OF-BLD-015 §7.2): what the
+    module holds, where it stands, and how it is marked."""
+
+    module: ModuleName
+    kind: str
+    id: str
+    # `<module>/<kind>/<id>`, what a claim cites.
+    ref: str
+    label: str
+    # Computed from `status` by module_stores, never by a model.
+    state: ModuleState
+    # The module's own word: a clearance state, a runbook status, an ingest state.
+    status: str
+    # The row's provenance mark when the module keeps one; null for a seed
+    # row that carries none (a lesson, a unit operation).
+    provenance: Provenance | None = None
+    # A few named fields the module shows, kept short.
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuditEntry(BaseModel):
+    """One line of core/data/audit.jsonl (OF-BLD-015 §7.3): a write a model
+    made, or a proposal a person carried out or dismissed."""
+
+    at: str
+    agent: Literal["model", "person"]
+    # The model id, or the person's name.
+    who: str
+    module: ModuleName
+    action: str
+    # The state the write left behind, or `proposed`, `done`, `dismissed`.
+    state: str
+    target: str | None = None
+    askId: str | None = None
+    effort: str | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+ProposalState = Literal["proposed", "done", "dismissed"]
+
+
+class Proposal(BaseModel):
+    """What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+    carries it out or dismisses it on Home."""
+
+    id: str
+    at: str
+    module: ModuleName
+    action: str
+    gate: str
+    title: str
+    why: str
+    # What the button does, in words, and where it takes the person when the
+    # server cannot act itself.
+    how: str
+    route: str | None = None
+    server: bool = False
+    target: str | None = None
+    fields: dict[str, str] = Field(default_factory=dict)
+    note: str = ""
+    # The model that proposed it.
+    by: str
+    askId: str | None = None
+    state: ProposalState = "proposed"
+    carriedOutBy: str | None = None
+    carriedOutAt: str | None = None
+    result: str | None = None
+
+
+class Proposals(BaseModel):
+    """core/data/proposals.json."""
+
+    version: Literal[1] = 1
+    proposals: list[Proposal] = Field(default_factory=list)
+
+
+class ProposalAction(BaseModel):
+    """A person carrying out or dismissing a proposal."""
+
+    person: str
+    reason: str = ""
+
+
+class CoverageMap(BaseModel):
+    """The sweep, module by module, in the order the rail lists them."""
+
+    # Names the question was found to hold, in its own words.
+    entities: list[str] = Field(default_factory=list)
+    searched: int = 0
+    found: int = 0
+    modules: list[ModuleCoverage] = Field(default_factory=list)
+
+
 class AnswerPlan(BaseModel):
     question: str
     claims: list[Claim] = Field(default_factory=list)
@@ -137,6 +274,11 @@ class AnswerPlan(BaseModel):
     passages: list[Passage] = Field(default_factory=list)
     trace: list[TraceStep] = Field(default_factory=list)
     stopped: StopReason = "done"
+    # OF-BLD-015 §7.1: the modules swept before the first turn, and what each
+    # held. The answer's footer reads it; null on the single-call path.
+    coverage: CoverageMap | None = None
+    # OF-BLD-015 §7.2: the module rows the claims cite.
+    rows: list[ModuleRow] = Field(default_factory=list)
     # OF-BLD-014 §9.2: a runbook the agent drafted, its numbers written by the
     # service (runbook_draft.py), for a person to adopt and lock.
     runbookDraft: "RunbookDraft | None" = None
@@ -996,6 +1138,8 @@ class ToolResult(BaseModel):
     usage: Usage = Field(default_factory=Usage)
     # A runbook draft the service assembled (OF-BLD-014 §9.2, E.6).
     draft: "RunbookDraft | None" = None
+    # Module rows a plan may cite (OF-BLD-015 §7.2).
+    rows: list[ModuleRow] = Field(default_factory=list)
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────

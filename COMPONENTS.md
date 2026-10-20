@@ -129,11 +129,11 @@ Not built: Common Seal.
 
 **Ask, plan, answer from records.** `/postdoc` · chord `g o`
 
-The thing you talk to. Runs a bounded loop of tools on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`: it searches the records and the papers' passages, shows each step as it runs, and writes claims that carry no numbers of their own, each citing a record, a sentence checked word for word against its passage, or a computed value.
+The thing you talk to. Before its first turn, code sweeps all eleven modules for what the question names and hands the model the map; then a bounded loop of tools runs on one model (`claude-haiku-5-5` in this build, restarted once on the fallback model on a refusal or an outage) through `openferment-core`: it reads any module through that module's read tool, searches the records and the papers' passages, shows each step as it runs, and writes claims that carry no numbers of their own, each citing a record, a module row with its computed state, a sentence checked word for word against its passage, or a computed value. It writes through each module's write tool, which calls the module's own write function and marks the result as the model's in the audit log; an action at a gate becomes a proposal that waits on Home for a person.
 
 | Component | Implemented in |
 |---|---|
-| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` |
+| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py`, `src/components/ProposalsCard.tsx` |
 
 ### geneOS
 
@@ -261,7 +261,7 @@ for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
-| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/tools/`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
+| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
