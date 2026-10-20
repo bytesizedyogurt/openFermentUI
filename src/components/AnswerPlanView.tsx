@@ -5,9 +5,9 @@
 // the code below. Nothing here prints model prose containing a quantity,
 // because the validator guarantees the prose has none:
 //
-//   plan says    "Titre at harvest in cw15 under mixotrophic conditions"  r-A1-1
-//   this renders  Titre at harvest in cw15 under mixotrophic conditions
-//                 0.2 % TSP · Curated · pending source check · A1
+//   plan says    "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions"  <record id>
+//   this renders  Ethanol yield on glucose in cenpk113-7d under anaerobic conditions
+//                 <the record's value and unit> · <its provenance> · <its paper>
 //
 // The provenance tick reuses the existing visual language rather than inventing
 // a fourth one — a claim is evidence, and evidence in this system is ticked.

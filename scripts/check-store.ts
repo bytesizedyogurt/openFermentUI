@@ -404,8 +404,8 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   st().addLiveTurn(fresh, turn('lt-d', 'running'));
   st().dropLiveTurn(fresh, 'lt-d');
   check('a conversation made for an unreceived question goes with it', !st().liveConversations.some((c) => c.id === fresh));
-  st().resetDemo();
-  check('Reset demo data clears the conversations', st().liveConversations.length === 0);
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data clears the conversations', st().liveConversations.length === 0);
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

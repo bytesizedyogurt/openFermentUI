@@ -719,7 +719,7 @@ export default function Protocols() {
         <Card>
           <EmptyState
             title="No protocols in this session"
-            body="The protocol set is empty. Restore the seeded demo data from the corpus settings to bring the bench procedures back."
+            body="The protocol set is empty in this session. Clearing this browser’s data from the corpus settings brings the bench procedures back."
             icon={<ClipboardList size={22} />}
             action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
           />

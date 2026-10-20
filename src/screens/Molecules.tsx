@@ -1,4 +1,4 @@
-// Molecule index (OF-BLD-005 §6) — 117 products in one table, faceted along
+// Molecule index (OF-BLD-005 §6) — every product in one table, faceted along
 // every axis a facility actually decides on: what it is, who makes it, which
 // downstream train it needs, how it ships, what it takes to sell it, and
 // whether anyone else already owns it.
@@ -8,7 +8,7 @@
 // you are allowed to build something is a catalogue that will get someone
 // sued.
 //
-// Every row is modeled: the provenance tick is dashed amber on all 117, and
+// Every row is modeled: the provenance tick is dashed amber on every row, and
 // the value-density band is an industry estimate that `aggregateExclusion()`
 // already holds out of every statistic. Nothing here is evidence.
 import { useMemo } from 'react';

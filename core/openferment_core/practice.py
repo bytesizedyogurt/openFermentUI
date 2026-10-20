@@ -364,7 +364,7 @@ its ref, exactly as given, and write [v1], [v2] and so on in the situation or \
 the prompt where it belongs, numbered in the order of your evidence list. In \
 the text a mark shows your label for the item; the evidence pane shows the \
 item with its value, copied from the source. Identifiers with \
-digits are fine: OD750, PR-OD-01, step c12, cw15. A draft that contains a \
+digits are fine: OD750, PR-OD-01, step c12, cenpk113-7d. A draft that contains a \
 number, cites a ref you were not given, or marks a [vN] past the end of the \
 evidence list is discarded whole.
 

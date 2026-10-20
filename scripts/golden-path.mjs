@@ -293,12 +293,17 @@ async function main() {
   const rules = await page.locator('[data-testid="strip-rule"]').count();
   check('geneOS → Model draws a computed ceiling and the envelope', rules === 1 && (await page.locator('[data-testid="frontier"]').count()) === 1, `${rules} rules`);
 
-  // ── 10d. fermOS fits the sample run and forecasts from it ───────────
+  // ── 10d. fermOS names what to deposit (OF-BLD-016 §3.2) ─────────────
+  // The invented sample run left the screen, and depositions live in the
+  // browser, where the double cannot supply one; so the beat checks that a
+  // fresh fermOS offers nothing invented and says what a run must carry.
   await go('/fermos');
-  await page.getByRole('button', { name: 'Load a sample run' }).click();
-  await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
-  const fitted = await page.locator('[data-testid="trajectory-fit"]').count();
-  check('fermOS fits a curve through the sample run', fitted === 3, `${fitted} curves`);
+  await page.locator('[data-testid="fermos-empty"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const fermosEmpty = await page.locator('[data-testid="fermos-empty"]').innerText().catch(() => '');
+  check(
+    'fermOS with no run deposited names the readings to deposit and where, and offers no invented run',
+    /time of each sample/.test(fermosEmpty) && /biomass/.test(fermosEmpty) && /Runbooks → Depositions/.test(fermosEmpty) && (await page.getByRole('button', { name: /sample run/i }).count()) === 0,
+  );
 
   // ── 10e. Proforma: the PHA scenario names where each input comes from ──
   // OF-BLD-014 §10.3, the demo's beat 7, over the double's stand-in binding.

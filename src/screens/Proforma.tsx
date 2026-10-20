@@ -218,7 +218,7 @@ export default function Proforma() {
                     <span className="text-body text-ink-soft ml-1">/kg</span>
                   </div>
                   <div className="text-caption text-ink-soft mt-0.5">
-                    Demo model v0 — illustrative economics, not validated
+                    Cost model v0 — illustrative economics, not validated
                   </div>
                 </Tick>
 

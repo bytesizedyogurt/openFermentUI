@@ -323,7 +323,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <EmptyState
             icon={<FlaskConical size={22} />}
             title="No strains in this session"
-            body="The seeded strain set is empty, which normally means the demo data was cleared. Restoring the seeded state from the corpus settings brings the organism index back."
+            body="The seeded strain set is empty in this session. Clearing this browser’s data from the corpus settings brings the organism index back."
             action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
           />
         </Card>
@@ -428,7 +428,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <LineChart size={13} className="mt-[2px] shrink-0" />
           <span>
             A scenario counts for a strain only when one of its assumptions cites a record for that
-            strain. Demo model v0 — illustrative economics, not validated.
+            strain. Cost model v0 — illustrative economics, not validated.
           </span>
         </div>
       </div>

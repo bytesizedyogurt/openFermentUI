@@ -149,7 +149,7 @@ export default function Compare() {
                 <span className="text-body text-ink-soft ml-1">/kg</span>
               </div>
               <div className="text-caption text-ink-soft">
-                Demo model v0 — illustrative economics, not validated
+                Cost model v0 — illustrative economics, not validated
               </div>
             </Tick>
             <div className="text-caption text-ink-soft mt-2 space-y-0.5">

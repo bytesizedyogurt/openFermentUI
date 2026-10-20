@@ -4,15 +4,13 @@
 // A forecast is drawn from one kept fit's covariance by the service, under the
 // fitted run's own starting values and length unless a person changes them;
 // a changed value is that person's assumption, and the forecast becomes
-// `demo`. Over the sample run it is computed inline and kept nowhere. The band
-// leaves out run-to-run variation, and says so.
+// `demo`. The band leaves out run-to-run variation, and says so.
 import { useState } from 'react';
 import type { ForecastResult } from '@/data/types';
 import { useStore, reviewerName } from '@/store';
 import { Button, Callout } from '@/components/ui';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { TrajectoryBand } from '@/components/figures';
-import { SAMPLE_DEPOSITION_ID, SAMPLE_NOTE, SAMPLE_SERIES } from '@/data/fermosSample';
 import { fmt } from '@/engine/units';
 import { FermosDown, FermosRefused, fermosForecast, fitFigureSeries, fitSeriesOf } from '@/lib/fermos';
 
@@ -28,10 +26,8 @@ export default function FermOSForecast() {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fit = fits[chosen];
-  const isSample = chosen === SAMPLE_DEPOSITION_ID;
 
   const seriesFor = (id: string) => {
-    if (id === SAMPLE_DEPOSITION_ID) return SAMPLE_SERIES;
     const d = depositions.find((x) => x.id === id);
     const rb = runbooks.find((r) => r.id === d?.runbookId);
     return d && rb ? fitSeriesOf(d, rb) : [];
@@ -44,12 +40,12 @@ export default function FermOSForecast() {
     setBusy(true);
     setProblem(null);
     fermosForecast({
-      fitArtifactId: isSample ? null : fit.kineticArtifactId,
-      fit: isSample ? fit.kinetic : null,
+      fitArtifactId: fit.kineticArtifactId,
+      fit: null,
       start: { X0: num(start.X0), P0: num(start.P0), S0: num(start.S0) },
       changedBy: changed ? reviewerName() : null,
       durationH: num(duration),
-      sample: isSample,
+      sample: false,
     })
       .then(setResult)
       .catch((e: unknown) => {
@@ -62,7 +58,8 @@ export default function FermOSForecast() {
   if (usable.length === 0) {
     return (
       <Callout kind="info" title="No fit to forecast from yet">
-        A forecast is drawn from a fit. Open Fits, choose a run with a kinetic fit (or load the sample run), and come back.
+        A forecast is drawn from a fit of a deposited run. Deposit a run with timed biomass, product and substrate readings in
+        Runbooks → Depositions, open Fits, choose it, and come back.
       </Callout>
     );
   }
@@ -75,7 +72,7 @@ export default function FermOSForecast() {
           <select className="input" aria-label="Fit" value={chosen} onChange={(e) => { setChosen(e.target.value); setResult(null); }}>
             {usable.map((f) => (
               <option key={f.depositionId} value={f.depositionId}>
-                {f.depositionId === SAMPLE_DEPOSITION_ID ? 'Sample run (invented)' : f.depositionId}
+                {f.depositionId}
               </option>
             ))}
           </select>
@@ -100,15 +97,14 @@ export default function FermOSForecast() {
           makes is marked modeled.
         </p>
       )}
-      {isSample && <Callout kind="warn" title="Sample run">{SAMPLE_NOTE} Its forecast is computed inline and kept nowhere.</Callout>}
       {problem && <Callout kind="warn">{problem}</Callout>}
       {result && fit && (
         <>
           <TrajectoryBand
-            title={`What would a run like ${isSample ? 'the sample run' : chosen} do?`}
+            title={`What would a run like ${chosen} do?`}
             series={fitFigureSeries(seriesFor(chosen), fit.kinetic)}
             forecast={{ times: result.times, bands: result.bands, provenance: result.evidence?.provenance }}
-            readingProvenance={isSample ? 'demo' : 'measured'}
+            readingProvenance="measured"
             notes={result.notes}
             basis={result.evidence ? [result.evidence.basis] : undefined}
             csvName={`forecast-${chosen}`}

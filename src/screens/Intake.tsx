@@ -530,7 +530,7 @@ export default function Intake() {
                 ? scopedPaper
                   ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
                   : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
-                : 'Nothing has been extracted in this session. Ingest a paper from the demo shelf, then run the extractor to stage candidate records here.'
+                : 'Nothing has been extracted in this session. Fetch a paper from the ingest queue, then run the extractor to stage candidate records here.'
             }
             action={
               paperParam ? (

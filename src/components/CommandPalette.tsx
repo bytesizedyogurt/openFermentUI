@@ -78,7 +78,7 @@ export function CommandPalette() {
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
-  const resetDemo = useStore((s) => s.resetDemo);
+  const clearBrowserData = useStore((s) => s.clearBrowserData);
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -246,11 +246,11 @@ export function CommandPalette() {
         run: () => navigate('/dominion/molecules?clearance=blocked'),
       },
       { id: 'a-help', group: 'Actions', label: 'Keyboard shortcuts', run: () => useStore.getState().setUI({ helpOpen: true }) },
-      { id: 'a-reset', group: 'Actions', label: 'Reset demo data', run: resetDemo },
+      { id: 'a-reset', group: 'Actions', label: 'Clear this browser’s data', run: clearBrowserData },
     ];
 
     return [...nav, ...actions];
-  }, [papers, strains, products, runbooks, protocols, scenarios, records, resetDemo]);
+  }, [papers, strains, products, runbooks, protocols, scenarios, records, clearBrowserData]);
 
   const results = useMemo(() => {
     const scored = items

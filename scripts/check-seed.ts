@@ -18,6 +18,7 @@ import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/com
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import * as ts from 'typescript';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
 import { provMeta } from '../src/components/Provenance';
@@ -205,6 +206,59 @@ for (const mod of MODULES)
     lines.forEach((line, i) => {
       if (SIM_IMPORT.test(line)) fail(`${file}:${i + 1} imports from src/sim/ — Postdoc speaks only through the service (OF-BLD-016 §3.1)`);
     });
+  }
+}
+
+// ── 2c. nothing invented reaches a default view (OF-BLD-016 E.3′) ─────
+//
+// The words demo, sample run, stand-in, placeholder and scripted appear in
+// what src/ shows a person only in `pnpm demo:offline`'s replay label.
+//
+// What a person can see is read from the syntax tree, not the raw text: every
+// string literal, template-literal part and JSX text node in every .ts and
+// .tsx file under src/ (attribute values included). Comments are not strings,
+// so they never count. Three kinds of string are code, not copy, and pass: an
+// import or export path, a literal used as a type, and a lowercase token with
+// no space in it (a provenance value such as 'demo', a class name, an id). A
+// word joined to a code token by - _ . / : @ or # (tick-demo, chip-demo,
+// demo:offline) is part of that token. Everything else is prose a person
+// reads, and a hit fails the build, with the file and line.
+//
+// ALLOWED names each exception and why; it stays this short.
+{
+  const WORD = /(?<![\w\-./:@#])(demo|sample run|stand-in|placeholder|scripted)(?![\w\-/:@])/i;
+  const ALLOWED: { file: string; text: RegExp; why: string }[] = [
+    { file: 'src/screens/Postdoc.tsx', text: /^Replay of a recorded test run, made with a scripted stand-in in place of the model\.$/, why: "pnpm demo:offline's replay label (E.3′)" },
+    { file: 'src/lib/csv.ts', text: /^#\s+demo\s+modeled, not measured \(simulation outputs\)$/, why: 'an export\'s legend names the provenance code `demo` its rows carry' },
+    { file: 'src/data/runbooks.ts', text: /^Equipment and CAPEX stage has not run; figure is a placeholder to be tested$/, why: 'a locked prediction\'s basis: its words are in the lock digest check:lock holds (OF-BLD-016 §3.3 marks the runbook an example)' },
+  ];
+  const CODE_TOKEN = /^[a-z0-9_\-:.\/@#]+$/;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : /\.tsx?$/.test(name) ? [path] : [];
+    });
+  for (const file of walk('src')) {
+    const text = readFileSync(file, 'utf8');
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const visit = (node: ts.Node): void => {
+      let said: string | null = null;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) said = node.text;
+      else if (ts.isJsxText(node)) said = node.text;
+      if (said !== null && WORD.test(said)) {
+        const parent = node.parent;
+        const code =
+          (parent && (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent) || ts.isLiteralTypeNode(parent) || ts.isExternalModuleReference(parent))) ||
+          CODE_TOKEN.test(said.trim());
+        const allowed = ALLOWED.some((a) => file.replace(/\\/g, '/') === a.file && a.text.test(said!.trim()));
+        if (!code && !allowed) {
+          const { line } = sf.getLineAndCharacterOfPosition(node.getStart());
+          fail(`${file}:${line + 1} shows "${said.replace(/\s+/g, ' ').trim().slice(0, 90)}" — nothing invented reaches a default view (OF-BLD-016 E.3′)`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
   }
 }
 

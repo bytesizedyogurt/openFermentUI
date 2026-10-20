@@ -850,7 +850,7 @@ export default function Home() {
                   meta={
                     <>
                       <span className="font-num">{pinnedScenarios.length}</span> pinned — open the
-                      comparison. Demo model v0 — illustrative economics, not validated.
+                      comparison. Cost model v0 — illustrative economics, not validated.
                     </>
                   }
                 />

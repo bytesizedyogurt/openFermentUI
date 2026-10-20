@@ -89,11 +89,9 @@ import {
   postWithdrawal,
   postPolicy,
 } from '@/lib/guild';
-import { sampleGuild } from '@/data/guildSample';
 import { loadPractice as loadPracticeFromService } from '@/lib/practice';
 import { CheckRefused, loadChecks as loadChecksFromService, postBrief, postDismiss, postPropose, postRecord, postRequest, postSchedule, whyNot } from '@/lib/checks';
-import { mayQueue, proposeChecks, type Proposal } from '@/engine/checks';
-import { competenceOf, isAssessor, localToday, mayCosign, statusOf } from '@/engine/competence';
+import { competenceOf, localToday, mayCosign, statusOf } from '@/engine/competence';
 import { SKILL_BY_ID } from '@/data/skills';
 
 export type Theme = 'bench' | 'night';
@@ -555,21 +553,12 @@ export interface OFState {
   /** Who is signing, as chosen in Guild's header. A claim, until there is sign-in. */
   guildActingId: string | null;
   /**
-   * The invented sample team, shown in place of the ledger while set. Never
-   * posted, never in the Durable tier; a reload drops it.
-   */
-  guildSample: Guild | null;
-  /**
    * OF-BLD-014 §7.4 — fermOS's fits made in this session, by deposition id,
-   * so Forecast can offer them; and whether the invented sample run is
-   * loaded. Ephemeral: a fit is kept by the service as an artifact, and the
-   * sample is kept nowhere.
+   * so Forecast can offer them. Ephemeral: a fit is kept by the service as
+   * an artifact.
    */
   fermosFits: Record<string, FermosFitResponse>;
-  fermosSampleLoaded: boolean;
   keepFermosFit: (fit: FermosFitResponse) => void;
-  setFermosSample: (loaded: boolean) => void;
-  guildSampleActingId: string | null;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
   /**
@@ -582,24 +571,12 @@ export interface OFState {
   /** A drafted scenario, or a session the tutor just answered, merged into `practice`. */
   mergePractice: (item: { scenario?: PracticeScenario; session?: PracticeSession }) => void;
   /**
-   * Whoever is learning, as Practice names them to the service: a person on
-   * the ledger who can hold skills, or null. A sample person is never sent.
-   */
-  practiceLearner: () => string | null;
-  /**
    * A session just closed. For a learner on the ledger the service has
-   * already put practice on it, so the ledger is fetched again; with the
-   * sample shown, the sample's learner gets the entry here, in the sample
-   * alone.
+   * already put practice on it, so the ledger is fetched again.
    */
   practiceClosed: (session: PracticeSession, title: string) => Promise<void>;
-  /**
-   * Guild's checks as the service last answered (OF-BLD-013 §5.4), or null.
-   * With the sample shown, `guildSampleChecks` stands in: the same ranking
-   * run in this browser, kept in memory, never posted.
-   */
+  /** Guild's checks as the service last answered (OF-BLD-013 §5.4), or null. */
   checks: Checks | null;
-  guildSampleChecks: Check[] | null;
   loadChecks: () => Promise<void>;
   /** Each returns null when it worked, or why it did not, in words. */
   checksPropose: () => Promise<{ made: number } | { why: string }>;
@@ -644,8 +621,6 @@ export interface OFState {
    * counts toward no skill or nobody who can hold skills is signing.
    */
   recordLessonForGuild: (lessonId: string) => Promise<{ personId: string; skills: string[] } | null>;
-  guildLoadSample: () => void;
-  guildClearSample: () => void;
   /** Post what this browser made offline, then take the service's ledger as the truth. */
   syncGuild: () => Promise<void>;
 
@@ -653,7 +628,8 @@ export interface OFState {
   logActivity: (e: ActivityEvent) => void;
   logExport: (name: string, rows: number) => void;
   addCollectionPapers: (collectionId: string, paperIds: string[]) => void;
-  resetDemo: () => void;
+  /** Settings → Clear this browser's data: the Durable tier, and the copies in memory it restores. */
+  clearBrowserData: () => void;
 }
 
 /**
@@ -842,16 +818,11 @@ export const useStore = create<OFState>()((set, get) => ({
   guildPending: [] as string[],
   guildPendingWithdrawals: [] as GuildWithdrawal[],
   guildActingId: null as string | null,
-  guildSample: null as Guild | null,
   fermosFits: {} as Record<string, FermosFitResponse>,
-  fermosSampleLoaded: false,
   keepFermosFit: (fit: FermosFitResponse) => set((s) => ({ fermosFits: { ...s.fermosFits, [fit.depositionId]: fit } })),
-  setFermosSample: (loaded: boolean) => set({ fermosSampleLoaded: loaded }),
-  guildSampleActingId: null as string | null,
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,
-  guildSampleChecks: null as Check[] | null,
 
   toast: (t) => {
     const id = nextId('toast');
@@ -2043,9 +2014,8 @@ export const useStore = create<OFState>()((set, get) => ({
       runbookId,
       protocolId,
       // OF-BLD-013 §2 — Guild's acting person, when the ledger has one who
-      // holds skills. Never a sample person: depositions are Durable, and the
-      // sample is kept out of the Durable tier.
-      operatorId: s.guildSample ? null : runOperatorDefault(s),
+      // holds skills.
+      operatorId: runOperatorDefault(s),
       startedAt: new Date().toISOString(),
       closedAt: null,
       state: 'staged',
@@ -2745,12 +2715,11 @@ export const useStore = create<OFState>()((set, get) => ({
   //
   // Every write is applied here first, then posted. The service stores it or
   // refuses it with a rule: a refusal takes the write back out and says why;
-  // no service keeps it, marked pending, for `syncGuild` to post later. While
-  // the sample team is shown, writes touch the sample and nothing else.
+  // no service keeps it, marked pending, for `syncGuild` to post later.
 
   guildAddPerson: async (input) => {
     const s = get();
-    const ledger = s.guildSample ?? s.guild;
+    const ledger = s.guild;
     const person: GuildPerson = {
       id: personIdFor(input.name, ledger.people.map((p) => p.id)),
       name: input.name.trim(),
@@ -2761,10 +2730,6 @@ export const useStore = create<OFState>()((set, get) => ({
       addedBy: ledger.people.length === 0 ? null : actingIdOf(s),
       addedAt: new Date().toISOString(),
     };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, people: [...s.guildSample.people, person] } });
-      return person;
-    }
     set({ guild: { ...s.guild, people: [...s.guild.people, person] } });
     if (ledger.people.length === 0 && !s.guildActingId) set({ guildActingId: person.id });
     return guildPost(set, get, person.id, () => postPerson(person), (stored) => ({
@@ -2775,10 +2740,6 @@ export const useStore = create<OFState>()((set, get) => ({
   guildUpdatePerson: async (person) => {
     const s = get();
     const changed: GuildPerson = { ...person, updatedBy: actingIdOf(s), updatedAt: new Date().toISOString() };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, people: s.guildSample.people.map((p) => (p.id === person.id ? changed : p)) } });
-      return changed;
-    }
     const before = s.guild.people.find((p) => p.id === person.id);
     set({ guild: { ...s.guild, people: s.guild.people.map((p) => (p.id === person.id ? changed : p)) } });
     return guildPost(set, get, person.id, () => postPerson(changed), (stored) => ({
@@ -2791,10 +2752,6 @@ export const useStore = create<OFState>()((set, get) => ({
   guildRecord: async (input) => {
     const s = get();
     const entry: GuildEvidence = { ...input, id: newEvidenceId(), recordedAt: null };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, evidence: [...s.guildSample.evidence, entry] } });
-      return entry;
-    }
     set({ guild: { ...s.guild, evidence: [...s.guild.evidence, entry] } });
     return guildPost(set, get, entry.id, () => postEvidence(entry), (stored) => ({
       guild: { ...get().guild, evidence: get().guild.evidence.map((e) => (e.id === entry.id ? stored : e)) },
@@ -2811,10 +2768,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const w: GuildWithdrawal = { evidenceId, by, at: localToday(), reason: reason.trim() };
     const mark = (e: GuildEvidence): GuildEvidence =>
       e.id === evidenceId ? { ...e, withdrawnAt: w.at, withdrawnBy: by, withdrawReason: w.reason } : e;
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, evidence: s.guildSample.evidence.map(mark) } });
-      return true;
-    }
     const before = s.guild.evidence.find((e) => e.id === evidenceId);
     set({ guild: { ...s.guild, evidence: s.guild.evidence.map(mark) } });
     const unmark = () => ({
@@ -2844,7 +2797,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  guildSetActing: (id) => set((s) => (s.guildSample ? { guildSampleActingId: id } : { guildActingId: id })),
+  guildSetActing: (id) => set({ guildActingId: id }),
 
   guildSetPolicy: async (choice) => {
     const s = get();
@@ -2856,10 +2809,6 @@ export const useStore = create<OFState>()((set, get) => ({
       return false;
     }
     const policy: GuildPolicy = { ...choice, updatedBy: lead.id, updatedAt: new Date().toISOString() };
-    if (s.guildSample) {
-      set({ guildSample: { ...s.guildSample, policy } });
-      return true;
-    }
     if (!s.serviceUp) {
       get().toast({ text: 'The gate and the check rate are kept by the service, which is not answering here.', kind: 'error' });
       return false;
@@ -2874,20 +2823,9 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  guildLoadSample: () => {
-    const sample = sampleGuild(localToday());
-    // The sample's queue is the ranking run here on the invented ledger.
-    const checks = proposeChecks(sample, SKILL_BY_ID, localToday()).map((p, i) => sampleCheck(p, i));
-    set({ guildSample: sample, guildSampleActingId: 'p-sample-eric', guildSampleChecks: checks });
-  },
-
-  guildClearSample: () => set({ guildSample: null, guildSampleActingId: null, guildSampleChecks: null }),
-
   // ── Checks (OF-BLD-013 §5.4) ─────────────────────────────────────────
   //
-  // The service's rules decide every write; with the sample shown the same
-  // moves happen to the sample's checks in memory, under the few rules a
-  // screen needs (who may act), and nothing is posted.
+  // The service's rules decide every write.
 
   loadChecks: async () => {
     set({ checks: await loadChecksFromService() });
@@ -2899,15 +2837,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const by = actingIdOf(s);
     if (!by) return { why: 'Choose who you are with Acting as: the ranking is run by an assessor or the lead.' };
-    if (s.guildSample) {
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      const me = s.guildSample.people.find((p) => p.id === by) ?? null;
-      if (!mayQueue(me, map)) return { why: 'The ranking is run by an assessor or the lead.' };
-      const open = s.guildSampleChecks ?? [];
-      const made = proposeChecks(s.guildSample, SKILL_BY_ID, localToday(), coveredBy(open)).map((p, i) => sampleCheck(p, open.length + i));
-      set({ guildSampleChecks: [...open, ...made] });
-      return { made: made.filter((c) => c.personId !== by).length };
-    }
     try {
       const made = await postPropose(by);
       await get().loadChecks();
@@ -2925,24 +2854,6 @@ export const useStore = create<OFState>()((set, get) => ({
     // open: a duplicate is the queue's to know, and the person never sees a
     // check that names them before it is run.
     const own = by === personId;
-    if (s.guildSample) {
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      const them = s.guildSample.people.find((p) => p.id === personId);
-      if (!them || !them.active || them.role === 'auditor') return 'A check is for an active person who can hold skills.';
-      if (!own && !skillIds.some((k) => isAssessor(map, by, k))) return 'A check is asked for by the person, or by an assessor on one of its skills.';
-      const open = s.guildSampleChecks ?? [];
-      const cover = coveredBy(open);
-      const fresh = skillIds.filter((k) => !cover.has(`${personId}|${k}`));
-      if (fresh.length === 0) return own ? null : 'A check already in the queue covers this.';
-      const who = by === personId ? 'the person themselves' : guildView(s).people.find((p) => p.id === by)?.name ?? by;
-      const made = sampleCheck(
-        { personId, skillIds: fresh, score: 0, reasons: fresh.map((k) => ({ kind: 'requested' as const, skillId: k, text: `Asked for by ${who}.` })) },
-        open.length,
-        by,
-      );
-      set({ guildSampleChecks: [...open, made] });
-      return null;
-    }
     try {
       await postRequest({ personId, skillIds, by });
       await get().loadChecks();
@@ -2953,25 +2864,12 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  checksSchedule: async (checkId, day) =>
-    checkMove(set, get, checkId, (c, by, map, ledger) => {
-      if (!ledger.people.some((p) => p.id === c.personId && p.active)) return 'The person checked is no longer active; the check can be dismissed.';
-      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Scheduled by an assessor on every one of its skills, never by the person checked.';
-      return { ...c, state: 'scheduled', assessorId: by, scheduledFor: day };
-    }, (by) => postSchedule(checkId, { by, scheduledFor: day })),
+  checksSchedule: async (checkId, day) => checkMove(get, (by) => postSchedule(checkId, { by, scheduledFor: day })),
 
-  checksDismiss: async (checkId, reason) =>
-    checkMove(set, get, checkId, (c, by, map, ledger) => {
-      if (reason.trim().length < 2) return 'A dismissal says why; it is kept for the audit trail.';
-      const lead = ledger.people.some((p) => p.id === by && p.active && p.role === 'lead');
-      if (by === c.personId || !(lead || c.skillIds.some((k) => isAssessor(map, by, k))))
-        return 'Dismissed by an assessor on one of its skills or by the lead, never by the person checked.';
-      return { ...c, state: 'dismissed', dismissedBy: by, dismissReason: reason.trim(), closedAt: new Date().toISOString() };
-    }, (by) => postDismiss(checkId, { by, reason })),
+  checksDismiss: async (checkId, reason) => checkMove(get, (by) => postDismiss(checkId, { by, reason })),
 
   checksBrief: async (checkId) => {
     const s = get();
-    if (s.guildSample) return 'A brief is drafted by the service from the ledger it keeps, and the sample stays in this browser.';
     const by = actingIdOf(s);
     if (!by) return 'Choose who you are first.';
     try {
@@ -2987,37 +2885,6 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const by = actingIdOf(s);
     if (!by) return 'Choose who you are first: a check is signed by the assessor who ran it.';
-    if (s.guildSample) {
-      const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
-      if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
-      const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-      if (by === c.personId || !c.skillIds.every((k) => isAssessor(map, by, k))) return 'Run by an assessor on every one of its skills, never by the person checked.';
-      const ids: string[] = [];
-      for (const k of c.skillIds) {
-        const n = SKILL_BY_ID[k].mastery.length;
-        const mine = results.filter((r) => r.skillId === k);
-        if (mine.length !== n) return `Every criterion of ${SKILL_BY_ID[k].name} is called before the check is signed.`;
-        const note = notes.find((x) => x.skillId === k)?.text.trim() ?? '';
-        if (note.length < 2) return `Write what you saw on ${SKILL_BY_ID[k].name}.`;
-        const e = await get().guildRecord({
-          personId: c.personId,
-          skillId: k,
-          kind: 'witnessed',
-          outcome: mine.every((r) => r.meets) ? 'pass' : 'fail',
-          at,
-          observerId: by,
-          source: { kind: 'check', ref: c.id },
-          raw: note,
-        });
-        if (e) ids.push(e.id);
-      }
-      set((x) => ({
-        guildSampleChecks: (x.guildSampleChecks ?? []).map((y) =>
-          y.id === checkId ? { ...y, state: 'done', assessorId: by, results, evidenceIds: ids, closedAt: new Date().toISOString() } : y,
-        ),
-      }));
-      return null;
-    }
     try {
       await postRecord(checkId, { by, at, results, notes });
       await get().loadChecks();
@@ -3048,34 +2915,12 @@ export const useStore = create<OFState>()((set, get) => ({
       };
     }),
 
-  practiceLearner: () => {
-    const s = get();
-    return s.guildSample ? null : runOperatorDefault(s);
-  },
 
-  practiceClosed: async (session, title) => {
-    const s = get();
+  practiceClosed: async (session) => {
     if (!session.closedAt) return;
     // A session the service named somebody on is theirs, whatever is shown
     // now: the service has put it on their ledger, so fetch the ledger back.
-    if (session.personId) {
-      if (session.evidenceId) await get().syncGuild();
-      return;
-    }
-    if (s.guildSample) {
-      const learner = runOperatorDefault(s);
-      if (!learner) return;
-      await get().guildRecord({
-        personId: learner,
-        skillId: session.skillId,
-        kind: 'scenario',
-        outcome: 'pass',
-        at: session.closedAt.slice(0, 10),
-        observerId: null,
-        source: { kind: 'scenario', ref: session.id },
-        raw: `Practice, \u201c${title}\u201d. The tutor observed: ${session.observed.map((o) => o.text).join(' ')}`,
-      });
-    }
+    if (session.personId && session.evidenceId) await get().syncGuild();
   },
 
   setRunOperator: (runId, personId) =>
@@ -3085,10 +2930,9 @@ export const useStore = create<OFState>()((set, get) => ({
       return {
         runs: { ...s.runs, [runId]: { ...run, operatorId: personId } },
         // The deposition names whoever is performing now; each step's entry
-        // on the ledger names who performed that step. A sample person is
-        // never written into a deposition, which is Durable.
+        // on the ledger names who performed that step.
         depositions:
-          run.depositionId && !s.guildSample
+          run.depositionId
             ? s.depositions.map((d) => (d.id === run.depositionId ? { ...d, operatorId: personId } : d))
             : s.depositions,
       };
@@ -3335,7 +3179,7 @@ export const useStore = create<OFState>()((set, get) => ({
     }
   },
 
-  resetDemo: () => {
+  clearBrowserData: () => {
     // Clear persistence as well as memory. A reset that leaves a durable
     // snapshot behind would restore itself on the next reload, which is the
     // opposite of what the button says.
@@ -3353,13 +3197,10 @@ export const useStore = create<OFState>()((set, get) => ({
       guildPending: [],
       guildPendingWithdrawals: [],
       guildActingId: serviceUp ? get().guildActingId : null,
-      guildSample: null,
-      guildSampleActingId: null,
-      guildSampleChecks: null,
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'Workspace restored to the seeded corpus — depositions, review decisions, runs and scenario edits discarded',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished and conversations kept here are gone, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3367,60 +3208,20 @@ export const useStore = create<OFState>()((set, get) => ({
 
 // ── Guild helpers (OF-BLD-013 §1.3) ────────────────────────────────────
 
-/** The ledger every Guild screen reads: the sample team while it is shown. */
-export function guildView(s: Pick<OFState, 'guild' | 'guildSample'>): Guild {
-  return s.guildSample ?? s.guild;
+/** The ledger every Guild screen reads. */
+export function guildView(s: Pick<OFState, 'guild'>): Guild {
+  return s.guild;
 }
 
-/** The checks every Guild screen reads: the sample's while it is shown. */
-export function checksView(s: Pick<OFState, 'checks' | 'guildSample' | 'guildSampleChecks'>): Check[] {
-  return s.guildSample ? (s.guildSampleChecks ?? []) : (s.checks?.checks ?? []);
+/** The checks every Guild screen reads, as the service last answered. */
+export function checksView(s: Pick<OFState, 'checks'>): Check[] {
+  return s.checks?.checks ?? [];
 }
 
-/** person|skill pairs an open check covers. */
-function coveredBy(checks: Check[]): Set<string> {
-  return new Set(checks.filter((c) => c.state === 'proposed' || c.state === 'scheduled').flatMap((c) => c.skillIds.map((k) => `${c.personId}|${k}`)));
-}
-
-/** A check in the sample's queue, made here and never posted. */
-function sampleCheck(p: Proposal, n: number, by: string | null = null): Check {
-  return {
-    id: `ck-sample-${n + 1}`,
-    personId: p.personId,
-    skillIds: p.skillIds,
-    reasons: p.reasons,
-    state: 'proposed',
-    score: p.score,
-    proposedAt: new Date().toISOString(),
-    proposedBy: by,
-    results: [],
-    evidenceIds: [],
-  };
-}
-
-/**
- * One move on one open check: in the sample, `local` makes it here (or says
- * why not); otherwise `post` asks the service and the queue is fetched again.
- */
-async function checkMove(
-  set: StoreSet,
-  get: () => OFState,
-  checkId: string,
-  local: (c: Check, by: string, map: ReturnType<typeof competenceOf>, ledger: Guild) => Check | string,
-  post: (by: string) => Promise<unknown>,
-): Promise<string | null> {
-  const s = get();
-  const by = actingIdOf(s);
+/** One move on one open check: `post` asks the service and the queue is fetched again. */
+async function checkMove(get: () => OFState, post: (by: string) => Promise<unknown>): Promise<string | null> {
+  const by = actingIdOf(get());
   if (!by) return 'Choose who you are first.';
-  if (s.guildSample) {
-    const c = (s.guildSampleChecks ?? []).find((x) => x.id === checkId);
-    if (!c || (c.state !== 'proposed' && c.state !== 'scheduled')) return 'This check is no longer open.';
-    const map = competenceOf(s.guildSample.evidence, s.guildSample.people, SKILL_BY_ID, localToday());
-    const next = local(c, by, map, s.guildSample);
-    if (typeof next === 'string') return next;
-    set((x) => ({ guildSampleChecks: (x.guildSampleChecks ?? []).map((y) => (y.id === checkId ? next : y)) }));
-    return null;
-  }
   try {
     await post(by);
     await get().loadChecks();
@@ -3430,9 +3231,9 @@ async function checkMove(
   }
 }
 
-/** Who is signing: the sample's acting person while the sample is shown. */
-export function actingIdOf(s: Pick<OFState, 'guildSample' | 'guildActingId' | 'guildSampleActingId'>): string | null {
-  return s.guildSample ? s.guildSampleActingId : s.guildActingId;
+/** Who is signing, as chosen in Guild's header. */
+export function actingIdOf(s: Pick<OFState, 'guildActingId'>): string | null {
+  return s.guildActingId;
 }
 
 let guildSyncing = false;

@@ -89,7 +89,7 @@ const ROUTES = [
   ['/settings/appearance', 'Settings — appearance'],
   ['/settings/units', 'Settings — units'],
   ['/settings/corpus', 'Settings — corpus'],
-  ['/settings/figures', 'Settings — the figure grammar over its sample'],
+  ['/settings/figures', 'Settings — the figure grammar'],
   ['/settings/export', 'Settings — export'],
   ['/settings/architecture', 'Architecture — the map of the eleven'],
   ['/settings/about', 'Settings — colophon'],
@@ -452,16 +452,15 @@ async function main() {
       await page.locator('[data-testid="quote-mark"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/Placeholder A \| 7 \| mg L-1/.test((await page.locator('[data-testid="quote-mark"]').innerText().catch(() => '')) ?? ''))
         problems.push('the quoted sentence did not open the reader on its words');
-      // OF-BLD-014 §6.1 — the figure gallery: the legend names all nine
-      // classes, three figures draw over the labelled sample, and a figure's
-      // table twin holds one row per mark.
+      // OF-BLD-014 §6.1, OF-BLD-016 §3.2 — the figure gallery: the legend
+      // names all nine classes, and the one figure drawn is the ceiling the
+      // double's artifact store keeps (no frontier is kept there), and
+      // nothing invented is drawn. check:figures holds the table twins.
       await page.goto(`http://localhost:${PORT}/#/settings/figures`, { waitUntil: 'networkidle' });
-      await page.locator('[data-testid="figure-gallery"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="figures-from-artifacts"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[data-testid="encoding-legend"] li').count()) !== 9) problems.push('the figure legend does not list nine provenances');
-      if ((await page.locator('[data-testid="figure"]').count()) !== 3) problems.push('the gallery does not draw three figures');
-      if (!/SAMPLE: invented values/.test(await page.locator('body').innerText())) problems.push('the gallery does not say its values are a sample');
-      await page.locator('[data-testid="figure"]').nth(1).getByRole('button', { name: 'View as table' }).click();
-      if ((await page.locator('[data-testid="figure-table"] tbody tr').count()) !== 12) problems.push('the ceiling figure\'s table does not hold one row per mark');
+      if ((await page.locator('[data-testid="figure"]').count()) !== 1) problems.push('the gallery does not draw the one kept ceiling');
+      if (/SAMPLE: invented values/.test(await page.locator('body').innerText())) problems.push('the gallery still draws invented values');
       // OF-BLD-014 §6.4 — geneOS → Model over the toy network's fixtures: a
       // dotted ceiling labelled with its model, the envelope, what the model
       // lacks, a sugar it cannot take up said in words; and the C. necator
@@ -485,25 +484,18 @@ async function main() {
       await page.locator('[data-testid="host-ceiling"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/not on this machine: run pnpm geneos:fetch/.test(await page.locator('[data-testid="host-ceiling"]').innerText().catch(() => '')))
         problems.push("the C. necator strain page has no ceiling card saying its file is not here");
-      // OF-BLD-014 §7.4 — fermOS over the sample run: it loads labelled, the
-      // fit draws through the points with its parameter table, and Forecast
-      // draws a band from that fit; both are asked of the service as sample.
+      // OF-BLD-014 §7.4, OF-BLD-016 §3.2 — fermOS with no deposited run:
+      // it offers no invented run, names the readings to deposit and where,
+      // and asks the service for no fit; Forecast says there is no fit yet.
       await page.goto(`http://localhost:${PORT}/#/fermos`, { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Load a sample run' }).click();
-      await page.locator('[data-testid="fit-params"]').waitFor({ timeout: 10000 }).catch(() => {});
-      const fits = await page.locator('[data-testid="fermos-fits"]').innerText().catch(() => '');
-      if (!/SAMPLE: an invented time course/.test(fits)) problems.push('the sample run is not labelled as sample');
-      if ((await page.locator('[data-testid="fit-params"] tbody tr').count()) !== 9) problems.push('the fit does not list nine parameters');
-      if ((await page.locator('[data-testid="trajectory-fit"]').count()) !== 3) problems.push('the fit does not draw a curve through each of the three series');
-      if (!/constant amount/.test(fits)) problems.push('the fit does not state its noise assumption');
-      if (!doubleState.fermosCalls.some((c) => c.path === '/api/fermos/fit' && c.sample === true)) problems.push('the sample fit was not asked of the service as sample');
+      await page.locator('[data-testid="fermos-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const fermosEmpty = await page.locator('[data-testid="fermos-fits"]').innerText().catch(() => '');
+      if (!/No run deposited yet/.test(fermosEmpty) || !/time of each sample/.test(fermosEmpty) || !/biomass/.test(fermosEmpty) || !/product/.test(fermosEmpty) || !/substrate/.test(fermosEmpty) || !/Runbooks → Depositions/.test(fermosEmpty))
+        problems.push('fermOS with no run does not name the readings to deposit and where');
+      if ((await page.getByRole('button', { name: /sample run/i }).count()) !== 0) problems.push('fermOS still offers an invented run');
+      if (doubleState.fermosCalls.some((c) => c.path === '/api/fermos/fit')) problems.push('fermOS asked for a fit with no run deposited');
       await page.goto(`http://localhost:${PORT}/#/fermos/forecast`, { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Forecast', exact: true }).click();
-      await page.locator('[data-testid="trajectory-forecast"]').first().waitFor({ timeout: 10000 }).catch(() => {});
-      if ((await page.locator('[data-testid="trajectory-forecast"]').count()) !== 3) problems.push('the forecast does not draw a band for each series');
-      const fc = await page.locator('[data-testid="fermos-forecast"]').innerText().catch(() => '');
-      if (!/Variation from run to run is absent/.test(fc)) problems.push('the forecast does not say run-to-run variation is absent');
-      if (!/Final biomass/.test(fc)) problems.push('the forecast does not give final values as intervals');
+      if (!/No fit to forecast from yet/.test(await page.locator('body').innerText())) problems.push('fermOS → Forecast does not say there is no fit yet');
       // OF-BLD-014 §8.2 — the Benchmark card, on a service whose simulator
       // has yet to run: it says so, names the expected price and offers a run.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
@@ -650,7 +642,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc draws its steps, quotes the table row and opens the reader on it, and with the service down says how to start it and keeps the conversation and the typed question; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported; fermOS fits and forecasts the sample run');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc draws its steps, quotes the table row and opens the reader on it, and with the service down says how to start it and keeps the conversation and the typed question; the figure gallery draws the kept ceiling and nothing invented; geneOS draws a ceiling beside what was reported; fermOS with no run names the readings to deposit');
       }
     } catch (e) {
       overlayFails++;
@@ -659,12 +651,52 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-016 §3.2 — empty states name the next step ───────────────
+  //
+  // With nothing answering under /api, the app is the seed alone: Witness
+  // says no extractor has run, fermOS names the readings to deposit, and
+  // Guild says how to add the first person. None offers anything invented.
+  let emptyFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    try {
+      await page.route('**/api/**', (r) => r.abort());
+      await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
+      const witness = await page.locator('body').innerText();
+      if (!/No extractor has been run against this corpus yet/.test(witness)) problems.push('Witness on the seed alone does not say no extractor has run');
+      await page.goto(`http://localhost:${PORT}/#/fermos`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(300);
+      const fermos = await page.locator('body').innerText();
+      if (!/No run deposited yet/.test(fermos) || !/time of each sample/.test(fermos)) problems.push('fermOS on the seed alone does not name the readings to deposit');
+      await page.goto(`http://localhost:${PORT}/#/guild/matrix`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(300);
+      const guild = await page.locator('body').innerText();
+      if (!/Nobody is on the ledger yet/.test(guild) || !/Add yourself below as the lead/.test(guild)) problems.push('Guild on the seed alone does not say how to add the first person');
+      if (/sample team|sample run/i.test(witness + fermos + guild)) problems.push('an empty state still offers something invented');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      emptyFails++;
+      console.log(`✗ empty        ${problems.join('; ')}`);
+    } else {
+      console.log('✓ empty        with the service down, Witness says no extractor has run, fermOS names the readings to deposit, Guild says how to add the first person');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-013 — the competence ledger, end to end in one browser ────
   //
-  // The sample team loads, a level is computed from it, an assessor's
-  // sign-off moves a cell, and the sample sends nothing to the service and
-  // leaves nothing behind. Then the real ledger: its first person is its
-  // lead, posted to the service as one, and still there after a reload.
+  // OF-BLD-016 §3.2: the invented sample team left the screens. A fresh
+  // browser shows the empty ledger and says how to add the first person,
+  // with no invented team on offer; My path says the same; a practice
+  // session runs on nobody's record. Then the real ledger: its first person
+  // is its lead, posted to the service as one, and still there after a
+  // reload. The ladder of levels (a suspension, a lapse, sign-offs, the
+  // bench's queue) is held in memory by check:guild on the ladder team.
   let guildFails = 0;
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -673,27 +705,11 @@ async function main() {
     try {
       await page.goto(`http://localhost:${PORT}/#/guild/matrix`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(500);
-      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('a fresh browser does not show the empty ledger');
-      await page.locator('button:has-text("Show a sample team")').click();
-      await page.waitForTimeout(300);
-      const body = await page.locator('body').innerText();
-      if (!/Sample team: invented people/.test(body)) problems.push('the sample is not labelled as invented');
-      const suspended = await page.locator('button[aria-label="Patrick Mugisha, OD750 reading: Qualified, suspended"]').count();
-      if (suspended !== 1) problems.push('the sample does not show its suspension on the matrix');
-      const cell = page.locator('button[aria-label="Aline Uwase, OD750 reading: Not started"]');
-      if ((await cell.count()) !== 1) problems.push('the cell to sign is missing');
-      else {
-        await cell.click();
-        await page.waitForTimeout(200);
-        if (!/Record what you saw/.test(await page.locator('[role="dialog"]').innerText())) problems.push('an assessor is not offered a sign-off');
-        await page.fill('#signoff-note', 'Briefed on PR-OD-01 and talked it back');
-        await page.locator('[role="dialog"] button:has-text("Sign as Eric Habimana")').click();
-        await page.waitForTimeout(300);
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(200);
-        const moved = await page.locator('button[aria-label="Aline Uwase, OD750 reading: Supervised"]').count();
-        if (moved !== 1) problems.push('a training sign-off did not move the cell to Supervised');
-      }
+      const emptyLedger = await page.locator('body').innerText();
+      if (!/Nobody is on the ledger yet/.test(emptyLedger)) problems.push('a fresh browser does not show the empty ledger');
+      if (!/Add yourself below as the lead/.test(emptyLedger)) problems.push('the empty ledger does not say how to add the first person');
+      if ((await page.locator('#person-name').count()) !== 1) problems.push('the empty ledger offers no form for the first person');
+      if (/sample team/i.test(emptyLedger)) problems.push('Guild still offers an invented team');
       // OF-BLD-014 §8.4 — the BioSTEAM scenario. Four inputs arrive bound to
       // (stand-in) records; the three that wait are typed as assumptions under
       // the reviewer's name, kept, and posted with the run; the run draws a
@@ -757,82 +773,14 @@ async function main() {
         problems.push('the dossier does not draw the ceiling as a rule');
       if (!/Stands behind the prediction Final product/.test(await page.locator('[data-testid="dossier"]').innerText().catch(() => '')))
         problems.push('a dossier figure does not name the prediction it stands behind');
-      // §2 — run mode reads the same ledger and writes to it as steps complete.
-      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-OD-01'));
-      await page.waitForTimeout(400);
-      await page.locator('button:has-text("Start run at")').first().click();
-      await page.waitForTimeout(500);
-      let bench = await page.locator('body').innerText();
-      if (!/Eric Habimana holds every skill this step needs/.test(bench)) problems.push('run mode does not start with the acting assessor cleared');
-      await page.locator('button:has-text("Hand over")').click();
-      await page.locator('button:has-text("Patrick Mugisha")').first().click();
-      await page.waitForTimeout(200);
-      bench = await page.locator('body').innerText();
-      if (!/Cosign needed/.test(bench)) problems.push('a Supervised operator is not asked for a cosigner');
-      await page.locator('button:has-text("Record cosigner")').click();
-      await page.locator('button:has-text("Eric Habimana")').first().click();
-      await page.waitForTimeout(200);
-      if (!/Cosigned by Eric Habimana/.test(await page.locator('body').innerText())) problems.push('the cosigner is not shown');
-      await page.locator('button:has-text("Mark step complete")').click();
-      await page.waitForTimeout(400);
-      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-patrick'));
-      await page.waitForTimeout(400);
-      const ledger = await page.locator('body').innerText();
-      if (!/Supervised run[\s\S]{0,200}PR-OD-01 · step o1 · cosigned by Eric Habimana/.test(ledger))
-        problems.push('completing a cosigned step did not write a supervised run to the ledger');
-      // §5.1 — enforce mode: a critical skill holds the step until a cosigner is recorded.
-      await page.evaluate(() => (location.hash = '#/runbooks/protocols/PR-CIP-01'));
-      await page.waitForTimeout(400);
-      await page.locator('button:has-text("Start run at")').first().click();
-      await page.waitForTimeout(500);
-      await page.locator('button:has-text("Hand over")').click();
-      await page.locator('button:has-text("Grace Ingabire")').first().click();
-      await page.waitForTimeout(200);
-      for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Next step' }).click();
-      await page.waitForTimeout(300);
-      const held = page.locator('button:has-text("Waits for a cosigner")');
-      if ((await held.count()) !== 1 || !(await held.isDisabled()))
-        problems.push('a Supervised operator on a critical skill is not held for a cosigner in enforce mode');
-      // §5.5 — a held step can be skipped, and the skip says it goes on the record.
-      await page.locator('footer button:has-text("Skip")').click();
-      await page.waitForTimeout(150);
-      if (!/Skipping it is kept with the run, and goes on the operator’s ledger as a deviation/.test(await page.locator('[role="dialog"]').innerText()))
-        problems.push('skipping a held step does not say it goes on the record');
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(150);
-      await page.locator('button:has-text("Record cosigner")').click();
-      await page.locator('button:has-text("Eric Habimana")').first().click();
-      await page.waitForTimeout(200);
-      if ((await page.locator('button:has-text("Mark step complete")').count()) !== 1)
-        problems.push('recording a cosigner does not release the held step');
-      // §3 — a lesson passed in Primer moves its learner from Not started to Learning.
-      await page.evaluate(() => (location.hash = '#/primer/l6-3'));
-      await page.waitForTimeout(400);
-      await page.selectOption('#lesson-learning-as', 'p-sample-olivier');
-      for (const answer of [
-        'Step c2: strip the vessel and find the ingress point',
-        'Clear hold water, a negative spore strip, and both results on the vessel log',
-        'A biological indicator spore strip',
-      ]) {
-        await page.locator('button', { hasText: answer }).first().click();
-        await page.getByRole('button', { name: 'Check answer' }).first().click();
-        await page.waitForTimeout(150);
-      }
-      if (!/On Olivier Ndayisaba’s ledger as a lesson passed/.test(await page.locator('main').innerText()))
-        problems.push('a passed lesson does not say it is on the learner’s ledger');
-      await page.evaluate(() => (location.hash = '#/guild/matrix'));
-      await page.waitForTimeout(400);
-      await page.selectOption('#matrix-protocol', 'PR-CIP-01');
-      await page.waitForTimeout(200);
-      if ((await page.locator('button[aria-label="Olivier Ndayisaba, Vessel sterilisation: Learning"]').count()) !== 1)
-        problems.push('a passed lesson did not move its learner to Learning on the Matrix');
+      // My path reads the same ledger, and says how to start it.
       await page.evaluate(() => (location.hash = '#/primer/path'));
       await page.waitForTimeout(400);
-      const path = await page.locator('main').innerText();
-      if (!/Vessel sterilisation[\s\S]{0,200}Waits for Pressure and heat safety to reach Supervised/.test(path))
-        problems.push('My path does not say a passed lesson waits on its prerequisite');
-      if (!/Next up[\s\S]*Open the lesson/.test(path)) problems.push('My path offers no lesson to take next');
-      // §4 — practice: a draft, three answers to the tutor, and the close on the learner's record.
+      const pathEmpty = await page.locator('main').innerText();
+      if (!/Nobody is on Guild’s ledger yet/.test(pathEmpty) || !/Add the first person/.test(pathEmpty))
+        problems.push('My path does not say how to start the ledger');
+      // §4 — practice: a draft, three answers to the tutor, and the close, on nobody's record
+      // while nobody is on the ledger.
       await page.evaluate(() => (location.hash = '#/primer/practice?skill=SK-OD'));
       await page.waitForTimeout(500);
       await page.locator('button:has-text("Draft a scenario")').first().click();
@@ -850,64 +798,12 @@ async function main() {
       player = await page.locator('main').innerText();
       if (!/Tutor · Asks why[\s\S]*Tutor · Closes[\s\S]*What the tutor observed[\s\S]*Chose to dilute/.test(player))
         problems.push('the tutor did not question and then close with what it observed');
-      if (!/Recorded for Olivier Ndayisaba in the sample team alone/.test(player))
-        problems.push('a closed session with the sample shown does not say it went on the sample learner alone');
-      if (practicePosts.some((x) => x.body.personId != null)) problems.push('a sample person was named to the service in Practice');
-      await page.evaluate(() => (location.hash = '#/guild/people/p-sample-olivier'));
-      await page.waitForTimeout(400);
-      if (!/Practice[\s\S]{0,300}Practice transcript pt-smoke-/.test(await page.locator('main').innerText()))
-        problems.push('the closed session is not on the learner\u2019s ledger with a link to its transcript');
-      // §5.4 — a check from the queue, run at the bench, signed, and on the ledger.
-      await page.evaluate(() => (location.hash = '#/guild/checks'));
-      await page.waitForTimeout(400);
-      await page.selectOption('#guild-acting-as', 'p-sample-eric');
-      await page.waitForTimeout(200);
-      const card = page.locator('.card', { hasText: 'Patrick Mugisha' }).filter({ hasText: 'Run now at the bench' }).first();
-      if (!/Did not meet every criterion at the witnessed check/.test(await card.innerText())) problems.push('the queue does not say why the suspended trainee is proposed');
-      await card.locator('a:has-text("Run now at the bench")').click();
-      await page.waitForTimeout(400);
-      if ((await page.locator('nav').count()) !== 0) problems.push('the bench check is not a full-screen takeover');
-      // The bench's own targets, buttons and links alike; a toast from earlier in the flow is the shell's, as it is in Deposition.
-      const short = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
-      if (short.length) problems.push(`bench buttons under 44px: ${short.join(', ')}`);
-      await page.locator('button:has-text("Begin with the first criterion")').click();
-      let calls = 0;
-      for (let guard = 0; guard < 60; guard++) {
-        const bench = await page.locator('main').innerText();
-        if (/Sign the check on Patrick Mugisha/.test(bench)) break;
-        if (/What did you see Patrick Mugisha do/.test(bench)) await page.locator('textarea[id^="bench-words-"]').fill('Worked through it at the bench and said each step aloud');
-        else {
-          await page.locator(`button:has-text("${calls === 0 ? 'Needs work' : 'Meets'}")`).click();
-          calls++;
-        }
-        await page.locator('button:has-text("Next"), button:has-text("To the sign step")').first().click();
-        await page.waitForTimeout(60);
-      }
-      if (!/1 need work[\s\S]*every criterion met/.test(await page.locator('main').innerText())) problems.push('the sign step does not sum up each skill');
-      const shortSign = await page.locator('header button, main button, main a, header a').evaluateAll((bs) => bs.filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 44).map((b) => b.innerText || b.getAttribute('aria-label')));
-      if (shortSign.length) problems.push(`sign-step targets under 44px: ${shortSign.join(', ')}`);
-      await page.locator('button:has-text("Sign as Eric Habimana")').click();
-      await page.waitForTimeout(400);
-      if (!/Signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('signing the check did not finish it');
-      await page.locator('button:has-text("Open Patrick Mugisha’s ledger")').click();
-      await page.waitForTimeout(400);
-      const signedLedger = await page.locator('main').innerText();
-      if (!/Witnessed check[\s\S]{0,40}not met[\s\S]{0,200}Bench check ck-sample-\d+ · observed by Eric Habimana/.test(signedLedger))
-        problems.push('the check is not on the ledger as a witnessed entry naming its assessor and its check');
-      const checkLink = await page.locator('a:has-text("Bench check ck-sample-")').first().getAttribute('href');
-      await page.evaluate((h) => (location.hash = h), checkLink);
-      await page.waitForTimeout(300);
-      if (!/run and signed by Eric Habimana/.test(await page.locator('main').innerText())) problems.push('the check\u2019s record does not say who signed it');
-      await page.selectOption('#guild-acting-as', 'p-sample-claudine');
+      if (!/On nobody’s record: nobody was chosen as learning/.test(player))
+        problems.push('a closed session with nobody learning does not say it is on nobody\u2019s record');
+      if (practicePosts.some((x) => x.body.personId != null)) problems.push('a person was named to the service in Practice with nobody learning');
       await page.evaluate(() => (location.hash = '#/guild/matrix'));
       await page.waitForTimeout(300);
-      if ((await page.locator('[role="tablist"] [role="tab"]:has-text("Checks")').count()) !== 0) problems.push('a member who assesses nothing is shown the Checks tab');
-      await page.locator('button:has-text("Hide the sample")').click();
-      await page.waitForTimeout(200);
-      await page.evaluate(() => (location.hash = '#/guild/matrix'));
-      await page.waitForTimeout(300);
-      if (!/Nobody is on the ledger yet/.test(await page.locator('body').innerText())) problems.push('hiding the sample left something behind');
-      if (guildPosts.length) problems.push(`the sample sent ${guildPosts.length} write(s) to the service`);
+      if (guildPosts.length) problems.push(`the browser sent ${guildPosts.length} Guild write(s) before anyone was added`);
       await page.fill('#person-name', 'Smoke Lead');
       await page.locator('button:has-text("Start the ledger as its lead")').click();
       await page.waitForTimeout(800);
@@ -925,7 +821,7 @@ async function main() {
       guildFails++;
       console.log(`✗ guild        ${problems.join('; ')}`);
     } else {
-      console.log('✓ guild        sample loads labelled; a suspension shows; a sign-off moves a cell; run mode asks for a cosigner and writes the cosigned step; a critical skill holds its step until a cosigner is recorded; a passed lesson makes Learning and My path names what it waits on; a practice session closes onto the learner\u2019s record; a check is run at the bench, signed, and read back with its assessor; the sample sends and leaves nothing; the first person is posted as lead and comes back after a reload');
+      console.log('✓ guild        the empty ledger says how to add the first person and offers no invented team; My path says the same; a practice session closes on nobody\u2019s record; the first person is posted as lead and comes back after a reload');
     }
     await page.close();
   }
@@ -939,8 +835,9 @@ async function main() {
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
-  console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, a bench check, first person, reload`);
-  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
+  console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
+  console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
+  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails || emptyFails) process.exit(1);
 }
 
 main();

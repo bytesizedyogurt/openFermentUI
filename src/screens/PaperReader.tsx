@@ -275,7 +275,7 @@ export default function PaperReader({
       href: `#/intake?paper=${paper.id}`,
     });
     toast({
-      text: `${label} queued for ${paper.id} — the demo extractor replays this paper's seeded records rather than minting new ones`,
+      text: `${label} queued for ${paper.id} — in this browser this paper's seeded records are staged again for review; new values come only from the service's extractor, anchored to the paper's own sentences`,
       kind: 'info',
       href: '#/intake',
       hrefLabel: 'Extract',
@@ -461,7 +461,7 @@ export default function PaperReader({
         <div className="mt-4">
           <Callout kind="info" title="Not ingested yet">
             <p className="mb-2">
-              <span className="font-num">{paper.id}</span> is still on the demo shelf, so it is not part of
+              <span className="font-num">{paper.id}</span> is still in the ingest queue, so it is not part of
               the searchable corpus and carries no extractions.
             </p>
             <div className="flex gap-2">

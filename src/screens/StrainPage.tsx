@@ -1461,7 +1461,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               </ul>
             )}
             <div className="text-caption text-ink-soft mt-2">
-              Demo model v0 — illustrative economics, not validated.
+              Cost model v0 — illustrative economics, not validated.
             </div>
           </Card>
 

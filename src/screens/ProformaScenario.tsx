@@ -210,7 +210,7 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
           ])
         : []),
       ...(result
-        ? [['Result', 'Minimum selling price', result.msp.toFixed(2), '$/kg', 'demo', '', 'Demo model v0 — illustrative, not validated']]
+        ? [['Result', 'Minimum selling price', result.msp.toFixed(2), '$/kg', 'demo', '', 'Cost model v0 — illustrative, not validated']]
         : []),
     ];
     exportCSV(`${scenario.id}-assumptions-results.csv`, headers, rows);
@@ -324,7 +324,7 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
               <span className="font-num">
                 {scenario.assumptions.filter((a) => a.recordId).length}
               </span>{' '}
-              are linked to corpus records; the rest are labelled demo assumptions.
+              are linked to corpus records; the rest are labelled industry estimates or modelling assumptions.
             </p>
             <Button className="w-full justify-center" onClick={() => setAssumptionsOpen(true)}>
               Open assumptions drawer
@@ -380,7 +380,7 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
                       <span className="text-section-title text-ink-soft ml-1">/kg</span>
                     </div>
                     <div className="text-caption text-ink-soft mt-1">
-                      Demo model v0 — illustrative economics, not validated
+                      Cost model v0 — illustrative economics, not validated
                     </div>
                   </Tick>
 
@@ -572,7 +572,7 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
         width={640}
       >
         <p className="text-body text-ink-soft mb-4">
-          Every row is either linked to a corpus record or explicitly labelled a demo assumption.
+          Every row is either linked to a corpus record or explicitly labelled an industry estimate or a modelling assumption.
           Nothing here is left ambiguous.
         </p>
         <div className="space-y-2">

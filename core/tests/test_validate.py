@@ -74,6 +74,10 @@ def test_numbers_are_found_in_every_disguise(text):
         "Phosphorylation by CK2 in the E. coli system",
         "The CC-4350 background used throughout",
         "Elow47 before the UV mutagenesis step",
+        # OF-BLD-016 §3.2 — the yeast program's strains are identifiers the same way.
+        "Ethanol yield on glucose in cenpk113-7d under anaerobic batch conditions",
+        "Ethanol yield on glucose in CEN.PK113-7D under anaerobic batch conditions",
+        "Glucose uptake in S288C as modelled by iMM904 and Yeast9",
     ],
 )
 def test_ordinary_prose_is_not_flagged(text):

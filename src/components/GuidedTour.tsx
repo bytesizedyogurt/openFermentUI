@@ -1,6 +1,6 @@
-// Guided tour / demo autopilot (OF-DES-001 §8.1, §19 fallback narrator).
-// Six stops that walk the golden path; doubles as the contingency if a live
-// demo goes sideways.
+// Guided tour (OF-DES-001 §8.1, §19 fallback narrator). Six stops that walk
+// the golden path. Every stop opens a route that exists (OF-BLD-016
+// §3.2), and none stands on content a program switch can hide.
 //
 // It is also the first place a new reader meets the vocabulary, so every stop
 // names the surface it is standing on. Six stops is six names learned in
@@ -33,10 +33,10 @@ const STOPS: Stop[] = [
     body: 'Postdoc is the thing you talk to. Its plan, tool calls, and retrieved passages are first-class UI — collapsed by default, never hidden. Every number in an answer carries a citation chip that resolves to a source span in two interactions.',
   },
   {
-    route: '/biorepo/paper/B5',
-    surface: 'BioRepo',
+    route: '/biorepo/search',
+    surface: 'BioRepo · Search',
     title: 'Evidence in context',
-    body: 'BioRepo is the corpus and everything retrieved from it. A chip’s promise is kept here: the span is highlighted in the source, and the right rail lists every extraction anchored to this paper. Hovering either side previews the other; clicking commits the scroll.',
+    body: 'BioRepo is the corpus and everything retrieved from it. Search finds passages in the papers’ own words; open a hit and the reader marks the sentence in its section, beside every extraction anchored to that paper. A chip’s promise is kept the same way: it resolves to a source span.',
   },
   {
     route: '/guild',
@@ -45,7 +45,7 @@ const STOPS: Stop[] = [
     body: 'The Guild of Applied Life is who may verify. Reviewers triage by keyboard: a accept, r reject, e edit, g flag for gold, u undo. Every decision lands in the record’s audit trail immediately — and propagates to the strain pages and to Witness.',
   },
   {
-    route: '/runbooks/protocols/PR-TAP-01',
+    route: '/runbooks/protocols/PR-OD-01',
     surface: 'Runbooks · Protocols',
     title: 'Verified numbers become procedures',
     body: 'Scaling is real arithmetic: change the batch size and every bound quantity, stock volume, and materials row recomputes, rounded to each material’s precision so the recipe stays pipettable. Deposition then executes it at the bench.',

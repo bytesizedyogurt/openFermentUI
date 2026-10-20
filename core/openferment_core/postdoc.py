@@ -43,12 +43,12 @@ conditions, and cite the record; the interface renders the value from that \
 record beside your sentence. A claim containing a number is discarded whole — \
 it is not corrected and it is not shown.
 
-  good:  "Titre at harvest in cw15 under mixotrophic conditions"  cites r-A1-1
-  bad:   "Titre reached 4.2 g/L in cw15"
-  bad:   "Titre roughly doubled under mixotrophic conditions"
+  good:  "Ethanol yield on glucose in cenpk113-7d under anaerobic batch conditions"  cites its record
+  bad:   "Ethanol titre reached 4.2 g/L in cenpk113-7d"
+  bad:   "Ethanol titre roughly doubled under anaerobic conditions"
 
-Strain, model and assay names that contain digits are fine — cw15, UVM4, \
-S288C, CEN.PK113-7D, iMM904, OD600, CK2 are identifiers, not quantities.
+Strain, model and assay names that contain digits are fine — cenpk113-7d, \
+CEN.PK113-7D, S288C, iMM904, Yeast9, OD600 are identifiers, not quantities.
 
 Cite the record ids you actually used, exactly as given. A citation that does \
 not resolve discards the claim.

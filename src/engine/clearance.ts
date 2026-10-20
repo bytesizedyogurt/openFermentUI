@@ -14,7 +14,7 @@
 // from the product's stored state. An earlier version did: it walked the
 // stored state down a severity ladder per office using a filing-propensity
 // weight plus a deterministic jitter, and produced a specific, plausible,
-// actionable-looking divergence for all 117 molecules out of nothing at all.
+// actionable-looking divergence for every molecule out of nothing at all.
 // It was labelled "modeled · not searched" and that did not rescue it — on
 // this surface a fabricated divergence is worse than no divergence, because
 // it looks like a finding and reads as a reason to act. It is gone. Cells are

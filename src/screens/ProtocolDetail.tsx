@@ -1066,7 +1066,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
             <span className="font-num">
               {citedSteps}/{version.steps.length}
             </span>{' '}
-            steps cite a source. Everything else is a demo value authored for this simulation.
+            steps cite a source. Everything else is a value authored for this protocol, with no source behind it.
           </p>
         </div>
       </Card>
@@ -1264,7 +1264,7 @@ export default function ProtocolDetail({ protocolId }: { protocolId: string }) {
               </span>
               <span>
                 Amounts round to each material's own precision spec, so a scaled recipe stays
-                pipettable. Rows without a source chip are demo values authored for this simulation.
+                pipettable. Rows without a source chip are values authored for this protocol, with no source behind them.
               </span>
             </p>
           </Card>

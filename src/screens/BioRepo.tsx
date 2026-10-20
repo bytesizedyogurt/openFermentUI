@@ -226,7 +226,7 @@ export default function BioRepo() {
       provenance: 'demo',
     });
     toast({
-      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — the demo extractor replays the seeded records, it does not mint new ones`,
+      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — in this browser the seeded records are staged again for review; new values come only from the service's extractor, anchored to each paper's own sentences`,
       kind: 'info',
       href: '#/intake',
       hrefLabel: 'Extract',
@@ -520,7 +520,7 @@ export default function BioRepo() {
         <Card>
           <EmptyState
             title="No papers in the corpus yet"
-            body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
+            body="Every paper is still in the ingest queue. Fetch one to see it flow through fetch, parse, chunk, embed and extract."
             action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>

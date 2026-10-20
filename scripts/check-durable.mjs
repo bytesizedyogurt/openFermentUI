@@ -130,11 +130,11 @@ check('a series role SURVIVED a page reload',
 // Reset must clear the durable store, not just memory.
 await page.evaluate(() => { /* noop */ });
 await go('/settings/corpus');
-const resetBtn = page.getByRole('button', { name: /Reset demo data/ }).first();
+const resetBtn = page.getByRole('button', { name: /Clear this browser’s data/ }).first();
 if (await resetBtn.count() > 0) {
   await resetBtn.click();                       // opens the confirmation
   await page.waitForTimeout(500);
-  await page.locator('div[role="dialog"]').getByRole('button', { name: /Reset demo data/ }).click();
+  await page.locator('div[role="dialog"]').getByRole('button', { name: /Clear this browser’s data/ }).click();
   await page.waitForTimeout(1400);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1600);
@@ -144,7 +144,7 @@ if (await resetBtn.count() > 0) {
   console.log('  (reset button not on this screen — checked via palette instead)');
   await page.keyboard.press('Control+k');
   await page.waitForTimeout(400);
-  await page.locator('input[aria-label="Command palette"]').fill('Reset demo');
+  await page.locator('input[aria-label="Command palette"]').fill('Clear this browser');
   await page.waitForTimeout(300);
   await page.keyboard.press('Enter');
   await page.waitForTimeout(1200);

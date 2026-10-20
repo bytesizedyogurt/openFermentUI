@@ -537,7 +537,7 @@ function ScenarioWidget({ scenarioId }: { scenarioId: string }) {
             <span className="text-body text-ink-soft ml-1">/kg</span>
           </div>
           <div className="text-caption text-ink-soft">
-            Demo model v0 — illustrative economics, not validated
+            Cost model v0 — illustrative economics, not validated
           </div>
         </Tick>
         <div className="flex-1 min-w-[220px]">
@@ -582,7 +582,7 @@ export function LessonEmbed({ embed, arg }: { embed: EmbedKind; arg?: string }) 
     case 'protocol-card':
       return <ProtocolCard protocolId={arg ?? 'PR-TAP-01'} />;
     case 'ask-prompt':
-      return <AskPrompt question={arg ?? 'What growth rates are reported for cw15 in TAP'} />;
+      return <AskPrompt question={arg ?? 'What ethanol yields on glucose are reported for cenpk113-7d'} />;
     case 'skill-steps':
       return <SkillSteps skillId={arg ?? ''} />;
     case 'scenario-widget':
