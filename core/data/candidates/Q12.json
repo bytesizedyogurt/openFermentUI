@@ -1,0 +1,246 @@
+{
+  "paperId": "Q12",
+  "run": "claude-1",
+  "extractedAt": "2026-10-20T03:41:50.682074+00:00",
+  "candidates": [
+    {
+      "id": "cl1-Q12-942a1840",
+      "paperId": "Q12",
+      "sectionId": "abstract",
+      "quote": "μmax = 0.179 1/h and Ks = 11.37 g.L−1 for the Monod model",
+      "field": "monod_ks",
+      "value": 11.37,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 11.37,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": "molasses",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q12-e04851e0",
+      "paperId": "Q12",
+      "sectionId": "t2",
+      "quote": "Ks (g.L−1) | 47.53789 ± 9.27",
+      "field": "monod_ks",
+      "value": 47.53789,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 47.53789,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q12-9da8d3c2",
+      "paperId": "Q12",
+      "sectionId": "t2",
+      "quote": "Ki (g.L−1) | 181.01639 ± 29.14",
+      "field": "substrate_inhibition_ki",
+      "value": 181.01639,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 181.01639,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q12-8aeb3351",
+      "paperId": "Q12",
+      "sectionId": "abstract",
+      "quote": "μmax = 0.179 1/h and Ks = 11.37 g.L−1 for the Monod model",
+      "field": "growth_rate_mu",
+      "value": 0.179,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.179,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": "molasses",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q12-f90a51f2",
+      "paperId": "Q12",
+      "sectionId": "t2",
+      "quote": "μmax (h−1) | 0.5086 ± 0.04",
+      "field": "growth_rate_mu",
+      "value": 0.5086,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.5086,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.55,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-20T03:41:50.682074+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 4,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 4,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: field biomass_yield_substrate is denominated in 'g g⁻¹'; no unit given",
+    "unit: field ethanol_yield_substrate is denominated in 'g g⁻¹'; no unit given",
+    "unit: field biomass_yield_substrate is denominated in 'g g⁻¹'; no unit given",
+    "unit: field ethanol_yield_substrate is denominated in 'g g⁻¹'; no unit given"
+  ],
+  "dropped": [
+    {
+      "paperId": "Q12",
+      "sectionId": "t3",
+      "field": "biomass_yield_substrate",
+      "value": 0.28,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field biomass_yield_substrate is denominated in 'g g⁻¹'; no unit given"
+    },
+    {
+      "paperId": "Q12",
+      "sectionId": "t3",
+      "field": "ethanol_yield_substrate",
+      "value": 0.42,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field ethanol_yield_substrate is denominated in 'g g⁻¹'; no unit given"
+    },
+    {
+      "paperId": "Q12",
+      "sectionId": "s9",
+      "field": "biomass_yield_substrate",
+      "value": 0.286,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field biomass_yield_substrate is denominated in 'g g⁻¹'; no unit given"
+    },
+    {
+      "paperId": "Q12",
+      "sectionId": "s9",
+      "field": "ethanol_yield_substrate",
+      "value": 0.431,
+      "unit": "",
+      "rule": "unit",
+      "detail": "field ethanol_yield_substrate is denominated in 'g g⁻¹'; no unit given"
+    }
+  ],
+  "usage": {
+    "inputTokens": 16386,
+    "outputTokens": 4258,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003768,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 3
+  }
+}

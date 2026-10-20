@@ -1,0 +1,68 @@
+{
+  "id": "b616b00ba65aeadb",
+  "tool": "geneos.ceiling",
+  "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "Yeast9",
+        "note": "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255), model/yeast-GEM.xml, sha256 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb (CC-BY-4.0)",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "Yeast9",
+    "product": "ethanol",
+    "substrate": "glucose",
+    "exchange": "r_1714",
+    "uptake": 10.0,
+    "flux": 20.0,
+    "molPerMol": 2.0,
+    "gPerG": 0.5114345345145319,
+    "solver": "glpk_interface",
+    "status": "optimal"
+  },
+  "outputHash": "145936b9edd000d86a7c4d044cac39fd72e8a2e59e1d3e56ced33feedcea2eea",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T03:56:20Z",
+  "durationMs": 999,
+  "seed": null
+}

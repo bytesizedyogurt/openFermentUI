@@ -1,0 +1,172 @@
+{
+  "paperId": "Q17",
+  "run": "claude-1",
+  "extractedAt": "2026-10-20T03:32:55.025251+00:00",
+  "candidates": [
+    {
+      "id": "cl1-Q17-3385c1b7",
+      "paperId": "Q17",
+      "sectionId": "s5",
+      "quote": "the maximum specific growth rate of anaerobic cultures (0.31 ± 0.01 h-1) during the glucose phase",
+      "field": "growth_rate_mu",
+      "value": 0.31,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.31,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q17-712da919",
+      "paperId": "Q17",
+      "sectionId": "s5",
+      "quote": "than that of aerobic cultures (0.39 ± 0.02 h-1",
+      "field": "growth_rate_mu",
+      "value": 0.39,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.39,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q17-d96637fa",
+      "paperId": "Q17",
+      "sectionId": "s5",
+      "quote": "the specific growth rate during the post-diauxic phase (0.10 ± 0.01 h-1)",
+      "field": "growth_rate_mu",
+      "value": 0.1,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.1,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q17-5a8a649c",
+      "paperId": "Q17",
+      "sectionId": "s12",
+      "quote": "with 20 g/L glucose as sole carbon-source",
+      "field": "medium_component_conc",
+      "value": 20.0,
+      "unit": "g L⁻¹",
+      "si": {
+        "value": 20.0,
+        "unit": "kg m⁻³"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Saccharomyces cerevisiae",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-20T03:32:55.025251+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 0,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 0,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [],
+  "dropped": [],
+  "usage": {
+    "inputTokens": 27017,
+    "outputTokens": 1754,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.003579,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

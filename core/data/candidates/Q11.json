@@ -1,0 +1,216 @@
+{
+  "paperId": "Q11",
+  "run": "claude-1",
+  "extractedAt": "2026-10-20T03:41:34.934863+00:00",
+  "candidates": [
+    {
+      "id": "cl1-Q11-193a006f",
+      "paperId": "Q11",
+      "sectionId": "t2",
+      "quote": "Glucose phase (μmax, h−1) | 0.37 ± 0.00 | 0.38 ± 0.01* | 0.34 ± 0.00*",
+      "field": "growth_rate_mu",
+      "value": 0.37,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.37,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "s-cerevisiae-cenpk113-7d",
+      "organismText": "CEN.PK113-7D (naive reference)",
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q11-94e1336f",
+      "paperId": "Q11",
+      "sectionId": "t2",
+      "quote": "Glucose phase (μmax, h−1) | 0.37 ± 0.00 | 0.38 ± 0.01* | 0.34 ± 0.00*",
+      "field": "growth_rate_mu",
+      "value": 0.34,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.34,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IMX2538 (minimal CCM)",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q11-e0d5524d",
+      "paperId": "Q11",
+      "sectionId": "t2",
+      "quote": "μmax (h−1) | 0.10 ± 0.00 | 0.12 ± 0.00* | 0.08 ± 0.01*",
+      "field": "growth_rate_mu",
+      "value": 0.08,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.08,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IMX2538 (minimal CCM)",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q11-15123ef6",
+      "paperId": "Q11",
+      "sectionId": "t2",
+      "quote": "Ybiomass/glucose (gDW gglucose−1) | 0.13 ± 0.00 | 0.13 ± 0.00 | 0.12 ± 0.00",
+      "field": "biomass_yield_substrate",
+      "value": 0.13,
+      "unit": "g g⁻¹",
+      "si": {
+        "value": 0.13,
+        "unit": "g g⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "s-cerevisiae-cenpk113-7d",
+      "organismText": "CEN.PK113-7D (naive reference)",
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q11-198cc135",
+      "paperId": "Q11",
+      "sectionId": "t2",
+      "quote": "Ybiomass/glucose (gDW gglucose−1) | 0.13 ± 0.00 | 0.13 ± 0.00 | 0.12 ± 0.00",
+      "field": "biomass_yield_substrate",
+      "value": 0.12,
+      "unit": "g g⁻¹",
+      "si": {
+        "value": 0.12,
+        "unit": "g g⁻¹"
+      },
+      "confidence": 0.9,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IMX2538 (minimal CCM)",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-20T03:41:34.934863+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 1,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 1,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit 'g liter−1' does not normalise"
+  ],
+  "dropped": [
+    {
+      "paperId": "Q11",
+      "sectionId": "s11",
+      "field": "medium_component_conc",
+      "value": 20.0,
+      "unit": "g liter−1",
+      "rule": "unit",
+      "detail": "unit 'g liter−1' does not normalise"
+    }
+  ],
+  "usage": {
+    "inputTokens": 38271,
+    "outputTokens": 2914,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.005284,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

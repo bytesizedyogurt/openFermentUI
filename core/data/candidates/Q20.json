@@ -1,0 +1,229 @@
+{
+  "paperId": "Q20",
+  "run": "claude-1",
+  "extractedAt": "2026-10-20T03:43:26.303671+00:00",
+  "candidates": [
+    {
+      "id": "cl1-Q20-6ef081f7",
+      "paperId": "Q20",
+      "sectionId": "s8",
+      "quote": "Strain SB31 exhibited a μmax (0.23 h–1) significantly higher than the value detected for Calsa (0.21 h–1)",
+      "field": "growth_rate_mu",
+      "value": 0.23,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.23,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "SB31",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q20-2a1bb562",
+      "paperId": "Q20",
+      "sectionId": "s8",
+      "quote": "Strain SB31 exhibited a μmax (0.23 h–1) significantly higher than the value detected for Calsa (0.21 h–1)",
+      "field": "growth_rate_mu",
+      "value": 0.21,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.21,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.85,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Calsa",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q20-e4a5a4e5",
+      "paperId": "Q20",
+      "sectionId": "s8",
+      "quote": "In contrast, strains such as M57 (0.14 h–1), LC376 (0.16 h–1), and M53 (0.18 h–1) showed significantly lower values.",
+      "field": "growth_rate_mu",
+      "value": 0.14,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.14,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "M57",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q20-83dd7243",
+      "paperId": "Q20",
+      "sectionId": "s8",
+      "quote": "an average peak growth rate of approximately 0.19 h–1, ranging from 0.14 to 0.23 h–1",
+      "field": "growth_rate_mu",
+      "value": 0.185,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.185,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.7,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": null,
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": {
+        "low": 0.14,
+        "high": 0.23
+      },
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "range-midpoint"
+    },
+    {
+      "id": "cl1-Q20-41b7b2bc",
+      "paperId": "Q20",
+      "sectionId": "t2",
+      "quote": "Calsa | 0.21 ± 0.00 B | 0.16–0.25 | 7.46 ± 0.13 A | 1.24–13.68 | 31.86 ± 0.67 A | 27.75–35.96 | 45.28 ± 0.22 A | 43.19–47.37",
+      "field": "growth_rate_mu",
+      "value": 0.21,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.21,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "Calsa",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-20T03:43:26.303671+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 2,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 2,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [
+    "unit: unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)",
+    "unit: unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+  ],
+  "dropped": [
+    {
+      "paperId": "Q20",
+      "sectionId": "t4",
+      "field": "monod_ks",
+      "value": 0.8,
+      "unit": "%w/v",
+      "rule": "unit",
+      "detail": "unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+    },
+    {
+      "paperId": "Q20",
+      "sectionId": "t4",
+      "field": "monod_ks",
+      "value": 0.34,
+      "unit": "%w/v",
+      "rule": "unit",
+      "detail": "unit '% w/v' is not in the family of 'g L⁻¹': Incompatible units: % w/v (percent) vs g L⁻¹ (massConc)"
+    }
+  ],
+  "usage": {
+    "inputTokens": 29436,
+    "outputTokens": 3066,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004477,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

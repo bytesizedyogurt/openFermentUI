@@ -1,0 +1,172 @@
+{
+  "paperId": "Q15",
+  "run": "claude-1",
+  "extractedAt": "2026-10-20T03:42:40.782438+00:00",
+  "candidates": [
+    {
+      "id": "cl1-Q15-552ea580",
+      "paperId": "Q15",
+      "sectionId": "t1",
+      "quote": "Biomass/glucose (gx/g) | 0.084 ± 0.002 | 0.096 ± 0.004 | 0.093 ± 0.001 | 0.078 ± 0.001 | 0.090 ± 0.001 | 0.093 ± 0.001",
+      "field": "biomass_yield_substrate",
+      "value": 0.084,
+      "unit": "g g⁻¹",
+      "si": {
+        "value": 0.084,
+        "unit": "g g⁻¹"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IME324",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q15-6b934f13",
+      "paperId": "Q15",
+      "sectionId": "t1",
+      "quote": "Biomass/glucose (gx/g) | 0.084 ± 0.002 | 0.096 ± 0.004 | 0.093 ± 0.001 | 0.078 ± 0.001 | 0.090 ± 0.001 | 0.093 ± 0.001",
+      "field": "biomass_yield_substrate",
+      "value": 0.078,
+      "unit": "g g⁻¹",
+      "si": {
+        "value": 0.078,
+        "unit": "g g⁻¹"
+      },
+      "confidence": 0.75,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IMX1489",
+      "organismText": null,
+      "carbonSource": "glucose",
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q15-89bae709",
+      "paperId": "Q15",
+      "sectionId": "t2",
+      "quote": "µmax (h−1) | 0.32 ± 0.01 | 0.29 ± 0.00 | 0.29 ± 0.01 | 0.25 ± 0.00 | 0.29 ± 0.00 | 0.29 ± 0.00",
+      "field": "growth_rate_mu",
+      "value": 0.32,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.32,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.8,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IME324",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    },
+    {
+      "id": "cl1-Q15-49b0bb2c",
+      "paperId": "Q15",
+      "sectionId": "t2",
+      "quote": "µmax (h−1) | 0.32 ± 0.01 | 0.29 ± 0.00 | 0.29 ± 0.01 | 0.25 ± 0.00 | 0.29 ± 0.00 | 0.29 ± 0.00",
+      "field": "growth_rate_mu",
+      "value": 0.29,
+      "unit": "h⁻¹",
+      "si": {
+        "value": 0.29,
+        "unit": "h⁻¹"
+      },
+      "confidence": 0.75,
+      "status": "unverified",
+      "provenance": "unverified",
+      "organism": "IMX2608",
+      "organismText": null,
+      "carbonSource": null,
+      "componentTag": null,
+      "goldOnly": null,
+      "extractorRun": "claude-1",
+      "rejectReason": null,
+      "isPrimary": true,
+      "citesRecordId": null,
+      "method": null,
+      "numbering": null,
+      "curationRef": null,
+      "range": null,
+      "comparativeBaseline": null,
+      "negativeResult": null,
+      "valueBasis": "exact"
+    }
+  ],
+  "audit": [
+    {
+      "at": "2026-10-20T03:42:40.782438+00:00",
+      "who": "claude-1",
+      "action": "extracted",
+      "from_": null,
+      "to": null
+    }
+  ],
+  "rejected": 0,
+  "rejectionReasons": {
+    "field": 0,
+    "section": 0,
+    "quote": 0,
+    "value": 0,
+    "unit": 0,
+    "range": 0,
+    "method": 0
+  },
+  "rejectionDetails": [],
+  "dropped": [],
+  "usage": {
+    "inputTokens": 34312,
+    "outputTokens": 2606,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0.004734,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "notes": [],
+  "calls": 1,
+  "truncatedSections": [],
+  "fieldDrops": {
+    "carbonSource": 0
+  }
+}

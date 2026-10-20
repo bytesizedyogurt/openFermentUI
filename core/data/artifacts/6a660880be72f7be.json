@@ -1,0 +1,68 @@
+{
+  "id": "6a660880be72f7be",
+  "tool": "geneos.ceiling",
+  "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "Saccharomyces cerevisiae S288C (iMM904)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "iMM904",
+        "note": "https://bigg.ucsd.edu/static/models/iMM904.xml (ETag \"017c86841952cc365f20a8b466292b31\", Last-Modified 2019-11-01), sha256 a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 (BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego)",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "secreted through EX_etoh_e; ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "iMM904",
+    "product": "ethanol",
+    "substrate": "glucose",
+    "exchange": "EX_glc__D_e",
+    "uptake": 10.0,
+    "flux": 19.99999999999999,
+    "molPerMol": 1.999999999999999,
+    "gPerG": 0.5114345345145316,
+    "solver": "glpk_interface",
+    "status": "optimal"
+  },
+  "outputHash": "33ffdcffa6dd3b29d1d55922b1cca64f1bed7814525ea5df2874919a1b8162a7",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T03:56:22Z",
+  "durationMs": 247,
+  "seed": null
+}
