@@ -159,11 +159,13 @@ function TrainView({ train, unit, choose }: { train: Train; unit: TrainUnit | nu
         units={train.units}
         provenance={train.provenance}
         massUnit={massUnit}
+        why={train.note}
         selected={unit?.id ?? null}
         onSelect={choose}
         csvName={`recovery-${train.scenarioId ?? train.artifactId}`}
         notes={[
           "A unit's recovery counts the outlets that lead on to the product stream, directly, through later units or round a recycle. Outlets over inlets would read one for every unit that reacts nothing, so it is not used.",
+          "A unit whose passes stay apart, such as a process heat exchanger, is counted only on the pass that carries the product on; product that enters a unit on the path and leaves by no outlet is lost there.",
           'Click a unit to cut the stream table below to its streams.',
         ]}
       />
@@ -241,7 +243,7 @@ function TrainProperties({ train }: { train: Train }) {
       <div className="grid md:grid-cols-2 gap-3">
         {shown.map((s) => (
           <PropertiesPanel
-            key={s.streamId}
+            key={`${train.artifactId}:${s.streamId}`}
             title={
               <>
                 {s.role}: <span className="font-num">{s.streamId}</span>

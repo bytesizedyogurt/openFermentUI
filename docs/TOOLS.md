@@ -94,7 +94,11 @@ simulated again; the row's mark is the run's, worked out as for any artifact
 row. This is a kind of the existing read, not a tool of its own. Proforma's
 rows list every scenario's runs and, since §6.1, the reference biorefineries'
 runs (`proforma.reference`). `GET /api/pureos/trains` and
-`GET /api/pureos/train/{key}` serve the same reading to the browser.
+`GET /api/pureos/train/{key}` serve the same reading to the browser, the
+mark worked out the same way (§4.R). A unit whose passes BioSTEAM keeps
+apart (an `HXprocess`) is credited only on the pass that carries the product
+on, and product that enters a unit on the path and leaves by no outlet is
+lost there.
 
 Before round one, `module_stores.coverage` sweeps every module for what the
 question names and hands the model the map. A follow-up is swept with the

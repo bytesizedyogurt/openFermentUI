@@ -1350,6 +1350,85 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §4.R — the fermOS Properties card answers the record it names.
+  //
+  // Two ethanol titre candidates on a thread Q paper join the overlay (TEST
+  // STAND-INs added in this page alone; no number here is a result), so the
+  // card has records to pick. Record A's answer is held back until the card
+  // has moved on to record B, as a first ask waits while the Proforma
+  // simulator starts: A's late answer must never show under B's title. Then
+  // B's first ask answers 503, as a simulator still starting does, and the
+  // card keeps its button, so a second ask gets B's answer.
+  let brothFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    try {
+      const entries = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/thermo-props.json'), 'utf8')).response.entries;
+      const beer = entries.find((e) => e.request.preset === 'beer-at-titre-of' && e.status === 200).body;
+      const [A, B] = ['cl1-Q1-smoke4ra', 'cl1-Q1-smoke4rb'];
+      const answerOf = { [A]: { ...beer, id: 'aaaaaaaaaaaaaaaa' }, [B]: { ...beer, id: 'bbbbbbbbbbbbbbbb' } };
+      const titre = (id, value) => ({
+        id, paperId: 'Q1', sectionId: 'abstract', quote: `a test stand-in titre of ${value} g/L`, field: 'ethanol_titre', value,
+        unit: 'g/L', confidence: 0.8, status: 'unverified', provenance: 'unverified', extractorRun: 'claude-1', isPrimary: true,
+        valueBasis: 'exact',
+      });
+      await page.route('**/api/biorepo/overlay', async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        body.candidates = [...(body.candidates ?? []), titre(A, 40), titre(B, 60)];
+        await route.fulfill({ response, json: body });
+      });
+      let releaseA;
+      const heldA = new Promise((r) => (releaseA = r));
+      let asksOfB = 0;
+      await page.route('**/api/thermo/props**', async (route) => {
+        const rq = route.request();
+        if (rq.method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ artifact: null }) });
+        const { recordId } = rq.postDataJSON();
+        if (recordId === A) await heldA;
+        if (recordId === B && ++asksOfB === 1)
+          return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'the Proforma simulator, where thermosteam runs, could not answer: the Proforma simulator could not start: it is still starting' }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answerOf[recordId]) });
+      });
+      await page.goto(`http://localhost:${PORT}/#/fermos`, { waitUntil: 'networkidle' });
+      const pick = page.locator('select[aria-label="Titre record"]');
+      await pick.waitFor({ timeout: 8000 });
+      const panel = page.locator('[data-testid="broth-properties"] [data-testid="thermo-panel"]');
+      await pick.selectOption(A);
+      await panel.getByRole('button', { name: 'Ask thermosteam' }).click();
+      await panel.getByText('Asking thermosteam').waitFor({ timeout: 4000 });
+      await pick.selectOption(B);
+      await panel.getByText('Not asked here yet').waitFor({ timeout: 4000 });
+      releaseA();
+      await page.waitForTimeout(800);
+      const afterA = await panel.innerText();
+      if ((await panel.locator('[data-testid="thermo-props"]').count()) !== 0 || /aaaaaaaaaaaaaaaa/.test(afterA))
+        problems.push(`record A's late answer shows under record B's title: ${JSON.stringify(afterA.slice(0, 160))}`);
+      if (!new RegExp(`titre of\\s*${B}`).test(afterA)) problems.push('the card does not name record B after the switch');
+      await panel.getByRole('button', { name: 'Ask thermosteam' }).click({ timeout: 4000 });
+      await panel.getByText(/could not start/).waitFor({ timeout: 4000 }).catch(() => {});
+      if (!/could not start/.test(await panel.innerText())) problems.push("a 503 is not said in the service's words");
+      if ((await panel.getByRole('button', { name: 'Ask thermosteam' }).count()) !== 1) problems.push('after a 503 the card leaves no way to ask again');
+      else {
+        await panel.getByRole('button', { name: 'Ask thermosteam' }).click({ timeout: 4000 });
+        await panel.locator('[data-testid="thermo-props"]').waitFor({ timeout: 4000 }).catch(() => {});
+        if (!/bbbbbbbbbbbbbbbb/.test(await panel.innerText())) problems.push("asking again after a 503 does not show B's answer");
+      }
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      brothFails++;
+      console.log(`✗ broth        ${problems.join('; ')}`);
+    } else {
+      console.log("✓ broth        fermOS's Properties card drops a late answer for the record it left, and after a 503 asks again");
+    }
+    await page.close();
+  }
+  // ── end §4.R
+
   await browser.close();
   server.close();
 
@@ -1365,7 +1444,8 @@ async function main() {
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
+  console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
 }
 
 main();

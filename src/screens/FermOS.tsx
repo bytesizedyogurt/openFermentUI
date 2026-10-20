@@ -277,6 +277,7 @@ function BrothProperties() {
         </p>
       ) : chosen ? (
         <PropertiesPanel
+          key={chosen.id}
           title={
             <>
               Water and ethanol at the titre of <span className="font-num">{chosen.id}</span>

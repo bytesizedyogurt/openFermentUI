@@ -335,6 +335,25 @@ def test_a_chemical_the_library_lacks_is_a_422_and_a_dead_worker_a_503(store, wo
     assert r.status_code == 503 and "where thermosteam runs" in r.json()["detail"]
 
 
+def test_a_damaged_file_is_a_409_in_words_never_a_500(store, worker, client):
+    """OF-BLD-019 §4.R: a run's file, or the answer's, that does not parse is
+    said in words, as GET /api/biorepo/artifacts/{id} says it, and the card
+    shows them; it was an unhandled 500 ('check its log')."""
+    (artifacts.folder() / "bbbbbbbbbbbbbbb2.json").write_text("not json", encoding="utf-8")
+    q = {"artifactId": "bbbbbbbbbbbbbbb2", "streamId": "beer"}
+    for r in (client.get("/api/thermo/props", params=q), client.post("/api/thermo/props", json=q)):
+        assert r.status_code == 409 and "bbbbbbbbbbbbbbb2 is damaged on disk" in r.json()["detail"], r.text
+    # The run parses and the answer kept for its stream does not.
+    asked = {"artifactId": RUN_ID, "streamId": "beer"}
+    inputs, _ = thermo.basis_inputs(ThermoPropsRequest(**asked), None)
+    reg = artifacts.registered(thermo.TOOL)
+    answer = artifacts.artifact_id(reg.tool, reg.version, inputs)
+    (artifacts.folder() / f"{answer}.json").write_text("{trunc", encoding="utf-8")
+    for r in (client.get("/api/thermo/props", params=asked), client.post("/api/thermo/props", json=asked)):
+        assert r.status_code == 409 and f"{answer} is damaged on disk" in r.json()["detail"], r.text
+    assert worker.calls == [], "nothing is asked of thermosteam over a damaged answer"
+
+
 # ── the double's answers ─────────────────────────────────────────────────
 
 

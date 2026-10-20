@@ -154,6 +154,98 @@ def test_a_run_kept_before_runs_carried_tables_says_how_to_get_them():
     assert tr.units == [] and tr.streams == [] and "run the scenario again" in tr.note
 
 
+def test_a_run_kept_before_the_tables_is_not_said_to_have_had_no_tea():
+    """§4.R: a run of OF-BLD-014 Phase 8 was priced by a TEA and kept its
+    price, never its tables; its product basis says it predates the tables,
+    not that it had no TEA."""
+    old = _art(tables=False)
+    old.output.update(basePrice=5.1, quantiles={"p50": 5.0}, samples=200)
+    tr = pureos.train_of(old, scenarios=[])
+    assert tr.product is None and "no TEA" not in tr.productBasis
+    assert "kept before runs carried their tables" in tr.productBasis and "run the scenario again" in tr.note
+
+
+def test_a_run_whose_base_case_could_not_run_says_so_and_why():
+    """§4.R: a run made after §2.1 whose base case was infeasible keeps empty
+    tables beside its reason; the train says the base case could not run and
+    why, never that the run predates the tables or had no TEA."""
+    bad = _art(tables=False)
+    bad.output.update(baseInfeasible="Infeasible: carbon: this yield and content leave no sugar for respiration",
+                      tablesSource=None, tea=None, streams=[], units=[], utilities=None, diagram=None, unitOrder=[],
+                      diagramNote="the base case could not run, so it has no tables", tableUnits={})
+    tr = pureos.train_of(bad, scenarios=[])
+    for words in (tr.note, tr.productBasis):
+        assert "base case could not run" in words and "leave no sugar for respiration" in words, words
+        assert "kept before" not in words and "no TEA" not in words, words
+    assert pureos.summary(tr).note == tr.note and tr.units == [] and tr.overallRecovery is None
+
+
+# ── a unit whose passes stay apart (§4.R) ────────────────────────────────
+#
+# BioSTEAM's own ethanol purification (biorefineries.ethanol, the train
+# ethanol_glucose_v0 runs): the beer is pumped through one side of a
+# process heat exchanger (HXprocess) into the beer column; the column's
+# bottoms are pumped back through the other side and leave as stillage. An
+# HXprocess copies ins[0] to outs[0] and ins[1] to outs[1] (its `_run`), so
+# the two passes never mix: the bottoms are lost at the column, and the
+# exchanger passes on all the beer it heats.
+
+
+def _purification(swap=False):
+    streams = [
+        _stream("beer", None, "P1", {"E": 100.0, "Water": 900.0}),
+        _stream("s1", "P1", "HX", {"E": 100.0, "Water": 900.0}),
+        _stream("s4", "HX", "D", {"E": 100.0, "Water": 900.0}),
+        _stream("product", "D", None, {"E": 99.0, "Water": 10.0}),
+        _stream("s2", "D", "P2", {"E": 1.0, "Water": 890.0}),
+        _stream("s3", "P2", "HX", {"E": 1.0, "Water": 890.0}),
+        _stream("stillage", "HX", None, {"E": 1.0, "Water": 890.0}),
+    ]
+    ins, outs = (["s3", "s1"], ["stillage", "s4"]) if swap else (["s1", "s3"], ["s4", "stillage"])
+    units = [_unit("P1", 0, ["beer"], ["s1"], "Pump"), _unit("HX", 1, ins, outs, "HXprocess"),
+             _unit("D", 2, ["s4"], ["product", "s2"], "BinaryDistillation"), _unit("P2", 3, ["s2"], ["s3"], "Pump")]
+    return _art(streams=streams, units=units, tea=_tea(basis_flow=99.0))
+
+
+@pytest.mark.parametrize("swap", [False, True], ids=["beer-on-side-0", "beer-on-side-1"])
+def test_recovery_is_credited_by_pass_so_the_column_loses_its_bottoms_and_the_exchanger_nothing(swap):
+    tr = pureos.train_of(_purification(swap), scenarios=[])
+    u = _by(tr)
+    d, hx = u["D"], u["HX"]
+    assert d.recovery == pytest.approx(0.99) and d.lostTo == ["s2"] and d.productLost == pytest.approx(1.0)
+    assert hx.onPath and hx.recovery == pytest.approx(1.0) and hx.lostTo == [] and hx.productLost == pytest.approx(0.0)
+    # Only the beer's pass is on the path: its product in and out are that pass's.
+    assert (hx.productIn, hx.productOut, hx.productOnward) == (pytest.approx(100.0),) * 3
+    assert "s3" in (hx.note or "") and "stillage" in (hx.note or ""), hx.note
+    assert not u["P2"].onPath and u["P2"].recovery is None and "off the product's path" in u["P2"].note
+    assert u["P1"].onPath and u["P1"].recovery == pytest.approx(1.0)
+    assert tr.overallRecovery == pytest.approx(0.99) and tr.productLost == pytest.approx(1.0)
+    assert [round(x.cumulative, 6) for x in tr.units if x.onPath] == [1.0, 1.0, 0.99]
+
+
+def test_a_mixing_unit_still_joins_every_inlet_to_every_outlet():
+    """Only a unit whose passes BioSTEAM keeps apart is read by pass: a mixer
+    or a separator fed by two lines (C: broth and a recycle) is one pass."""
+    c = _by(pureos.train_of(_art(), scenarios=[]))["C"]
+    assert c.productIn == pytest.approx(52.0) and c.recovery == pytest.approx(47.0 / 52.0)
+
+
+def test_product_that_enters_a_unit_on_the_path_and_does_not_leave_it_is_lost_there():
+    """§4.R: R forms 50 E, H passes 40 E on and nothing elsewhere, D delivers
+    40. The ten H consumed are lost at H, so the cumulative and the overall
+    recovery agree with H's own."""
+    streams = [_stream("feed", None, "R", {"Glucose": 100.0}), _stream("broth", "R", "H", {"E": 50.0, "Water": 50.0}),
+               _stream("hot", "H", "D", {"E": 40.0, "Water": 50.0}), _stream("product", "D", None, {"E": 40.0, "Water": 10.0}),
+               _stream("bottoms", "D", None, {"Water": 40.0})]
+    units = [_unit("R", 0, ["feed"], ["broth"]), _unit("H", 1, ["broth"], ["hot"]), _unit("D", 2, ["hot"], ["product", "bottoms"])]
+    tr = pureos.train_of(_art(streams=streams, units=units, tea=_tea(basis_flow=40.0)), scenarios=[])
+    h = _by(tr)["H"]
+    assert h.recovery == pytest.approx(0.8) and h.productLost == pytest.approx(10.0) and h.lostTo == []
+    assert "leaves it by no outlet" in (h.note or ""), h.note
+    assert h.cumulative == pytest.approx(0.8) and tr.overallRecovery == pytest.approx(0.8)
+    assert tr.productLost == pytest.approx(10.0)
+
+
 # ── which scenario, which program ───────────────────────────────────────
 
 SCENARIOS = [
@@ -235,6 +327,25 @@ def test_get_train_reads_by_scenario_or_run_and_404s_in_words(stored):
     assert missing.status_code == 404 and "run the scenario in Proforma" in missing.json()["detail"]
 
 
+def test_the_page_and_pureos_read_give_one_train_one_provenance(tmp_path, monkeypatch, pool):  # noqa: F811
+    """§4.R: a run stored as `computed` whose bound record is no longer in
+    the pool is worth less now. pureos_read worked that out from its inputs;
+    the page served the file's word. Both read it as it stands now."""
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    (tmp_path / "artifacts").mkdir()
+    inputs = [BasisInput(name="flowsheet", value="test_line", unit="", source=BasisSource(kind="convention")),
+              BasisInput(name="titre", value="a record", unit="", source=BasisSource(kind="record", id="gone-record-1"))]
+    a = _art(inputs=inputs)
+    assert a.provenance == "computed"
+    (tmp_path / "artifacts" / f"{a.id}.json").write_text(a.model_dump_json(), encoding="utf-8")
+    row = read("pureos", ctx_for(pool, artifacts=lambda: [a]), ids=[LINE], kind="train").rows[0]
+    c = _client()
+    page = c.get(f"/api/pureos/train/{LINE}").json()
+    listed = next(t for t in c.get("/api/pureos/trains").json() if t["artifactId"] == LINE)
+    assert row.provenance != "computed"
+    assert page["provenance"] == listed["provenance"] == row.provenance
+
+
 def test_the_double_serves_what_the_code_reads_from_the_same_run():
     """The double's train is the one the real code reads from the run
     artifacts.json carries (test_demo holds the files to demo.py)."""
@@ -309,3 +420,44 @@ def test_every_class_the_vocabulary_names_is_one_biosteam_defines_and_names_one_
     missing = {c for c, _ in named} - _biosteam_unit_classes()
     assert not missing, f"BioSTEAM defines no class {sorted(missing)}"
     assert {o for _, o in named} >= {"distillation", "molecular-sieve", "centrifugation"}
+
+
+# ── BioSTEAM's own purification train, through the real worker (`sim`) ──
+
+
+@pytest.mark.sim
+def test_the_ethanol_train_loses_at_the_beer_column_and_the_exchanger_passes_on_its_beer(tmp_path, monkeypatch):
+    """§4.R on BioSTEAM's own `create_ethanol_purification_system`, which
+    ethanol_glucose_v0 runs (§2.3): the beer column's bottoms are lost at
+    the column, the HXprocess that heats the beer with them passes on all the
+    beer, and the pump on the bottoms is off the path. The inputs are the
+    test_proforma STAND-INs, a fixture's assumptions: no number here is a
+    result, and only which unit loses what is asserted."""
+    from openferment_core import proforma
+    from openferment_core.models import InputAssumption
+    from test_proforma import ETHANOL_STANDIN
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    proforma.start(background=False)
+    a = [InputAssumption(key=k, value=v, low=v, high=v, by="openFerment test fixture", at="2026-10-20")
+         for k, v in ETHANOL_STANDIN.items()]
+    tr = pureos.train_of(proforma.run_flowsheet("ethanol_glucose_v0", a, samples=1, seed=1, scenario_id="sc-yeast-1"),
+                         scenarios=[])
+    u = _by(tr)
+    assert tr.product == "Ethanol" and tr.productStream == "ethanol"
+    hx = [x for x in tr.units if x.unitClass == "HXprocess"]
+    assert hx, "the purification train has no HXprocess: the case this test holds is gone"
+    for x in hx:
+        assert x.onPath and x.recovery == pytest.approx(1.0) and x.lostTo == [] and "kept apart" in x.note
+        # The beer's pass feeds the beer column; the other pass is the column's bottoms coming back.
+        beer_out = next(o for o in x.outs if any(s.id == o and s.sink and u[s.sink].unitClass == "BinaryDistillation"
+                                                   for s in tr.streams))
+        column = u[next(s.sink for s in tr.streams if s.id == beer_out)]
+        assert column.recovery < 1.0 and column.lostTo, "the beer column loses its bottoms"
+        bottoms = column.lostTo[0]
+        pump = u[next(s.sink for s in tr.streams if s.id == bottoms)]
+        assert not pump.onPath and pump.recovery is None
+    on = [x for x in tr.units if x.onPath]
+    assert on[-1].cumulative == pytest.approx(tr.overallRecovery)
+    assert tr.productLost == pytest.approx(sum(x.productLost or 0.0 for x in on))
+    assert tr.overallRecovery == pytest.approx(tr.productOut / (tr.productOut + tr.productLost))

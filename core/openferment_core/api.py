@@ -464,7 +464,7 @@ def proforma_run(req: ProformaRunRequest) -> dict:
 
 
 def _thermo_answer(fn, req: ThermoPropsRequest):
-    from . import evidence_pool, thermo
+    from . import artifacts, evidence_pool, thermo
 
     try:
         # A person names the run or the record by id, so archived programs'
@@ -476,6 +476,8 @@ def _thermo_answer(fn, req: ThermoPropsRequest):
         raise HTTPException(status_code=404, detail=str(e)) from None
     except thermo.ThermoRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
+    except artifacts.ArtifactDamaged as e:  # the run's file or the answer's (§4.R): in words, as artifacts_read says it
+        raise HTTPException(status_code=409, detail=str(e)) from None
 
 
 @app.post("/api/thermo/props", response_model=Artifact)
@@ -483,9 +485,9 @@ def thermo_props(req: ThermoPropsRequest) -> Artifact:
     """thermosteam's density, heat capacity, viscosity and bubble and dew
     points for a run's stream, or a preset: one `thermo_props` artifact,
     computed in the Proforma worker or returned as stored. 404 for a run,
-    stream or record not on file; 422 for a question that cannot be asked,
-    a chemical the library lacks among them, in words; 503 when the worker
-    cannot answer."""
+    stream or record not on file; 409 for a run or an answer whose file is
+    damaged on disk; 422 for a question that cannot be asked, a chemical the
+    library lacks among them, in words; 503 when the worker cannot answer."""
     from . import thermo
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 
@@ -500,7 +502,7 @@ def thermo_props_stored(artifactId: str | None = None, streamId: str | None = No
                         preset: str | None = None, recordId: str | None = None) -> dict:
     """The answer stored for the same question, as `{"artifact": …}`, or
     `{"artifact": null}` when it has not been asked here: a read, which
-    starts no simulator. The same 404 and 422 as the POST."""
+    starts no simulator. The same 404, 409 and 422 as the POST."""
     from . import thermo
 
     art = _thermo_answer(thermo.stored, ThermoPropsRequest(artifactId=artifactId, streamId=streamId, preset=preset,

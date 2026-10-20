@@ -23,6 +23,8 @@ export interface RecoveryByUnitProps {
   massUnit: string;
   notes?: string[];
   csvName?: string;
+  /** Why the run kept no unit table, in the train's own words (its note). */
+  why?: string | null;
   /** The unit picked on the page, outlined. */
   selected?: string | null;
   onSelect?: (unitId: string) => void;
@@ -75,6 +77,23 @@ const L = 170;
 const R = 150;
 const T = 8;
 
+/**
+ * What the figure says instead of drawing, or null when it draws. A run that
+ * kept no unit table names no product either; it says the table is missing
+ * first, with the train's own words for why (a run kept before the tables, a
+ * base case that could not run), never that its flowsheet prices nothing.
+ */
+export function emptyOf(props: RecoveryByUnitProps): { what: string; where: string } | null {
+  if (props.units.length === 0)
+    return {
+      what: 'this run kept no unit table.',
+      where: props.why || 'Run the scenario again in Proforma; a run keeps its tables from OF-BLD-019 on.',
+    };
+  if (!props.product)
+    return { what: 'this run names no product, so no recovery is read.', where: 'A run whose flowsheet prices a product stream names one; Proforma runs it.' };
+  return null;
+}
+
 export function RecoveryByUnit(props: RecoveryByUnitProps) {
   const units = props.units;
   const top = Math.max(1, ...units.map((u) => (u.recovery != null && Number.isFinite(u.recovery) ? u.recovery : 0)));
@@ -82,11 +101,7 @@ export function RecoveryByUnit(props: RecoveryByUnitProps) {
   const x = (v: number) => L + (Math.max(0, v) / top) * (W - L - R);
   const color = markColor(props.provenance);
   const dash = DASH_ARRAY[ENCODING[props.provenance].line.dash];
-  const empty = !props.product
-    ? { what: 'this run names no product, so no recovery is read.', where: 'A run whose flowsheet prices a product stream names one; Proforma runs it.' }
-    : units.length === 0
-      ? { what: 'this run kept no unit table.', where: 'Run the scenario again in Proforma; a run keeps its tables from OF-BLD-019 on.' }
-      : null;
+  const empty = emptyOf(props);
   return (
     <FigureFrame
       title={props.title}

@@ -9,7 +9,13 @@
 // units, beside the library's version, the answer's provenance and a link to
 // the artifact. A chemical the library lacks comes back as the service's
 // words, and with the service down the panel says so; nothing stands in.
-import { useEffect, useState, type ReactNode } from 'react';
+//
+// ONE QUESTION, ONE ANSWER (§4.R). An ask belongs to the question it was made
+// for: a new question, or the panel leaving, aborts it, and an answer that
+// arrives after that is dropped, so one record's numbers never show under
+// another's title. A caller whose question names a different thing also keys
+// the panel by it, so a new thing mounts a new panel.
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ExternalLink, FlaskConical } from 'lucide-react';
 import type { Artifact, ThermoPropsRequest } from '@/data/types';
 import { PROPERTY_ROWS, ThermoDown, ThermoRefused, propsOf, thermoAsk, thermoStored } from '@/lib/thermo';
@@ -25,11 +31,16 @@ type State =
   | { kind: 'refused'; text: string }
   | { kind: 'down'; text: string };
 
+// A 503 is the simulator not answering (still starting, timed out, crashed):
+// the service's words, and the button stays, since a second ask on a worker
+// that is ready answers. Any other refusal is the question's, and final.
 const said = (e: unknown): State =>
   e instanceof ThermoDown
     ? { kind: 'down', text: `${e.message} ${e.remedy}` }
     : e instanceof ThermoRefused
-      ? { kind: 'refused', text: e.message }
+      ? e.status === 503
+        ? { kind: 'down', text: `${e.message.replace(/\.?\s*$/, '.')} Ask again once the simulator is ready.` }
+        : { kind: 'refused', text: e.message }
       : { kind: 'down', text: String(e) };
 
 /** Mass fractions, largest first, as the service wrote them. */
@@ -42,6 +53,8 @@ function composition(fractions: Record<string, number>, shown = 4): string {
 export function PropertiesPanel({ title, question }: { title: ReactNode; question: ThermoPropsRequest }) {
   const [state, setState] = useState<State>({ kind: 'reading' });
   const key = JSON.stringify(question);
+  /** The ask in flight, for the question this panel shows now. */
+  const asking = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -49,15 +62,22 @@ export function PropertiesPanel({ title, question }: { title: ReactNode; questio
     thermoStored(question, ctrl.signal)
       .then((art) => !ctrl.signal.aborted && setState(art ? { kind: 'answer', art } : { kind: 'none' }))
       .catch((e) => !ctrl.signal.aborted && setState(said(e)));
-    return () => ctrl.abort();
+    return () => {
+      ctrl.abort();
+      asking.current?.abort();
+      asking.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   const ask = () => {
+    asking.current?.abort();
+    const ctrl = new AbortController();
+    asking.current = ctrl;
     setState({ kind: 'asking' });
-    thermoAsk(question)
-      .then((art) => setState({ kind: 'answer', art }))
-      .catch((e) => setState(said(e)));
+    thermoAsk(question, ctrl.signal)
+      .then((art) => !ctrl.signal.aborted && setState({ kind: 'answer', art }))
+      .catch((e) => !ctrl.signal.aborted && setState(said(e)));
   };
 
   return (

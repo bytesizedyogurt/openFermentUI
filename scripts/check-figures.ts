@@ -15,6 +15,8 @@
  *    held against a sugar's ceiling only when it was measured on that sugar.
  * 6. OF-BLD-019 §4.1: RecoveryByUnit draws one row per unit, never divides a
  *    recovery out of a unit no product enters, and keeps the run's provenance.
+ *    §4.R: a run that kept no unit table says so, with the train's own words
+ *    for why, before it says the run names no product.
  * 7. OF-BLD-019 §3.2: CostWaterfall draws one row per TEA line and closes on
  *    the price the run solved, never a sum it made; a line with no per-unit
  *    value draws no bar; a credit runs back; every row keeps the run's
@@ -33,7 +35,7 @@ import { toTable as frontierTable } from '../src/components/figures/Frontier';
 import { toTable as distributionTable } from '../src/components/figures/Distribution';
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
-import { noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
+import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
 import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
 import type { TrainUnit } from '../src/data/types';
 import { gatherLinks } from '../src/components/Dossier';
@@ -195,7 +197,17 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   if (rows[0][7] !== '—' || !String(rows[0][10]).includes('formed here')) problems.push('a unit no product enters is given a recovery, or not told why');
   if (noBar(units[0]) == null || noBar(units[2]) == null || noBar(units[1]) != null) problems.push('RecoveryByUnit draws a bar for a unit with no recovery, or none for one with');
   if (rows.some((r) => r[9] !== 'demo')) problems.push("a RecoveryByUnit row loses the run's provenance");
-  ok.push(`tables: recovery by unit ${rows.length}, one row per unit; a unit with no product in says why and draws no bar`);
+  // §4.R: a run with no tables names no product too; the figure says the
+  // tables are missing and why, in the train's words, never that the run's
+  // flowsheet prices nothing.
+  const why = 'this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again';
+  const old = recoveryEmpty({ title: 't', product: null, units: [], provenance: 'demo', massUnit: 'kg/hr', why });
+  if (!old || !/kept no unit table/.test(old.what) || /names no product/.test(old.what) || old.where !== why)
+    problems.push(`a run that kept no unit table is drawn as one naming no product: ${JSON.stringify(old)}`);
+  const toy = recoveryEmpty({ title: 't', product: null, units, provenance: 'demo', massUnit: 'kg/hr' });
+  if (!toy || !/names no product/.test(toy.what)) problems.push('a run with units and no product does not say it names none');
+  if (recoveryEmpty({ title: 't', product: 'E', units, provenance: 'demo', massUnit: 'kg/hr' }) !== null) problems.push('a train with a product and units is drawn empty');
+  ok.push(`tables: recovery by unit ${rows.length}, one row per unit; a unit with no product in says why and draws no bar; a run with no unit table says so before naming no product`);
 }
 
 // 7 — OF-BLD-019 §3.2: the cost breakdown and the tornado, on the grammar.

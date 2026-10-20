@@ -13,7 +13,17 @@ ratio is one for every separator and says nothing about recovery. A unit's
 recovery here is the product leaving by the outlets that lead on toward the
 product stream (directly, through later units, or round a recycle) over the
 product entering it; what leaves by its other outlets is lost at that unit,
-and the outlets are named. Both masses, in and out, are kept beside it.
+and the outlets are named, and product that enters a unit on the path and
+leaves by no outlet is lost there too. Both masses, in and out, are kept
+beside it.
+
+BY PASS, NOT BY UNIT (§4.R). Which streams lead on is worked out stream by
+stream: a stream leads on when the outlets its sink unit sends it to do. A
+unit joins every inlet to every outlet, except one whose passes BioSTEAM
+keeps apart (`SEPARATE_PASSES`): a process heat exchanger heats the beer on
+one side and cools the column's bottoms on the other, and the bottoms never
+join the beer. Such a unit is credited only on the passes that lead on, so
+the column loses its bottoms and the exchanger passes on all the beer.
 
 THE PRODUCT is the component the run's price is per: of the stream the
 run's TEA prices, the one component whose flow is the TEA's basis flow,
@@ -35,6 +45,15 @@ from .models import Artifact, ProformaTables, StreamRow, Train, TrainSummary, Tr
 RUN = "proforma.run"
 # kg/hr: a flow at or below this carries nothing.
 EPS = 1e-9
+# A share of the product entering a unit below which what does not leave it
+# is the float's rounding, not product lost (a precision, not a process number).
+ROUNDING = 1e-9
+# BioSTEAM unit classes whose passes stay apart: inlet i leaves by outlet i
+# and by no other. `HXprocess._run` copies ins[0] to outs[0] and ins[1] to
+# outs[1] and exchanges heat between them (biosteam/units/heat_exchange.py,
+# BioSTEAM 2.54.0). No other class in BioSTEAM's units package is shown by
+# its source to keep its passes apart, so every other unit is one pass.
+SEPARATE_PASSES = frozenset({"HXprocess"})
 
 
 class TrainNotFound(LookupError):
@@ -104,10 +123,26 @@ def program_of(art: Artifact, scenario_id: str | None, scenarios: Iterable[dict[
     return archived or (kept[0] if kept else None)
 
 
-def product_of(t: ProformaTables) -> tuple[str | None, str | None, str]:
-    """(the product stream, the component traced, how it was read in words)."""
+def _kept_tables(art: Artifact) -> bool:
+    """Whether the run was kept with its tables' keys (OF-BLD-019 §2.1 on),
+    even empty ones; a run kept before them holds none of the keys."""
+    o = art.output if isinstance(art.output, dict) else {}
+    return any(k in o for k in ("tea", "streams", "units"))
+
+
+def _base_infeasible(art: Artifact) -> str | None:
+    o = art.output if isinstance(art.output, dict) else {}
+    why = o.get("baseInfeasible")
+    return str(why) if why else None
+
+
+def product_of(t: ProformaTables, *, no_tea: str | None = None) -> tuple[str | None, str | None, str]:
+    """(the product stream, the component traced, how it was read in words).
+    `no_tea` says why a run holds no TEA when the reason is not that its
+    flowsheet prices nothing (a base case that could not run, a run kept
+    before the tables)."""
     if t.tea is None:
-        return None, None, "this run has no TEA, so it names no product and no recovery is read"
+        return None, None, no_tea or "this run has no TEA, so it names no product and no recovery is read"
     stream = next((s for s in t.streams if s.id == t.tea.product), None)
     if stream is None:
         return t.tea.product, None, f"the run prices {t.tea.product}, and its stream table holds no such stream"
@@ -127,20 +162,39 @@ def product_of(t: ProformaTables) -> tuple[str | None, str | None, str]:
 # ── the train ────────────────────────────────────────────────────────────
 
 
-def _reach(product_stream: str | None, streams: list[StreamRow]) -> set[str]:
-    """Every unit with an outlet that leads to the product stream."""
-    source = next((s.source for s in streams if s.id == product_stream), None)
-    if not source:
+def passes(u: Any) -> list[tuple[list[str], list[str]]]:
+    """A unit's passes, each (inlets, outlets): one per inlet for a class
+    whose passes stay apart, when its row lists as many outlets as inlets;
+    else one pass joining every inlet to every outlet."""
+    if u.unitClass in SEPARATE_PASSES and len(u.ins) == len(u.outs):
+        return [([i], [o]) for i, o in zip(u.ins, u.outs)]
+    return [(list(u.ins), list(u.outs))]
+
+
+def _leads_on(product_stream: str | None, streams: list[StreamRow], units: list[Any]) -> set[str]:
+    """Every stream that leads to the product stream: the product stream,
+    and each stream whose sink unit passes it into one that does (by pass)."""
+    if not product_stream or not any(s.id == product_stream for s in streams):
         return set()
-    reach = {source}
+    by_unit = {u.id: u for u in units}
+    sends: dict[str, list[str]] = {}
+    for s in streams:
+        if not s.sink:
+            continue
+        u = by_unit.get(s.sink)
+        if u is None:  # a sink with no row in the unit table: one pass, from its streams
+            sends[s.id] = [x.id for x in streams if x.source == s.sink]
+        else:
+            sends[s.id] = next((outs for ins, outs in passes(u) if s.id in ins), list(u.outs))
+    on = {product_stream}
     grew = True
     while grew:
         grew = False
-        for s in streams:
-            if s.source and s.sink in reach and s.source not in reach:
-                reach.add(s.source)
+        for sid, nexts in sends.items():
+            if sid not in on and any(n in on for n in nexts):
+                on.add(sid)
                 grew = True
-    return reach
+    return on
 
 
 def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None, provenance: str | None = None,
@@ -153,7 +207,13 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
     scenarios = list(seed_scenarios() if scenarios is None else scenarios)
     t = proforma.tables_of(art)
     sid, sname = scenario_of(art, scenarios)
-    stream_id, product, how = product_of(t)
+    infeasible = _base_infeasible(art)
+    no_tea = (f"the base case could not run ({infeasible}), so the run kept no tables, names no product and reads "
+              "no recovery" if infeasible else
+              None if _kept_tables(art) else
+              "this run was kept before runs carried their tables (OF-BLD-019 §2.1), so it names no product here "
+              "and reads no recovery")
+    stream_id, product, how = product_of(t, no_tea=no_tea)
     by_id = {s.id: s for s in t.streams}
 
     def m(sid_: str) -> float:
@@ -163,32 +223,44 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
     def total(ids: list[str]) -> float:
         return float(sum(by_id[i].massFlow for i in ids if i in by_id))
 
-    reach = _reach(stream_id, t.streams) if product else set()
-
-    def onward(sid_: str) -> bool:
-        s = by_id.get(sid_)
-        return sid_ == stream_id or (s is not None and s.sink in reach)
+    leads = _leads_on(stream_id, t.streams, t.units) if product else set()
 
     units: list[TrainUnit] = []
     for u in sorted(t.units, key=lambda x: x.order):
+        on_path = [(ins, outs) for ins, outs in passes(u) if any(o in leads for o in outs)]
         row: dict[str, Any] = {"id": u.id, "unitClass": u.unitClass, "line": u.line, "order": u.order, "ins": u.ins,
-                               "outs": u.outs, "onPath": u.id in reach, "massIn": total(u.ins), "massOut": total(u.outs)}
-        if product:
-            p_in, p_out = sum(m(i) for i in u.ins), sum(m(o) for o in u.outs)
-            row.update(productIn=p_in, productOut=p_out)
-            if u.id not in reach:
-                row["note"] = f"off the product's path: no outlet of {u.id} leads to {stream_id}"
+                               "outs": u.outs, "onPath": bool(on_path), "massIn": total(u.ins), "massOut": total(u.outs)}
+        if product and not on_path:
+            row.update(productIn=sum(m(i) for i in u.ins), productOut=sum(m(o) for o in u.outs),
+                       note=f"off the product's path: no outlet of {u.id} leads to {stream_id}")
+        elif product:
+            # Only the passes on the path are credited: another pass's product
+            # was counted where it left the path, or never was on it.
+            ins = [i for p_ins, _ in on_path for i in p_ins]
+            outs = [o for _, p_outs in on_path for o in p_outs]
+            p_in, p_out = sum(m(i) for i in ins), sum(m(o) for o in outs)
+            on = sum(m(o) for o in outs if o in leads)
+            kept = p_in - p_out if p_in - p_out > ROUNDING * p_in else 0.0  # entered, and left by no outlet
+            row.update(productIn=p_in, productOut=p_out, productOnward=on, productLost=(p_out - on) + kept,
+                       lostTo=[o for o in outs if o not in leads and m(o) > EPS])
+            notes = []
+            apart = [(p_ins, p_outs) for p_ins, p_outs in passes(u) if (p_ins, p_outs) not in on_path]
+            if apart:
+                notes.append("only the pass " + "; ".join(f"{', '.join(a)} → {', '.join(b)}" for a, b in on_path) +
+                             " is on the product's path; the pass " +
+                             "; ".join(f"{', '.join(a)} → {', '.join(b)}" for a, b in apart) +
+                             f" is kept apart by {u.unitClass} and is not counted here")
+            if p_in <= EPS:
+                notes.append(f"no {product} enters {u.id}: the product is formed here" if p_out > EPS
+                             else f"no {product} enters or leaves {u.id}")
             else:
-                on = sum(m(o) for o in u.outs if onward(o))
-                row.update(productOnward=on, productLost=p_out - on,
-                           lostTo=[o for o in u.outs if not onward(o) and m(o) > EPS])
-                if p_in <= EPS:
-                    row["note"] = (f"no {product} enters {u.id}: the product is formed here" if p_out > EPS
-                                   else f"no {product} enters or leaves {u.id}")
-                else:
-                    row["recovery"] = on / p_in
-                    if on > p_in * (1 + 1e-9):
-                        row["note"] = f"more {product} leaves {u.id} on its way than enters it: the unit forms product"
+                row["recovery"] = on / p_in
+                if on > p_in * (1 + 1e-9):
+                    notes.append(f"more {product} leaves {u.id} on its way than enters it: the unit forms product")
+                if kept:
+                    notes.append(f"some of the {product} entering {u.id} leaves it by no outlet, and is counted lost here")
+            if notes:
+                row["note"] = "; ".join(notes)
         units.append(TrainUnit(**row))
 
     out = m(stream_id) if (product and stream_id) else None
@@ -203,10 +275,13 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
                 gone += u.productLost or 0.0
                 units[n] = u.model_copy(update={"cumulative": 1.0 - gone / delivered})
     note = None
-    if not t.units:
+    if infeasible:
+        note = (f"the base case could not run ({infeasible}), so the run kept no tables and no train is read; change "
+                "the inputs it cannot hold in Proforma and run it again")
+    elif not t.units:
         note = ("this run was kept before runs carried their tables (OF-BLD-019 §2.1); run the scenario again in "
-                "Proforma and its train reads here")
-    elif product and not reach:
+                "Proforma and its train reads here" if not _kept_tables(art) else "this run kept no unit table")
+    elif product and not any(u.onPath for u in units):
         note = f"no unit's outlet leads to {stream_id}, so no recovery is read"
     return Train(
         scenarioId=sid, scenarioName=sname, artifactId=art.id, flowsheet=t.flowsheet, createdAt=art.createdAt,
@@ -214,6 +289,30 @@ def train_of(art: Artifact, *, scenarios: Iterable[dict[str, Any]] | None = None
         program=program_of(art, sid, scenarios, record_lookup), tablesSource=t.tablesSource,
         productStream=stream_id, product=product, productBasis=how, productOut=out, productLost=lost,
         overallRecovery=overall, units=units, streams=t.streams, tableUnits=t.tableUnits, runs=runs, note=note)
+
+
+class _Marks:
+    """What each run is worth now (§4.R): `basis_provenance` over its inputs
+    as they stand, the pool's records and the store's artifacts, as
+    `module_stores` works out the mark pureos_read gives the same train. The
+    pool is loaded once, and only for a run that binds a record; a person
+    opens a train by id, so archived programs' records resolve."""
+
+    def __init__(self, kept: list[Artifact], records_by_id: Any = None):
+        self.kept = {a.id: a for a in kept}
+        self.records_by_id = records_by_id
+
+    def __call__(self, art: Artifact) -> str:
+        from .artifacts import basis_of
+        from .basis import basis_provenance
+
+        kinds = {i.source.kind for i in art.inputs}
+        if "record" in kinds and self.records_by_id is None:
+            from . import evidence_pool
+
+            self.records_by_id = evidence_pool.load(include_archived=True).records_by_id
+        records = self.records_by_id if "record" in kinds else {}
+        return basis_provenance(basis_of(art), records or {}, self.kept if "artifact" in kinds else {})
 
 
 def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]]) -> dict[str, list[Artifact]]:
@@ -231,17 +330,21 @@ def _runs(arts: Iterable[Artifact], scenarios: list[dict[str, Any]]) -> dict[str
 
 
 def trains(include_archived: bool = False, *, arts: Iterable[Artifact] | None = None,
-           scenarios: Iterable[dict[str, Any]] | None = None, record_lookup: Any = None) -> list[Train]:
+           scenarios: Iterable[dict[str, Any]] | None = None, record_lookup: Any = None,
+           records_by_id: Any = None) -> list[Train]:
     """The newest run of every scenario with a run on file (and every run no
     scenario claims), newest first. A train of an archived program is left
-    out unless the caller asks for archived programs (OF-BLD-016 §2.R)."""
+    out unless the caller asks for archived programs (OF-BLD-016 §2.R). Each
+    train's provenance is its run's worth now, as pureos_read gives it."""
     from . import artifacts, programs
 
     scenarios = list(seed_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
+    mark = _Marks(kept, records_by_id)
     out = []
     for runs in _runs(kept, scenarios).values():
-        tr = train_of(runs[0], scenarios=scenarios, runs=len(runs), record_lookup=record_lookup)
+        tr = train_of(runs[0], scenarios=scenarios, provenance=mark(runs[0]), runs=len(runs),
+                      record_lookup=record_lookup)
         try:
             hidden = programs.hides(tr.program, include_archived)
         except FileNotFoundError:
@@ -259,21 +362,24 @@ def summary(tr: Train) -> TrainSummary:
 
 
 def train(key: str, *, arts: Iterable[Artifact] | None = None, scenarios: Iterable[dict[str, Any]] | None = None,
-          record_lookup: Any = None) -> Train:
+          record_lookup: Any = None, records_by_id: Any = None) -> Train:
     """The train a scenario id or a run's artifact id names: the newest run
     of that scenario, or that run. A deep link opens whatever program it
-    belongs to, as every page opened by id does; the page says the program."""
+    belongs to, as every page opened by id does; the page says the program.
+    Its provenance is the run's worth now, as pureos_read gives it."""
     from . import artifacts
 
     scenarios = list(seed_scenarios() if scenarios is None else scenarios)
     kept = list(artifacts.all_artifacts() if arts is None else arts)
+    mark = _Marks(kept, records_by_id)
     runs = _runs(kept, scenarios)
     if key in runs:
-        return train_of(runs[key][0], scenarios=scenarios, runs=len(runs[key]), record_lookup=record_lookup)
+        a = runs[key][0]
+        return train_of(a, scenarios=scenarios, provenance=mark(a), runs=len(runs[key]), record_lookup=record_lookup)
     for group in runs.values():
         for a in group:
             if a.id == key:
-                return train_of(a, scenarios=scenarios, runs=1, record_lookup=record_lookup)
+                return train_of(a, scenarios=scenarios, provenance=mark(a), runs=1, record_lookup=record_lookup)
     other = next((a for a in kept if a.id == key), None)
     if other is not None:
         raise TrainNotFound(f"artifact {key} is a {other.tool} artifact, not a Proforma run; a train is read from a run")
