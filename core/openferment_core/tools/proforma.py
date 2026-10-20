@@ -19,7 +19,7 @@ person's, in Proforma.
 stover ethanol design as `biorefineries.cornstover` builds it, with every
 setting the package's own. Its stored run comes back as one `Evidence`, the
 price per gallon; with none stored the tool refuses. It runs nothing here
-either: a person runs the benchmark in Proforma → BioSTEAM.
+either: a person runs the benchmark in Proforma, on the corn stover reference card or its page (/proforma/reference/cornstover_benchmark).
 
 `run_flowsheet` takes a scenario id and nothing else, and runs the scenario
 as the service binds it: a free write through `proforma.run` (compute, no
@@ -81,7 +81,7 @@ class SellingPriceInput(BaseModel):
 def _benchmark() -> ToolResult:
     art = proforma.stored_benchmark()
     if art is None:
-        return ToolResult(error=f"{NAME} refused: the benchmark has not been run on this service. A person runs it in Proforma → BioSTEAM.")
+        return ToolResult(error=f"{NAME} refused: the benchmark has not been run on this service. A person runs it in Proforma, on the corn stover reference card or its page (/proforma/reference/cornstover_benchmark).")
     ev = proforma.benchmark_evidence(art)
     o = art.output
     return ToolResult(

@@ -6,11 +6,15 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 
 ## The active build (OF-BLD-019)
 
-OF-BLD-019 (Proforma stands on BioSTEAM) runs on `claude/of-bld-019-proforma`, cut from
+OF-BLD-019 (Proforma stands on BioSTEAM) ran on `claude/of-bld-019-proforma`, cut from
 `main` at `a261f30`. Its document is `docs/build/OF-BLD-019.md` (prompt
-`docs/build/PROMPT-019.md`); its commits are `OF-BLD-019 §n.m: <what>`; it follows
+`docs/build/PROMPT-019.md`); its commits are `OF-BLD-019 §n.m: <what>`; it followed
 OF-BLD-014 Part A with OF-BLD-016's amendments below, a nine-hour clock and a 2.00 USD cap.
-"Next phase" on this branch means the first `OF-BLD-019 §` step missing from its log.
+**Every step of it is built** (§7.R and §7.T the last two; what it built is *Proforma on
+BioSTEAM* below, and STATE.md's `## OF-BLD-019` section is its log). Its pull request is
+`claude/of-bld-019-proforma → main`; Sean merges it, then follows the document's
+Appendix 1 on the Mini (`deploy.sh --keep-decisions`, `pnpm data:pull`, the kickstart,
+`pnpm ready`, `brew install graphviz`) and types `sc-yeast-1`'s three assumptions.
 
 ## The previous build (OF-BLD-016)
 
@@ -700,7 +704,7 @@ Mini, which serves `main` (D8).
   (the question as title, units, CSV, sources, the basis of anything
   computed, and what would fill it when empty). `pnpm check:figures` holds
   it; `recharts` stays in Compare and ProformaScenario alone, for their
-  authored surfaces (OF-BLD-019 Phase 3, below). Settings →
+  authored surfaces (*Proforma on BioSTEAM*, below). Settings →
   Figure grammar (`/settings/figures`) is the written definition, drawn over
   the newest kept `geneos.ceiling` and `geneos.frontier` artifacts from
   `/api/biorepo/artifacts`, else the legend alone with where to compute one.
@@ -774,93 +778,60 @@ Mini, which serves `main` (D8).
   (Runbooks → Depositions, the Time series panel). `growth_forecast` is the
   fifth tool.
 
-## Proforma prices a flowsheet BioSTEAM ran (OF-BLD-014 Phase 8)
+## Proforma on BioSTEAM (OF-BLD-014 Phase 8, OF-BLD-019)
 
-- **BioSTEAM lives in the Proforma worker.** `biosteam` is imported in
-  `workers/proforma_worker.py` and `flowsheets/` alone (`test_workers`).
-  `proforma.py` keeps one warm `SimWorker`; `GET /api/proforma/status`
-  answers cold, starting, ready or failed, and `OPENFERMENT_WARM_PROFORMA=1`
-  starts it with the service. `pnpm test:sim` (marker `sim`) runs the real
-  worker in verify; `pnpm test:slow` (marker `slow`) holds the benchmark, the
-  corn plant to its package's test, and the PHA and glucose-to-ethanol
-  flowsheets, outside verify.
-- **The benchmark comes first.** `biorefineries.cornstover` with its own
-  defaults must give 1.968 USD per gallon within 0.5 % (B.3); it is an
-  artifact sourced `model`. `GET /api/proforma/benchmark` reads, POST runs.
-- **`pha_sugar_v0` holds no input value.** Sugar and its dilution water are
-  two streams, so sugar is priced on sugar alone. `tea._sales` is reset
-  before every `solve_price`: the solver starts from the last answer, and a
-  price would otherwise depend on run order. An infeasible case names its
-  reason: carbon, oxygen (BioSTEAM's own "infinite flow rate of gas"), or
-  the fermenter's balance.
-- **Every input names its source.** `proforma.bind` binds the PHA draft to
-  thread P records of a sugar or hydrolysate feed through the aggregate gate
-  and `units.py` (every other flowsheet binds by its shelf entry, below), or
-  to a named person's assumption (kept in the Durable tier, merged by input
-  key); an input with neither refuses the run with a 422. A run is one
-  artifact, `demo` while any assumption remains. Spearman uses averaged ranks
-  and skips an input with no spread. `selling_price` is the sixth tool and
-  never runs a scenario; given `proforma_benchmark` it cites the stored
-  benchmark run (the NREL 2011 corn stover design) in USD per gallon. The double's Proforma fixtures come from
-  `demo.py --prototype` with a STAND-IN evaluator in place of BioSTEAM.
-- **Postdoc runs a flowsheet and reads its streams** (OF-BLD-019 §6.1).
-  `run_flowsheet` takes a scenario id and nothing else and runs it as the
-  service binds it: a free write through `proforma.run` (compute, no model
-  money), at no gate, audited with the model as agent. The service holds no
-  person's assumption, so an input no record binds waits and the tool returns
-  the 422's words. It and `proforma_write`'s `run` are one function,
-  `writes.run_scenario`, so `check:tools` reads the one call to `proforma.run`
-  in `writes.py`; its rule 2b fails when any other tool file reaches what
-  keeps a Proforma run or writes an audit line. That is found, never listed
-  (§6.R): every function of the service that calls `artifacts.compute` for a
-  `proforma.run`, `proforma.reference` or `proforma_benchmark` artifact (or
-  for a tool the check cannot name) or `audit.append`, and every function
-  that reaches one, each name followed through its import as rule 2 follows
-  it; a tool file may also not call `artifacts.compute` for a run, hand a
-  store module around bare or import by name at run time.
-  `core/tests/test_check_tools.py` plants each way round in a copy of the
-  package. `stream_table` reads a `proforma.run` or `proforma.reference`
-  artifact's stream table through `proforma.tables_of`,
-  cut to the cap (feeds and products first, the count left out said), the
-  whole table in `ToolResult.data`, which no model reads. Both return the run
-  as one `Evidence` whose id is the artifact's, so a claim cites the run as it
-  cites a ceiling, and `proforma_read` lists reference runs too.
-
-## The shelf (OF-BLD-019 Phase 2)
-
-- **The shelf is data, served without BioSTEAM.** `flowsheets/shelf.py` (a
-  subprocess test holds it free of BioSTEAM) declares a `FlowsheetInfo` for
-  each of four: `cornstover_benchmark` (a reference, no program),
-  `corn_drygrind` (a reference, yeast), `ethanol_glucose_v0` (yeast) and
-  `pha_sugar_v0` (pha). `toy` sits in `TEST_ONLY`, is never served, and
-  `shelf.info` refuses it without `allow_toy`; `flowsheets.KNOWN` is the
-  shelf's ids and the toy's. `GET /api/proforma/shelf?includeArchived=`
-  serves it, an archived program's entry left out unless asked. The shelf's
-  models and the table models are in `types.ts` and `PAIRS`. A seed scenario
-  names its flowsheet by `modelId`, and `check:seed` holds it to
-  `BIOSTEAM_FLOWSHEETS`.
-- **One artifact per run (D1), read through `tables_of`.** A scenario's run is
-  one `proforma.run` artifact (D1 calls it `proforma_run`; the tree kept the
-  tool's name), versioned `RUN_VERSION` with the biosteam and biorefineries
-  versions: quantiles, histogram, Spearman, grid, and the base case's `tea`,
-  `streams`, `units`, `utilities`, `diagram`, `diagramNote`, `unitOrder` and
-  `tableUnits`, which the worker's `run` op reads from BioSTEAM's objects
-  with the product at its solved price. The TEA lines sum to the price;
-  capital recovery is `TEA.sales − TEA.AOC` at that price, because the TEA
-  keeps no annualised figure. `proforma.tables_of(art)` is the one reader;
-  nothing recomputes on read. `ProformaRunRequest.samples` defaults to
-  `proforma.SAMPLES` and is refused past `MAX_SAMPLES` (D7).
+- **BioSTEAM lives in the Proforma worker.** `biosteam` and `thermosteam`
+  are imported in `workers/proforma_worker.py` and `flowsheets/` alone
+  (`test_workers` greps both), and `biorefineries` in `flowsheets/` alone
+  (by practice: no test greps it). `proforma.py` keeps one warm `SimWorker`;
+  `GET /api/proforma/status` answers cold, starting, ready or failed, and
+  `OPENFERMENT_WARM_PROFORMA=1` starts it with the service. `pnpm test:sim`
+  (marker `sim`) runs the real worker in verify; `pnpm test:slow` (marker
+  `slow`) holds the benchmark, the corn plant to its package's test, and the
+  PHA and glucose-to-ethanol flowsheets, outside verify.
+- **The shelf is data, served without BioSTEAM** (D2). `flowsheets/shelf.py`
+  (a subprocess test holds it free of BioSTEAM) declares a `FlowsheetInfo`
+  for each of four: the two references `cornstover_benchmark` (no program)
+  and `corn_drygrind` (yeast), and the two scenario flowsheets
+  `ethanol_glucose_v0` (yeast, `sc-yeast-1`) and `pha_sugar_v0` (pha,
+  `sc-pha-1`). `toy` sits in `TEST_ONLY`, is never served, and `shelf.info`
+  refuses it without `allow_toy`; `flowsheets.KNOWN` is the shelf's ids and
+  the toy's. `GET /api/proforma/shelf?includeArchived=` serves it, an
+  archived program's entry left out unless asked. The shelf's models and the
+  table models are in `types.ts` and `PAIRS`. A seed scenario names its
+  flowsheet by `modelId`, and `check:seed` holds it to `BIOSTEAM_FLOWSHEETS`.
+- **One artifact per run, and every reader reads it** (D1). A scenario's run
+  is one `proforma.run` artifact (D1 calls it `proforma_run`; the tree kept
+  the tool's name), versioned `RUN_VERSION` with the biosteam and
+  biorefineries versions: quantiles, histogram, Spearman (service-side,
+  averaged ranks, an input with no spread skipped), grid, and the base case's
+  `tea`, `streams`, `units`, `utilities`, `diagram`, `diagramNote`,
+  `unitOrder` and `tableUnits`, read from BioSTEAM's objects with the product
+  at its solved price. The TEA lines sum to the price; capital recovery is
+  `TEA.sales − TEA.AOC` at that price, because the TEA keeps no annualised
+  figure. `proforma.tables_of(art)` is the one reader (Proforma's pages,
+  pureOS's train, `stream_table`, the MCP server); nothing recomputes on
+  read. `ProformaRunRequest.samples` defaults to `proforma.SAMPLES` and is
+  refused past `MAX_SAMPLES` (D7).
+- **`model` is a basis source; the run's provenance is computed** (D3 as the
+  tree has it: `PROVENANCE_RANK` has no `model`). A reference run's inputs
+  are `model` (the package, BioSTEAM, thermosteam) and `convention`, so it is
+  `computed`, as the stored benchmark is. A scenario's run is the weakest of
+  `computed`, its records' and any fit's, and `demo` while an assumption
+  remains.
 - **A reference biorefinery runs whole** (`proforma.reference`,
   `REFERENCE_VERSION`): the worker's `reference` op builds the package's plant
-  afresh, reads every table and the quantities its package's test asserts,
-  and rounds every number to `REFERENCE_DIGITS` significant digits (the
-  basis's `precision` convention: BioSTEAM sums a set of units in an order
-  that moves the last digits). `GET /api/proforma/reference/{id}` reads and
-  starts nothing, `POST` runs; 404 for an id that is not a reference on the
-  shelf, 503 on a worker error. The worker, `runnable` and `run_flowsheet`
-  refuse a reference case by case. The benchmark's endpoints and artifact are
-  unchanged. A reference run's inputs are `model` and `convention` sources, so
-  its provenance is `computed` (D3's `model` is a basis source kind here).
+  afresh on its own defaults, reads every table and the quantities its
+  package's test asserts, and rounds every number to `REFERENCE_DIGITS`
+  significant digits (the basis's `precision` convention: BioSTEAM sums a set
+  of units in an order that moves the last digits). `GET
+  /api/proforma/reference/{id}` reads and starts nothing, `POST` runs; 404 for
+  an id that is not a reference on the shelf, 503 on a worker error. The
+  worker, `runnable` and `run_flowsheet` refuse a reference case by case. The
+  benchmark (`biorefineries.cornstover`, 1.968 USD per gallon within 0.5 %,
+  OF-BLD-014 B.3) keeps `GET`/`POST /api/proforma/benchmark` and its stored
+  artifact unchanged; every reference card reads the reference endpoint, and
+  a `proforma_benchmark` artifact is read only when that answer holds no run.
 - **The package's own test is the authority.** `shelf.package_regression(id)`
   parses the installed `biorefineries/tests/test_biorefineries.py` with `ast`,
   found through the distribution's metadata and never imported; no package
@@ -876,226 +847,223 @@ Mini, which serves `main` (D8).
   2.54.0 declares one, so `corn.load()` stops without it. No number of the
   package's changes; `shelf.REFERENCE_COMPAT` puts it in every corn run's
   basis as the `compatibility` convention.
-- **The warm worker keeps no plant's settings** (§2.R). `package_defaults()`
-  gives every loaded `biorefineries` `chemical_cache` function an empty cache
-  (the packages share Chemical objects by name), runs
+- **The warm worker keeps no plant's settings.** `package_defaults()` gives
+  every loaded `biorefineries` `chemical_cache` function an empty cache (the
+  packages share Chemical objects by name), runs
   `bst.process_tools.default()` (tickets cleared too), and on exit puts back
   what the worker held: CEPCI, the power price and factors, the heat agents,
   the tickets, thermosteam's chemical cache, the main flowsheet, the thermo
-  and each package's chemicals. Every plant builds inside it: a reference
-  run, the benchmark (afresh, `cs.Biorefinery(load=False, save=False)`), and
-  a scenario flowsheet's first build (`built`). A scenario flowsheet sets
-  `default_utilities()` and `default_CEPCI()` at the start of every case and
-  reads them back (`flowsheets.utility_settings`); every priced run's basis
-  carries `utility prices and cost index` (`model`, BioSTEAM's version).
-  `test_the_warm_worker_keeps_no_plants_settings` (sim) holds three orders
-  in three workers to 1e-9.
+  and each package's chemicals. Every plant builds inside it. A scenario
+  flowsheet sets `default_utilities()` and `default_CEPCI()` at the start of
+  every case and reads them back (`flowsheets.utility_settings`); every
+  priced run's basis carries `utility prices and cost index` (`model`).
+  `test_the_warm_worker_keeps_no_plants_settings` (sim) holds three orders in
+  three workers to 1e-9.
 - **The diagram is a basis input** (D8). `diagram` (`convention`) says "drawn
   by Graphviz" when `dot` is on the path of the host that made the run
-  (`proforma.drawn_here()`), else not drawn; the worker draws as the basis
-  says, so a host with Graphviz keeps a run of its own. `NO_GRAPHVIZ` and
+  (`proforma.drawn_here()`), else not drawn, and the unit list in run order
+  stands in; a host with Graphviz keeps a run of its own. `NO_GRAPHVIZ` and
   `DOT_MISSING` speak of the host that made the run. `ready.py`'s `graphviz`
-  row warns at most. `demo.rebuild_prototype` pins `drawn_here` to False, so
-  the fixtures are the same on every host.
-- **The run contract** (§2.3). `GET /api/proforma/scenarios` binds each seed
-  BioSTEAM scenario the switch shows (`seed_scenarios`, read from
+  row warns at most. `demo.rebuild_prototype` pins `drawn_here` to False.
+- **No input value in a flowsheet file** (D4). `pha_sugar_v0`: sugar and its
+  dilution water are two streams, so sugar is priced alone; `tea._sales` is
+  reset before every `solve_price` (the solver starts from the last answer);
+  an infeasible case names its reason (carbon, oxygen, the fermenter's
+  balance). `ethanol_glucose_v0` (an AST test allows 0 and 1): glucose and
+  water as two streams, a `bst.BatchBioreactor` at the bound yield over the
+  theoretical yield, `tau` titre over productivity, then
+  `biorefineries.ethanol`'s purification train; the theoretical yield
+  (`Glucose -> 2 Ethanol + 2 CO2` at thermosteam's molecular weights), the
+  vessel limit, the corn plant's TEA settings and the purity are read back,
+  never typed. Each case empties the train's recycle first; a replay is held
+  to 1e-9, not bitwise.
+- **Every input names its source.** `bind_inputs` binds every flowsheet but
+  the PHA draft by its shelf entry: the input's fields in order, on its
+  program's papers, through the aggregate gate, a carbon source in
+  `FEED_CARBON` (glucose; a record naming none is counted out), `units.py`
+  into the input's unit. The feed binds `medium_component_conc` (there is no
+  `glucose_initial_conc` field), titre, yield and productivity their
+  `ethanol_*` fields; plant scale and glucose price are assumptions;
+  `ethanol_purity` is a convention in every basis, never a scenario input.
+  `proforma.bind` binds the PHA draft to thread P records of a sugar or
+  hydrolysate feed. Otherwise an input takes a named person's assumption
+  (Durable, merged by input key) or a fermOS fit a person chose (below), or
+  it waits, and a run with an input waiting is a 422 naming it.
+- **The run contract.** `GET /api/proforma/scenarios` binds each seed
+  BioSTEAM scenario the switch shows (`seed_scenarios`, from
   `modules.json`) over its own program's records whatever the switch says;
   `GET /api/proforma/bind?flowsheet=` binds a shelf flowsheet as a scenario
   made in the browser shows it, id and name empty; `POST /api/proforma/run`
   takes `scenarioId` and, for a scenario made in the browser, `flowsheet` (a
-  seed scenario runs its own, and naming another is refused), with
-  `assumptions`, `fits` (§5.1), `samples`, `seed` and `host`. Every refusal is
-  a 422 in words: a reference, the toy, an unknown id, an authored seed
-  scenario, an archived program's flowsheet on `bind` with the switch off, a
-  non-finite assumption, a negative seed, an input that waits, and a run
-  with no feasible sample (each reason counted, the kept artifact named).
-  Every run's basis carries `scenario`, a `convention`, which
-  `basis_provenance` ignores; `latest_run` keeps to its scenario.
-- **Glucose to ethanol holds no number** (`ethanol_glucose_v0.py`; an AST
-  test allows 0 and 1). `bind_inputs` binds every flowsheet but the PHA draft
-  by its shelf entry: the input's fields in order, on its program's papers,
-  through the aggregate gate, a carbon source in `FEED_CARBON` (glucose; a
-  record naming none is counted out), `units.py` into the input's unit; else
-  a named person's assumption; else it waits. The feed binds
-  `medium_component_conc` (there is no `glucose_initial_conc` field), titre,
-  yield and productivity their `ethanol_*` fields, plant scale and glucose
-  price are assumptions, and `ethanol_purity` is a convention in every basis,
-  never a scenario input. The theoretical yield (`Glucose -> 2 Ethanol + 2
-  CO2` at thermosteam's molecular weights), the vessel limit
-  (`AnaerobicBioreactor.V_max_default`), the TEA settings and the purity are
-  read back, never typed. Each case empties the train's recycle first; a
-  replay is held to the last digits (1e-9), not bitwise.
-
-## Proforma's screens (OF-BLD-019 Phase 3)
-
+  seed scenario runs its own; naming another is refused), with
+  `assumptions`, `fits`, `samples`, `seed` and `host`. Every refusal is a 422
+  in words: a reference, the toy, an unknown id, an authored seed scenario,
+  an archived program's flowsheet on `bind` with the switch off, a
+  non-finite assumption, a negative seed, an input that waits, a run with no
+  feasible sample (each reason counted, the kept artifact named). Every
+  run's basis carries `scenario`, a `convention` `basis_provenance` ignores;
+  `latest_run` keeps to its scenario, and `GET /api/proforma/runs?scenarioId=`
+  serves it.
 - **Four places, two reserved segments.** `/proforma` is the index
   (`Proforma.tsx`: Reference runs, Flowsheets, the scenarios the switch
-  shows); `/proforma/scenario/:id` the scenario page; `/proforma/reference/:id`
-  a reference biorefinery's page (`ProformaReference.tsx`, mounted with
-  `key={id}` so a run in flight lands on the page that asked); Compare stays
-  `/biorepo/compare`. `scenario` and `reference` are reserved under
-  `/proforma`: the old `/proforma/:id` pattern skips both, `/proforma/reference`
-  alone is the index, `/proforma/benchmark` and `/proforma/biosteam` redirect
-  to `/proforma/reference/cornstover_benchmark`, and `check:seed` refuses a
-  scenario with either id. Every reference card reads
-  `GET /api/proforma/reference/{id}`, the benchmark included; a
-  `proforma_benchmark` artifact is read only when that answer holds no run.
+  shows; nothing disabled for an empty list, and `check:store` refuses
+  `disabled` on the New scenario buttons in any spelling);
+  `/proforma/scenario/:id` the scenario page; `/proforma/reference/:id` a
+  reference's page (`ProformaReference.tsx`, mounted with `key={id}`);
+  Compare stays `/biorepo/compare`. `scenario` and `reference` are reserved
+  under `/proforma`, `/proforma/reference` alone is the index,
+  `/proforma/benchmark` and `/proforma/biosteam` redirect to
+  `/proforma/reference/cornstover_benchmark`, and `check:seed` refuses a
+  scenario with either id.
 - **New scenario makes a `biosteam` scenario and nothing else** (D5).
   `NewScenarioDialog` offers the shelf's non-reference flowsheets, a name and
-  the flowsheet's own program (`programsFor`; an archived one only with the
-  switch on); the palette's *New Proforma scenario* opens it. `createScenario`
-  gives a time-based `sc-…` id (`timeId`: `nextId` restarts on a reload),
-  `modelId` = `flowsheetId`, no dims, point or assumptions. Nothing on the
-  index is disabled for an empty list; `check:store` reads the New scenario
-  buttons' tags and refuses `disabled` in any spelling.
-- **Durable (D6):** `createdScenarios` (the whole scenario, by id),
-  `scenarioRuns` (a seeded scenario's newest run id), `pinnedScenarios`
-  (seeded pins; a made scenario keeps its own `pinned`), `proformaAssumptions`
-  and `proformaFits`, through `snapshotOf` / `applyDurable`, all dropped by
-  *Clear this browser's data*; `check:store` round-trips each. The service
-  keeps the runs and no scenario made here: one runs by the flowsheet it
-  names, and its run's basis carries `scenario`.
+  the flowsheet's own program (an archived one only with the switch on); the
+  palette's *New Proforma scenario* opens it. `createScenario` gives a
+  time-based `sc-…` id (`nextId` restarts on a reload), `modelId` =
+  `flowsheetId`. **Durable (D6):** `createdScenarios`, `scenarioRuns`,
+  `pinnedScenarios`, `proformaAssumptions` and `proformaFits`, through
+  `snapshotOf` / `applyDurable`, all dropped by *Clear this browser's data*;
+  `check:store` round-trips each. The service keeps the runs and no scenario
+  made here.
 - **A page reads one run and computes nothing.** `BiosteamScenario`
-  (ProformaScenario.tsx) serves a seed BioSTEAM scenario and a made one alike;
-  every section under Run is `RunReport` and its kin, exported from
-  `ProformaBiosteam.tsx`, over a `RunView` (`runViewOfArtifact`,
-  `runViewOfResult`; `runViewOfReference` for a `proforma.reference` run, one
-  case). The newest run is the service's (`proformaNewestRun` →
-  `GET /api/proforma/runs?scenarioId=`, `proforma.latest_run`), else this
-  browser's (`newestRunId`); the service wins. The waterfall closes on the
-  run's `basePrice` (a reference's on the TEA's `productPrice`), never a
-  browser sum; a reference page reads its package test through
-  `referenceChecks` and types no package value, and shows the TEA's own
-  installed equipment cost; Compare subtracts and sums nothing. CSVs export
-  the run's own numbers; `readBackRows` credits each read-back value to who
-  set it; `QUESTIONS[flowsheet]` are a flowsheet's own; times print through
-  `stamp`, UTC named. `check:store` holds each by source.
+  (ProformaScenario.tsx) serves a seed scenario and a made one alike; every
+  section under Run is `RunReport` and its kin (`ProformaBiosteam.tsx`) over
+  a `RunView` (`runViewOfArtifact`, `runViewOfResult`, `runViewOfReference`).
+  The newest run is the service's (`proformaNewestRun`), else this
+  browser's. The waterfall closes on the run's `basePrice` (a reference's on
+  the TEA's `productPrice`), never a browser sum; a reference page reads its
+  package test through `referenceChecks` and shows the TEA's own installed
+  equipment cost; Compare subtracts and sums nothing; CSVs export the run's
+  own numbers; `readBackRows` credits each read-back value to who set it;
+  `QUESTIONS[flowsheet]` are a flowsheet's own; times print through `stamp`,
+  UTC named. `check:store` holds each by source.
 - **recharts stays in `ProformaScenario.tsx` and `Compare.tsx`**, for the
   authored surfaces alone (S1–S3 and `grids.ts` open the archived casein
   examples under their banner, D5). The BioSTEAM sections draw with the
-  grammar: `CostWaterfall.tsx` (a row per TEA line, no bar for a line with no
-  per-unit value, a credit runs back, closing on the run's price) and
-  `Tornado.tsx`, each with its own `toTable`, `ENCODING` and `FigureFrame`
-  (`check:figures` part 7). Home's pinned card says *Cost model v0* for an
-  authored surface alone.
-- **The double answers the run contract** from fixtures `demo.py
-  --prototype` writes with the stand-in evaluator: the shelf and
-  `scenarios` by the switch; `bind` from what the real code answered,
-  bindings and refusals, with `fits` from the recorded choices, any other a
-  422 in words; `run` a
-  seed by its id and a made scenario by its flowsheet, answered under the id
-  asked, refusing inputs that still wait; `runs` from what it answered
-  (`proformaRunsOnFile`, which a test may set or clear);
-  `reference/{id}` from `proforma-reference-<id>.json`, a 404 for any other
-  id.
-
-## pureOS reads the train, thermosteam answers (OF-BLD-019 Phase 4)
-
-- **A train is read from one run, never typed.** `pureos.py` reads a
-  `proforma.run` artifact through `proforma.tables_of` and nothing else (D1)
-  and simulates nothing; a `proforma.reference` run is not a train.
-  `GET /api/pureos/trains?includeArchived=` (`TrainSummary`, the newest run
-  of each scenario, newest first, an archived program's left out unless
-  asked) and `GET /api/pureos/train/{key}` (`Train`, by scenario id or run
-  artifact id; a 404 says how a run gets there) serve the browser;
-  `pureos_read`'s kinds `train` and `train-unit` read the same. A run
-  belongs to the scenario its basis input `scenario` names, else to the one
-  seed scenario whose `modelId` is its flowsheet, else it is known by its
-  artifact id. `train` is a reserved second segment under `/pureos`, and
-  `check:seed` fails on a BioSTEAM class that two vocabulary steps name.
-- **Recovery is by pass.** A unit's recovery is the product leaving by
-  outlets that lead on to the product stream over the product entering, never
-  outlets over inlets (one, by mass balance). What leads on is worked out
-  stream by stream through each sink unit's passes: a class in
-  `SEPARATE_PASSES` (`HXprocess` alone, read from BioSTEAM's source) sends
-  inlet i to outlet i, every other unit is one pass. Product a unit on the
-  path takes in and lets out by no outlet is lost there. The overall recovery
-  is the product stream's product over the sum of it and all lost on the path.
-- **A train's provenance is recomputed on read** (`_Marks`:
-  `basis_provenance` over the run's inputs as they stand now), so the
-  endpoints and `pureos_read` give one train one mark; never the stored one.
-- **thermosteam runs in the Proforma worker** (op `thermo_props`) and is
-  imported in `workers/proforma_worker.py` and `flowsheets/` alone
-  (`test_workers`); `thermo.py` talks to it through the JSON contract. A
+  grammar: `CostWaterfall.tsx` and `Tornado.tsx`, each with its own
+  `toTable`, `ENCODING` and `FigureFrame` (`check:figures` part 7). Home's
+  pinned card says *Cost model v0* for an authored surface alone.
+- **pureOS reads the train, never types it.** `pureos.py` reads a
+  `proforma.run` artifact through `tables_of` and simulates nothing; a
+  `proforma.reference` run is not a train. `GET
+  /api/pureos/trains?includeArchived=` (`TrainSummary`, the newest run of each
+  scenario) and `GET /api/pureos/train/{key}` (`Train`, by scenario id or run
+  artifact id; a 404 says how a run gets there); `pureos_read`'s kinds
+  `train` and `train-unit` read the same. A run belongs to the scenario its
+  basis names, else to the one seed scenario whose `modelId` is its
+  flowsheet, else to its artifact id. `train` is reserved under `/pureos`,
+  and `check:seed` fails on a BioSTEAM class two vocabulary steps name.
+  Recovery is by pass: the product leaving by outlets that lead on to the
+  product stream over the product entering, never outlets over inlets; a
+  class in `SEPARATE_PASSES` (`HXprocess` alone) sends inlet i to outlet i;
+  product a unit on the path lets out by no outlet is lost there; the
+  overall recovery is the product stream's product over it and all lost on
+  the path. A train's provenance is recomputed on read (`_Marks`), never the
+  stored one.
+- **thermosteam answers, never guesses** (D9), in the Proforma worker (op
+  `thermo_props`); `thermo.py` talks to it through the JSON contract. A
   question names a run's stream (artifact id and stream id) or a preset
   (`ethanol-water-azeotrope`, `beer-at-titre-of` an `ethanol_titre` record)
   and never a number; a T or P nobody gave is the library's default, said
   so. The answer is one `thermo_props` artifact with thermosteam's version in
   its basis. `POST /api/thermo/props` asks; `GET` returns the stored answer
-  or `{"artifact": null}`, starts no simulator, and recomputes the mark.
-  Both answer 404 for what is not on file, **409 for a run's or an answer's
-  file damaged on disk**, 422 for a refusal in words (a chemical the library
-  lacks, a stream in more than one phase); the POST 503 when the worker
-  cannot answer.
-- **`thermo_props` is the registry's thirtieth name, a loose read**: each
-  property its own `Evidence`, `<artifact id>:<property>`, cited like any
-  computed value; with the switch off a run of an archived program is
-  refused. `PropertiesPanel` (pureOS → Train, fermOS) aborts an ask its
-  question no longer names, is keyed by its subject, and keeps the ask
-  button after a 503.
-
-## The bridges (OF-BLD-019 Phase 5)
-
-- **A fermOS fit is a source, never a copy** (D10). `proforma.fit_info`
-  reads what one kept `kinetic_fit` or `growth_forecast` gives `FIT_KEYS`
-  (titre, yield, productivity), or why not; `GET /api/fermos/fits?flowsheet=`
-  lists every one (`FermosFitInfo`, `FitFeed`, in `PAIRS`) and keeps nothing.
-  There is no `batch_simulation`. A kinetic fit is forecast under its run's own
-  starting values and length (`fermos.forecast_for`) and kept nowhere. Titre
-  is the forecast's final product, yield its `yieldInterval` (product made over
-  sugar used: the kinetic fit holds no Yp/s), productivity the titre over the
-  batch time, the hour the median sugar runs out. `fermos.to_run_out` finds
-  that hour between grid points (linear between the last point with sugar and
-  the first without, the grid drawn again to that bracket until a step is at
-  most `RUN_OUT_STEP`, 2 %, of the hour, at most `RUN_OUT_PASSES` times) and
-  draws the forecast again to it with the same fit, starting values and seed,
-  kept nowhere, so a feed does not move with how long the forecast ran.
-  Refused in words naming the parameter: μ or Xmax unidentified (and what run
-  would identify it), no Yp/s, no sugar series, sugar that does not run out,
-  a product series naming another product (`PRODUCT_WORDS`), a damaged fit
-  file (`fit_of` refuses it; the list keeps the rest). `forecast` compares
-  units through `units.normalize`; `fermos-1` is not bumped.
-- **A person chooses, input by input; a model never does.**
+  or `{"artifact": null}` and starts no simulator. Both answer 404 for what is
+  not on file, **409 for a run's or an answer's file damaged on disk**, 422
+  for a refusal in words; the POST 503 when the worker cannot answer.
+  `PropertiesPanel` (pureOS → Train, fermOS) aborts an ask its question no
+  longer names, is keyed by its subject, and keeps the ask button after a
+  503.
+- **A fermOS fit is a source, never a copy** (D10). `proforma.fit_info` reads
+  what one kept `kinetic_fit` or `growth_forecast` gives `FIT_KEYS` (titre,
+  yield, productivity), or why not; `GET /api/fermos/fits?flowsheet=` lists
+  every one (`FermosFitInfo`, `FitFeed`) and keeps nothing. There is no
+  `batch_simulation`. A kinetic fit is forecast under its run's own starting
+  values and length and kept nowhere. Titre is the forecast's final product,
+  yield its `yieldInterval`, productivity the titre over the hour the median
+  sugar runs out, which `fermos.to_run_out` finds between grid points
+  (`RUN_OUT_STEP`, `RUN_OUT_PASSES`) and draws the forecast again to.
+  Refused in words naming the parameter: μ or Xmax unidentified, no Yp/s, no
+  sugar series, sugar that does not run out, another product
+  (`PRODUCT_WORDS`), a damaged fit file (the list keeps the rest).
+  `forecast` compares units through `units.normalize`; `fermos-1` is not
+  bumped.
+- **A person chooses the fit, input by input; a model never does.**
   `ProformaRunRequest.fits` and `?fits=` on `/bind` and the ceiling check
-  carry the choice. `apply_fits` binds each chosen input to the artifact
+  carry the choice; `apply_fits` binds each chosen input to the artifact
   (`binding: 'artifact'`, sampled across its band) and the basis names it per
-  input (`<key> fit`, `… fit low`, `… fit high`) with the `fit batch time`, so
-  the fit's provenance enters through `basis_provenance`. **A fit's
-  productivity feeds only beside titre from the same fit**; otherwise refused,
-  naming what titre is, and never bound to the fit behind the person's back.
-  The browser keeps the choice in `proformaFits` (Durable, by scenario and
-  input); **Use a fermOS fit** on the scenario page and **Send to Proforma**
-  on fermOS → Forecast (`?fit=` on the scenario's page) choose, and stopping
-  one fit clears only the inputs it feeds. No tool reads or writes fits.
+  input (`<key> fit`, `… fit low`, `… fit high`) with the `fit batch time`. A
+  fit's productivity feeds only beside titre from the same fit; otherwise
+  refused, naming what titre is. **Use a fermOS fit** on the scenario page
+  and **Send to Proforma** on fermOS → Forecast (`?fit=`) choose;
+  `proformaFits` keeps it, and stopping one fit clears only the inputs it
+  feeds. No tool reads or writes fits.
 - **The ceiling check is a flag, never a bound** (D11).
-  `proforma.ceiling_check` (`GET /api/proforma/ceiling-check`; `CeilingCheck`
-  and `CeilingRow` in `PAIRS`) binds the yield as the page binds it and sets
-  it beside the newest stored `geneos.ceiling` of each shelf model of the
-  scenario's organism on `CEILING_SUGAR` (glucose for both flowsheets), in
-  g g⁻¹ through `units.convert` and in mol mol⁻¹ at the artifact's own
-  `molPerMol` over `gPerG`. A value or high end above is `above`, naming the
-  records above; nothing is clamped (a test holds the binding, the run and
-  its artifact id unchanged). Computed on read, kept nowhere, it starts no
-  worker; every refusal is a 422 in words. The PHA draft's records are read
-  unclipped (`cap=None`) while its run still clips (`PHA_CLIP_NOTE`).
-- **How a strain maps to a model.** `Scenario` carries no strain: the
-  organism is the host filter when one is chosen, else each bound record's
-  strain, else the species its `organismText` opens with, else the program's
-  one species when every host it catalogues is of one species. A shelf model
-  is the scenario's when its `host` is one of those strains (`match: strain`)
-  or of those species (`match: species`, said on the row); a model with no
-  host maps to none. `organismWords` counts each kind as it is (3 of
-  `sc-yeast-1`'s 18 yield records name CEN.PK113-7D, 15 name no catalogued
-  strain), and each row says how many records it covers. With no ceiling on
-  file the card names `computeAt`, and never sends a model whose shelf `feed`
-  is another sugar (RehMBEL1391) to compute on glucose. GeneOSModel lists the
-  scenarios above the chosen model's ceiling.
-- **The double** answers both from what `demo.py --prototype` records
-  through the real code over a STAND-IN ethanol run and a STAND-IN ceiling
-  (`demo`): `fermos-fits.json`, `proforma-bind-fits.json` (with `others`),
-  `proforma-ceiling-check.json` (with `fitted`), picked by
-  `flags.fermosFitsOnFile` and `flags.ceilingOnFile`, both off as a fresh
-  install starts; any other choice of fits is a 422 in words.
+  `proforma.ceiling_check` (`GET /api/proforma/ceiling-check`; `CeilingCheck`,
+  `CeilingRow`) sets the yield, bound as the page binds it, beside the newest
+  stored `geneos.ceiling` of each shelf model of the scenario's organism on
+  `CEILING_SUGAR` (glucose), in g g⁻¹ and mol mol⁻¹. Above is flagged, naming
+  the records; nothing is clamped (a test holds the binding, the run and its
+  artifact id unchanged). Computed on read, kept nowhere, no worker. The
+  organism is the host filter, else each record's strain, else the species
+  its `organismText` opens with, else the program's one species; a model
+  matches by strain or by species (said), and `organismWords` counts each
+  kind, and each row says how many records it covers. With no ceiling on
+  file the card names `computeAt` and never sends a model whose shelf `feed`
+  is another sugar (RehMBEL1391) to compute on glucose; every refusal is a
+  422 in words. The PHA draft's records are read unclipped while its run
+  still clips (`PHA_CLIP_NOTE`). GeneOSModel lists the scenarios above a
+  ceiling.
+- **The tools.** `selling_price` (the sixth) never runs: it cites the newest
+  kept run of a seed BioSTEAM scenario the switch shows, or, given
+  `proforma_benchmark`, the stored benchmark in USD per gallon.
+  `run_flowsheet` takes a scenario id and nothing else and runs it as the
+  service binds it: a free write through `proforma.run` at no gate, audited
+  with the model as agent; the service holds no person's assumption, so an
+  input no record binds waits and the tool returns the 422's words. It and
+  `proforma_write`'s `run` are one function, `writes.run_scenario`, and
+  `check:tools` rule 2b fails when any other tool file reaches what keeps a
+  Proforma run or writes an audit line. That is found, never listed: every
+  function of the service that calls `artifacts.compute` for a
+  `proforma.run`, `proforma.reference` or `proforma_benchmark` artifact (or
+  for a tool the check cannot name) or `audit.append`, and every function
+  that reaches one, followed through imports; a tool file may also not call
+  `artifacts.compute` for a run, hand a store module around bare or import by
+  name at run time (`test_check_tools` plants each way round). `stream_table`
+  reads a run's or a reference's streams through `tables_of`, cut to the cap
+  (feeds and products first, the count left out said), the whole table in
+  `ToolResult.data`, which no model reads. `thermo_props` is a loose read, each property its own
+  `Evidence` (`<artifact id>:<property>`). Each returns the run as one
+  `Evidence` whose id is the artifact's; `proforma_read` lists reference runs
+  too; with the switch off every tool that reads a run refuses one of an
+  archived program (`module_stores.artifact_program`), while the MCP
+  server's `get_artifact` reads any kept artifact by id.
+- **The double** answers from fixtures `demo.py --prototype` writes with a
+  STAND-IN evaluator in place of BioSTEAM: the shelf and `scenarios` by the
+  switch; `bind` from what the real code answered (any other choice of fits a
+  422 in words); `run` a seed by its id
+  and a made scenario by its flowsheet, refusing inputs that wait; `runs`
+  from what it answered (`proformaRunsOnFile`); `reference/{id}` from
+  `proforma-reference-<id>.json`; trains, thermo answers, fits
+  (`fermos-fits.json`, `proforma-bind-fits.json`) and the ceiling check
+  (`proforma-ceiling-check.json`), the last two behind `flags.fermosFitsOnFile`
+  and `flags.ceilingOnFile`, both off as a fresh install starts.
+- **What waits for Sean.** `sc-yeast-1` binds feed, titre and yield to
+  thread Q records; productivity (all its records name no carbon source),
+  plant scale and glucose price wait for his assumptions, so no yeast run
+  is kept yet (STATE.md §7.1). `brew install graphviz` on the Mini draws the
+  diagram. Loosening the carbon-source rule is his call (§2.3).
+- **What the final review settled (§7.R).** A drawn diagram replays: the
+  worker renames BioSTEAM's address-named nodes in order of appearance
+  (`workers/dot_names.py`, `stable_names`, no BioSTEAM import) before
+  Graphviz draws. A second request while the worker starts waits on
+  `proforma._SETTLED` up to `START_TIMEOUT_S`, then says the simulator is
+  still starting or why it could not start, never "None". `?fits=` and
+  `?assumptions=` nested past Python's recursion limit are the 422s their
+  other refusals are. Compare reads `<key> fit` basis inputs as the input's
+  fermOS fit, with its artifact link. The double keeps two stand-in runs,
+  sc-pha-1's and sc-yeast-1's, and serves both trains
+  (`pureos-train-yeast.json`; `flags.pureosYeastOnFile`, on by default, turns
+  the yeast train off for an empty-state test).
 
 ## Runbooks keep score (OF-BLD-014 Phase 9)
 
@@ -1210,9 +1178,10 @@ Mini, which serves `main` (D8).
   opened by id. `proforma.scenario` and `run`, `rageval` (its `--thread`
   narrows the questions, never the index), and eval set O
   (`evalo.INCLUDE_ARCHIVED`). `ask:batch` follows the API's default, off.
-  The write tools and the compute tools (`yield_ceiling`, `selling_price`,
-  `growth_forecast`, `draft_runbook`) are filtered by nothing beyond the
-  pool they read.
+  With the switch off `yield_ceiling`, `selling_price`, `draft_runbook`,
+  `run_flowsheet` and `proforma_write`'s `run` refuse an archived target
+  named by id; `growth_forecast` and the other write tools are filtered by
+  nothing beyond the pool they read.
 - **`check:seed` holds the letters to the programs**: a thread with papers
   and no program, a program with no letter, a letter in two programs, a gap
   in the letters, and a `program` field naming nothing each fail it. The
@@ -1296,8 +1265,8 @@ Mini, which serves `main` (D8).
 - `docs/DEMO.md` — the one run sheet. `docs/TOOLS.md` — the tool registry,
   the gates, the program switch and the proposal rules.
 - A build's own document is the exception, for the length of its build
-  (OF-BLD-014's decision D1, kept by OF-BLD-015 and OF-BLD-016):
-  `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's and OF-BLD-016's
-  documents and prompts on the work branch, and OF-BLD-015's closing truth
+  (OF-BLD-014's decision D1, kept by OF-BLD-015, OF-BLD-016 and OF-BLD-019):
+  `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's, OF-BLD-016's and
+  OF-BLD-019's documents and prompts on the work branch, and OF-BLD-015's closing truth
   pass deletes the folder. OF-BLD-014's `docs/build/OF-BLD-014.md` and
   `PROMPT.md` are still on `main`, its §10.4 having been left undone.
