@@ -386,10 +386,8 @@ def yield_cap() -> tuple[float, str] | None:
 def bind(records: list[dict], host: str | None = None, assumptions: list | None = None,
          cap: tuple[float, str] | None = None) -> list:
     """Every input of the scenario, bound to records or an assumption."""
-    import statistics
-
     from . import units, validate
-    from .models import BasisSource, BoundRecord, ScenarioInput
+    from .models import BoundRecord, ScenarioInput
 
     given = {a.key: a for a in assumptions or []}
     out = []
@@ -431,18 +429,7 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
             if clipped:
                 inp.flags.append(f"{len(clipped)} above the highest glucose ceiling on the geneOS shelf, clipped to it")
         if bound:
-            vals = sorted(b.value for b in bound)
-            inp.binding = "records"
-            inp.records, inp.recordIds = bound, [b.id for b in bound]
-            inp.source = BasisSource(kind="record", note=f"{len(bound)} record{'s' if len(bound) != 1 else ''} of {field_id}")
-            if len(vals) >= 3 and vals[0] != vals[-1]:
-                inp.value, inp.low, inp.high, inp.sampling = statistics.median(vals), vals[0], vals[-1], "triangular"
-            elif len(vals) == 2 and vals[0] != vals[1]:
-                inp.value, inp.low, inp.high, inp.sampling = (vals[0] + vals[1]) / 2, vals[0], vals[1], "uniform"
-            else:
-                inp.value = inp.low = inp.high = vals[0]
-                inp.sampling = "fixed"
-                inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
+            _settle(inp, bound, field_id)
         elif key in given:
             _assume(inp, given[key])
         out.append(inp)
@@ -452,6 +439,28 @@ def bind(records: list[dict], host: str | None = None, assumptions: list | None 
             _assume(inp, given[key])
         out.append(inp)
     return out
+
+
+def _settle(inp, bound: list, field_id: str) -> None:
+    """An input bound to records: their median with their range and a
+    triangular draw from three on, a pair drawn uniform, one held fixed and
+    flagged (§8.3)."""
+    import statistics
+
+    from .models import BasisSource
+
+    vals = sorted(b.value for b in bound)
+    inp.binding = "records"
+    inp.records, inp.recordIds = bound, [b.id for b in bound]
+    inp.source = BasisSource(kind="record", note=f"{len(bound)} record{'s' if len(bound) != 1 else ''} of {field_id}")
+    if len(vals) >= 3 and vals[0] != vals[-1]:
+        inp.value, inp.low, inp.high, inp.sampling = statistics.median(vals), vals[0], vals[-1], "triangular"
+    elif len(vals) == 2 and vals[0] != vals[1]:
+        inp.value, inp.low, inp.high, inp.sampling = (vals[0] + vals[1]) / 2, vals[0], vals[1], "uniform"
+    else:
+        inp.value = inp.low = inp.high = vals[0]
+        inp.sampling = "fixed"
+        inp.flags.append(SINGLE if len(vals) == 1 else "every bound record gives the same value: held fixed in sampling")
 
 
 def _assume(inp, a) -> None:
@@ -487,9 +496,10 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
 
 
 def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = FLOWSHEET,
-                 samples: int = SAMPLES) -> list:
-    """The run's basis: the flowsheet, what it borrows from a package, the
-    samples, and every record, assumption, the cap and the conventions."""
+                 samples: int = SAMPLES, scenario_id: str | None = None) -> list:
+    """The run's basis: the flowsheet, the scenario it belongs to, what it
+    borrows from a package, the samples, and every record, assumption, the
+    cap and the conventions."""
     from .models import BasisInput, BasisSource
 
     info = _shelf.info(flowsheet, allow_toy=True)
@@ -498,11 +508,19 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
     else:
         note = f"{info.title}: {info.description}"
     out = [BasisInput(name="flowsheet", value=flowsheet, unit="", source=BasisSource(kind="convention", note=note))]
+    if scenario_id:
+        # OF-BLD-019 §2.3 (e): the scenario a run belongs to, as words; pureOS
+        # reads it ("a basis input named scenario wins"). A convention, so it
+        # leaves the provenance as the records and assumptions make it.
+        out.append(BasisInput(name="scenario", value=scenario_id, unit="", source=BasisSource(
+            kind="convention", note="the scenario this run belongs to")))
     if flowsheet == FLOWSHEET:
         out.append(BasisInput(
             name="finance and properties", value=f"biorefineries.cornstover@{_installed('biorefineries')}", unit="",
             source=BasisSource(kind="model", id=f"biorefineries.cornstover@{_installed('biorefineries')}",
                                note="create_tea and create_chemicals; PHB borrows Lignin's volume and heat capacity")))
+    elif flowsheet == ETHANOL:
+        out += ethanol_basis()
     out.append(BasisInput(name="samples", value=f"{samples} Latin hypercube", unit="", source=BasisSource(kind="convention")))
     if cap is not None:
         out.append(BasisInput(name="yield cap", value=cap[0], unit="g g-1", source=BasisSource(kind="artifact", id=cap[1])))
@@ -708,31 +726,39 @@ def run(req, pool=None):
     from . import artifacts, evidence_pool
     from .models import ProformaGrid, ProformaRunResult
 
-    if req.scenarioId != SCENARIO_ID:
-        raise ScenarioRefused(f"there is no scenario {req.scenarioId}; the BioSTEAM scenario is {SCENARIO_ID}")
+    # OF-BLD-019 §2.3 (d): a seed scenario by its id, or a scenario a person
+    # made here by the shelf flowsheet it names; anything else is refused.
+    flowsheet = flowsheet_of(req.scenarioId, req.flowsheet)
+    info = _shelf.info(flowsheet)
     _check_samples(req.samples)
+    # A run is a caller a person started by id: its records bind whatever the
+    # program switch says (OF-BLD-016, "what keeps everything").
     pool = pool or evidence_pool.load(include_archived=True)
-    cap = yield_cap()
-    inputs = bind(pool.records, req.host, req.assumptions, cap)
+    if flowsheet == FLOWSHEET:
+        cap = yield_cap()
+        inputs = bind(pool.records, req.host, req.assumptions, cap)
+    else:
+        cap = None
+        inputs = bind_inputs(flowsheet, pool.records, req.host, req.assumptions)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    art = artifacts.compute(RUN, basis_inputs(inputs, cap, FLOWSHEET, req.samples), records_by_id=pool.records_by_id,
-                            seed=req.seed)
+    art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId),
+                            records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
     ev = evidence_of(art)
     tables = tables_of(art)
     return ProformaRunResult(
-        scenarioId=SCENARIO_ID, artifactId=art.id, provenance=art.provenance, inputs=inputs,
+        scenarioId=req.scenarioId, artifactId=art.id, provenance=art.provenance, inputs=inputs,
         basePrice=o["basePrice"], baseCostLines=o["baseCostLines"], baseInfeasible=o["baseInfeasible"],
         quantiles=q, histogram=o["histogram"], sensitivity=o["sensitivity"], samples=o["samples"],
         feasible=o["feasible"], infeasible=o["infeasible"], grid=ProformaGrid(**o["grid"]), readBack=o["readBack"],
-        leavesOut=LEAVES_OUT, priceBasis=PRICE_BASIS, evidence=ev, **tables.model_dump())
+        leavesOut=info.leavesOut, priceBasis=info.priceBasis or "", evidence=ev, **tables.model_dump())
 
 
 def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, seed: int = 0,
-                  allow_toy: bool = False):
+                  allow_toy: bool = False, scenario_id: str | None = None):
     """Run a flowsheet whose every input is a named person's assumption, and
     return its one `proforma.run` artifact. The toy is refused unless the
     caller is a test or a fixture and says `allow_toy`; a reference
@@ -748,11 +774,13 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
         raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults")
     _check_samples(samples)
     given = {a.key: a for a in assumptions}
-    unknown = sorted(set(given) - {i.key for i in info.inputs})
+    unknown = sorted(set(given) - {i.key for i in info.inputs if i.kind != "convention"})
     if unknown:
         raise ScenarioRefused(f"{flowsheet} takes no input {', '.join(unknown)}")
     inputs = []
     for fi in info.inputs:
+        if fi.kind == "convention":  # stated in the basis; it takes no value
+            continue
         inp = ScenarioInput(key=fi.key, label=fi.name, unit=fi.unit, binding="waiting")
         if fi.key in given:
             _assume(inp, given[fi.key])
@@ -760,7 +788,8 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    return artifacts.compute(RUN, basis_inputs(inputs, None, flowsheet, samples), records_by_id={}, seed=seed)
+    return artifacts.compute(RUN, basis_inputs(inputs, None, flowsheet, samples, scenario_id=scenario_id),
+                             records_by_id={}, seed=seed)
 
 
 def tables_of(art):
@@ -802,16 +831,273 @@ def evidence_of(art):
     q = art.output["quantiles"]
     if not q:
         raise ScenarioRefused("this run has no sample the flowsheet could hold, so it has no price to cite")
+    # The scenario and flowsheet the run's basis names (OF-BLD-019 §2.3); a
+    # run stored before the basis named its scenario is sc-pha-1's.
+    flowsheet = str(_named(art.inputs, "flowsheet") or FLOWSHEET)
+    scenario_id = _named(art.inputs, "scenario") or SCENARIO_ID
+    info = _shelf.info(flowsheet, allow_toy=True)
     return Evidence(
-        id=art.id, label=f"Minimum selling price, {SCENARIO_ID} (BioSTEAM draft flowsheet v0)",
-        value=q.get("p50", float("nan")), unit=PRICE_BASIS,
+        id=art.id, label=f"Minimum selling price, {scenario_id} ({info.title})",
+        value=q.get("p50", float("nan")), unit=info.priceBasis or PRICE_BASIS,
         interval=Range(low=q["p5"], high=q["p95"]) if q else None,
         provenance=art.provenance, basis=artifacts.basis_of(art), figure="distribution")
 
 
 def latest_run(scenario_id: str = SCENARIO_ID):
-    """The most recent stored run of a scenario, or None."""
+    """The most recent stored run of a scenario, or None: a run whose basis
+    names the scenario, or one stored before a basis named its scenario
+    whose flowsheet is the seed scenario's (OF-BLD-019 §2.3)."""
     from . import artifacts
 
-    runs = [a for a in artifacts.all_artifacts() if a.tool == RUN]
+    seeded = {s["id"]: s.get("modelId") for s in seed_scenarios()}.get(scenario_id)
+
+    def belongs(a) -> bool:
+        named = _named(a.inputs, "scenario")
+        if named:
+            return named == scenario_id
+        return seeded is not None and str(_named(a.inputs, "flowsheet") or FLOWSHEET) == seeded
+
+    runs = [a for a in artifacts.all_artifacts() if a.tool == RUN and belongs(a)]
     return max(runs, key=lambda a: a.createdAt) if runs else None
+
+
+# ── Glucose to ethanol, and every scenario the shelf can run (OF-BLD-019 §2.3) ──
+#
+# The yeast program's flowsheet of our own binds by the shelf alone: each
+# process input to the records of the fields its shelf entry names, on its
+# program's papers, through the aggregate gate and units.py, as `bind` does
+# for thread P. The seed's BioSTEAM scenarios (src/data/scenarios.ts, read
+# through modules.json) each name the shelf flowsheet they run; a scenario a
+# person makes in the browser (D6) names one too, and binds and runs the
+# same way. Rule 1: no value here; the stand-ins live in the tests.
+
+ETHANOL = "ethanol_glucose_v0"
+YEAST_SCENARIO_ID = "sc-yeast-1"
+# The carbon source a record must name to bind a process input of a
+# flowsheet `bind_inputs` binds: the flowsheet's own feed. A record naming
+# none is left out and counted, as one naming another feed is.
+FEED_CARBON: dict[str, frozenset[str]] = {ETHANOL: frozenset({"glucose"})}
+# What a bound scenario says it makes, by flowsheet.
+PRODUCTS = {FLOWSHEET: "phb", ETHANOL: "ethanol"}
+
+
+def seed_scenarios() -> list[dict]:
+    """The seed's BioSTEAM scenarios as `export:corpus` projects them into
+    modules.json, each naming the non-reference shelf flowsheet it runs (its
+    `modelId`). With no projection here, sc-pha-1 alone, the one scenario
+    this module knew before the shelf."""
+    from . import module_stores
+
+    try:
+        rows = list(module_stores._projection()["proforma"]["scenarios"])
+    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
+        rows = [{"id": SCENARIO_ID, "name": "PHA from cellulosic sugar — draft flowsheet", "kind": "biosteam",
+                 "modelId": FLOWSHEET, "program": "pha"}]
+    return [r for r in rows if r.get("kind") == "biosteam" and r.get("modelId") in _shelf.SHELF
+            and not _shelf.SHELF[r["modelId"]].reference]
+
+
+def runnable(flowsheet: str):
+    """The shelf entry of a flowsheet a scenario can run, or the refusal in
+    words: the toy, an id the shelf does not hold, and a reference
+    biorefinery (it runs whole on its package's own defaults) are refused."""
+    try:
+        info = _shelf.info(flowsheet)
+    except _shelf.NotOnShelf as e:
+        raise ScenarioRefused(str(e)) from None
+    if info.reference:
+        raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults, "
+                              "not as a scenario's flowsheet")
+    return info
+
+
+def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
+    """The flowsheet a run runs: a seed scenario's own, by its id; else, for a
+    scenario a person made here, the non-reference shelf flowsheet it names.
+    Any other case is refused, in words."""
+    if not (scenario_id or "").strip():
+        raise ScenarioRefused("a run names the scenario it belongs to")
+    seeds = {s["id"]: s for s in seed_scenarios()}
+    if scenario_id in seeds:
+        own = seeds[scenario_id]["modelId"]
+        if flowsheet and flowsheet != own:
+            raise ScenarioRefused(f"{scenario_id} runs {own}, not {flowsheet}")
+        return own
+    if not flowsheet:
+        raise ScenarioRefused(f"there is no seed scenario {scenario_id}; the seed's BioSTEAM scenarios are "
+                              f"{', '.join(seeds) or 'none'}, and a scenario made here names the flowsheet it runs")
+    return runnable(flowsheet).id
+
+
+def _in_program(paper_id: str, program: str | None) -> bool:
+    from . import programs
+
+    try:
+        return program is not None and programs.program_of_paper(paper_id or "") == program
+    except FileNotFoundError:  # no corpus exported here: no paper is known to be the program's
+        return False
+
+
+def bind_inputs(flowsheet: str, records: list[dict], host: str | None = None, assumptions: list | None = None) -> list:
+    """Every input of a shelf flowsheet that takes a value, bound by its shelf
+    entry: a process input to the records of its fields (the first field
+    with a bound record wins) on its program's papers that pass the
+    aggregate gate and name the flowsheet's feed as their carbon source, each
+    converted by units.py into the input's unit; with none, or with the
+    binding stopped, a named person's assumption; else it waits. A
+    convention takes no value: the run's basis states it."""
+    from . import units, validate
+    from .models import BoundRecord, ScenarioInput
+
+    info = _shelf.info(flowsheet, allow_toy=True)
+    feed = FEED_CARBON.get(flowsheet, frozenset())
+    given = {a.key: a for a in assumptions or []}
+    out = []
+    for fi in info.inputs:
+        if fi.kind == "convention":
+            continue
+        inp = ScenarioInput(key=fi.key, label=fi.name, unit=fi.unit, binding="waiting")
+        bound: list = []
+        refused: str | None = None
+        used = None
+        for field_id in fi.fields:
+            no_carbon = other_carbon = 0
+            for r in records:
+                if r.get("field") != field_id or not _in_program(r.get("paperId", ""), info.program) or _exclusion(r):
+                    continue
+                if host and r.get("strainId") != host:
+                    continue
+                carbon = r.get("carbonSource")
+                if not carbon:
+                    no_carbon += 1
+                    continue
+                if validate.carbon_source_id(carbon) not in feed:
+                    other_carbon += 1
+                    continue
+                try:
+                    v = units.convert(float(r["value"]), r.get("unit") or fi.unit, fi.unit)
+                except (TypeError, ValueError) as e:
+                    refused = f"record {r['id']}: {units.explain_refusal(r.get('unit') or '', fi.unit) or e}"
+                    break
+                bound.append(BoundRecord(id=r["id"], paperId=r["paperId"], value=v,
+                                         organism=r.get("organismText") or r.get("strainId"), carbonSource=carbon,
+                                         provenance=r.get("provenance") or "unverified"))
+            inp.leftOutNoCarbon += no_carbon
+            inp.leftOutOtherCarbon += other_carbon
+            if refused or bound:
+                used = field_id
+                break
+        if refused:
+            inp.flags.append(f"the binding stopped: {refused}")
+            if fi.key in given:
+                _assume(inp, given[fi.key])
+        elif bound:
+            _settle(inp, bound, used)
+        elif fi.key in given:
+            _assume(inp, given[fi.key])
+        out.append(inp)
+    return out
+
+
+def ethanol_basis() -> list:
+    """What the glucose-to-ethanol flowsheet takes from packages and states
+    as conventions, for every run's basis (D3, D4): each package with its
+    version, the theoretical yield the fermenter's conversion is a share of,
+    the batch time's rule, and fuel grade. Values the run reads back are in
+    its `readBack`; none is typed here."""
+    from .models import BasisInput, BasisSource
+
+    corn = f"biorefineries.corn@{_installed('biorefineries')}"
+    ethanol = f"biorefineries.ethanol@{_installed('biorefineries')}"
+    sim = f"biosteam@{_installed('biosteam')}"
+    return [
+        BasisInput(name="chemicals and finance", value=corn, unit="", source=BasisSource(
+            kind="model", id=corn,
+            note="the dry-grind corn ethanol plant's create_chemicals, and its create_tea: ConventionalEthanolTEA "
+                 "with the package's default_tea_parameters")),
+        BasisInput(name="purification train", value=ethanol, unit="", source=BasisSource(
+            kind="model", id=ethanol,
+            note="create_ethanol_purification_system as the package builds it: beer column with its heat "
+                 "integration, rectifier, superheater, molecular sieves, product tanks")),
+        BasisInput(name="fermenter", value=f"{sim} BatchBioreactor", unit="", source=BasisSource(
+            kind="model", id=sim,
+            note="BioSTEAM's batch bioreactor, sized and costed by BioSTEAM; its working volume fraction, cleaning "
+                 "time and temperature are its own, its vessel limit BioSTEAM's anaerobic bioreactor's, all read back")),
+        BasisInput(name="theoretical yield", value="Glucose -> 2 Ethanol + 2 CO2", unit="", source=BasisSource(
+            kind="convention",
+            note="the fermenter's conversion is the bound yield over this reaction's yield at thermosteam's "
+                 "molecular weights; the run reads the theoretical yield back")),
+        BasisInput(name="batch time", value="titre / productivity", unit="h", source=BasisSource(kind="convention")),
+        BasisInput(name="ethanol purity", value="fuel grade", unit="", source=BasisSource(
+            kind="convention",
+            note="the ethanol the package's molecular sieves give, with no denaturant blended; the run reads the "
+                 "purity back")),
+    ]
+
+
+def _hosts(records: list[dict], flowsheet: str) -> list[str]:
+    info = _shelf.info(flowsheet, allow_toy=True)
+    fields = {f for i in info.inputs for f in i.fields}
+    return sorted({r.get("strainId") for r in records
+                   if r.get("strainId") and r.get("field") in fields and _in_program(r.get("paperId", ""), info.program)})
+
+
+def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | None = None,
+          assumptions: list | None = None, pool=None):
+    """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
+    serves: a seed scenario's with its id and name, a flowsheet's alone with
+    both empty (§2.3, c)."""
+    from . import evidence_pool
+    from .models import ProformaScenarioInfo
+
+    pool = pool or evidence_pool.load(include_archived=True)
+    if flowsheet == FLOWSHEET:
+        return scenario(host, assumptions, pool).model_copy(update={"id": scenario_id, "name": name})
+    info = _shelf.info(flowsheet, allow_toy=True)
+    inputs = bind_inputs(flowsheet, pool.records, host, assumptions)
+    return ProformaScenarioInfo(
+        id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
+        hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[i.key for i in inputs if i.binding == "waiting"],
+        leavesOut=info.leavesOut, priceBasis=info.priceBasis or "")
+
+
+def _hidden(program: str | None, include_archived: bool) -> bool:
+    from . import programs
+
+    try:
+        return programs.hides(program, include_archived)
+    except FileNotFoundError:  # no corpus exported here: nothing is known to be archived
+        return False
+
+
+def scenarios(include_archived: bool = False, host: str | None = None, pool=None) -> list:
+    """GET /api/proforma/scenarios (§2.3, b): one bound scenario per seed
+    scenario of kind biosteam whose program the switch shows (an example
+    hides with the archive). Each binds its own program's records whatever
+    the switch says, as a scenario opened by id does."""
+    from . import evidence_pool
+
+    out = []
+    for s in seed_scenarios():
+        if _hidden(s.get("program"), include_archived) or (s.get("example") and not include_archived):
+            continue
+        pool = pool or evidence_pool.load(include_archived=True)
+        out.append(bound(s["modelId"], scenario_id=s["id"], name=s.get("name") or s["id"], host=host, pool=pool))
+    return out
+
+
+def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str | None = None,
+                   assumptions: list | None = None, pool=None):
+    """GET /api/proforma/bind (§2.3, c): a shelf flowsheet's inputs bound as a
+    scenario a person made here shows them, id and name empty. The toy, an
+    id the shelf does not hold, a reference biorefinery, and a flowsheet of
+    a program the switch hides (as the shelf hides it) are refused in words."""
+    from . import programs
+
+    info = runnable(flowsheet)
+    if _hidden(info.program, include_archived):
+        held = programs.program_by_id(info.program)
+        raise ScenarioRefused(
+            f"{flowsheet} belongs to the archived program {held.name if held else info.program}; "
+            "Settings → Programs → Show archived programs and examples binds it")
+    return bound(flowsheet, host=host, assumptions=assumptions, pool=pool)

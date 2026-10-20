@@ -177,3 +177,78 @@ def test_the_corn_stover_plant_answers_through_the_reference_endpoint_too(store)
     replay = artifacts.replay(art["id"])
     moved = {d.path.split("[")[0].split(".")[0] for d in replay.differences}
     assert moved <= {"streams", "units", "unitOrder", "…"}, moved
+
+
+# ── glucose to ethanol (OF-BLD-019 §2.3) ───────────────────────────────
+# PLACEHOLDER inputs, chosen here to exercise the flowsheet; none is a
+# measurement and no price below is a result.
+
+ETHANOL_CASE = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0, "plant_scale": 100000.0,
+                "glucose_price": 0.4}
+# What this lock (biosteam 2.54.0, thermosteam 0.54.2, biorefineries 2.35.1)
+# gave on ETHANOL_CASE, measured 2026-10-20: a regression value for the
+# code, held within 1 %, never shown as a price of anything.
+ETHANOL_REGRESSION_USD_PER_KG = 1.0654458162278913
+
+
+@pytest.fixture(scope="module")
+def eth():
+    from openferment_core.flowsheets import ethanol_glucose_v0
+
+    return ethanol_glucose_v0, ethanol_glucose_v0.build()
+
+
+def test_the_ethanol_price_on_fixed_stand_ins_holds_its_regression_value(eth):
+    f, b = eth
+    out = f.evaluate(b, ETHANOL_CASE)
+    assert out["pricePerKgEthanol"] == pytest.approx(ETHANOL_REGRESSION_USD_PER_KG, rel=0.01)
+    assert sum(out["costLines"].values()) == pytest.approx(out["pricePerKgEthanol"], rel=1e-12)
+    # The glucose is charged on glucose alone, and the feed holds the bound
+    # glucose per litre of solution, by thermosteam's volume.
+    assert b.glucose.cost == pytest.approx(ETHANOL_CASE["glucose_price"] * b.glucose.imass["Glucose"], rel=1e-12)
+    solution = b.M1.outs[0]
+    assert solution.imass["Glucose"] / solution.F_vol == pytest.approx(ETHANOL_CASE["feed_glucose_conc"], rel=1e-9)
+    # The fermenter makes what the yield says from the glucose fed.
+    assert b.R1.outs[1].imass["Ethanol"] + b.R1.outs[0].imass["Ethanol"] == pytest.approx(
+        ETHANOL_CASE["yield"] * b.glucose.imass["Glucose"], rel=1e-9)
+
+
+def test_an_ethanol_case_gives_one_price_whatever_ran_before(eth):
+    # The recycle is emptied before every case (carried over, it moved a
+    # price in its fourth digit); what remains is BioSTEAM's own noise in the
+    # last digit, which a fresh build does not remove either (measured).
+    f, b = eth
+    first = f.evaluate(b, ETHANOL_CASE)["pricePerKgEthanol"]
+    f.evaluate(b, {**ETHANOL_CASE, "feed_glucose_conc": 20.0, "yield": 0.3})
+    assert f.evaluate(b, ETHANOL_CASE)["pricePerKgEthanol"] == pytest.approx(first, rel=1e-12)
+    assert f.evaluate(f.build(), ETHANOL_CASE)["pricePerKgEthanol"] == pytest.approx(first, rel=1e-12)
+
+
+def test_a_dearer_glucose_raises_the_ethanol_price(eth):
+    f, b = eth
+    prices = [f.evaluate(b, {**ETHANOL_CASE, "glucose_price": p})["pricePerKgEthanol"] for p in (0.2, 0.3, 0.4, 0.5)]
+    assert all(a < c for a, c in zip(prices, prices[1:]))
+
+
+def test_a_whole_yeast_run_through_the_worker(store):
+    from types import SimpleNamespace
+
+    from openferment_core import demo
+    from openferment_core.models import InputAssumption, ProformaRunRequest
+
+    rs = demo._standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-20")
+         for k, v, lo, hi in demo.YEAST_STANDIN_ASSUMED]
+    out = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=a, seed=3), pool=pool)
+    assert out.samples == 500 and out.feasible + sum(out.infeasible.values()) == 500 and out.baseInfeasible is None
+    assert set(out.infeasible) <= {"yield", "concentration", "convergence"}
+    assert out.provenance == "demo" and out.flowsheet == "ethanol_glucose_v0" and out.tea.teaClass == "ConventionalEthanolTEA"
+    q = out.quantiles
+    assert q["p5"] <= q["p25"] <= q["p50"] <= q["p75"] <= q["p95"]
+    assert {s.key for s in out.sensitivity} <= {"feed_glucose_conc", "titre", "yield", "productivity", "glucose_price"}
+    assert len(out.grid.msp) == 125 and sum(out.baseCostLines.values()) == pytest.approx(out.basePrice, rel=1e-12)
+    assert [i.value for i in artifacts.get(out.artifactId).inputs if i.name == "scenario"] == ["sc-yeast-1"]
+    from test_proforma import replays_to_the_last_digits
+
+    replays_to_the_last_digits(out.artifactId)

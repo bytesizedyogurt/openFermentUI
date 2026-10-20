@@ -246,6 +246,108 @@
       "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn"
     },
     {
+      "id": "ethanol_glucose_v0",
+      "title": "Glucose to ethanol, draft v0",
+      "description": "A glucose solution into a batch fermenter, then the ethanol purification train of the BioSTEAM reference designs (beer column, rectifier, molecular sieves), giving fuel-grade ethanol. The fermenter turns glucose into ethanol at the bound yield as a share of the theoretical yield, for a batch time of titre over productivity. Chemicals and finance are the dry-grind corn ethanol plant's; equipment and thermodynamics are BioSTEAM's own; no number is the flowsheet's.",
+      "source": "this repository",
+      "program": "yeast",
+      "reference": false,
+      "inputs": [
+        {
+          "key": "feed_glucose_conc",
+          "name": "glucose in the fermenter's feed",
+          "dimension": "massConc",
+          "unit": "g L-1",
+          "fields": [
+            "medium_component_conc"
+          ],
+          "kind": "process",
+          "note": "records of a medium component whose carbon source is glucose; sets the water that dilutes the glucose, by thermosteam's volume of the solution"
+        },
+        {
+          "key": "titre",
+          "name": "ethanol titre at harvest",
+          "dimension": "massConc",
+          "unit": "g L-1",
+          "fields": [
+            "ethanol_titre"
+          ],
+          "kind": "process",
+          "note": "with the productivity, sets the batch time; the beer's own ethanol follows from the feed's glucose and the yield, and the run reads it back"
+        },
+        {
+          "key": "yield",
+          "name": "ethanol yield on glucose",
+          "dimension": "yield",
+          "unit": "g g-1",
+          "fields": [
+            "ethanol_yield_substrate"
+          ],
+          "kind": "process",
+          "note": "the fermenter's conversion is this yield over the theoretical yield of the reaction; a case above the theoretical yield cannot run, and says so"
+        },
+        {
+          "key": "productivity",
+          "name": "ethanol volumetric productivity",
+          "dimension": "volProd",
+          "unit": "g L-1 h-1",
+          "fields": [
+            "ethanol_productivity"
+          ],
+          "kind": "process",
+          "note": "the batch time is the titre divided by it"
+        },
+        {
+          "key": "plant_scale",
+          "name": "ethanol fermented in a year",
+          "dimension": "massFlow",
+          "unit": "t yr-1",
+          "fields": [],
+          "kind": "economic",
+          "note": "a named person's assumption; with the yield it sets the glucose fed, so the plant's size"
+        },
+        {
+          "key": "glucose_price",
+          "name": "price of glucose",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "economic",
+          "note": "a named person's assumption; the glucose alone is priced, not its water"
+        },
+        {
+          "key": "ethanol_purity",
+          "name": "ethanol purity",
+          "dimension": "fraction",
+          "unit": "",
+          "fields": [],
+          "kind": "convention",
+          "note": "fuel grade: the ethanol the package's molecular sieves give, with no denaturant blended; a convention every run's basis names, and the run reads the purity back"
+        }
+      ],
+      "outputs": [
+        "pricePerKgEthanol",
+        "ethanolKgPerH",
+        "costLines",
+        "readBack"
+      ],
+      "priceOutput": "pricePerKgEthanol",
+      "priceBasis": "USD per kg of fuel-grade ethanol, as the product leaves its tank",
+      "leavesOut": [
+        "where the glucose comes from: it arrives as clean glucose, priced as such",
+        "cell mass and by-products: the glucose the yield does not turn into ethanol leaves unconverted in the stillage",
+        "the scrubber that recovers ethanol from the fermenter's gas",
+        "stillage handling and co-products",
+        "wastewater treatment and the boiler"
+      ],
+      "gridInputs": [
+        "titre",
+        "yield",
+        "glucose_price"
+      ],
+      "packageTest": null
+    },
+    {
       "id": "pha_sugar_v0",
       "title": "PHA from fermentable sugar, draft v0",
       "description": "Fermentable sugar and ammonia into an aerated batch fermenter, a solids centrifuge and a drum dryer, giving dried, PHA-rich cell mass. Chemicals and finance are the corn stover reference biorefinery's; equipment and thermodynamics are BioSTEAM's own.",

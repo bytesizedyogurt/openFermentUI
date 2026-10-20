@@ -176,7 +176,65 @@ _PHA = FlowsheetInfo(
     gridInputs=["titre", "yield", "sugarPrice"],
 )
 
-SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _PHA)}
+# OF-BLD-019 §2.3: glucose to ethanol, ours. What it leaves out is
+# flowsheets/ethanol_glucose_v0.LEAVES_OUT, repeated here as data so the
+# service reads it without BioSTEAM (test_proforma_ethanol holds the two equal).
+ETHANOL_LEAVES_OUT = [
+    "where the glucose comes from: it arrives as clean glucose, priced as such",
+    "cell mass and by-products: the glucose the yield does not turn into ethanol leaves unconverted in the stillage",
+    "the scrubber that recovers ethanol from the fermenter's gas",
+    "stillage handling and co-products",
+    "wastewater treatment and the boiler",
+]
+ETHANOL_PRICE_BASIS = "USD per kg of fuel-grade ethanol, as the product leaves its tank"
+
+_ETHANOL = FlowsheetInfo(
+    id="ethanol_glucose_v0",
+    title="Glucose to ethanol, draft v0",
+    description=(
+        "A glucose solution into a batch fermenter, then the ethanol purification train of the BioSTEAM "
+        "reference designs (beer column, rectifier, molecular sieves), giving fuel-grade ethanol. The fermenter "
+        "turns glucose into ethanol at the bound yield as a share of the theoretical yield, for a batch time of "
+        "titre over productivity. Chemicals and finance are the dry-grind corn ethanol plant's; equipment and "
+        "thermodynamics are BioSTEAM's own; no number is the flowsheet's."
+    ),
+    source="this repository",
+    program="yeast",
+    reference=False,
+    inputs=[
+        FlowsheetInput(key="feed_glucose_conc", name="glucose in the fermenter's feed", dimension="massConc",
+                       unit="g L-1", fields=["medium_component_conc"], kind="process",
+                       note="records of a medium component whose carbon source is glucose; sets the water that "
+                            "dilutes the glucose, by thermosteam's volume of the solution"),
+        FlowsheetInput(key="titre", name="ethanol titre at harvest", dimension="massConc", unit="g L-1",
+                       fields=["ethanol_titre"], kind="process",
+                       note="with the productivity, sets the batch time; the beer's own ethanol follows from "
+                            "the feed's glucose and the yield, and the run reads it back"),
+        FlowsheetInput(key="yield", name="ethanol yield on glucose", dimension="yield", unit="g g-1",
+                       fields=["ethanol_yield_substrate"], kind="process",
+                       note="the fermenter's conversion is this yield over the theoretical yield of the reaction; "
+                            "a case above the theoretical yield cannot run, and says so"),
+        FlowsheetInput(key="productivity", name="ethanol volumetric productivity", dimension="volProd",
+                       unit="g L-1 h-1", fields=["ethanol_productivity"], kind="process",
+                       note="the batch time is the titre divided by it"),
+        FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
+                       kind="economic",
+                       note="a named person's assumption; with the yield it sets the glucose fed, so the plant's size"),
+        FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
+                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+        FlowsheetInput(key="ethanol_purity", name="ethanol purity", dimension="fraction", unit="",
+                       kind="convention",
+                       note="fuel grade: the ethanol the package's molecular sieves give, with no denaturant "
+                            "blended; a convention every run's basis names, and the run reads the purity back"),
+    ],
+    outputs=["pricePerKgEthanol", "ethanolKgPerH", "costLines", "readBack"],
+    priceOutput="pricePerKgEthanol",
+    priceBasis=ETHANOL_PRICE_BASIS,
+    leavesOut=ETHANOL_LEAVES_OUT,
+    gridInputs=["titre", "yield", "glucose_price"],
+)
+
+SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _PHA)}
 
 # The package module each reference biorefinery runs (OF-BLD-019 §2.2).
 REFERENCE_MODULES = {"cornstover_benchmark": "biorefineries.cornstover", "corn_drygrind": "biorefineries.corn"}

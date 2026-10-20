@@ -1575,6 +1575,12 @@ class ProformaRunRequest(BaseModel):
     # default is proforma.SAMPLES, held equal by test_proforma, and
     # proforma.run refuses more than proforma.MAX_SAMPLES, in words.
     samples: int = 500
+    # The shelf flowsheet a scenario made in the browser runs (OF-BLD-019
+    # §2.3, D6): a seed scenario runs its own and needs none; a scenario id
+    # that is not a seed scenario's runs this one, bound as
+    # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
+    # id the shelf does not hold is refused in words.
+    flowsheet: str | None = None
 
 
 class HistogramBin(BaseModel):

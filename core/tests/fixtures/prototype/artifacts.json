@@ -1783,7 +1783,7 @@
       "seed": 0
     },
     {
-      "id": "c88399e09c348cad",
+      "id": "5f8f9d1f578313a4",
       "tool": "proforma.run",
       "toolVersion": "shelf run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
       "inputs": [
@@ -1795,6 +1795,17 @@
             "kind": "convention",
             "id": null,
             "note": "draft v0: fermentation, harvest and drying only; feedstock pretreatment and hydrolysis; polymer extraction and purification; wastewater treatment; co-products left out",
+            "by": null
+          }
+        },
+        {
+          "name": "scenario",
+          "value": "sc-pha-1",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "the scenario this run belongs to",
             "by": null
           }
         },

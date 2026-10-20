@@ -2785,6 +2785,12 @@ export interface ProformaRunRequest {
   seed: number;
   /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
   samples?: number;
+  /**
+   * The shelf flowsheet a scenario made in this browser runs (OF-BLD-019
+   * §2.3, D6). A seed scenario runs its own and sends none; any other id runs
+   * this flowsheet, bound as `GET /api/proforma/bind` binds it.
+   */
+  flowsheet?: string | null;
 }
 
 export interface HistogramBin {

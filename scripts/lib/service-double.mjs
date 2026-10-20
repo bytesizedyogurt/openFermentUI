@@ -363,64 +363,62 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(entry.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(entry.body));
     }
-    // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
-    // and a run made through the real code with a stand-in evaluator.
-    //
-    // OF-BLD-019 §3.2 — the scenario run contract, answered from the fixtures
-    // that exist (the bound sc-pha-1 and its stored stand-in run); the query
-    // is read from the request's own URL, since `url` has lost it.
-    //   (b) the seed scenarios the switch shows: with it off, those whose
-    //       flowsheet is on the switch-off shelf (none here: PHA's is
-    //       archived); with it on, every one;
-    //   (c) a flowsheet bound as a scenario made here: the fixture's binding
-    //       of that flowsheet with id and name blank; a reference flowsheet,
-    //       or one this double holds no binding of, refused in words;
-    //   (d) a run: a seed scenario by its id, a scenario made here by its
-    //       flowsheet (the stored run, under the asked id); inputs that still
-    //       wait refused as the service refuses them, anything else in words.
-    if (url === '/api/proforma/scenarios' && req.method === 'GET') {
+    // OF-BLD-014 §8.4 — the BioSTEAM scenarios, bound over stand-in records,
+    // and runs made through the real code with a stand-in evaluator.
+    // OF-BLD-019 §2.3 (b): the seed's scenarios with the program switch off
+    // (sc-yeast-1) and, asked with ?includeArchived=true, on (sc-pha-1 too);
+    // the switch is read from the request's own URL, which keeps its query.
+    if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
       const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
-      const all = await prototype('proforma-scenarios.json');
-      const offShelf = on ? null : new Set((await prototype('proforma-shelf.json')).map((f) => f.id));
-      const out = offShelf ? all.filter((sc) => offShelf.has(sc.flowsheet)) : all;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(out));
+      return res.end(JSON.stringify(await prototype(on ? 'proforma-scenarios-archived.json' : 'proforma-scenarios.json')));
     }
+    // (c): a shelf flowsheet bound as a scenario made in the browser shows it,
+    // or the service's refusal in its words, each as demo.py --prototype
+    // recorded it for the switch off and on.
     if (url === '/api/proforma/bind' && req.method === 'GET') {
-      const id = new URL(req.url ?? '/', 'http://double').searchParams.get('flowsheet') ?? '';
-      const shelf = await prototype('proforma-shelf-archived.json');
-      const info = shelf.find((f) => f.id === id);
-      const bound = (await prototype('proforma-scenarios.json')).find((sc) => sc.flowsheet === id);
-      const refuse = (status, detail) => {
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ detail }));
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      const flowsheet = q.get('flowsheet') ?? '';
+      const answers = (await prototype('proforma-bind.json'))[q.get('includeArchived') === 'true' ? 'on' : 'off'];
+      const answer = answers[flowsheet] ?? {
+        status: 422,
+        body: { detail: `there is no flowsheet ${flowsheet} on the shelf; it holds ${Object.keys(answers).filter((k) => k !== 'toy').join(', ')}` },
       };
-      if (!info) return refuse(404, `no flowsheet ${id || '(none named)'} is on the shelf`);
-      if (info.reference) return refuse(422, `${id} is a reference biorefinery: it runs whole on its package's own defaults`);
-      if (!bound) return refuse(422, `the smoke double holds no binding of ${id}`);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ ...bound, id: '', name: '' }));
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(answer.body));
     }
+    // (d): a seed scenario's run by its id; a scenario made in the browser
+    // gets the run of the seed scenario on the flowsheet it names, under its
+    // own id (the stand-in's artifact still names the seed scenario in its
+    // basis); anything else is the service's 422, in words.
     if (url === '/api/proforma/run' && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) body += chunk;
       const asked = JSON.parse(body || '{}');
       proformaRuns.push(asked);
-      const seeds = await prototype('proforma-scenarios.json');
-      const run = await prototype('proforma-run.json');
+      const seeds = await prototype('proforma-scenarios-archived.json');
+      const bySeed = { 'sc-pha-1': 'proforma-run.json', 'sc-yeast-1': 'proforma-run-yeast.json' };
+      const byFlowsheet = { pha_sugar_v0: 'proforma-run.json', ethanol_glucose_v0: 'proforma-run-yeast.json' };
+      const name = bySeed[asked.scenarioId] ?? (asked.scenarioId ? byFlowsheet[asked.flowsheet] : undefined);
       const refuse = (detail) => {
         res.writeHead(422, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ detail }));
       };
+      if (!name)
+        return refuse(
+          asked.flowsheet
+            ? `${asked.flowsheet} is not a flowsheet a scenario made here can run`
+            : `there is no seed scenario ${asked.scenarioId}; the seed's BioSTEAM scenarios are sc-pha-1, sc-yeast-1, and a scenario made here names the flowsheet it runs`,
+        );
+      // Inputs that still wait are refused as the service refuses them (§3.2).
       const seed = seeds.find((sc) => sc.id === asked.scenarioId);
-      const bound = seed ?? (asked.flowsheet ? seeds.find((sc) => sc.flowsheet === asked.flowsheet) : null);
-      if (!bound || bound.flowsheet !== run.flowsheet)
-        return refuse(`there is no scenario ${asked.scenarioId}, and ${asked.flowsheet ?? 'no flowsheet'} is not a flowsheet a scenario made here runs on`);
+      const bound = seed ?? seeds.find((sc) => sc.flowsheet === asked.flowsheet);
       const typed = new Set((asked.assumptions ?? []).map((a) => a.key));
-      const waiting = bound.inputs.filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
+      const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
       if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
+      const run = await prototype(name);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(seed ? run : { ...run, scenarioId: asked.scenarioId }));
+      return res.end(JSON.stringify(bySeed[asked.scenarioId] ? run : { ...run, scenarioId: asked.scenarioId }));
     }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.

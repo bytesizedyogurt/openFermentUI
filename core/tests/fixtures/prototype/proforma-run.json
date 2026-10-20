@@ -2,7 +2,7 @@
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
   "response": {
     "scenarioId": "sc-pha-1",
-    "artifactId": "c88399e09c348cad",
+    "artifactId": "5f8f9d1f578313a4",
     "provenance": "demo",
     "inputs": [
       {
@@ -1353,8 +1353,8 @@
     ],
     "priceBasis": "USD per kg of PHA contained in dried cell mass",
     "evidence": {
-      "id": "c88399e09c348cad",
-      "label": "Minimum selling price, sc-pha-1 (BioSTEAM draft flowsheet v0)",
+      "id": "5f8f9d1f578313a4",
+      "label": "Minimum selling price, sc-pha-1 (PHA from fermentable sugar, draft v0)",
       "value": 2.1064252809691655,
       "unit": "USD per kg of PHA contained in dried cell mass",
       "interval": {
@@ -1374,6 +1374,17 @@
               "kind": "convention",
               "id": null,
               "note": "draft v0: fermentation, harvest and drying only; feedstock pretreatment and hydrolysis; polymer extraction and purification; wastewater treatment; co-products left out",
+              "by": null
+            }
+          },
+          {
+            "name": "scenario",
+            "value": "sc-pha-1",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the scenario this run belongs to",
               "by": null
             }
           },
@@ -1631,7 +1642,7 @@
             }
           }
         ],
-        "artifactId": "c88399e09c348cad",
+        "artifactId": "5f8f9d1f578313a4",
         "at": "2026-09-15T09:00:00Z",
         "seed": 0
       },

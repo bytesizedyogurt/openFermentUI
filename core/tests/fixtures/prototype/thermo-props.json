@@ -4,12 +4,12 @@
     "entries": [
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "sugar"
         },
         "status": 200,
         "body": {
-          "id": "e2f5acf3c65556f7",
+          "id": "761f5d6060cbc46b",
           "tool": "thermo_props",
           "toolVersion": "thermo props 1 · thermosteam 0.54.2",
           "inputs": [
@@ -30,7 +30,7 @@
               "unit": "",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -41,7 +41,7 @@
               "unit": "K",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -52,7 +52,7 @@
               "unit": "Pa",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -63,7 +63,7 @@
               "unit": "",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -74,7 +74,7 @@
               "unit": "kg/hr",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -93,8 +93,8 @@
           ],
           "output": {
             "kind": "stream",
-            "subject": "stream sugar of run c88399e09c348cad",
-            "runArtifactId": "c88399e09c348cad",
+            "subject": "stream sugar of run 5f8f9d1f578313a4",
+            "runArtifactId": "5f8f9d1f578313a4",
             "streamId": "sugar",
             "preset": null,
             "recordId": null,
@@ -131,7 +131,7 @@
               "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
             ]
           },
-          "outputHash": "fba5ee228b9d142bf17ec9fa24beb7c019aa385cc4bc5b04cd572d5e74456bc7",
+          "outputHash": "d507f15714ba77ebb421ca9c039a452559cca8fefba6e3f0ebbd3e43fef0d6b5",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "durationMs": 0,
@@ -140,12 +140,12 @@
       },
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "process_water"
         },
         "status": 200,
         "body": {
-          "id": "d267d30de2df5124",
+          "id": "852ac37b2ff0ecf8",
           "tool": "thermo_props",
           "toolVersion": "thermo props 1 · thermosteam 0.54.2",
           "inputs": [
@@ -166,7 +166,7 @@
               "unit": "",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -177,7 +177,7 @@
               "unit": "K",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -188,7 +188,7 @@
               "unit": "Pa",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -199,7 +199,7 @@
               "unit": "",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -210,7 +210,7 @@
               "unit": "kg/hr",
               "source": {
                 "kind": "artifact",
-                "id": "c88399e09c348cad",
+                "id": "5f8f9d1f578313a4",
                 "note": "a stream of the run's stream table",
                 "by": null
               }
@@ -229,8 +229,8 @@
           ],
           "output": {
             "kind": "stream",
-            "subject": "stream process_water of run c88399e09c348cad",
-            "runArtifactId": "c88399e09c348cad",
+            "subject": "stream process_water of run 5f8f9d1f578313a4",
+            "runArtifactId": "5f8f9d1f578313a4",
             "streamId": "process_water",
             "preset": null,
             "recordId": null,
@@ -267,7 +267,7 @@
               "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
             ]
           },
-          "outputHash": "fe44c263313e177c0f1857e595e7cb1a3fc5660f1b1be0417c519451d7a85980",
+          "outputHash": "86ed9b22a14b472007102df1595976dcac88e3762b75ca2f2cb9e735a335a031",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
           "durationMs": 0,
@@ -276,7 +276,7 @@
       },
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "broth"
         },
         "status": 422,
@@ -286,7 +286,7 @@
       },
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "spent_medium"
         },
         "status": 422,
@@ -296,7 +296,7 @@
       },
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "wet_solids"
         },
         "status": 422,
@@ -306,7 +306,7 @@
       },
       {
         "request": {
-          "artifactId": "c88399e09c348cad",
+          "artifactId": "5f8f9d1f578313a4",
           "streamId": "product"
         },
         "status": 422,

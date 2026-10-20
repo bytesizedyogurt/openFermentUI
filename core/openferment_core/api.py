@@ -420,17 +420,35 @@ def proforma_reference_run(flowsheet_id: str) -> dict:
 
 
 @app.get("/api/proforma/scenarios")
-def proforma_scenarios(host: str | None = None) -> list[dict]:
-    """The BioSTEAM scenario with its inputs bound to records (§8.3). A read:
-    it starts no simulator."""
+def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The seed's BioSTEAM scenarios with their inputs bound to records
+    (§8.3; OF-BLD-019 §2.3): one per scenario whose program the switch
+    shows, so sc-yeast-1 with it off and sc-pha-1 too with it on. A read: it
+    starts no simulator."""
     from . import proforma
 
-    return [proforma.scenario(host=host).model_dump(mode="json")]
+    return [s.model_dump(mode="json") for s in proforma.scenarios(include_archived=includeArchived, host=host)]
+
+
+@app.get("/api/proforma/bind")
+def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False) -> dict:  # noqa: N803
+    """A shelf flowsheet's inputs bound, as a scenario a person made in the
+    browser shows them (OF-BLD-019 §2.3, D6), id and name empty. A reference
+    biorefinery, the toy, an unknown id, or a flowsheet of a program the
+    switch hides is a 422 in words. A read: it starts no simulator."""
+    from . import proforma
+
+    try:
+        return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @app.post("/api/proforma/run")
 def proforma_run(req: ProformaRunRequest) -> dict:
-    """Run the scenario: 422 listing every input waiting for a source."""
+    """Run a seed scenario by its id, or a scenario made in the browser by
+    the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
+    other case, and listing every input waiting for a source."""
     from . import proforma
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 

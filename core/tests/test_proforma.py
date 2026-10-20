@@ -136,10 +136,12 @@ def test_the_scenario_endpoints(store, monkeypatch):
     rs = [rec("t", "pha_titre", 10.0, "g/L"), rec("k", "pha_titre", 20.0, "g/L", strain="p-putida-kt2440")]
     monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
     c = TestClient(api.app, base_url="http://127.0.0.1")
-    [sc] = c.get("/api/proforma/scenarios").json()
+    # PHA is archived (OF-BLD-016): its scenario is served with the switch on (OF-BLD-019 §2.3).
+    [sc] = [x for x in c.get("/api/proforma/scenarios?includeArchived=true").json() if x["id"] == "sc-pha-1"]
     assert sc["id"] == "sc-pha-1" and sc["hosts"] == ["c-necator-h16", "p-putida-kt2440"]
     assert set(sc["waiting"]) == {"yield", "content", "productivity", "recovery", "sugarPrice", "sugarFeed"}
-    assert c.get("/api/proforma/scenarios?host=p-putida-kt2440").json()[0]["inputs"][0]["recordIds"] == ["k"]
+    narrowed = c.get("/api/proforma/scenarios?includeArchived=true&host=p-putida-kt2440").json()
+    assert next(x for x in narrowed if x["id"] == "sc-pha-1")["inputs"][0]["recordIds"] == ["k"]
     r = c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"})
     assert r.status_code == 422 and "wait for a source" in r.json()["detail"]
     assert c.post("/api/proforma/run", json={"scenarioId": "sc-pha-1"}, headers={"Origin": "https://evil.example"}).status_code == 403
@@ -317,3 +319,73 @@ def test_the_corn_plant_runs_in_the_worker_and_reads_back_every_input(store):
     # The worker put back what it held: the PHA draft, built before, prices as it did.
     after = proforma.call("run", {"flowsheet": "pha_sugar_v0", "base": pha, "specs": {}, "samples": 0, "seed": 0})
     assert after["base"] == before["base"] and after["tables"]["tea"] == before["tables"]["tea"]
+
+
+# ── glucose to ethanol through the real worker (OF-BLD-019 §2.3; `sim`) ──
+# Every input is a STAND-IN typed here as a fixture's assumption, so the run
+# is `demo`; none is a measurement and no price here is a result.
+
+ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0,
+                   "plant_scale": 100000.0, "glucose_price": 0.4}
+
+
+def replays_to_the_last_digits(artifact_id: str, rel: float = 1e-9) -> None:
+    """A run of the ethanol flowsheet replays, identically or with every
+    difference a number within `rel`: BioSTEAM's solvers carry noise in the
+    last digits between cases (measured 2026-10-20: one ulp of the price in
+    some cases), and the replay names it rather than hiding it."""
+    from openferment_core import artifacts
+
+    r = artifacts.replay(artifact_id)
+    for d in r.differences:
+        if d.path in ("…", "toolVersion"):
+            assert d.path == "…", d
+            continue
+        assert isinstance(d.stored, (int, float)) and isinstance(d.replayed, (int, float)), d
+        assert d.replayed == pytest.approx(d.stored, rel=rel, abs=1e-12), d
+
+
+@pytest.fixture(scope="module")
+def warm():
+    proforma.start(background=False)
+    assert proforma.status()["status"] == "ready", proforma.status()
+    return proforma
+
+
+@pytest.mark.sim
+def test_the_ethanol_flowsheet_converges_on_stand_in_assumptions(warm, store):
+    from openferment_core import artifacts
+
+    a = [assume(k, v, v, v, by="openFerment test fixture") for k, v in ETHANOL_STANDIN.items()]
+    art = proforma.run_flowsheet("ethanol_glucose_v0", a, samples=8, seed=1, scenario_id="sc-yeast-1")
+    o = art.output
+    assert art.provenance == "demo" and o["baseInfeasible"] is None and o["feasible"] == o["samples"] == 8
+    assert o["basePrice"] > 0 and o["flowsheet"] == "ethanol_glucose_v0"
+    assert [i.value for i in art.inputs if i.name == "scenario"] == ["sc-yeast-1"]
+    t = proforma.tables_of(art)
+    assert t.tea.teaClass == "ConventionalEthanolTEA" and t.tea.product == "ethanol" and t.tea.feedstock == "glucose"
+    assert sum(line.perUnit for line in t.tea.lines) == pytest.approx(o["basePrice"], rel=1e-9)
+    classes = [u.unitClass for u in t.units]
+    assert classes[:2] == ["Mixer", "Fermenter"] and classes.count("BinaryDistillation") == 2 and "MolecularSieve" in classes
+    rb = o["readBack"]
+    # The theoretical yield is computed in the worker from the reaction and
+    # thermosteam's molecular weights; the document states 0.511.
+    assert rb["theoreticalYieldGPerG"] == pytest.approx(0.511, abs=5e-4)
+    assert rb["fermenterConversion"] == pytest.approx(ETHANOL_STANDIN["yield"] / rb["theoreticalYieldGPerG"], rel=1e-12)
+    assert rb["batchTimeH"] == pytest.approx(ETHANOL_STANDIN["titre"] / ETHANOL_STANDIN["productivity"], rel=1e-12)
+    assert rb["denaturantFraction"] == 0 and rb["productEthanolMassFraction"] > rb["beerEthanolGPerL"] / 1000
+    # The feed's glucose is the bound concentration, by thermosteam's volume of the solution.
+    glucose = next(s for s in t.streams if s.id == "glucose_solution")
+    assert glucose.massFlows["Glucose"] == pytest.approx(rb["glucoseFedKgPerH"], rel=1e-12)
+    assert artifacts.get(art.id).id == art.id
+    replays_to_the_last_digits(art.id)
+
+
+@pytest.mark.sim
+def test_a_yield_above_the_theoretical_cannot_run_and_says_why(warm):
+    above = {**ETHANOL_STANDIN, "yield": 0.6}
+    r = warm.call("run", {"flowsheet": "ethanol_glucose_v0", "base": above, "specs": {"yield": {"kind": "fixed", "value": 0.6}},
+                          "samples": 3, "seed": 0})
+    assert r["base"] is None and "above the theoretical yield of ethanol on glucose" in r["baseInfeasible"]
+    assert r["tables"] is None
+    assert [s["infeasible"]["reason"] for s in r["montecarlo"]["samples"]] == ["yield"] * 3

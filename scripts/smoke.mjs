@@ -716,7 +716,7 @@ async function main() {
       await page.locator('[data-testid="bind-problem"]').waitFor({ timeout: 8000 }).catch(() => {});
       const unbound = await page.locator('main').innerText().catch(() => '');
       if (!/This scenario has not run yet/.test(unbound)) problems.push('a scenario the double cannot bind does not say it has not run');
-      if (!/no flowsheet no_such_flowsheet is on the shelf/.test(unbound)) problems.push('a scenario the double cannot bind does not say the service\u2019s words');
+      if (!/there is no flowsheet no_such_flowsheet on the shelf/.test(unbound)) problems.push('a scenario the double cannot bind does not say the service\u2019s words');
       const unboundRun = await page.getByRole('button', { name: 'Run the scenario' }).isDisabled({ timeout: 5000 }).catch(() => null);
       if (unboundRun !== true) problems.push(unboundRun === null ? 'a scenario the double cannot bind shows no Run' : 'a scenario with no binding is offered a run');
       await page.goto(`http://localhost:${PORT}/#/proforma/scenario/${made}`, { waitUntil: 'networkidle' });

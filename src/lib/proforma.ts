@@ -431,11 +431,14 @@ export const NO_DIAGRAM =
  */
 export const diagramSrc = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
-/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS). */
+/** The words for an infeasible sample's reason (flowsheets/pha_sugar_v0.REASONS and ethanol_glucose_v0.REASONS). */
 export const INFEASIBLE_WORDS: Record<string, string> = {
   carbon: 'left no sugar for respiration',
   oxygen: 'asked for more oxygen than the aerated tank transfers',
   balance: "left the fermenter's mass balance open",
+  yield: 'asked for a yield above the theoretical yield of ethanol on glucose',
+  concentration: 'asked for more glucose than a litre of feed can hold',
+  convergence: 'did not converge in the simulator',
   error: 'failed in the simulator',
 };
 
