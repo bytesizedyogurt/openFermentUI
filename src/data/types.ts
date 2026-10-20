@@ -1361,6 +1361,50 @@ export interface ModuleRow {
   detail: Record<string, unknown>;
 }
 
+/** One line of the audit log (OF-BLD-015 §7.3). */
+export interface AuditEntry {
+  at: string;
+  agent: 'model' | 'person';
+  who: string;
+  module: ModuleName;
+  action: string;
+  state: string;
+  target: string | null;
+  askId: string | null;
+  effort: string | null;
+  detail: Record<string, unknown>;
+}
+
+export type ProposalState = 'proposed' | 'done' | 'dismissed';
+
+/** What a model asked for at a gate (OF-BLD-015 §7.4), until a person acts on Home. */
+export interface Proposal {
+  id: string;
+  at: string;
+  module: ModuleName;
+  action: string;
+  gate: string;
+  title: string;
+  why: string;
+  how: string;
+  route: string | null;
+  server: boolean;
+  target: string | null;
+  fields: Record<string, string>;
+  note: string;
+  by: string;
+  askId: string | null;
+  state: ProposalState;
+  carriedOutBy: string | null;
+  carriedOutAt: string | null;
+  result: string | null;
+}
+
+export interface ProposalAction {
+  person: string;
+  reason: string;
+}
+
 export interface CoverageMap {
   entities: string[];
   searched: number;

@@ -66,6 +66,10 @@ const PAIRS = [
   ['CoverageMap', 'CoverageMap'],
   // OF-BLD-015 §7.2 — what a module's read tool returns.
   ['ModuleRow', 'ModuleRow'],
+  // OF-BLD-015 §7.3, §7.4 — the audit log and the proposals.
+  ['AuditEntry', 'AuditEntry'],
+  ['Proposal', 'Proposal'],
+  ['ProposalAction', 'ProposalAction'],
   // OF-BLD-012 §2.5 — Intake. The service's FetchedSection is the browser's
   // PaperSection; the rest keep their names on both sides.
   ['FetchedSection', 'PaperSection'],

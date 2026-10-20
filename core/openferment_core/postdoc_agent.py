@@ -37,6 +37,7 @@ import copy
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -92,7 +93,11 @@ moduleRefs. A row's state is the service's; say it, never decide it.
 it is discarded whole.
 11. When the question asks for a runbook, gather the evidence (records by \
 field, a ceiling or a forecast by evidence id), then call draft_runbook: the \
-draft is the answer the person asked for, and nothing else stands in for it."""
+draft is the answer the person asked for, and nothing else stands in for it.
+12. Each module also has a write tool (geneos_write, intake_write and the \
+rest). What it writes lands marked as yours for a person to promote; an \
+action at a gate comes back `state: proposed` and waits for a person on Home. \
+Say in gaps what you wrote or proposed, and what a tool refused to write."""
 )
 
 
@@ -185,6 +190,14 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         what += [", ".join(inp["ids"])] if inp.get("ids") else []
         what += [str(inp[k]) for k in ("kind", "state") if inp.get(k)]
         return f"Read {label}{' for ' + ' · '.join(what) if what else ''} · {_count(int(result.summary.get('count', 0)), 'row')}"
+    if name.endswith("_write") and name[: -len("_write")] in module_stores.LABEL:
+        label = module_stores.LABEL[name[: -len("_write")]]
+        action = str(inp.get("action") or "")
+        target = f" {inp['target']}" if inp.get("target") else ""
+        state = str(result.summary.get("state") or "")
+        if state == "proposed" and result.summary.get("proposalId"):
+            return f"Proposed to {label}: {action}{target} · waits for a person on Home"
+        return f"Wrote {label}: {action}{target}" + (f" · {state}" if state else "")
     return f"Ran {name}"
 
 
@@ -321,6 +334,7 @@ def ask(
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     ctx = ctx or tools.ToolContext()
+    ctx.ask_id = f"ask-{uuid.uuid4().hex[:12]}"
     run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock())
     if cancelled is not None:
         run.cancelled = cancelled

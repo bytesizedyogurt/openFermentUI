@@ -52,7 +52,6 @@ PARTIAL = {
                 "the service read the seed's runbooks and protocols",
     "fermos": "depositions stay in the browser; the service read the fits and forecasts it computed",
     "biorepo": "review decisions not yet posted from a browser stay in that browser",
-    "home": "proposals awaiting a person arrive with OF-BLD-015 §7.4; the service read the review queue and open checks",
 }
 
 # Words that name a module itself. Common nouns ("record", "host") are left
@@ -187,6 +186,7 @@ class Sources:
     shelf: Callable[[], list[Any]]
     strain_aliases: Callable[[], dict[str, str]]
     witness: Callable[[], list[Any]] = list
+    proposals: Callable[[], list[Any]] = list
 
 
 def _projection() -> dict[str, Any]:
@@ -202,7 +202,7 @@ def _strain_aliases() -> dict[str, str]:
 
 
 def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
-    from . import artifacts, checks, evidence_pool, geneos, guild, intake, witness
+    from . import artifacts, checks, evidence_pool, geneos, guild, intake, proposals, witness
 
     return Sources(
         projection=_projection,
@@ -214,6 +214,7 @@ def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
         shelf=geneos.models,
         strain_aliases=_strain_aliases,
         witness=witness.runs,
+        proposals=proposals.open_ones,
     )
 
 
@@ -426,6 +427,10 @@ class Stores:
                 # Who a check names is never shown before it is run.
                 yield Row("home", "check", c.id, f"Open check on {', '.join(c.skillIds)}", check_state(c.state), c.state,
                           detail={"skillIds": c.skillIds})
+        for p in self._get("proposals"):
+            # What a model asked for at a gate (§7.4), waiting for a person.
+            yield Row("home", "proposal", p.id, p.title, "proposed", p.gate, words=" ".join([p.module, p.action, p.why]),
+                      detail={"module": p.module, "action": p.action, "gate": p.gate, "how": p.how, "by": p.by, "at": p.at})
 
 
 # ── reading, for the read tools ───────────────────────────────────────────
@@ -441,7 +446,7 @@ KINDS = {
     "guild": ("person", "check"),
     "primer": ("lesson",),
     "intake": ("source",),
-    "home": ("review", "check"),
+    "home": ("review", "check", "proposal"),
 }
 
 

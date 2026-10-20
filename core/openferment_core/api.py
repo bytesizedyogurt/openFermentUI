@@ -34,6 +34,9 @@ from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild,
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
+    AuditEntry,
+    Proposal,
+    ProposalAction,
     AnswerPlan,
     Artifact,
     AskRequest,
@@ -770,6 +773,52 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
 def tools_list() -> list[ToolInfo]:
     """Each tool's name, description and input schema."""
     return tools.infos()
+
+
+# ── Proposals and the audit log (OF-BLD-015 §7.3, §7.4) ────────────────
+
+
+@app.get("/api/proposals", response_model=list[Proposal])
+def proposals_list(state: str | None = None) -> list[Proposal]:
+    """Every proposal, or those in one state; Home shows the `proposed`."""
+    from . import proposals
+
+    every = proposals.read().proposals
+    return [p for p in every if state is None or p.state == state]
+
+
+@app.post("/api/proposals/{proposal_id}/carry-out", response_model=Proposal)
+def proposals_carry_out(proposal_id: str, action: ProposalAction) -> Proposal:
+    """A person presses the button: the server runs the action in their name
+    where it can, and records that they took it otherwise."""
+    from . import checks, extract, proposals
+
+    try:
+        return proposals.carry_out(proposal_id, action.person)
+    except proposals.ProposalRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except checks.CheckRefused as e:
+        raise HTTPException(status_code=422, detail=f"{e}") from e
+    except (extract.ExtractUnavailable, extract.ExtractTruncated, llm.ModelUnavailable, llm.ModelRefused) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/api/proposals/{proposal_id}/dismiss", response_model=Proposal)
+def proposals_dismiss(proposal_id: str, action: ProposalAction) -> Proposal:
+    from . import proposals
+
+    try:
+        return proposals.dismiss(proposal_id, action.person, action.reason)
+    except proposals.ProposalRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/audit", response_model=list[AuditEntry])
+def audit_read(limit: int = 200) -> list[AuditEntry]:
+    """The newest lines of the audit log, newest last."""
+    from . import audit
+
+    return audit.read(max(1, min(limit, audit.MAX_READ)))
 
 
 @app.post("/api/tools/{name}", response_model=ToolResult)

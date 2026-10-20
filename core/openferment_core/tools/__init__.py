@@ -53,6 +53,18 @@ WHITELIST = (
     "primer_read",
     "intake_read",
     "home_read",
+    # OF-BLD-015 §7.3 — its pair, one write tool per module.
+    "dominion_write",
+    "runbooks_write",
+    "geneos_write",
+    "fermos_write",
+    "pureos_write",
+    "proforma_write",
+    "biorepo_write",
+    "guild_write",
+    "primer_write",
+    "intake_write",
+    "home_write",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -74,6 +86,9 @@ class ToolContext:
     # hands in its own factory.
     stores_factory: Callable[[], Any] | None = None
     _stores: Any = field(default=None, repr=False)
+    # The ask this run belongs to, on every audit line a write makes (§7.3);
+    # empty for a call from the endpoint or the MCP server.
+    ask_id: str = ""
 
     @property
     def pool(self) -> Any:
@@ -192,6 +207,7 @@ def infos() -> list[ToolInfo]:
 from . import fermos as _fermos  # noqa: E402,F401
 from . import geneos as _geneos  # noqa: E402,F401
 from . import modules as _modules  # noqa: E402,F401
+from . import writes as _writes  # noqa: E402,F401
 from . import passages as _passages  # noqa: E402,F401
 from . import proforma as _proforma  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401

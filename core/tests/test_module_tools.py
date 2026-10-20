@@ -151,7 +151,7 @@ def test_a_whole_request_stays_inside_the_sixteen_union_parameters_strict_tools_
                    for m in module_stores.MODULES)
 
 
-def test_the_read_tools_go_out_loose_and_the_rest_strict():
+def test_the_module_tools_go_out_loose_and_the_rest_strict():
     """Eighteen strict tools compiled to a grammar the API refused as too
     large (live, 2026-10-19); the seven earlier tools stay strict, and
     `tools.run` validates every input either way."""
@@ -159,7 +159,7 @@ def test_the_read_tools_go_out_loose_and_the_rest_strict():
 
     sent = [llm.tool_param(t["name"], t["description"], t["input_schema"], t["strict"]) for t in postdoc_agent._tool_defs()]
     assert [t["name"] for t in sent if t["strict"]] == list(tools.WHITELIST[:7])
-    assert {t["name"] for t in sent if not t["strict"]} == {f"{m}_read" for m in module_stores.MODULES}
+    assert {t["name"] for t in sent if not t["strict"]} == {f"{m}_{w}" for m in module_stores.MODULES for w in ("read", "write")}
     assert "refused its input" in tools.run("dominion_read", {"ids": "hot-start-taq", "words": "", "kind": "", "state": "",
                                                               "limit": 5}).error
 

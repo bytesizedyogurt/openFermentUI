@@ -188,8 +188,8 @@ def test_a_summary_over_the_limit_is_replaced_by_an_error(monkeypatch, pool):
     assert r.summary == {} and "over the 9000" in r.error
 
 
-READS = [f"{m}_read" for m in ("dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild",
-                                 "primer", "intake", "home")]
+MODULES = ("dominion", "runbooks", "geneos", "fermos", "pureos", "proforma", "biorepo", "guild", "primer", "intake", "home")
+READS = [f"{m}_read" for m in MODULES] + [f"{m}_write" for m in MODULES]
 
 
 def test_only_the_whitelisted_names_may_register():

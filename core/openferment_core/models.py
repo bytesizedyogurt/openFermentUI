@@ -178,6 +178,69 @@ class ModuleRow(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
+class AuditEntry(BaseModel):
+    """One line of core/data/audit.jsonl (OF-BLD-015 §7.3): a write a model
+    made, or a proposal a person carried out or dismissed."""
+
+    at: str
+    agent: Literal["model", "person"]
+    # The model id, or the person's name.
+    who: str
+    module: ModuleName
+    action: str
+    # The state the write left behind, or `proposed`, `done`, `dismissed`.
+    state: str
+    target: str | None = None
+    askId: str | None = None
+    effort: str | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+ProposalState = Literal["proposed", "done", "dismissed"]
+
+
+class Proposal(BaseModel):
+    """What a model asked for at a gate (OF-BLD-015 §7.4), until a person
+    carries it out or dismisses it on Home."""
+
+    id: str
+    at: str
+    module: ModuleName
+    action: str
+    gate: str
+    title: str
+    why: str
+    # What the button does, in words, and where it takes the person when the
+    # server cannot act itself.
+    how: str
+    route: str | None = None
+    server: bool = False
+    target: str | None = None
+    fields: dict[str, str] = Field(default_factory=dict)
+    note: str = ""
+    # The model that proposed it.
+    by: str
+    askId: str | None = None
+    state: ProposalState = "proposed"
+    carriedOutBy: str | None = None
+    carriedOutAt: str | None = None
+    result: str | None = None
+
+
+class Proposals(BaseModel):
+    """core/data/proposals.json."""
+
+    version: Literal[1] = 1
+    proposals: list[Proposal] = Field(default_factory=list)
+
+
+class ProposalAction(BaseModel):
+    """A person carrying out or dismissing a proposal."""
+
+    person: str
+    reason: str = ""
+
+
 class CoverageMap(BaseModel):
     """The sweep, module by module, in the order the rail lists them."""
 
