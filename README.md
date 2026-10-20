@@ -10,7 +10,7 @@ full fidelity, the faculty demo, and the executable spec for the eventual produc
 
 ## The program it is built around
 
-Not a generic demo. The corpus serves two real research programs. The first, threads A to O,
+Not a generic demo. The corpus serves three real research programs. The first, threads A to O,
 was curated by hand before Intake existed, and most screens are populated from it:
 
 > **Can phosphorylated bovine β-casein be expressed in the cell-wall-deficient
@@ -41,8 +41,19 @@ every number on a thread P paper arrives through Intake and a Guild decision. Tw
 (*Cupriavidus necator* H16, *Pseudomonas putida* KT2440), two products (PHB, mcl-PHA) and five
 polymer ontology fields are in place for it. As of 2026-10-15 the thread holds **35 papers**
 (P1–P35), proposed by the rule held to title and abstract and approved by Sean Creighton on
-2026-10-14; all 35 return full text from Europe PMC, and none has been through extraction yet
-(`STATE.md`, `## Live owed`). Home's **Programs** strip counts both programs live.
+2026-10-14; all 35 return full text from Europe PMC (`STATE.md` has what extraction has done
+since).
+
+The third program is **ethanol from glucose by wild-type *Saccharomyces cerevisiae* in batch**,
+thread Q, proposed by the same rule module (`pnpm thread:propose:q`) and applied on Sean
+Creighton's approval on 2026-10-20: **22 sources**, two NREL reports from OSTI (the corn stover
+design report by Humbird et al. and its successor by Tao et al.), the Saccharomyces Genome
+Database entries for S288C and CEN.PK113-7D, and 18 open-access kinetics and physiology papers,
+all 22 fetched with full text. Extraction on Haiku anchored **163** values to sentences (all
+`unverified` until a person decides them in Guild). geneOS carries two reconstructions of
+*S. cerevisiae* S288C, Yeast9 and iMM904, each giving an ethanol ceiling on glucose; Proforma's
+stored BioSTEAM benchmark prices the Humbird design. `docs/DEMO-YEAST.md` is its run sheet.
+Home's **Programs** strip counts each program live.
 
 ## What is real, and what is modeled
 
@@ -420,7 +431,7 @@ export set together.
 ### The gate
 
 ```bash
-pnpm verify              # offline — no key, no service, no network — twenty-two stages, in order:
+pnpm verify              # offline — no key, no service, no network — twenty-four stages, in order:
   pnpm check:secrets     #   no key under src/, none committed, core/.env still ignored
   pnpm typecheck         #   tsc --noEmit
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field
@@ -435,7 +446,10 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   guild.py's rules, the competence mirror replayed from competence.ts, and
                          #   practice.py's drafts and tutor turns against a stand-in model, and
                          #   checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs
+  pnpm test:sim          #   the real BioSTEAM worker answers (pytest marker sim)
   pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
+  pnpm check:tools       #   every module has a read and a write tool; a write goes through its module's write
+                         #   function; a gated action waits for a person's name; docs/TOOLS.md's gate table is gates.py's
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails

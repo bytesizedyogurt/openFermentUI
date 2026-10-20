@@ -89,3 +89,13 @@ def test_the_map_is_the_first_step_and_rides_in_round_one(pool):  # noqa: F811
     assert out.coverage is not None and out.coverage.found >= 1
     # Nothing written, yet the decline never says the corpus is silent.
     assert out.declined and "corpus does not contain" not in out.declined and "Dominion" in out.declined
+
+
+def test_the_map_says_its_refs_are_for_reading_not_for_citing(pool):  # noqa: F811
+    """OF-BLD-016 §1.2's live run: Haiku cited `geneos/model/Yeast9` from the map
+    without reading geneOS, and the validator rightly dropped both ceiling
+    claims. The map and the prompt say a ref is citable only once a read tool
+    returns it in this conversation."""
+    text = module_stores.for_model(module_stores.coverage("brazzein", stores(pool)))
+    assert "not citable" in text and "read tool returns" in text
+    assert "not citable" in postdoc_agent.AGENT_SYSTEM

@@ -114,7 +114,10 @@ sentence.
 11. The app's modules each have a read tool (dominion_read, runbooks_read, \
 geneos_read and the rest). When the coverage map names a module, read it with \
 its tool before you answer, and cite the rows you rely on by their ref in \
-moduleRefs. A row's state is the service's; say it, never decide it.
+moduleRefs. The map's refs are not citable: put a ref in moduleRefs only when \
+a read tool returned it in this conversation, or the claim is discarded. A \
+computed ceiling is cited by its evidence id, never by the model's ref. A \
+row's state is the service's; say it, never decide it.
 12. Never write a numeral, a count or an ordinal in a claim or a gap: not \
 "2 rows", not "the first", not "one of 55". Say "several", "one of them", \
 "the rows returned"; the screen shows the counts. A claim with a number in \

@@ -583,7 +583,9 @@ def for_model(cmap: CoverageMap) -> str:
     lines = [
         "COVERAGE MAP, built by code before you began. It says which of the app's modules hold what this question "
         "names. When a module below found something, do not say the app or the corpus holds nothing about it: "
-        "read that module with its tool and answer from what it returns, or say in `gaps` why you could not.",
+        "read that module with its tool and answer from what it returns, or say in `gaps` why you could not. "
+        "The refs below are for reading and are not citable: a ref goes in a claim's moduleRefs only after a "
+        "read tool returns it in this conversation, and a claim citing one no read tool returned is discarded.",
         f"Names found in the question: {', '.join(cmap.entities) or 'none'}.",
     ]
     for m in cmap.modules:
