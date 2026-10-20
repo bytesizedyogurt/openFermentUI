@@ -409,6 +409,13 @@ def test_the_resolver_fixture_covers_both_rules_and_their_refusals():
     assert strains["Chlamydomonas reinhardtii UVM4"] == "uvm4"
     assert strains["uvm40"] is None and strains["xuvm4"] is None
     assert strains["cw15 and UVM4 crossed"] is None
+    # Thread Q: a designation resolves; the species, the bare CEN.PK family,
+    # its other members and an S288C derivative do not.
+    assert strains["Saccharomyces cerevisiae S288C"] == "s-cerevisiae-s288c"
+    assert strains["CEN.PK113-7D MATa"] == "s-cerevisiae-cenpk113-7d"
+    assert strains["Saccharomyces cerevisiae"] is None and strains["cen.pk"] is None
+    assert strains["CEN.PK2-1C"] is None and strains["CEN.PK113-5D"] is None
+    assert strains["BY4741"] is None
     carbon = {c["text"]: c["id"] for c in RX["carbon"]}
     assert carbon["crude glycerol"] == "glycerol"
     assert carbon["glucosamine"] is None and carbon["glucose and xylose"] is None

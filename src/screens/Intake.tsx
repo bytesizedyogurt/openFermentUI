@@ -63,6 +63,7 @@ const FAMILY_LABEL: Record<string, string> = {
   vvm: 'Gas flow (vvm)',
   rpm: 'Agitation (rpm)',
   length: 'Length (m)',
+  costUSDVolume: 'Price per volume (USD gal⁻¹)',
   unrecognised: 'Unrecognised unit',
 };
 

@@ -21,7 +21,7 @@ export interface UnitDef {
 // Family base units: rate=h⁻¹, time=h, massConc=g L⁻¹, mass=g, volume=L,
 // percent=%, yield=g g⁻¹, volProd=g L⁻¹ h⁻¹, specProd=mg g⁻¹ h⁻¹,
 // odDcw=g L⁻¹ OD⁻¹, temp=°C, light=µmol m⁻² s⁻¹, ph=(none), molar=mol L⁻¹,
-// percentCdw=% CDW, molarMass=g mol⁻¹
+// percentCdw=% CDW, molarMass=g mol⁻¹, costUSDVolume=USD gal⁻¹
 export const U: Record<string, UnitDef> = {
   'h⁻¹': { family: 'rate', factor: 1, label: 'h⁻¹' },
   'd⁻¹': { family: 'rate', factor: 1 / 24, label: 'd⁻¹' },
@@ -109,6 +109,13 @@ export const U: Record<string, UnitDef> = {
   'g mol⁻¹': { family: 'molarMass', factor: 1, label: 'g mol⁻¹' },
   Da: { family: 'molarMass', factor: 1, label: 'Da' },
   kDa: { family: 'molarMass', factor: 1000, label: 'kDa' },
+
+  // ── the yeast-ethanol program (thread Q) ────────────────────────────
+  // A price per US gallon, as ethanol techno-economic analyses quote one.
+  // Its OWN family, not `costUSD`: a gallon is a volume and a kilogram a
+  // mass, and between them stands the product's density, which a unit
+  // engine has no business assuming. `gal` is read as the US gallon.
+  'USD gal⁻¹': { family: 'costUSDVolume', factor: 1, label: 'USD gal⁻¹' },
 };
 
 /**
@@ -142,6 +149,13 @@ export const REFUSALS: { a: string; b: string; because: string }[] = [
     b: 'massConc',
     because:
       'A share of dry cell mass and a concentration are not interconvertible without the biomass density of that culture. Record the dry cell weight per litre the paper reports for it and the conversion becomes possible; guessing it would fabricate a titre.',
+  },
+  {
+    // Thread Q: a minimum ethanol selling price and minimum_selling_price.
+    a: 'costUSDVolume',
+    b: 'costUSD',
+    because:
+      'A price per gallon and a price per kilogram are not interconvertible without the density of the product. Record the density the analysis assumes for it and the conversion becomes possible; guessing it would fabricate a price.',
   },
 ];
 
@@ -196,6 +210,7 @@ export const SI_UNIT: Record<string, string> = {
   percentCdw: '% CDW',
   // The kDa is numerically the SI kg mol⁻¹.
   molarMass: 'kDa',
+  costUSDVolume: 'USD gal⁻¹',
 };
 
 // Alias normalization: accept human/ASCII notations.
@@ -267,6 +282,21 @@ export const ALIASES: Record<string, string> = {
   '% (w/w)': '% CDW',
   kda: 'kDa',
   'kg/mol': 'kDa',
+  // Thread Q. How techno-economic analyses write a price per gallon or per
+  // kilogram; every spelling names its currency and its denominator.
+  '$/gal': 'USD gal⁻¹',
+  'USD/gal': 'USD gal⁻¹',
+  '$ gal-1': 'USD gal⁻¹',
+  '$ gal⁻¹': 'USD gal⁻¹',
+  // The minus sign journals print: the fallback below compares table keys,
+  // not aliases, so the spelling with U+2212 needs its own entry.
+  '$ gal−1': 'USD gal⁻¹',
+  'US$/gal': 'USD gal⁻¹',
+  '$/gallon': 'USD gal⁻¹',
+  '$ per gallon': 'USD gal⁻¹',
+  'usd per gallon': 'USD gal⁻¹',
+  '$/kg': 'USD kg⁻¹',
+  'USD/kg': 'USD kg⁻¹',
   m: 'mol L⁻¹',
   mm: 'mmol L⁻¹',
   um: 'µmol L⁻¹',

@@ -51,11 +51,14 @@ export type ParameterFamily =
   | 'cultivation'
   | 'downstream'
   // OF-BLD-014 §2.1 — thread P's polyhydroxyalkanoates.
-  | 'polymer';
+  | 'polymer'
+  // The yeast-ethanol program (thread Q): growth, product and price kinetics.
+  | 'kinetics';
 
 /**
- * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — and
- * the polymer family OF-BLD-014 §2.1 adds: twenty-nine fields in six.
+ * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
+ * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
+ * yeast-ethanol program (thread Q) adds: forty fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -92,7 +95,19 @@ export type FieldId =
   | 'pha_titre'
   | 'pha_yield_substrate'
   | 'pha_productivity'
-  | 'pha_mw';
+  | 'pha_mw'
+  // Family 7 — growth and product kinetics (thread Q)
+  | 'monod_ks'
+  | 'biomass_yield_substrate'
+  | 'ethanol_yield_substrate'
+  | 'ethanol_titre'
+  | 'ethanol_productivity'
+  | 'ethanol_inhibition_ki'
+  | 'ethanol_max_conc'
+  | 'substrate_inhibition_ki'
+  | 'ethanol_lp_alpha'
+  | 'ethanol_lp_beta'
+  | 'ethanol_mesp';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17

@@ -1,6 +1,7 @@
 // Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families,
-// replacing the 16-field synthetic ontology of OF-DES-001 Appendix C — and
-// the polymer family OF-BLD-014 §2.1 adds for thread P: 29 fields in six.
+// replacing the 16-field synthetic ontology of OF-DES-001 Appendix C — the
+// polymer family OF-BLD-014 §2.1 adds for thread P, and the kinetics family
+// the yeast-ethanol program adds for thread Q: 40 fields in seven.
 //
 // Two rules this literature forces and the synthetic version did not:
 //
@@ -22,6 +23,7 @@ export const FAMILY_LABEL: Record<ParameterFamily, string> = {
   cultivation: 'Cultivation',
   downstream: 'Downstream & economics',
   polymer: 'Polymer',
+  kinetics: 'Growth and product kinetics',
 };
 
 /**
@@ -30,6 +32,14 @@ export const FAMILY_LABEL: Record<ParameterFamily, string> = {
  */
 const D9_RANGE_NOTE =
   'Validation range proposed in OF-BLD-014 and accepted by Sean Creighton on 2026-10-14. It rejects implausible extractions and states nothing about what has been achieved.';
+
+/**
+ * The same, for the kinetics family the yeast-ethanol program (thread Q)
+ * adds, written in D9's form. One constant, so that recording Sean's answer
+ * is a one-line edit.
+ */
+const Y1_RANGE_NOTE =
+  'Validation range proposed on 2026-10-20 for the yeast-ethanol program (thread Q), awaiting acceptance by Sean Creighton. It rejects implausible extractions and states nothing about what has been achieved.';
 
 export const ONTOLOGY: ParameterDef[] = [
   // ── Family 1 — expression performance ───────────────────────────────
@@ -375,6 +385,133 @@ export const ONTOLOGY: ParameterDef[] = [
     range: [1, 10000],
     notes: D9_RANGE_NOTE,
     requiresMethod: true,
+  },
+
+  // ── Family 7 — growth and product kinetics (thread Q) ───────────────
+  // The yeast-ethanol program: wild-type S. cerevisiae on glucose in batch.
+  // The parameters a kinetics paper fits, the titre, yield and productivity
+  // it fits them to, and the selling price a techno-economic analysis
+  // computes. The extraction model reads each definition, so each names the
+  // fields it must not be mistaken for and carries no number. Every range is
+  // a guard proposed for Sean Creighton's acceptance, not a value anybody
+  // measured.
+  {
+    id: 'monod_ks',
+    family: 'kinetics',
+    name: 'Substrate saturation constant (Ks)',
+    definition:
+      'The substrate concentration at which the specific growth rate is half its maximum in a Monod-type growth model, as a mass concentration of the limiting substrate. A fitted or reported model parameter: not a substrate concentration supplied to or measured in the medium (medium_component_conc), and not the constant of a substrate-inhibition term (substrate_inhibition_ki).',
+    canonicalUnit: 'g L⁻¹',
+    range: [1e-5, 100],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'biomass_yield_substrate',
+    family: 'kinetics',
+    name: 'Biomass yield on substrate (Yx/s)',
+    definition:
+      'Grams of dry biomass formed per gram of substrate consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. Not a yield on oxygen or on a product, and not a yield per mole or per C-mole, which belongs to no field.',
+    canonicalUnit: 'g g⁻¹',
+    range: [0.001, 1],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_yield_substrate',
+    family: 'kinetics',
+    name: 'Ethanol yield on substrate (Yp/s)',
+    definition:
+      'Grams of ethanol formed per gram of substrate consumed, over the phase or run the quote states, whether observed or fitted as a model parameter. A yield given as a percentage of the theoretical maximum is a different quantity and belongs to no field.',
+    canonicalUnit: 'g g⁻¹',
+    range: [0.001, 0.6],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_titre',
+    family: 'kinetics',
+    name: 'Ethanol titre',
+    definition:
+      'Ethanol concentration in the broth, as mass per volume, at the time the quote states — commonly the final or peak concentration of a run. A measured concentration, not the model parameter at which ethanol stops growth (ethanol_max_conc). A concentration given as a percentage by volume needs the density of ethanol to become a mass, and belongs to no field.',
+    canonicalUnit: 'g L⁻¹',
+    range: [0.01, 250],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_productivity',
+    family: 'kinetics',
+    name: 'Ethanol volumetric productivity',
+    definition:
+      'Ethanol formed per litre of broth per hour, over the period the quote states. Use it rather than volumetric_productivity when the product is ethanol. Not a specific rate per gram of biomass, which belongs to no field.',
+    canonicalUnit: 'g L⁻¹ h⁻¹',
+    range: [0.001, 100],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_inhibition_ki',
+    family: 'kinetics',
+    name: 'Ethanol inhibition constant (Ki)',
+    definition:
+      'The ethanol concentration constant of a product-inhibition term in a growth or production rate model, such as the non-competitive term Ki/(Ki + P) where P is the ethanol concentration, in concentration units. A constant in litres per gram, the reciprocal of a concentration as in an exponential term, belongs to no field; the concentration at which ethanol stops growth is ethanol_max_conc.',
+    canonicalUnit: 'g L⁻¹',
+    range: [0.01, 300],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_max_conc',
+    family: 'kinetics',
+    name: 'Maximum ethanol concentration (Pmax)',
+    definition:
+      'The ethanol concentration at which growth or ethanol formation stops in a Levenspiel-type or linear product-inhibition model, where the inhibition term falls to nothing as the ethanol concentration P reaches Pmax. A model parameter: not the highest titre a run reached (ethanol_titre), and not the constant of a non-competitive term (ethanol_inhibition_ki).',
+    canonicalUnit: 'g L⁻¹',
+    range: [1, 300],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'substrate_inhibition_ki',
+    family: 'kinetics',
+    name: 'Substrate inhibition constant (KiS)',
+    definition:
+      'The substrate concentration constant of a substrate-inhibition term in an Andrews- or Haldane-type growth model, the term that lowers the specific growth rate as substrate accumulates. Not the saturation constant (monod_ks), and not an ethanol constant.',
+    canonicalUnit: 'g L⁻¹',
+    range: [0.01, 1000],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_lp_alpha',
+    family: 'kinetics',
+    name: 'Luedeking–Piret growth-associated coefficient (α)',
+    definition:
+      'The growth-associated coefficient α of the Luedeking–Piret model dP/dt = α dX/dt + β X, where P is ethanol and X is biomass: grams of ethanol formed per gram of biomass formed. A fitted model coefficient, not a yield on substrate.',
+    canonicalUnit: 'g g⁻¹',
+    range: [0, 50],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_lp_beta',
+    family: 'kinetics',
+    name: 'Luedeking–Piret non-growth-associated coefficient (β)',
+    definition:
+      'The non-growth-associated coefficient β of the Luedeking–Piret model dP/dt = α dX/dt + β X, where P is ethanol and X is biomass: grams of ethanol formed per gram of biomass per hour. A fitted model coefficient; a specific ethanol production rate measured in a run belongs to no field.',
+    canonicalUnit: 'g g⁻¹ h⁻¹',
+    range: [0, 10],
+    notes: Y1_RANGE_NOTE,
+  },
+  {
+    id: 'ethanol_mesp',
+    family: 'kinetics',
+    name: 'Minimum ethanol selling price',
+    definition:
+      'The ethanol price per US gallon at which a modelled plant breaks even over its life, as a techno-economic analysis states it. Its method is the costing basis the analysis names, such as a discounted cash flow analysis, or "undetermined" when it names none. A price per kilogram is minimum_selling_price; a price per litre belongs to no field.',
+    canonicalUnit: 'USD gal⁻¹',
+    range: [0.1, 50],
+    notes: Y1_RANGE_NOTE,
+    requiresMethod: true,
+    refuseConversionTo: [
+      {
+        field: 'minimum_selling_price',
+        because:
+          'Needs the density of the product the analysis assumes. Without it, a price per gallon cannot become a price per kilogram.',
+      },
+    ],
   },
 ];
 

@@ -49,6 +49,21 @@ export const STRAIN_ALIASES: Record<string, string> = {
   kt2440: 'p-putida-kt2440',
   'p. putida kt2440': 'p-putida-kt2440',
   'pseudomonas putida kt2440': 'p-putida-kt2440',
+  // Thread Q yeasts, by the same rule. "Saccharomyces cerevisiae" alone names
+  // a species, and bare "CEN.PK" names a family: CEN.PK2-1C and CEN.PK113-5D
+  // are different strains from CEN.PK113-7D, so neither spelling is here.
+  // BY4741 and BY4742 descend from S288C and are not it, so neither is an
+  // alias; wording that names S288C as their background ("BY4741, an S288C
+  // derivative") still resolves to S288C by the whole-word rule, and the
+  // reviewer reads the paper's wording beside the id (`organismText`).
+  s288c: 's-cerevisiae-s288c',
+  's. cerevisiae s288c': 's-cerevisiae-s288c',
+  'saccharomyces cerevisiae s288c': 's-cerevisiae-s288c',
+  'cen.pk113-7d': 's-cerevisiae-cenpk113-7d',
+  'cen.pk 113-7d': 's-cerevisiae-cenpk113-7d',
+  'cen.pk113-7d mata': 's-cerevisiae-cenpk113-7d',
+  's. cerevisiae cen.pk113-7d': 's-cerevisiae-cenpk113-7d',
+  'saccharomyces cerevisiae cen.pk113-7d': 's-cerevisiae-cenpk113-7d',
 };
 
 /**
@@ -413,6 +428,44 @@ export const STRAINS: Strain[] = [
         at: '2026-10-14',
         who: 'OF-BLD-014 §2.2',
         text: 'Catalogued as the medium-chain-length PHA host of thread P. Nothing in the corpus is attributed to it until thread P papers are fetched, extracted and reviewed.',
+      },
+    ],
+  },
+  // Wild-type yeasts for thread Q, ethanol from glucose in batch. Kept apart
+  // from the S288C-derived platform entry above, which products and runbooks
+  // name: a value measured on one strain is not a value for the other. Each
+  // note says where the identity comes from and states no process number.
+  {
+    id: 's-cerevisiae-s288c',
+    binomial: 'Saccharomyces cerevisiae',
+    designation: 'S288C',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes', 'Saccharomycetales', 'Saccharomycetaceae', 'Saccharomyces'],
+    description:
+      'The reference laboratory strain of budding yeast. The reference genome the Saccharomyces Genome Database publishes was sequenced from it, and the BY strains of the deletion collections descend from it; a derivative is not the parent, and a value measured on one is not attributed to the other.',
+    badges: ['reference genome', 'laboratory strain', 'BSL-1'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-10-20',
+        who: 'Thread Q',
+        text: 'Catalogued as a wild-type host of thread Q, ethanol from glucose in batch. Its identity is as the Saccharomyces Genome Database strain page gives it: https://www.yeastgenome.org/strain/S288C. Nothing in the corpus is attributed to it until thread Q papers are fetched, extracted and reviewed.',
+      },
+    ],
+  },
+  {
+    id: 's-cerevisiae-cenpk113-7d',
+    binomial: 'Saccharomyces cerevisiae',
+    designation: 'CEN.PK113-7D',
+    taxonomy: ['Eukaryota', 'Fungi', 'Ascomycota', 'Saccharomycetes', 'Saccharomycetales', 'Saccharomycetaceae', 'Saccharomyces'],
+    description:
+      'The prototrophic haploid of the CEN.PK family, widely used in yeast physiology and quantitative fermentation studies. Its relatives CEN.PK2-1C and CEN.PK113-5D carry auxotrophic markers and are different strains, so the family name alone names none of them.',
+    badges: ['prototrophic', 'physiology reference', 'BSL-1'],
+    bsl: 1,
+    notes: [
+      {
+        at: '2026-10-20',
+        who: 'Thread Q',
+        text: 'Catalogued as a wild-type host of thread Q, ethanol from glucose in batch. Its identity is as the Saccharomyces Genome Database strain page for the CEN.PK family gives it: https://www.yeastgenome.org/strain/CEN.PK. Nothing in the corpus is attributed to it until thread Q papers are fetched, extracted and reviewed.',
       },
     ],
   },

@@ -85,6 +85,31 @@ const NORMALIZE_INPUTS = [
   'h\u22121',
   'g L\u22121 h\u22121',
   'g L\u20131',
+  // Thread Q — a price per gallon and per kilogram, every alias it adds …
+  'USD gal⁻¹', // the key itself
+  '$/gal',
+  'USD/gal',
+  '$ gal-1',
+  '$ gal⁻¹',
+  'US$/gal',
+  '$/gallon',
+  '$ per gallon',
+  'USD per gallon', // through the lower-cased alias
+  'USD gal-1', // ASCII superscript, by the fallback
+  '$ gal−1', // the printed minus, through its own alias
+  '$/kg',
+  'USD/kg',
+  // … and the spellings its kinetic fields arrive in, each reaching the
+  // field's canonical unit through an alias or the fallback.
+  'g/g',
+  'g g-1',
+  'g L-1',
+  'g/L/h',
+  'g L-1 h-1',
+  'g/g/h',
+  'g g-1 h-1',
+  'g g\u22121 h\u22121',
+  'h-1',
 ];
 
 const normalize = NORMALIZE_INPUTS.map((raw) => ({
@@ -114,6 +139,10 @@ const CONVERT_INPUTS: [number, string, string][] = [
   [250000, 'Da', 'kDa'],
   [40, '% CDW', 'g/L'], // a share of dry cells is not a titre — must throw
   [40, '% CDW', '%'], // nor a bare percentage — must throw
+  // Thread Q — a price per gallon is not a price per kilogram.
+  [2.5, '$/gal', 'USD gal⁻¹'],
+  [2.5, '$/gal', 'USD/kg'], // needs the product's density — must throw
+  [0.4, 'g/g/h', 'g g⁻¹ h⁻¹'],
 ];
 
 const conversions = CONVERT_INPUTS.map(([value, from, to]) => {
@@ -132,6 +161,7 @@ const SI_INPUTS: [number, string][] = [
   [5, 'unknownunit'], // passes through untouched
   [62, 'wt%'], // OF-BLD-014 §2.1
   [450000, 'g mol⁻¹'],
+  [2.5, '$/gal'], // thread Q
 ];
 const si = SI_INPUTS.map(([value, unit]) => ({ value, unit, si: toSI(value, unit) }));
 
@@ -149,6 +179,10 @@ const REFUSAL_INPUTS: [string, string][] = [
   ['mg/L', 'wt%'], // symmetric, through the aliases
   ['% CDW', '% DW'], // another family, no recorded trap → null
   ['kDa', 'g/L'], // incompatible but no recorded trap → null
+  // Thread Q — the conversion needs the product's density.
+  ['USD gal⁻¹', 'USD kg⁻¹'],
+  ['$/kg', '$/gal'], // symmetric, through the aliases
+  ['USD gal⁻¹', 'EUR kg⁻¹'], // another family, no recorded trap → null
 ];
 const refusals = REFUSAL_INPUTS.map(([from, to]) => ({ from, to, because: explainRefusal(from, to) }));
 
@@ -203,6 +237,25 @@ const STRAIN_INPUTS = [
   'CC-137c', // two aliases (cc-137c, 137c), one id
   '',
   'constructor', // not an alias, whatever Object.prototype holds
+  // Thread Q yeasts: designation-bearing spellings resolve …
+  'S288C',
+  'S. cerevisiae S288C',
+  'Saccharomyces cerevisiae S288C',
+  'Saccharomyces  cerevisiae   S288C grown on glucose', // a designation inside the wording
+  'CEN.PK113-7D',
+  'CEN.PK 113-7D',
+  'CEN.PK113-7D MATa',
+  'S. cerevisiae CEN.PK113-7D',
+  'Saccharomyces cerevisiae CEN.PK113-7D',
+  // … and the species, the bare family and its other members do not.
+  'Saccharomyces cerevisiae',
+  'S. cerevisiae',
+  'CEN.PK',
+  'cen.pk',
+  'CEN.PK2-1C',
+  'CEN.PK113-5D',
+  'BY4741',
+  'S288C and CEN.PK113-7D compared', // two ids → null
 ];
 const CARBON_INPUTS = [
   'glucose',
