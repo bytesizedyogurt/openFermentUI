@@ -1,0 +1,355 @@
+{
+ "set": "O",
+ "at": "2026-10-20T03:06:44.979530+00:00",
+ "n": 10,
+ "searched": 0.8,
+ "footer": 1.0,
+ "costUsd": 0.0525,
+ "models": [
+  "claude-haiku-5-5"
+ ],
+ "questions": [
+  {
+   "question": "What is open in Dominion and which runbooks touch it?",
+   "key": [
+    "dominion",
+    "runbooks"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "dominion",
+    "runbooks"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "dominion_read",
+    "runbooks_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read"
+   ],
+   "kept": 6,
+   "dropped": 0,
+   "reasons": [
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.007756,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 38.1
+  },
+  {
+   "question": "Is brazzein open to make, what did its runbook lock, and which host does it run on?",
+   "key": [
+    "dominion",
+    "runbooks"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "dominion",
+    "runbooks"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "dominion_read",
+    "runbooks_read",
+    "dominion_read"
+   ],
+   "kept": 5,
+   "dropped": 0,
+   "reasons": [],
+   "declined": null,
+   "costUsd": 0.003577,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 9.2
+  },
+  {
+   "question": "Which hosts in geneOS could make PHB, and what yield ceiling has been computed for Cupriavidus necator H16 on glucose?",
+   "key": [
+    "dominion",
+    "geneos"
+   ],
+   "searched": false,
+   "footer": true,
+   "read": [
+    "geneos"
+   ],
+   "missedRead": [
+    "dominion"
+   ],
+   "missedNamed": [],
+   "tools": [
+    "geneos_read",
+    "geneos_read",
+    "yield_ceiling",
+    "geneos_read"
+   ],
+   "kept": 4,
+   "dropped": 1,
+   "reasons": [
+    "c4: cites what no tool returned in this run: 68a5a1abe61d1d12, d5e338305d43cac0"
+   ],
+   "declined": null,
+   "costUsd": 0.005202,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 19.7
+  },
+  {
+   "question": "What PHB titres have been reported on xylose hydrolysate, and which of those papers has Intake fetched with full text?",
+   "key": [
+    "dominion",
+    "intake"
+   ],
+   "searched": false,
+   "footer": true,
+   "read": [
+    "biorepo",
+    "intake"
+   ],
+   "missedRead": [
+    "dominion"
+   ],
+   "missedNamed": [],
+   "tools": [
+    "search_records",
+    "intake_read",
+    "intake_read",
+    "search_records",
+    "search_passages"
+   ],
+   "kept": 4,
+   "dropped": 0,
+   "reasons": [
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.006345,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 21.0
+  },
+  {
+   "question": "What does the Proforma scenario for PHA from cellulosic sugar still wait for, and what does the benchmark run give?",
+   "key": [
+    "proforma"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "proforma"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "proforma_read",
+    "selling_price"
+   ],
+   "kept": 2,
+   "dropped": 1,
+   "reasons": [
+    "c3: claim text contains a number ('2') — values come from the record"
+   ],
+   "declined": null,
+   "costUsd": 0.003275,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 7.9
+  },
+  {
+   "question": "Which downstream unit operations does Taq DNA polymerase need, and what does pureOS say about the centrifugation step?",
+   "key": [
+    "dominion",
+    "runbooks",
+    "pureos"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "dominion",
+    "pureos",
+    "runbooks"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "dominion_read",
+    "pureos_read",
+    "runbooks_read"
+   ],
+   "kept": 6,
+   "dropped": 0,
+   "reasons": [],
+   "declined": null,
+   "costUsd": 0.00378,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 11.0
+  },
+  {
+   "question": "What is waiting for a person on Home right now, and which Primer lesson teaches measuring dry cell weight?",
+   "key": [
+    "primer"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "home",
+    "primer"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "home_read",
+    "primer_read"
+   ],
+   "kept": 2,
+   "dropped": 0,
+   "reasons": [
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.003595,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 7.5
+  },
+  {
+   "question": "Which protocols in Runbooks are tagged for Komagataella phaffii GS115, and which molecules in Dominion default to that host?",
+   "key": [
+    "dominion",
+    "runbooks",
+    "geneos"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "dominion",
+    "geneos",
+    "runbooks"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "runbooks_read",
+    "dominion_read",
+    "geneos_read",
+    "runbooks_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read",
+    "dominion_read"
+   ],
+   "kept": 3,
+   "dropped": 0,
+   "reasons": [
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.00608,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 20.5
+  },
+  {
+   "question": "Which Guild checks are open, and which Primer lessons count toward the skills they name?",
+   "key": [
+    "primer"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "guild",
+    "primer"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "guild_read",
+    "primer_read",
+    "guild_read"
+   ],
+   "kept": 3,
+   "dropped": 0,
+   "reasons": [
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.003598,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 10.1
+  },
+  {
+   "question": "Which Intake sources failed to fetch, and does BioRepo hold any record from them?",
+   "key": [
+    "biorepo",
+    "intake"
+   ],
+   "searched": true,
+   "footer": true,
+   "read": [
+    "biorepo",
+    "intake"
+   ],
+   "missedRead": [],
+   "missedNamed": [],
+   "tools": [
+    "intake_read",
+    "intake_read",
+    "intake_read",
+    "biorepo_read",
+    "intake_read",
+    "intake_read",
+    "biorepo_read",
+    "biorepo_read",
+    "biorepo_read",
+    "biorepo_read",
+    "biorepo_read",
+    "biorepo_read"
+   ],
+   "kept": 1,
+   "dropped": 9,
+   "reasons": [
+    "c2: cites what no tool returned in this run: r-A1-1, r-A1-2",
+    "c3: cites what no tool returned in this run: r-E1-1, r-E1-2, r-E1-3",
+    "c4: cites what no tool returned in this run: r-E2-1",
+    "c5: cites what no tool returned in this run: r-H4-1, r-H4-2, r-H4-4",
+    "c6: cites what no tool returned in this run: r-H8-1, r-H8-2, r-H8-5, r-H8-7",
+    "c7: cites what no tool returned in this run: r-I1-1, r-I1-2",
+    "c8: cites what no tool returned in this run: r-I2-1",
+    "c9: cites what no tool returned in this run: r-G2-1",
+    "c10: cites what no tool returned in this run: r-K1-1, r-K1-2",
+    "a gap dropped: it holds a number",
+    "a gap dropped: it holds a number"
+   ],
+   "declined": null,
+   "costUsd": 0.009279,
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "seconds": 31.6
+  }
+ ]
+}
