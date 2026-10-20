@@ -44,7 +44,7 @@ export function ProposalsCard() {
     return () => ctrl.abort();
   }, [serviceUp]);
 
-  const shown = shownProposals(items, guild.acting, guild.status, guild.sample);
+  const shown = shownProposals(items, guild.acting, guild.status);
   if (!serviceUp || shown.length === 0) return null;
 
   const run = async (p: Proposal, verb: 'carry-out' | 'dismiss') => {

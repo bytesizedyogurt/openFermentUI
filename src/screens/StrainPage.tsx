@@ -15,7 +15,7 @@ import { HostCeilingCard } from './GeneOSModel';
 import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -61,11 +61,9 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 
 // ── model ──────────────────────────────────────────────────────────────
 
@@ -580,21 +578,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const depositions = useStore((s) => s.depositions);
   const inView = useProgramScope({ kind: 'strain', id: strainId });
 
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState<'plots' | 'table'>('plots');
   const [showRejected, setShowRejected] = useState(false);
   const [fieldQuery, setFieldQuery] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [strainId]);
 
   const strain = strains.find((s) => s.id === strainId);
 
@@ -1083,28 +1069,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             body="The organism index lists every strain this corpus covers. Open it to pick one."
             action={<LinkButton to="/geneos/hosts">Back to hosts</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="geneOS · Hosts"
-          title={
-            <span>
-              <span className="italic">{strain.binomial}</span>{' '}
-              <span className="font-num not-italic">{strain.designation}</span>
-            </span>
-          }
-        />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={10} />
         </Card>
       </>
     );
@@ -1623,7 +1587,7 @@ export default function StrainPage({ strainId }: { strainId: string }) {
               </ul>
             )}
             <div className="text-caption text-ink-soft mt-2">
-              Demo model v0 — illustrative economics, not validated.
+              Cost model v0 — illustrative economics, not validated.
             </div>
           </Card>
 

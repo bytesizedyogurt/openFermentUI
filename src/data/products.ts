@@ -1,4 +1,4 @@
-// The molecule catalogue (OF-BLD-005 §3) — 117 products across 11 categories,
+// The molecule catalogue (OF-BLD-005 §3) — every product across 11 categories,
 // and two PHA products in a twelfth (OF-BLD-014 §2.2), every one of them
 // modeled rather than measured.
 //

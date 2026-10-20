@@ -98,7 +98,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'corpus',
     label: 'Corpus & ontology',
-    blurb: 'Owner controls: the ontology reference, the gold set, and demo data reset.',
+    blurb: 'Owner controls: the ontology reference, the gold set, and clearing this browser’s data.',
     owner: true,
   },
   {
@@ -112,7 +112,7 @@ const SECTIONS: SectionDef[] = [
     id: 'figures',
     label: 'Figure grammar',
     blurb:
-      'How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Shown over a labelled sample.',
+      'How every chart draws results and predictions: the mark for each kind of thing, the stroke for each provenance, and a table behind every figure. Drawn over the newest computed results the service keeps, or by its legend alone.',
   },
   {
     id: 'export',
@@ -122,7 +122,7 @@ const SECTIONS: SectionDef[] = [
   {
     id: 'about',
     label: 'About & fidelity',
-    blurb: 'What is real in this build, what is scripted, and what is only a surface.',
+    blurb: 'What is real in this build, what follows an authored timeline, and what is only a surface.',
   },
 ];
 
@@ -179,7 +179,6 @@ function RadioCards<T extends string | number>({
 function GuildPolicySection() {
   const ledger = useStore((s) => guildView(s));
   const actingId = useStore((s) => actingIdOf(s));
-  const sample = useStore((s) => s.guildSample !== null);
   const save = useStore((s) => s.guildSetPolicy);
   const current = policyOf(ledger);
   // Only what the lead has changed is held here; every other field reads the
@@ -202,11 +201,6 @@ function GuildPolicySection() {
   ];
   return (
     <div className="space-y-6 max-w-2xl">
-      {sample && (
-        <Callout kind="warn" title="Sample team: invented people">
-          A change made now applies to the sample alone, and goes when the sample is hidden.
-        </Callout>
-      )}
       {ledger.people.length === 0 && (
         <p className="text-body text-ink-soft">
           Nobody is on Guild&rsquo;s ledger yet, so the gate holds nothing. The first person added is the lead, who sets these.
@@ -446,8 +440,8 @@ function AppearanceSection() {
         <p className="text-caption text-ink-soft mt-2 max-w-3xl">
           This scales <span className="font-medium text-ink">simulated latency only</span> — ingest
           stages, extraction and solver jobs, and Deposition timers. It changes nothing about the
-          numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so a
-          demo audience is never misled about how fast the real thing would be.
+          numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so
+          nobody watching is misled about how fast the real thing would be.
         </p>
       </section>
     </div>
@@ -811,7 +805,7 @@ function CorpusSection() {
   const archivedHidden = papers.length < allPapers.length || visibleRecords.length < allRecords.length;
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
-  const resetDemo = useStore((s) => s.resetDemo);
+  const clearBrowserData = useStore((s) => s.clearBrowserData);
   const depositions = useStore((s) => s.depositions);
   const [confirm, setConfirm] = useState(false);
   const reviewer = useStore((s) => s.reviewer);
@@ -829,8 +823,8 @@ function CorpusSection() {
   return (
     <div className="space-y-6">
       <Callout kind="info" title="Owner view">
-        You are signed in as the demo curator, who owns this deployment. Everything on this panel
-        edits the corpus for the whole session; there is no second reviewer to undo it for you.
+        This panel is the owner&rsquo;s. Everything on it edits the corpus for the whole session; there is
+        no second reviewer to undo it for you.
       </Callout>
 
       <section>
@@ -853,7 +847,7 @@ function CorpusSection() {
             <code className="font-mono text-caption">core/data/biorepo.json</code>, which is
             committed. A record is only verified when a named person promoted it against a sentence
             in the paper&rsquo;s own text — so the service refuses a decision signed by nobody, or
-            by a placeholder like &ldquo;you&rdquo;. The name is kept in this browser and is not
+            by a word like &ldquo;you&rdquo; that names nobody. The name is kept in this browser and is not
             sent anywhere except with a decision.
           </p>
         </Card>
@@ -1012,22 +1006,22 @@ function CorpusSection() {
       </section>
 
       <section>
-        <SectionTitle>Demo data</SectionTitle>
+        <SectionTitle>This browser&rsquo;s data</SectionTitle>
         <Card className="p-3">
           <p className="text-body text-ink-soft max-w-3xl">
-            Review decisions, edits, runs, new protocol versions and duplicated scenarios all live
-            in this browser tab only. Resetting puts the corpus back to the state it shipped in, so
-            the next walkthrough starts clean.
+            Depositions, review decisions, runbook locks, lessons finished, Postdoc&rsquo;s conversations
+            and Guild entries the service has not stored yet are kept in this browser (the Durable tier).
+            Clearing them leaves what the service keeps untouched.
           </p>
           <div className="mt-3">
             <Button onClick={() => setConfirm(true)}>
-              <RotateCcw size={13} /> Reset demo data
+              <RotateCcw size={13} /> Clear this browser&rsquo;s data
             </Button>
           </div>
         </Card>
       </section>
 
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="Reset demo data">
+      <Modal open={confirm} onClose={() => setConfirm(false)} title="Clear this browser’s data">
         <p className="text-body">
           Restores all <span className="font-num">{SEEDED.records}</span> records,{' '}
           <span className="font-num">{SEEDED.protocols}</span> protocols, and{' '}
@@ -1053,11 +1047,11 @@ function CorpusSection() {
           <Button
             variant="primary"
             onClick={() => {
-              resetDemo();
+              clearBrowserData();
               setConfirm(false);
             }}
           >
-            <RotateCcw size={13} /> Reset demo data
+            <RotateCcw size={13} /> Clear this browser&rsquo;s data
           </Button>
         </div>
       </Modal>
@@ -1149,7 +1143,7 @@ function ExportSection() {
         <SectionTitle
           right={
             <span className="chip text-signal-warn border-signal-warn/40">
-              Not active in this demo
+              Not active in this build
             </span>
           }
         >
@@ -1171,10 +1165,10 @@ function ExportSection() {
                 aria-describedby="api-key-note"
               />
               <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" disabled title="Not active in this demo">
+                <Button size="sm" disabled title="Not active in this build">
                   Generate key
                 </Button>
-                <Button size="sm" disabled title="Not active in this demo">
+                <Button size="sm" disabled title="Not active in this build">
                   Revoke all
                 </Button>
               </div>
@@ -1194,7 +1188,7 @@ function ExportSection() {
 
 // ── about / colophon ───────────────────────────────────────────────────
 
-type Fidelity = 'Full' | 'Scripted' | 'Visual';
+type Fidelity = 'Full' | 'Authored' | 'Visual';
 
 /** `fidelity` carries the full honest phrase; `fidelityKind` reduces it to a badge colour. */
 const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
@@ -1273,20 +1267,15 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Protocol editor',
-    fidelity: 'Full for edit and reorder, scripted for validation edge cases',
+    fidelity: 'Full for edit and reorder, authored for validation edge cases',
     notes:
       'Editing, reordering and saving a new version are real; the validation warnings for pathological edits are authored examples.',
   },
   {
     feature: 'Simulation results',
-    fidelity: 'Full interpolation over scripted precomputed grids',
+    fidelity: 'Full interpolation over authored precomputed grids',
     notes:
       'Multilinear interpolation across an authored cost-model sweep. The interpolation is real; the cost model is invented.',
-  },
-  {
-    feature: 'Simulation converging job feel',
-    fidelity: 'Scripted',
-    notes: 'Solver stages and their durations follow an authored timeline. Nothing is iterating.',
   },
   {
     feature: 'Scenario compare',
@@ -1294,26 +1283,14 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     notes: 'Deltas, shared assumptions and divergences are computed from the pinned scenarios.',
   },
   {
-    feature: 'Agent chat — scripted mode',
-    fidelity: 'Scripted',
-    notes:
-      'Plans, tool calls and answers come from authored flows matched to the question. The same question always gives the same answer.',
-  },
-  {
-    feature: 'Agent chat — live mode',
+    feature: 'Agent chat',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down a question says so; nothing scripted answers in its place.',
-  },
-  {
-    feature: 'Retrieval inspector and tool traces',
-    fidelity: 'Scripted, mirroring the flow’s actual data',
-    notes:
-      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — the curator’s note for an entry the service has not fetched, the paper’s own words for one it has.',
+      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down Postdoc says so and how to start it, and keeps the conversations and the typed question; nothing answers in its place.',
   },
   {
     feature: 'Ingest pipeline',
-    fidelity: 'Scripted',
+    fidelity: 'Authored',
     notes:
       'Fetch, parse, chunk, embed and extract are timed stages over entries already present in the build, including one authored parse failure. No document is retrieved and no text is added: every entry is still catalogued when the run finishes.',
   },
@@ -1330,13 +1307,13 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Jobs tray',
-    fidelity: 'Full over scripted job timelines',
+    fidelity: 'Full over authored job timelines',
     notes: 'Progress, failure surfacing and completion toasts are real; stage durations are authored.',
   },
   {
     feature: 'Authentication, API keys, sharing',
     fidelity: 'Visual',
-    notes: 'One demo identity. No accounts, no tokens, no sharing, no server.',
+    notes: 'One identity: the reviewer name set in Settings, a claim and not a sign-in. No accounts, no tokens, no sharing.',
   },
   {
     feature: 'Real PDF rendering',
@@ -1348,13 +1325,13 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
 
 const FIDELITY_STYLE: Record<Fidelity, string> = {
   Full: 'text-accent border-accent/45',
-  Scripted: 'text-signal-info border-signal-info/45',
+  Authored: 'text-signal-info border-signal-info/45',
   Visual: 'text-signal-warn border-signal-warn/45',
 };
 
 function fidelityKind(f: string): Fidelity {
   if (f.startsWith('Full')) return 'Full';
-  if (f.startsWith('Scripted')) return 'Scripted';
+  if (f.startsWith('Authored')) return 'Authored';
   return 'Visual';
 }
 
@@ -1369,7 +1346,7 @@ function AboutSection() {
   const archivedHidden = papers.length < allPapers.length || records.length < allRecords.length;
 
   const counts = useMemo(() => {
-    const c: Record<Fidelity, number> = { Full: 0, Scripted: 0, Visual: 0 };
+    const c: Record<Fidelity, number> = { Full: 0, Authored: 0, Visual: 0 };
     for (const r of FIDELITY_ROWS) c[fidelityKind(r.fidelity)]++;
     return c;
   }, []);
@@ -1455,16 +1432,16 @@ function AboutSection() {
             </li>
             <li>
               <span className="font-medium">Simulation economics are illustrative.</span> The cost
-              models are authored spreadsheets swept over a grid — Demo model v0, illustrative
+              models are authored spreadsheets swept over a grid — cost model v0, illustrative
               economics, not validated. This is the part of the build that really is synthetic.
               Treat a minimum selling price here as a shape to reason about, never as a number to
               plan against.
             </li>
             <li>
-              <span className="font-medium">Scripted answers are written, not generated.</span>{' '}
-              In scripted mode, plans, tool calls and answer prose come from authored flows matched
-              to the question, so the same question always returns the same answer. Live mode is a
-              real model call through openferment-core and is labelled as such.
+              <span className="font-medium">Postdoc answers only through the service.</span>{' '}
+              Every answer is a real model call through openferment-core, and every value in it is
+              rendered from the record it cites. With the service down Postdoc says so and how to
+              start it; nothing answers in its place.
             </li>
           </ul>
         </Callout>
@@ -1496,9 +1473,9 @@ function AboutSection() {
             <span className="font-num">{counts.Full}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="chip text-signal-info border-signal-info/45">Scripted</span>
+            <span className="chip text-signal-info border-signal-info/45">Authored</span>
             follows an authored timeline or answer —{' '}
-            <span className="font-num">{counts.Scripted}</span>
+            <span className="font-num">{counts.Authored}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="chip text-signal-warn border-signal-warn/45">Visual</span>
@@ -1570,15 +1547,14 @@ function AboutSection() {
             named reviewer decides; Witness scores that run.
           </Row>
           <Row label="Agent">
-            Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
-            flows and no model is called. Live: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
-            Sonnet 5.5 as fallback by default), values rendered from the cited records.
+            One path: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
+            Sonnet 5.5 as fallback by default), values rendered from the cited records. With the
+            service down it says so, and nothing answers in its place.
           </Row>
           <Row label="Retrieval">
-            Local lexical scorer over the section text held in the build — the curator&rsquo;s note
-            for an entry the service has not fetched, the paper&rsquo;s own words for one it has. No
-            embedding model, no vector store; the &ldquo;Embed&rdquo; stage in ingest is a timed
-            animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
+            In the service: passages cut from the fetched papers, searched by the lane the service
+            names (BioRepo &rarr; Search, Witness &rarr; Retrieval). The browser holds no index; the
+            &ldquo;Embed&rdquo; stage in the offline ingest board is a timed animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
             one structured response per paper for the candidates.
           </Row>
           <Row label="Storage">
@@ -1589,7 +1565,7 @@ function AboutSection() {
             be lost to a page reload, and neither can a question somebody is halfway through. Everything
             else is memory only and resets: open panels, density, theme, simulation speed. No
             localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
-            browser. &ldquo;Reset demo data&rdquo; clears the durable store as well as memory.
+            browser. &ldquo;Clear this browser&rsquo;s data&rdquo; clears the durable store as well as memory.
           </Row>
           <Row label="Type">
             <span className="inline-flex items-center gap-1.5">

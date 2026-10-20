@@ -16,7 +16,7 @@
 // its process-family neighbours pass the program selector through
 // `useProgramScope`: on a general molecule the archived programs' share is
 // hidden, and on an archived one its own program's shows with it.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ArrowRight,
   Boxes,
@@ -60,10 +60,8 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 function StorageRow({ id, warmest }: { id: string; warmest: boolean }) {
   const f = STORAGE_FORMATS_BY_ID[id];
@@ -95,18 +93,6 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
   const records = useStore((s) => s.records);
   const depositions = useStore((s) => s.depositions);
   const inView = useProgramScope({ kind: 'product', id: productId });
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [productId]);
 
   const product = products.find((p) => p.id === productId);
 
@@ -161,20 +147,6 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             body="The molecule index lists every product this catalogue covers. Open it to pick one."
             action={<LinkButton to="/dominion/molecules">Back to molecules</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Molecules" title={product.name} />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={8} />
         </Card>
       </>
     );

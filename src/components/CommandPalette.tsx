@@ -87,7 +87,7 @@ export function CommandPalette() {
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
-  const resetDemo = useStore((s) => s.resetDemo);
+  const clearBrowserData = useStore((s) => s.clearBrowserData);
   // Every entity the palette finds passes through the program selector
   // (OF-BLD-016 §2.2): with archived programs hidden, the default, none of
   // theirs is a result, and with the switch on the palette is as it was.
@@ -272,7 +272,7 @@ export function CommandPalette() {
         run: () => navigate('/dominion/molecules?clearance=blocked'),
       },
       { id: 'a-help', group: 'Actions', label: 'Keyboard shortcuts', run: () => useStore.getState().setUI({ helpOpen: true }) },
-      { id: 'a-reset', group: 'Actions', label: 'Reset demo data', run: resetDemo },
+      { id: 'a-reset', group: 'Actions', label: 'Clear this browser’s data', run: clearBrowserData },
     ];
 
     // An action that opens an entity is offered while that entity shows.
@@ -284,7 +284,7 @@ export function CommandPalette() {
     hidden.push(...actions.filter((a) => !offered.includes(a)));
 
     return { items: [...nav, ...offered], hidden };
-  }, [papers, strains, products, runbooks, protocols, scenarios, records, resetDemo, shows]);
+  }, [papers, strains, products, runbooks, protocols, scenarios, records, clearBrowserData, shows]);
 
   const results = useMemo(() => {
     const scored = items

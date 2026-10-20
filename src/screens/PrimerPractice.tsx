@@ -23,7 +23,7 @@ import { fmt } from '@/engine/units';
 import { ActingAs, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
+import { Button, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { PracticeRefused, draftScenario, forDrafting, recordSession, splitMarkers, takeTurn } from '@/lib/practice';
 import { IntakeDown } from '@/lib/intake';
 import { href, navigate, useRoute } from '@/router';
@@ -67,7 +67,6 @@ export default function PrimerPractice({ id }: { id?: string }) {
 // ── header ─────────────────────────────────────────────────────────────
 
 function Frame({ title = 'Practice', subtitle, children }: { title?: string; subtitle?: ReactNode; children: ReactNode }) {
-  const sample = useStore((s) => s.guildSample !== null);
   return (
     <div className="max-w-[760px]">
       <PageHeader
@@ -81,13 +80,6 @@ function Frame({ title = 'Practice', subtitle, children }: { title?: string; sub
       <div className="-mt-2 mb-4">
         <ActingAs id="practice-learning-as" label="Learning as" />
       </div>
-      {sample && (
-        <div className="mb-4">
-          <Callout kind="warn" title="Sample team: invented people">
-            The service holds the session with nobody named on it, and the sample&rsquo;s learner gets the practice entry in the sample alone.
-          </Callout>
-        </div>
-      )}
       <OwnerTabs tabs={PRIMER_TABS} />
       {children}
     </div>
@@ -108,8 +100,8 @@ function PracticeList({ asked }: { asked: boolean }) {
   const [problem, setProblem] = useState<{ skillId: string; text: string } | null>(null);
 
   const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
-  // Who the service knows this learner as: nobody, with the sample shown.
-  const named = useStore((s) => s.practiceLearner)();
+  // Who the service knows this learner as.
+  const named = learner?.id ?? null;
   // Every skill a protocol step needs: a scenario is drafted from those steps.
   const tagged = useMemo(() => {
     const needed = new Set(PROTOCOLS.flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))));
@@ -168,7 +160,7 @@ function PracticeList({ asked }: { asked: boolean }) {
 
   return (
     <Frame>
-      {!learner && ctx.guild.people.length > 0 && !ctx.sample && (
+      {!learner && ctx.guild.people.length > 0 && (
         <p className="text-body text-ink-soft mb-4">
           Nobody is chosen as learning, so a session goes on nobody&rsquo;s record. Choose who is learning above to have it count.
         </p>
@@ -176,7 +168,7 @@ function PracticeList({ asked }: { asked: boolean }) {
       {sessions.length > 0 && (
         <div className="mb-6">
           <SectionTitle>
-            {named && learner ? `${learner.name}’s sessions` : ctx.sample ? 'Sessions held while the sample is shown' : 'Sessions on nobody’s record'}
+            {named && learner ? `${learner.name}’s sessions` : 'Sessions on nobody’s record'}
           </SectionTitle>
           <Card>
             {sessions.slice(0, 8).map((x) => {
@@ -260,9 +252,9 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
   const ctx = useGuild();
   const practice = useStore((s) => s.practice);
   const merge = useStore((s) => s.mergePractice);
-  const learnerForService = useStore((s) => s.practiceLearner)();
   const closed = useStore((s) => s.practiceClosed);
   const learner = ctx.acting && ctx.acting.active && ctx.acting.role !== 'auditor' ? ctx.acting : null;
+  const learnerForService = learner?.id ?? null;
 
   // Resume this learner's open session on the scenario, unless a session was
   // opened by its id. A session named on nobody is resumed only by its id:
@@ -392,9 +384,7 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
                   ? `On ${owner}’s record as practice, which counts toward Learning. An assessor at the bench does the rest.`
                   : session.personId
                     ? `Closed, and the ledger kept nothing for ${owner}; the service's log says why.`
-                    : ctx.sample && learner
-                      ? `Recorded for ${learner.name} in the sample team alone.`
-                      : 'On nobody’s record: nobody was chosen as learning.'}
+                    : 'On nobody’s record: nobody was chosen as learning.'}
               </p>
               {session.personId && !session.evidenceId && (
                 <Button size="sm" onClick={retryRecord} style={{ minHeight: 44 }}>
@@ -442,9 +432,7 @@ function Player({ scenario, opened }: { scenario: PracticeScenario; opened: Prac
               <span className="text-caption text-ink-soft">
                 {learnerForService
                   ? `Goes on ${learner?.name}’s record when the session closes.`
-                  : ctx.sample && learner
-                    ? `Recorded for ${learner.name} in the sample alone.`
-                    : 'Goes on nobody’s record.'}
+                  : 'Goes on nobody’s record.'}
               </span>
             </div>
           </Card>

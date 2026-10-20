@@ -865,7 +865,7 @@ One rule of hygiene closes the lesson: **market figures are not evidence.** Vend
             kind: 'prose',
             md: `Move the biomass density slider and watch the minimum selling price fall steeply at the low end and then flatten. The knee is the argument: while density is the binding constraint it is the cheapest lever available, and past it capital and downstream take over and further gains buy progressively less.
 
-Two things to keep in view. The reference point sits at 2 g/L — already optimistic against the 1.23 g/L actually measured for this organism in this medium. And the cost engine is an authored demonstration model: the scaling laws and dependencies are real and traceable, the absolute values are illustrative, and every screen that shows them says so. Literature-derived assumptions carry source chips; modelling conventions carry a demo tick. Check which is which before quoting anything from it.`,
+Two things to keep in view. The reference point sits at 2 g/L — already optimistic against the 1.23 g/L actually measured for this organism in this medium. And the cost engine is an authored demonstration model: the scaling laws and dependencies are real and traceable, the absolute values are illustrative, and every screen that shows them says so. Literature-derived assumptions carry source chips; modelling conventions carry a modeled tick. Check which is which before quoting anything from it.`,
           },
         ],
         checkpoint: [
@@ -1078,7 +1078,7 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
   {
     id: 'm6',
     index: 6,
-    title: 'Bench track: the trunk skills (placeholder)',
+    title: 'Bench track: the trunk skills',
     blurb:
       'Working lessons for the skills Guild tracks, taught from the protocols’ own steps until the skills content pass writes the real ones. A passed checkpoint puts you at Learning on its skills; a training sign-off from an assessor, at the bench, is what moves you to Supervised.',
     lessons: [
@@ -1090,7 +1090,7 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
         blocks: [
           {
             kind: 'prose',
-            md: '*Placeholder lesson, to be replaced by the skills content pass.* Until then the lesson is the protocol: every step below is read live from PR-OD-01 and the seed train, so the numbers you see are the protocol’s own.\n\nAn optical density reading takes seconds and estimates biomass from scattered light. A dry cell weight takes most of a day and weighs the biomass itself. A run needs both, because the factor that links them is measured in your lab, on your strain.',
+            md: 'The lesson is the protocol: every step below is read live from PR-OD-01 and the seed train, so the numbers you see are the protocol’s own.\n\nAn optical density reading takes seconds and estimates biomass from scattered light. A dry cell weight takes most of a day and weighs the biomass itself. A run needs both, because the factor that links them is measured in your lab, on your strain.',
           },
           { kind: 'embed', embed: 'skill-steps', arg: 'SK-OD' },
           {
@@ -1171,7 +1171,7 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
         blocks: [
           {
             kind: 'prose',
-            md: '*Placeholder lesson, to be replaced by the skills content pass.* The steps below are read live from PR-CIP-01.\n\nA clean-in-place cycle removes what the last run left behind, in an order that matters: water at ambient temperature first, then hot alkaline detergent, a rinse to neutral, acid for mineral scale, and neutral again. The detergent and the acid carry their own hazards, so each rinse is confirmed before the next chemical goes in.',
+            md: 'The steps below are read live from PR-CIP-01.\n\nA clean-in-place cycle removes what the last run left behind, in an order that matters: water at ambient temperature first, then hot alkaline detergent, a rinse to neutral, acid for mineral scale, and neutral again. The detergent and the acid carry their own hazards, so each rinse is confirmed before the next chemical goes in.',
           },
           { kind: 'embed', embed: 'skill-steps', arg: 'SK-CIP' },
           { kind: 'embed', embed: 'skill-steps', arg: 'SK-CAUSTIC' },
@@ -1230,7 +1230,7 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
         blocks: [
           {
             kind: 'prose',
-            md: '*Placeholder lesson, to be replaced by the skills content pass.* The steps below are read live from PR-CIP-01.\n\nSterilising a vessel and releasing it are two skills. The first runs the cycle. The second decides whether the vessel may be used, from a sterility hold and a spore strip, and the release needs both results on the vessel log.',
+            md: 'The steps below are read live from PR-CIP-01.\n\nSterilising a vessel and releasing it are two skills. The first runs the cycle. The second decides whether the vessel may be used, from a sterility hold and a spore strip, and the release needs both results on the vessel log.',
           },
           { kind: 'embed', embed: 'skill-steps', arg: 'SK-STER' },
           { kind: 'embed', embed: 'skill-steps', arg: 'SK-HOLD' },

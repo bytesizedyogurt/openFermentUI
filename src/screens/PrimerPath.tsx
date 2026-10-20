@@ -24,7 +24,7 @@ import { REFRESH_WINDOW, pathOf, type PathItem, type PathSection } from '@/engin
 import { ActingAs, useGuild, type GuildContext } from '@/components/GuildBits';
 import { LevelGlyph, levelLabel } from '@/components/LevelGlyph';
 import { OwnerTabs } from '@/components/OwnerTabs';
-import { Button, Callout, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
+import { Button, Card, EmptyState, LinkButton, PageHeader, SectionTitle, cx } from '@/components/ui';
 import { href } from '@/router';
 
 /** Up to three names, then how many more. */
@@ -38,8 +38,6 @@ export default function PrimerPath() {
   const ctx = useGuild();
   const modules = useStore((s) => s.modules);
   const runs = useStore((s) => s.runs);
-  const loadSample = useStore((s) => s.guildLoadSample);
-  const clearSample = useStore((s) => s.guildClearSample);
 
   const shows = useProgramFilter();
 
@@ -63,32 +61,17 @@ export default function PrimerPath() {
       <div className="-mt-2 mb-4">
         <ActingAs id="path-learning-as" label="Learning as" />
       </div>
-      {ctx.sample && (
-        <div className="mb-4">
-          <Callout kind="warn" title="Sample team: invented people">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Nothing done to the sample is saved or sent to the service.</span>
-              <Button size="sm" onClick={clearSample}>
-                Hide the sample
-              </Button>
-            </span>
-          </Callout>
-        </div>
-      )}
       <OwnerTabs tabs={PRIMER_TABS} />
 
       {ctx.guild.people.length === 0 ? (
         <Card>
           <EmptyState
             title="Nobody is on Guild’s ledger yet"
-            body="A path is read from the ledger: the people on the team and what has been recorded about each of them. Start the ledger in Guild, or look at an invented team first."
+            body="A path is read from the ledger: the people on the team and what has been recorded about each of them. Start the ledger in Guild with yourself as its lead, then add the team."
             action={
-              <span className="flex flex-wrap gap-2 justify-center">
-                <LinkButton to="/guild/matrix" variant="primary">
-                  Start the ledger
-                </LinkButton>
-                <Button onClick={loadSample}>Show a sample team</Button>
-              </span>
+              <LinkButton to="/guild/people" variant="primary">
+                Add the first person
+              </LinkButton>
             }
           />
         </Card>

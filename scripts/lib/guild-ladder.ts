@@ -1,21 +1,17 @@
-// The sample team (OF-BLD-013 §1.3). INVENTED PEOPLE, for showing Guild to
-// someone before a real team is on the ledger.
-//
-// Loaded from Guild's empty state with a button that says what it is, held in
-// the store beside the real ledger and never in place of it: nothing here is
-// posted to the service, written to guild.json or kept in the Durable tier,
-// and a banner sits above every Guild view while it is shown. A reload drops
-// it. Every name is made up.
+// The ladder team: INVENTED PEOPLE, built in memory by check:guild and by
+// export-competence-fixtures, and never shown in the app (OF-BLD-016 §3.2:
+// it was Guild's "sample team" until the sample left the screens).
 //
 // HOW IT IS BUILT. A table says roughly where each person stands on each
 // skill; `sampleGuild` writes the entries that would put them there, dated
-// back from the day it is loaded. Nothing downstream reads the table:
+// back from the day it is built. Nothing downstream reads the table:
 // `competenceOf` computes every level from the entries alone, which makes the
-// sample a working test of the engine as much as a demonstration.
-import type { Guild, GuildEvidence, GuildPerson } from './types';
-import { SKILLS, SKILL_BY_ID } from './skills';
-import { PROTOCOLS } from './protocols';
-import { DEFAULT_POLICY, addDays } from '@/engine/competence';
+// ladder a working test of the engine: every level, a suspension, a lapse and
+// a prerequisite holding a skill back.
+import type { Guild, GuildEvidence, GuildPerson } from '../../src/data/types';
+import { SKILLS, SKILL_BY_ID } from '../../src/data/skills';
+import { PROTOCOLS } from '../../src/data/protocols';
+import { DEFAULT_POLICY, addDays } from '../../src/engine/competence';
 
 export const SAMPLE_LEAD = 'p-sample-lead';
 

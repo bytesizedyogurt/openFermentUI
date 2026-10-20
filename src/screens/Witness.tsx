@@ -2,7 +2,7 @@
 // by, so every number here is either measured or explicitly marked as
 // undefined. Metrics recompute from the live gold set: promote a record in the
 // review queue and these numbers move.
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -37,12 +37,10 @@ import {
   PageHeader,
   SectionTitle,
   Sheet,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { useCategorical } from '@/lib/viz';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RetrievalScorecard } from '@/components/RetrievalScorecard';
 import { BIOREPO_TABS } from '@/data/tabs';
@@ -296,7 +294,6 @@ export default function Witness() {
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
 
-  const [ready, setReady] = useState(false);
   const [pickedRun, setPickedRun] = useState<ExtractorRun | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'nGold', dir: -1 });
   const [tag, setTag] = useState<string>('all');
@@ -308,16 +305,6 @@ export default function Witness() {
 
   const upColor = palette[0];
   const downColor = palette[1];
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const orderedRuns = useMemo<RunOutput[]>(
     () =>
@@ -551,17 +538,6 @@ export default function Witness() {
     <OwnerTabs tabs={BIOREPO_TABS} />
     </>
   );
-
-  if (!ready) {
-    return (
-      <>
-        {header()}
-        <Card>
-          <Skeleton rows={10} />
-        </Card>
-      </>
-    );
-  }
 
   // No extractor has been run against this corpus, and the screen says so
   // rather than showing a number (OF-COR-001 §22, actions 6–7). Every entry is

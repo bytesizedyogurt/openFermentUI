@@ -1,4 +1,4 @@
-// Molecule index (OF-BLD-005 §6) — 117 products in one table, faceted along
+// Molecule index (OF-BLD-005 §6) — every product in one table, faceted along
 // every axis a facility actually decides on: what it is, who makes it, which
 // downstream train it needs, how it ships, what it takes to sell it, and
 // whether anyone else already owns it.
@@ -8,7 +8,7 @@
 // you are allowed to build something is a catalogue that will get someone
 // sued.
 //
-// Every row is modeled: the provenance tick is dashed amber on all 117, and
+// Every row is modeled: the provenance tick is dashed amber on every row, and
 // the value-density band is an industry estimate that `aggregateExclusion()`
 // already holds out of every statistic. Nothing here is evidence.
 //
@@ -19,7 +19,7 @@
 // catalogue: it opens under ArchivedBanner with that program's molecules
 // (`useProgramScope`). When the filter empties the table, the table says what
 // is hidden and where the switch is.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight, Boxes, Package, Thermometer, X } from 'lucide-react';
 import type { Product } from '@/data/types';
 import { useStore, type ProgramEntityKind, useProgramScope } from '@/store';
@@ -41,9 +41,8 @@ import { clearanceSeverity } from '@/engine/clearance';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ClearanceChip, CounselCallout } from '@/components/Clearance';
 import { ProvenanceLegend } from '@/components/Provenance';
-import { Card, EmptyState, Explain, LinkButton, PageHeader, Skeleton, cx } from '@/components/ui';
+import { Card, EmptyState, Explain, LinkButton, PageHeader, cx } from '@/components/ui';
 import { referenceFor } from '@/data/reference';
-import { delayClass } from '@/sim/latency';
 
 // ── scoping by query string ────────────────────────────────────────────
 
@@ -143,17 +142,6 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
   const depositions = useStore((s) => s.depositions);
   const density = useStore((s) => s.ui.density);
   const route = useRoute();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const scopes = useMemo(() => {
     const out: { key: ScopeKey; value: string }[] = [];
@@ -426,17 +414,6 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
 
   const subtitle =
     'Every molecule this platform can describe, with the host it would be made in, the downstream train it needs, how it ships, and who already owns it. Modeled throughout — this is a map of the option space, not a set of measurements.';
-
-  if (!ready) {
-    return (
-      <>
-        {!embedded && <PageHeader eyebrow="Module 5 · Molecules" title="Molecules" subtitle={subtitle} />}
-        <Card>
-          <Skeleton rows={12} />
-        </Card>
-      </>
-    );
-  }
 
   return (
     <>

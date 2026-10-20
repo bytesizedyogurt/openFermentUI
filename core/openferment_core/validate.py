@@ -5,8 +5,8 @@ prose and cites a record; the interface renders the value from that record.
 This is the strongest available implementation of Rule 1, because the model is
 not being asked to be careful with quantities — it has no slot to put one in.
 
-    model emits   "Titre in cw15 under mixotrophic conditions"  + ["r-A1-1"]
-    UI renders    Titre in cw15 under mixotrophic conditions — 4.2 g/L (verified)
+    model emits   "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions"  + [its record id]
+    UI renders    Ethanol yield on glucose in cenpk113-7d under anaerobic conditions — <the record's value and unit> (verified)
 
 A claim is rejected when any of these hold:
 
@@ -79,11 +79,12 @@ _MAGNITUDE = re.compile(
 )
 
 
-# Identifiers carry digits and are not quantities. Strain designations (cw15,
-# UVM4, Elow47, CC-4350), assay names (OD600), proteins (CK2) and corpus ids
-# (A1, H4, r-A1-1) all contain digits, and a claim that cannot name the strain
-# it is about is useless — "Titre in cw15 under mixotrophic conditions" is the
-# specification's own worked example of a GOOD claim.
+# Identifiers carry digits and are not quantities. Strain designations
+# (cenpk113-7d, S288C, cw15, UVM4, CC-4350), model names (iMM904, Yeast9),
+# assay names (OD600), proteins (CK2) and corpus ids (Q4, r-A1-1) all contain
+# digits, and a claim that cannot name the strain it is about is useless —
+# "Ethanol yield on glucose in cenpk113-7d under anaerobic conditions" is a
+# GOOD claim (the specification's own worked example named cw15 the same way).
 #
 # The distinguishing feature is position: an identifier's digits are attached to
 # letters, letters first. A quantity's digits stand alone or lead — "4.2 g/L",

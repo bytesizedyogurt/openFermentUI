@@ -15,8 +15,9 @@
 // to real runs in a specific vessel; mu_max copied out of a paper about a
 // different strain in a different reactor is a number with no owner. No
 // parameter from a paper enters fermOS: the screen sends only a deposition's
-// own series, or the invented sample run, which is labelled, computed inline
-// and kept nowhere. The service cannot see the browser's depositions, so it
+// own series. With no deposition to fit, the screen names the readings to
+// deposit and where (OF-BLD-016 §3.2: the invented sample run left the
+// screen; demo.py still writes it for the service double). The service cannot see the browser's depositions, so it
 // takes the readings as sent, and each fit's basis says so (§7.R). The only route from here to a
 // kinetic model runs through Deposition.
 //
@@ -26,13 +27,12 @@ import { FlaskConical } from 'lucide-react';
 import type { FermosFitResponse, FermosSeries, FitParam } from '@/data/types';
 import { useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import { Button, Callout, EmptyState, PageHeader } from '@/components/ui';
+import { Callout, EmptyState, PageHeader } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
 import { SubsystemShelf } from '@/components/ReferenceView';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { TrajectoryBand } from '@/components/figures';
 import { FERMOS_TABS } from '@/data/tabs';
-import { SAMPLE_DEPOSITION_ID, SAMPLE_NOTE, SAMPLE_SERIES } from '@/data/fermosSample';
 import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
 import { FermosDown, FermosRefused, fermosFit, fitFigureSeries, fitSeriesOf, qualifies } from '@/lib/fermos';
@@ -74,22 +74,19 @@ function ParamTable({ params }: { params: FitParam[] }) {
 function Fits() {
   const depositions = useStore((s) => s.depositions);
   const runbooks = useStore((s) => s.runbooks);
-  const sampleLoaded = useStore((s) => s.fermosSampleLoaded);
-  const setSample = useStore((s) => s.setFermosSample);
   const keepFit = useStore((s) => s.keepFermosFit);
   const route = useRoute();
   const qualifying = useMemo(
     () => depositions.filter((d) => qualifies(d, runbooks.find((r) => r.id === d.runbookId))),
     [depositions, runbooks],
   );
-  const options = [...qualifying.map((d) => d.id), ...(sampleLoaded ? [SAMPLE_DEPOSITION_ID] : [])];
+  const options = qualifying.map((d) => d.id);
   const chosen = route.query.get('run') ?? options[0] ?? null;
   const [result, setResult] = useState<FermosFitResponse | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const seriesFor = (id: string): FermosSeries[] => {
-    if (id === SAMPLE_DEPOSITION_ID) return SAMPLE_SERIES;
     const d = depositions.find((x) => x.id === id);
     const rb = runbooks.find((r) => r.id === d?.runbookId);
     return d && rb ? fitSeriesOf(d, rb) : [];
@@ -101,7 +98,7 @@ function Fits() {
     setBusy(true);
     setProblem(null);
     setResult(null);
-    fermosFit(chosen, seriesFor(chosen), chosen === SAMPLE_DEPOSITION_ID, ctrl.signal)
+    fermosFit(chosen, seriesFor(chosen), false, ctrl.signal)
       .then((r) => {
         setResult(r);
         keepFit(r);
@@ -115,7 +112,6 @@ function Fits() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chosen, depositions]);
 
-  const isSample = chosen === SAMPLE_DEPOSITION_ID;
   return (
     <div className="space-y-4" data-testid="fermos-fits">
       <div className="flex flex-wrap items-end gap-3">
@@ -132,43 +128,44 @@ function Fits() {
             >
               {options.map((id) => (
                 <option key={id} value={id}>
-                  {id === SAMPLE_DEPOSITION_ID ? 'Sample run (invented)' : id}
+                  {id}
                 </option>
               ))}
             </select>
           </label>
         )}
-        <Button onClick={() => setSample(!sampleLoaded)}>{sampleLoaded ? 'Unload the sample run' : 'Load a sample run'}</Button>
         {busy && <span className="text-caption text-ink-soft">Fitting…</span>}
       </div>
 
       {options.length === 0 && (
-        <EmptyState
-          icon={<FlaskConical size={28} />}
-          title="No run to fit yet"
-          body={
-            <>
-              fermOS fits what a run measured. Record a biomass reading at four or more times in a{' '}
-              <a href={href('/runbooks/depositions')} className="text-accent hover:underline">
-                deposition
-              </a>
-              , give each its hours into the run on the deposition's Time series panel, and mark the series as biomass; a
-              product and a substrate series add the production and substrate terms. Or load the sample run to see what
-              fermOS does with one.
-            </>
-          }
-        />
+        <div data-testid="fermos-empty">
+          <EmptyState
+            icon={<FlaskConical size={28} />}
+            title="No run deposited yet"
+            body={
+              <>
+                fermOS fits what a run measured, and nothing else. Deposit a run in{' '}
+                <a href={href('/runbooks/depositions')} className="text-accent hover:underline">
+                  Runbooks → Depositions
+                </a>{' '}
+                with these readings: the time of each sample, in hours into the run; a biomass reading at four or more of
+                those times; and, for the production and uptake terms, a product reading and a substrate reading at the
+                same times. On the deposition&rsquo;s Time series panel, give each reading its hours and mark each series as
+                biomass, product or substrate. The run then appears here to fit.
+              </>
+            }
+          />
+        </div>
       )}
 
-      {isSample && <Callout kind="warn" title="Sample run">{SAMPLE_NOTE} Its fit is computed inline and kept nowhere.</Callout>}
       {problem && <Callout kind="warn">{problem}</Callout>}
 
       {result && chosen && (
         <>
           <TrajectoryBand
-            title={`What did ${isSample ? 'the sample run' : chosen} do, and what curve fits it?`}
+            title={`What did ${chosen} do, and what curve fits it?`}
             series={fitFigureSeries(seriesFor(chosen), result.kinetic)}
-            readingProvenance={isSample ? 'demo' : 'measured'}
+            readingProvenance="measured"
             notes={result.notes}
             csvName={`fit-${chosen}`}
           />
@@ -238,7 +235,7 @@ export default function FermOS() {
             <a href={href('/runbooks/depositions')} className="text-accent hover:underline">
               deposition
             </a>
-            , or from the invented sample run, which says so.
+            .
           </p>
         </Callout>
 

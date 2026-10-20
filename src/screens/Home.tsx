@@ -47,7 +47,6 @@ import { WorkforceCard } from '@/components/GuildBits';
 import { HIT_RATE_MIN_TESTED, ledgerCounts } from '@/engine/ledger';
 import { livePrompts, subjectsShow, type OfferedPrompt } from '@/data/livePrompts';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH, THREAD_LETTER_CLASS } from '@/data/programs';
-import { sessionShows } from '@/data/flows';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -482,8 +481,6 @@ export default function Home() {
   const allScenarios = useStore((s) => s.scenarios);
   const allProducts = useStore((s) => s.products);
   const allRunbooks = useStore((s) => s.runbooks);
-  const allSessions = useStore((s) => s.sessions);
-  const collections = useStore((s) => s.collections);
   const liveConversations = useStore((s) => s.liveConversations);
   const allActivity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -504,10 +501,6 @@ export default function Home() {
   const scenarios = useMemo(() => allScenarios.filter((x) => shows('scenario', x.id)), [allScenarios, shows]);
   const products = useMemo(() => allProducts.filter((p) => shows('product', p.id)), [allProducts, shows]);
   const runbooks = useMemo(() => allRunbooks.filter((r) => shows('runbook', r.id)), [allRunbooks, shows]);
-  const sessions = useMemo(
-    () => allSessions.filter((x) => sessionShows(x, shows, collections)),
-    [allSessions, shows, collections],
-  );
   const activity = useMemo(() => allActivity.filter((e) => activityShows(e, shows)), [allActivity, shows]);
   // The review queue as it stands, less the records whose program is hidden:
   // the position is the count of shown records before the reviewer's place.
@@ -603,11 +596,9 @@ export default function Home() {
   );
 
   // ── band 2 state ─────────────────────────────────────────────────────
-  // The last conversation somebody actually had: a Live one first, else a
-  // scripted session with messages in it. The seeded sessions are empty, and
-  // an empty session is not work to resume.
+  // The last conversation somebody actually had with Postdoc. An empty one
+  // is not work to resume.
   const lastLive = liveConversations.find((c) => c.turns.length > 0) ?? null;
-  const lastSession = lastLive ? null : (sessions.find((x) => x.messages.length > 0) ?? null);
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
   // A run in progress shows while its protocol's program does (§2.2).
   const runInProgress = activeRunId ? (runs[activeRunId] ?? null) : null;
@@ -627,7 +618,6 @@ export default function Home() {
 
   const hasWork =
     lastLive !== null ||
-    lastSession !== null ||
     reviewQueue.length > 0 ||
     activeRun !== null ||
     pinnedScenarios.length > 0 ||
@@ -934,23 +924,6 @@ export default function Home() {
                   }
                 />
               )}
-              {lastSession && (
-                <ResumeCard
-                  to={`/postdoc/${lastSession.id}`}
-                  kicker="Last conversation"
-                  title={lastSession.title}
-                  prov="user"
-                  meta={
-                    <>
-                      <span className="font-num">{lastSession.messages.length}</span>{' '}
-                      {lastSession.messages.length === 1 ? 'message' : 'messages'} ·{' '}
-                      <span className="font-num">{lastSession.startedAt}</span>
-                      {lastSession.scope && ` · scoped to ${lastSession.scope.label}`}
-                    </>
-                  }
-                />
-              )}
-
               {reviewQueue.length > 0 ? (
                 <ResumeCard
                   to="/guild"
@@ -1037,7 +1010,7 @@ export default function Home() {
                   meta={
                     <>
                       <span className="font-num">{pinnedScenarios.length}</span> pinned — open the
-                      comparison. Demo model v0 — illustrative economics, not validated.
+                      comparison. Cost model v0 — illustrative economics, not validated.
                     </>
                   }
                 />
@@ -1215,15 +1188,21 @@ export default function Home() {
         <Card className="overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
-              title="No activity yet"
+              title={allActivity.length > 0 ? 'Nothing to show here' : 'Nothing has happened in this browser yet'}
               body={
                 allActivity.length > 0 ? (
                   <>
-                    Activity about archived programs is hidden. <SwitchLink /> shows it again. Ingests,
-                    review decisions, runs and exports land here as you work.
+                    Activity about archived programs is hidden. <SwitchLink /> shows it again. What a
+                    person does here is listed as it happens: a paper fetched, a record reviewed, a run
+                    deposited, a runbook adopted.
                   </>
                 ) : (
-                  'Ingests, review decisions, runs and exports land here as you work. Nothing is recorded outside this browser session.'
+                  <>
+                    What a person does here is listed as it happens: a paper fetched, a record
+                    reviewed, a run deposited, a runbook adopted. To start, review the next record
+                    in <a href={href('/guild')} className="text-accent hover:underline">Guild</a> or
+                    fetch a paper in <a href={href('/intake/ingest')} className="text-accent hover:underline">Intake</a>.
+                  </>
                 )
               }
               icon={<Clock size={20} aria-hidden />}

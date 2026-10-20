@@ -304,11 +304,6 @@ export default function PrimerLesson({ moduleId, lessonId }: { moduleId: string;
               <>Choose who is learning to have this lesson count toward a skill.</>
             )}
           </p>
-          {ctx.sample && (
-            <p className="text-caption text-signal-warn">
-              Sample team: invented people. A lesson passed now is recorded on the sample alone.
-            </p>
-          )}
           {ctx.guild.people.length > 0 && <ActingAs id="lesson-learning-as" label="Learning as" />}
         </Card>
       )}

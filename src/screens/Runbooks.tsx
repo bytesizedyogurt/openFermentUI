@@ -16,7 +16,7 @@
 // program leaves the board while the switch is off. A handoff link from an
 // archived molecule still opens its panel, under the banner that names the
 // program.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
@@ -36,10 +36,8 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -197,17 +195,6 @@ export default function Runbooks() {
     return PROGRAMS.filter((p) => ids.has(p.id));
   }, [allRunbooks, shows]);
   const route = useRoute();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const handoffId = route.query.get('handoff');
 
@@ -238,22 +225,6 @@ export default function Runbooks() {
 
   const subtitle =
     'A runbook is a synthesised, followable answer to a question about making something. Industrial runbooks output a process you could build and defend; research runbooks output a prediction and the experiments that would test it. Same toolchain, different question.';
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
-        <OwnerTabs tabs={RUNBOOK_TABS} />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={6} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
 
   return (
     <>

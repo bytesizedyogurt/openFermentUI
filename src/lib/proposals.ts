@@ -17,17 +17,16 @@ export async function listProposals(signal?: AbortSignal): Promise<Proposal[]> {
  * src/engine/checks.ts decide who sees it: the queue is for the lead and
  * assessors (`mayQueue`), and a check never shows to the person it names
  * until it is run (`shownTo`, held here on the proposal's `personId`; a
- * listed proposal has not run). With the sample team shown, whoever is
- * acting is invented, so no Guild proposal shows. Every other proposal
- * shows to everyone.
+ * listed proposal has not run). Every other proposal shows to everyone.
+ * (The in-browser sample team this once also excluded left the screens in
+ * OF-BLD-016 §3.2.)
  */
 export function shownProposals(
   items: Proposal[],
   acting: GuildPerson | null,
   status: StatusMap,
-  sample: boolean,
 ): Proposal[] {
-  const queue = !sample && mayQueue(acting, status);
+  const queue = mayQueue(acting, status);
   return items.filter((p) => p.module !== 'guild' || (queue && acting !== null && p.fields.personId !== acting.id));
 }
 

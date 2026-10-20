@@ -11,7 +11,7 @@
 // or PHA host and no card counts their papers. A page that names one entity
 // applies it through `useProgramScope` (store.ts), and an emptied list says
 // what it hides through `HiddenByArchive` (components/HiddenByArchive.tsx).
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
 import type { ExtractionRecord, Paper, Program, Strain } from '@/data/types';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
@@ -26,10 +26,8 @@ import {
   Explain,
   LinkButton,
   PageHeader,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 // ── coverage model ─────────────────────────────────────────────────────
 
@@ -253,18 +251,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   const depositions = useStore((s) => s.depositions);
   const shows = useProgramFilter();
 
-  const [ready, setReady] = useState(false);
   const [sort, setSort] = useState<SortKey>('coverage');
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
 
@@ -349,21 +336,6 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   const subtitle =
     'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe this demonstration corpus — not the published literature.';
 
-  if (!ready) {
-    return (
-      <>
-        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={7} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
-
   if (strains.length === 0) {
     return (
       <>
@@ -372,7 +344,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <EmptyState
             icon={<FlaskConical size={22} />}
             title="No strains in this session"
-            body="The seeded strain set is empty, which normally means the demo data was cleared. Restoring the seeded state from the corpus settings brings the organism index back."
+            body="The seeded strain set is empty in this session. Clearing this browser’s data from the corpus settings brings the organism index back."
             action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
           />
         </Card>
@@ -503,7 +475,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
           <LineChart size={13} className="mt-[2px] shrink-0" />
           <span>
             A scenario counts for a strain only when one of its assumptions cites a record for that
-            strain. Demo model v0 — illustrative economics, not validated.
+            strain. Cost model v0 — illustrative economics, not validated.
           </span>
         </div>
       </div>

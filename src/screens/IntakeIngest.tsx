@@ -17,8 +17,6 @@ import { useMemo } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
-  FileUp,
-  Link2,
   Loader2,
   Plus,
   RefreshCw,
@@ -196,7 +194,6 @@ export default function IntakeIngest() {
   const ingestPaper = useStore((s) => s.ingestPaper);
   const extractPaperLive = useStore((s) => s.extractPaperLive);
   const setPaperIngest = useStore((s) => s.setPaperIngest);
-  const resetDemo = useStore((s) => s.resetDemo);
   const toast = useStore((s) => s.toast);
   const serviceUp = useStore((s) => s.serviceUp);
   const live = serviceUp === true;
@@ -364,12 +361,7 @@ export default function IntakeIngest() {
             ) : shelf.length === 0 ? (
               <EmptyState
                 title="The shelf is empty"
-                body="Every tranche-1 entry already has parsed full text."
-                action={
-                  <Button size="sm" onClick={resetDemo}>
-                    <RefreshCw size={13} /> Reset demo data
-                  </Button>
-                }
+                body="Every tranche-1 entry already has parsed full text. A new paper enters through a thread's propose-and-approve rule, below."
               />
             ) : (
               <div>
@@ -409,45 +401,14 @@ export default function IntakeIngest() {
             )}
           </Card>
 
-          {/* Inactive input methods — visibly present, explicitly off. */}
-          <Card className="p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="font-serif text-section-title font-semibold text-ink-soft">
-                Import by DOI list
-              </h2>
-              <span className="chip text-ink-soft border-dashed">Inactive</span>
-            </div>
-            <fieldset disabled className="opacity-55 space-y-2">
-              <textarea
-                className="input font-num h-[68px] resize-none"
-                placeholder={'10.0000/openferment.demo.001\n10.0000/openferment.demo.002'}
-                aria-label="DOI list (inactive in this demo)"
-              />
-              <Button size="sm">
-                <Link2 size={13} /> Fetch metadata
-              </Button>
-            </fieldset>
-            <p className="text-caption text-ink-soft mt-2">
-              Not active in this build. Fetch by identifier runs from the queue above.
-            </p>
-          </Card>
-
-          <Card className="p-3">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="font-serif text-section-title font-semibold text-ink-soft">
-                Upload PDFs
-              </h2>
-              <span className="chip text-ink-soft border-dashed">Inactive</span>
-            </div>
-            <fieldset disabled className="opacity-55 space-y-2">
-              <div className="rounded-card border border-dashed border-line py-5 grid place-items-center text-center gap-1">
-                <FileUp size={18} className="text-ink-soft" aria-hidden />
-                <span className="text-body text-ink-soft">Drop PDFs here</span>
-              </div>
-              <Button size="sm">Choose files</Button>
-            </fieldset>
-            <p className="text-caption text-ink-soft mt-2">
-              Not active in this build. Fetch by identifier runs from the queue above.
+          {/* OF-BLD-016 §3.2: the inactive DOI-list and PDF-upload controls are gone; this says how a paper enters today. */}
+          <Card className="p-3" data-testid="how-a-paper-enters">
+            <h2 className="font-serif text-section-title font-semibold mb-1">How a paper enters</h2>
+            <p className="text-body text-ink-soft">
+              Through a thread&rsquo;s propose-and-approve rule: <code className="font-num">pnpm thread:propose</code> asks
+              Europe PMC with the thread&rsquo;s fixed rule, a person approves the rows to keep,{' '}
+              <code className="font-num">pnpm thread:apply</code> writes them into the corpus under that person&rsquo;s name, and
+              Fetch in the queue above brings in each paper&rsquo;s text.
             </p>
           </Card>
         </div>
@@ -480,7 +441,7 @@ export default function IntakeIngest() {
             <span>
               {live
                 ? 'Chunk, Embed and Extract are not built; a fetched paper shows them as not run.'
-                : 'Stage times are scripted demo budgets, not measured throughput.'}
+                : 'With the service down, stage times are timed in this browser and are not measured throughput.'}
             </span>
           </div>
           {rows.length > 0 && boardHidden.length > 0 && (
@@ -500,7 +461,7 @@ export default function IntakeIngest() {
             <Card>
               <EmptyState
                 title="Nothing in the pipeline"
-                body="Add a paper from the demo shelf on the left and its five stages will fill in here, left to right."
+                body="Add a paper from the ingest queue on the left and its five stages will fill in here, left to right."
               />
             </Card>
           ) : (

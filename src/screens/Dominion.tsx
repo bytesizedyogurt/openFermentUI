@@ -1,7 +1,8 @@
 // Dominion — patents and clearance (OF-BLD-008 §4).
 //
 // NOT A PLACEHOLDER. Dominion arrives with the molecule catalogue as its
-// default view and the clearance engine behind it — 117 molecules, six
+// default view and the clearance engine behind it — every molecule in the
+// catalogue (counted from PRODUCTS at render, never typed), six
 // jurisdictions, and a set of authored findings. `Molecules.tsx` and
 // `MoleculeDetail.tsx` are the same files they were; what changed is that they
 // live under an owner now, because a catalogue of what could be made is

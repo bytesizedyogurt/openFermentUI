@@ -5,11 +5,10 @@
 // somewhere, and who cannot run it yet. A cell opens the sign-off sheet.
 import { useMemo, useState } from 'react';
 import { ChevronDown, Users } from 'lucide-react';
-import { useStore } from '@/store';
 import { FAMILIES, SKILLS } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import type { Protocol } from '@/data/types';
-import { Button, Card, EmptyState, cx } from '@/components/ui';
+import { Card, EmptyState, cx } from '@/components/ui';
 import { AddPersonForm, GuildHeader, SignoffSheet, useGuild } from '@/components/GuildBits';
 import { LevelGlyph, LevelLegend, levelLabel } from '@/components/LevelGlyph';
 import { statusOf, verdictFor } from '@/engine/competence';
@@ -30,7 +29,6 @@ const stepsOf = (p: Protocol) => (p.versions.find((v) => v.version === p.current
 
 export default function GuildMatrix() {
   const ctx = useGuild();
-  const loadSample = useStore((s) => s.guildLoadSample);
   const [protocolId, setProtocolId] = useState<string>(TAGGED[0]?.id ?? 'all');
   const [pair, setPair] = useState<{ p: string; s: string } | null>(null);
   const protocol = TAGGED.find((p) => p.id === protocolId) ?? null;
@@ -59,13 +57,10 @@ export default function GuildMatrix() {
           <EmptyState
             icon={<Users size={22} />}
             title="Nobody is on the ledger yet"
-            body="The ledger starts with its lead, who adds the team and designates the first assessors. Or look around with an invented sample team first; nothing about the sample is saved."
+            body="The ledger starts with its lead. Add yourself below as the lead: you then add the team, one person at a time, and designate the first assessors."
           />
           <div className="px-6 pb-6 space-y-4">
             <AddPersonForm />
-            <div className="border-t border-line pt-3">
-              <Button onClick={loadSample}>Show a sample team</Button>
-            </div>
           </div>
         </Card>
       </>

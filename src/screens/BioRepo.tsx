@@ -1,6 +1,6 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
 // in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BookMarked,
@@ -25,11 +25,9 @@ import {
   LinkButton,
   PageHeader,
   Popover,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
 import { SubsystemShelf } from '@/components/ReferenceView';
@@ -160,19 +158,7 @@ export default function BioRepo() {
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
-
-  // Simulated first-paint latency (§13.5) so the loading state is real.
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const allRows = useMemo<LibRow[]>(() => {
     const byPaper = new Map<string, { total: number; gold: number; verified: number }>();
@@ -267,7 +253,7 @@ export default function BioRepo() {
       provenance: 'demo',
     });
     toast({
-      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — the demo extractor replays the seeded records, it does not mint new ones`,
+      text: `Extraction queued for ${n} paper${n === 1 ? '' : 's'} — in this browser the seeded records are staged again for review; new values come only from the service's extractor, anchored to each paper's own sentences`,
       kind: 'info',
       href: '#/intake',
       hrefLabel: 'Extract',
@@ -566,20 +552,6 @@ export default function BioRepo() {
     </>
   );
 
-  if (!ready) {
-    return (
-      <>
-        {header}
-        <Card>
-          <Skeleton rows={10} />
-        </Card>
-        <div className="sr-only" aria-live="polite">
-          Loading corpus table
-        </div>
-      </>
-    );
-  }
-
   if (allRows.length === 0 && hiddenPapers.length > 0) {
     return (
       <>
@@ -602,7 +574,7 @@ export default function BioRepo() {
         <Card>
           <EmptyState
             title="No papers in the corpus yet"
-            body="Every paper is still held on the demo shelf. Ingest one to see it flow through fetch, parse, chunk, embed and extract."
+            body="Every paper is still in the ingest queue. Fetch one to see it flow through fetch, parse, chunk, embed and extract."
             action={<LinkButton to="/intake/ingest">Open the ingest board</LinkButton>}
           />
         </Card>

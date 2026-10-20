@@ -9,7 +9,7 @@
 // off, and a host in an archived program leaves the organism chips and the
 // Organism facet, so a general protocol written for casein hosts lists none of
 // them. With the switch on, every row and chip is back in its old order.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Beaker,
   Calculator,
@@ -46,10 +46,8 @@ import {
   LinkButton,
   PageHeader,
   Popover,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -448,21 +446,9 @@ export default function Protocols() {
   const runs = useStore((s) => s.runs);
   const density = useStore((s) => s.ui.density);
 
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState<Record<FacetKey, string[]>>(EMPTY_SELECTION);
-
-  // Simulated first-paint latency (§13.5) so the loading state is a real state.
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const allRows = useMemo<ProtoRow[]>(() => {
     const runCounts = new Map<string, number>();
@@ -763,24 +749,6 @@ export default function Protocols() {
     </>
   );
 
-  if (!ready) {
-    return (
-      <>
-        {header}
-        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={4} />
-            </Card>
-          ))}
-        </div>
-        <div className="sr-only" aria-live="polite">
-          Loading protocols
-        </div>
-      </>
-    );
-  }
-
   if (allRows.length === 0 && hiddenPrograms.length > 0) {
     return (
       <>
@@ -810,7 +778,7 @@ export default function Protocols() {
         <Card>
           <EmptyState
             title="No protocols in this session"
-            body="The protocol set is empty. Restore the seeded demo data from the corpus settings to bring the bench procedures back."
+            body="The protocol set is empty in this session. Clearing this browser’s data from the corpus settings brings the bench procedures back."
             icon={<ClipboardList size={22} />}
             action={<LinkButton to="/settings/corpus">Open corpus settings</LinkButton>}
           />

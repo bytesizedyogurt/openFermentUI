@@ -929,7 +929,7 @@ class PracticeSession(BaseModel):
     scenarioId: str
     skillId: str
     # A person on Guild's ledger, or None for a session nobody's record keeps
-    # (the sample team, or nobody chosen).
+    # (nobody chosen as learning).
     personId: str | None = None
     turns: list[PracticeTurn] = Field(default_factory=list)
     observed: list[PracticeObservation] = Field(default_factory=list)

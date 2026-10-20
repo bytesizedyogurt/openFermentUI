@@ -133,7 +133,7 @@ The thing you talk to. Before its first turn, code sweeps all eleven modules for
 
 | Component | Implemented in |
 |---|---|
-| Postdoc | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py`, `src/components/ProposalsCard.tsx` |
+| Postdoc | `src/lib/postdoc.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py`, `src/components/ProposalsCard.tsx` |
 
 ### geneOS
 
@@ -261,7 +261,7 @@ for the ones with a rail entry.
 
 | Component | Layer | Lives in | Surfaced as |
 |---|---|---|---|
-| Postdoc | The agent | `src/sim/chat.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
+| Postdoc | The agent | `src/lib/postdoc.ts`, `src/screens/Postdoc.tsx`, `core/openferment_core/postdoc_agent.py`, `core/openferment_core/validate.py`, `core/openferment_core/module_stores.py`, `core/openferment_core/tools/`, `core/openferment_core/audit.py`, `core/openferment_core/proposals.py`, `core/openferment_core/evidence_pool.py` | the rail, /postdoc |
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |

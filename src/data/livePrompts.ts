@@ -1,11 +1,17 @@
-// Questions offered on Postdoc's Live empty state, and the first three on
-// Home's first-visit band. Questions only: every answer comes from the
-// service, over whatever the corpus holds when it is asked.
+// Questions offered on Postdoc's empty state (SUGGESTED_PROMPTS in flows.ts
+// reads this list), and the first three on Home's first-visit band. Questions
+// only: every answer comes from the service, over whatever the corpus holds
+// when it is asked.
 //
-// Each was asked of the live service three times over the seeded corpus on
-// 2026-10-20 (claude-haiku-5-5, effort medium) and answered from thread Q's
-// records, passages and computed values each time; docs/DEMO-YEAST.md gives
-// what came back. Most reliable first.
+// The yeast five come first, in this order. Each was asked of the live service
+// three times over the seeded corpus on 2026-10-20 (claude-haiku-5-5, effort
+// medium) and answered from thread Q's records, passages and computed values
+// each time; docs/DEMO-YEAST.md gives what came back. Most reliable first.
+//
+// Then the cross-module questions, numbered six to eleven in OF-BLD-016
+// Appendix 2 and written exactly as it words them. They show Postdoc reading
+// and writing across the modules (OF-BLD-015 Phase 7); OF-BLD-016 §4.1 asks
+// each of them live and records what came back.
 //
 // Each question names what it is about (OF-BLD-016 §2.2, E.1′): the strains
 // and papers its answer stands on. A screen offers a question only when every
@@ -63,10 +69,31 @@ export const LIVE_PROMPT_LIST: OfferedPrompt[] = [
       { kind: 'paper', id: 'Q12' },
     ],
   },
+  // ── cross-module (OF-BLD-016 Appendix 2, questions 6 to 11) ──────────
+  // These ask across the modules and stand on no one program's entity, so
+  // they name none and always show; the eleventh asks what is archived.
+  { text: 'What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?', about: [] },
+  {
+    text: 'Which hosts in geneOS could make ethanol, which models sit on their pages, and what ceiling does each give on glucose?',
+    about: [],
+  },
+  {
+    text: 'Draft a runbook for a batch ethanol fermentation in CEN.PK113-7D on glucose, using the extracted yield records and the Yeast9 glucose ceiling as a bound.',
+    about: [{ kind: 'strain', id: 's-cerevisiae-cenpk113-7d' }],
+  },
+  { text: 'What is waiting for a person on Home right now?', about: [] },
+  {
+    text: 'What does Proforma need before it can price ethanol from glucose on this evidence, and what does the corn stover benchmark give?',
+    about: [],
+  },
+  { text: 'What is archived in this corpus, and how would I see the PHA work?', about: [] },
 ];
 
 /** Every live question, in order, whatever its program. */
 export const LIVE_PROMPTS: string[] = LIVE_PROMPT_LIST.map((p) => p.text);
+
+/** How many of LIVE_PROMPTS are the yeast five; the rest are cross-module. */
+export const YEAST_PROMPT_COUNT = 5;
 
 /** The live questions a screen offers: those whose subjects all show, in order. */
 export function livePrompts(shows: SubjectShows): string[] {

@@ -395,8 +395,18 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('after a reload the conversation is back with both turns', back?.turns.map((t) => t.id).join() === 'lt-a,lt-b');
   check('a turn the reload cut short reads interrupted', back?.turns.find((t) => t.id === 'lt-b')?.status === 'interrupted');
   check('a conversation started since the page loaded is kept, first', st().liveConversations[0]?.id === fresh);
-  st().resetDemo();
-  check('Reset demo data clears the conversations', st().liveConversations.length === 0);
+  // OF-BLD-016 §3.1 — a question the service never received is taken back:
+  // its turn goes, the turns before it stay, and a conversation made for it
+  // alone goes with it.
+  st().addLiveTurn(id, turn('lt-c', 'running'));
+  st().dropLiveTurn(id, 'lt-c');
+  check('a turn the service never received is taken back, and the turns before it stay',
+    st().liveConversations.find((c) => c.id === id)?.turns.map((t) => t.id).join() === 'lt-a,lt-b');
+  st().addLiveTurn(fresh, turn('lt-d', 'running'));
+  st().dropLiveTurn(fresh, 'lt-d');
+  check('a conversation made for an unreceived question goes with it', !st().liveConversations.some((c) => c.id === fresh));
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data clears the conversations', st().liveConversations.length === 0);
 }
 
 // OF-BLD-016 §2.1 — whether archived programs show is Durable: the switch

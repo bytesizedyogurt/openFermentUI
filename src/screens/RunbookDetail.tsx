@@ -18,7 +18,7 @@
 // counted, the ledger figure and the host chip read through the program
 // filter, widened on an archived runbook to its own program (`useRunbookScope`),
 // so a link into the archive still shows that runbook's own runs.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   Boxes,
@@ -69,10 +69,8 @@ import {
   Modal,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 /**
  * A stage `value` is free text on purpose — stages produce titres, CAPEX
@@ -662,18 +660,6 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const runbooks = useStore((s) => s.runbooks);
   const products = useStore((s) => s.products);
   const inScope = useRunbookScope(runbookId);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [runbookId]);
 
   const runbook = runbooks.find((r) => r.id === runbookId);
   const product = runbook?.productId
@@ -696,20 +682,6 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
             body="The board lists every runbook in this session, grouped by what it is waiting on."
             action={<LinkButton to="/runbooks">Back to the board</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Runbooks" title={runbook.title} />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={8} />
         </Card>
       </>
     );

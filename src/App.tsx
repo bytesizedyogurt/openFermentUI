@@ -1,5 +1,5 @@
 // App shell (OF-DES-001 §7.1): left rail + top utility bar + content region,
-// with the persistent demo banner, jobs tray, palette, and global shortcuts.
+// with the reviewer line, jobs tray, palette, and global shortcuts.
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
@@ -80,6 +80,26 @@ function isActive(path: string, to: string) {
  * blanks the whole app. Keyed by the screen at the call site, so moving to
  * another screen clears it, and moving within one remounts nothing.
  */
+
+/**
+ * Who is signing (OF-BLD-016 §3.2): the reviewer name set in Settings →
+ * Corpus & ontology, which every decision and assumption carries, or a link
+ * there when none is set. There is no sign-in; the name is a claim.
+ */
+function SignedIn() {
+  const reviewer = useStore((s) => s.reviewer.trim());
+  return (
+    <a
+      href="#/settings/corpus"
+      className={cx('text-caption truncate max-w-[12rem] hover:underline', reviewer ? 'text-ink' : 'text-signal-warn')}
+      title={reviewer ? `Decisions and assumptions are signed ${reviewer}. Change it in Settings.` : 'Set your reviewer name in Settings'}
+      data-testid="signed-in"
+    >
+      {reviewer || 'No reviewer name set'}
+    </a>
+  );
+}
+
 class ScreenBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
   static getDerivedStateFromError(error: Error) {
@@ -230,43 +250,6 @@ function Screen() {
         </div>
       );
   }
-}
-
-// ── Demo banner (§7.1) ─────────────────────────────────────────────────
-
-function DemoBanner() {
-  const dismissed = useStore((s) => s.ui.bannerDismissed);
-  const setUI = useStore((s) => s.setUI);
-  if (dismissed) return null;
-  return (
-    <div className="h-8 shrink-0 flex items-center gap-2 px-3 border-b border-signal-warn/30 bg-signal-warn/[0.08] text-caption">
-      <span
-        className="inline-block w-[3px] h-4 rounded-[1px] shrink-0"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(to bottom, rgb(var(--signal-warn)) 0 3px, transparent 3px 6px)',
-        }}
-        aria-hidden
-      />
-      <span className="text-signal-warn font-medium">Real literature · modeled economics</span>
-      <span className="text-ink-soft hidden sm:inline">
-        — papers and values are real and citable. Simulation outputs are illustrative models,
-        not validated economics. Depositions, review decisions, Guild&rsquo;s ledger, finished
-        lessons and Postdoc&rsquo;s conversations survive a refresh; everything else resets.
-      </span>
-      <a href="#/settings/about" className="text-accent hover:underline hidden md:inline">
-        Read the colophon
-      </a>
-      <button
-        className="ml-auto text-ink-soft hover:text-ink"
-        onClick={() => setUI({ bannerDismissed: true })}
-        aria-label="Dismiss banner for this session"
-        title="Dismiss for this session"
-      >
-        <X size={13} />
-      </button>
-    </div>
-  );
 }
 
 // ── Help sheet (§9.6, Appendix A) ──────────────────────────────────────
@@ -437,7 +420,6 @@ export default function App() {
 
   return (
     <div className="h-full flex flex-col">
-      <DemoBanner />
       <div className="flex-1 flex min-h-0">
         {/* Left rail */}
         <nav
@@ -622,12 +604,7 @@ export default function App() {
             >
               {ui.theme === 'bench' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
-            <div
-              className="w-7 h-7 rounded-full bg-accent/15 border border-accent/30 grid place-items-center text-caption font-medium text-accent"
-              title="Signed in as demo curator"
-            >
-              SC
-            </div>
+            <SignedIn />
           </header>
 
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
