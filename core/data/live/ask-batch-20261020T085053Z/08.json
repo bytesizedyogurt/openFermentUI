@@ -1,0 +1,559 @@
+{
+  "question": "Draft a runbook for a batch ethanol fermentation in CEN.PK113-7D on glucose, using the extracted yield records and the Yeast9 glucose ceiling as a bound.",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Yeast9 flux balance ceiling for ethanol from glucose in the genome-scale model, an upper bound with no time axis or vessel, usable as the theoretical bound for the runbook",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-b616b00ba65aeadb"
+      ],
+      "moduleRefs": [
+        "geneos/model/Yeast9"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Ethanol yield on glucose extracted for CEN.PK113-7D from the paper on glycerol formation in a very high ethanol performance fed-batch process; the record is a fed-batch run, not a batch run, and its conditions field is empty",
+      "recordIds": [
+        "cl1-Q9-c774cd36"
+      ],
+      "paperIds": [
+        "Q9"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "Ethanol yield on glucose extracted for CEN.PK113-7D from the paper on reducing glycerol formation capacity under anaerobic conditions; the source table describes anaerobic fed-batch fermentation, so this is not a batch run",
+      "recordIds": [
+        "cl1-Q7-2b034640"
+      ],
+      "paperIds": [
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q7:t1:2",
+          "quote": "Yields, concentrations, and specific rates are average values of 2 independent fermentations."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c4",
+      "text": "Ethanol yield on glucose extracted for the parental CEN.PK113-7D strain in the adaptive laboratory evolution paper on ethanol tolerance; the record carries no conditions field, so the cultivation mode is not established from the corpus",
+      "recordIds": [
+        "cl1-Q18-a44d7ce1"
+      ],
+      "paperIds": [
+        "Q18"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "draft_runbook was refused: there is no product 'ethanol' in the Dominion catalogue, and the Dominion module returned no ethanol molecule. No runbook was drafted and nothing was locked or published. A person with catalogue rights would need to add an ethanol product id before a runbook can be drafted.",
+    "No extracted yield record for CEN.PK113-7D on glucose is labelled as a batch run. The returned records are fed-batch (two papers) or of unstated mode (one paper). A batch-specific yield record is needed for the prediction.",
+    "All returned CEN.PK113-7D yield records have provenance unverified and an empty conditions field. Temperature, aeration, medium, pH and glucose concentration are not recorded for them, so they cannot anchor run settings.",
+    "The Yeast9 ceiling is for the S288C reference strain, not CEN.PK113-7D, and the model's ethanol route is the native pyruvate decarboxylase and alcohol dehydrogenase route. No CEN.PK113-7D-specific model or ceiling is on the shelf.",
+    "No batch growth or kinetic fit exists for CEN.PK113-7D in fermOS, and BioRepo returned no verified records, so no forecast or fitted time course can bound run length, biomass or product titre.",
+    "The runbook's start, mid-run and harvest measurements, and the sampling intervals, have not been specified by any source in the corpus; the bench protocol for CEN.PK113-7D batch ethanol is missing."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 14,
+    "outputTokens": 5788,
+    "cacheReadTokens": 159790,
+    "cacheWriteTokens": 17152,
+    "costUsd": 0.006637,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [
+    {
+      "id": "ev-b616b00ba65aeadb",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (Yeast9) (genome scale)",
+      "value": 0.5114345345145319,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "Yeast9",
+              "note": "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255), model/yeast-GEM.xml, sha256 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb (CC-BY-4.0)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "b616b00ba65aeadb",
+        "at": "2026-10-20T03:56:20Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [
+    {
+      "id": "Q7:t1:2",
+      "paperId": "Q7",
+      "sectionId": "t1",
+      "heading": "Table 1 Fermentation characteristics for Saccharomyces cerevisiae CEN.PK113-7D and the two mutant strains during anaerobic fed-batch fermentation at 30°C",
+      "kind": "table",
+      "text": "Table 1 Fermentation characteristics for Saccharomyces cerevisiae CEN.PK113-7D and the two mutant strains during anaerobic fed-batch fermentation at 30°C\n | WT | TEFmut7 | TEFmut2\nμmax: maximum specific growth rate, DCWmax maximum cell concentration , Yi/j yield of production of constituent i on the constituent j: DCW biomass ;.n.d. : not detected (detection thresholds were 60, 50 and 100 mg L-1 for acetate, pyruvate and succinate respectively). Yields, concentrations, and specific rates are average values of 2 independent fermentations. Productivity and fermentation time correspond to the experiments shown in the paper.",
+      "start": 1152,
+      "end": 1600
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 12 · rb-taq-kigali, rb-lnfp1, rb-brazzein … · read in part",
+          "geneOS · 2 · s-cerevisiae-cenpk113-7d, Yeast9",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in two",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol yield glucose batch fermentation",
+        "field": null,
+        "organism": "s-cerevisiae-cenpk113-7d",
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol yield glucose batch fermentation · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "Yeast9",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 652,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [
+          "geneos/host/s-cerevisiae-cenpk113-7d",
+          "geneos/model/Yeast9"
+        ],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 10
+      },
+      "summary": "Read geneOS for geneos/host/s-cerevisiae-cenpk113-7d, geneos/model/Yeast9 · 2 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "runbooks_read",
+      "input": {
+        "ids": [],
+        "words": "ethanol",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read Runbooks for \"ethanol\" · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "CEN.PK 113-7D batch cultivation ethanol yield glucose anaerobic",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"CEN.PK 113-7D batch cultivation ethanol yield glucose anaerobic\" · 6 passages",
+      "ms": 167,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol yield Yp/s glucose",
+        "field": null,
+        "organism": "s-cerevisiae-cenpk113-7d",
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol yield Yp/s glucose · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 8,
+      "kind": "tool",
+      "tool": "draft_runbook",
+      "input": {
+        "title": "Batch ethanol fermentation on glucose in CEN.PK113-7D, bounded by the Yeast9 glucose ceiling",
+        "productId": "ethanol",
+        "strainId": "s-cerevisiae-cenpk113-7d",
+        "items": [
+          {
+            "label": "Ethanol yield on glucose, Yeast9 theoretical ceiling (upper bound)",
+            "evidenceId": "ev-b616b00ba65aeadb"
+          },
+          {
+            "label": "Ethanol yield on glucose in CEN.PK113-7D, reported in the literature (extracted records)",
+            "recordIds": [
+              "cl1-Q7-2b034640",
+              "cl1-Q9-c774cd36",
+              "cl1-Q18-a44d7ce1"
+            ]
+          }
+        ],
+        "measures": [
+          {
+            "label": "Ethanol yield on glucose",
+            "unit": "g g-1",
+            "timepoint": "harvest",
+            "itemLabel": "Ethanol yield on glucose, Yeast9 theoretical ceiling (upper bound)"
+          },
+          {
+            "label": "Ethanol yield on glucose",
+            "unit": "g g-1",
+            "timepoint": "harvest",
+            "itemLabel": "Ethanol yield on glucose in CEN.PK113-7D, reported in the literature (extracted records)"
+          }
+        ]
+      },
+      "summary": "draft_runbook refused: draft_runbook refused: there is no product 'ethanol'",
+      "ms": 5,
+      "ok": false
+    },
+    {
+      "n": 9,
+      "kind": "tool",
+      "tool": "dominion_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "molecule",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read Dominion for molecule · 116 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 10,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "ethanol",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read geneOS for \"ethanol\" · 4 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 11,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "cen pk113 7d",
+      "yeast9"
+    ],
+    "searched": 11,
+    "found": 2,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 12,
+        "hits": [
+          {
+            "ref": "runbooks/runbook/rb-taq-kigali",
+            "id": "rb-taq-kigali",
+            "kind": "runbook",
+            "label": "Taq polymerase — 2,000 L Kigali facility",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-lnfp1",
+            "id": "rb-lnfp1",
+            "kind": "runbook",
+            "label": "LNFP-I — process definition",
+            "state": "proposed"
+          },
+          {
+            "ref": "runbooks/runbook/rb-brazzein",
+            "id": "rb-brazzein",
+            "kind": "runbook",
+            "label": "Brazzein — pilot process",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-diag-panel",
+            "id": "rb-diag-panel",
+            "kind": "runbook",
+            "label": "Malaria antigen panel — regional supply",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-chymosin",
+            "id": "rb-chymosin",
+            "kind": "runbook",
+            "label": "Camel chymosin — variant landscape",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-nootkatone",
+            "id": "rb-nootkatone",
+            "kind": "runbook",
+            "label": "Nootkatone — fragrance-grade train",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-thermo-ligase",
+            "id": "rb-thermo-ligase",
+            "kind": "runbook",
+            "label": "Thermostable ligase — homolog discovery",
+            "state": "locked"
+          },
+          {
+            "ref": "runbooks/runbook/rb-sialyl-genus",
+            "id": "rb-sialyl-genus",
+            "kind": "runbook",
+            "label": "Sialyltransferase genus enumeration",
+            "state": "locked"
+          }
+        ],
+        "named": true,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 2,
+        "hits": [
+          {
+            "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+            "id": "s-cerevisiae-cenpk113-7d",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/model/Yeast9",
+            "id": "Yeast9",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "Yeast9",
+      "ref": "geneos/model/Yeast9",
+      "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    }
+  ],
+  "runbookDraft": null
+}

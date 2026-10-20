@@ -1,23 +1,23 @@
 {
-  "date": "2026-10-16T05:31:48Z",
-  "manifestHash": "6aed9fea97359b69",
-  "papersIndexed": 66,
-  "passages": 5043,
+  "date": "2026-10-20T07:46:46Z",
+  "manifestHash": "ca4e87f1eb597aef",
+  "papersIndexed": 88,
+  "passages": 7179,
   "sets": [
     {
       "name": "K",
-      "questions": 94,
-      "note": "known items: 3 records and 216 anchored candidates whose quote sits in a passage"
+      "questions": 85,
+      "note": "known items on thread Q: 0 records and 163 anchored candidates whose quote sits in a passage"
     },
     {
       "name": "S",
-      "questions": 179,
-      "note": "written questions: 179 kept of 200 asked, 21 discarded"
+      "questions": 83,
+      "note": "written questions on thread Q: 83 kept of 100 asked, 17 discarded"
     },
     {
       "name": "F",
-      "questions": 3,
-      "note": "flows: 3 of the 12 flows that cite records have a record that anchors"
+      "questions": 0,
+      "note": "flows: none of the 12 flows that cite records cites an anchored record on thread Q, so F is empty on this thread"
     }
   ],
   "lanes": [
@@ -26,105 +26,133 @@
       "available": true,
       "why": null,
       "paid": false,
-      "score": 0.4265,
+      "score": 0.4226,
       "sets": {
         "K": {
-          "questions": 94,
-          "recall5": 0.3348,
-          "recall10": 0.4759,
-          "recall20": 0.5617,
-          "mrr10": 0.2381,
-          "ndcg10": 0.2955,
-          "medianSeconds": 0.0176,
+          "questions": 85,
+          "recall5": 0.2618,
+          "recall10": 0.3206,
+          "recall20": 0.4922,
+          "mrr10": 0.1774,
+          "ndcg10": 0.1997,
+          "medianSeconds": 0.0145,
           "costPerQuestion": 0.0
         },
         "S": {
-          "questions": 179,
-          "recall5": 0.6648,
-          "recall10": 0.7933,
-          "recall20": 0.8771,
-          "mrr10": 0.4832,
-          "ndcg10": 0.5576,
-          "medianSeconds": 0.0334,
-          "costPerQuestion": 0.0
-        },
-        "F": {
-          "questions": 3,
-          "recall5": 0.0,
-          "recall10": 0.0,
-          "recall20": 0.0,
-          "mrr10": 0.0,
-          "ndcg10": 0.0,
-          "medianSeconds": 0.0164,
+          "questions": 83,
+          "recall5": 0.7229,
+          "recall10": 0.8434,
+          "recall20": 0.9398,
+          "mrr10": 0.5845,
+          "ndcg10": 0.6456,
+          "medianSeconds": 0.0316,
           "costPerQuestion": 0.0
         }
-      }
+      },
+      "refused": 0
     },
     {
       "lane": "bm25+expand",
-      "available": false,
-      "why": "its helper model call failed: declined by the safety classifier (bio) on claude-haiku-5-5. Nothing was kept; the request can be asked again later",
+      "available": true,
+      "why": null,
       "paid": true,
-      "score": null,
-      "sets": {}
+      "score": 0.4294,
+      "sets": {
+        "K": {
+          "questions": 85,
+          "recall5": 0.2716,
+          "recall10": 0.3392,
+          "recall20": 0.5745,
+          "mrr10": 0.2153,
+          "ndcg10": 0.2205,
+          "medianSeconds": 1.8038,
+          "costPerQuestion": 0.000098
+        },
+        "S": {
+          "questions": 83,
+          "recall5": 0.7711,
+          "recall10": 0.8675,
+          "recall20": 0.9277,
+          "mrr10": 0.5664,
+          "ndcg10": 0.6382,
+          "medianSeconds": 2.1923,
+          "costPerQuestion": 0.000131
+        }
+      },
+      "refused": 0
     },
     {
       "lane": "hybrid",
       "available": true,
       "why": null,
       "paid": false,
-      "score": 0.4309,
+      "score": 0.4587,
       "sets": {
         "K": {
-          "questions": 94,
-          "recall5": 0.2754,
-          "recall10": 0.4348,
-          "recall20": 0.5362,
-          "mrr10": 0.2434,
-          "ndcg10": 0.2673,
-          "medianSeconds": 0.1027,
+          "questions": 85,
+          "recall5": 0.3216,
+          "recall10": 0.3569,
+          "recall20": 0.4471,
+          "mrr10": 0.1758,
+          "ndcg10": 0.2132,
+          "medianSeconds": 0.1719,
           "costPerQuestion": 0.0
         },
         "S": {
-          "questions": 179,
-          "recall5": 0.6983,
-          "recall10": 0.8492,
-          "recall20": 0.905,
-          "mrr10": 0.5153,
-          "ndcg10": 0.5946,
-          "medianSeconds": 0.1199,
-          "costPerQuestion": 0.0
-        },
-        "F": {
-          "questions": 3,
-          "recall5": 0.0,
-          "recall10": 0.0,
-          "recall20": 0.0,
-          "mrr10": 0.0,
-          "ndcg10": 0.0,
-          "medianSeconds": 0.0982,
+          "questions": 83,
+          "recall5": 0.8313,
+          "recall10": 0.9277,
+          "recall20": 0.9639,
+          "mrr10": 0.6338,
+          "ndcg10": 0.7043,
+          "medianSeconds": 0.1723,
           "costPerQuestion": 0.0
         }
-      }
+      },
+      "refused": 0
     },
     {
       "lane": "bm25+rerank",
-      "available": false,
-      "why": "its helper model call failed: declined by the safety classifier (bio) on claude-haiku-5-5. Nothing was kept; the request can be asked again later",
+      "available": true,
+      "why": null,
       "paid": true,
-      "score": null,
-      "sets": {}
+      "score": 0.5942,
+      "sets": {
+        "K": {
+          "questions": 85,
+          "recall5": 0.5402,
+          "recall10": 0.549,
+          "recall20": 0.5667,
+          "mrr10": 0.4627,
+          "ndcg10": 0.4636,
+          "medianSeconds": 20.9066,
+          "costPerQuestion": 0.003888
+        },
+        "S": {
+          "questions": 83,
+          "recall5": 0.8072,
+          "recall10": 0.8675,
+          "recall20": 0.9157,
+          "mrr10": 0.6791,
+          "ndcg10": 0.7249,
+          "medianSeconds": 20.3715,
+          "costPerQuestion": 0.003834
+        }
+      },
+      "refused": 0
     },
     {
       "lane": "hybrid+rerank",
       "available": false,
-      "why": "its helper model call failed: declined by the safety classifier (bio) on claude-haiku-5-5. Nothing was kept; the request can be asked again later",
+      "why": "its helper model call failed: Today's model spend is $1.30 of the $1.30 daily cap, and this call could pass it. Raise OPENFERMENT_DAILY_BUDGET_USD in core/.env, or wait for the next UTC day.",
       "paid": true,
       "score": null,
-      "sets": {}
+      "sets": {},
+      "refused": 0
     }
   ],
-  "chosenLane": "hybrid",
+  "chosenLane": "bm25+rerank",
   "rule": "A lane's score is the mean of its nDCG@10 on K and on S. bm25 holds the choice until a lane scores higher; a lane that spends a model call on every question must lead the best free lane by 0.02 or more. An unavailable lane is skipped.",
-  "totalCostUsd": 0.425622
+  "totalCostUsd": 0.752755,
+  "thread": "Q"
 }

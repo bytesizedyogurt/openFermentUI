@@ -1,0 +1,126 @@
+{
+  "id": "ee2b8673ffde6f72",
+  "tool": "geneos.frontier",
+  "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "Saccharomyces cerevisiae S288C (iMM904)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "iMM904",
+        "note": "https://bigg.ucsd.edu/static/models/iMM904.xml (ETag \"017c86841952cc365f20a8b466292b31\", Last-Modified 2019-11-01), sha256 a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 (BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego)",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "secreted through EX_etoh_e; ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "iMM904",
+    "product": "ethanol",
+    "substrate": "glucose",
+    "exchange": "EX_glc__D_e",
+    "uptake": 10.0,
+    "growthReaction": "BIOMASS_SC5_notrace",
+    "points": [
+      {
+        "growth": 0.0,
+        "flux": 19.99999999999999,
+        "gPerG": 0.5114345345145316
+      },
+      {
+        "growth": 0.02616960942763592,
+        "flux": 19.679248605536877,
+        "gPerG": 0.5032323675084251
+      },
+      {
+        "growth": 0.05233921885527184,
+        "flux": 19.35849721107374,
+        "gPerG": 0.49503020050231805
+      },
+      {
+        "growth": 0.07850882828290776,
+        "flux": 19.037745816610677,
+        "gPerG": 0.48682803349621295
+      },
+      {
+        "growth": 0.10467843771054368,
+        "flux": 18.716994422147557,
+        "gPerG": 0.4786258664901063
+      },
+      {
+        "growth": 0.1308480471381796,
+        "flux": 18.39624302768446,
+        "gPerG": 0.47042369948400026
+      },
+      {
+        "growth": 0.1570176565658155,
+        "flux": 18.075491633221333,
+        "gPerG": 0.46222153247789344
+      },
+      {
+        "growth": 0.18318726599345145,
+        "flux": 17.754740238758238,
+        "gPerG": 0.4540193654717874
+      },
+      {
+        "growth": 0.20935687542108736,
+        "flux": 17.42234041417721,
+        "gPerG": 0.4455193279939219
+      },
+      {
+        "growth": 0.23552648484872327,
+        "flux": 16.926319652364374,
+        "gPerG": 0.43283522062255736
+      },
+      {
+        "growth": 0.2616960942763592,
+        "flux": 16.403751013569085,
+        "gPerG": 0.4194722381958493
+      },
+      {
+        "growth": 0.2878657037039951,
+        "flux": 15.815474819206063,
+        "gPerG": 0.4044290001143477
+      }
+    ]
+  },
+  "outputHash": "1356c4044a94e88927d8718b11ea02f0a7d3aee2a58da137fb8129ecd93afc6a",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T04:28:49Z",
+  "durationMs": 881,
+  "seed": null
+}

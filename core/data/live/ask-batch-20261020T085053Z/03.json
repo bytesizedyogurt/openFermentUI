@@ -1,0 +1,372 @@
+{
+  "question": "What maximum specific growth rate does wild-type Saccharomyces cerevisiae CEN.PK113-7D reach on glucose, and what biomass and ethanol yields go with it?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "The maximum specific growth rate of the wild-type CEN.PK113-7D strain on glucose, in the anaerobic study of glycerol-formation mutants, is recorded as the wild-type μmax.",
+      "recordIds": [
+        "cl1-Q7-b32d94eb"
+      ],
+      "paperIds": [
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q7:s10:0",
+          "quote": "The maximum growth rate, μmax was 0.29 h-1 for the wild type, 0.13 h-1 for TEFmut7, and 0.046 h-1 for TEFmut2."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-cenpk113-7d"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "The biomass yield on glucose of the wild-type CEN.PK113-7D strain under anaerobic batch conditions in the glycerol-formation study.",
+      "recordIds": [
+        "cl1-Q7-1fa84540"
+      ],
+      "paperIds": [
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-cenpk113-7d"
+      ]
+    },
+    {
+      "id": "c3",
+      "text": "The overall ethanol yield on glucose of the wild-type CEN.PK113-7D strain under anaerobic batch conditions in the same glycerol-formation study.",
+      "recordIds": [
+        "cl1-Q7-2b034640"
+      ],
+      "paperIds": [
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-cenpk113-7d"
+      ]
+    },
+    {
+      "id": "c4",
+      "text": "Under the same anaerobic glucose batch study, the wild type reached a maximum biomass density and a final ethanol concentration, which were recorded alongside its growth rate.",
+      "recordIds": [
+        "cl1-Q7-f32ad2ac",
+        "cl1-Q7-2f3dcdbc"
+      ],
+      "paperIds": [
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c5",
+      "text": "A separate fed-batch study of the same strain reports its own wild-type ethanol yield and biomass yield on glucose, which are lower than the anaerobic batch values for the same strain.",
+      "recordIds": [
+        "cl1-Q9-c774cd36",
+        "cl1-Q9-499852da"
+      ],
+      "paperIds": [
+        "Q9"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q9:s15:1",
+          "quote": "While the wild-type strain produced 0.43 g g-1, TEFmut7 formed 0.44 g g-1and TEFmut2 0.45 g g-1."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "The maximum growth rate, biomass yield and ethanol yield come from one anaerobic glucose batch study of the wild type (Q7). The rate record does not state its carbon source or conditions, and the yield values were read from the table column order in the extracted record, so confirm the wild-type column against the source table.",
+    "The fed-batch study (Q9) gives a different wild-type ethanol yield and biomass yield under very-high-gravity conditions, not a batch maximum growth rate. Claim c5 contrasts the two without a growth rate for the fed-batch study.",
+    "No aerobic glucose growth-rate record for the wild type CEN.PK113-7D was returned. The Q18 adaptive-evolution records report growth rates only under ethanol stress, so they are not a glucose maximum.",
+    "All of these records are unverified extractor candidates; none has been reviewed by a person.",
+    "The yield ceiling tools were not run; no computed theoretical ceiling for this strain is in the record."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 2878,
+    "cacheReadTokens": 60856,
+    "cacheWriteTokens": 9995,
+    "costUsd": 0.003297,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "Q7:s10:0",
+      "paperId": "Q7",
+      "sectionId": "s10",
+      "heading": "Results › Reduced glycerol formation altered fermentation rates",
+      "kind": "prose",
+      "text": "The reduction of GPDH activity in the engineered strains led to a decrease in the maximum specific glycerol production rate of 64 and 92%, respectively in TEFmut7 and TEFmut2 compared to the wild type (0.2 g glycerol g DCW-1 h-1) (Figure 2). However, the maximum specific growth rate and the maximum specific ethanol production rates were also reduced in TEFmut7 and TEFmut2. The maximum growth rate, μmax was 0.29 h-1 for the wild type, 0.13 h-1 for TEFmut7, and 0.046 h-1 for TEFmut2. The maximum specific ethanol production rates were reduced by 57% and 85% in TEFmut7 and TEFmut2, respectively compared to the wild type (1.5 g ethanol g DCW-1 h-1). The overall volumetric ethanol productivity was also affected in TEFmut7 and TEFmut2, i.e. 0.73 and 0.33 g L-1h-1 respectively, compared to 1.97 g L-1h-1 for the wild type (Table 1).",
+      "start": 0,
+      "end": 835
+    },
+    {
+      "id": "Q9:s15:1",
+      "paperId": "Q9",
+      "sectionId": "s15",
+      "heading": "Results › Impact of reduced GPDH activity on yields",
+      "kind": "prose",
+      "text": "As a result, the overall ethanol production yield on glucose was increased in the two engineered strains. While the wild-type strain produced 0.43 g g-1, TEFmut7 formed 0.44 g g-1and TEFmut2 0.45 g g-1. As visible from Table 3, the strain differences in the overall ethanol yields were solely due to the differences observed during the growth phase. In this phase, ethanol yields reached 0.41 g g-1for the wild type, 0.42 g g-1for TEFmut7 and 0.44 g g-1for TEFmut2. During the \"production phase\", no significant variation of ethanol yield could be observed between the wild type and the two engineered strains (0.47 g g-1). We also calculated oxygen to biomass yield for all three strains. The average oxygen to biomass yield during the growth phase of the wild type was 6 mmolO2gDCW-1. ",
+      "start": 758,
+      "end": 1545
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 1 · s-cerevisiae-cenpk113-7d",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 7,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [
+          "geneos/host/s-cerevisiae-cenpk113-7d"
+        ],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 5
+      },
+      "summary": "Read geneOS for geneos/host/s-cerevisiae-cenpk113-7d · 1 row",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "CEN.PK113-7D maximum specific growth rate glucose biomass yield ethanol yield",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of CEN.PK113-7D maximum specific growth rate glucose biomass yield ethanol yield · 10 records",
+      "ms": 2,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "wild type ethanol yield glucose anaerobic batch biomass yield",
+        "field": null,
+        "organism": "s-cerevisiae-cenpk113-7d",
+        "limit": 10
+      },
+      "summary": "Looked up records of wild type ethanol yield glucose anaerobic batch biomass yield · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "wild type maximum growth rate 0.29 h-1 anaerobic glucose ethanol yield",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"wild type maximum growth rate 0.29 h-1 anaerobic glucose ethanol yield\" · 6 passages",
+      "ms": 184,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 5 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "saccharomyces cerevisiae cen pk113 7d"
+    ],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 1,
+        "hits": [
+          {
+            "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+            "id": "s-cerevisiae-cenpk113-7d",
+            "kind": "host",
+            "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-cenpk113-7d",
+      "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+      "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "prototrophic",
+          "physiology reference",
+          "BSL-1"
+        ]
+      }
+    }
+  ],
+  "runbookDraft": null
+}

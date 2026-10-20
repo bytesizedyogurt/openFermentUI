@@ -1,0 +1,153 @@
+{
+  "id": "1fcc55651c86b5dd",
+  "tool": "geneos.mix",
+  "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+  "inputs": [
+    {
+      "name": "model",
+      "value": "Saccharomyces cerevisiae S288C (iMM904)",
+      "unit": "",
+      "source": {
+        "kind": "model",
+        "id": "iMM904",
+        "note": "https://bigg.ucsd.edu/static/models/iMM904.xml (ETag \"017c86841952cc365f20a8b466292b31\", Last-Modified 2019-11-01), sha256 a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 (BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego)",
+        "by": null
+      }
+    },
+    {
+      "name": "uptake",
+      "value": 10.0,
+      "unit": "mmol gDW-1 h-1",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+        "by": null
+      }
+    },
+    {
+      "name": "product",
+      "value": "ethanol",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "secreted through EX_etoh_e; ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate a",
+      "value": "glucose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+        "by": null
+      }
+    },
+    {
+      "name": "substrate b",
+      "value": "xylose",
+      "unit": "",
+      "source": {
+        "kind": "convention",
+        "id": null,
+        "note": "through EX_xyl__D_e, 150.13 g mol-1, 5 carbons",
+        "by": null
+      }
+    }
+  ],
+  "output": {
+    "modelId": "iMM904",
+    "product": "ethanol",
+    "a": "glucose",
+    "b": "xylose",
+    "carbon": 60.0,
+    "points": [
+      {
+        "shareA": 1.0,
+        "uptakeA": 10.0,
+        "uptakeB": 0.0,
+        "flux": 19.99999999999999,
+        "gPerG": 0.5114345345145316
+      },
+      {
+        "shareA": 0.9,
+        "uptakeA": 9.0,
+        "uptakeB": 1.1999999999999997,
+        "flux": 20.000000000000007,
+        "gPerG": 0.511434534514532
+      },
+      {
+        "shareA": 0.8,
+        "uptakeA": 8.0,
+        "uptakeB": 2.3999999999999995,
+        "flux": 19.999999999999996,
+        "gPerG": 0.5114345345145318
+      },
+      {
+        "shareA": 0.7,
+        "uptakeA": 7.0,
+        "uptakeB": 3.6000000000000005,
+        "flux": 20.000000000000007,
+        "gPerG": 0.511434534514532
+      },
+      {
+        "shareA": 0.6,
+        "uptakeA": 6.0,
+        "uptakeB": 4.8,
+        "flux": 19.999999999999996,
+        "gPerG": 0.5114345345145318
+      },
+      {
+        "shareA": 0.5,
+        "uptakeA": 5.0,
+        "uptakeB": 6.0,
+        "flux": 19.999999999999982,
+        "gPerG": 0.5114345345145315
+      },
+      {
+        "shareA": 0.4,
+        "uptakeA": 4.0,
+        "uptakeB": 7.2,
+        "flux": 19.999999999999986,
+        "gPerG": 0.5114345345145316
+      },
+      {
+        "shareA": 0.30000000000000004,
+        "uptakeA": 3.0000000000000004,
+        "uptakeB": 8.4,
+        "flux": 19.999999999999993,
+        "gPerG": 0.5114345345145317
+      },
+      {
+        "shareA": 0.19999999999999996,
+        "uptakeA": 1.9999999999999993,
+        "uptakeB": 9.6,
+        "flux": 19.99999999999996,
+        "gPerG": 0.511434534514531
+      },
+      {
+        "shareA": 0.09999999999999998,
+        "uptakeA": 0.9999999999999997,
+        "uptakeB": 10.8,
+        "flux": 19.99999999999998,
+        "gPerG": 0.5114345345145314
+      },
+      {
+        "shareA": 0.0,
+        "uptakeA": 0.0,
+        "uptakeB": 12.0,
+        "flux": 19.999999999999993,
+        "gPerG": 0.5114345345145317
+      }
+    ]
+  },
+  "outputHash": "05cb814eb701b02b84d38c22d2bf6a97115c9f38299f3debcaafa8ac5121b51b",
+  "provenance": "computed",
+  "createdAt": "2026-10-20T04:28:49Z",
+  "durationMs": 1001,
+  "seed": null
+}

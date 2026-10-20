@@ -1,0 +1,315 @@
+{
+  "question": "What minimum ethanol selling price does the NREL corn stover design report by Humbird et al. state, and how does the BioSTEAM benchmark of that design compare?",
+  "claims": [
+    {
+      "id": "c2",
+      "text": "The report defines this plant-gate price as the minimum ethanol selling price, the figure a plant must receive per unit of ethanol to break even on its discounted cash flow.",
+      "recordIds": [],
+      "paperIds": [
+        "Q1"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q1:s11:1",
+          "quote": "This plant-gate price is referred to as the minimum ethanol selling price or MESP."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "The BioSTEAM benchmark of the same corn stover ethanol design, computed by the biorefineries.cornstover package with the package's own rate of return, income tax, operating-day and year settings, gives a minimum ethanol selling price that is lower than the figure the Humbird report states.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": []
+    },
+    {
+      "id": "c4",
+      "text": "The BioSTEAM benchmark is a model rebuild of the Humbird design, so its gap from the report's stated figure is a question of the model's settings and cost basis rather than a different process.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "inferred",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "35e708d122a6b4fc"
+      ],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "No record or passage in the corpus explains why the BioSTEAM benchmark differs from the report's stated figure; a side-by-side of the report's discounted cash flow worksheet against the package's stored settings (rate of return, income tax, plant life, startup duration, and dollar-year basis) is needed.",
+    "The report's price is stated in its own dollar basis; the benchmark evidence does not state its dollar basis, so the two cannot yet be placed on one cost year without that basis being recorded.",
+    "No selling_price run from a person exists for the draft PHA flowsheet or the corn stover design with the report's inputs, so the benchmark cannot be checked against a person-run scenario; no BioRepo record of the report's stated price was returned.",
+    "No runbook, fit, or forecast was needed or returned for this question; the coverage map found no matching rows in the other modules."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 3293,
+    "cacheReadTokens": 38130,
+    "cacheWriteTokens": 5209,
+    "costUsd": 0.00268,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c1: a quote that is not a whole sentence or row of Q1:s78:1"
+  ],
+  "evidence": [
+    {
+      "id": "35e708d122a6b4fc",
+      "label": "Minimum ethanol selling price, the NREL 2011 corn stover design as biorefineries.cornstover builds it",
+      "value": 1.9676711216619653,
+      "unit": "USD gal⁻¹",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "proforma_benchmark",
+        "toolVersion": "biorefineries.cornstover@2.35.1",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "biorefineries.cornstover.Biorefinery",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the corn stover ethanol biorefinery built to NREL/TP-5100-47764, with every setting the package's own",
+              "by": null
+            }
+          },
+          {
+            "name": "simulator",
+            "value": "biosteam 2.54.0",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "the process simulator the package runs on",
+              "by": null
+            }
+          },
+          {
+            "name": "gallon",
+            "value": "ethanol_density_kggal",
+            "unit": "kg gal-1",
+            "source": {
+              "kind": "model",
+              "id": "biorefineries.cornstover@2.35.1",
+              "note": "the package's own ethanol density per gallon converts its price per kilogram",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "35e708d122a6b4fc",
+        "at": "2026-10-15T19:54:30Z",
+        "seed": null
+      },
+      "figure": null
+    }
+  ],
+  "passages": [
+    {
+      "id": "Q1:s11:1",
+      "paperId": "Q1",
+      "sectionId": "s11",
+      "heading": "Page 11",
+      "kind": "prose",
+      "text": "This research \nis conducted by national laboratories, universities, and private industry in conjunction with \nengineering and construction companies. \nAs part of its involvement in the program, the National Renewable Energy Laboratory (NREL) \ninvestigates the complete process design and economics of cellulosic ethanol manufacturing in \norder to develop an absolute plant-gate price for ethanol based on process and plant design \nassumptions consistent with applicable best practices in engineering, construction, and operation. \nThis plant-gate price is referred to as the minimum ethanol selling price or MESP. The MESP \ncan be used by policymakers and DOE to assess the cost-competitiveness and market penetration \npotential of cellulosic ethanol in comparison with petroleum-derived fuels and starch- or sugar-\nbased ethanol. \n",
+      "start": 592,
+      "end": 1424
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "selling_price",
+      "input": {
+        "scenarioId": "proforma_benchmark"
+      },
+      "summary": "Ran selling_price",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "minimum ethanol selling price corn stover design",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"minimum ethanol selling price corn stover design\" · 6 passages",
+      "ms": 134,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Humbird process design economics biochemical conversion lignocellulosic ethanol",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Humbird process design economics biochemical conversion lignocellulosic ethanol\" · 6 passages",
+      "ms": 105,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 3 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}

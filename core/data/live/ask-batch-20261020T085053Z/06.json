@@ -1,0 +1,546 @@
+{
+  "question": "What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?",
+  "claims": [
+    {
+      "id": "c2",
+      "text": "BioRepo holds an extracted ethanol yield on glucose record for an engineered Calvin-cycle-enzyme strain of Saccharomyces cerevisiae, from a paper on optimizing anaerobic growth rate and fermentation kinetics. This record is unverified.",
+      "recordIds": [
+        "cl1-Q10-1a38257c"
+      ],
+      "paperIds": [
+        "Q10"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c3",
+      "text": "BioRepo holds extracted ethanol yield on glucose records from a study of the metabolic cost of lowering glycerol formation in Saccharomyces cerevisiae under anaerobic conditions. These records are unverified.",
+      "recordIds": [
+        "cl1-Q7-2f3dcdbc",
+        "cl1-Q18-310f0b42",
+        "cl1-Q18-a44d7ce1"
+      ],
+      "paperIds": [
+        "Q18",
+        "Q7"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c4",
+      "text": "geneOS holds a computed ethanol yield ceiling on glucose for the Saccharomyces cerevisiae S288C iMM904 model, and a parallel ceiling on the Yeast9 model. Both are flux-balance values, not measurements.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/artifact/6a660880be72f7be",
+        "geneos/artifact/b616b00ba65aeadb"
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "geneOS also holds a computed growth-product frontier and a glucose-xylose mixed-substrate ceiling for ethanol on the iMM904 model.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/artifact/ee2b8673ffde6f72",
+        "geneos/artifact/1fcc55651c86b5dd"
+      ]
+    },
+    {
+      "id": "c6",
+      "text": "geneOS lists Saccharomyces cerevisiae host strains and the iMM904 and Yeast9 models on its shelf, for ethanol modelling.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "geneos/host/s-cerevisiae-s288c",
+        "geneos/host/s-cerevisiae-cenpk113-7d",
+        "geneos/model/iMM904",
+        "geneos/model/Yeast9"
+      ]
+    },
+    {
+      "id": "c7",
+      "text": "The literature passages in the corpus describe industrial ethanol production by Saccharomyces cerevisiae on plant carbohydrate feedstocks, with yeast-based production concentrated in the USA and Brazil using corn starch and cane sugar.",
+      "recordIds": [],
+      "paperIds": [
+        "Q22"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q22:s1:0",
+          "quote": "Yeast-based ethanol production is predominantly performed in the USA and Brazil, using corn starch and cane sugar, respectively, as feedstocks."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c8",
+      "text": "A passage on the glycerol-reduction strategy in Saccharomyces cerevisiae notes that alcoholic fermentation of sugar is redox-neutral and generates ATP, with pyruvate converted to ethanol by pyruvate decarboxylase and alcohol dehydrogenase.",
+      "recordIds": [],
+      "paperIds": [
+        "Q15"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q15:s1:1",
+          "quote": "This native yeast pathway for sugar fermentation is redox-neutral and generates ATP."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "The Dominion, Runbooks, Primer, Intake, Proforma, Guild, pureOS and Home modules were not read: the coverage map found no matching rows for this question.",
+    "BioRepo records are unverified extractor candidates; none has been reviewed or published, so no value here is confirmed.",
+    "Ethanol titre, yield and productivity records lack recorded fermentation conditions (aeration, temperature, medium, strain background) in most cases; these need to be checked against the source papers before use.",
+    "No record or fitted kinetic model (fermOS) of an S. cerevisiae ethanol run was found, so no growth forecast or runbook exists for this organism.",
+    "The geneOS ceilings are stoichiometric limits from flux-balance models, not measured yields; no measured ceiling against them was found.",
+    "No pureOS downstream unit or Proforma cost scenario for ethanol recovery from S. cerevisiae was found."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 6,
+    "outputTokens": 3265,
+    "cacheReadTokens": 38100,
+    "cacheWriteTokens": 8181,
+    "costUsd": 0.003036,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 1,
+  "rejectionReasons": [
+    "c1: claim text contains a number ('1') — values come from the record"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "Q15:s1:1",
+      "paperId": "Q15",
+      "sectionId": "s1",
+      "heading": "Background",
+      "kind": "prose",
+      "text": "Therefore, maximizing the ethanol yield on feedstock is an economically important goal. Alcoholic fermentation of glucose and sucrose by S. cerevisiae starts with the ATP-yielding Embden–Meyerhof glycolytic pathway, whose product pyruvate is converted to ethanol and carbon dioxide by the combined action of pyruvate decarboxylase and alcohol dehydrogenase. This native yeast pathway for sugar fermentation is redox-neutral and generates ATP. Its maximum product yield of 2 mol of ethanol per mole of glucose corresponds to the theoretical maximum yield based on conservation laws. Indeed, near-theoretical ethanol yields on glucose were demonstrated during prolonged cultivation of S. cerevisiae at near-zero specific growth rates in anaerobic retentostat cultures. ",
+      "start": 560,
+      "end": 1327
+    },
+    {
+      "id": "Q22:s1:0",
+      "paperId": "Q22",
+      "sectionId": "s1",
+      "heading": "Background",
+      "kind": "prose",
+      "text": "With an estimated global output of 103 billion litres in 2021, fuel ethanol produced from plant carbohydrates with the yeast Saccharomyces cerevisiae remains the largest process in microbial biotechnology based on product volume. Yeast-based ethanol production is predominantly performed in the USA and Brazil, using corn starch and cane sugar, respectively, as feedstocks. Since the carbohydrate feedstock can contribute up to 70% to the overall process costs of industrial ethanol production, optimization of the ethanol yield on carbohydrates is of paramount importance for process economics. Hydrolysis of corn starch yields glucose as fermentable sugar, while sucrose, the predominant sugar in sugar cane, is hydrolysed to glucose and fructose by yeast invertase. ",
+      "start": 0,
+      "end": 769
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol fermentation Saccharomyces cerevisiae",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol fermentation Saccharomyces cerevisiae · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "ethanol fermentation Saccharomyces cerevisiae",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"ethanol fermentation Saccharomyces cerevisiae\" · 6 passages",
+      "ms": 128,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "biorepo_read",
+      "input": {
+        "ids": [],
+        "words": "ethanol Saccharomyces cerevisiae",
+        "kind": "record",
+        "state": "",
+        "limit": 10
+      },
+      "summary": "Read BioRepo for \"ethanol Saccharomyces cerevisiae\" · record · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [],
+        "words": "ethanol Saccharomyces cerevisiae",
+        "kind": "",
+        "state": "",
+        "limit": 10
+      },
+      "summary": "Read geneOS for \"ethanol Saccharomyces cerevisiae\" · 9 rows",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 7 claims kept, 1 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "artifact",
+      "id": "1fcc55651c86b5dd",
+      "ref": "geneos/artifact/1fcc55651c86b5dd",
+      "label": "geneos.mix artifact",
+      "state": "open",
+      "status": "computed",
+      "provenance": "computed",
+      "detail": {
+        "tool": "geneos.mix",
+        "createdAt": "2026-10-20T04:28:49Z",
+        "inputs": [
+          "model=Saccharomyces cerevisiae S288C (iMM904)",
+          "product=ethanol",
+          "substrate a=glucose",
+          "substrate b=xylose"
+        ],
+        "output": {
+          "modelId": "iMM904",
+          "product": "ethanol",
+          "a": "glucose",
+          "b": "xylose",
+          "carbon": 60.0
+        },
+        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "artifact",
+      "id": "6a660880be72f7be",
+      "ref": "geneos/artifact/6a660880be72f7be",
+      "label": "geneos.ceiling artifact",
+      "state": "open",
+      "status": "computed",
+      "provenance": "computed",
+      "detail": {
+        "tool": "geneos.ceiling",
+        "createdAt": "2026-10-20T03:56:22Z",
+        "inputs": [
+          "model=Saccharomyces cerevisiae S288C (iMM904)",
+          "product=ethanol",
+          "substrate=glucose"
+        ],
+        "output": {
+          "modelId": "iMM904",
+          "product": "ethanol",
+          "substrate": "glucose",
+          "exchange": "EX_glc__D_e",
+          "uptake": 10.0,
+          "flux": 19.99999999999999,
+          "molPerMol": 1.999999999999999,
+          "gPerG": 0.5114345345145316
+        },
+        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "artifact",
+      "id": "b616b00ba65aeadb",
+      "ref": "geneos/artifact/b616b00ba65aeadb",
+      "label": "geneos.ceiling artifact",
+      "state": "open",
+      "status": "computed",
+      "provenance": "computed",
+      "detail": {
+        "tool": "geneos.ceiling",
+        "createdAt": "2026-10-20T03:56:20Z",
+        "inputs": [
+          "model=Saccharomyces cerevisiae S288C (Yeast9)",
+          "product=ethanol",
+          "substrate=glucose"
+        ],
+        "output": {
+          "modelId": "Yeast9",
+          "product": "ethanol",
+          "substrate": "glucose",
+          "exchange": "r_1714",
+          "uptake": 10.0,
+          "flux": 20.0,
+          "molPerMol": 2.0,
+          "gPerG": 0.5114345345145319
+        },
+        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "artifact",
+      "id": "ee2b8673ffde6f72",
+      "ref": "geneos/artifact/ee2b8673ffde6f72",
+      "label": "geneos.frontier artifact",
+      "state": "open",
+      "status": "computed",
+      "provenance": "computed",
+      "detail": {
+        "tool": "geneos.frontier",
+        "createdAt": "2026-10-20T04:28:49Z",
+        "inputs": [
+          "model=Saccharomyces cerevisiae S288C (iMM904)",
+          "product=ethanol",
+          "substrate=glucose"
+        ],
+        "output": {
+          "modelId": "iMM904",
+          "product": "ethanol",
+          "substrate": "glucose",
+          "exchange": "EX_glc__D_e",
+          "uptake": 10.0,
+          "growthReaction": "BIOMASS_SC5_notrace"
+        },
+        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-cenpk113-7d",
+      "ref": "geneos/host/s-cerevisiae-cenpk113-7d",
+      "label": "Saccharomyces cerevisiae CEN.PK113-7D",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "prototrophic",
+          "physiology reference",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "host",
+      "id": "s-cerevisiae-s288c",
+      "ref": "geneos/host/s-cerevisiae-s288c",
+      "label": "Saccharomyces cerevisiae S288C",
+      "state": "open",
+      "status": "in the catalogue",
+      "provenance": null,
+      "detail": {
+        "bsl": 1,
+        "badges": [
+          "reference genome",
+          "laboratory strain",
+          "BSL-1"
+        ]
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "Yeast9",
+      "ref": "geneos/model/Yeast9",
+      "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "iMM904",
+      "ref": "geneos/model/iMM904",
+      "label": "Saccharomyces cerevisiae S288C (iMM904)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    }
+  ],
+  "runbookDraft": null
+}

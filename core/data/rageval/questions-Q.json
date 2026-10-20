@@ -1,0 +1,12 @@
+{
+  "asked": 100,
+  "kept": 83,
+  "discarded": {
+    "five words in a row from the passage": 5,
+    "a number from the passage": 12
+  },
+  "seed": 14,
+  "costUsd": 0.008953,
+  "manifestHash": "ca4e87f1eb597aef",
+  "thread": "Q"
+}

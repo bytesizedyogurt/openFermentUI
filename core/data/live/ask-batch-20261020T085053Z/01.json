@@ -1,0 +1,484 @@
+{
+  "question": "What is the theoretical maximum ethanol yield on glucose according to the Yeast9 and iMM904 genome-scale models, and how close do measured ethanol yields come to it?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Flux balance analysis of the Yeast9 genome-scale model gives a maximum ethanol yield on glucose, reported in mass and molar units, for the S288C network with pyruvate decarboxylase and alcohol dehydrogenase as the native ethanol route.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-b616b00ba65aeadb"
+      ],
+      "moduleRefs": [
+        "geneos/model/Yeast9"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Flux balance analysis of the iMM904 genome-scale model gives a maximum ethanol yield on glucose, reported in mass and molar units, for the S288C network with the PYRDC and ALCD2ir reactions as the ethanol route.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "computed",
+      "passages": [],
+      "evidenceIds": [
+        "ev-6a660880be72f7be"
+      ],
+      "moduleRefs": [
+        "geneos/model/iMM904"
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "Measured ethanol yield on glucose for the Calvin-cycle-expressing strain IMX774 under anaerobic fermentation is below the cenpk113-7d glycerol-reduction value and further from the model ceiling; the record is an unverified curation note.",
+      "recordIds": [
+        "cl1-Q10-1a38257c"
+      ],
+      "paperIds": [
+        "Q10"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c6",
+      "text": "Among the anaerobic glucose ethanol yields returned, the highest measured values come closest to the Yeast9 and iMM904 ceiling, and none reaches it; the aerobic batch yield on glucose returned is far below and is not a like-for-like fermentation comparison.",
+      "recordIds": [
+        "cl1-Q7-2b034640",
+        "cl1-Q10-1a38257c",
+        "cl1-Q5-bdcd98fe"
+      ],
+      "paperIds": [
+        "Q10",
+        "Q5",
+        "Q7"
+      ],
+      "support": "inferred",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [
+        "ev-b616b00ba65aeadb",
+        "ev-6a660880be72f7be"
+      ],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "No record gives a measured ethanol yield as a fraction of the model ceiling, so how close fermentations come to theoretical is only compared qualitatively here; a ratio would need the ceiling and the measured yield on one unit basis.",
+    "The measured ethanol yield records are unverified curation notes; several have null strain or condition fields, so anaerobic status and feed concentration are not confirmed for each.",
+    "No measured ethanol yield on glucose from a fermentation run in the Yeast9 or iMM904 model context, or from a strain modeled by either model, was returned; the link between model ceiling and measured strain is not established.",
+    "The yield ceiling is a flux balance result with no time axis or vessel; no record reports measured yields on the same carbon-balance basis, so the gap between ceiling and measurement cannot be attributed to a specific cause from this corpus."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3829,
+    "cacheReadTokens": 61867,
+    "cacheWriteTokens": 6533,
+    "costUsd": 0.003351,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 2,
+  "rejectionReasons": [
+    "c3: claim text contains a number ('two') — values come from the record",
+    "c4: a quote that is not a whole sentence or row of Q7:s14:1",
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [
+    {
+      "id": "ev-6a660880be72f7be",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (iMM904) (genome scale)",
+      "value": 0.5114345345145316,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (iMM904)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "iMM904",
+              "note": "https://bigg.ucsd.edu/static/models/iMM904.xml (ETag \"017c86841952cc365f20a8b466292b31\", Last-Modified 2019-11-01), sha256 a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1 (BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through EX_etoh_e; ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through EX_glc__D_e, 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "6a660880be72f7be",
+        "at": "2026-10-20T03:56:22Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    },
+    {
+      "id": "ev-b616b00ba65aeadb",
+      "label": "most ethanol from glucose, Saccharomyces cerevisiae S288C (Yeast9) (genome scale)",
+      "value": 0.5114345345145319,
+      "unit": "g g-1",
+      "interval": null,
+      "provenance": "computed",
+      "basis": {
+        "tool": "geneos.ceiling",
+        "toolVersion": "cobra 0.32.1 · worker a8fe70110d3b",
+        "inputs": [
+          {
+            "name": "model",
+            "value": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "Yeast9",
+              "note": "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255), model/yeast-GEM.xml, sha256 30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb (CC-BY-4.0)",
+              "by": null
+            }
+          },
+          {
+            "name": "uptake",
+            "value": 10.0,
+            "unit": "mmol gDW-1 h-1",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+              "by": null
+            }
+          },
+          {
+            "name": "product",
+            "value": "ethanol",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+              "by": null
+            }
+          },
+          {
+            "name": "substrate",
+            "value": "glucose",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons",
+              "by": null
+            }
+          }
+        ],
+        "artifactId": "b616b00ba65aeadb",
+        "at": "2026-10-20T03:56:20Z",
+        "seed": null
+      },
+      "figure": "ceiling"
+    }
+  ],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 2 · iMM904, Yeast9",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in one",
+      "ms": 88,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "Yeast9",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 5780,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "yield_ceiling",
+      "input": {
+        "modelId": "iMM904",
+        "product": "ethanol",
+        "substrate": "glucose"
+      },
+      "summary": "Ran yield_ceiling",
+      "ms": 2442,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "geneos_read",
+      "input": {
+        "ids": [
+          "geneos/model/iMM904",
+          "geneos/model/Yeast9"
+        ],
+        "kind": "model",
+        "state": "",
+        "words": "",
+        "limit": 5
+      },
+      "summary": "Read geneOS for geneos/model/iMM904, geneos/model/Yeast9 · model · 2 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol yield on glucose Saccharomyces cerevisiae",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol yield on glucose Saccharomyces cerevisiae · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "anaerobic batch glucose ethanol yield glycerol",
+        "k": 3
+      },
+      "summary": "Searched the papers for \"anaerobic batch glucose ethanol yield glycerol\" · 3 passages",
+      "ms": 1622,
+      "ok": true
+    },
+    {
+      "n": 7,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 2 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [
+      "imm904",
+      "yeast9"
+    ],
+    "searched": 11,
+    "found": 1,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 2,
+        "hits": [
+          {
+            "ref": "geneos/model/iMM904",
+            "id": "iMM904",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (iMM904)",
+            "state": "open"
+          },
+          {
+            "ref": "geneos/model/Yeast9",
+            "id": "Yeast9",
+            "kind": "model",
+            "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+            "state": "open"
+          }
+        ],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "Yeast9",
+      "ref": "geneos/model/Yeast9",
+      "label": "Saccharomyces cerevisiae S288C (Yeast9)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    },
+    {
+      "module": "geneos",
+      "kind": "model",
+      "id": "iMM904",
+      "ref": "geneos/model/iMM904",
+      "label": "Saccharomyces cerevisiae S288C (iMM904)",
+      "state": "open",
+      "status": "on the shelf",
+      "provenance": null,
+      "detail": {
+        "host": "s-cerevisiae-s288c",
+        "unavailable": null
+      }
+    }
+  ],
+  "runbookDraft": null
+}

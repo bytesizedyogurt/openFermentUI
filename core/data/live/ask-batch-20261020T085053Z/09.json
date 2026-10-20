@@ -1,0 +1,367 @@
+{
+  "question": "What is waiting for a person on Home right now?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "Everything waiting on Home is in the review state: the candidate extractions awaiting a person's review, and none are open checks or proposals.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "home/review/cl1-Q1-d897e4fe",
+        "home/review/cl1-Q1-e04daf67",
+        "home/review/cl1-Q10-f19d6e1d",
+        "home/review/cl1-Q11-193a006f",
+        "home/review/cl1-Q12-942a1840"
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "The review items on Home are candidate extractions from several fetched papers, each labelled as awaiting review, with the paper it came from shown in its detail.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": [
+        "home/review/cl1-Q1-6aa5ac68",
+        "home/review/cl1-Q10-a508daa2",
+        "home/review/cl1-Q11-94e1336f",
+        "home/review/cl1-Q12-e04851e0"
+      ]
+    }
+  ],
+  "gaps": [
+    "I did not open the individual candidate records behind the review items, so I cannot say whether each candidate's value and quote are correct.",
+    "Checks and proposals on Home were read and returned none; any check or proposal waiting on a person would have to appear in those lists."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 1334,
+    "cacheReadTokens": 59725,
+    "cacheWriteTokens": 3120,
+    "costUsd": 0.001655,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 0,
+  "rejectionReasons": [
+    "a gap dropped: it holds a number"
+  ],
+  "evidence": [],
+  "passages": [],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "home_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "",
+        "state": "",
+        "limit": 20
+      },
+      "summary": "Read Home · 163 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "home_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "check",
+        "state": "",
+        "limit": 5
+      },
+      "summary": "Read Home for check · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "home_read",
+      "input": {
+        "ids": [],
+        "words": "",
+        "kind": "proposal",
+        "state": "",
+        "limit": 5
+      },
+      "summary": "Read Home for proposal · 0 rows",
+      "ms": 0,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 2 claims kept, 0 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q1-6aa5ac68",
+      "ref": "home/review/cl1-Q1-6aa5ac68",
+      "label": "Awaiting review: cl1-Q1-6aa5ac68",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q1"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q1-d897e4fe",
+      "ref": "home/review/cl1-Q1-d897e4fe",
+      "label": "Awaiting review: cl1-Q1-d897e4fe",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q1"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q1-e04daf67",
+      "ref": "home/review/cl1-Q1-e04daf67",
+      "label": "Awaiting review: cl1-Q1-e04daf67",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q1"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q10-a508daa2",
+      "ref": "home/review/cl1-Q10-a508daa2",
+      "label": "Awaiting review: cl1-Q10-a508daa2",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q10"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q10-f19d6e1d",
+      "ref": "home/review/cl1-Q10-f19d6e1d",
+      "label": "Awaiting review: cl1-Q10-f19d6e1d",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q10"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q11-193a006f",
+      "ref": "home/review/cl1-Q11-193a006f",
+      "label": "Awaiting review: cl1-Q11-193a006f",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q11"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q11-94e1336f",
+      "ref": "home/review/cl1-Q11-94e1336f",
+      "label": "Awaiting review: cl1-Q11-94e1336f",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q11"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q12-942a1840",
+      "ref": "home/review/cl1-Q12-942a1840",
+      "label": "Awaiting review: cl1-Q12-942a1840",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q12"
+      }
+    },
+    {
+      "module": "home",
+      "kind": "review",
+      "id": "cl1-Q12-e04851e0",
+      "ref": "home/review/cl1-Q12-e04851e0",
+      "label": "Awaiting review: cl1-Q12-e04851e0",
+      "state": "proposed",
+      "status": "awaiting review",
+      "provenance": null,
+      "detail": {
+        "paperId": "Q12"
+      }
+    }
+  ],
+  "runbookDraft": null
+}

@@ -1,0 +1,302 @@
+{
+  "question": "Which Monod saturation constants (Ks) and ethanol or substrate inhibition constants have been reported for Saccharomyces cerevisiae ethanol fermentation, and in which kinetic models?",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "A Monod-type saturation constant for glucose was fitted for the freeze-tolerant baker's yeast strain AFY in aerobic batch culture on glucose; the record carries no strain or condition annotation and is an unverified curation note.",
+      "recordIds": [
+        "cl1-Q5-c2652ce4"
+      ],
+      "paperIds": [
+        "Q5"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c4",
+      "text": "A substrate inhibition constant was reported alongside Monod-type and Andrews-type fits for batch alcoholic fermentation of molasses; the record does not name a yeast strain or the inhibiting species.",
+      "recordIds": [
+        "cl1-Q12-9da8d3c2"
+      ],
+      "paperIds": [
+        "Q12"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c5",
+      "text": "A Monod saturation constant was reported for sugarcane leaf waste hydrolysate fermentation, with the model stated to omit any ethanol inhibition term because ethanol stayed below the level considered inhibitory to yeast.",
+      "recordIds": [
+        "cl1-Q13-b720822e"
+      ],
+      "paperIds": [
+        "Q13"
+      ],
+      "support": "direct",
+      "provenance": "unverified",
+      "passages": [
+        {
+          "passageId": "Q13:s8:1",
+          "quote": "A term considering inhibition of growth by ethanol concentration was not included, since the maximum ethanol concentration obtained in this study is far below the 15% threshold which inhibits yeast cells."
+        }
+      ],
+      "evidenceIds": [],
+      "moduleRefs": []
+    },
+    {
+      "id": "c8",
+      "text": "No ethanol inhibition constant (Ki or equivalent) for Saccharomyces cerevisiae ethanol fermentation was returned by the records or passages searched; the only inhibition constants returned are substrate inhibition constants from molasses and sorghum studies with no yeast strain stated.",
+      "recordIds": [],
+      "paperIds": [],
+      "support": "unsupported",
+      "provenance": "unverified",
+      "passages": [],
+      "evidenceIds": [],
+      "moduleRefs": []
+    }
+  ],
+  "gaps": [
+    "Strain annotation is missing on every returned record: the strain and conditions fields are empty, so none of the Ks or inhibition values can be tied to S. cerevisiae ethanol fermentation with confidence.",
+    "All returned records are unverified curation notes; they need a person's verification against the source tables before use.",
+    "The Luong ethanol inhibition model is mentioned in a returned passage, but no fitted ethanol inhibition constant (Ki, or the exponent of the ethanol term) for S. cerevisiae was retrieved; the source tables of the relevant papers would need to be read.",
+    "The Q20 ethanol tolerance study reports Gompertz-based non-inhibitory and minimum inhibitory concentrations, not a Monod Ks or Ki; its parameters were not in the records returned.",
+    "Monod Ks values for S. cerevisiae growing on glucose in anaerobic ethanol fermentation (not aerobic growth or molasses) were not returned; a search of records restricted to the yeast strain and anaerobic batch conditions is needed.",
+    "The coverage map showed no matches in any app module; no runbook, fit or ceiling exists for these constants."
+  ],
+  "declined": null,
+  "usage": {
+    "inputTokens": 8,
+    "outputTokens": 3607,
+    "cacheReadTokens": 67424,
+    "cacheWriteTokens": 5827,
+    "costUsd": 0.003206,
+    "models": [
+      "claude-haiku-5-5"
+    ]
+  },
+  "rejected": 4,
+  "rejectionReasons": [
+    "c2: claim text contains a number ('second') — values come from the record",
+    "c3: cites records that do not exist: cl1-Q12-cc0e0b0a",
+    "c6: a quote of Q14:s11:2 longer than 300 characters",
+    "c7: a quote of Q6:s11:0 longer than 300 characters"
+  ],
+  "evidence": [],
+  "passages": [
+    {
+      "id": "Q13:s8:1",
+      "paperId": "Q13",
+      "sectionId": "s8",
+      "heading": "Methods › Kinetic models and calculation of kinetic parameters",
+      "kind": "prose",
+      "text": "The processes were sampled every 2 h, and sugar consumption and cell growth were monitored. The specific growth rates (μ) were estimated using experimental data obtained during the exponential phase by linear regression from the slope of natural log of biomass vs time (Eq. (1)): (1) μ = (ln(X2-X1))/t2-t1 The maximum specific growth rate (μmax) and Monod constant (KS) were subsequently estimated using the non-linear least squares method. (2) μ = μmaxS/(Ks + S) In addition to the Monod kinetic model, the logistic model is increasingly being used to describe microbial growth systems. A term considering inhibition of growth by ethanol concentration was not included, since the maximum ethanol concentration obtained in this study is far below the 15% threshold which inhibits yeast cells. ",
+      "start": 663,
+      "end": 1456
+    }
+  ],
+  "trace": [
+    {
+      "n": 1,
+      "kind": "coverage",
+      "tool": null,
+      "input": {
+        "modules": [
+          "Dominion · 0",
+          "Runbooks · 0 · read in part",
+          "geneOS · 0",
+          "fermOS · 0 · read in part",
+          "pureOS · 0",
+          "Proforma · 0",
+          "BioRepo · 0 · read in part",
+          "Guild · 0",
+          "Primer · 0",
+          "Intake · 0",
+          "Home · 0"
+        ]
+      },
+      "summary": "Swept the modules for what the question names · searched eleven, found in none",
+      "ms": 4,
+      "ok": true
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "Monod saturation constant Ks ethanol inhibition constant Saccharomyces cerevisiae",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of Monod saturation constant Ks ethanol inhibition constant Saccharomyces cerevisiae · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Monod saturation constant Ks ethanol inhibition kinetic model yeast",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Monod saturation constant Ks ethanol inhibition kinetic model yeast\" · 6 passages",
+      "ms": 129,
+      "ok": true
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "tool": "search_records",
+      "input": {
+        "query": "ethanol inhibition constant Ki Luong model alcoholic fermentation yeast",
+        "field": null,
+        "organism": null,
+        "limit": 10
+      },
+      "summary": "Looked up records of ethanol inhibition constant Ki Luong model alcoholic fermentation yeast · 10 records",
+      "ms": 1,
+      "ok": true
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "tool": "search_passages",
+      "input": {
+        "query": "Saccharomyces cerevisiae ethanol inhibition parameter Ki Ks fitted batch fermentation",
+        "k": 6
+      },
+      "summary": "Searched the papers for \"Saccharomyces cerevisiae ethanol inhibition parameter Ki Ks fitted batch fermentation\" · 6 passages",
+      "ms": 165,
+      "ok": true
+    },
+    {
+      "n": 6,
+      "kind": "final",
+      "tool": null,
+      "input": null,
+      "summary": "Answered: 4 claims kept, 4 dropped",
+      "ms": 0,
+      "ok": true
+    }
+  ],
+  "stopped": "done",
+  "coverage": {
+    "entities": [],
+    "searched": 11,
+    "found": 0,
+    "modules": [
+      {
+        "module": "dominion",
+        "label": "Dominion",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "runbooks",
+        "label": "Runbooks",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions, and runbooks adopted or locked in a browser, stay in that browser; the service read the seed's runbooks and protocols",
+        "error": null
+      },
+      {
+        "module": "geneos",
+        "label": "geneOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "fermos",
+        "label": "fermOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "depositions stay in the browser; the service read the fits and forecasts it computed",
+        "error": null
+      },
+      {
+        "module": "pureos",
+        "label": "pureOS",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "proforma",
+        "label": "Proforma",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "biorepo",
+        "label": "BioRepo",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": "review decisions not yet posted from a browser stay in that browser",
+        "error": null
+      },
+      {
+        "module": "guild",
+        "label": "Guild",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "primer",
+        "label": "Primer",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "intake",
+        "label": "Intake",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      },
+      {
+        "module": "home",
+        "label": "Home",
+        "count": 0,
+        "hits": [],
+        "named": false,
+        "partial": null,
+        "error": null
+      }
+    ],
+    "includeArchived": false,
+    "archived": []
+  },
+  "rows": [],
+  "runbookDraft": null
+}
