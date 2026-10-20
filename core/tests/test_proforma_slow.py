@@ -22,7 +22,14 @@ def test_the_benchmark_reproduces_the_published_price(store):
     assert art.output["package"] == "biorefineries.cornstover@2.35.1"
     assert art.provenance == "computed" and {i.source.kind for i in art.inputs} == {"model"}
     assert proforma.stored_benchmark().id == art.id
-    assert artifacts.replay(art.id).identical
+    # The plant is built afresh for every run (OF-BLD-019 §2.R), so a replay
+    # in the same worker builds a second plant, and BioSTEAM's sums over a
+    # set of units move the last digit, as they do for a reference run:
+    # measured, 0.6588136420152626 against …628 USD/kg. The replay is held to
+    # the last digits, as the ethanol runs' are.
+    from test_proforma import replays_to_the_last_digits
+
+    replays_to_the_last_digits(art.id)
 
 
 # ── the PHA flowsheet (§8.3) ───────────────────────────────────────────
@@ -252,3 +259,34 @@ def test_a_whole_yeast_run_through_the_worker(store):
     from test_proforma import replays_to_the_last_digits
 
     replays_to_the_last_digits(out.artifactId)
+
+
+def test_an_ethanol_case_prices_on_biosteams_own_utility_prices_whatever_ran_before(eth):
+    # §2.R, review 1: the corn stover plant sets its own utility prices and
+    # cost index as it builds (CEPCI 525.4, free steam and cooling water, in
+    # biorefineries.cellulosic's load_process_settings). Run here, in this
+    # process and outside the worker's package_defaults, it leaves them set;
+    # an ethanol case still prices on BioSTEAM's own defaults, which its
+    # basis names, and reads each back.
+    import biosteam as bst
+
+    from openferment_core.flowsheets import cornstover_benchmark
+
+    f, b = eth
+    first = f.evaluate(b, ETHANOL_CASE)
+    cornstover_benchmark.run()
+    left = (bst.CE, bst.PowerUtility.price)
+    out = f.evaluate(b, ETHANOL_CASE)
+    rb = out["readBack"]
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
+    assert left != (bst.CE, bst.PowerUtility.price), "the corn stover plant left BioSTEAM's defaults as they were"
+    assert rb["cepci"] == bst.CE and rb["electricityPrice"] == bst.PowerUtility.price
+    agents = {a.ID: a for a in (*bst.HeatUtility.heating_agents, *bst.HeatUtility.cooling_agents)}
+    for agent_id in ("low_pressure_steam", "cooling_water"):
+        key = "".join(w if i == 0 else w.capitalize() for i, w in enumerate(agent_id.split("_")))
+        a = agents[agent_id]
+        assert rb[f"{key}RegenerationPrice"] == a.regeneration_price and rb[f"{key}T"] == a.T, agent_id
+        assert rb[f"{key}HeatTransferPrice"] == a.heat_transfer_price, agent_id
+    assert out["pricePerKgEthanol"] == pytest.approx(first["pricePerKgEthanol"], rel=1e-12)
+    assert out["pricePerKgEthanol"] == pytest.approx(ETHANOL_REGRESSION_USD_PER_KG, rel=0.01)

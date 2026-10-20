@@ -254,7 +254,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       }
       if (url.startsWith('/api/biorepo/artifacts/')) {
         const [id, action] = url.slice('/api/biorepo/artifacts/'.length).split('/');
-        const found = (await prototype('artifacts.json')).find((a) => a.id === id);
+        // OF-BLD-019 §2.R: a reference run the double serves at
+        // /api/proforma/reference/:id reads back by its id too, as the
+        // service keeps every artifact it returns (the cards link to it).
+        const referenceRuns = await Promise.all(
+          ['cornstover_benchmark', 'corn_drygrind'].map((f) => prototype(`proforma-reference-${f}.json`).then((r) => r.artifact).catch(() => null)),
+        );
+        const found = [...(await prototype('artifacts.json')), ...referenceRuns.filter(Boolean)].find((a) => a.id === id);
         if (!found) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ detail: `no artifact '${id}'` }));

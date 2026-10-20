@@ -377,6 +377,10 @@ def test_the_ethanol_flowsheet_converges_on_stand_in_assumptions(warm, store):
     # The feed's glucose is the bound concentration, by thermosteam's volume of the solution.
     glucose = next(s for s in t.streams if s.id == "glucose_solution")
     assert glucose.massFlows["Glucose"] == pytest.approx(rb["glucoseFedKgPerH"], rel=1e-12)
+    # §2.R, review 6: the product's row carries the price the run solved, the
+    # price every TEA line is read at, never the package's list price.
+    [product] = [s for s in t.streams if s.id == t.tea.product]
+    assert product.price == pytest.approx(t.tea.productPrice, rel=1e-12) and product.price == pytest.approx(o["basePrice"], rel=1e-12)
     assert artifacts.get(art.id).id == art.id
     replays_to_the_last_digits(art.id)
 
@@ -389,3 +393,81 @@ def test_a_yield_above_the_theoretical_cannot_run_and_says_why(warm):
     assert r["base"] is None and "above the theoretical yield of ethanol on glucose" in r["baseInfeasible"]
     assert r["tables"] is None
     assert [s["infeasible"]["reason"] for s in r["montecarlo"]["samples"]] == ["yield"] * 3
+
+
+# ── the warm worker keeps no plant's settings (OF-BLD-019 §2.R) ────────
+# Review findings 0, 9 and 10: a plant one op built or ran changed what the
+# next op in the same worker priced (the benchmark left corn stover's utility
+# prices and cost index behind; the corn plant's chemicals lock ammonia to
+# liquid in objects the corn stover plant shares; BioSTEAM's stream tickets
+# ran on from whatever was built first). Each op here is held to what a
+# worker started for it alone gives, within the replay tolerance the tests
+# use (`replays_to_the_last_digits`).
+
+PHA_STANDIN = {"titre": 50.0, "yield": 0.3, "content": 0.7, "productivity": 1.0, "recovery": 0.95, "sugarPrice": 0.4,
+               "sugarFeed": 10000.0}  # PLACEHOLDER inputs to exercise the PHA draft; no price here is a result
+ETHANOL_RUN = ("run", {"flowsheet": "ethanol_glucose_v0", "base": ETHANOL_STANDIN, "specs": {}, "samples": 0, "seed": 0})
+PHA_RUN = ("run", {"flowsheet": "pha_sugar_v0", "base": PHA_STANDIN, "specs": {}, "samples": 0, "seed": 0})
+BENCHMARK_RUN = ("benchmark", {})
+CORN_RUN = ("reference", {"flowsheet": "corn_drygrind", "digits": proforma.REFERENCE_DIGITS})
+
+
+def in_a_worker_of_its_own(calls):
+    """Each call in turn in a worker started for these calls alone, so the
+    first answer is what a fresh worker gives."""
+    from openferment_core.workers import SimWorker
+
+    w = SimWorker("openferment_core.workers.proforma_worker", timeout_s=proforma.CALL_TIMEOUT_S)
+    try:
+        return [w.call(op, args) for op, args in calls]
+    finally:
+        w.close()
+
+
+@pytest.mark.sim
+def test_the_warm_worker_keeps_no_plants_settings():
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(3) as ex:
+        ordered = ex.submit(in_a_worker_of_its_own, [ETHANOL_RUN, BENCHMARK_RUN, CORN_RUN, ETHANOL_RUN, BENCHMARK_RUN])
+        benchmark_first = ex.submit(in_a_worker_of_its_own, [BENCHMARK_RUN, PHA_RUN, ETHANOL_RUN])
+        corn_first = ex.submit(in_a_worker_of_its_own, [CORN_RUN, BENCHMARK_RUN, ETHANOL_RUN])
+        ethanol, benchmark, corn, ethanol_again, benchmark_again = ordered.result()
+        fresh_benchmark, _pha, ethanol_built_last = benchmark_first.result()
+        fresh_corn, benchmark_after_corn, ethanol_after_corn = corn_first.result()
+    tol = {"rel": 1e-9, "abs": 1e-12}
+    price = lambda r: r["base"]["pricePerKgEthanol"]  # noqa: E731
+    seen = {"benchmark after ethanol": benchmark["mespUsdPerGal"], "benchmark first": fresh_benchmark["mespUsdPerGal"],
+            "benchmark after the corn plant": benchmark_again["mespUsdPerGal"],
+            "benchmark after the corn plant first": benchmark_after_corn["mespUsdPerGal"],
+            "ethanol first": price(ethanol), "ethanol after the benchmark and corn": price(ethanol_again),
+            "ethanol built after the benchmark and PHA": price(ethanol_built_last)}
+    # The benchmark, after the ethanol flowsheet built corn's chemicals, and
+    # again after the corn plant ran, gives what a worker that ran nothing
+    # before gives (finding 10; the corn plant's run reached it through the
+    # chemicals its package shares with the corn stover plant's).
+    assert benchmark["mespUsdPerGal"] == pytest.approx(fresh_benchmark["mespUsdPerGal"], **tol), seen
+    assert benchmark_again["mespUsdPerGal"] == pytest.approx(fresh_benchmark["mespUsdPerGal"], **tol), seen
+    assert benchmark_after_corn["mespUsdPerGal"] == pytest.approx(fresh_benchmark["mespUsdPerGal"], **tol), seen
+    assert benchmark["mespUsdPerGal"] == pytest.approx(1.968, rel=0.005)
+    # So does the corn plant, after the ethanol flowsheet and the benchmark.
+    for key in ("ethanolPriceUsdPerKg", "IRR", "ethanolKgPerH", "cornKgPerH"):
+        assert corn[key] == pytest.approx(fresh_corn[key], **tol), key
+    for expression, value in fresh_corn["measured"].items():
+        assert corn["measured"][expression] == pytest.approx(value, **tol), expression
+    # The ethanol flowsheet prices as it did first, once the benchmark and the
+    # corn plant ran (finding 0), and when built after them and PHA; its
+    # utility and capital lines with it.
+    assert price(ethanol_again) == pytest.approx(price(ethanol), **tol), seen
+    assert price(ethanol_built_last) == pytest.approx(price(ethanol), **tol), seen
+    assert price(ethanol_after_corn) == pytest.approx(price(ethanol), **tol), seen
+    for later in (ethanol_again, ethanol_built_last, ethanol_after_corn):
+        for line, v in ethanol["base"]["costLines"].items():
+            assert later["base"]["costLines"][line] == pytest.approx(v, **tol), line
+        assert later["base"]["readBack"] == pytest.approx(ethanol["base"]["readBack"], **tol)
+    # The streams a package leaves unnamed take the same ids whichever plant
+    # the worker built first (finding 9).
+    ids = lambda r: [s["id"] for s in r["tables"]["streams"]]  # noqa: E731
+    wiring = lambda r: [(u["id"], u["ins"], u["outs"]) for u in r["tables"]["units"]]  # noqa: E731
+    for later in (ethanol_built_last, ethanol_after_corn):
+        assert ids(later) == ids(ethanol) and wiring(later) == wiring(ethanol)

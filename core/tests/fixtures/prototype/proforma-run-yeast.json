@@ -2,7 +2,7 @@
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
   "response": {
     "scenarioId": "sc-yeast-1",
-    "artifactId": "c20ee600d879e015",
+    "artifactId": "77a6c3ec1f9c6739",
     "provenance": "demo",
     "inputs": [
       {
@@ -1335,7 +1335,7 @@
     ],
     "priceBasis": "USD per kg of fuel-grade ethanol, as the product leaves its tank",
     "evidence": {
-      "id": "c20ee600d879e015",
+      "id": "77a6c3ec1f9c6739",
       "label": "Minimum selling price, sc-yeast-1 (Glucose to ethanol, draft v0)",
       "value": 1.1232697772553721,
       "unit": "USD per kg of fuel-grade ethanol, as the product leaves its tank",
@@ -1346,7 +1346,7 @@
       "provenance": "demo",
       "basis": {
         "tool": "proforma.run",
-        "toolVersion": "shelf run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
+        "toolVersion": "shelf run 2 · biosteam 2.54.0 · biorefineries 2.35.1",
         "inputs": [
           {
             "name": "flowsheet",
@@ -1433,6 +1433,28 @@
               "kind": "convention",
               "id": null,
               "note": "the ethanol the package's molecular sieves give, with no denaturant blended; the run reads the purity back",
+              "by": null
+            }
+          },
+          {
+            "name": "utility prices and cost index",
+            "value": "biosteam.process_tools.default_utilities() and default_CEPCI()",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "BioSTEAM's own default prices of electricity and of each heating and cooling agent, and its default plant cost index, set at the start of every case and read back after it, each value the case used (cepci, electricityPrice, and each agent's price and temperature)",
+              "by": null
+            }
+          },
+          {
+            "name": "diagram",
+            "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
               "by": null
             }
           },
@@ -1646,7 +1668,7 @@
             }
           }
         ],
-        "artifactId": "c20ee600d879e015",
+        "artifactId": "77a6c3ec1f9c6739",
         "at": "2026-09-15T09:00:00Z",
         "seed": 0
       },

@@ -32,8 +32,9 @@ import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, Overlay } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, ProformaScenarioInfo, Scenario } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
+import { inputCounts, referencePrice } from '../src/lib/proforma';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -651,6 +652,33 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('Compare reads each BioSTEAM scenario from its newest run artifact, and makes no price of its own',
     /proformaArtifact\(/.test(compare) && /runViewOfArtifact\(/.test(compare) && /viewPrice\(/.test(compare) && !/basePrice\s*[-+]/.test(compare));
 }
+// OF-BLD-019 §2.R — what the index says of a run and a scenario is what the
+// service says. A reference card names how its price was had in no words of
+// its own beyond the shelf's: the corn plant's price is the package's own,
+// set, and its TEA solves the IRR at it, so the card may not say the package
+// solved or gave it (review 8 and 12). A scenario made here is counted as the
+// service binds it, as its page lists it, and a card that could not ask says
+// only what can bind (review 13).
+{
+  const fixture = <T,>(name: string): T =>
+    JSON.parse(readFileSync(new URL(`../core/tests/fixtures/prototype/${name}`, import.meta.url), 'utf8')).response as T;
+  const shelf = fixture<FlowsheetInfo[]>('proforma-shelf.json');
+  const corn = shelf.find((f) => f.id === 'corn_drygrind');
+  const price = corn?.priceOutput ? referencePrice(corn, { output: { [corn.priceOutput]: 0.5 } } as unknown as Artifact) : null;
+  check('the corn plant\u2019s card claims no solving and no giving of the price its package set',
+    !!price && !/solve|gives/i.test(price.reads) && price.basis === corn?.priceBasis, price);
+  const ethanol = shelf.find((f) => f.id === 'ethanol_glucose_v0');
+  const made = { id: 'sc-made-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario;
+  const bound = fixture<{ off: Record<string, { status: number; body: ProformaScenarioInfo }> }>('proforma-bind.json').off.ethanol_glucose_v0.body;
+  const byService = inputCounts(made, bound, shelf, []);
+  check('a made scenario\u2019s card counts the inputs the service binds, as its page lists them',
+    !!byService && byService.bound && byService.total === bound.inputs.length &&
+      byService.waiting === bound.inputs.filter((i) => i.binding === 'waiting').length, byService);
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  check('the index asks the service to bind a scenario made here, and says only what can bind when it cannot ask',
+    /proformaBind\(/.test(index) && /can bind to records/.test(index) && !/bind to records when it runs/.test(index) && !!ethanol);
+}
+
 // OF-BLD-019 §5.1 (D10) — the fermOS fits a person chose for a scenario's
 // inputs are Durable, like its assumptions: which artifact feeds which input
 // survives a reload keyed by scenario and input, one input can stop using its

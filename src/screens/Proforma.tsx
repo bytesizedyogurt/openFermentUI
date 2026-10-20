@@ -50,6 +50,7 @@ import {
   type ReferenceResponse,
   inputCounts,
   proformaArtifact,
+  proformaBind,
   proformaReference,
   referencePath,
   proformaScenarios,
@@ -271,9 +272,29 @@ function BiosteamCard({
 }) {
   const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]);
   const fits = useStore((s) => s.proformaFits[scenario.id]);
+  const madeHere = useStore((s) => s.createdScenarioIds.includes(scenario.id));
+  const showArchived = useStore((s) => s.showArchived);
   const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const runId = scenario.lastRunId ?? null;
+  const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
+
+  // OF-BLD-019 §2.R: a scenario made here is bound by the service as its page
+  // binds it (`GET /api/proforma/bind`, contract (c), with the fits chosen),
+  // so the card counts what the page lists. Until the service answers, the
+  // card counts nothing; if it cannot be asked, the shelf says what can bind.
+  const [made, setMade] = useState<{ info: ProformaScenarioInfo | null } | null>(null);
+  const fitsKey = JSON.stringify(Object.entries(fits ?? {}).sort());
+  useEffect(() => {
+    setMade(null);
+    if (!madeHere || info) return;
+    const ctrl = new AbortController();
+    const chosen = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
+    proformaBind(flowsheetId, { host: null, includeArchived: showArchived, fits: chosen }, ctrl.signal)
+      .then((b) => setMade({ info: b }))
+      .catch(() => !ctrl.signal.aborted && setMade({ info: null }));
+    return () => ctrl.abort();
+  }, [madeHere, info, flowsheetId, showArchived, fitsKey]);
 
   useEffect(() => {
     setArt(null);
@@ -286,9 +307,9 @@ function BiosteamCard({
     return () => ctrl.abort();
   }, [runId]);
 
-  const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
   const flowsheet = shelf.find((f) => f.id === flowsheetId) ?? null;
-  const counts = inputCounts(scenario, info, shelf, assumptions ?? [], fits ?? {});
+  const asked = madeHere && !info;
+  const counts = asked && !made ? null : inputCounts(scenario, info ?? made?.info ?? null, shelf, assumptions ?? [], fits ?? {});
   const price = art ? runPrice(art, shelf) : null;
   return (
     <Card className="p-4 flex flex-col" data-testid="biosteam-card" data-scenario={scenario.id}>
@@ -333,7 +354,7 @@ function BiosteamCard({
       </div>
       {counts && (
         <p className="text-caption text-ink-soft mb-3 font-num" data-testid="scenario-inputs">
-          {counts.total} inputs: {counts.records} {counts.bound ? 'bound to records' : 'bind to records when it runs'}
+          {counts.total} inputs: {counts.records} {counts.bound ? 'bound to records' : 'can bind to records'}
           {counts.computed > 0 && `, ${counts.computed} from a fermOS fit`}
           {counts.assumed > 0 && `, ${counts.assumed} assumed`}
           {counts.conventions > 0 && `, ${counts.conventions} by convention`}, {counts.waiting} waiting for an assumption

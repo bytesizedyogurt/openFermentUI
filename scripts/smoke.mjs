@@ -548,7 +548,8 @@ async function main() {
       const made = await make('pha_sugar_v0', 'PHA from the shelf');
       // §3.2: the page lists the inputs the service bound for its flowsheet; wait for its rows.
       await page.locator('[data-testid="proforma-inputs"] tbody tr').first().waitFor({ timeout: 8000 }).catch(() => {});
-      if ((await page.locator('[data-testid="proforma-inputs"] tbody tr').count()) !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
+      const pageRows = await page.locator('[data-testid="proforma-inputs"] tbody tr').count();
+      if (pageRows !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
       if (made) {
         await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
         const card = page.locator(`[data-testid="biosteam-card"][data-scenario="${made}"]`);
@@ -557,8 +558,13 @@ async function main() {
         // the counts line draws once the shelf answers, so wait for it.
         await card.locator('[data-testid="scenario-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
         const said = await card.innerText().catch(() => '');
-        if (!/Not run yet/.test(said) || !/7 inputs: 4 bind to records when it runs, 3 waiting for an assumption/.test(said))
-          problems.push(`the index does not list the made scenario as not run with its inputs: ${JSON.stringify(said.slice(0, 200))}`);
+        // §2.R: the card counts the inputs as the service binds them (the
+        // double's answer to GET /api/proforma/bind), as the page lists them.
+        const bound = fixture('proforma-bind.json').on.pha_sugar_v0.body.inputs;
+        const of = (b) => bound.filter((i) => i.binding === b).length;
+        const counted = `${bound.length} inputs: ${of('records')} bound to records, ${of('waiting')} waiting for an assumption`;
+        if (!/Not run yet/.test(said) || !said.includes(counted) || bound.length !== pageRows)
+          problems.push(`the index does not list the made scenario as not run with its inputs as the service binds them (${counted}; the page lists ${pageRows}): ${JSON.stringify(said.slice(0, 200))}`);
         await page.waitForTimeout(700);
         await page.reload({ waitUntil: 'networkidle' });
         await card.waitFor({ timeout: 8000 }).catch(() => {});
@@ -811,6 +817,10 @@ async function main() {
         await page.locator('[data-testid="reference-run"]:has-text("Rerun")').waitFor({ timeout: 8000 }).catch(() => {});
         if (doubleState.proformaReferences.length !== before + 1 || doubleState.proformaReferences.at(-1) !== id) lacks.push('Run did not post');
         if ((await count('[data-testid="regression-row"]')) !== ref.regression.values.length) lacks.push('the table after a run');
+        // §2.R: the run the page names reads back by its id, as the service keeps it.
+        await page.goto(`http://localhost:${PORT}/#/biorepo/artifacts/${ref.artifact.id}`, { waitUntil: 'networkidle' });
+        await page.locator('[data-testid="artifact-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if ((await count('[data-testid="artifact-inputs"] tbody tr')) !== ref.artifact.inputs.length) lacks.push(`its run ${ref.artifact.id} read back by its id`);
         if (lacks.length) problems.push(`${id}: the page lacks ${lacks.join(', ')}`);
       }
       // The index's reference cards link to their pages.
@@ -882,6 +892,12 @@ async function main() {
       await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
       await typeYeast();
       await runAndPin('sc-yeast-1');
+      // §2.R: after a reload the yeast scenario reads its newest run back from its artifact, as sc-pha-1 does.
+      await page.waitForTimeout(700);
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
+        problems.push('after a reload sc-yeast-1 does not read its newest run back from the artifact');
 
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
       const card = page.locator('[data-testid="flowsheet-card"][data-flowsheet="ethanol_glucose_v0"]');

@@ -23,7 +23,10 @@ the product is the ethanol the package's sieves give, fuel grade, a
 convention the basis names. Chemicals and finance are the dry-grind corn
 ethanol plant's (`biorefineries.corn.create_chemicals`, `corn.create_tea`
 with its `default_tea_parameters`), cited with the package's version in the
-basis; equipment and thermodynamics are BioSTEAM's own.
+basis; equipment and thermodynamics are BioSTEAM's own, and so are the
+utility prices and the plant cost index: BioSTEAM's defaults, set at the
+start of every case (OF-BLD-019 §2.R; not the corn plant's own settings,
+which its package loads only when it builds the corn plant).
 
 WHAT IT LEAVES OUT (`LEAVES_OUT`): where the glucose comes from; cell mass
 and by-products (the glucose the yield does not turn into ethanol leaves in
@@ -33,7 +36,8 @@ wastewater treatment and the boiler.
 
 Every input is set by the caller; this module holds no value for any of
 them (Rule 1, D4). Everything else is the package's or BioSTEAM's own, read
-back after each case (`read_back`) so the screen can name its source.
+back after each case (`read_back`, the utility prices and cost index
+included) so the screen can name its source.
 """
 from __future__ import annotations
 
@@ -41,6 +45,8 @@ from typing import Any
 
 import biosteam as bst
 import thermosteam as tmo
+
+from . import utility_settings
 
 NAME = "ethanol_glucose_v0"
 
@@ -185,6 +191,11 @@ def simulate(b: Built, values: dict[str, float]) -> None:
     _check(v)
     bst.main_flowsheet.set_flowsheet(b.flowsheet)
     bst.settings.set_thermo(b.thermo)
+    # BioSTEAM's own utility prices and plant cost index for every case, so
+    # a case never prices on what an earlier plant in the worker set (the
+    # basis names them; read_back reads them).
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
     conversion = v["yield"] / b.theoretical
     if conversion > 1:
         raise Infeasible("yield")
@@ -235,6 +246,7 @@ def read_back(b: Built) -> dict[str, float]:
         "endYear": float(tea.duration[1]),
         "incomeTax": float(tea.income_tax),
         "langFactor": float(tea.lang_factor),
+        **utility_settings(b.system.units),
     }
 
 

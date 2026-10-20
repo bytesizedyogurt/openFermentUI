@@ -7,7 +7,8 @@ the worker builds each flowsheet once and keeps it; every later request sets
 its inputs on the built objects and re-simulates (Appendix 3, trap 3).
 
     ping        answered by `serve`
-    benchmark   the published reference biorefinery (§8.2)
+    benchmark   the published reference biorefinery (§8.2), built afresh
+                inside `package_defaults()` (OF-BLD-019 §2.R)
     evaluate    one case of a flowsheet: its inputs in, its outputs out
     grid        the outputs over a grid of up to three inputs
     montecarlo  Latin hypercube samples of the inputs, seeded
@@ -27,6 +28,17 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
 
+THE WARM WORKER KEEPS NO PLANT'S SETTINGS (OF-BLD-019 §2.R). BioSTEAM keeps
+process-wide state a plant can change: the utility prices and the plant cost
+index, the stream and unit tickets that name what a package leaves unnamed,
+and the chemicals thermosteam's `chemical_cache` keeps per package, whose
+Chemical objects are shared by name between packages (the corn plant locks
+ammonia to liquid in the object the corn stover plant uses). Every plant
+therefore builds inside `package_defaults()`, as it would in a worker that
+had built nothing before, and the worker puts back what it held afterwards;
+a scenario flowsheet sets BioSTEAM's default utility prices and cost index
+for every case it runs, and says so in its read-back.
+
 The tables are read through BioSTEAM's own attributes and methods, never
 recomputed: the TEA object's sales, material and utility cost, installed
 equipment cost, FCI, TCI, FOC and IRR; each unit's costs, heat utilities and
@@ -42,10 +54,13 @@ pressure nobody gave is the library's own Stream default, said so.
 """
 from __future__ import annotations
 
+import functools
 import inspect
 import itertools
 import math
 import shutil
+import sys
+import types
 from contextlib import contextmanager
 from importlib.metadata import version
 from typing import Any, Iterator
@@ -54,6 +69,7 @@ import biosteam as bst  # imported here so the cost is paid at start
 import numpy as np
 import thermosteam as tmo  # BioSTEAM's property engine, loaded with it
 from scipy.stats import qmc
+from thermosteam.utils import chemical_cache
 
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
@@ -75,7 +91,13 @@ def built(name: str) -> tuple[Any, Any]:
         raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
                       "through its reference run, not case by case")
     if name not in _BUILT:
-        _BUILT[name] = module.build()
+        # Built as it would be in a worker that had built nothing before
+        # (OF-BLD-019 §2.R): BioSTEAM's tickets start at one, so the streams a
+        # package leaves unnamed take the same ids whichever plant this worker
+        # built first; and every chemical comes from fresh caches, so nothing
+        # this plant changes reaches a plant built later, nor the other way.
+        with package_defaults():
+            _BUILT[name] = module.build()
     return module, _BUILT[name]
 
 
@@ -146,8 +168,11 @@ def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, b
 # The units of what the tables hold are BioSTEAM's, written into every run
 # as `tableUnits` (flowsheets/shelf.py's TABLE_UNITS; demo.py's stand-in
 # claims the same). D8's words when the diagram cannot be drawn here:
-NO_GRAPHVIZ = ("Graphviz is not installed here; the diagram draws on a host that has it "
-               "(brew install graphviz on the Mini). The units are listed in run order.")
+NO_GRAPHVIZ = ("Graphviz was not on the host that made this run, so it has no diagram; a host that has it "
+               "(brew install graphviz on the Mini) draws its own run of the same inputs. The units are listed in run order.")
+# A run whose basis asks for the diagram, replayed where dot is not found.
+DOT_MISSING = ("This run's basis asks for the diagram Graphviz draws, and Graphviz's dot is not on this host's path; "
+               "the units are listed in run order.")
 
 
 def _num(x: Any) -> float | None:
@@ -306,39 +331,57 @@ def tea_breakdown(parts: dict[str, Any]) -> dict[str, Any] | None:
     return out
 
 
-def diagram(system: Any) -> dict[str, Any]:
-    """The flowsheet as SVG text when Graphviz's dot is here (D8); else
-    None and the words why."""
-    if not shutil.which("dot"):
+def diagram(system: Any, draw: bool | None = None) -> dict[str, Any]:
+    """The flowsheet as SVG text when the run's basis asks for it (`draw`,
+    the `diagram` input the service sets from whether this host has
+    Graphviz's dot; None, a caller that names nothing, draws when dot is
+    here) (D8); else None and the words why."""
+    here = shutil.which("dot") is not None
+    if draw is None:
+        draw = here
+    if not draw:
         return {"diagram": None, "diagramNote": NO_GRAPHVIZ}
+    if not here:
+        return {"diagram": None, "diagramNote": DOT_MISSING}
     try:
         svg = system.diagram(format="svg", display=False).pipe(format="svg").decode("utf-8")
     except Exception as e:  # Graphviz is here and could not draw it: say so, list the units
-        return {"diagram": None, "diagramNote": f"Graphviz could not draw this flowsheet here ({type(e).__name__}); "
-                                               "the units are listed in run order."}
+        return {"diagram": None, "diagramNote": f"Graphviz could not draw this flowsheet on the host that made this run "
+                                               f"({type(e).__name__}); the units are listed in run order."}
     return {"diagram": svg, "diagramNote": None}
 
 
-def tables(module: Any, b: Any) -> dict[str, Any]:
-    """Every table of the base case, read from the objects it left."""
+def tables(module: Any, b: Any, draw: bool | None = None) -> dict[str, Any]:
+    """Every table of the base case, read from the objects it left. Where
+    the flowsheet solved a price, the product carries it while every table
+    is read, its stream row included, and gets back what it had after
+    (OF-BLD-019 §2.R: the row once showed the package's list price beside
+    the price the run solved)."""
     parts = module.parts(b) if hasattr(module, "parts") else {"system": b}
     system = parts["system"]
-    tea = parts.get("tea")
+    tea, product, price = parts.get("tea"), parts.get("product"), parts.get("price")
     units = tea.units if tea is not None else system.units
-    return {
-        "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
-        "tea": tea_breakdown(parts),
-        "streams": stream_table(system),
-        "units": unit_table(system),
-        "utilities": utility_duties(units, "the units the TEA costs" if tea is not None else "every unit of the system"),
-        **diagram(system),
-        "unitOrder": [u.ID for u in system.units],
-        "tableUnits": TABLE_UNITS,
-    }
+    before = product.price if product is not None else None
+    try:
+        if product is not None and price is not None:
+            product.price = price
+        return {
+            "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
+            "tea": tea_breakdown(parts),
+            "streams": stream_table(system),
+            "units": unit_table(system),
+            "utilities": utility_duties(units, "the units the TEA costs" if tea is not None else "every unit of the system"),
+            **diagram(system, draw),
+            "unitOrder": [u.ID for u in system.units],
+            "tableUnits": TABLE_UNITS,
+        }
+    finally:
+        if product is not None:
+            product.price = before
 
 
 def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], samples: int, seed: int,
-        axes: dict[str, list[float]] | None = None) -> dict[str, Any]:
+        axes: dict[str, list[float]] | None = None, draw: bool | None = None) -> dict[str, Any]:
     """One whole run: the base case and its tables, read before any other
     case moves the objects; then the grid, when one is asked; then the
     samples, Latin hypercube and seeded, as `montecarlo`."""
@@ -349,7 +392,7 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
         raise
     except Exception as e:  # the base case cannot be held: said as the service says a worker error
         base_out, base_infeasible = None, f"{type(e).__name__}: {e}"
-    out_tables = tables(module, b) if base_out is not None else None
+    out_tables = tables(module, b, draw) if base_out is not None else None
     out_grid = grid(name, axes, base) if axes else None
     mc = montecarlo(name, specs, samples, seed, base) if samples else {"n": 0, "seed": seed, "samples": []}
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
@@ -358,16 +401,57 @@ def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], sam
 # ── a reference biorefinery's run (OF-BLD-019 §2.2) ────────────────────
 
 
+# The code every function thermosteam's `chemical_cache` decorator makes
+# runs: how such a function is told from any other.
+_CACHED_CHEMICALS = chemical_cache(lambda: None).__code__
+
+
+def _cached_chemicals() -> dict[int, Any]:
+    """Every function a loaded `biorefineries` module made with thermosteam's
+    `chemical_cache` (each package's `create_chemicals` and kin), by id.
+    Each keeps, through `functools.cache`, the chemicals it made the first
+    time it ran, and makes each one by name with thermosteam's chemical cache
+    on, so a Chemical object is shared by every package that made it: a
+    package that changes one changes it for the others (biorefineries.corn
+    locks NH3 to liquid in the object biorefineries.cornstover uses)."""
+    out: dict[int, Any] = {}
+    for name, module in list(sys.modules.items()):
+        if not (name == "biorefineries" or name.startswith("biorefineries.")):
+            continue
+        for v in list(getattr(module, "__dict__", {}).values()):
+            if type(v) is types.FunctionType and v.__code__ is _CACHED_CHEMICALS:
+                out[id(v)] = v
+    return out
+
+
+def _cache_of(fn: Any) -> Any:
+    """The cell that holds a `chemical_cache` function's functools cache."""
+    return fn.__closure__[fn.__code__.co_freevars.index("g")]
+
+
+def _fresh_cache(fn: Any) -> None:
+    """Give a `chemical_cache` function an empty cache of its own, so the
+    next call makes its chemicals anew, as in a fresh worker."""
+    plain = fn.__closure__[fn.__code__.co_freevars.index("f")].cell_contents
+    _cache_of(fn).cell_contents = functools.cache(plain)
+
+
 @contextmanager
 def package_defaults() -> Iterator[None]:
-    """BioSTEAM's defaults while a reference biorefinery builds and is read,
-    as the package's own test runs it (`default_settings` in
+    """A plant builds, and a reference biorefinery is read, as in a worker
+    that had built nothing before: BioSTEAM's defaults first, as the
+    package's own test runs it (`default_settings` in
     biorefineries/tests/test_biorefineries.py calls
-    `bst.process_tools.default()`); afterwards, what the worker held before
-    is put back, not the defaults, because the worker keeps other plants
-    warm whose costs read these globals (a PowerUtility's cost reads the
-    class's price when it is asked)."""
+    `bst.process_tools.default()`, which also clears the tickets and
+    thermosteam's chemical cache), and every package's chemicals made anew
+    from empty caches (OF-BLD-019 §2.R). Afterwards what the worker held
+    before is put back, not the defaults, because the worker keeps other
+    plants warm whose costs read these globals (a PowerUtility's cost reads
+    the class's price when it is asked); a chemicals cache first filled
+    inside is emptied, so nothing a plant made here is shared with the next."""
+    cached = _cached_chemicals()
     saved = {
+        "cachedChemicals": {k: _cache_of(fn).cell_contents for k, fn in cached.items()},
         "CE": bst.CE,
         "power": bst.PowerUtility.price,
         "powerFactors": dict(bst.PowerUtility.characterization_factors),
@@ -378,10 +462,17 @@ def package_defaults() -> Iterator[None]:
         "flowsheet": bst.main_flowsheet.get_flowsheet(),
         "thermo": getattr(bst.settings, "_thermo", None),
     }
+    for fn in cached.values():
+        _fresh_cache(fn)
     bst.process_tools.default()
     try:
         yield
     finally:
+        for k, fn in _cached_chemicals().items():
+            if k in saved["cachedChemicals"]:
+                _cache_of(fn).cell_contents = saved["cachedChemicals"][k]
+            else:  # a module first imported inside: its cache holds this plant's chemicals
+                _fresh_cache(fn)
         bst.CE = saved["CE"]
         bst.PowerUtility.price = saved["power"]
         bst.PowerUtility.characterization_factors.clear()
@@ -430,7 +521,7 @@ def rounded(value: Any, digits: int) -> Any:
     return value
 
 
-def reference(name: str, digits: int) -> dict[str, Any]:
+def reference(name: str, digits: int, draw: bool | None = None) -> dict[str, Any]:
     """A reference biorefinery, run whole: built afresh inside
     `package_defaults()`, then everything read before the settings go back."""
     try:
@@ -450,13 +541,13 @@ def reference(name: str, digits: int) -> dict[str, Any]:
             **module.outputs(b),
             "measured": package_test_quantities(parts),
             "readBack": module.read_back(b) if hasattr(module, "read_back") else {},
-            **tables(module, b),
+            **tables(module, b, draw),
         }
     return rounded(out, digits)
 
 
 def _op_reference(args):
-    return reference(str(args["flowsheet"]), int(args.get("digits", 17)))
+    return reference(str(args["flowsheet"]), int(args.get("digits", 17)), args.get("diagram"))
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -644,7 +735,7 @@ def _op_thermo_props(args):
 
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
-               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None)
+               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"))
 
 
 def _op_evaluate(args):
@@ -661,9 +752,14 @@ def _op_montecarlo(args):
 
 
 def _op_benchmark(args):
+    """The benchmark (§8.2), built afresh inside `package_defaults()`: the
+    corn stover plant sets its own utility prices and cost index as it
+    builds, and these go back with everything else afterwards, so no later
+    case prices on them (OF-BLD-019 §2.R)."""
     from openferment_core.flowsheets import cornstover_benchmark
 
-    return cornstover_benchmark.run()
+    with package_defaults():
+        return cornstover_benchmark.run()
 
 
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,

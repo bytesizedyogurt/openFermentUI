@@ -9,7 +9,9 @@ and purification, wastewater treatment, co-products (`LEAVES_OUT`).
 
 Every input is set by the caller; this module holds no value for any of them.
 Everything else is the reference biorefinery's (`biorefineries.cornstover`)
-or BioSTEAM's own, and is read back after each run and listed (`read_back`),
+or BioSTEAM's own (the utility prices and the plant cost index are
+BioSTEAM's defaults, set at the start of every case: OF-BLD-019 §2.R), and
+is read back after each run and listed (`read_back`),
 so the screen can name its source. Appendix 3's five traps are handled where
 they bite and marked "trap n".
 """
@@ -19,6 +21,8 @@ from typing import Any
 
 import biosteam as bst
 import thermosteam as tmo
+
+from . import utility_settings
 
 NAME = "pha_sugar_v0"
 
@@ -150,6 +154,10 @@ def simulate(b: Built, values: dict[str, float]) -> None:
     _check(v)
     bst.main_flowsheet.set_flowsheet(b.flowsheet)
     bst.settings.set_thermo(b.thermo)
+    # BioSTEAM's own utility prices and plant cost index for every case
+    # (OF-BLD-019 §2.R; the basis names them, read_back reads them).
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
     x_phb, x_cells, x_burn = conversions(b, v)
     if x_burn < 0:
         raise Infeasible("carbon")
@@ -191,6 +199,7 @@ def read_back(b: Built) -> dict[str, float]:
         "incomeTax": float(tea.income_tax),
         "ammoniaPriceUsdPerKg": float(b.ammonia.price),
         "packageGlucosePriceUsdPerKg": float(b.cs.price["Glucose"]) if "Glucose" in b.cs.price else float("nan"),
+        **utility_settings(b.system.units),
     }
 
 

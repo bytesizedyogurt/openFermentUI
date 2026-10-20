@@ -225,9 +225,9 @@
       "packageTest": "biorefineries/tests/test_biorefineries.py::test_corn"
     },
     "artifact": {
-      "id": "265ab7ab750327be",
+      "id": "1b2f2c463c872086",
       "tool": "proforma.reference",
-      "toolVersion": "reference run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
+      "toolVersion": "reference run 2 · biosteam 2.54.0 · biorefineries 2.35.1",
       "inputs": [
         {
           "name": "flowsheet",
@@ -534,6 +534,17 @@
             "kind": "convention",
             "id": null,
             "note": "every number the run keeps is rounded so: BioSTEAM sums a set of units in an order that moves the last digits from one build to the next, and a replay compares the plant",
+            "by": null
+          }
+        },
+        {
+          "name": "diagram",
+          "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+          "unit": "",
+          "source": {
+            "kind": "convention",
+            "id": null,
+            "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
             "by": null
           }
         }

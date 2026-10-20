@@ -8,8 +8,10 @@ starting rather than look stuck.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
+import shutil
 import threading
 from typing import Any, Literal
 
@@ -92,6 +94,37 @@ def _installed(dist: str) -> str:
         return "not installed"
 
 
+def drawn_here() -> bool:
+    """Whether this host draws a run's flowsheet diagram: Graphviz's `dot` on
+    the path the service and its worker share (D8)."""
+    return shutil.which("dot") is not None
+
+
+# OF-BLD-019 §2.R: whether a run's diagram is drawn is part of its basis, so
+# a host with Graphviz never inherits, as its own, a run made of the same
+# inputs where Graphviz was absent: it computes and keeps its own.
+DIAGRAM_DRAWN = "drawn by Graphviz"
+DIAGRAM_NOT_DRAWN = "not drawn: Graphviz's dot was not on the path of the host that made this run"
+
+
+def diagram_input():
+    """The basis input that says whether the run's diagram is drawn, from
+    this host (D8). A convention: it leaves the provenance as it is."""
+    from .models import BasisInput, BasisSource
+
+    return BasisInput(name="diagram", value=DIAGRAM_DRAWN if drawn_here() else DIAGRAM_NOT_DRAWN, unit="",
+                      source=BasisSource(kind="convention", note=(
+                          "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the "
+                          "run is the same plant either way, and a host with Graphviz keeps a run of its own")))
+
+
+def _draws(inputs) -> bool | None:
+    """What a run's basis says of its diagram, for the worker; None for a
+    run kept before the basis said (the worker then draws when dot is here)."""
+    said = _named(inputs, "diagram")
+    return None if said is None else str(said) == DIAGRAM_DRAWN
+
+
 def benchmark_inputs() -> list:
     from .models import BasisInput, BasisSource
 
@@ -170,7 +203,9 @@ def benchmark_evidence(art):
 # artifact (§8.2) are unchanged; the corn stover plant answers here too.
 
 REFERENCE = "proforma.reference"
-REFERENCE_VERSION = "reference run 1"
+# 2 (OF-BLD-019 §2.R): the basis says whether the diagram is drawn, and the
+# plant builds with fresh chemical caches.
+REFERENCE_VERSION = "reference run 2"
 # The significant digits a reference run keeps: BioSTEAM sums a set of units
 # in an order that moves the last digits from one build to the next, so the
 # run keeps fewer, and a replay compares the plant (a precision, stated in
@@ -223,6 +258,7 @@ def reference_inputs(flowsheet_id: str) -> list:
     out.append(BasisInput(name="precision", value=f"{REFERENCE_DIGITS} significant digits", unit="", source=BasisSource(
         kind="convention", note="every number the run keeps is rounded so: BioSTEAM sums a set of units in an order "
                                 "that moves the last digits from one build to the next, and a replay compares the plant")))
+    out.append(diagram_input())
     return out
 
 
@@ -247,7 +283,7 @@ def _run_reference(inputs, seed):
     and reads it; the package test's values are set beside what it read."""
     flowsheet = str(_named(inputs, "flowsheet"))
     digits = int(str(_named(inputs, "precision") or REFERENCE_DIGITS).split()[0])
-    out = call("reference", {"flowsheet": flowsheet, "digits": digits})
+    out = call("reference", {"flowsheet": flowsheet, "digits": digits, "diagram": _draws(inputs)})
     regression = _shelf.package_regression(flowsheet)
     out["regression"] = regression.model_dump(mode="json") if regression else None
     out["checks"] = ([c.model_dump(mode="json") for c in regression_checks(regression, out.get("measured") or {})]
@@ -471,6 +507,9 @@ def _assume(inp, a) -> None:
     why = reviewer_refusal(a.by)
     if why:
         raise ScenarioRefused(f"the assumption for {inp.key} needs a person's name: {why}")
+    if not all(math.isfinite(v) for v in (a.value, a.low, a.high)):
+        # §2.R: an infinite value passed the range check and broke the artifact's JSON.
+        raise ScenarioRefused(f"the assumption for {inp.key} must be a finite number, with a finite low and high")
     if not a.low <= a.value <= a.high:
         raise ScenarioRefused(f"the assumption for {inp.key} must lie within its own low and high")
     inp.binding = "assumption"
@@ -524,6 +563,9 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
                                note="create_tea and create_chemicals; PHB borrows Lignin's volume and heat capacity")))
     elif flowsheet == ETHANOL:
         out += ethanol_basis()
+    if info.priceOutput:
+        out.append(utility_input())
+    out.append(diagram_input())
     out.append(BasisInput(name="samples", value=f"{samples} Latin hypercube", unit="", source=BasisSource(kind="convention")))
     if cap is not None:
         out.append(BasisInput(name="yield cap", value=cap[0], unit="g g-1", source=BasisSource(kind="artifact", id=cap[1])))
@@ -542,6 +584,24 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
                 out.append(BasisInput(name=f"{inp.key} fit{part}", value=v, unit=inp.unit, source=inp.source))
     out += fitted or []
     return out
+
+
+def utility_input():
+    """What a priced scenario run's utility lines and equipment costs rest
+    on (OF-BLD-019 §2.R): BioSTEAM's own default utility prices and plant
+    cost index, which the flowsheet sets at the start of every case and
+    reads back, so no case prices on what an earlier plant left in the
+    worker. BioSTEAM's defaults, not the corn plant's own settings."""
+    from .models import BasisInput, BasisSource
+
+    sim = f"biosteam@{_installed('biosteam')}"
+    return BasisInput(
+        name="utility prices and cost index",
+        value="biosteam.process_tools.default_utilities() and default_CEPCI()", unit="",
+        source=BasisSource(kind="model", id=sim, note=(
+            "BioSTEAM's own default prices of electricity and of each heating and cooling agent, and its default plant "
+            "cost index, set at the start of every case and read back after it, each value the case used "
+            "(cepci, electricityPrice, and each agent's price and temperature)")))
 
 
 def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, str]]:
@@ -647,7 +707,7 @@ def _run_scenario(inputs, seed):
         s = specs[k]
         axes[k] = [s["value"]] if s["kind"] == "fixed" else [float(v) for v in np.linspace(s["low"], s["high"], GRID_POINTS)]
     r = call("run", {"flowsheet": flowsheet, "base": base, "specs": specs, "samples": _samples_of(inputs),
-                     "seed": int(seed or 0), "axes": axes or None})
+                     "seed": int(seed or 0), "axes": axes or None, "diagram": _draws(inputs)})
     base_out, base_infeasible = r["base"], r["baseInfeasible"]
     mc = r["montecarlo"]
 
@@ -715,7 +775,10 @@ def _run_scenario(inputs, seed):
 
 # A run that carries its tables (OF-BLD-019 §2.1); a run stored before them
 # was versioned by its flowsheet alone, and replays with that difference said.
-RUN_VERSION = "shelf run 1"
+# 2 (OF-BLD-019 §2.R): the basis names the utility prices and cost index and
+# whether the diagram is drawn; the product's stream row carries the solved
+# price; the plant builds as in a fresh worker.
+RUN_VERSION = "shelf run 2"
 
 
 def _register_run() -> None:
@@ -741,6 +804,28 @@ def _check_samples(n: int) -> None:
         raise ScenarioRefused(f"a run draws between 1 and {MAX_SAMPLES} samples; {n} were asked for")
 
 
+def _check_seed(seed: int) -> None:
+    """The sampler takes a whole number from zero up (§2.R: a negative seed
+    reached it after the base case and the grid had run)."""
+    if seed < 0:
+        raise ScenarioRefused(f"a run's seed is a whole number from 0 up; {seed} was given")
+
+
+def _no_sample_held(art) -> str:
+    """Why a run kept no price, in words: each reason its samples could not
+    be held, counted, and the base case's own words; and the run it kept
+    (§2.R: the 422 said only that there was no price, and the run it had
+    stored was found nowhere)."""
+    o = art.output
+    n = o.get("samples") or 0
+    reasons = "; ".join(f"{reason}: {count} of {n}" for reason, count in sorted((o.get("infeasible") or {}).items()))
+    base = o.get("baseInfeasible")
+    return ("this run has no sample the flowsheet could hold, so it has no price to cite"
+            + (f" (the samples that could not run, by reason: {reasons})" if reasons else "")
+            + (f"; the base case: {base}" if base else "")
+            + f". The run is kept as artifact {art.id}.")
+
+
 def run(req, pool=None):
     """Bind, refuse what waits for a source, and run once per basis. The run
     is one `proforma.run` artifact holding the price, the sensitivity and the
@@ -753,6 +838,7 @@ def run(req, pool=None):
     flowsheet = flowsheet_of(req.scenarioId, req.flowsheet)
     info = _shelf.info(flowsheet)
     _check_samples(req.samples)
+    _check_seed(req.seed)
     # A run is a caller a person started by id: its records bind whatever the
     # program switch says (OF-BLD-016, "what keeps everything").
     pool = pool or evidence_pool.load(include_archived=True)
@@ -773,6 +859,8 @@ def run(req, pool=None):
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
+    if not q:
+        raise ScenarioRefused(_no_sample_held(art))
     ev = evidence_of(art)
     tables = tables_of(art)
     return ProformaRunResult(
@@ -799,6 +887,7 @@ def run_flowsheet(flowsheet: str, assumptions: list, *, samples: int = SAMPLES, 
     if info.reference:
         raise ScenarioRefused(f"{flowsheet} is a reference biorefinery: it runs whole on its package's own defaults")
     _check_samples(samples)
+    _check_seed(seed)
     given = {a.key: a for a in assumptions}
     unknown = sorted(set(given) - {i.key for i in info.inputs if i.kind != "convention"})
     if unknown:
@@ -949,10 +1038,35 @@ def flowsheet_of(scenario_id: str, flowsheet: str | None = None) -> str:
         if flowsheet and flowsheet != own:
             raise ScenarioRefused(f"{scenario_id} runs {own}, not {flowsheet}")
         return own
+    kind = _unrunnable_seed(scenario_id)
+    if kind is not None:
+        # §2.R: a seed scenario that runs no shelf flowsheet (the casein
+        # examples are authored cost surfaces) is not a scenario made here;
+        # a run under its id would file a flowsheet's train under it.
+        what = ("an authored scenario of the seed, a cost surface written by hand" if kind == "authored"
+                else f"a seed scenario of kind {kind} whose flowsheet is not on the shelf")
+        raise ScenarioRefused(f"{scenario_id} is {what}: it runs no flowsheet here, and a scenario made here takes an "
+                              "id of its own")
     if not flowsheet:
         raise ScenarioRefused(f"there is no seed scenario {scenario_id}; the seed's BioSTEAM scenarios are "
                               f"{', '.join(seeds) or 'none'}, and a scenario made here names the flowsheet it runs")
     return runnable(flowsheet).id
+
+
+def _unrunnable_seed(scenario_id: str) -> str | None:
+    """The kind of a seed scenario that runs no shelf flowsheet (an authored
+    cost surface), by its id, from the projection modules.json holds; None
+    when the seed holds no such scenario or there is no projection here."""
+    from . import module_stores
+
+    try:
+        rows = list(module_stores._projection()["proforma"]["scenarios"])
+    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
+        return None
+    row = next((r for r in rows if r.get("id") == scenario_id), None)
+    if row is None or (row.get("kind") == "biosteam" and row.get("modelId") in _shelf.SHELF):
+        return None
+    return str(row.get("kind") or "authored")
 
 
 def _in_program(paper_id: str, program: str | None) -> bool:

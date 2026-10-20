@@ -409,6 +409,20 @@ def prototype_proposals() -> dict[str, Any]:
 
 
 def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
+    from . import proforma
+
+    # OF-BLD-019 §2.R: a run's basis says whether its diagram is drawn, from
+    # whether this host has Graphviz. The STAND-IN draws none on any host, so
+    # its runs say so, and the fixtures are the same wherever they are made.
+    drawn_here = proforma.drawn_here
+    proforma.drawn_here = lambda: False
+    try:
+        return _rebuild_prototype(out)
+    finally:
+        proforma.drawn_here = drawn_here
+
+
+def _rebuild_prototype(out: Path) -> list[Path]:
     from . import artifacts
 
     art = prototype_artifact()

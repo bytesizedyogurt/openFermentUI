@@ -188,7 +188,13 @@ def test_the_toy_run_artifact_carries_every_table(warm, store):
     assert t.utilities.heatingUnit == "GJ/hr" and t.utilities.electricityConsumptionUnit == "MW"
     assert t.tableUnits == shelf.TABLE_UNITS
     if shutil.which("dot") is None:
-        assert t.diagram is None and "Graphviz is not installed here" in t.diagramNote
+        # §2.R: the note is a fact about the host that made the run, and the
+        # basis says the diagram was not drawn, so a host with dot draws its own.
+        assert t.diagram is None and "Graphviz was not on the host that made this run" in t.diagramNote
+        assert [i.value for i in art.inputs if i.name == "diagram"] == [proforma.DIAGRAM_NOT_DRAWN]
+        # A basis that asks for the diagram, replayed where dot is absent, says so.
+        asked = warm.call("run", {"flowsheet": "toy", "base": {}, "specs": {}, "samples": 0, "seed": 0, "diagram": True})
+        assert asked["tables"]["diagram"] is None and "basis asks for the diagram" in asked["tables"]["diagramNote"]
     else:
         assert "<svg" in t.diagram
     assert art.output["samples"] == art.output["feasible"] == 8 and art.output["grid"] is None
@@ -246,7 +252,10 @@ def test_with_dot_on_the_path_the_diagram_is_the_svg_it_drew(tmp_path, monkeypat
     w = SimWorker("openferment_core.workers.proforma_worker", timeout_s=proforma.START_TIMEOUT_S)
     try:
         r = w.call("run", {"flowsheet": "toy", "base": {}, "specs": {}, "samples": 0, "seed": 0})
+        not_drawn = w.call("run", {"flowsheet": "toy", "base": {}, "specs": {}, "samples": 0, "seed": 0, "diagram": False})
     finally:
         w.close()
     assert r["tables"]["diagram"] == '<svg xmlns="http://www.w3.org/2000/svg"><title>stand-in dot</title></svg>'
     assert r["tables"]["diagramNote"] is None
+    # §2.R: a run whose basis says it was made where dot was absent is not drawn here either: its replay is that run.
+    assert not_drawn["tables"]["diagram"] is None and "not on the host that made this run" in not_drawn["tables"]["diagramNote"]

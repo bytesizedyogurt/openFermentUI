@@ -282,3 +282,92 @@ def test_the_latest_run_and_its_evidence_follow_the_scenario(standin):
     assert proforma.latest_run("sc-yeast-1").id == yeast.artifactId
     ev = proforma.evidence_of(artifacts.get(yeast.artifactId))
     assert "sc-yeast-1" in ev.label and ev.unit == shelf.ETHANOL_PRICE_BASIS
+
+
+# ── the Phase 2 review (OF-BLD-019 §2.R), offline ──────────────────────
+# Each test below was written before its fix and seen to fail for the
+# reason the review gave; the worker's own (sim and slow) are in
+# test_proforma.py and test_proforma_slow.py.
+
+
+def test_every_run_names_the_utility_prices_and_cost_index_it_priced_on():
+    # §2.R, review 1: the run's utilities and every equipment cost rest on
+    # BioSTEAM's utility prices and plant cost index; the basis names them,
+    # BioSTEAM's own defaults set for every case, and the run reads them back.
+    for flowsheet in (ETHANOL, "pha_sugar_v0"):
+        named = {i.name: i for i in proforma.basis_inputs([], None, flowsheet, 8)}
+        u = named["utility prices and cost index"]
+        assert u.source.kind == "model" and u.source.id.startswith("biosteam@"), flowsheet
+        assert "default_utilities" in str(u.value) and "default_CEPCI" in str(u.value)
+        assert "read back" in (u.source.note or "")
+
+
+def test_a_run_with_no_sample_the_flowsheet_holds_says_why_and_names_its_run(standin, client):
+    # §2.R, review 3: every case asks a yield above the theoretical, so no
+    # sample runs; the 422 says why and names the run it kept, which was
+    # stored before the refusal and was found nowhere on the screen.
+    above = demo.STANDIN_THEORETICAL * 1.2
+    every = [assume("feed_glucose_conc", 100.0), assume("titre", 45.0), assume("yield", above),
+             assume("productivity", 2.0), *ASSUMED]
+    host = "nobody"  # no record binds: every input is a named person's assumption
+    with pytest.raises(proforma.ScenarioRefused) as e:
+        proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, host=host, assumptions=every, samples=4),
+                     pool=standin)
+    said = str(e.value)
+    [kept] = [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]
+    assert "no sample the flowsheet could hold" in said and kept.id in said
+    assert "yield: 4 of 4" in said and "the base case" in said and "yield" in kept.output["baseInfeasible"]
+    r = client.post("/api/proforma/run", json={"scenarioId": MADE_HERE, "flowsheet": ETHANOL, "host": host, "samples": 4,
+                                               "assumptions": [a.model_dump() for a in every]})
+    assert r.status_code == 422 and kept.id in r.json()["detail"] and "yield: 4 of 4" in r.json()["detail"]
+
+
+def test_an_authored_seed_scenario_is_not_a_scenario_made_here(standin, client):
+    # §2.R, review 4: sc-s1 is the seed's authored casein example; a run of
+    # it on a shelf flowsheet would file an ethanol train under it.
+    for body in ({"scenarioId": "sc-s1", "flowsheet": ETHANOL}, {"scenarioId": "sc-s1"}):
+        with pytest.raises(proforma.ScenarioRefused, match="sc-s1 is an authored scenario"):
+            proforma.run(ProformaRunRequest(**body, assumptions=ASSUMED), pool=standin)
+        r = client.post("/api/proforma/run", json={**body, "assumptions": [a.model_dump() for a in ASSUMED]})
+        assert r.status_code == 422 and "sc-s1 is an authored scenario" in r.json()["detail"]
+        assert "there is no seed scenario sc-s1" not in r.json()["detail"]
+    assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]
+
+
+def test_a_number_that_is_not_finite_and_a_negative_seed_are_refused_in_words(standin, client):
+    # §2.R, review 5: both were a 500 (the infinite assumption reached the
+    # artifact's canonical JSON; the negative seed reached the sampler).
+    for field in ("value", "low", "high"):
+        a = {"key": "plant_scale", "value": 100000.0, "low": 100000.0, "high": 100000.0, "by": BY, "at": "2026-10-20"}
+        a[field] = "INF"
+        body = ('{"scenarioId": "sc-yeast-1", "samples": 4, "assumptions": ['
+                + ", ".join(__import__("json").dumps(x) for x in (a, ASSUMED[1].model_dump()))
+                + "]}").replace('"INF"', "Infinity")
+        r = client.post("/api/proforma/run", content=body, headers={"Content-Type": "application/json"})
+        assert r.status_code == 422 and "plant_scale" in r.json()["detail"] and "finite" in r.json()["detail"], (field, r.text)
+    called = []
+    real = proforma.call
+    proforma.call = lambda op, args: called.append(op) or real(op, args)
+    try:
+        r = client.post("/api/proforma/run", json={"scenarioId": "sc-yeast-1", "seed": -1, "samples": 4,
+                                                   "assumptions": [a.model_dump() for a in ASSUMED]})
+    finally:
+        proforma.call = real
+    assert r.status_code == 422 and "seed" in r.json()["detail"] and called == []
+    assert not [a for a in artifacts.all_artifacts() if a.tool == proforma.RUN]
+
+
+def test_a_host_with_graphviz_draws_its_own_run_of_a_basis_run_without_it(monkeypatch, standin):
+    # §2.R, review 7 and 11: whether the run's diagram is drawn is part of its
+    # basis, so a run made where Graphviz's dot was absent is not the run a
+    # host with dot makes of the same inputs: that host draws its own.
+    monkeypatch.setattr(proforma, "drawn_here", lambda: False)
+    without = proforma.run_reference("corn_drygrind")
+    named = {i.name: i for i in without.inputs}
+    assert named["diagram"].source.kind == "convention" and "not drawn" in str(named["diagram"].value)
+    monkeypatch.setattr(proforma, "drawn_here", lambda: True)
+    drawn = proforma.run_reference("corn_drygrind")
+    assert drawn.id != without.id and {i.name: i for i in drawn.inputs}["diagram"].value == "drawn by Graphviz"
+    assert without.provenance == drawn.provenance == "computed"
+    run_without = {i.name: i for i in proforma.basis_inputs([], None, ETHANOL, 8)}["diagram"]
+    assert run_without.value == "drawn by Graphviz"  # drawn_here is patched to True above

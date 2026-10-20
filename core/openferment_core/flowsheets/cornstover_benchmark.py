@@ -38,10 +38,10 @@ def _settings(tea: Any) -> dict[str, Any]:
 
 # ── its reference run (OF-BLD-019 §2.2) ─────────────────────────────────
 # The same plant through GET/POST /api/proforma/reference/cornstover_benchmark,
-# as one `proforma.reference` artifact with every table. `run()` above stays
-# the benchmark's, unchanged; the reference run builds its own plant afresh,
-# as `cornstover.load()` names it, inside the worker's `package_defaults()`,
-# and leaves the benchmark's cached plant as it was.
+# as one `proforma.reference` artifact with every table. `run()` below stays
+# the benchmark's; both build their plant afresh inside the worker's
+# `package_defaults()` (the benchmark since OF-BLD-019 §2.R), the reference
+# run under the name `cornstover.load()` gives it.
 
 
 def load() -> Any:
@@ -72,9 +72,15 @@ def outputs(br: Any) -> dict[str, Any]:
 
 
 def run() -> dict[str, Any]:
+    """The benchmark: the package's plant built afresh (`load=False`,
+    `save=False`, so the package's own cache neither hands back a plant an
+    earlier call built nor keeps this one), its price solved as the package
+    solves it. The worker calls it inside `package_defaults()`, so the
+    utility prices and cost index the plant sets as it builds go back
+    afterwards (OF-BLD-019 §2.R)."""
     from biorefineries import cornstover as cs
 
-    br = cs.Biorefinery()
+    br = cs.Biorefinery(load=False, save=False)
     tea = br.cornstover_tea
     per_kg = float(tea.solve_price(br.ethanol))
     years = tea.duration

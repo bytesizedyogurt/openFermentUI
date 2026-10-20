@@ -2,7 +2,7 @@
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
   "response": {
     "scenarioId": "sc-pha-1",
-    "artifactId": "5f8f9d1f578313a4",
+    "artifactId": "965796f3dc87a2ff",
     "provenance": "demo",
     "inputs": [
       {
@@ -1353,7 +1353,7 @@
     ],
     "priceBasis": "USD per kg of PHA contained in dried cell mass",
     "evidence": {
-      "id": "5f8f9d1f578313a4",
+      "id": "965796f3dc87a2ff",
       "label": "Minimum selling price, sc-pha-1 (PHA from fermentable sugar, draft v0)",
       "value": 2.1064252809691655,
       "unit": "USD per kg of PHA contained in dried cell mass",
@@ -1364,7 +1364,7 @@
       "provenance": "demo",
       "basis": {
         "tool": "proforma.run",
-        "toolVersion": "shelf run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
+        "toolVersion": "shelf run 2 · biosteam 2.54.0 · biorefineries 2.35.1",
         "inputs": [
           {
             "name": "flowsheet",
@@ -1396,6 +1396,28 @@
               "kind": "model",
               "id": "biorefineries.cornstover@2.35.1",
               "note": "create_tea and create_chemicals; PHB borrows Lignin's volume and heat capacity",
+              "by": null
+            }
+          },
+          {
+            "name": "utility prices and cost index",
+            "value": "biosteam.process_tools.default_utilities() and default_CEPCI()",
+            "unit": "",
+            "source": {
+              "kind": "model",
+              "id": "biosteam@2.54.0",
+              "note": "BioSTEAM's own default prices of electricity and of each heating and cooling agent, and its default plant cost index, set at the start of every case and read back after it, each value the case used (cepci, electricityPrice, and each agent's price and temperature)",
+              "by": null
+            }
+          },
+          {
+            "name": "diagram",
+            "value": "not drawn: Graphviz's dot was not on the path of the host that made this run",
+            "unit": "",
+            "source": {
+              "kind": "convention",
+              "id": null,
+              "note": "D8: the flowsheet diagram is drawn with Graphviz when its dot is on the host's path; the run is the same plant either way, and a host with Graphviz keeps a run of its own",
               "by": null
             }
           },
@@ -1642,7 +1664,7 @@
             }
           }
         ],
-        "artifactId": "5f8f9d1f578313a4",
+        "artifactId": "965796f3dc87a2ff",
         "at": "2026-09-15T09:00:00Z",
         "seed": 0
       },

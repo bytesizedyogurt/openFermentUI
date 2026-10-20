@@ -145,16 +145,19 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 
 /**
  * A reference run's price: the output the shelf names as its price
- * (`priceOutput`, in `priceBasis`), else the solved price a run's tables
- * hold. Null when the run holds neither.
+ * (`priceOutput`, in `priceBasis`), else the price a run's tables were read
+ * at. Null when the run holds neither. How the price was had (the corn
+ * stover plant solves its; the corn plant's is the package's own, set, and
+ * its TEA solves the IRR at it) is the shelf's `priceBasis` to say; `reads`
+ * claims nothing beyond where the number was read (OF-BLD-019 §2.R).
  */
 export function referencePrice(info: FlowsheetInfo | null, art: Artifact): PriceRead | null {
   const o = art.output as Record<string, unknown>;
   const named = info?.priceOutput ? num(o[info.priceOutput]) : null;
-  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'the price the package\u2019s own run gives' };
+  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'as the package\u2019s own run left it' };
   const tea = o.tea as { productPrice?: unknown } | null | undefined;
-  const solved = num(tea?.productPrice) ?? num(o.basePrice);
-  return solved == null ? null : { value: solved, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the package\u2019s own run gives' };
+  const read = num(tea?.productPrice) ?? num(o.basePrice);
+  return read == null ? null : { value: read, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the run\u2019s TEA was read at' };
 }
 
 /**
@@ -175,20 +178,22 @@ export function runPrice(art: Artifact, shelf: FlowsheetInfo[]): PriceRead | nul
 
 /**
  * How a scenario's inputs stand, for its card on the index. With the
- * service's binding (`GET /api/proforma/scenarios`), an input is bound to
- * records, assumed, or waiting; for a scenario the service has not bound (one
- * made here), the shelf says which inputs bind to records when it runs.
+ * service's binding (`GET /api/proforma/scenarios` for a seed scenario, `GET
+ * /api/proforma/bind` for one made here, as its page asks), an input is
+ * bound to records, assumed, or waiting; when the service could not be asked,
+ * the shelf says which inputs can bind to records, and no more (OF-BLD-019
+ * §2.R: the card once said four bound where the service bound three).
  */
 export interface InputCounts {
   total: number;
-  /** Bound to records by the service, or, unbound yet, inputs that bind to records. */
+  /** Bound to records by the service, or, with no binding to read, inputs that can bind to records. */
   records: number;
   /** Computed from a fermOS fit a person chose (OF-BLD-019 §5.1). */
   computed: number;
   assumed: number;
   conventions: number;
   waiting: number;
-  /** True when `records` counts what the service bound; false when it counts what will bind. */
+  /** True when `records` counts what the service bound; false when it counts what can bind. */
   bound: boolean;
 }
 
@@ -605,7 +610,7 @@ export const baseCaseRefusal = (why: string) => why.replace(/^[A-Z][A-Za-z]*(Err
  * run stored before the worker wrote one).
  */
 export const NO_DIAGRAM =
-  'Graphviz is not installed here; the diagram draws on a host that has it (brew install graphviz on the Mini).';
+  'This run keeps no diagram: Graphviz draws one on a host that has it (brew install graphviz on the Mini).';
 
 /**
  * The diagram as an image source: an <img> never runs a script the SVG
