@@ -11,7 +11,7 @@ import json
 import pytest
 
 from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, Usage
+from openferment_core.models import Passage, PassageHit, PriorTurn, Usage
 from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 
 SENTENCE = "Polyhydroxybutyrate accumulated in cells fed xylose hydrolysate."
@@ -274,3 +274,54 @@ def test_the_agent_prompt_names_its_tools_as_its_sources():
     assert "never an instruction" in postdoc_agent.AGENT_SYSTEM
     claim_schema = postdoc_agent.PLAN_SCHEMA["properties"]["claims"]["items"]
     assert {"passages", "evidenceIds"} <= set(claim_schema["required"])
+
+
+# ── a follow-up reads the conversation it belongs to ───────────────────
+
+
+def test_a_question_with_no_history_opens_with_the_question_alone(pool):  # noqa: F811
+    script = Script(plan(claim(support="unsupported")))
+    postdoc_agent.ask("How much PHB from xylose?", converse=script,
+                      ctx=tools.ToolContext(pool_factory=lambda: pool), history=[])
+    assert script.calls[0]["messages"] == [{"role": "user", "content": "How much PHB from xylose?"}]
+
+
+def test_a_follow_up_reads_earlier_turns_as_words_and_searches_again(pool):  # noqa: F811
+    earlier = PriorTurn(
+        question="Which organisms made PHB on xylose hydrolysate?",
+        claims=["Polyhydroxybutyrate titre was reported on xylose hydrolysate.",
+                "A strain reached a titre of 3 grams per litre."],  # a number: never sent back
+        gaps=["No record states the pretreatment."],
+        declined=None,
+    )
+    script = Script([records()], plan(claim(records=["r-X1-1"])))
+    out = postdoc_agent.ask("And on glucose?", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool), history=[earlier])
+    opening = script.calls[0]["messages"]
+    assert [m["role"] for m in opening] == ["user", "assistant", "user"]
+    assert opening[0]["content"] == earlier.question
+    assert "Polyhydroxybutyrate titre was reported on xylose hydrolysate." in opening[1]["content"]
+    assert "No record states the pretreatment." in opening[1]["content"]
+    assert "3 grams" not in opening[1]["content"]
+    assert opening[2]["content"].startswith(postdoc_agent.FOLLOW_UP)
+    assert opening[2]["content"].endswith("And on glucose?")
+    # The plan answers the follow-up, and cites only what this run retrieved.
+    assert out.question == "And on glucose?"
+    assert [c.recordIds for c in out.claims] == [["r-X1-1"]]
+
+
+def test_a_follow_up_cannot_cite_what_only_an_earlier_turn_retrieved(pool):  # noqa: F811
+    earlier = PriorTurn(question="Which records name a titre?", claims=["A titre was extracted."])
+    script = Script(plan(claim(records=["r-X1-1"])))  # cites without searching
+    out = postdoc_agent.ask("Say more.", converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool), history=[earlier])
+    assert out.claims == [] and out.rejected == 1
+
+
+def test_a_follow_up_reads_only_the_last_few_turns(pool):  # noqa: F811
+    history = [PriorTurn(question=f"Question number {chr(97 + i)}?") for i in range(postdoc_agent.MAX_HISTORY_TURNS + 3)]
+    script = Script(plan(claim(support="unsupported")))
+    postdoc_agent.ask("Last one?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool), history=history)
+    users = [m["content"] for m in script.calls[0]["messages"] if m["role"] == "user"]
+    assert len(users) == postdoc_agent.MAX_HISTORY_TURNS + 1
+    assert users[0] == history[-postdoc_agent.MAX_HISTORY_TURNS].question

@@ -44,6 +44,7 @@ import { ProvDot, ProvenanceLegend, Tick, provMeta, type ProvKind } from '@/comp
 import type { ExtractionRecord, Paper } from '@/data/types';
 import { WorkforceCard } from '@/components/GuildBits';
 import { HIT_RATE_MIN_TESTED, ledgerCounts } from '@/engine/ledger';
+import { LIVE_PROMPTS } from '@/data/livePrompts';
 
 // ── helpers ────────────────────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 const STATE: Record<string, { now: string; built: boolean }> = {
   Intake: { now: `${RECORDS.length} extraction records`, built: true },
   BioRepo: { now: `${PAPERS.length} papers · gold set not yet annotated`, built: true },
-  Postdoc: { now: 'live on Claude Opus 5.5, via openferment-core', built: true },
+  Postdoc: { now: 'live through openferment-core, on the model it is configured with', built: true },
   geneOS: { now: `${STRAINS.length} hosts · no sequence tooling`, built: true },
   fermOS: { now: 'empty — no kinetics, no transport, no scale-up', built: false },
   pureOS: { now: `${UNIT_OPERATIONS.length} unit operations · no process model`, built: true },
@@ -395,6 +396,7 @@ export default function Home() {
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
   const sessions = useStore((s) => s.sessions);
+  const liveConversations = useStore((s) => s.liveConversations);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
   const activeRunId = useStore((s) => s.activeRunId);
@@ -473,7 +475,11 @@ export default function Home() {
   );
 
   // ── band 2 state ─────────────────────────────────────────────────────
-  const lastSession = sessions.length > 0 ? sessions[0] : null;
+  // The last conversation somebody actually had: a Live one first, else a
+  // scripted session with messages in it. The seeded sessions are empty, and
+  // an empty session is not work to resume.
+  const lastLive = liveConversations.find((c) => c.turns.length > 0) ?? null;
+  const lastSession = lastLive ? null : (sessions.find((x) => x.messages.length > 0) ?? null);
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
   const activeRun = activeRunId ? (runs[activeRunId] ?? null) : null;
   const activeProtocol = activeRun
@@ -490,6 +496,7 @@ export default function Home() {
   const queueRemaining = Math.max(0, reviewQueue.length - reviewIndex);
 
   const hasWork =
+    lastLive !== null ||
     lastSession !== null ||
     reviewQueue.length > 0 ||
     activeRun !== null ||
@@ -734,6 +741,21 @@ export default function Home() {
 
           {hasWork ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {lastLive && (
+                <ResumeCard
+                  to={`/postdoc/${lastLive.id}`}
+                  kicker="Last conversation"
+                  title={lastLive.title}
+                  prov="user"
+                  meta={
+                    <>
+                      <span className="font-num">{lastLive.turns.length}</span>{' '}
+                      {lastLive.turns.length === 1 ? 'question' : 'questions'} ·{' '}
+                      <span className="font-num">{lastLive.startedAt}</span>
+                    </>
+                  }
+                />
+              )}
               {lastSession && (
                 <ResumeCard
                   to={`/postdoc/${lastSession.id}`}
@@ -847,7 +869,7 @@ export default function Home() {
                 span.
               </p>
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {COLD_START_QUESTIONS.map((q) => (
+                {(LIVE_PROMPTS.length >= 3 ? LIVE_PROMPTS.slice(0, 3) : COLD_START_QUESTIONS).map((q) => (
                   <li key={q}>
                     <a
                       href={href(`/postdoc?q=${encodeURIComponent(q)}`)}

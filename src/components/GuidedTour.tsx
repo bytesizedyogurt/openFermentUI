@@ -33,7 +33,7 @@ const STOPS: Stop[] = [
     body: 'Postdoc is the thing you talk to. Its plan, tool calls, and retrieved passages are first-class UI — collapsed by default, never hidden. Every number in an answer carries a citation chip that resolves to a source span in two interactions.',
   },
   {
-    route: '/biorepo/paper/SP-002',
+    route: '/biorepo/paper/B5',
     surface: 'BioRepo',
     title: 'Evidence in context',
     body: 'BioRepo is the corpus and everything retrieved from it. A chip’s promise is kept here: the span is highlighted in the source, and the right rail lists every extraction anchored to this paper. Hovering either side previews the other; clicking commits the scroll.',
@@ -54,7 +54,7 @@ const STOPS: Stop[] = [
     route: '/biorepo/witness',
     surface: 'BioRepo · Witness',
     title: 'How we know, and how we’re honest when we’re wrong',
-    body: 'Witness asks whether it reproduces. No extractor has been run against this corpus, so this screen shows no precision, recall or F1 — it shows the gold-set plan those numbers would be earned against, the six cases chosen to be hard, and the real values the ontology has no field for. Refusing to display a metric it has not earned is the point of the screen.',
+    body: 'Witness asks whether it reproduces. It scores the extractor\'s run against the curated records on the papers the service fetched, labels each figure provisional with the records it stands on, and lists the real values the ontology has no field for. A metric it has not earned is not displayed: with no run, it shows the gold-set plan instead.',
   },
 ];
 

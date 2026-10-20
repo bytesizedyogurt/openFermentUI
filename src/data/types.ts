@@ -1341,6 +1341,54 @@ export interface AnswerPlan {
   runbookDraft?: RunbookDraft | null;
 }
 
+/**
+ * One earlier turn sent with a follow-up (models.py PriorTurn): the question
+ * and the plan's words. No id, value or quote travels; the follow-up's own
+ * tools find whatever it cites.
+ */
+export interface PriorTurn {
+  question: string;
+  claims: string[];
+  gaps: string[];
+  declined: string | null;
+}
+
+/** What the browser posts to /api/ask and /api/ask/stream (models.py AskRequest). */
+export interface AskRequest {
+  question: string;
+  maxEvidence: number;
+  mode: 'agent' | 'single';
+  /** The conversation's earlier turns, oldest first. */
+  history: PriorTurn[];
+}
+
+/**
+ * One question asked in Live mode, and what came back: the steps as they
+ * arrived, then the plan or the failure in words. Kept in its conversation,
+ * so a follow-up reads it, and a citation followed and returned from, or a
+ * reload, finds it where it was.
+ */
+export interface LiveTurn {
+  id: string;
+  question: string;
+  askedAt: string;
+  steps: TraceStep[];
+  plan: AnswerPlan | null;
+  error: { message: string; remedy: string } | null;
+  /** `running` until the plan or the failure arrives. A turn a reload cut short reads `interrupted`. */
+  status: 'running' | 'answered' | 'failed' | 'stopped' | 'interrupted';
+  /** Set when the stream replayed a recording rather than running (OF-BLD-014 §10.3). */
+  replay?: { recordedAt: string; standIn: boolean } | null;
+}
+
+/** A Live-mode conversation: its turns, oldest first. Durable. */
+export interface LiveConversation {
+  id: string;
+  title: string;
+  startedAt: string;
+  turns: LiveTurn[];
+}
+
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
 //
 // Mirrors of the Pydantic models in core/openferment_core/models.py; `pnpm

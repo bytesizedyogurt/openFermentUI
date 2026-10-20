@@ -162,6 +162,19 @@ def weakest_provenance(provenances: list[str]) -> str:
     return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "demo"
 
 
+class PriorTurn(BaseModel):
+    """One earlier turn of the conversation a follow-up belongs to, in words:
+    the question as the person asked it, and the claims' text, the gaps and
+    the decline of the plan that answered it. The validator already held each
+    of these to Rule 1; the loop drops any that still holds a number. No id,
+    value or quote travels: a follow-up searches again before it cites."""
+
+    question: str
+    claims: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    declined: str | None = None
+
+
 class AskRequest(BaseModel):
     question: str
     # §6 caps evidence at 30 records. A caller asking for more is clamped rather
@@ -170,6 +183,9 @@ class AskRequest(BaseModel):
     # OF-BLD-014 §5.3: `agent` is the bounded loop (postdoc_agent.py), the
     # default; `single` is one retrieval and one call (postdoc.py).
     mode: Literal["agent", "single"] = "agent"
+    # The earlier turns of the same conversation, oldest first. The agent
+    # reads the last few as context; `single` mode ignores them.
+    history: list[PriorTurn] = Field(default_factory=list)
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────

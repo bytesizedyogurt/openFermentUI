@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from openferment_core import llm, postdoc_agent, retrieve, tools
-from openferment_core.models import Passage, PassageHit, ToolResult, Usage
+from openferment_core.models import Passage, PassageHit, PriorTurn, ToolResult, Usage
 from openferment_core.validate import SeenSet, validate_plan
 from test_postdoc_agent import SENTENCE, Script, claim, papers, passages_found, plan, records  # noqa: F401
 from test_tools import pool  # noqa: F401
@@ -97,8 +97,9 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
 
     seen = {}
 
-    def fake(question, on_step=None, cancelled=None):
+    def fake(question, on_step=None, cancelled=None, history=None):
         seen["cancelled"] = cancelled
+        seen["history"] = history
         on_step(postdoc_agent.TraceStep(n=1, kind="tool", tool="t", input={}, summary="s", ms=0, ok=True))
         import time
         for _ in range(200):
@@ -108,10 +109,13 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
         return postdoc_agent.AnswerPlan(question=question)
 
     monkeypatch.setattr(api, "_ask_agent", fake)
-    body = api._stream_events(api.AskRequest(question="q?"))
+    earlier = PriorTurn(question="Which strains?", claims=["A strain was named."])
+    body = api._stream_events(api.AskRequest(question="q?", history=[earlier]))
     assert next(body).startswith("event: step")
     body.close()
     assert seen["cancelled"]() is True
+    # A follow-up's earlier turns reach the loop as the browser sent them.
+    assert seen["history"] == [earlier]
 
 
 # R5 — a question no model answered says so in its trace.

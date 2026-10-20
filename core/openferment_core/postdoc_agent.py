@@ -25,6 +25,11 @@ Every claim the model writes is held to `validate_plan`: no number in its
 text, nothing cited that no tool returned in this run, every quote verbatim
 in its passage. Text inside a tool result is evidence to weigh; an
 instruction found there changes nothing the validator lets through.
+
+A FOLLOW-UP opens with the conversation's last few turns as words (`_opening`):
+each earlier question, then that plan's claims, gaps and decline as code
+writes them. No id, value or quote from an earlier turn is carried, and
+`seen` starts empty, so whatever the follow-up cites, its own tools returned.
 """
 from __future__ import annotations
 
@@ -36,7 +41,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import llm, spend, tools
-from .models import AnswerPlan, RunbookDraft, ToolResult, TraceStep, Usage
+from .models import AnswerPlan, PriorTurn, RunbookDraft, ToolResult, TraceStep, Usage
 from .postdoc import MAX_TOKENS, SYSTEM as SINGLE_SYSTEM, TOOL as SINGLE_TOOL
 from .validate import SeenSet, decline_reason, find_number, validate_plan
 
@@ -46,6 +51,16 @@ log = logging.getLogger("openferment.postdoc_agent")
 MAX_ROUNDS = 6
 MAX_TOOL_CALLS = 12
 MAX_SECONDS = 180.0
+# How much of a conversation a follow-up reads: its last few turns, each cut
+# to a length, so a long conversation costs what a short one does.
+MAX_HISTORY_TURNS = 4
+MAX_TURN_CHARS = 2000
+
+FOLLOW_UP = (
+    "This question follows the earlier turns above. They say what the conversation is about; "
+    "their evidence is not in hand now. Search again before you cite anything, and cite only ids "
+    "your tools return for this question."
+)
 
 _SOURCES_SINGLE = (
     "You may only make claims supported by the evidence records you are given. You have no other sources. "
@@ -115,6 +130,42 @@ class Cancelled(Exception):
     """Nobody waits for the answer any more (the stream's reader left)."""
 
 
+def _earlier_answer(turn: PriorTurn) -> str:
+    """An earlier plan in words, written by code. A line that holds a number
+    is left out: the validator already dropped such claims, and a decline or
+    a question's echo is not let through either."""
+    lines: list[str] = []
+    claims = [c.strip() for c in turn.claims if c.strip() and not find_number(c)]
+    gaps = [g.strip() for g in turn.gaps if g.strip() and not find_number(g)]
+    if turn.declined and turn.declined.strip() and not find_number(turn.declined):
+        lines.append(f"I declined: {turn.declined.strip()}")
+    if claims:
+        lines.append("My earlier answer, as claims without their evidence:")
+        lines.extend(f"- {c}" for c in claims)
+    if gaps:
+        lines.append("What the corpus did not have:")
+        lines.extend(f"- {g}" for g in gaps)
+    text = "\n".join(lines) or "No answer came back."
+    return text if len(text) <= MAX_TURN_CHARS else text[: MAX_TURN_CHARS - 1].rstrip() + "…"
+
+
+def _opening(question: str, history: list[PriorTurn]) -> list[dict[str, Any]]:
+    """The conversation a question opens: the last few earlier turns as user
+    and assistant text, then the question. With no history, the question
+    alone, exactly as before."""
+    messages: list[dict[str, Any]] = []
+    for turn in history[-MAX_HISTORY_TURNS:]:
+        asked = turn.question.strip()
+        if not asked:
+            continue
+        messages.append({"role": "user", "content": asked[:MAX_TURN_CHARS]})
+        messages.append({"role": "assistant", "content": _earlier_answer(turn)})
+    if not messages:
+        return [{"role": "user", "content": question}]
+    messages.append({"role": "user", "content": f"{FOLLOW_UP}\n\n{question}"})
+    return messages
+
+
 @dataclass
 class _Run:
     question: str
@@ -129,6 +180,7 @@ class _Run:
     cache: dict[str, ToolResult] = field(default_factory=dict)
     draft: RunbookDraft | None = None
     cancelled: Callable[[], bool] = lambda: False
+    history: list[PriorTurn] = field(default_factory=list)
 
     def step(self, **kw: Any) -> TraceStep:
         s = TraceStep(n=len(self.trace) + 1, **kw)
@@ -210,7 +262,7 @@ STOP_WORDS = {
 def _attempt(run: _Run, model: str, budget_usd: float) -> tuple[llm.Turn, str]:
     """One conversation on one model. Returns the answering turn and why the
     loop stopped. Raises what `converse` raises."""
-    messages: list[dict[str, Any]] = [{"role": "user", "content": run.question}]
+    messages = _opening(run.question, run.history)
     defs = _tool_defs()
     rounds = 0
     while True:
@@ -254,14 +306,18 @@ def ask(
     clock: Callable[[], float] = time.monotonic,
     on_step: Callable[[TraceStep], None] | None = None,
     cancelled: Callable[[], bool] | None = None,
+    history: list[PriorTurn] | None = None,
 ) -> AnswerPlan:
     """One question through the loop. Every failure is a plan with `declined`
-    set, as in the single-shot path."""
+    set, as in the single-shot path. `history` is the conversation's earlier
+    turns, oldest first; a restart reads them too, since they are part of
+    what the question means."""
     question = question.strip()
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     ctx = ctx or tools.ToolContext()
-    run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock())
+    run = _Run(question=question, ctx=ctx, converse=converse or llm.converse, clock=clock, started=clock(),
+               history=list(history or []))
     if cancelled is not None:
         run.cancelled = cancelled
     if on_step is not None:

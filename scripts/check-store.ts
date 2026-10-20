@@ -371,5 +371,32 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
     !!back && back.lockHash === hash && lockIntact(back) && Object.isFrozen(back.predictions) && st().adoptedRunbookIds.includes(id));
 }
 
+// Postdoc's Live conversations are Durable: a question, its steps and its
+// plan survive a reload; a turn the reload cut short says so; one this page
+// started since loading is kept beside the saved ones; a reset clears them.
+{
+  const st = () => useStore.getState();
+  const id = st().startLiveConversation('What growth rate does CEN.PK113-7D reach?');
+  const turn = (tid: string, status: 'answered' | 'running') => ({
+    id: tid, question: 'What growth rate does CEN.PK113-7D reach?', askedAt: '2026-10-20 09:00',
+    steps: [], plan: null, error: null, status, replay: null,
+  });
+  st().addLiveTurn(id, turn('lt-a', 'answered'));
+  st().addLiveTurn(id, turn('lt-b', 'running'));
+  st().patchLiveTurn(id, 'lt-a', { step: { n: 1, kind: 'tool', tool: 'search_records', input: { query: 'growth rate' }, summary: 'Looked up records of growth rate · 0 records', ms: 3, ok: true } });
+  const snap = snapshotOf(st());
+  check('the snapshot carries the conversation and its steps',
+    snap.liveConversations?.find((c) => c.id === id)?.turns.find((t) => t.id === 'lt-a')?.steps.length === 1);
+  const fresh = st().startLiveConversation('Asked after the page loaded');
+  useStore.setState((s) => ({ liveConversations: s.liveConversations.filter((c) => c.id !== id) }));
+  st().applyDurable(snap);
+  const back = st().liveConversations.find((c) => c.id === id);
+  check('after a reload the conversation is back with both turns', back?.turns.map((t) => t.id).join() === 'lt-a,lt-b');
+  check('a turn the reload cut short reads interrupted', back?.turns.find((t) => t.id === 'lt-b')?.status === 'interrupted');
+  check('a conversation started since the page loaded is kept, first', st().liveConversations[0]?.id === fresh);
+  st().resetDemo();
+  check('Reset demo data clears the conversations', st().liveConversations.length === 0);
+}
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

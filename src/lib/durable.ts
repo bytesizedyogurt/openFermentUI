@@ -12,8 +12,8 @@
 //   Reference  papers, protocols, products, vocabulary — never mutated, so
 //              there is nothing to persist. Reloading gets them from source.
 //   Durable    depositions, review decisions, runbook locks, this browser's
-//              copy of Guild's ledger, and the lessons finished here — must
-//              survive.
+//              copy of Guild's ledger, the lessons finished here, and
+//              Postdoc's Live conversations — must survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -27,7 +27,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -126,6 +126,12 @@ export interface DurableSnapshot {
    * lock on one is kept in `runbookLocks`, like a seeded runbook's.
    */
   adoptedRunbooks?: Runbook[];
+  /**
+   * Postdoc's Live conversations, newest first: each question, the steps the
+   * loop took, and the plan or the failure that came back. Optional for the
+   * same reason as `guild`.
+   */
+  liveConversations?: LiveConversation[];
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {
