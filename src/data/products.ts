@@ -1551,6 +1551,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'beta-lactoglobulin',
+    program: 'casein',
     name: 'Beta-lactoglobulin',
     aliases: ['BLG'],
     category: 'food_protein',
@@ -2813,6 +2814,7 @@ export const PRODUCTS: Product[] = [
   // proteins and small molecules above, so it opens its own process family.
   {
     id: 'phb',
+    program: 'pha',
     name: 'Polyhydroxybutyrate (PHB)',
     aliases: ['PHB', 'P3HB', 'poly(3-hydroxybutyrate)'],
     category: 'biopolymer',
@@ -2832,6 +2834,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'mcl-pha',
+    program: 'pha',
     name: 'Medium-chain-length PHA',
     aliases: ['mcl-PHA', 'PHA (mcl)'],
     category: 'biopolymer',

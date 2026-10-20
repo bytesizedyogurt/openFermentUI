@@ -26,7 +26,8 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
-import { mergeAssumptions, snapshotOf, useStore } from '../src/store';
+import { mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
+import { RECORDS } from '../src/data/records';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
 import type { Candidate, Overlay } from '../src/data/types';
@@ -396,6 +397,27 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('a conversation started since the page loaded is kept, first', st().liveConversations[0]?.id === fresh);
   st().resetDemo();
   check('Reset demo data clears the conversations', st().liveConversations.length === 0);
+}
+
+// OF-BLD-016 §2.1 — whether archived programs show is Durable: the switch
+// survives a reload, a snapshot from before programs existed leaves it where
+// it is, and it starts off. The selector every screen calls answers from it.
+{
+  const st = () => useStore.getState();
+  check('archived programs start hidden', st().showArchived === false && !programVisible('paper', 'P1', st()) && programVisible('paper', 'Q1', st()));
+  st().setShowArchived(true);
+  const snap = snapshotOf(st());
+  check('the snapshot carries the switch', snap.showArchived === true, snap.showArchived);
+  st().setShowArchived(false);
+  st().applyDurable(snap);
+  check('after a reload the switch is back on, and an archived paper shows', st().showArchived === true && programVisible('paper', 'P1', st()));
+  st().setShowArchived(false);
+  const { showArchived: _dropped, ...older } = snapshotOf(st());
+  st().applyDurable(older);
+  check('a snapshot from before programs leaves the switch where it is', st().showArchived === false);
+  check('a general entity shows with the switch off', programVisible('strain', 's-cerevisiae', st()));
+  check('an archived strain does not', !programVisible('strain', 'c-necator-h16', st()));
+  check('a record shows as its paper does', programOf('record', RECORDS.find((r) => r.paperId.startsWith('H'))!.id, st()) === 'casein');
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

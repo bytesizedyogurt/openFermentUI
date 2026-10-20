@@ -187,6 +187,8 @@ const PAIRS = [
   // A follow-up carries its conversation's earlier turns in words.
   ['PriorTurn', 'PriorTurn'],
   ['AskRequest', 'AskRequest'],
+  // OF-BLD-016 §2.1 — a program is data.
+  ['Program', 'Program'],
 ];
 
 let compared = 0;

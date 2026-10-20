@@ -2,6 +2,7 @@
 // provenance-affecting changes fan out to derived views in one place.
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5);
 // what must survive a reload goes to the Durable tier (src/lib/durable.ts).
+import { useCallback } from 'react';
 import { create } from 'zustand';
 import type {
   InputAssumption,
@@ -52,6 +53,8 @@ import type {
   CheckNote,
   CheckResult,
   Checks,
+  Program,
+  ProgramId,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -62,6 +65,7 @@ import { RUNBOOKS } from '@/data/runbooks';
 import { PROTOCOLS } from '@/data/protocols';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
+import { PROGRAMS, PROGRAM_BY_ID, isArchived, programOfPaperId } from '@/data/programs';
 import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
@@ -512,6 +516,15 @@ export interface OFState {
   reviewer: string;
   setReviewerName: (name: string) => void;
   /**
+   * Whether archived programs show (OF-BLD-016 §2.1, E.1′). Off by default:
+   * casein and PHA leave every list, count, prompt and evidence pool until a
+   * person turns this on in Settings → Programs. Durable, like the reviewer's
+   * name: a choice about what to see should survive a reload. Screens read
+   * it through `useProgramFilter()` / `programVisible`, never directly.
+   */
+  showArchived: boolean;
+  setShowArchived: (on: boolean) => void;
+  /**
    * The review decisions the Durable tier restored, with the snapshot's
    * savedAt — kept so a server decision for the same record can be compared
    * against them: the later of the two wins (OF-BLD-012 §7.3).
@@ -842,6 +855,11 @@ export const useStore = create<OFState>()((set, get) => ({
 
   reviewer: '',
   setReviewerName: (name) => set({ reviewer: name }),
+
+  // Outside seedState: a reset discards the session's work, not what the
+  // person chose to see.
+  showArchived: false,
+  setShowArchived: (on) => set({ showArchived: on }),
 
   guild: EMPTY_GUILD,
   guildPending: [] as string[],
@@ -2521,6 +2539,9 @@ export const useStore = create<OFState>()((set, get) => ({
         // Older snapshots predate the field; an unnamed reviewer is the
         // same as one who has not said yet (OF-BLD-012.1 F2).
         reviewer: snap.reviewerName ?? '',
+        // OF-BLD-016 §2.1 — older snapshots predate the switch; the current
+        // position (off unless changed since load) stands.
+        showArchived: snap.showArchived ?? s.showArchived,
         // OF-BLD-013 §1.3 — the ledger as this browser last held it, and what
         // it still owes the service. Older snapshots predate the field.
         guild: snap.guild?.ledger ?? s.guild,
@@ -3572,6 +3593,7 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     reviewDecisions,
     runbookLocks,
     reviewerName: s.reviewer,
+    showArchived: s.showArchived,
     guild: {
       ledger: s.guild,
       pending: s.guildPending,
@@ -3612,6 +3634,7 @@ if (durableAvailable()) {
       s.runbooks === prev.runbooks &&
       s.measuredEvidence === prev.measuredEvidence &&
       s.reviewer === prev.reviewer &&
+      s.showArchived === prev.showArchived &&
       s.guild === prev.guild &&
       s.guildPending === prev.guildPending &&
       s.guildPendingWithdrawals === prev.guildPendingWithdrawals &&
@@ -3626,6 +3649,155 @@ if (durableAvailable()) {
   });
   // A tab closing mid-run must not lose the last few hundred milliseconds.
   window.addEventListener('pagehide', flushDurable);
+}
+
+// ── programs (OF-BLD-016 §2.1, E.1′) ───────────────────────────────────
+//
+// One question, asked one way: which program does this entity belong to, and
+// does it show? Every list a screen renders, every count on Home and every
+// suggested prompt filters through `programVisible` (or the hook below); no
+// screen reads `showArchived` or a `program` field itself. The service asks
+// the same of corpus.json and modules.json through `programs.py`.
+
+/** What `programOf` can be asked about. */
+export type ProgramEntityKind =
+  | 'paper'
+  | 'record'
+  | 'strain'
+  | 'product'
+  | 'scenario'
+  | 'protocol'
+  | 'runbook'
+  | 'module'
+  | 'lesson'
+  | 'deposition';
+
+/**
+ * The lists `programOf` reads, from the store's state or any part of it.
+ * Each falls back to the seed when absent, so a check script or the corpus
+ * export can ask with no store at all. `records` and `runbooks` are worth
+ * passing from the store: the first holds the extractor's candidates, the
+ * second the runbooks adopted from a draft. `depositions` exist nowhere else.
+ */
+export type ProgramLookup = Partial<
+  Pick<OFState, 'records' | 'strains' | 'products' | 'scenarios' | 'protocols' | 'runbooks' | 'modules' | 'depositions'>
+>;
+
+const idIndexes = new WeakMap<readonly { id: string }[], Map<string, { id: string }>>();
+/** An id → entity map per list, built once per list identity. */
+function indexById<T extends { id: string }>(list: readonly T[]): Map<string, T> {
+  let m = idIndexes.get(list) as Map<string, T> | undefined;
+  if (!m) {
+    m = new Map(list.map((x) => [x.id, x]));
+    idIndexes.set(list, m);
+  }
+  return m;
+}
+
+const lessonIndexes = new WeakMap<readonly LearnModule[], Map<string, { lesson: ProgramId | undefined; module: ProgramId | undefined }>>();
+function lessonIndex(modules: readonly LearnModule[]) {
+  let m = lessonIndexes.get(modules);
+  if (!m) {
+    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, { lesson: l.program, module: mod.program }] as const)));
+    lessonIndexes.set(modules, m);
+  }
+  return m;
+}
+
+/** The programs that show by default: those whose status is active. */
+export function activePrograms(): Program[] {
+  return PROGRAMS.filter((p) => p.status === 'active');
+}
+
+/**
+ * The program an entity belongs to, or null when it is general (and always
+ * shows) or unknown.
+ *
+ *   paper       by its thread letter ('P12' → 'pha')
+ *   record      by the paper it cites, candidates included
+ *   strain, product, scenario, protocol, module
+ *               by the entry's own `program` field
+ *   lesson      its own field, else its module's
+ *   runbook     its own field, else the product it names, else the strain
+ *   deposition  the runbook it follows, else its protocol
+ */
+export function programOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): ProgramId | null {
+  switch (kind) {
+    case 'paper':
+      return programOfPaperId(id);
+    case 'record': {
+      const r = indexById(s.records ?? RECORDS).get(id) ?? indexById(RECORDS).get(id);
+      return r ? programOfPaperId(r.paperId) : null;
+    }
+    case 'strain':
+      return indexById(s.strains ?? STRAINS).get(id)?.program ?? null;
+    case 'product':
+      return indexById(s.products ?? PRODUCTS).get(id)?.program ?? null;
+    case 'scenario':
+      return indexById(s.scenarios ?? SCENARIOS).get(id)?.program ?? null;
+    case 'protocol':
+      return indexById(s.protocols ?? PROTOCOLS).get(id)?.program ?? null;
+    case 'module':
+      return indexById(s.modules ?? MODULES).get(id)?.program ?? null;
+    case 'lesson': {
+      const l = lessonIndex(s.modules ?? MODULES).get(id);
+      return l?.lesson ?? l?.module ?? null;
+    }
+    case 'runbook': {
+      const rb = indexById(s.runbooks ?? RUNBOOKS).get(id);
+      if (!rb) return null;
+      return (
+        rb.program ??
+        (rb.productId ? programOf('product', rb.productId, s) : null) ??
+        (rb.strainId ? programOf('strain', rb.strainId, s) : null)
+      );
+    }
+    case 'deposition': {
+      const d = indexById(s.depositions ?? []).get(id);
+      if (!d) return null;
+      return programOf('runbook', d.runbookId, s) ?? programOf('protocol', d.protocolId, s);
+    }
+  }
+}
+
+/**
+ * Whether an entity shows: it is general, its program is active, or the
+ * person has turned archived programs on. The one selector every screen
+ * calls (through `useProgramFilter` in a component).
+ */
+export function programVisible(
+  kind: ProgramEntityKind,
+  id: string,
+  s: ProgramLookup & Pick<OFState, 'showArchived'>,
+): boolean {
+  return s.showArchived || !isArchived(programOf(kind, id, s));
+}
+
+/** The archived program an entity belongs to, or null — what ArchivedBanner names. */
+export function archivedProgramOf(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): Program | null {
+  const p = programOf(kind, id, s);
+  return p && isArchived(p) ? PROGRAM_BY_ID[p] : null;
+}
+
+/**
+ * `programVisible` bound to the store, for a component: call it once per
+ * render and filter with the predicate it returns —
+ *
+ *   const shows = useProgramFilter();
+ *   const papers = allPapers.filter((p) => shows('paper', p.id));
+ *
+ * It re-renders the component when the switch moves, a candidate arrives,
+ * a runbook is adopted or a deposition starts.
+ */
+export function useProgramFilter(): (kind: ProgramEntityKind, id: string) => boolean {
+  const showArchived = useStore((s) => s.showArchived);
+  const records = useStore((s) => s.records);
+  const runbooks = useStore((s) => s.runbooks);
+  const depositions = useStore((s) => s.depositions);
+  return useCallback(
+    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { showArchived, records, runbooks, depositions }),
+    [showArchived, records, runbooks, depositions],
+  );
 }
 
 // ── derived selectors ──────────────────────────────────────────────────

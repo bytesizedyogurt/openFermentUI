@@ -330,6 +330,24 @@ class AskRequest(BaseModel):
     history: list[PriorTurn] = Field(default_factory=list)
 
 
+# ── Programs (OF-BLD-016 §2.1, E.1′, E.2′) ──────────────────────────────
+#
+# A program is data: the corpus threads that are its papers, a name, and
+# whether it is active or archived. Declared in src/data/programs.ts and
+# written into corpus.json and modules.json by `pnpm export:corpus`;
+# `programs.py` reads them. Mirrors `Program` in src/data/types.ts.
+
+ProgramStatus = Literal["active", "archived"]
+
+
+class Program(BaseModel):
+    id: str
+    name: str
+    letters: list[str]
+    status: ProgramStatus
+    summary: str
+
+
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
 #
 # Mirrored in src/data/types.ts and named in scripts/check-plan.mjs PAIRS, like

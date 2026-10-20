@@ -159,6 +159,7 @@ export const BIOSTEAM_FLOWSHEETS = ['pha_sugar_v0'];
 export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s1',
+    program: 'casein',
     modelId: 'S1',
     kind: 'authored',
     name: 'cw15 intracellular β-casein',
@@ -191,6 +192,7 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'sc-s2',
+    program: 'casein',
     modelId: 'S2',
     kind: 'authored',
     name: 'K. phaffii secreted comparator',
@@ -215,6 +217,7 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 'sc-s3',
+    program: 'casein',
     modelId: 'S3',
     kind: 'authored',
     name: 'Conventional β-casein from milk',
@@ -240,6 +243,7 @@ export const SCENARIOS: Scenario[] = [
   // assumptions of its own.
   {
     id: 'sc-pha-1',
+    program: 'pha',
     modelId: 'pha_sugar_v0',
     kind: 'biosteam',
     name: 'PHA from cellulosic sugar — draft flowsheet',

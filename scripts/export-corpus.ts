@@ -23,7 +23,8 @@ import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
 import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
-import { provenanceOf } from '../src/store';
+import { programOf, provenanceOf } from '../src/store';
+import { PROGRAMS } from '../src/data/programs';
 import { SKILLS } from '../src/data/skills';
 import { MODULES } from '../src/data/learn';
 import { PROTOCOLS } from '../src/data/protocols';
@@ -239,10 +240,18 @@ const carbonSources = CARBON_SOURCES;
 const products = PRODUCTS.map((p) => ({ id: p.id, name: p.name }));
 const strains = STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim() }));
 
+/**
+ * The programs (OF-BLD-016 §2.1, E.2′), verbatim from src/data/programs.ts:
+ * which thread letters are whose, and which are archived. A paper's program
+ * is its thread letter's and a record's is its paper's, so neither carries a
+ * copy; `programs.py` resolves both from this list.
+ */
+const programs = PROGRAMS.map((p) => ({ id: p.id, name: p.name, letters: p.letters, status: p.status, summary: p.summary }));
+
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(
   OUT,
-  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources, products, strains }, null, 2) + '\n',
+  JSON.stringify({ papers, records, ontology, units, strainAliases, carbonSources, products, strains, programs }, null, 2) + '\n',
 );
 
 /**
@@ -294,6 +303,9 @@ writeFileSync(join(dirname(OUT), 'skills.json'), JSON.stringify(guildProjection,
  * in the module.
  */
 const modulesProjection = {
+  // OF-BLD-016 §2.1 — the same programs as corpus.json, and on every row
+  // below the program `programOf` gives it (null: general, always shown).
+  programs,
   dominion: {
     molecules: PRODUCTS.map((p) => ({
       id: p.id,
@@ -308,6 +320,7 @@ const modulesProjection = {
       unitOperationIds: p.unitOperationIds,
       provenance: p.provenance,
       note: p.note,
+      program: programOf('product', p.id),
     })),
     findings: CLEARANCE_FINDINGS.map((f) => ({
       productId: f.productId,
@@ -329,6 +342,7 @@ const modulesProjection = {
       strainId: r.strainId,
       lockedAt: r.lockedAt,
       predictions: r.predictions.map((x) => x.label),
+      program: programOf('runbook', r.id),
     })),
     protocols: PROTOCOLS.map((p) => ({
       id: p.id,
@@ -338,21 +352,22 @@ const modulesProjection = {
       purpose: p.purpose,
       currentVersion: p.currentVersion,
       versions: p.versions.map((v) => v.version),
+      program: programOf('protocol', p.id),
     })),
   },
   geneos: {
-    hosts: STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim(), bsl: s.bsl, badges: s.badges })),
+    hosts: STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim(), bsl: s.bsl, badges: s.badges, program: programOf('strain', s.id) })),
     pathways: PATHWAYS.map((x) => ({ id: x.id, label: x.label, products: x.products })),
   },
   pureos: {
     unitOperations: UNIT_OPERATIONS.map((u) => ({ id: u.id, label: u.label, stage: u.stage, note: u.note ?? null })),
   },
   proforma: {
-    scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId })),
+    scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId, program: programOf('scenario', x.id) })),
   },
   primer: {
     lessons: MODULES.flatMap((m) =>
-      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [] })),
+      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [], program: programOf('lesson', l.id) })),
     ),
   },
 };
@@ -374,4 +389,5 @@ console.log(`  ontology    ${ontology.length} fields, ${ontology.filter((d) => d
 console.log(`  units       ${Object.keys(U).length} units in ${new Set(Object.values(U).map((u) => u.family)).size} families, ${Object.keys(ALIASES).length} aliases, ${REFUSALS.length} explained refusals`);
 console.log(`  strains     ${Object.keys(strainAliases).length} aliases to ${new Set(Object.values(strainAliases)).size} strain ids`);
 console.log(`  carbon      ${carbonSources.length} sources, ${carbonSources.reduce((n, c) => n + c.spellings.length, 0)} spellings`);
+console.log(`  programs    ${programs.map((p) => `${p.id} (${p.letters.length === 1 ? p.letters[0] : `${p.letters[0]}–${p.letters[p.letters.length - 1]}`}, ${p.status})`).join(', ')}`);
 console.log(`\n✓ ${OUT}`);

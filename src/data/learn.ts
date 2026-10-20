@@ -21,6 +21,7 @@ import type { LearnModule } from './types';
 export const MODULES: LearnModule[] = [
   {
     id: 'm0',
+    program: 'casein',
     index: 0,
     title: 'PhycoExtract: reading the literature like a machine',
     blurb:
@@ -476,6 +477,7 @@ Two limits: it costs one configuration per held-out paper, and it does not rescu
 
   {
     id: 'm1',
+    program: 'casein',
     index: 1,
     title: 'Host and chassis',
     blurb:
@@ -579,6 +581,7 @@ This is a research bet. The corpus supports calling it a defensible one. It does
 
   {
     id: 'm2',
+    program: 'casein',
     index: 2,
     title: 'Expression and localisation',
     blurb:
@@ -688,6 +691,7 @@ The corpus does not settle this. What it does is state the comparison honestly: 
 
   {
     id: 'm3',
+    program: 'casein',
     index: 3,
     title: 'The molecule and its modification',
     blurb:
@@ -813,6 +817,7 @@ The corpus also records evidence that phosphorylation is not universally require
 
   {
     id: 'm4',
+    program: 'casein',
     index: 4,
     title: 'Techno-economics',
     blurb:
@@ -937,6 +942,7 @@ Two things to keep in view. The reference point sits at 2 g/L — already optimi
 
   {
     id: 'm5',
+    program: 'casein',
     index: 5,
     title: 'Agentic literature methods',
     blurb:

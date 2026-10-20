@@ -18,7 +18,8 @@ import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/com
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
 import { readFileSync, existsSync } from 'node:fs';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
-import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
+import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, programOf, tickClass } from '../src/store';
+import { PROGRAMS, THREAD_LETTERS, THREAD_LETTER_CLASS } from '../src/data/programs';
 import { provMeta } from '../src/components/Provenance';
 import { JURISDICTIONS } from '../src/engine/clearance';
 import {
@@ -1038,6 +1039,92 @@ for (const f of CLEARANCE_FINDINGS) {
       fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
 }
 
+// ── programs (OF-BLD-016 §2.1, E.1′, D7) ───────────────────────────────
+//
+// A program is data, and its letters are the rule. Every thread a paper
+// carries has exactly one program; every program names at least one letter;
+// no letter is in two. The thread-letter patterns written in code — `[A-Q]`
+// in papers.ts's byEntryId, src/sim/chat.ts (while it exists) and the
+// golden path's chip matcher — must span exactly the declared letters, so a
+// new thread changes programs.ts first and this names every pattern that has
+// not followed. Each entry's own `program` field must name a program.
+{
+  const ids = new Set<string>();
+  const owner = new Map<string, string>();
+  for (const p of PROGRAMS) {
+    if (ids.has(p.id)) fail(`programs: "${p.id}" is declared twice`);
+    ids.add(p.id);
+    if (p.letters.length === 0) fail(`programs: "${p.id}" has no thread letter`);
+    if (p.status !== 'active' && p.status !== 'archived') fail(`programs: "${p.id}" has status "${p.status}"`);
+    if (!p.name.trim() || !p.summary.trim()) fail(`programs: "${p.id}" needs a name and a line`);
+    for (const l of p.letters) {
+      if (!/^[A-Z]$/.test(l)) fail(`programs: "${p.id}" names "${l}", which is not a thread letter`);
+      if (owner.has(l)) fail(`programs: thread ${l} is in both "${owner.get(l)}" and "${p.id}"`);
+      owner.set(l, p.id);
+    }
+  }
+  if (!PROGRAMS.some((p) => p.status === 'active')) fail('programs: none is active, so every default view would be empty');
+
+  // Every thread letter a paper carries has a program.
+  for (const t of [...new Set(PAPERS.map((p) => p.thread))].sort())
+    if (!owner.has(t)) fail(`programs: thread ${t} has papers and no program — declare it in src/data/programs.ts`);
+  for (const p of PAPERS) {
+    if (programOf('paper', p.id) !== owner.get(p.thread))
+      fail(`programs: paper ${p.id} is thread ${p.thread} but resolves to "${programOf('paper', p.id)}"`);
+  }
+  // A declared letter no paper carries yet is allowed (a thread proposed and
+  // not applied), and said.
+  for (const l of owner.keys())
+    if (!PAPERS.some((p) => p.thread === l)) warn(`programs: thread ${l} (${owner.get(l)}) has no paper yet`);
+
+  // One class names the letters: they run from the first to the last
+  // without a gap.
+  const codes = THREAD_LETTERS.map((l) => l.charCodeAt(0));
+  if (codes.some((c, i) => i > 0 && c !== codes[i - 1] + 1))
+    fail(`programs: the letters ${THREAD_LETTERS.join('')} have a gap, so no ${THREAD_LETTER_CLASS} pattern names them`);
+
+  // The patterns in code, held to that class. A thread-letter class is the
+  // one followed by the entry index's digit (`[A-Q])(\d`, `[A-Q]\d`).
+  const PATTERN_FILES: { path: string; required: boolean }[] = [
+    { path: 'src/data/papers.ts', required: true },
+    { path: 'src/sim/chat.ts', required: false },
+    { path: 'scripts/golden-path.mjs', required: true },
+  ];
+  for (const { path, required } of PATTERN_FILES) {
+    if (!existsSync(path)) {
+      if (required) fail(`programs: ${path} is missing, and it holds a thread-letter pattern`);
+      continue;
+    }
+    const found = [...readFileSync(path, 'utf8').matchAll(/\[A-([A-Z])\]\)?\(?\\d/g)].map((m) => m[0].slice(0, 5));
+    if (found.length === 0) fail(`programs: ${path} holds no thread-letter pattern; expected ${THREAD_LETTER_CLASS}`);
+    for (const f of found)
+      if (f !== THREAD_LETTER_CLASS)
+        fail(`programs: ${path} writes the thread letters as ${f}, but src/data/programs.ts declares ${THREAD_LETTER_CLASS}`);
+  }
+
+  // Every entry's own field names a declared program.
+  const named: [string, string, string | undefined][] = [
+    ...STRAINS.map((x) => ['strain', x.id, x.program] as [string, string, string | undefined]),
+    ...PRODUCTS.map((x) => ['product', x.id, x.program] as [string, string, string | undefined]),
+    ...SCENARIOS.map((x) => ['scenario', x.id, x.program] as [string, string, string | undefined]),
+    ...PROTOCOLS.map((x) => ['protocol', x.id, x.program] as [string, string, string | undefined]),
+    ...RUNBOOKS.map((x) => ['runbook', x.id, x.program] as [string, string, string | undefined]),
+    ...MODULES.map((x) => ['module', x.id, x.program] as [string, string, string | undefined]),
+    ...MODULES.flatMap((m) => m.lessons.map((x) => ['lesson', x.id, x.program] as [string, string, string | undefined])),
+  ];
+  for (const [kind, id, program] of named)
+    if (program !== undefined && !ids.has(program)) fail(`programs: ${kind} ${id} names program "${program}", which is not declared`);
+
+  // The resolutions the document states (§2.1 tests, D6).
+  const pPaper = PAPERS.find((p) => p.thread === 'P');
+  if (pPaper && programOf('paper', pPaper.id) !== 'pha') fail(`programs: a thread P paper (${pPaper.id}) must resolve to pha`);
+  if (programOf('strain', 's-cerevisiae-cenpk113-7d') !== 'yeast') fail('programs: s-cerevisiae-cenpk113-7d must resolve to yeast');
+  if (programOf('strain', 's-cerevisiae') !== null) fail('programs: the species entry s-cerevisiae stays general (D6)');
+  for (const r of RECORDS)
+    if (programOf('record', r.id) !== programOf('paper', r.paperId))
+      fail(`programs: record ${r.id} must take the program of the paper it cites (${r.paperId})`);
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -1049,6 +1136,7 @@ console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.pr
 console.log(`  non-primary       ${RECORDS.filter((r) => r.isPrimary === false).length} (citations of other records, excluded from aggregates)`);
 console.log(`  with method       ${RECORDS.filter((r) => r.method).length}, of which ${RECORDS.filter((r) => r.method === 'undetermined').length} undetermined`);
 console.log(`  gold set          ${goldIds.size} annotated (60 planned across 14 papers — pending tranche-1 ingest)`);
+console.log(`  programs          ${PROGRAMS.map((p) => `${p.name} (${p.letters.length === 1 ? p.letters[0] : `${p.letters[0]}–${p.letters[p.letters.length - 1]}`}, ${p.status})`).join(' · ')}; letters ${THREAD_LETTER_CLASS} held in code`);
 console.log(`  strains           ${STRAINS.length}`);
 console.log(`  molecules         ${PRODUCTS.length} across ${new Set(PRODUCTS.map((p) => p.category)).size} categories, ${new Set(PRODUCTS.map((p) => p.processCode)).size} process families (all modeled)`);
 console.log(`  clearance         ${PRODUCTS.filter((p) => p.clearanceState === 'blocked').length} blocked, ${PRODUCTS.filter((p) => p.clearanceState === 'unknown').length} unassessed, ${PRODUCTS.filter((p) => p.clearanceState.startsWith('clear')).length} clear`);

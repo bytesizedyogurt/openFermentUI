@@ -193,6 +193,29 @@ export type CorpusThread =
   /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
   | 'Q';
 
+// ── Programs (OF-BLD-016 §2.1, E.1′) ────────────────────────────────────
+//
+// A program is data: a set of thread letters, a name, and whether it is
+// active or archived. An archived program's papers, records, strains,
+// products, scenarios, protocols, runbooks and lessons stay in the
+// repository and leave every default view; Settings → Programs shows them
+// again. `src/data/programs.ts` declares them; `check:seed` holds every
+// thread letter to exactly one program. Mirrored by `Program` in models.py.
+
+export type ProgramId = 'casein' | 'pha' | 'yeast';
+export type ProgramStatus = 'active' | 'archived';
+
+export interface Program {
+  id: ProgramId;
+  /** As Settings lists it: "Yeast ethanol", "Casein", "PHA". */
+  name: string;
+  /** The corpus threads that are this program's papers. No letter is in two programs. */
+  letters: CorpusThread[];
+  status: ProgramStatus;
+  /** One line on what the program is, in words. */
+  summary: string;
+}
+
 export type SourceType =
   | 'journal-article'
   | 'review'
@@ -455,6 +478,11 @@ export interface Strain {
   badges: string[];
   bsl: 1 | 2;
   notes: CuratorNote[];
+  /**
+   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
+   * is general and shows whatever programs are archived.
+   */
+  program?: ProgramId;
 }
 
 export type ProtocolCategory =
@@ -518,6 +546,11 @@ export interface Protocol {
   versions: ProtocolVersion[];
   currentVersion: string;
   provenanceNote: string;
+  /**
+   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
+   * is general and shows whatever programs are archived.
+   */
+  program?: ProgramId;
 }
 
 export interface Deviation {
@@ -614,6 +647,11 @@ export interface Scenario {
   point: Record<string, number>;
   assumptions: ScenarioAssumption[];
   pinned: boolean;
+  /**
+   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
+   * is general and shows whatever programs are archived.
+   */
+  program?: ProgramId;
 }
 
 export interface GridPointResult {
@@ -725,6 +763,11 @@ export interface Lesson {
    * assessor's training sign-off moves them to Supervised.
    */
   skills?: string[];
+  /**
+   * The program this lesson belongs to (OF-BLD-016 §2.1). Absent, it takes
+   * its module's; a module with none is general.
+   */
+  program?: ProgramId;
 }
 
 export type LessonBlock =
@@ -752,6 +795,11 @@ export interface LearnModule {
   blurb: string;
   lessons: Lesson[];
   outline?: string[];
+  /**
+   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
+   * is general and shows whatever programs are archived.
+   */
+  program?: ProgramId;
 }
 
 export interface ActivityEvent {
@@ -988,6 +1036,11 @@ export interface Product {
    * class out of every median, range and count.
    */
   economicsProvenance: Provenance;
+  /**
+   * The program this entry belongs to (OF-BLD-016 §2.1), or absent when it
+   * is general and shows whatever programs are archived.
+   */
+  program?: ProgramId;
 }
 
 /**
@@ -1266,6 +1319,12 @@ export interface Runbook {
    * ISO timestamp is what this build can honestly offer.
    */
   lockHash: string | null;
+  /**
+   * The program this runbook belongs to (OF-BLD-016 §2.1). Absent on every
+   * seed runbook: a runbook takes the program of the product it names, else
+   * of the strain, and is general when neither has one.
+   */
+  program?: ProgramId;
 }
 
 // ── AnswerPlan (OF-BLD-007 §3) ─────────────────────────────────────────
