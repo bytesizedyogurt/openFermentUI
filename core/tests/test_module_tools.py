@@ -162,3 +162,45 @@ def test_the_read_tools_go_out_loose_and_the_rest_strict():
     assert {t["name"] for t in sent if not t["strict"]} == {f"{m}_read" for m in module_stores.MODULES}
     assert "refused its input" in tools.run("dominion_read", {"ids": "hot-start-taq", "words": "", "kind": "", "state": "",
                                                               "limit": 5}).error
+
+
+# ── tuned on the first live runs (2026-10-20) ─────────────────────────────
+
+
+def test_a_word_finds_a_row_by_its_head(pool):  # noqa: F811
+    """Haiku searched Primer for "depos" and found nothing where a person
+    would have read "Depositing" as a match: a query word of four letters or
+    more matches the head of a row's word, and the module's blurb counts."""
+    ctx = ctx_for(pool)
+    assert [r.id for r in read("primer", ctx, words="steril").rows] == ["l6-3"]  # "Sterilising and releasing a vessel"
+    assert read("primer", ctx, words="ste").summary["count"] == 0  # three letters is too short a head
+    assert read("primer", ctx, words="extract").summary["count"] >= 1  # "Why extraction", and the module's blurb
+
+
+def test_an_artifact_row_carries_its_headline_values(pool):  # noqa: F811
+    """A Proforma read said the benchmark row named its tool and date and
+    nothing else (live, 2026-10-20). The top-level scalars of the output
+    ride on the row, with the inputs' names, so a read says what was
+    computed; a value is still cited through the tool that computes it."""
+    from openferment_core.models import Artifact, BasisInput, BasisSource
+
+    art = Artifact(id="0123456789abcdef", tool="proforma_benchmark", toolVersion="1", provenance="computed",
+                   createdAt="2026-10-20T00:00:00Z", outputHash="x", durationMs=1,
+                   inputs=[BasisInput(name="package", value="biorefineries.cornstover@2.35.1", unit="",
+                                      source=BasisSource(kind="model", id="x"))],
+                   output={"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1", "nested": {"a": 1},
+                           "quantiles": [1, 2, 3]})
+    r = read("proforma", ctx_for(pool, artifacts=lambda: [art]), kind="artifact")
+    [row] = r.rows
+    assert row.detail["output"] == {"mespUsdPerGal": 1.9677, "package": "biorefineries.cornstover@2.35.1"}
+    assert row.detail["inputs"] == ["package=biorefineries.cornstover@2.35.1"]
+    assert read("proforma", ctx_for(pool, artifacts=lambda: [art]), words="cornstover").summary["count"] == 1
+
+
+def test_a_molecule_row_names_its_train_and_pathways(pool):  # noqa: F811
+    """The seams to pureOS and geneOS: the unit operations and pathways a
+    molecule declares are on its row, so a read of Dominion hands the next
+    read its ids."""
+    [row] = read("dominion", ctx_for(pool), ids=["taq-dna-polymerase"]).rows
+    assert row.detail["processCode"] == "P9" and "heat-step" in row.detail["unitOperationIds"]
+    assert read("dominion", ctx_for(pool), words="heat-step").summary["count"] >= 1

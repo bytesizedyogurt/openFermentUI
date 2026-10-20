@@ -77,6 +77,7 @@ STATE_WORDS = {
 }
 COVERAGE_HITS = 8
 MIN_NAME = 3
+PREFIX_MIN = 4
 
 
 @dataclass(frozen=True)
@@ -235,9 +236,28 @@ ARTIFACT_MODULE = {
 }
 
 
+HEADLINE_VALUES = 8
+
+
+def _headline(output: Any) -> dict[str, Any]:
+    """An artifact's top-level scalars (a price, a ceiling, a unit, a note),
+    so a read says what was computed and not only that it was. Anything
+    nested is left to `get_artifact` and the evidence a tool returns."""
+    out: dict[str, Any] = {}
+    for k, v in (output.items() if isinstance(output, dict) else []):
+        if isinstance(v, (str, int, float, bool)) and not (isinstance(v, str) and len(v) > MAX_TEXT):
+            out[k] = v
+        if len(out) >= HEADLINE_VALUES:
+            break
+    return out
+
+
 def _artifact_row(module: str, a: Any) -> Row:
+    inputs = [f"{i.name}={i.value}" for i in a.inputs if isinstance(getattr(i, "value", None), str)][:MAX_ITEMS]
     return Row(module=module, kind="artifact", id=a.id, label=f"{a.tool} artifact", state="open", status="computed",
-               provenance=a.provenance, words=a.tool, detail={"tool": a.tool, "createdAt": a.createdAt})
+               provenance=a.provenance, words=" ".join([a.tool, *inputs]),
+               detail={"tool": a.tool, "createdAt": a.createdAt, "inputs": inputs, "output": _headline(a.output),
+                       "cite": "cite the value through get_artifact or the tool that computes it; this row names it"})
 
 
 class Stores:
@@ -280,9 +300,14 @@ class Stores:
         for m in p["molecules"]:
             yield Row("dominion", "molecule", m["id"], m["name"], clearance_state(m["clearanceState"]), m["clearanceState"],
                       provenance=m.get("provenance"), names=tuple(m.get("aliases") or ()),
-                      words=" ".join([m["category"], m["clearanceLabel"], m.get("note") or ""]),
+                      words=" ".join([m["category"], m["clearanceLabel"], m.get("note") or "", m.get("processCode") or ""]
+                                     + (m.get("unitOperationIds") or []) + (m.get("pathwayIds") or [])),
+                      # The train and the pathways are the seams to pureOS and
+                      # geneOS: their ids are what pureos_read and geneos_read take.
                       detail={"clearance": m["clearanceLabel"], "category": m["category"],
-                              "defaultStrainId": m.get("defaultStrainId"), "note": m.get("note")})
+                              "defaultStrainId": m.get("defaultStrainId"), "processCode": m.get("processCode"),
+                              "unitOperationIds": m.get("unitOperationIds") or [], "pathwayIds": m.get("pathwayIds") or [],
+                              "note": m.get("note")})
         for f in p["findings"]:
             fid = f"{f['productId']}.{f['jurisdictionId']}"
             yield Row("dominion", "finding", fid, f"Clearance finding: {f['productId']} in {f['jurisdictionId']}",
@@ -378,7 +403,7 @@ class Stores:
     def _primer(self) -> Iterable[Row]:
         for lesson in self._get("projection")["primer"]["lessons"]:
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
-                      words=" ".join([lesson["moduleTitle"]] + lesson.get("skills", [])),
+                      words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
                       detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])})
 
     def _intake(self) -> Iterable[Row]:
@@ -444,7 +469,10 @@ def find(stores: Stores, module: str, *, ids: Iterable[str] = (), words: str = "
         scored = []
         for n, r in enumerate(rows):
             have = _tokens(" ".join([r.label, r.id, r.words, *r.names]))
-            score = len(query & have)
+            # A query word matches a row word whole, or as its head when
+            # four letters or longer: "depos" finds "deposition", "polymer"
+            # finds "polymerase".
+            score = sum(1 for q in query if q in have or (len(q) >= PREFIX_MIN and any(h.startswith(q) for h in have)))
             if score:
                 scored.append((-score, n, r))
         rows = [r for _, _, r in sorted(scored, key=lambda x: (x[0], x[1]))]

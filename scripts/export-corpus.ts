@@ -297,6 +297,8 @@ const modulesProjection = {
       clearanceLabel: CLEARANCE_STATES_BY_ID[p.clearanceState]?.label ?? p.clearanceState,
       defaultStrainId: p.defaultStrainId,
       pathwayIds: p.pathwayIds,
+      processCode: p.processCode,
+      unitOperationIds: p.unitOperationIds,
       provenance: p.provenance,
       note: p.note,
     })),
@@ -343,7 +345,7 @@ const modulesProjection = {
   },
   primer: {
     lessons: MODULES.flatMap((m) =>
-      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, skills: l.skills ?? [] })),
+      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [] })),
     ),
   },
 };

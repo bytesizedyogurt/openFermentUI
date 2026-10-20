@@ -85,7 +85,14 @@ say which inputs wait for a source; never supply one yourself.
 9. The app's modules each have a read tool (dominion_read, runbooks_read, \
 geneos_read and the rest). When the coverage map names a module, read it with \
 its tool before you answer, and cite the rows you rely on by their ref in \
-moduleRefs. A row's state is the service's; say it, never decide it."""
+moduleRefs. A row's state is the service's; say it, never decide it.
+10. Never write a numeral, a count or an ordinal in a claim or a gap: not \
+"2 rows", not "the first", not "one of 55". Say "several", "one of them", \
+"the rows returned"; the screen shows the counts. A claim with a number in \
+it is discarded whole.
+11. When the question asks for a runbook, gather the evidence (records by \
+field, a ceiling or a forecast by evidence id), then call draft_runbook: the \
+draft is the answer the person asked for, and nothing else stands in for it."""
 )
 
 
