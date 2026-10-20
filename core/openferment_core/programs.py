@@ -131,6 +131,55 @@ def shows(kind: Kind, entity_id: str, include_archived: bool = False, **paths: A
     return not is_archived(program_of(kind, entity_id, **paths), corpus_path)
 
 
+def hides(program_id: str | None, include_archived: bool = False) -> bool:
+    """Whether an entity of this program is left out: it belongs to an
+    archived program and the caller did not ask for archived programs."""
+    return not include_archived and is_archived(program_id)
+
+
+# A paper id inside a record's or a candidate's id: `r-B5-3`, `cl1-P12-…`.
+_PAPER_IN_ID = re.compile(r"(?:^|-)([A-Z]\d+)(?=-|$)")
+
+
+def program_of_record_id(record_id: str, lookup: Any = None) -> str | None:
+    """A record's program by its id: the record `lookup(id)` returns when
+    there is one, else the paper id the record id carries."""
+    record = lookup(record_id) if lookup is not None else None
+    if record:
+        return program_of_record(record)
+    m = _PAPER_IN_ID.search(record_id or "")
+    return program_of_paper(m.group(1)) if m else None
+
+
+def program_of_model(model_id: str | None) -> str | None:
+    """A geneOS shelf model's program: its host strain's."""
+    from .geneos_models import SHELF
+
+    shelf = SHELF.get(model_id or "")
+    return program_of("strain", shelf.host) if shelf is not None and shelf.host else None
+
+
+def program_of_artifact(artifact: Any, record_lookup: Any = None) -> str | None:
+    """A computed artifact's program, from what its inputs name: a record (by
+    the paper it cites), a shelf model (by its host), a product or a strain
+    (by their own field). An archived program found among them wins, so a
+    value computed from an archived program's records hides with them;
+    anything else computed is general (a benchmark, a fit of a deposition)."""
+    found: list[str] = []
+    for i in getattr(artifact, "inputs", None) or []:
+        src = i.source
+        if src.kind == "record" and src.id:
+            found.append(program_of_record_id(src.id, record_lookup) or "")
+        elif src.kind == "model" and src.id:
+            found.append(program_of_model(src.id) or "")
+        if isinstance(i.value, str) and i.name in ("product", "productId"):
+            found.append(program_of("product", i.value) or "")
+        if isinstance(i.value, str) and i.name in ("strain", "strainId", "host"):
+            found.append(program_of("strain", i.value) or "")
+    found = [p for p in found if p]
+    return next((p for p in found if is_archived(p)), found[0] if found else None)
+
+
 def clear_cache() -> None:
     """Forget what was read, after `pnpm export:corpus` rewrote the projections."""
     _programs.cache_clear()

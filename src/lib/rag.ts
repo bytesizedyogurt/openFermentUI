@@ -3,8 +3,9 @@
 // Three calls: what is indexed, search, and the scorecard. Same discipline as
 // lib/intake.ts: with the service down this says so and names the command
 // that starts it, and nothing stands in for a result (E.2).
-import type { PassageHit, RagReport, RagSearchResponse, RagStatus } from '@/data/types';
+import type { PassageHit, RagReport, RagSearchRequest, RagSearchResponse, RagStatus } from '@/data/types';
 import { href } from '@/router';
+import { useStore } from '@/store';
 import { START_COMMAND, postdocHealth } from './postdoc';
 
 export class RagDown extends Error {
@@ -59,13 +60,17 @@ export const ragStatus = (signal?: AbortSignal) => call<RagStatus>('/api/rag/sta
 
 export const ragReport = (signal?: AbortSignal) => call<RagReport>('/api/rag/report', { signal });
 
-export const ragSearch = (question: string, lane: string | null, signal?: AbortSignal) =>
-  call<RagSearchResponse>('/api/rag/search', {
+export const ragSearch = (question: string, lane: string | null, signal?: AbortSignal) => {
+  // Settings → Programs (OF-BLD-016 §2.3): off, archived programs' passages
+  // are left out by the service.
+  const body: RagSearchRequest = { question, k: 8, lane, includeArchived: useStore.getState().showArchived };
+  return call<RagSearchResponse>('/api/rag/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, k: 8, lane }),
+    body: JSON.stringify(body),
     signal,
   });
+};
 
 /**
  * The paper's own words a hit points at, as the reader will look for them:

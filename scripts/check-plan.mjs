@@ -64,6 +64,7 @@ const PAIRS = [
   ['CoverageHit', 'CoverageHit'],
   ['ModuleCoverage', 'ModuleCoverage'],
   ['CoverageMap', 'CoverageMap'],
+  ['ArchivedCoverage', 'ArchivedCoverage'],
   // OF-BLD-015 §7.2 — what a module's read tool returns.
   ['ModuleRow', 'ModuleRow'],
   // OF-BLD-015 §7.3, §7.4 — the audit log and the proposals.

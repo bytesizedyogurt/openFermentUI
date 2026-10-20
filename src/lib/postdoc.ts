@@ -11,6 +11,7 @@
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
 import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveTurn, PriorTurn, TraceStep } from '@/data/types';
+import { useStore } from '@/store';
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
 export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
@@ -72,6 +73,10 @@ async function post(
     maxEvidence: opts.maxEvidence ?? 30,
     mode: opts.mode ?? 'agent',
     history: opts.history ?? [],
+    // Settings → Programs (OF-BLD-016 §2.3): off, the service leaves archived
+    // programs out of everything Postdoc reads. Read when the question is
+    // sent, so a change of the switch holds from the next question on.
+    includeArchived: useStore.getState().showArchived,
   };
   let response: Response;
   try {

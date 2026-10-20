@@ -17,7 +17,7 @@ from test_tools import pool  # noqa: F401
 
 @pytest.fixture()
 def client(pool, monkeypatch):  # noqa: F811
-    monkeypatch.setattr(evidence_pool, "load", lambda: pool)
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: pool)
     return TestClient(api.app, base_url="http://127.0.0.1")
 
 
@@ -59,7 +59,7 @@ def test_single_mode_is_one_call_with_no_tools(client, monkeypatch):
 
 
 def test_a_missing_corpus_declines_in_words(monkeypatch):
-    def missing():
+    def missing(include_archived=False):
         raise FileNotFoundError("no corpus.json")
 
     monkeypatch.setattr(evidence_pool, "load", missing)

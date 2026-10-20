@@ -8,7 +8,8 @@ from test_tools import pool  # noqa: F401
 
 
 def seeded(pool_):  # noqa: F811
-    return module_stores.Stores(module_stores.seed_sources(lambda: pool_))
+    # The whole seed, archived programs shown, as eval set O was written over it.
+    return module_stores.Stores(module_stores.seed_sources(lambda: pool_), include_archived=True)
 
 
 def test_the_set_holds_ten_questions_and_their_keys_come_from_the_stores(pool):  # noqa: F811

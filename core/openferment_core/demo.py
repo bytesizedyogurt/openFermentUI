@@ -476,7 +476,9 @@ def prototype_rag() -> dict[str, Any]:
             (_intake.FULLTEXT_DIR / "B5.json").write_text(fetched.model_dump_json(), encoding="utf-8")
             passages.build()
             status = passages.status()
-            detail = retrieve.search_detail(RAG_QUESTION, k=8, lane="bm25")
+            # The stand-in is filed under B5, a casein paper id; the fixture
+            # is the search with archived programs shown (OF-BLD-016 §2.3).
+            detail = retrieve.search_detail(RAG_QUESTION, k=8, lane="bm25", include_archived=True)
             search = RagSearchResponse(lane=detail.lane, hits=detail.hits, phrasings=[], unverifiedSentences=0, costUsd=0.0)
             items = [dict(raw, id=f"stand-in-{n}", paperId="B5", source="candidate") for n, raw in enumerate(SMOKE_RAWS)]
             k, counts = rageval.build_k(items, passages.read_index(), {"titer_secreted": "Secreted titer", "time_to_colony": "Time to colony"}, {})
@@ -546,6 +548,9 @@ def _stream_pool(overlay: dict[str, Any]):
         [Candidate.model_validate(c) for c in overlay["candidates"]],
         {},
         [{"id": "titer_secreted", "name": "Secreted titer"}, {"id": "time_to_colony", "name": "Time to colony"}],
+        # B5's letter is casein's, an archived program (OF-BLD-016 §2.3): the
+        # recordings run with archived programs shown, as the switch on.
+        include_archived=True,
     )
 
 
@@ -580,11 +585,13 @@ def prototype_stream(overlay: dict[str, Any]) -> list[dict[str, Any]]:
 def _seed_ctx(pool: Any) -> tools.ToolContext:
     """A context whose coverage pass (OF-BLD-015 §7.1) sweeps the seed and
     the stand-in pool alone, so the recorded loop is the same on every
-    machine."""
+    machine. The stand-in sits under an archived program's letter, so the
+    recordings run with the program switch on (OF-BLD-016 §2.3)."""
     from . import module_stores, tools
 
-    return tools.ToolContext(pool_factory=lambda: pool,
-                             stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool)))
+    return tools.ToolContext(pool_factory=lambda: pool, include_archived=True,
+                             stores_factory=lambda: module_stores.Stores(module_stores.seed_sources(lambda: pool),
+                                                                         include_archived=True))
 
 
 # §9.4: a second recorded loop, in which the stand-in asks for a forecast and

@@ -16,6 +16,13 @@ is what lets a claim cite them (`SeenSet`).
 
 A module part of which lives only in a browser says so in `partial`, and the
 tool reads what the service has. Nothing here writes.
+
+Rows of archived programs are left out unless the request's switch shows them
+(`ToolContext.include_archived`, OF-BLD-016 §2.3); the switch is never an
+input. When a read by ids names rows that were left out, the summary says
+which archived programs hold them, and nothing more of them; a read by words
+says nothing, since words match loosely and the coverage map has already said
+what the question named.
 """
 from __future__ import annotations
 
@@ -26,7 +33,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .. import module_stores
+from .. import module_stores, programs
 from ..models import ToolResult
 from . import MAX_SUMMARY_CHARS, Tool, ToolContext, register
 
@@ -75,6 +82,17 @@ class ModuleReadInput(BaseModel):
         return v
 
 
+def _hidden_note(hidden: list[Any]) -> str:
+    names = []
+    for r in hidden:
+        p = programs.program_by_id(r.program)
+        name = p.name if p else str(r.program)
+        if name not in names:
+            names.append(name)
+    return (f"rows matching this read belong to archived programs ({', '.join(names)}) and are hidden; the switch in "
+            "Settings → Programs shows them. Do not answer about them.")
+
+
 def _summary(module: str, inp: ModuleReadInput, matched: list[Any], rows: list[dict[str, Any]], cut: bool) -> dict[str, Any]:
     states: dict[str, int] = {}
     for r in matched:
@@ -114,7 +132,13 @@ def _runner(module: str):
             dumped.pop()
             picked.pop()
             cut = True
-        return ToolResult(summary=_summary(module, inp, matched, dumped, cut), rows=picked)
+        summary = _summary(module, inp, matched, dumped, cut)
+        if not getattr(stores, "include_archived", True) and [i for i in inp.ids if i.strip()]:
+            hidden = module_stores.find(stores, module, ids=inp.ids, kind=inp.kind or None, state=inp.state or None,
+                                        hidden=True)
+            if hidden:
+                summary["hidden"] = _hidden_note(hidden)
+        return ToolResult(summary=summary, rows=picked)
 
     return run
 

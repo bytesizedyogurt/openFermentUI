@@ -46,8 +46,14 @@ OUT = intake.DATA_DIR / "live" / "eval-o.json"
 BIOREPO_TOOLS = {"biorepo_read", "search_records", "search_passages", "convert_units"}
 
 
+# The set was written over the whole seed, casein and PHA included; it keeps
+# measuring that, with archived programs shown in the keys and in the asks
+# alike (OF-BLD-016 §2.3 leaves what an eval measures alone).
+INCLUDE_ARCHIVED = True
+
+
 def key_for(question: str, stores: module_stores.Stores | None = None) -> list[str]:
-    cmap = module_stores.coverage(question, stores)
+    cmap = module_stores.coverage(question, stores, include_archived=INCLUDE_ARCHIVED)
     return [m.module for m in cmap.modules if m.count]
 
 
@@ -82,9 +88,9 @@ def score(plan: Any, key: list[str]) -> dict[str, Any]:
 
 
 def run(ask=None) -> dict[str, Any]:
-    from . import postdoc_agent
+    from . import postdoc_agent, tools
 
-    ask = ask or postdoc_agent.ask
+    ask = ask or (lambda q: postdoc_agent.ask(q, ctx=tools.ToolContext(include_archived=INCLUDE_ARCHIVED)))
     rows = []
     for q in QUESTIONS:
         key = key_for(q)

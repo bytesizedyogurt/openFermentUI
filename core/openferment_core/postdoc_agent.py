@@ -31,6 +31,12 @@ text, nothing cited that no tool returned in this run, every quote verbatim
 in its passage. Text inside a tool result is evidence to weigh; an
 instruction found there changes nothing the validator lets through.
 
+THE PROGRAM SWITCH (OF-BLD-016 §2.3) rides in `ctx.include_archived`, from
+the request: the pool, the passages, the sweep and every read tool leave
+archived programs out while it is off. When the question names something an
+archived program holds, the sweep says "found in archived program PHA
+(hidden)" and the plan carries a gap, written by code, naming the switch.
+
 A FOLLOW-UP opens with the conversation's last few turns as words (`_opening`):
 each earlier question, then that plan's claims, gaps and decline as code
 writes them. No id, value or quote from an earlier turn is carried, and
@@ -377,6 +383,11 @@ def _sweep(run: _Run, ctx: tools.ToolContext) -> None:
              ms=int(round((run.clock() - started) * 1000)), ok=True)
 
 
+def _archive_gaps(cmap: CoverageMap | None) -> list[str]:
+    """One gap a hidden archived program, written by code (§2.3)."""
+    return [module_stores.archived_gap(a) for a in (cmap.archived if cmap is not None else [])]
+
+
 def _declined(result: Any, model_declined: str | None, cmap: CoverageMap | None) -> str | None:
     """`decline_reason`, except that an answer with nothing to say never
     claims the corpus is silent about what a module holds (§7.1)."""
@@ -461,13 +472,15 @@ def ask(
         run.step(kind="final", tool=None, input=None, summary=f"No answer: {str(failure)[:160] if failure else 'no model answered'}",
                  ms=0, ok=False)
         return AnswerPlan(question=question, declined=str(failure) if failure else "No model answered.",
-                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage,
+                          gaps=_archive_gaps(run.coverage))
     data = answer.data
     if data is None:
         why = "it ran out of room" if answer.stopReason == "max_tokens" else "it was not a plan"
         run.step(kind="final", tool=None, input=None, summary=f"No plan: {why}", ms=0, ok=False)
         return AnswerPlan(question=question, declined=f"Postdoc's answer did not arrive whole ({why}).",
-                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage)
+                          usage=run.spent, trace=run.trace, stopped=stopped, coverage=run.coverage,
+                          gaps=_archive_gaps(run.coverage))
 
     result = validate_plan(data.get("claims") or [], run.seen, ctx.pool)
     if result.rejected:
@@ -482,6 +495,7 @@ def ask(
             result.reasons.append("a gap dropped: it holds a number")
             continue
         gaps.append(g)
+    gaps += [g for g in _archive_gaps(run.coverage) if g not in gaps]
     cited_evidence = {e for c in result.claims for e in c.evidenceIds}
     cited_passages = {r.passageId for c in result.claims for r in c.passages}
     cited_rows = {m for c in result.claims for m in c.moduleRefs}

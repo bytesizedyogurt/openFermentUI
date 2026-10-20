@@ -19,14 +19,16 @@ from test_tools import pool  # noqa: F401  (the stand-in pool fixture)
 STATES = {"open", "fenced", "approved", "locked", "proposed", "retired"}
 
 
-def ctx_for(pool_, **over):  # noqa: F811
+def ctx_for(pool_, include_archived=True, **over):  # noqa: F811
+    """The seed with archived programs shown, as the tools read it before
+    the program switch (OF-BLD-016 §2.3), unless the test turns it off."""
     def make():
         src = module_stores.seed_sources(lambda: pool_)
         for k, v in over.items():
             setattr(src, k, v)
-        return module_stores.Stores(src)
+        return module_stores.Stores(src, include_archived=include_archived)
 
-    return tools.ToolContext(pool_factory=lambda: pool_, stores_factory=make)
+    return tools.ToolContext(pool_factory=lambda: pool_, stores_factory=make, include_archived=include_archived)
 
 
 def read(module, ctx, ids=(), words="", kind="", state="", limit=20):
@@ -204,3 +206,38 @@ def test_a_molecule_row_names_its_train_and_pathways(pool):  # noqa: F811
     [row] = read("dominion", ctx_for(pool), ids=["taq-dna-polymerase"]).rows
     assert row.detail["processCode"] == "P9" and "heat-step" in row.detail["unitOperationIds"]
     assert read("dominion", ctx_for(pool), words="heat-step").summary["count"] >= 1
+
+
+# ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
+
+
+def test_with_the_switch_off_a_read_leaves_archived_rows_out_and_says_so(pool):  # noqa: F811
+    from openferment_core import programs
+
+    off = ctx_for(pool, include_archived=False)
+    asked = read("geneos", off, ids=["c-necator-h16"])
+    assert asked.error is None and asked.rows == [] and asked.summary["count"] == 0
+    assert "PHA" in asked.summary["hidden"] and "Settings → Programs" in asked.summary["hidden"]
+    hosts = read("geneos", off, kind="host")
+    assert hosts.rows and not [r.id for r in hosts.rows if programs.is_archived(programs.program_of("strain", r.id))]
+    # A listing, or a read by words, says nothing of what is hidden.
+    assert "hidden" not in hosts.summary
+    assert "hidden" not in read("geneos", off, words="necator").summary
+    # With the switch on, the row is read as before, and nothing is said hidden.
+    on = read("geneos", ctx_for(pool), ids=["c-necator-h16"])
+    assert [r.id for r in on.rows] == ["c-necator-h16"] and "hidden" not in on.summary
+
+
+def test_with_the_switch_on_every_module_counts_what_it_did_before(pool):  # noqa: F811
+    on, off = ctx_for(pool), ctx_for(pool, include_archived=False)
+    for module in module_stores.MODULES:
+        every = len(on.stores.all_rows(module))
+        assert read(module, on, limit=1).summary["count"] == every, module
+        assert read(module, off, limit=1).summary["count"] == every - len(off.stores.hidden(module)), module
+    assert read("dominion", off, limit=1).summary["count"] < read("dominion", on, limit=1).summary["count"]
+
+
+def test_the_switch_is_not_a_tool_input(pool):  # noqa: F811
+    refused = tools.run("geneos_read", {"ids": [], "words": "", "kind": "", "state": "", "limit": 5,
+                                        "includeArchived": True}, ctx_for(pool, include_archived=False))
+    assert refused.error and "includeArchived" in refused.error

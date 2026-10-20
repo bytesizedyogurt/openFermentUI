@@ -362,7 +362,9 @@ def build_sets() -> tuple[dict[str, list[Question]], list[RagSetInfo]]:
 
     cuts = passages.read_index()
     field_names, organisms = _corpus_extras()
-    pool = load_pool()
+    # The scorecard measures retrieval over the whole index, archived
+    # programs included (OF-BLD-016 §2.3 leaves what it measures alone).
+    pool = load_pool(include_archived=True)
     k_questions, k_counts = build_k(pool.records, cuts, field_names, organisms)
     flows_path = Path(__file__).parent.parent / "tests" / "fixtures" / "flows.json"
     flows = json.loads(flows_path.read_text(encoding="utf-8")) if flows_path.exists() else []
@@ -413,7 +415,8 @@ def evaluate(
                     for q in questions:
                         started = time.perf_counter()
                         try:
-                            detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder)
+                            detail = retrieve.search_detail(q.text, k=20, lane=lane, ask=ask, embedder=embedder,
+                                                            include_archived=True)
                         except llm.ModelRefused as e:
                             # One question the helper model declined: that
                             # question goes unscored on this lane, and is
