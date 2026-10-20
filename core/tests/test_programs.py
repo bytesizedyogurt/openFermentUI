@@ -268,7 +268,10 @@ def test_with_the_switch_on_the_sweep_is_what_it_was_before():
         assert on.rows(module) == on.all_rows(module) and on.hidden(module) == []
         # BioRepo's records come from the pool, which left them out first.
         from_pool = off.pool_hidden if module == "biorepo" else 0  # type: ignore[attr-defined]
-        assert len(off.rows(module)) + len(off.hidden(module)) + from_pool == len(on.rows(module)), module
+        # Examples leave with the archive, outside `hidden` (§4.R).
+        hidden_ids = {r.id for r in off.hidden(module)}
+        examples = len([r for r in on.rows(module) if r.detail.get("example") and r.id not in hidden_ids])
+        assert len(off.rows(module)) + len(off.hidden(module)) + from_pool + examples == len(on.rows(module)), module
         assert not [r.id for r in off.rows(module) if programs.is_archived(r.program)], module
     # The switch hides something in every module a program reaches.
     assert {m for m in module_stores.MODULES if off.hidden(m)} >= {"dominion", "runbooks", "geneos", "proforma",
@@ -441,3 +444,15 @@ def test_with_the_switch_off_geneos_rows_hold_no_pha_pathway():
     off = [r for r in _stores(False).rows("geneos") if r.kind == "pathway"]
     on = [r for r in _stores(True).rows("geneos") if r.kind == "pathway"]
     assert "phb-route" not in {r.id for r in off} and "phb-route" in {r.id for r in on}
+
+
+def test_with_the_switch_off_an_example_never_reaches_a_read(modules_json):
+    """OF-BLD-016 §4.R: the browser hides a run nobody made with the archive,
+    and so must Postdoc's reads; the review found question 8's trace naming
+    rb-taq-kigali, rb-lnfp1 and rb-brazzein with the switch off. With it on,
+    they are read, marked as examples."""
+    off = {r.id for r in _stores(include_archived=False).rows("runbooks")}
+    assert not off & {"rb-taq-kigali", "rb-lnfp1", "rb-brazzein"}
+    assert "PR-OD-01" in off and "PR-TAP-01" not in off
+    on = {r.id: r for r in _stores(include_archived=True).rows("runbooks")}
+    assert on["rb-taq-kigali"].detail.get("example") is True

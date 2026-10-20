@@ -6,7 +6,7 @@
 // The yeast five come first, in this order. Each was asked of the live service
 // three times over the seeded corpus on 2026-10-20 (claude-haiku-5-5, effort
 // medium) and answered from thread Q's records, passages and computed values
-// each time; docs/DEMO-YEAST.md gives what came back. Most reliable first.
+// each time; docs/DEMO.md gives what came back. Most reliable first.
 //
 // Then the cross-module questions, numbered six to eleven in OF-BLD-016
 // Appendix 2 and written exactly as it words them. They show Postdoc reading

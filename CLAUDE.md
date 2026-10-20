@@ -840,16 +840,21 @@ Mini, which serves `main` (D8).
   into `corpus.json` and `modules.json`, with a `program` (null for general)
   on every row.
 - **One switch, `showArchived`.** Durable (`snapshotOf`, `applyDurable`),
-  off by default, and outside `seedState`, so clearing the browser's data
-  keeps it. Settings → Programs (`/settings/programs`,
+  off by default, and outside `seedState`; *Clear this browser's data* (one
+  confirm step) turns it off again, since the shipped state hides archived
+  programs (§3.R). Settings → Programs (`/settings/programs`,
   `PROGRAMS_SETTINGS_PATH`) lists the three programs and holds it, as *Show
   archived programs and examples*. A list it empties says what it hides,
   whose, and where the switch is (`HiddenByArchive`). A deep link to an
   archived entity still opens it, under `ArchivedBanner`, which names the
   program and links to the switch; `useProgramScope` shows that entity's own
-  program on its page and nothing of another. Live conversations are the
-  person's history and are not filtered, and neither is Home's proposals
-  card.
+  program on its page and nothing of another. A Live conversation whose
+  questions name an archived entity, and a proposal whose target is one,
+  hide with the hidden-count line like any list (`src/lib/programShows.ts`,
+  §2.R). BioRepo → Artifacts and Settings → Figure grammar list artifacts
+  through `visibleArtifacts` (an artifact takes the program of the records,
+  product or strain its basis names) and send the switch to
+  `GET /api/biorepo/artifacts?includeArchived=`.
 - **Examples hide with the archive** (§3.3, D3). `example: true` marks a
   seed runbook, protocol, scenario, module (its lessons inherit) or
   deposition that describes a run nobody made: all ten runbooks, the seven
@@ -859,9 +864,11 @@ Mini, which serves `main` (D8).
   both, and `ArchivedBanner` says when a page is an example. The flag is
   outside `canonical()`, so the eight lock digests are unchanged;
   `check:seed` fails on a runbook carrying a locked prediction with no
-  deposition behind it and no `example`. The service lists examples to
-  Postdoc marked (`example: true` in a module row's `detail`) rather than
-  hiding them, and the coverage pass does not count them as hidden.
+  deposition behind it and no `example`. The service carries the flag
+  (`example: true` in a module row's `detail`): with the switch off
+  `Stores.rows` leaves examples out as the browser does (§4.R), with it on a
+  read returns them marked; the coverage pass never counts an example as an
+  archived program's row.
 - **The service takes the switch from the request, never from a model.**
   `includeArchived` (default false) on `AskRequest` and `RagSearchRequest`;
   `?includeArchived=true` on `POST /api/tools/{name}`, a query parameter

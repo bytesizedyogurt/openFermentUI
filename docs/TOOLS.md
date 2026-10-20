@@ -90,15 +90,19 @@ take. With the switch off:
   question names something archived; the trace reads *found in archived
   program PHA (hidden)*, no hidden row's ref reaches the model, and the
   code writes a gap naming the switch.
-- The compute tools (`yield_ceiling`, `growth_forecast`,
-  `selling_price`, `draft_runbook`) and the write tools are filtered by
-  nothing beyond the pool they read.
+- With the switch off, `yield_ceiling`, `selling_price` and `draft_runbook`
+  refuse an archived model, product, scenario or strain with *archived
+  (hidden)* and name Settings → Programs, and no tool's description or schema
+  names an archived model, product or scenario (`programs.archived_target`,
+  `offered`; §2.R). `growth_forecast` reads the browser's run and the write
+  tools are filtered by nothing beyond the pool they read.
 
 **Examples.** A seed runbook, protocol, scenario or lesson that describes a
 run nobody made carries `example: true` in its row's `detail`. The browser
-hides examples with the archived programs; the read tools list them, marked,
-with the switch off too, so a read can say a runbook is an example, and the
-coverage pass does not count them as hidden.
+hides examples with the archived programs, and so do the read tools: with the
+switch off no read returns an example row (§4.R); with it on, a read returns
+them marked, so it can say a runbook is an example. The coverage pass does not
+count an example as an archived program's row.
 
 ## The write tools (OF-BLD-015 §7.3)
 

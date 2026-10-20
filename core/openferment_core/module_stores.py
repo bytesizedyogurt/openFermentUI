@@ -323,7 +323,11 @@ class Stores:
         """The rows this question may see."""
         if module not in self._rows:
             every = self.all_rows(module)
-            self._rows[module] = [r for r in every if not programs.hides(r.program, self.include_archived)]
+            # An example (a run nobody made, §3.3) is left out with the
+            # archive, as the browser leaves it out (§4.R); it is not an
+            # archived program's row, so it is not counted in `hidden`.
+            self._rows[module] = [r for r in every if not programs.hides(r.program, self.include_archived)
+                                  and (self.include_archived or not r.detail.get("example"))]
             self._hidden[module] = [r for r in every if programs.hides(r.program, self.include_archived)]
         return self._rows[module]
 

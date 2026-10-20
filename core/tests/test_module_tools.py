@@ -277,7 +277,12 @@ def test_with_the_switch_on_every_module_counts_what_it_did_before(pool):  # noq
     for module in module_stores.MODULES:
         every = len(on.stores.all_rows(module))
         assert read(module, on, limit=1).summary["count"] == every, module
-        assert read(module, off, limit=1).summary["count"] == every - len(off.stores.hidden(module)), module
+        hidden = off.stores.hidden(module)
+        # Examples (§3.3) leave with the archive too, without being an
+        # archived program's rows (OF-BLD-016 §4.R).
+        hidden_ids = {r.id for r in hidden}
+        examples = [r for r in on.stores.all_rows(module) if r.detail.get("example") and r.id not in hidden_ids]
+        assert read(module, off, limit=1).summary["count"] == every - len(hidden) - len(examples), module
     assert read("dominion", off, limit=1).summary["count"] < read("dominion", on, limit=1).summary["count"]
 
 
