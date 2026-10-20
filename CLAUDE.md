@@ -304,9 +304,9 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   needing the skill is refused whole. The tutor is held to the same, closes
   on the third answer with what it observed, and a closed session for a
   person on the ledger becomes a `scenario` entry (no observer, the session
-  as its source), which is Learning and no more. With the sample shown the
-  service is sent nobody (`practiceLearner`), and the entry goes on the
-  sample alone. `core/data/practice.json` never enters git. Offline tests use
+  as its source), which is Learning and no more. A session for someone who
+  is not on the ledger closes on nobody's record. `core/data/practice.json`
+  never enters git. Offline tests use
   a stand-in model; the real one is `pnpm test:live`.
 - **Checks are proposed by fixed rules, and run by an assessor.**
   `rankPairs` / `proposeChecks` in `src/engine/checks.ts` rank every person
@@ -334,14 +334,18 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   is swallowed for the asker alone). `/guild/checks/:id/run` is the bench
   (`BenchCheck.tsx`), a full-screen takeover under Deposition's constraints:
   one criterion at a time, Meets or Needs work, the assessor's words per
-  skill, then a sign step in the assessor's name. With the sample shown the
-  queue is the ranking run in the browser and the bench writes to the sample
-  alone. `check:guild` part 10 and the smoke's bench flow hold all of it. A
+  skill, then a sign step in the assessor's name. Every move on a check is
+  a post `checks.py` decides; the browser makes none on its own.
+  `check:guild` part 10 and the smoke's bench flow hold all of it. A
   model's proposal to check someone follows the same rules on Home
   (`shownProposals` in `src/lib/proposals.ts`, `check:guild` part 11).
-- **The sample team is invented and stays in the browser.** `guildSample` is
-  shown in place of the ledger while loaded; nothing in it is posted, written
-  to `guild.json` or kept in the Durable tier.
+- **There is no invented team.** `guildSample` left `src/` (OF-BLD-016
+  §3.2): the ladder `check:guild` and `export:competence-fixtures` build in
+  memory is `scripts/lib/guild-ladder.ts`, and `check:guild` fails if the
+  store holds a team of its own. With an empty ledger, Matrix and People say
+  *Add yourself below as the lead* over the add-person form, Checks and My
+  path link to it, and Home's Workforce card says nobody is on the ledger
+  yet.
 
 ## Licences, sessions and data that outlive a VM (OF-BLD-014 Phase 1)
 
@@ -650,8 +654,11 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   (the question as title, units, CSV, sources, the basis of anything
   computed, and what would fill it when empty). `pnpm check:figures` holds
   it; `recharts` stays in Compare and ProformaScenario alone. Settings →
-  Figure grammar (`/settings/figures`) is the written definition, over a
-  sample `demo.py --prototype` writes to `src/data/figureSamples.json`.
+  Figure grammar (`/settings/figures`) is the written definition, drawn over
+  the newest kept `geneos.ceiling` and `geneos.frontier` artifacts from
+  `/api/biorepo/artifacts`, else the legend alone with where to compute one.
+  `src/data/figureSamples.json`, which `demo.py --prototype` writes, feeds
+  `check:figures` and is never shown.
 - **geneOS computes a ceiling.** Flux balance analysis on a shelf of
   published reaction networks (`geneos_models.py`, data only): `e_coli_core`
   and `iJO1366` bundled with cobra plus the phaCAB add-on, each added
@@ -712,9 +719,13 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   without it), ends where the median sugar runs out, and refuses a fit whose
   μ or Xmax is unidentified. A changed starting value is an assumption with
   a name, so the forecast is `demo`; one equal to the run's own is no change.
-- **The sample run is invented** (`demo.py --prototype` writes
-  `src/data/fermosSample.json`), labelled, fitted and forecast inline
-  (`sample: true`) and kept nowhere. `growth_forecast` is the fifth tool.
+- **No sample run on screen** (OF-BLD-016 §3.2, D4). `demo.py --prototype`
+  still writes `src/data/fermosSample.json` for the tests; no screen reads
+  it. fermOS and its Forecast with no deposited run say *No run deposited
+  yet* and name the readings (each sample's time in hours, biomass at four
+  or more times, product and substrate at the same times) and where
+  (Runbooks → Depositions, the Time series panel). `growth_forecast` is the
+  fifth tool.
 
 ## Proforma prices a flowsheet BioSTEAM ran (OF-BLD-014 Phase 8)
 
@@ -860,6 +871,41 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   `THREAD_LETTER_CLASS`, which `programs.ts` builds (`[A-Q]` today), so a
   new thread changes `programs.ts` first and `check:seed` names what has not
   followed.
+
+## Nothing invented on screen (OF-BLD-016)
+
+- **Postdoc speaks only through the service.** `src/sim/` is gone, the
+  scripted player and its invented delays with it, and `check:seed` refuses
+  the directory and any import from `@/sim` or `../sim` under `src/`. There
+  is no Scripted mode, no Inspector and no seed session; the store has no
+  `chatMode`. With the service down Postdoc says *Postdoc needs the
+  service* and how to start it (`pnpm prototype:up`), keeps the
+  conversations, and puts a question it could not ask back in the box.
+  `SUGGESTED_PROMPTS` is `livePrompts.ts` (`check:seed` holds it): the yeast
+  five, then Appendix 2's six cross-module questions, filtered by program.
+  The F flows stay in `flows.ts` as the evaluation set, graded against and
+  never offered. `src/data/misc.ts` is gone with its seed sessions, activity
+  and collections; Home's activity card says nothing has happened in this
+  browser yet and names the next step.
+- **No demo chrome.** No banner; the top bar shows the reviewer name or *No
+  reviewer name set*, linking to Settings. Settings' button is *Clear this
+  browser's data* (`clearBrowserData`, the Durable tier alone). Intake →
+  Ingest has no reset button, no placeholder DOI and no inactive card; *How
+  a paper enters* names `pnpm thread:propose`, a person's approval,
+  `pnpm thread:apply`, then Fetch. Authored cost surfaces are labelled *Cost
+  model v0*.
+- **`check:seed` holds it (E.3′).** It walks the syntax tree of every
+  `.ts`/`.tsx` under `src/` and fails on *demo*, *sample run*, *stand-in*,
+  *placeholder* or *scripted* in any string literal, template part or JSX
+  text. Comments never count, nor do code tokens (`'demo'` the provenance,
+  `tick-demo`); `ALLOWED` names three exceptions with why: the
+  `demo:offline` replay label, `rb-taq-kigali`'s locked prediction basis
+  (its words are in the lock digest), and the CSV legend that names the
+  `demo` provenance code.
+- **The double keeps its fixtures** (D4). `demo.py --prototype`,
+  `scripts/lib/service-double.mjs` and `pnpm demo:offline` are how verify
+  runs with no key; a user never sees them, and a replayed answer says it is
+  a replay.
 
 ## Persistence tiers
 

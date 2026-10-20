@@ -186,8 +186,7 @@ The rules a proposal holds to (OF-BLD-016 §1.R), in `proposals.propose`:
   `home_read` serve it without its note, why and target, and keep its field
   ids, as Guild's checks serve theirs; the store keeps every word. Home shows
   it to the lead and assessors alone (`mayQueue`), never to the person it
-  names (`shownTo`), and to nobody while the sample team is shown
-  (`shownProposals` in `src/lib/proposals.ts`).
+  names (`shownTo`), through `shownProposals` in `src/lib/proposals.ts`.
 
 ## The MCP server
 

@@ -73,38 +73,43 @@ programs, and shown by the same switch under a banner that says so.
 
 ## What is real, and what is modeled
 
+Measured on 2026-10-20 in the build checkout, over the data on `openferment-data`. Nothing a user
+sees by default is invented: there is no scripted agent, no sample team, no sample run and no
+sample figure on any screen, and the seed's runbooks, casein protocols, authored cost scenarios and
+casein lessons, which describe runs nobody made, are flagged as examples and hidden with the
+archived programs (above).
+
 | Layer | Status |
 |---|---|
-| Papers, venues, identifiers | **Real, unevenly keyed** — 167 catalogued entries: 132 in threads A–O, and 35 in thread P, approved by rule and by name (above), each with a PMCID; 94 carry a DOI/PMCID/PMID, 73 carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
-| Full text | **Real, when fetched** — as of 2026-10-15, **66 of the 94** papers that carry an identifier return full text from Europe PMC (`pnpm intake:fetch --all`): 31 of threads A–O's 59 (25 of the 27 with a PMCID, 6 found by DOI or PMID) and all 35 of thread P; 26 have no open-access text there, and B1 and D1 sit outside Europe PMC's open-access subset, where its full-text endpoint answers 500. Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
-| Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document |
-| Extractor run | **Real, when run** — `claude-1`: Claude Opus 5.5 (Sonnet 5.5 where Opus declines), one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; as of 2026-10-15, **0 candidates anchored, 0 rejected** in this checkout: the key on the cloud environment is not scoped to a workspace, and the API refuses every call made with it (`pnpm intake:extract --all`; reasons in Witness; `pnpm witness:numbers` prints Witness's scores) |
-| Verified records | **0** as of 2026-10-14 — a verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` into `core/data/biorepo.json` |
-| Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice |
-| Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. The **sample team** a screen can show is invented, labelled as such, and never posted or kept |
+| Papers, venues, identifiers | **Real, unevenly keyed** — 189 catalogued entries: 132 in threads A–O, 35 in thread P and 22 in thread Q, the last two approved by rule and by name. 114 carry a DOI, PMCID or PMID, two (the SGD strain entries) a source URL alone, and 73, all in threads A–O, carry none. `pnpm ids:propose` asks Crossref for a DOI for each of the 73 and a person approves each one before `pnpm ids:apply` writes it into the seed |
+| Full text | **Real, when fetched** — **88** papers return full text from Europe PMC, OSTI or SGD (`pnpm intake:fetch --all`): 31 of threads A–O, all 35 of thread P and all 22 of thread Q; 26 of threads A–O have no open-access text there (B1 and D1 sit outside Europe PMC's open-access subset, where its full-text endpoint answers 500). Fetched text stays on the machine that fetched it; the rest show the curator's note and say so |
+| Extracted values | **Real** — 132 curated records traceable to a source, plus 2 `industry-estimate` figures with no source document (all casein, archived); and **500** values the extractor anchored to a sentence of a fetched paper: **163** on thread Q, 303 on thread P, 34 on threads A–O. Every one is `unverified` until a person decides it in Guild |
+| Extractor run | **Real** — `claude-1`, one structured response per fetched paper, every candidate anchored to a verbatim quote or dropped and counted; in this build on `claude-haiku-5-5` at effort `medium` by the owner's rule (`llm.py`'s defaults are Claude Opus 5.5, then Claude Sonnet 5.5). Thread Q's run anchored 163 values and dropped 15 for $0.25 |
+| Verified records | **0** — `core/data/biorepo.json` holds no decision. A verified record is one a named reviewer (Settings → Reviewer name; the service refuses `you`) promoted against a quote in the paper's own text, through `biorepo.write` |
+| Strains, protocols, ontology | **Real** — drawn from the literature and standard bench practice. Two protocols show by default (`PR-OD-01`, `PR-CIP-01`, generic methods); the seven casein protocols are examples |
+| Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. With no ledger, Guild and Home's Workforce card say so and offer the form to add the first person, as the lead |
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
-| Practice scenarios and tutor sessions | **Model-written words over copied values** — Claude Opus 5.5 (Sonnet 5.5 as fallback) drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. Kept in `core/data/practice.json` on the Mini, out of git |
-| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): `e_coli_core` and `iJO1366` as bundled with cobra 0.32.1, with the phaCAB route added, and the *C. necator* H16 reconstruction `RehMBEL1391`, fetched at its pinned commit and hash. As of 2026-10-15 the six values of OF-BLD-014 Appendix 2 reproduce within 0.1 % (PHB on glucose: 0.4779 g/g central carbon, 0.5931 g/g genome scale; on fructose in *C. necator*: 0.5932 g/g). A ceiling has no time axis and no vessel. No reported PHA yield is in the store yet to draw beside it: thread P's extraction waits on a key the API accepts |
-| Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling; a fitted rate and a price in later phases) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **8** kept as of 2026-10-15 and pushed to `openferment-data`: r-B5-3's 17.5 d in hours (the Phase 3 screenshots), and seven geneOS ceilings, envelopes and mixes computed for the Phase 6 screenshots |
-| Retrieval | **Real, measured** — as of 2026-10-15, the 66 fetched papers are cut into **5,043** passages of their own words (`pnpm index:build`), with meaning vectors from `BAAI/bge-small-en-v1.5` (`--dense`). Five search lanes; `pnpm rag:eval` scores each on the same questions and a fixed rule picks the default: **bm25**, on K nDCG@10 **0.395**, recall@10 **1.000** (hybrid 0.167 and 0.500), F 0.000 for both. K holds 2 questions and F 3 flows, so the choice is provisional: the written set S and the three lanes that call a model wait for a key the API accepts. BioRepo → Search, Witness → Retrieval |
-| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. As of 2026-10-15 no real run has been fitted: none is deposited with timed readings. The sample run is invented and labelled |
-| Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. As of 2026-10-15 the seed locks 24 predictions and no run has tested one. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
-| Simulation economics, authored | **Modeled** — the three scenarios S1–S3 are illustrative cost surfaces written by hand, not validated, and labelled so |
-| Simulation economics, BioSTEAM | **Simulated, draft** — `sc-pha-1` runs a BioSTEAM flowsheet (fermentation, harvest and drying of PHA; pretreatment, extraction, wastewater and co-products left out) over 500 seeded samples and shows the price as a distribution with what moves it. Its finance and properties are the published corn stover biorefinery's; that benchmark reproduces here at **1.9677** USD per gallon against 1.968 for `biorefineries` 2.35.1 (2026-10-15). Every input names its source: thread P records or a named person's assumption, which makes the run demo. As of 2026-10-15 no thread P record exists to bind (the extraction waits on a key), so all seven inputs wait |
-| Agent answer prose | **Real model calls in a bounded loop** — Postdoc on Claude Opus 5.5, restarted once on Claude Sonnet 5.5 on a refusal or an outage, through `openferment-core`. It searches the records and the papers' passages with its tools (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, quoted sentences checked word for word against their passages, or computed values. As of 2026-10-15 the loop is tested offline against a scripted stand-in only: the key on the cloud environment is refused, so the twelve flows and the ten PHA questions (`pnpm ask:batch`) wait on a key. 13 authored flows remain as the scripted mode and the acceptance tests |
+| Practice scenarios and tutor sessions | **Model-written words over copied values** — the model drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. A session goes on a person's ledger only when that person is on it. Kept in `core/data/practice.json` on the Mini, out of git |
+| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): for ethanol, Yeast9 (yeast-GEM v9.1.1) and iMM904, two reconstructions of *S. cerevisiae* S288C, each giving **0.5114** g g⁻¹ on glucose (OF-BLD-016 B.1); for PHB (archived), `e_coli_core` and `iJO1366` as bundled with cobra with the phaCAB route added, and `RehMBEL1391` for *C. necator* H16, fetched at its pinned commit and hash. A ceiling has no time axis and no vessel; geneOS → Model draws thread Q's reported ethanol yields beside it and rings one above it for a reviewer |
+| Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling, a fitted rate, a price) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **25** kept in this checkout and on `openferment-data` |
+| Retrieval | **Real, measured** — 88 fetched papers cut into **7,179** passages of their own words, with meaning vectors from `BAAI/bge-small-en-v1.5`. Witness → Retrieval's scorecard is measured on thread Q (2026-10-20T07:46:46Z): K 85 questions, S 83, F empty; the rule's score (mean nDCG@10 on K and S) bm25 0.4226, bm25+expand 0.4294, hybrid 0.4587, bm25+rerank **0.5942**, hybrid+rerank not scored. The rule chose bm25+rerank; search is held on **hybrid** (`core/data/index/config.json`), because each reranked search is a model call of about twenty seconds, and Witness names both the lane in use (`laneInUse`) and the rule's choice |
+| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. No run is deposited, so nothing real has been fitted: fermOS says *No run deposited yet* and names the readings to deposit and where |
+| Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. The seed's ten runbooks (eight of them locked) are examples, so by default the ledger counts zero and says why; no run has tested a prediction. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
+| Simulation economics, authored | **Modeled, and examples** — the three scenarios S1–S3 are illustrative casein cost surfaces written by hand, not validated, labelled *Cost model v0*, and hidden with the archive |
+| Simulation economics, BioSTEAM | **Simulated, draft** — the stored benchmark, `biorefineries.cornstover` with its own defaults, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15); `selling_price` cites it. `sc-pha-1` (archived with PHA) runs a BioSTEAM flowsheet of fermentation, harvest and drying of PHA over 500 seeded samples; every input names thread P records or a named person's assumption, which makes the run `demo`. No ethanol scenario exists yet |
+| Agent answer prose | **Real model calls in a bounded loop** — Postdoc on the configured model (`claude-haiku-5-5` in this build), restarted once on the fallback on a refusal or an outage, through `openferment-core`. Code sweeps the eleven modules first; the loop reads them, searches the records and passages (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, module rows, quoted sentences checked word for word against their passages, or computed values. There is no scripted mode: with the service down Postdoc says so, keeps the history, and offers nothing in its place. The eleven run-sheet questions, each asked twice on 2026-10-20, cost $0.1072 for the 22 and took 8–53 s each (`docs/DEMO.md`). The 13 authored flows are an evaluation set, graded against and never offered |
 
-The corpus is real literature. That is the whole point of OF-COR-001, and it is why the
-demo-labelling policy is narrow rather than blanket: only the two genuinely synthetic
-surfaces — simulation grids and scripted agent text — carry demo treatment. Everything else
-carries its actual provenance.
+The corpus is real literature, and since OF-BLD-016 nothing on screen is invented. `demo` is a
+provenance, not a mode: it marks a value modeled rather than measured (an authored cost surface, a
+computed value resting on a named assumption), and it is one of the two dashed ticks. Everything
+else carries its actual provenance.
 
-"Real" is not the same as "complete", and the app is built to say so. 36 of the 132 entries
-carry a DOI, 59 carry some persistent identifier, 50 record no authors, and 18 sit at
+"Real" is not the same as "complete", and the app is built to say so. Of the 132 casein entries,
+36 carry a DOI, 59 carry some persistent identifier, 50 record no authors, and 18 sit at
 `year: 0` because OF-COR-001 states no year. `curated` — the provenance on 132 of the 134
-records — means *transcribed from the curation document and not yet checked against the source
-PDF*. It does not mean verified. A record becomes `verified` only through a review decision in
-Guild, which `biorepo.write` stores in `core/data/biorepo.json` and `pnpm export:corpus` merges;
-the counts in the table above are what that file held when this README was written.
+seed records — means *transcribed from the curation document and not yet checked against the
+source PDF*. It does not mean verified. A record becomes `verified` only through a review decision
+in Guild, which `biorepo.write` stores in `core/data/biorepo.json` and `pnpm export:corpus` merges.
 
 ### Seed inventory
 
@@ -192,15 +197,18 @@ workspace's id. Put the id in `core/.env` as `OPENFERMENT_WORKSPACE_ID`; every
 client sends it as the `anthropic-workspace-id` header, and `pnpm ready` names
 the setting when the 400 comes back.
 
-Then switch Postdoc to **Live**. If the service is not running the screen says
-so and tells you what to type — it never falls back to the scripted flows. A
-convincing fake standing in for a broken service is worse than a blank screen,
-because everything looks like it is working.
+Postdoc has one path, the service. If the service is not running the page says
+*Postdoc needs the service*, tells you what to type (`pnpm prototype:up`), keeps
+your conversations, and puts a question it could not ask back in the box. There is
+no scripted mode to fall back to: a convincing fake standing in for a broken service
+is worse than a blank screen, because everything looks like it is working.
 
-The thirteen authored conversations are still here, and they are the acceptance
-criteria now rather than a parallel implementation: `pnpm test:live` asks the
-real pipeline each one and checks the plan cites the records a human said were
-the answer. `pnpm verify` stays offline and needs no key.
+Its empty state offers the yeast program's five questions and six that cross the
+modules (`src/data/livePrompts.ts`), filtered by program. The thirteen authored
+conversations of the casein and PHA flows are an evaluation set, graded against and
+never offered: `pnpm test:live` asks the real pipeline each one and checks the plan
+cites the records a human said were the answer. `pnpm verify` stays offline and
+needs no key.
 
 Every model call goes through `core/openferment_core/llm.py`. With nothing set it asks **Claude Opus
 5.5** first and **Claude Sonnet 5.5** when Opus declines or is unavailable (this build sets Haiku for both, above), and it
@@ -516,23 +524,29 @@ still broken. Rendering is not working.
 
 ## What "working" means here
 
-The simulation holds itself to eight conditions (design §11):
+The prototype holds itself to nine conditions (design §11, and OF-BLD-016's eighth):
 
 1. **No dead controls.** Every visible button, link, chip, toggle, and slider does its
    designed thing, or is explicitly labeled inactive.
 2. **No lorem ipsum.** Every string is real copy; every datum comes from the seeded corpus.
 3. **Traversable journeys.** Every cross-entity path — chip → reader → record → strain →
    protocol → scenario — is walkable in both directions.
-4. **Believable time.** Latency is simulated per operation class, so the prototype
-   demonstrates the *pacing* of the product, not just its layouts.
-5. **Deterministic where it matters.** Scripted agent flows and simulation results are
-   reproducible run to run; randomness is confined to cosmetic timing jitter.
+4. **Time as it is.** No screen waits on an invented delay; each draws when its data is
+   there. What remains of the simulated pacing is the browser's job queue (`startJob` /
+   `tickJobs` in `store.ts`, paced by `simSpeed`): Intake's real fetch and extract jobs report
+   the service's progress, while BioRepo's and the reader's extraction jobs and the runbook
+   jobs still advance through authored stages.
+5. **Deterministic where it matters.** Simulation results and every computed value are
+   reproducible run to run (a computed value is replayed from its inputs); only the model's
+   words vary, and a validator holds them to the evidence.
 6. **Functional protocols.** Scaling math, timers, run logging, materials aggregation,
    version diffs, and exports actually compute.
-7. **Honest boundaries.** Session-only persistence, catalogued-not-ingested papers, and
-   modeled economics are labeled at the shell level and at every point of possible confusion.
-8. **The golden path holds.** The ten-minute demo script runs start to finish with no dead
-   ends, offline, with no external calls.
+7. **Honest boundaries.** Browser-only persistence, catalogued-not-fetched papers, archived
+   programs, examples and modeled economics are labeled at every point of possible confusion.
+8. **Nothing invented on screen.** No sample team, sample run, sample figure, scripted answer,
+   placeholder DOI or demo banner reaches a default view; `check:seed` fails on the words.
+9. **The golden path holds.** The demo script runs start to finish with no dead ends,
+   offline, with no external calls.
 
 ## Module map
 
@@ -689,46 +703,36 @@ In production the frozen grids become caches in front of a real BioSTEAM worker 
 same `Scenario`/`ResultGrid` contract. Nothing in the UI changes, which is the point of
 specifying it this way.
 
-### Simulated agent
+### No simulated agent
 
-One working mode. **Scripted** is offline and deterministic: it plays seeded conversation
-flows — the plan ticks, tool calls appear, retrieval sets render, the answer streams. Because
-every message comes from the flow object, the inspector's "trace" is the literal data that
-produced the answer, honest by construction rather than reconstructed afterward. The composer
-offers a **Live** toggle, which is not inert: with `openferment-core` running it is Postdoc's
-loop of real model calls, its steps drawn as they arrive (see *Postdoc runs on Claude Opus*
-above), and with the service down it says so and plays nothing in its place. In scripted mode
-no language model is called.
-
-When no flow matches, a fallback ladder takes over: first an **entity-lookup flow** that
-genuinely queries the seeded store and answers from live data with real chips, subject to the
-same `isAggregatable()` gate as every other statistic; failing that, an explicit decline naming
-what the corpus does cover.
-
-Getting that ladder to actually run took work. Intent matching originally scored whole-phrase
-containment in both directions, so a two-character query sitting inside a trigger scored 70+
-and played a full scripted answer: `"hi"` scored 79.6, `"cost"` 76. Keyword overlap measured
-only how much of the *trigger* the query covered, never how much of the query the trigger
-accounted for, so `"max secreted yield from tomatoes"` scored 52.5 and answered `15 mg/L` about
-*Chlamydomonas*. Matching now scores the F1 of both coverage directions, weights query tokens
-by corpus document frequency so a rare unmatched term outweighs the common ones it shares, and
-multiplies confidence by 0.4 for every token absent from the corpus vocabulary. All 65 authored
-triggers still route to their own flow; the probes above now fall through to the ladder.
+There was one: a scripted player in `src/sim/` that replayed authored conversations
+offline, with invented delays. OF-BLD-016 removed it. Postdoc's only path is the
+service's loop of real model calls, and with the service down it says so and plays
+nothing in its place. The authored flows survive in `src/data/flows.ts` as the
+evaluation set (`pnpm test:live`, and Witness's F set) and are never shown as answers.
+The service double the browser tests use (`scripts/lib/service-double.mjs`) replays
+loops recorded by the real code over a stand-in model, and a replayed answer says it
+is a replay.
 
 ## Honesty policy
 
-Real corpus, modeled economics — so the labelling is targeted rather than blanket:
+Real corpus, real model calls, modeled economics — so the labelling is targeted rather than
+blanket, and nothing on screen is invented:
 
-1. A persistent shell banner: *"Real literature · modeled economics."*
-2. The dashed demo tick on modeled values; real records carry their real provenance. Citation
-   chips show title, authors, year, venue and the quoted span — an identifier reaches the
-   clipboard via "Copy citation" when the paper has one, which 59 of 132 do.
-3. A colophon at `/settings/about` with the full fidelity matrix — computed vs. scripted vs.
-   visual.
-4. Simulation headlines permanently subtitled *"Demo model v0 — illustrative economics, not
-   validated."*
-5. Agent answers footer the fact that their prose is scripted, alongside a source count.
-6. Exports embed the disclosure. CSVs carry the 11-line provenance header from `src/lib/csv.ts`;
+1. No demo banner and no demo account: the top bar shows the reviewer name, or *No reviewer
+   name set* with the link to set one.
+2. Every value carries its provenance tick; the dashed `demo` tick marks a value modeled rather
+   than measured. Citation chips show title, authors, year, venue and the quoted span — an
+   identifier reaches the clipboard via "Copy citation" when the paper has one.
+3. A colophon at `/settings/about` with the fidelity matrix — computed, authored or visual.
+4. Authored cost surfaces are permanently subtitled *"Cost model v0 — illustrative economics,
+   not validated."*
+5. Postdoc's claims carry no number of their own; each value is rendered from the record, row,
+   passage or computed value it cites, and the plan shows the model that answered and the cost.
+6. Example runbooks, protocols, scenarios and lessons are hidden by default and, when shown,
+   open under a banner saying they describe a run nobody made. Archived programs open under a
+   banner naming the program and the switch.
+7. Exports embed the disclosure. CSVs carry the 11-line provenance header from `src/lib/csv.ts`;
    run logs, review sessions, materials checklists and agent answers carry their own headers
    saying the same thing in the shape their format allows.
 
