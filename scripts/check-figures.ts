@@ -27,7 +27,7 @@ import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
-import { yieldsOnSugar } from '../src/lib/geneos';
+import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';
 
 const problems: string[] = [];
 const ok: string[] = [];
@@ -136,7 +136,16 @@ if (demoRule[0]?.[4] !== 'demo') problems.push(`a demo ceiling's rule draws as $
 const mk = (id: string, carbonSource?: string) => ({ ...records[0], id, field: 'pha_yield_substrate', carbonSource }) as unknown as ExtractionRecord;
 const sorted = yieldsOnSugar([mk('a', 'glucose'), mk('b', 'glycerol'), mk('c'), mk('d', 'D-glucose syrup')], 'glucose');
 if (sorted.on.map((r) => r.id).join() !== 'a,d' || sorted.elsewhere !== 2) problems.push(`yieldsOnSugar kept ${sorted.on.map((r) => r.id).join()} for glucose`);
-ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, a yield meets only its own sugar\'s ceiling');
+// A ceiling meets only its own product's yields: a PHA yield never stands
+// beside an ethanol ceiling, and a product whose field the ontology lacks
+// draws nothing.
+const etoh = { ...mk('e', 'glucose'), field: YIELD_FIELD.ethanol } as unknown as ExtractionRecord;
+const onEthanol = yieldsOnSugar([mk('a', 'glucose'), etoh], 'glucose', 'ethanol');
+const wantEthanol = yieldFieldKnown('ethanol') ? 'e' : '';
+if (onEthanol.on.map((r) => r.id).join() !== wantEthanol) problems.push(`an ethanol ceiling meets ${onEthanol.on.map((r) => r.id).join() || 'nothing'}, not ${wantEthanol || 'nothing'}`);
+const unknown = yieldsOnSugar([mk('a', 'glucose')], 'glucose', 'no-such-product');
+if (unknown.on.length || unknown.elsewhere) problems.push('a product with no yield field in the ontology draws records');
+ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, a yield meets only its own sugar\'s and its own product\'s ceiling');
 
 // §9.R — the dossier keeps what came back, in the chain's order, and names
 // what did not; one missing artifact no longer blanks the band.

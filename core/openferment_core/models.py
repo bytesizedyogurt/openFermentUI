@@ -162,6 +162,19 @@ def weakest_provenance(provenances: list[str]) -> str:
     return PROVENANCE_ORDER[worst] if worst < len(PROVENANCE_ORDER) else "demo"
 
 
+class PriorTurn(BaseModel):
+    """One earlier turn of the conversation a follow-up belongs to, in words:
+    the question as the person asked it, and the claims' text, the gaps and
+    the decline of the plan that answered it. The validator already held each
+    of these to Rule 1; the loop drops any that still holds a number. No id,
+    value or quote travels: a follow-up searches again before it cites."""
+
+    question: str
+    claims: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    declined: str | None = None
+
+
 class AskRequest(BaseModel):
     question: str
     # §6 caps evidence at 30 records. A caller asking for more is clamped rather
@@ -170,6 +183,9 @@ class AskRequest(BaseModel):
     # OF-BLD-014 §5.3: `agent` is the bounded loop (postdoc_agent.py), the
     # default; `single` is one retrieval and one call (postdoc.py).
     mode: Literal["agent", "single"] = "agent"
+    # The earlier turns of the same conversation, oldest first. The agent
+    # reads the last few as context; `single` mode ignores them.
+    history: list[PriorTurn] = Field(default_factory=list)
 
 
 # ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
@@ -189,15 +205,20 @@ class FetchedSection(BaseModel):
 
 
 class FetchLicense(BaseModel):
-    """What the JATS <license> element said. Stored beside every fetched text,
-    because Europe PMC's open-access subset spans several licences and the
-    text is kept local partly on that account (§2.2)."""
+    """What the JATS <license> element said, or what an OSTI report or an SGD
+    strain entry states of itself. Stored beside every fetched text, because
+    Europe PMC's open-access subset spans several licences and the text is
+    kept local partly on that account (§2.2)."""
 
     href: str | None = None
     text: str | None = None
 
 
 FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
+# Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
+# Saccharomyces Genome Database strain entry (thread Q). A file cached before
+# the field existed was fetched from Europe PMC, and reads as such.
+FetchSource = Literal["europepmc", "osti", "sgd"]
 
 
 class FetchResult(BaseModel):
@@ -212,9 +233,11 @@ class FetchResult(BaseModel):
     fetchedAt: str
     license: FetchLicense | None = None
     sections: list[FetchedSection] = Field(default_factory=list)
-    # Size of the XML as received. A sanity figure for the batch table and the
-    # quickest tell that a "success" was actually an error page.
+    # Size of the document as received: the XML, the PDF or the JSON. A sanity
+    # figure for the batch table and the quickest tell that a "success" was
+    # actually an error page.
     bytes: int = 0
+    source: FetchSource = "europepmc"
 
 
 class IntakeStatus(BaseModel):
@@ -229,6 +252,7 @@ class IntakeStatus(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
+    source: FetchSource = "europepmc"
 
 
 class OverlayPaper(BaseModel):
@@ -244,6 +268,9 @@ class OverlayPaper(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
+    # Who served the text, so the reader names its source rather than
+    # assuming Europe PMC.
+    source: FetchSource = "europepmc"
 
 
 class Overlay(BaseModel):
@@ -990,6 +1017,10 @@ class GeneosModelInfo(BaseModel):
     # The sugar a view opens on: one the model can take up.
     feed: str
     notes: list[str] = Field(default_factory=list)
+    # The product a view opens on, and every product the shelf names a route
+    # to in this model ("phb", "ethanol"); the worker decides what it makes.
+    product: str
+    products: list[str] = Field(default_factory=list)
 
 
 GeneosKind = Literal["ceiling", "frontier", "mix"]

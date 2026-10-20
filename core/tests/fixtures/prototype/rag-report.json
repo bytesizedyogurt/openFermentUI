@@ -2,7 +2,7 @@
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
   "response": {
     "date": "2026-09-15T09:00:00Z",
-    "manifestHash": "48f0699fba6d0f32",
+    "manifestHash": "77fd7eea55f1a93a",
     "papersIndexed": 1,
     "passages": 7,
     "sets": [

@@ -1,6 +1,7 @@
 // Single store (OF-DES-001 §13.3). All mutations flow through actions so
 // provenance-affecting changes fan out to derived views in one place.
-// No localStorage/sessionStorage anywhere — session-only by design (§9.5).
+// No localStorage/sessionStorage anywhere — session-only by design (§9.5);
+// what must survive a reload goes to the Durable tier (src/lib/durable.ts).
 import { create } from 'zustand';
 import type {
   InputAssumption,
@@ -13,6 +14,9 @@ import type {
   ClearanceStateId,
   ChatSession,
   Collection,
+  LiveConversation,
+  LiveTurn,
+  TraceStep,
   Deposition,
   Deviation,
   ExtractionRecord,
@@ -117,6 +121,12 @@ interface UndoFrame {
 
 let seq = 0;
 export const nextId = (prefix: string) => `${prefix}-${++seq}`;
+
+/** An id that stays unique across reloads: the time, and a counter for ties. */
+export const timeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq}`;
+
+/** How many Live conversations the Durable tier keeps, newest first. */
+const MAX_LIVE_CONVERSATIONS = 30;
 
 /** Deterministic clock-free timestamp label for audit entries. */
 function stamp(): string {
@@ -292,6 +302,12 @@ export interface OFState {
   modules: LearnModule[];
   activity: ActivityEvent[];
   sessions: ChatSession[];
+  /**
+   * Postdoc's Live conversations, newest first. Durable: a question asked
+   * here is still on the page after a citation is followed and after a
+   * reload, and a follow-up reads the turns before it.
+   */
+  liveConversations: LiveConversation[];
 
   // ── runtime ──────────────────────────────────────────────────────────
   runs: Record<string, RunState>;
@@ -419,6 +435,14 @@ export interface OFState {
 
   // chat
   createSession: (title: string, scope?: ChatSession['scope']) => string;
+  /** A new Live conversation, first in the list; returns its id. */
+  startLiveConversation: (title: string) => string;
+  /** Add a turn to a Live conversation. */
+  addLiveTurn: (conversationId: string, turn: LiveTurn) => void;
+  /** Change a turn; a step is appended with `step`. */
+  patchLiveTurn: (conversationId: string, turnId: string, patch: Partial<LiveTurn> & { step?: TraceStep }) => void;
+  /** Remove a Live conversation. */
+  dropLiveConversation: (conversationId: string) => void;
   appendMessage: (sessionId: string, msg: ChatMessage) => void;
   updateMessage: (sessionId: string, msgId: string, patch: Partial<ChatMessage>) => void;
   pinEvidence: (sessionId: string, hits: ChatSession['pinned']) => void;
@@ -758,6 +782,7 @@ const seedState = () => ({
   modules: structuredClone(MODULES),
   activity: structuredClone(ACTIVITY),
   sessions: structuredClone(SEED_SESSIONS),
+  liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
   activeRunId: null,
   jobs: [] as Job[],
@@ -1258,6 +1283,7 @@ export const useStore = create<OFState>()((set, get) => ({
             license: result.license?.href ?? result.license?.text ?? null,
             fetchedAt: result.fetchedAt,
             reason: null,
+            source: result.source,
           },
         },
         records: {},
@@ -2290,6 +2316,39 @@ export const useStore = create<OFState>()((set, get) => ({
       }),
     })),
 
+  // Live conversations take time-based ids, because nextId restarts on a
+  // reload and these outlive one (the same reason adopted runbooks do).
+  startLiveConversation: (title) => {
+    const id = timeId('lc');
+    const conversation: LiveConversation = { id, title, startedAt: stamp(), turns: [] };
+    set((s) => ({ liveConversations: [conversation, ...s.liveConversations].slice(0, MAX_LIVE_CONVERSATIONS) }));
+    return id;
+  },
+
+  addLiveTurn: (conversationId, turn) =>
+    set((s) => ({
+      liveConversations: s.liveConversations.map((c) =>
+        c.id === conversationId ? { ...c, turns: [...c.turns, turn] } : c,
+      ),
+    })),
+
+  patchLiveTurn: (conversationId, turnId, { step, ...patch }) =>
+    set((s) => ({
+      liveConversations: s.liveConversations.map((c) =>
+        c.id !== conversationId
+          ? c
+          : {
+              ...c,
+              turns: c.turns.map((t) =>
+                t.id !== turnId ? t : { ...t, ...patch, steps: step ? [...t.steps, step] : (patch.steps ?? t.steps) },
+              ),
+            },
+      ),
+    })),
+
+  dropLiveConversation: (conversationId) =>
+    set((s) => ({ liveConversations: s.liveConversations.filter((c) => c.id !== conversationId) })),
+
   // ── learn ────────────────────────────────────────────────────────────
   // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map
   // remembers which lessons were finished here across a refresh. Whether a
@@ -2475,6 +2534,9 @@ export const useStore = create<OFState>()((set, get) => ({
         // §8.4 — assumptions typed here; anything typed since load wins.
         proformaAssumptions: mergeAssumptions(snap.proformaAssumptions ?? {}, s.proformaAssumptions),
         adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
+        // Postdoc's Live conversations. A turn still running when the page
+        // went away has no stream to finish it, and says so.
+        liveConversations: mergeConversations(snap.liveConversations ?? [], s.liveConversations),
       };
     });
     if (get().serviceUp) void get().syncGuild();
@@ -2515,6 +2577,7 @@ export const useStore = create<OFState>()((set, get) => ({
           // SOMETHING, and the curator's words labelled as such beat nothing.
           sections: fetched ? o.sections : p.sections,
           license: fetched ? (o.license ?? undefined) : p.license,
+          fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
           ingestReason: o.reason ?? undefined,
         } as Paper;
       });
@@ -3521,7 +3584,24 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     adoptedRunbooks: s.runbooks
       .filter((r) => s.adoptedRunbookIds.includes(r.id))
       .map((r) => ({ ...structuredClone({ ...r, predictions: [...r.predictions], measurementSchema: [...r.measurementSchema] }), lockedAt: null, lockHash: null })),
+    liveConversations: s.liveConversations,
   };
+}
+
+/**
+ * The Live conversations after a hydrate: those this page started since it
+ * loaded, then the snapshot's, newest first, one per id. A turn the snapshot
+ * left running was cut short by the reload and is marked so.
+ */
+function mergeConversations(saved: LiveConversation[], current: LiveConversation[]): LiveConversation[] {
+  const ids = new Set(current.map((c) => c.id));
+  const restored = saved
+    .filter((c) => !ids.has(c.id))
+    .map((c) => ({
+      ...c,
+      turns: c.turns.map((t) => (t.status === 'running' ? { ...t, status: 'interrupted' as const } : t)),
+    }));
+  return [...current, ...restored].slice(0, MAX_LIVE_CONVERSATIONS);
 }
 
 if (durableAvailable()) {
@@ -3538,7 +3618,8 @@ if (durableAvailable()) {
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
       s.proformaAssumptions === prev.proformaAssumptions &&
-      s.adoptedRunbookIds === prev.adoptedRunbookIds
+      s.adoptedRunbookIds === prev.adoptedRunbookIds &&
+      s.liveConversations === prev.liveConversations
     )
       return;
     saveDurable(snapshotOf(s));

@@ -7,10 +7,11 @@ half-written file. For biorepo.json, the committed record of who decided what,
 that would be the decisions themselves. A reader in another process (the
 nightly job writes while the server reads) could also catch a file mid-write.
 
-`write_text` here writes beside the target, flushes to disk, then renames over
-it. A rename within one directory is atomic, so the target holds either the
-old contents or the new ones, never a mixture, and a failed write leaves the
-old file exactly as it was and nothing beside it.
+`write_text` here (and `write_bytes`, for a file kept byte for byte as it was
+fetched) writes beside the target, flushes to disk, then renames over it. A
+rename within one directory is atomic, so the target holds either the old
+contents or the new ones, never a mixture, and a failed write leaves the old
+file exactly as it was and nothing beside it.
 
 "Flushes to disk" has to mean the disk. On macOS, fsync hands the data to the
 drive, whose own cache can still lose it in a power cut; F_FULLFSYNC asks the
@@ -57,6 +58,12 @@ def _sync_folder(folder: Path) -> None:
 
 def write_text(path: Path, text: str) -> None:
     """Replace `path` with `text` (UTF-8) atomically, creating its folder."""
+    write_bytes(path, text.encode("utf-8"))
+
+
+def write_bytes(path: Path, data: bytes) -> None:
+    """Replace `path` with `data` atomically, creating its folder: a file
+    kept as it was fetched (a model file, whose hash is its pin)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         mode = path.stat().st_mode & 0o777
@@ -64,11 +71,11 @@ def write_text(path: Path, text: str) -> None:
         mode = 0o644
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "wb") as f:
             # mkstemp makes the file owner-only; give it the permissions the
             # file it replaces had, or ordinary ones for a new file.
             os.fchmod(f.fileno(), mode)
-            f.write(text)
+            f.write(data)
             f.flush()
             _flush(f.fileno())
         os.replace(tmp, path)

@@ -40,6 +40,7 @@ import {
 } from '@/components/ui';
 import { delayClass } from '@/sim/latency';
 import { locateQuote } from '@/lib/review';
+import { fetchSourceName } from '@/lib/intake';
 
 const STAGE_KEYS = ['fetch', 'parse', 'chunk', 'embed', 'extract'] as const;
 const STAGE_LABELS = ['Fetch', 'Parse', 'Chunk', 'Embed', 'Extract'];
@@ -463,7 +464,7 @@ export default function PaperReader({
         <div className="mt-2 text-caption text-accent flex items-start gap-1.5">
           <span className="inline-block w-[3px] h-3 rounded-[1px] shrink-0 mt-[3px] bg-accent" aria-hidden />
           <span>
-            Full text from Europe PMC{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
+            Full text from {fetchSourceName(paper.fetchedFrom)}{paper.license ? <> · licence <span className="font-num">{paper.license}</span></> : null}.
             The sections below are the paper&rsquo;s own words; a record whose curated quote is not
             found in them is listed in the rail as pending verification, not hidden.
           </span>

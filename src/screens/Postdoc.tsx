@@ -22,11 +22,13 @@ import {
   X,
   Check,
   AlertCircle,
+  Square,
 } from 'lucide-react';
-import { useStore, provenanceOf } from '@/store';
+import { useStore, provenanceOf, timeId } from '@/store';
 import { navigate, useRoute } from '@/router';
-import type { AnswerPlan, ChatMessage, ChatRetrievalHit, ChatToolCall, TraceStep } from '@/data/types';
+import type { ChatMessage, ChatRetrievalHit, ChatToolCall, LiveConversation, LiveTurn } from '@/data/types';
 import { SUGGESTED_PROMPTS } from '@/data/flows';
+import { LIVE_PROMPTS } from '@/data/livePrompts';
 import { send, sendFlow } from '@/sim/chat';
 import { fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
@@ -38,7 +40,7 @@ import { Markdown } from '@/components/Markdown';
 import { ProvDot } from '@/components/Provenance';
 import { useSeriesColor } from '@/lib/viz';
 import { AnswerPlanView, PostdocDownNotice } from '@/components/AnswerPlanView';
-import { askPostdocStream, postdocHealth, PostdocDown, type PostdocHealth, type ReplayInfo } from '@/lib/postdoc';
+import { askPostdocStream, postdocHealth, PostdocDown, priorTurns, type PostdocHealth } from '@/lib/postdoc';
 import { PlanTrace } from '@/components/PlanTrace';
 
 const SLASH_HINTS = [
@@ -257,31 +259,126 @@ function ToolMessage({ m, onInspect }: { m: Extract<ChatMessage, { kind: 'tool' 
 }
 
 /**
- * The live turn (OF-BLD-007 §8).
+ * Live mode (OF-BLD-007 §8): a conversation of questions, each answered by
+ * Postdoc's bounded loop (OF-BLD-014 §5.4), its steps drawn as the service
+ * completes them: what was searched, what came back, how long it took.
  *
- * Deliberately not a chat transcript. There is one question and one plan,
- * and drawing it as a conversation would imply a history the service does not
- * keep. Since OF-BLD-014 §5.4 the plan comes from Postdoc's bounded loop, and
- * its steps draw here as the service completes them: what was searched, what
- * came back, how long it took.
+ * A turn is NOT a ChatMessage. A scripted turn is a transcript the store
+ * holds; a live turn is a question and the AnswerPlan the service returned.
+ * Conflating them would invent a message shape for something that is not one,
+ * the mistake §1 warns about. So live turns keep their own shape (LiveTurn),
+ * in their own list (`liveConversations`), in the Durable tier: a citation
+ * followed and returned from, or a reload, finds the conversation where it
+ * was, and a follow-up sends the earlier turns' words with its question
+ * (`priorTurns`). The service keeps no history; the browser sends it.
  */
+
+/** The streams in flight, by turn id. Module-level, so Stop still reaches a
+ * question asked before the page last mounted. */
+const inflight = new Map<string, AbortController>();
+
+/** Whether somebody picked a mode on this page load; until then, Live is
+ * chosen for them when the service can answer. */
+let modeChosen = false;
+
+const TURN_NOTE: Record<Exclude<LiveTurn['status'], 'running' | 'answered' | 'failed'>, string> = {
+  stopped: 'Stopped before an answer came back. Nothing was kept from this question.',
+  interrupted: 'The page reloaded before this answer came back, so it never arrived. Ask it again.',
+};
+
+function LiveTurnView({
+  turn,
+  health,
+  latest,
+  onAskAgain,
+}: {
+  turn: LiveTurn;
+  health: PostdocHealth | null;
+  latest: boolean;
+  onAskAgain: (q: string) => void;
+}) {
+  const running = turn.status === 'running' && inflight.has(turn.id);
+  const steps = turn.plan?.trace ?? turn.steps;
+  return (
+    <article className="space-y-3" data-testid="live-turn">
+      {turn.replay && (
+        <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
+          {/* §10.R: a stand-in recording's date is fixed to keep the fixture
+              stable, so it claims none; a real recording names its day. */}
+          {turn.replay.standIn
+            ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
+            : `Replay of a run on ${turn.replay.recordedAt.slice(0, 10)}.`}{' '}
+          Nothing is being asked now.
+        </div>
+      )}
+      <div className="flex items-baseline gap-2">
+        <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
+        <p className="text-reading text-ink flex-1">{turn.question}</p>
+        <span className="font-num text-caption text-ink-soft shrink-0">{turn.askedAt}</span>
+      </div>
+
+      {(running || steps.length > 0) && (
+        <Card className="px-4 py-2">
+          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
+            {running ? (
+              <>
+                Working on{' '}
+                <span className="font-num normal-case">
+                  {/* After a restart the second model in the chain answers (§5.R). */}
+                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
+                </span>
+              </>
+            ) : (
+              'What Postdoc did'
+            )}
+          </div>
+          {latest || running ? (
+            <PlanTrace steps={steps} running={running} />
+          ) : (
+            <details>
+              <summary className="cursor-pointer text-caption text-ink-soft py-1">
+                {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+              </summary>
+              <PlanTrace steps={steps} running={false} />
+            </details>
+          )}
+        </Card>
+      )}
+
+      {turn.status === 'failed' && turn.error && <PostdocDownNotice message={turn.error.message} remedy={turn.error.remedy} />}
+      {(turn.status === 'stopped' || turn.status === 'interrupted') && (
+        <Callout kind="info" title={turn.status === 'stopped' ? 'Stopped' : 'No answer arrived'}>
+          <p className="text-ink">{TURN_NOTE[turn.status]}</p>
+          <button className="btn btn-sm mt-2" onClick={() => onAskAgain(turn.question)}>
+            <RefreshCw size={12} /> Ask again
+          </button>
+        </Callout>
+      )}
+      {turn.status === 'running' && !running && (
+        // A running turn with no stream behind it: the page reloaded mid-answer.
+        <Callout kind="info" title="No answer arrived">
+          <p className="text-ink">{TURN_NOTE.interrupted}</p>
+          <button className="btn btn-sm mt-2" onClick={() => onAskAgain(turn.question)}>
+            <RefreshCw size={12} /> Ask again
+          </button>
+        </Callout>
+      )}
+
+      {turn.plan && !running && <AnswerPlanView plan={turn.plan} />}
+    </article>
+  );
+}
+
 function LivePanel({
-  question,
-  plan,
-  steps,
-  down,
-  busy,
+  conversation,
   health,
   onAsk,
 }: {
-  question: string;
-  plan: AnswerPlan | null;
-  steps: TraceStep[];
-  down: { message: string; remedy: string } | null;
-  busy: boolean;
+  conversation: LiveConversation | null;
   health: PostdocHealth | null;
   onAsk: (q: string) => void;
 }) {
+  const turns = conversation?.turns ?? [];
   return (
     <div className="space-y-3 pt-1">
       {/* The service is up but cannot answer. A different problem from being
@@ -309,62 +406,52 @@ function LivePanel({
         </Callout>
       )}
 
-      {question && (
-        <div className="flex items-baseline gap-2">
-          <span className="text-caption uppercase tracking-wide text-ink-soft shrink-0">Asked</span>
-          <p className="text-reading text-ink">{question}</p>
+      {turns.map((t, i) => (
+        <div key={t.id} className={cx(i > 0 && 'pt-4 border-t border-line')}>
+          <LiveTurnView turn={t} health={health} latest={i === turns.length - 1} onAskAgain={onAsk} />
         </div>
-      )}
+      ))}
 
-      {(busy || steps.length > 0) && (
-        <Card className="px-4 py-2">
-          <div className="text-caption uppercase tracking-wide text-ink-soft mb-1">
-            {busy ? (
-              <>
-                Working on{' '}
-                <span className="font-num normal-case">
-                  {/* After a restart the second model in the chain answers (§5.R). */}
-                  {(steps.some((s) => s.kind === 'restart') ? health?.fallbackModel : health?.model) ?? 'the model'}
-                </span>
-              </>
-            ) : (
-              'What Postdoc did'
-            )}
-          </div>
-          <PlanTrace steps={plan?.trace ?? steps} running={busy} />
-        </Card>
-      )}
-
-      {down && <PostdocDownNotice message={down.message} remedy={down.remedy} />}
-
-      {plan && !busy && <AnswerPlanView plan={plan} />}
-
-      {!question && !busy && !down && (
+      {turns.length === 0 && (
         <div className="pt-6">
           <EmptyState
             title="Ask the corpus a question"
-            body="Postdoc searches the records and the papers' own text with its tools, then writes claims that carry no numbers of their own: every value is rendered from the record it cites, and every quoted sentence was checked word for word against its paper. A question the corpus cannot support gets an explicit decline."
+            body="Postdoc searches the records and the papers' own text with its tools, then writes claims that carry no numbers of their own: every value is rendered from the record it cites, and every quoted sentence was checked word for word against its paper. A question the corpus cannot support gets an explicit decline. Ask a follow-up and it reads this conversation first."
             icon={<Sparkles size={28} />}
           />
-          <div className="flex flex-wrap gap-2 justify-center mt-2">
-            {SUGGESTED_PROMPTS.map((p) => (
-              <button
-                key={p}
-                className="chip hover:border-accent hover:bg-accent-wash"
-                onClick={() => onAsk(p)}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          {LIVE_PROMPTS.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-center mt-2">
+              {LIVE_PROMPTS.map((p) => (
+                // A whole question, so it wraps rather than running off the column.
+                <button
+                  key={p}
+                  className="chip hover:border-accent hover:bg-accent-wash whitespace-normal text-left max-w-full py-1"
+                  onClick={() => onAsk(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+/** A turn's time, as the sessions list writes it. */
+function askedAt(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** What `activeId` holds after "New conversation", before its first question. */
+const NEW_CONVERSATION = 'new';
+
 export default function Postdoc({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
   const sessions = useStore((s) => s.sessions);
+  const liveConversations = useStore((s) => s.liveConversations);
   const createSession = useStore((s) => s.createSession);
   const appendMessage = useStore((s) => s.appendMessage);
   const pinEvidence = useStore((s) => s.pinEvidence);
@@ -382,59 +469,95 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
+  const handledQuery = useRef<string | null>(null);
 
   // ── live mode (OF-BLD-007) ──────────────────────────────────────────
-  // A plan is NOT a message. A scripted turn is a transcript the store holds;
-  // a live turn is an AnswerPlan the service returned. Conflating them would
-  // mean inventing a message shape for something that is not one, which is the
-  // mistake §1 warns about — bolting the API onto the transcript shape.
-  const [livePlan, setLivePlan] = useState<AnswerPlan | null>(null);
-  const [liveReplay, setLiveReplay] = useState<ReplayInfo | null>(null);
-  const [liveSteps, setLiveSteps] = useState<TraceStep[]>([]);
-  const [liveQuestion, setLiveQuestion] = useState('');
-  const [down, setDown] = useState<{ message: string; remedy: string } | null>(null);
+  // A plan is NOT a message (see LivePanel). The live turns are in the store
+  // (`liveConversations`), so this component holds only what it is showing.
   const [health, setHealth] = useState<PostdocHealth | null>(null);
+  const [healthChecked, setHealthChecked] = useState(false);
 
-  // Probed once. Lets the screen tell "not running" from "running without a
-  // key" — two different problems with two different fixes — and offer the
-  // switch to Live when the service is actually there.
+  // Lets the screen tell "not running" from "running without a key" — two
+  // different problems with two different fixes — and opens in Live when the
+  // service can answer, unless somebody already picked a mode.
+  const probeHealth = (signal?: AbortSignal) =>
+    postdocHealth(signal)
+      .then((h) => {
+        setHealth(h);
+        if (h.ok && h.hasKey && !modeChosen) setUI({ chatMode: 'live' });
+        return h;
+      })
+      .catch(() => {
+        setHealth(null);
+        return null;
+      })
+      .finally(() => setHealthChecked(true));
+
   useEffect(() => {
     const ac = new AbortController();
-    postdocHealth(ac.signal)
-      .then(setHealth)
-      .catch(() => setHealth(null));
+    void probeHealth(ac.signal);
     return () => ac.abort();
-  }, []);
-
-  const session = sessions.find((s) => s.id === activeId) ?? null;
-
-  // Resolve or create the session, and play an initial query once.
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const scopeParam = route.query.get('scope');
-    if (sessionId && sessions.some((s) => s.id === sessionId)) {
-      setActiveId(sessionId);
-      if (initialQuery) void run(initialQuery, sessionId);
-      return;
-    }
-    if (initialQuery) {
-      const scope = scopeParam
-        ? ({ kind: 'paper' as const, id: scopeParam, label: scopeParam })
-        : undefined;
-      const id = createSession(initialQuery.slice(0, 52), scope);
-      setActiveId(id);
-      void run(initialQuery, id);
-    } else if (sessionId) {
-      setActiveId(sessionId);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A browser that has Live conversations opens in Live even when the service
+  // does not answer: the history stays on screen, and the next question says
+  // the service is down rather than a scripted transcript answering it.
+  const hasLive = liveConversations.length > 0;
+  useEffect(() => {
+    if (hasLive && !modeChosen) setUI({ chatMode: 'live' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasLive]);
+
+  // A link to a Live conversation opens it in Live mode.
+  useEffect(() => {
+    if (!sessionId) return;
+    setActiveId(sessionId);
+    if (liveConversations.some((c) => c.id === sessionId)) {
+      modeChosen = true;
+      setUI({ chatMode: 'live' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  const session = sessions.find((s) => s.id === activeId) ?? null;
+  // With nothing chosen, Live resumes the latest conversation; "New
+  // conversation" shows an empty one until its first question.
+  const conversation =
+    liveConversations.find((c) => c.id === activeId) ?? (activeId === null ? (liveConversations[0] ?? null) : null);
+  const liveRunning = !!conversation?.turns.some((t) => t.status === 'running' && inflight.has(t.id));
+  const liveReady = !!health?.ok && !!health.hasKey;
+
+  // A question handed over in the address (?q=) is asked once, after the
+  // health probe has settled which mode it belongs to, and then leaves the
+  // address so a reload or Back does not ask it again.
+  useEffect(() => {
+    if (!initialQuery) {
+      handledQuery.current = null;
+      return;
+    }
+    if (!healthChecked || handledQuery.current === initialQuery) return;
+    handledQuery.current = initialQuery;
+    const scopeParam = route.query.get('scope');
+    if (useStore.getState().ui.chatMode === 'live') {
+      void run(initialQuery, { fresh: true });
+      return;
+    }
+    if (sessionId && sessions.some((s) => s.id === sessionId)) {
+      void run(initialQuery, { sid: sessionId });
+      return;
+    }
+    const scope = scopeParam ? { kind: 'paper' as const, id: scopeParam, label: scopeParam } : undefined;
+    const id = createSession(initialQuery.slice(0, 52), scope);
+    setActiveId(id);
+    void run(initialQuery, { sid: id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery, healthChecked]);
+
+  const liveSteps = conversation?.turns.reduce((n, t) => n + t.steps.length + (t.plan ? 1 : 0), 0) ?? 0;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [session?.messages.length]);
+  }, [session?.messages.length, conversation?.turns.length, liveSteps]);
 
   // ⌘I toggles the Inspector; ⌘⇧P pins the last answer's sources.
   useEffect(() => {
@@ -469,36 +592,74 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     return id;
   };
 
-  async function run(text: string, sid?: string) {
-    // Live: one call to openferment-core, which retrieves, asks the model, and
-    // validates. NO FALLBACK to the scripted flows when it fails — a
-    // convincing fake standing in for a broken service is the one outcome
-    // worth avoiding, because everything looks like it is working and the
-    // thing being demonstrated is not running.
-    if (chatMode === 'live') {
-      setBusy(true);
-      setDown(null);
-      setLiveQuestion(text);
-      setLivePlan(null);
-      setLiveSteps([]);
-      setLiveReplay(null);
-      try {
-        setLivePlan(await askPostdocStream(text, (step) => setLiveSteps((prev) => [...prev, step]), { onReplay: setLiveReplay }));
-      } catch (err) {
-        if (err instanceof PostdocDown) setDown({ message: err.message, remedy: err.remedy });
-        else if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          setDown({
+  /**
+   * Live: one question to openferment-core, which runs the loop and
+   * validates. NO FALLBACK to the scripted flows when it fails — a convincing
+   * fake standing in for a broken service is the one outcome worth avoiding,
+   * because everything looks like it is working and the thing being
+   * demonstrated is not running. Every write goes through the store, so the
+   * answer lands in its conversation even if this screen was left meanwhile.
+   */
+  async function ask(text: string, fresh: boolean) {
+    const store = useStore.getState();
+    if (!health) void probeHealth();
+    const current = fresh ? null : conversation;
+    const history = current ? priorTurns(current.turns) : [];
+    const convId = current?.id ?? store.startLiveConversation(text.slice(0, 60));
+    const turnId = timeId('lt');
+    store.addLiveTurn(convId, {
+      id: turnId,
+      question: text,
+      askedAt: askedAt(),
+      steps: [],
+      plan: null,
+      error: null,
+      status: 'running',
+      replay: null,
+    });
+    setActiveId(convId);
+    if (route.path !== `/postdoc/${convId}` || route.query.has('q')) navigate(`/postdoc/${convId}`, { replace: true });
+
+    const ac = new AbortController();
+    inflight.set(turnId, ac);
+    const patch = useStore.getState().patchLiveTurn;
+    try {
+      const plan = await askPostdocStream(text, (step) => patch(convId, turnId, { step }), {
+        signal: ac.signal,
+        history,
+        onReplay: (replay) => patch(convId, turnId, { replay }),
+      });
+      patch(convId, turnId, { plan, status: 'answered' });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        patch(convId, turnId, { status: 'stopped' });
+      } else if (err instanceof PostdocDown) {
+        patch(convId, turnId, { status: 'failed', error: { message: err.message, remedy: err.remedy } });
+      } else {
+        patch(convId, turnId, {
+          status: 'failed',
+          error: {
             message: 'The request to Postdoc failed.',
             remedy: 'Check the service log — it will name what went wrong.',
-          });
-        }
-      } finally {
-        setBusy(false);
+          },
+        });
       }
+    } finally {
+      inflight.delete(turnId);
+    }
+  }
+
+  const stopLive = () => {
+    for (const t of conversation?.turns ?? []) inflight.get(t.id)?.abort();
+  };
+
+  async function run(text: string, opts: { sid?: string; fresh?: boolean } = {}) {
+    if (useStore.getState().ui.chatMode === 'live') {
+      await ask(text, !!opts.fresh);
       return;
     }
 
-    const id = sid ?? ensureSession(text);
+    const id = opts.sid ?? ensureSession(text);
     setBusy(true);
     try {
       const res = await send(text, id);
@@ -521,9 +682,12 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
     }
   }
 
+  const live = chatMode === 'live';
+  const working = live ? liveRunning : busy;
+
   const submit = () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || working) return;
     setInput('');
     void run(text);
   };
@@ -541,44 +705,86 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
   return (
     <div className="flex gap-4 items-start" style={{ height: 'calc(100vh - 132px)' }}>
-      {/* Sessions */}
+      {/* Sessions: Live conversations in Live mode, the scripted sessions otherwise. */}
       {sessionsOpen && (
         <aside className="w-[240px] shrink-0 hidden lg:flex flex-col h-full">
-          <Button
-            className="w-full justify-center mb-2"
-            onClick={() => {
-              const id = createSession('New session');
-              setActiveId(id);
-              navigate(`/postdoc/${id}`);
-            }}
-          >
-            <MessageSquarePlus size={14} /> New session
-          </Button>
-          <div className="flex-1 overflow-y-auto space-y-1">
-            {sessions.map((s) => (
-              <button
-                key={s.id}
+          {live ? (
+            <>
+              <Button
+                className="w-full justify-center mb-2"
                 onClick={() => {
-                  setActiveId(s.id);
-                  navigate(`/postdoc/${s.id}`);
+                  setActiveId(NEW_CONVERSATION);
+                  navigate(`/postdoc/${NEW_CONVERSATION}`);
                 }}
-                className={cx(
-                  'w-full text-left px-2.5 py-2 rounded-btn',
-                  s.id === activeId ? 'bg-accent-wash' : 'hover:bg-ink-soft/[0.06]',
-                )}
               >
-                <div className="text-body truncate">{s.title}</div>
-                <div className="text-caption text-ink-soft flex items-center gap-1.5">
-                  <span className="font-num">{s.startedAt}</span>
-                  {s.scope && (
-                    <span className="chip text-[10px] py-0 border-signal-info/40 text-signal-info">
-                      {s.scope.label}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+                <MessageSquarePlus size={14} /> New conversation
+              </Button>
+              <div className="flex-1 overflow-y-auto space-y-1" data-testid="live-conversations">
+                {liveConversations.length === 0 && (
+                  <p className="text-caption text-ink-soft px-2.5 py-2">
+                    Conversations asked in Live mode are kept here, in this browser, across reloads.
+                  </p>
+                )}
+                {liveConversations.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setActiveId(c.id);
+                      navigate(`/postdoc/${c.id}`);
+                    }}
+                    className={cx(
+                      'w-full text-left px-2.5 py-2 rounded-btn',
+                      c.id === conversation?.id ? 'bg-accent-wash' : 'hover:bg-ink-soft/[0.06]',
+                    )}
+                  >
+                    <div className="text-body truncate">{c.title}</div>
+                    <div className="text-caption text-ink-soft">
+                      <span className="font-num">{c.startedAt}</span> · <span className="font-num">{c.turns.length}</span>{' '}
+                      {c.turns.length === 1 ? 'question' : 'questions'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <Button
+                className="w-full justify-center mb-2"
+                onClick={() => {
+                  const id = createSession('New session');
+                  setActiveId(id);
+                  navigate(`/postdoc/${id}`);
+                }}
+              >
+                <MessageSquarePlus size={14} /> New session
+              </Button>
+              <div className="flex-1 overflow-y-auto space-y-1">
+                {sessions.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setActiveId(s.id);
+                      navigate(`/postdoc/${s.id}`);
+                    }}
+                    className={cx(
+                      'w-full text-left px-2.5 py-2 rounded-btn',
+                      s.id === activeId ? 'bg-accent-wash' : 'hover:bg-ink-soft/[0.06]',
+                    )}
+                  >
+                    <div className="text-body truncate">{s.title}</div>
+                    <div className="text-caption text-ink-soft flex items-center gap-1.5">
+                      <span className="font-num">{s.startedAt}</span>
+                      {s.scope && (
+                        <span className="chip text-[10px] py-0 border-signal-info/40 text-signal-info">
+                          {s.scope.label}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </aside>
       )}
 
@@ -593,44 +799,30 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
             <PanelLeft size={13} />
           </button>
           <h1 className="font-serif text-page-title font-semibold truncate flex-1">
-            {session?.title ?? 'Postdoc'}
+            {(live ? conversation?.title : session?.title) ?? 'Postdoc'}
           </h1>
-          {session?.scope && (
+          {!live && session?.scope && (
             <span className="chip text-signal-info border-signal-info/40">
               scoped to {session.scope.label}
             </span>
           )}
-          <button
-            className="btn btn-sm"
-            onClick={() => setUI({ inspectorOpen: !inspectorOpen })}
-            title="Toggle Inspector (⌘I)"
-          >
-            {inspectorOpen ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
-            <span className="hidden xl:inline">Inspector</span>
-          </button>
+          {/* The Inspector reads the scripted transcript; a live answer shows
+              its trace and its quoted sentences inline, so Live has none. */}
+          {!live && (
+            <button
+              className="btn btn-sm hidden xl:inline-flex"
+              onClick={() => setUI({ inspectorOpen: !inspectorOpen })}
+              title="Toggle Inspector (⌘I)"
+            >
+              {inspectorOpen ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+              <span>Inspector</span>
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-          {chatMode === 'live' && liveReplay && (
-            <div className="rounded-input border border-signal-warn/50 px-3 py-2 text-caption text-signal-warn" data-testid="replay-label">
-              {/* §10.R: a stand-in recording's date is fixed to keep the fixture
-                  stable, so it claims none; a real recording names its day. */}
-              {liveReplay.standIn
-                ? 'Replay of a recorded test run, made with a scripted stand-in in place of the model.'
-                : `Replay of a run on ${liveReplay.recordedAt.slice(0, 10)}.`}{' '}
-              Nothing is being asked now.
-            </div>
-          )}
-          {chatMode === 'live' ? (
-            <LivePanel
-              question={liveQuestion}
-              plan={livePlan}
-              steps={liveSteps}
-              down={down}
-              busy={busy}
-              health={health}
-              onAsk={(q) => void run(q)}
-            />
+          {live ? (
+            <LivePanel conversation={conversation} health={health} onAsk={(q) => void run(q)} />
           ) : !session || session.messages.length === 0 ? (
             <div className="pt-6">
               <EmptyState
@@ -866,7 +1058,13 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               )}
               .
               These are authored transcripts —{' '}
-              <button className="text-accent hover:underline" onClick={() => setUI({ chatMode: 'live' })}>
+              <button
+                className="text-accent hover:underline"
+                onClick={() => {
+                  modeChosen = true;
+                  setUI({ chatMode: 'live' });
+                }}
+              >
                 switch to Live
               </button>{' '}
               for a real answer over the same corpus.
@@ -878,7 +1076,13 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
               <textarea
                 className="input font-sans resize-none"
                 rows={2}
-                placeholder="Ask about the corpus — or type / for commands"
+                placeholder={
+                  live
+                    ? conversation && conversation.turns.length > 0
+                      ? 'Ask a follow-up — Postdoc reads this conversation first'
+                      : 'Ask a question about the corpus'
+                    : 'Ask about the corpus — or type / for commands'
+                }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -889,7 +1093,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                 }}
                 aria-label="Ask a question"
               />
-              {input.startsWith('/') && (
+              {!live && input.startsWith('/') && (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-caption text-ink-soft">
                   {SLASH_HINTS.map((h) => (
                     <span key={h.cmd}>
@@ -899,9 +1103,15 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                 </div>
               )}
             </div>
-            <Button variant="primary" onClick={submit} disabled={busy || !input.trim()} style={{ minHeight: 40 }}>
-              <Send size={14} /> Send
-            </Button>
+            {live && liveRunning ? (
+              <Button onClick={stopLive} style={{ minHeight: 40 }} data-testid="stop-ask">
+                <Square size={13} /> Stop
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={submit} disabled={working || !input.trim()} style={{ minHeight: 40 }}>
+                <Send size={14} /> Send
+              </Button>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -911,20 +1121,31 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
             <div className="flex-1" />
             <div className="flex items-center gap-1 text-caption">
               <span className="text-ink-soft">Mode</span>
-              {(['scripted', 'live'] as const).map((mode) => (
+              {/* With the service up and keyed, Live is the only mode offered:
+                  the scripted transcripts are fixtures for when it is not, and
+                  nobody should demo them by accident (§9). */}
+              {(liveReady ? (['live'] as const) : (['scripted', 'live'] as const)).map((mode) => (
                 <button
                   key={mode}
                   className={cx('chip', chatMode === mode && 'chip-active')}
-                  onClick={() => setUI({ chatMode: mode })}
+                  onClick={() => {
+                    modeChosen = true;
+                    setUI({ chatMode: mode });
+                  }}
                   aria-pressed={chatMode === mode}
                 >
                   {mode === 'scripted' ? 'Scripted' : 'Live (Postdoc service)'}
                 </button>
               ))}
+              {live && liveReady && (
+                <span className="text-ink-soft">
+                  · <span className="font-num">{health?.model}</span>
+                </span>
+              )}
             </div>
           </div>
 
-          {session && session.messages.length > 0 && (
+          {!live && session && session.messages.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {SUGGESTED_PROMPTS.slice(0, 3).map((p) => (
                 <button
@@ -942,7 +1163,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
       </div>
 
       {/* Inspector */}
-      {inspectorOpen && (
+      {inspectorOpen && !live && (
         <aside className="w-[340px] shrink-0 hidden xl:flex flex-col h-full card">
           <div className="flex border-b border-line">
             {(['retrieval', 'trace', 'pinned'] as const).map((t) => (

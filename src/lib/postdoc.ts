@@ -10,7 +10,7 @@
 // everything looks like it is working and the thing you are demonstrating is
 // not running. The scripted flows still exist; they are fixtures now, not a
 // safety net (§9).
-import type { AnswerPlan, AnswerPlanUsage, TraceStep } from '@/data/types';
+import type { AnswerPlan, AnswerPlanUsage, AskRequest, LiveTurn, PriorTurn, TraceStep } from '@/data/types';
 
 /** Exactly what to type, so the message is actionable rather than sympathetic. */
 export const START_COMMAND = 'uv run uvicorn openferment_core.api:app --reload';
@@ -65,14 +65,20 @@ export type AskMode = 'agent' | 'single';
 async function post(
   path: string,
   question: string,
-  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode },
+  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode; history?: PriorTurn[] },
 ): Promise<Response> {
+  const body: AskRequest = {
+    question,
+    maxEvidence: opts.maxEvidence ?? 30,
+    mode: opts.mode ?? 'agent',
+    history: opts.history ?? [],
+  };
   let response: Response;
   try {
     response = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, maxEvidence: opts.maxEvidence ?? 30, mode: opts.mode ?? 'agent' }),
+      body: JSON.stringify(body),
       signal: opts.signal,
     });
   } catch (e) {
@@ -116,7 +122,7 @@ async function post(
  */
 export async function askPostdoc(
   question: string,
-  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode } = {},
+  opts: { maxEvidence?: number; signal?: AbortSignal; mode?: AskMode; history?: PriorTurn[] } = {},
 ): Promise<AnswerPlan> {
   const response = await post('/api/ask', question, opts);
   return (await response.json()) as AnswerPlan;
@@ -165,7 +171,7 @@ export function parseEvents(buffer: string): { events: StreamEvent[]; rest: stri
 export async function askPostdocStream(
   question: string,
   onStep: (step: TraceStep) => void,
-  opts: { maxEvidence?: number; signal?: AbortSignal; onReplay?: (r: ReplayInfo) => void } = {},
+  opts: { maxEvidence?: number; signal?: AbortSignal; onReplay?: (r: ReplayInfo) => void; history?: PriorTurn[] } = {},
 ): Promise<AnswerPlan> {
   const { onReplay, ...rest } = opts;
   const response = await post('/api/ask/stream', question, { ...rest, mode: 'agent' });
@@ -206,4 +212,20 @@ export function cachedShare(u: AnswerPlanUsage): number | null {
   const prompt = u.inputTokens + read + (u.cacheWriteTokens ?? 0);
   if (read <= 0 || prompt <= 0) return null;
   return Math.round((read / prompt) * 100);
+}
+
+/**
+ * The earlier turns a follow-up sends: each answered turn's question and its
+ * plan's words. A turn that failed, or was stopped, carries no answer and is
+ * left out.
+ */
+export function priorTurns(turns: LiveTurn[]): PriorTurn[] {
+  return turns
+    .filter((t) => t.status === 'answered' && t.plan)
+    .map((t) => ({
+      question: t.question,
+      claims: t.plan!.claims.map((c) => c.text),
+      gaps: t.plan!.gaps,
+      declined: t.plan!.declined,
+    }));
 }

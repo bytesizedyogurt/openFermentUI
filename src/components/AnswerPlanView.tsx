@@ -202,7 +202,10 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
           explainRefusal() in src/engine/units.ts: say what is missing and what
           would establish it, rather than apologising for the absence. */}
       {plan.declined && (
-        <Callout kind="info" title="Postdoc declined to answer this">
+        // A decline the model chose is an answer. A question no model could
+        // take up — no key, a spent budget, an answer that never arrived
+        // whole — ends on a failed final step, and is titled as a failure.
+        <Callout kind="info" title={last?.kind === 'final' && !last.ok ? 'Postdoc could not answer this' : 'Postdoc declined to answer this'}>
           <p className="text-ink">{plan.declined}</p>
           {hasClaims && (
             <p className="text-ink-soft mt-1.5">
@@ -330,9 +333,21 @@ export function AnswerPlanView({ plan }: { plan: AnswerPlan }) {
 
 /** The service is not running. Says exactly what to type. */
 export function PostdocDownNotice({ message, remedy }: { message: string; remedy: string }) {
+  // A remedy writes a command between backticks; show it as one.
+  const parts = remedy.split('`');
   return (
     <Callout kind="error" title={message}>
-      <p className="text-ink">{remedy}</p>
+      <p className="text-ink">
+        {parts.map((part, i) =>
+          i % 2 === 1 ? (
+            <code key={i} className="font-num text-caption bg-surface-1 rounded px-1">
+              {part}
+            </code>
+          ) : (
+            part
+          ),
+        )}
+      </p>
       <p className="text-ink-soft mt-1.5 inline-flex items-start gap-1.5">
         <HelpCircle size={13} className="shrink-0 mt-0.5" aria-hidden />
         <span>

@@ -34,6 +34,7 @@ from openferment_core.units import (
     to_canonical,
     to_si,
 )
+from openferment_core.validate import anchor_candidate, find_number
 
 FIXTURE = Path(__file__).parent / "fixtures" / "units.json"
 
@@ -222,3 +223,161 @@ def test_a_bacterial_growth_rate_is_inside_the_widened_range():
     assert in_range(to_canonical(0.41, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")
     assert in_range(to_canonical(24, "d⁻¹", "growth_rate_mu"), "growth_rate_mu")
     assert not in_range(to_canonical(30, "h⁻¹", "growth_rate_mu"), "growth_rate_mu")
+
+
+# ── the kinetics family (thread Q) ─────────────────────────────────────
+
+KINETICS = {
+    "monod_ks": "g L⁻¹",
+    "biomass_yield_substrate": "g g⁻¹",
+    "ethanol_yield_substrate": "g g⁻¹",
+    "ethanol_titre": "g L⁻¹",
+    "ethanol_productivity": "g L⁻¹ h⁻¹",
+    "ethanol_inhibition_ki": "g L⁻¹",
+    "ethanol_max_conc": "g L⁻¹",
+    "substrate_inhibition_ki": "g L⁻¹",
+    "ethanol_lp_alpha": "g g⁻¹",
+    "ethanol_lp_beta": "g g⁻¹ h⁻¹",
+    "ethanol_mesp": "USD gal⁻¹",
+}
+
+
+def test_the_ontology_carries_the_eleven_kinetics_fields_in_units_the_engine_knows():
+    ontology = tables()["ontology"]
+    kinetics = {k: d for k, d in ontology.items() if d["family"] == "kinetics"}
+    assert {k: d["canonicalUnit"] for k, d in kinetics.items()} == KINETICS
+    for field_id, unit in KINETICS.items():
+        assert normalize(unit) == unit, f"{field_id}: {unit!r} is not a key of the table"
+        assert to_canonical(1, unit, field_id) == 1, field_id
+    # Only the price needs its method: the costing basis the analysis names.
+    assert {k for k, d in kinetics.items() if d["requiresMethod"]} == {"ethanol_mesp"}
+    [refusal] = kinetics["ethanol_mesp"]["refuseConversionTo"]
+    assert refusal["field"] == "minimum_selling_price" and "density of the product" in refusal["because"]
+
+
+def test_the_kinetic_fields_take_the_spellings_papers_write():
+    for spelling, field_id in (
+        ("g/L", "monod_ks"),
+        ("g L-1", "ethanol_titre"),
+        ("g L−1", "ethanol_max_conc"),
+        ("g/g", "biomass_yield_substrate"),
+        ("g g-1", "ethanol_yield_substrate"),
+        ("g/L/h", "ethanol_productivity"),
+        ("g L-1 h-1", "ethanol_productivity"),
+        ("g/g/h", "ethanol_lp_beta"),
+        ("g g−1 h−1", "ethanol_lp_beta"),
+        ("$/gal", "ethanol_mesp"),
+    ):
+        assert to_canonical(2, spelling, field_id) == 2, (spelling, field_id)
+
+
+def test_a_price_per_gallon_normalises_and_refuses_a_price_per_kilogram_with_the_density_reason():
+    for spelling in ("$/gal", "USD/gal", "$ gal-1", "$ gal−1", "US$/gal", "$/gallon", "USD per gallon", "USD gal-1"):
+        assert normalize(spelling) == "USD gal⁻¹" and family(spelling) == "costUSDVolume", spelling
+    for spelling in ("$/kg", "USD/kg"):
+        assert normalize(spelling) == "USD kg⁻¹" and family(spelling) == "costUSD", spelling
+    reason = explain_refusal("USD gal⁻¹", "USD kg⁻¹")
+    assert reason is not None and "density of the product" in reason
+    assert explain_refusal("$/kg", "$/gal") == reason, "symmetric, through the aliases"
+    with pytest.raises(UnitError) as caught:
+        convert(2.5, "$/gal", "USD kg⁻¹")
+    assert caught.value.reason == reason
+    with pytest.raises(UnitError) as caught:
+        to_canonical(2.5, "$/gal", "minimum_selling_price")
+    assert caught.value.reason == reason
+    # Nor is it a euro price, and there the refusal is plain dimensional analysis.
+    assert explain_refusal("USD gal⁻¹", "EUR kg⁻¹") is None
+
+
+# A paper nobody wrote: one sentence per kinetic quantity, each value placed
+# outside its field's guard, and one inside it. Test values, stated as such.
+KINETICS_SECTION = [
+    {
+        "id": "s1",
+        "text": (
+            "In the imaginary run the ethanol yield reached 0.92 g g-1 on glucose. "
+            "The imaginary analysis put the minimum ethanol selling price at $75/gal. "
+            "The fitted Ks of the imaginary strain was 150 g/L. "
+            "The fitted beta was 12 g g-1 h-1. "
+            "In the control run the ethanol yield was 0.45 g g-1 on glucose."
+        ),
+    }
+]
+
+
+@pytest.mark.parametrize(
+    "field_id, value, unit, quote, method",
+    [
+        ("ethanol_yield_substrate", 0.92, "g g-1", "the ethanol yield reached 0.92 g g-1 on glucose", None),
+        ("ethanol_mesp", 75, "$/gal", "the minimum ethanol selling price at $75/gal", "undetermined"),
+        ("monod_ks", 150, "g/L", "The fitted Ks of the imaginary strain was 150 g/L", None),
+        ("ethanol_lp_beta", 12, "g g-1 h-1", "The fitted beta was 12 g g-1 h-1", None),
+    ],
+)
+def test_a_value_outside_a_kinetic_fields_range_is_refused_at_anchoring(field_id, value, unit, quote, method):
+    raw = {
+        "sectionId": "s1", "field": field_id, "value": value, "unit": unit, "quote": quote,
+        "isPrimary": True, "confidence": 0.9,
+    }
+    if method:
+        raw["method"] = method
+    candidate, rule, detail = anchor_candidate(raw, KINETICS_SECTION, paper_id="Q1")
+    assert candidate is None and rule == "range", f"{rule}: {detail}"
+    assert field_id in detail
+
+
+def test_a_value_inside_the_range_anchors_on_the_same_sentence_shape():
+    raw = {
+        "sectionId": "s1", "field": "ethanol_yield_substrate", "value": 0.45, "unit": "g g-1",
+        "quote": "the ethanol yield was 0.45 g g-1 on glucose",
+        "organism": "Saccharomyces cerevisiae CEN.PK113-7D", "isPrimary": True, "confidence": 0.9,
+    }
+    candidate, rule, detail = anchor_candidate(raw, KINETICS_SECTION, paper_id="Q1")
+    assert candidate is not None, f"{rule}: {detail}"
+    assert candidate.value == 0.45 and candidate.unit == "g g⁻¹"
+    assert candidate.organism == "s-cerevisiae-cenpk113-7d"
+
+
+# Definitions reach the extraction model verbatim (extract.ontology_for_prompt),
+# so a numeral in one is a number set in front of a model asked to find
+# numbers. Read by Rule 1's own detector for its digit form, a numeral outside
+# an identifier token: CK2 and cw15 are names. Its word numbers are not held
+# here, because "half" in a half-saturation constant and "first" in a
+# first-order rate are what those fields mean. Two definitions predate the
+# rule and state the native state and the numbering convention they are about;
+# every other field, and every field added after them, holds none.
+DEFINITIONS_WITH_NUMERALS = {"phosphate_count", "phospho_site_position"}
+
+
+def _numeral(text: str) -> str | None:
+    found = find_number(text)
+    # find_number looks for numerals first, so a word it returns means none.
+    return found if found is not None and any(ch.isnumeric() for ch in found) else None
+
+
+def test_no_definition_the_extractor_reads_carries_a_numeral():
+    for field_id, d in tables()["ontology"].items():
+        found = _numeral(d["name"]) or _numeral(d["definition"])
+        if field_id in DEFINITIONS_WITH_NUMERALS:
+            assert found, f"{field_id} no longer carries a numeral; take it off the exception list"
+            continue
+        assert found is None, f"{field_id}: its name or definition carries {found!r}"
+
+
+# Thread Q's papers write a yield's grams with what they weigh. Grams per gram
+# whatever the labels; a kilogram, a milligram, a rate or a volume stays apart.
+@pytest.mark.parametrize("raw", [
+    "g EtOH/g Glucose", "g ethanol [g glucose]−1", "g biomass [g glucose]−1",
+    "gDW gglucose−1", "gx/g", "gx g−1", "gE gG –1",
+])
+def test_a_labelled_gram_per_gram_is_grams_per_gram(raw):
+    assert normalize(raw) == "g g⁻¹"
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("g kg-1", None), ("gx/l", None), ("g gX-1 h-1", None),
+    ("mg g-1", "mg g⁻¹"), ("g.L−1", "g L⁻¹"), ("g L-1h-1", "g L⁻¹ h⁻¹"), ("g/L hr", "g L⁻¹ h⁻¹"),
+])
+def test_what_a_labelled_ratio_must_not_swallow(raw, expected):
+    assert normalize(raw) == expected
+

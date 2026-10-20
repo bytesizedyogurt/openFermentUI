@@ -103,6 +103,15 @@ _STRIP_STEPS = (
 )
 _WS = re.compile(r"\s+")
 
+# Grams per gram with each gram labelled by what it weighs: g EtOH/g glucose,
+# gx/g, gDW gglucose⁻¹, g biomass [g glucose]⁻¹. The browser's
+# LABELLED_MASS_RATIO in src/engine/units.ts, pattern for pattern; read
+# against the stripped spelling, after every key has missed.
+LABELLED_MASS_RATIO = (
+    re.compile(r"^g(?:\s*[a-z]+)?\s*/\s*g(?:\s*[a-z]+)?$"),
+    re.compile(r"^g(?:\s*[a-z]+)?(?:\s*\[\s*|\s+)g(?:\s*[a-z]+)?\s*\]?\s*-1$"),
+)
+
 
 def _strip(s: str) -> str:
     for a, b in _STRIP_STEPS:
@@ -113,9 +122,10 @@ def _strip(s: str) -> str:
 def normalize(raw: str) -> str | None:
     """The table key for a unit as somebody wrote it, or None.
 
-    Four attempts, in the browser's order: the exact key; the alias as typed;
-    the alias lower-cased; and finally a superscript-blind, middot-blind,
-    case-blind comparison against every key. The order matters — 'mm' is a
+    Five attempts, in the browser's order: the exact key; the alias as typed;
+    the alias lower-cased; a superscript-blind, middot-blind, case-blind
+    comparison against every key; and last, grams per gram with each gram
+    labelled (LABELLED_MASS_RATIO). The order matters — 'mm' is a
     key (millimetres) and is found first, while 'mM' misses the key, misses
     the alias as typed, and reaches millimolar through the lower-cased alias.
     """
@@ -133,6 +143,8 @@ def normalize(raw: str) -> str | None:
     for key in table:
         if _strip(key) == target:
             return key
+    if any(p.match(target.strip()) for p in LABELLED_MASS_RATIO):
+        return "g g⁻¹"
     return None
 
 

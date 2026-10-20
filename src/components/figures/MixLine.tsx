@@ -42,9 +42,13 @@ export function MixLine(props: MixLineProps) {
   const vals = pts.map((p) => p.value);
   const lo = vals.length ? Math.min(...vals) : 0;
   const hi = vals.length ? Math.max(...vals) : 1;
-  const pad = (hi - lo || hi || 1) * 0.15;
+  // A spread under a millionth of the value is the solver's rounding, not a
+  // change across the mixtures: drawn flat, with one label, so float noise is
+  // never stretched across the whole axis.
+  const flat = hi - lo <= Math.abs(hi) * 1e-6;
+  const pad = (flat ? Math.abs(hi) || 1 : hi - lo) * 0.15;
   const x = (share: number) => L + (1 - share) * (W - L - R);
-  const y = (v: number) => H - B - ((v - (lo - pad)) / (hi + pad - (lo - pad))) * (H - T - B);
+  const y = (v: number) => (flat ? (T + H - B) / 2 : H - B - ((v - (lo - pad)) / (hi + pad - (lo - pad))) * (H - T - B));
   return (
     <FigureFrame
       title={props.title}
@@ -64,7 +68,7 @@ export function MixLine(props: MixLineProps) {
             {t === 0 ? `all ${props.a}` : t === 1 ? `all ${props.b}` : 'half and half'}
           </text>
         ))}
-        {[lo, hi].map((v) => (
+        {(flat ? [hi] : [lo, hi]).map((v) => (
           <text key={v} x={L - 6} y={y(v) + 3} textAnchor="end" fontSize={10} fill="currentColor" opacity={0.7}>
             {fmt(v, 3)}
           </text>

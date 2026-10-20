@@ -1,6 +1,6 @@
 // App shell (OF-DES-001 §7.1): left rail + top utility bar + content region,
 // with the persistent demo banner, jobs tray, palette, and global shortcuts.
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlaskConical,
   Settings as SettingsIcon,
@@ -73,6 +73,37 @@ function isActive(path: string, to: string) {
 }
 
 // ── Route dispatch ─────────────────────────────────────────────────────
+
+/**
+ * A screen that throws while rendering says so in words, and the rail, the
+ * palette and every other screen keep working. Without it one bad render
+ * blanks the whole app. Keyed by the screen at the call site, so moving to
+ * another screen clears it, and moving within one remounts nothing.
+ */
+class ScreenBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    console.error('screen failed to render', error);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="card p-4 border-signal-error/40 max-w-[720px]" role="alert" data-testid="screen-error">
+        <div className="font-medium text-ink">This screen could not be drawn.</div>
+        <p className="text-body text-ink-soft mt-1">
+          {this.state.error.message || this.state.error.name}. Nothing was lost: every other screen still
+          works, and reloading the page tries this one again.
+        </p>
+        <button className="btn btn-sm mt-2" onClick={() => this.setState({ error: null })}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+}
 
 function Screen() {
   const route = useRoute();
@@ -220,8 +251,8 @@ function DemoBanner() {
       <span className="text-signal-warn font-medium">Real literature · modeled economics</span>
       <span className="text-ink-soft hidden sm:inline">
         — papers and values are real and citable. Simulation outputs are illustrative models,
-        not validated economics. Depositions, review decisions, Guild&rsquo;s ledger and finished
-        lessons survive a refresh; everything else resets.
+        not validated economics. Depositions, review decisions, Guild&rsquo;s ledger, finished
+        lessons and Postdoc&rsquo;s conversations survive a refresh; everything else resets.
       </span>
       <a href="#/settings/about" className="text-accent hover:underline hidden md:inline">
         Read the colophon
@@ -396,7 +427,9 @@ export default function App() {
   if (inDeposition || inBenchCheck) {
     return (
       <>
-        <Screen />
+        <ScreenBoundary key={route.segments[0] ?? 'home'}>
+          <Screen />
+        </ScreenBoundary>
         <Toasts />
       </>
     );
@@ -599,7 +632,9 @@ export default function App() {
 
           <main id="of-main" className="flex-1 overflow-y-auto of-grid">
             <div className="p-5 max-w-[1600px]">
-              <Screen />
+              <ScreenBoundary key={route.segments[0] ?? 'home'}>
+                <Screen />
+              </ScreenBoundary>
             </div>
           </main>
         </div>

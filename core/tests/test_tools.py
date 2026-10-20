@@ -260,6 +260,25 @@ def test_selling_price_cites_the_latest_run_a_person_produced(monkeypatch, tmp_p
     assert r.evidence[0].interval.low <= r.evidence[0].value <= r.evidence[0].interval.high
 
 
+def test_selling_price_cites_the_stored_benchmark_and_runs_nothing(monkeypatch, tmp_path):
+    from openferment_core import intake, proforma
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    ctx = tools.ToolContext()
+    r = tools.run("selling_price", {"scenarioId": "proforma_benchmark"}, ctx)
+    assert r.error and "has not been run on this service" in r.error
+    # A STAND-IN benchmark output, so the stored artifact exists without BioSTEAM.
+    monkeypatch.setattr(proforma, "call", lambda op, args: {
+        "package": "biorefineries.cornstover@stand-in", "biosteam": "stand-in", "mespUsdPerGal": 2.5,
+        "mespUsdPerKg": 0.8, "ethanolDensityKgPerGal": 3.0, "settings": {}, "references": []})
+    art = proforma.run_benchmark()
+    monkeypatch.setattr(proforma, "call", lambda op, args: pytest.fail("the tool ran the benchmark"))
+    r = tools.run("selling_price", {"scenarioId": "proforma_benchmark"}, ctx)
+    assert r.error is None and r.evidence[0].id == art.id
+    assert r.evidence[0].value == 2.5 and r.evidence[0].unit == "USD gal⁻¹"
+    assert r.summary["provenance"] == r.evidence[0].provenance
+
+
 # Live test, 2026-10-16: told "an empty string for any field", the model sent
 # the two characters "" and every such search came back empty. The filters
 # are nullable now, null means unused, and the literal "" means the same.

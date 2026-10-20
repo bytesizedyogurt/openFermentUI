@@ -139,15 +139,16 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None) -> AnswerPlan:
-    """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands."""
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> AnswerPlan:
+    """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
+    with the conversation's earlier turns when the question is a follow-up."""
     ctx = tools.ToolContext()
     try:
         ctx.pool  # loaded now, so a missing corpus declines in words
     except FileNotFoundError as e:
         log.error("corpus missing: %s", e)
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
-    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled)
+    return postdoc_agent.ask(question, ctx=ctx, on_step=on_step, cancelled=cancelled, history=history)
 
 
 @app.post("/api/ask", response_model=AnswerPlan)
@@ -166,7 +167,7 @@ def ask(request: AskRequest) -> AnswerPlan:
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     if request.mode == "agent":
-        return _ask_agent(question)
+        return _ask_agent(question, history=request.history)
 
     try:
         corpus = load_corpus()
@@ -246,7 +247,7 @@ def _stream_events(request: AskRequest):
                 plan = ask(request)
             else:
                 plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
-                                  cancelled=gone.is_set)
+                                  cancelled=gone.is_set, history=request.history)
             events.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
@@ -402,7 +403,9 @@ _warm_proforma()
 
 @app.post("/api/intake/{paper_id}/fetch", response_model=FetchResult)
 def intake_fetch(paper_id: str, force: bool = False) -> FetchResult:
-    """Fetch one paper's full text from Europe PMC, split it, cache it.
+    """Fetch one paper's full text from Europe PMC, or from OSTI or the
+    Saccharomyces Genome Database when its `sourceUrl` names one, split it,
+    cache it.
 
     A fetch that fails returns HTTP 200 with `status: failed:fetch` or
     `failed:parse` and a reason — the ingest board renders both, and a 5xx

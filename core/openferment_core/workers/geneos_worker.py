@@ -7,14 +7,18 @@ applies the add-on route where a model lacks one, and answers five ops:
 
     ping       answered by `serve`
     describe   counts of reactions, metabolites and genes; the growth
-               reaction; which of the shelf's sugars the model can take up
+               reaction; which of the shelf's sugars the model can take up,
+               and which of its products it has a route to
     ceiling    the most product from one feed (Appendix 2's procedure)
     frontier   the production envelope over twelve growth rates
     mix        the ceiling across eleven mixtures of two sugars at equal carbon
 
-A substrate the model has no uptake reaction for is a finding, said in words,
-with no number. Every number returned is cobra's, on the model as its file
-publishes it, with the substrate's uptake opened at the convention rate.
+The product is the flux through a demand on its metabolite (PHB, added here
+where the file lacks one) or out through the exchange it is secreted by
+(ethanol). A substrate the model has no uptake reaction for, or a product it
+has no route to, is a finding, said in words, with no number. Every number
+returned is cobra's, on the model as its file publishes it, with the
+substrate's uptake opened at the convention rate.
 """
 from __future__ import annotations
 
@@ -44,19 +48,23 @@ class Refused(ValueError):
 
 def build_toy() -> Model:
     """The toy network the offline tests and fixtures run on. STAND-IN, not a
-    published model: three metabolites and four reactions, worked by hand.
+    published model: four metabolites and six reactions, worked by hand.
 
         EX_glc__D_e   glc__D_e <=>               (the feed)
         SPLIT         glc__D_e --> 2 a_c
         GROWTH        a_c -->                    (the objective)
         PHAC          a_c --> phb_c
+        FERM          a_c --> etoh_e
+        EX_etoh_e     etoh_e -->                 (the secreted product)
 
-    The worker adds the demand on phb_c. From glucose at 10, the most product
-    is 20: 2 mol per mol, and 2 × 86.09 / 180.156 g per g."""
+    The worker adds the demand on phb_c. From glucose at 10, the most of
+    either product is 20: 2 mol per mol, and 2 × 86.09 / 180.156 g per g of
+    PHB, 2 × 46.069 / 180.156 of ethanol."""
     m = Model("toy")
     glc = Metabolite("glc__D_e", formula="C6H12O6", compartment="e", name="glucose")
     a = Metabolite("a_c", formula="C3H6O3", compartment="c", name="toy intermediate")
     phb = Metabolite("phb_c", formula="C4H6O2", compartment="c", name="PHB repeat unit")
+    etoh = Metabolite("etoh_e", formula="C2H6O", compartment="e", name="ethanol")
     ex = Reaction("EX_glc__D_e", lower_bound=-10.0, upper_bound=1000.0)
     ex.add_metabolites({glc: -1})
     split = Reaction("SPLIT", lower_bound=0.0, upper_bound=1000.0)
@@ -65,7 +73,11 @@ def build_toy() -> Model:
     growth.add_metabolites({a: -1})
     phac = Reaction("PHAC", lower_bound=0.0, upper_bound=1000.0)
     phac.add_metabolites({a: -1, phb: 1})
-    m.add_reactions([ex, split, growth, phac])
+    ferm = Reaction("FERM", lower_bound=0.0, upper_bound=1000.0)
+    ferm.add_metabolites({a: -1, etoh: 1})
+    ex_etoh = Reaction("EX_etoh_e", lower_bound=0.0, upper_bound=1000.0)
+    ex_etoh.add_metabolites({etoh: -1})
+    m.add_reactions([ex, split, growth, phac, ferm, ex_etoh])
     m.objective = "GROWTH"
     return m
 
@@ -119,12 +131,16 @@ def load(model_id: str, path: str | None = None) -> Model:
             if not path:
                 raise Refused(f"{model_id} is read from a fetched file, and no path was given")
             m = read_sbml_model(path)
+        check_exchange_names(m, entry)
         _PUBLISHED[model_id] = _counts(m)
         if entry.addon:
             added += apply_addon(m, shelf.ADDONS[entry.addon])
-    # The demand on each product is added here, once, where the file lacks
-    # it. RehMBEL1391 exports PHB through PHBt and carries no DM_phb_c.
+    # The demand on each product defined by a metabolite is added here, once,
+    # where the file lacks it. RehMBEL1391 exports PHB through PHBt and
+    # carries no DM_phb_c. A product secreted through an exchange needs none.
     for prod in shelf.PRODUCTS.values():
+        if "metabolite" not in prod:
+            continue
         rid = f"DM_{prod['metabolite']}"
         if prod["metabolite"] in m.metabolites and rid not in m.reactions:
             demand(m, prod["metabolite"])
@@ -132,6 +148,20 @@ def load(model_id: str, path: str | None = None) -> Model:
     _ADDED[model_id] = added
     _LOADED[model_id] = m
     return m
+
+
+def check_exchange_names(model: Model, entry: shelf.ShelfModel) -> None:
+    """Refuse a file whose mapped exchanges no longer carry the names the
+    shelf maps them by: a numbered id means nothing on its own, and one
+    renumbered between releases would feed or drain the wrong metabolite."""
+    for key, name in entry.exchange_names.items():
+        rid = entry.exchanges[key]
+        if rid not in model.reactions:
+            raise Refused(f"{entry.id}'s file has no reaction {rid}, which the shelf maps {key} to")
+        found = model.reactions.get_by_id(rid).name
+        if found != name:
+            raise Refused(f"{entry.id}'s file names {rid} '{found}', not '{name}': the shelf's map for {key} "
+                          "does not match this file, and nothing is computed on it")
 
 
 def _counts(model: Model) -> dict[str, int]:
@@ -157,15 +187,48 @@ def close_carbon(model: Model) -> None:
             ex.lower_bound = 0.0
 
 
-def exchange_for(model: Model, substrate: str) -> str | None:
-    sub = shelf.SUBSTRATES.get(substrate)
-    if sub is None:
+def exchange_for(model: Model, model_id: str, substrate: str) -> str | None:
+    """The substrate's exchange in this model (the shelf's map, else the BiGG
+    id), or None when the model has no such reaction."""
+    if substrate not in shelf.SUBSTRATES:
         raise Refused(f"there is no substrate {substrate}; the shelf knows {', '.join(shelf.SUBSTRATES)}")
-    return sub["exchange"] if sub["exchange"] in model.reactions else None
+    rid = shelf.exchange_id(model_id, substrate)
+    return rid if rid in model.reactions else None
+
+
+def _product(product: str) -> dict[str, Any]:
+    prod = shelf.PRODUCTS.get(product)
+    if prod is None:
+        raise Refused(f"there is no product {product}; the shelf knows {', '.join(shelf.PRODUCTS)}")
+    return prod
+
+
+def has_route(model: Model, model_id: str, product: str) -> bool:
+    """Whether the model can carry the product out, without adding anything."""
+    prod = _product(product)
+    if "exchange" in prod:
+        return shelf.exchange_id(model_id, product) in model.reactions
+    return prod["metabolite"] in model.metabolites
+
+
+def product_reaction(model: Model, model_id: str, product: str) -> Reaction | None:
+    """The reaction whose flux is the product: the exchange it is secreted
+    through, for a product defined by one (None when the model has none), or
+    the demand on its metabolite, as Appendix 2 adds it."""
+    prod = _product(product)
+    if "exchange" in prod:
+        rid = shelf.exchange_id(model_id, product)
+        return model.reactions.get_by_id(rid) if rid in model.reactions else None
+    return demand(model, prod["metabolite"])
 
 
 def no_uptake(model_id: str, substrate: str) -> dict[str, Any]:
     return {"finding": f"this reconstruction has no uptake reaction for {substrate}", "modelId": model_id, "substrate": substrate}
+
+
+def no_route(model_id: str, product: str) -> dict[str, Any]:
+    return {"finding": f"this reconstruction has no route to {shelf.PRODUCTS[product]['name']}", "modelId": model_id,
+            "product": product}
 
 
 def _optimum(model: Model, opens: dict[str, float], dm: Reaction) -> tuple[float, str]:
@@ -181,13 +244,13 @@ def _optimum(model: Model, opens: dict[str, float], dm: Reaction) -> tuple[float
 
 
 def ceiling(model: Model, model_id: str, product: str, substrate: str, uptake: float = shelf.UPTAKE) -> dict[str, Any]:
-    prod = shelf.PRODUCTS.get(product)
-    if prod is None:
-        raise Refused(f"there is no product {product}; the shelf knows {', '.join(shelf.PRODUCTS)}")
-    ex = exchange_for(model, substrate)
+    prod = _product(product)
+    ex = exchange_for(model, model_id, substrate)
     if ex is None:
         return no_uptake(model_id, substrate)
-    dm = demand(model, prod["metabolite"])
+    dm = product_reaction(model, model_id, product)
+    if dm is None:
+        return no_route(model_id, product)
     flux, status = _optimum(model, {ex: uptake}, dm)
     sub = shelf.SUBSTRATES[substrate]
     return {
@@ -200,13 +263,13 @@ def ceiling(model: Model, model_id: str, product: str, substrate: str, uptake: f
 
 def frontier(model: Model, model_id: str, product: str, substrate: str, uptake: float = shelf.UPTAKE,
              points: int = shelf.FRONTIER_POINTS) -> dict[str, Any]:
-    prod = shelf.PRODUCTS.get(product)
-    if prod is None:
-        raise Refused(f"there is no product {product}")
-    ex = exchange_for(model, substrate)
+    prod = _product(product)
+    ex = exchange_for(model, model_id, substrate)
     if ex is None:
         return no_uptake(model_id, substrate)
-    dm = demand(model, prod["metabolite"])
+    dm = product_reaction(model, model_id, product)
+    if dm is None:
+        return no_route(model_id, product)
     growth = growth_reaction(model)
     sub = shelf.SUBSTRATES[substrate]
     with model:
@@ -229,16 +292,16 @@ def mix(model: Model, model_id: str, product: str, a: str, b: str, uptake: float
         points: int = shelf.MIX_POINTS) -> dict[str, Any]:
     """The ceiling at `points` proportions of two sugars, from all of `a` at
     the convention uptake to all of `b` at the same total carbon."""
-    prod = shelf.PRODUCTS.get(product)
-    if prod is None:
-        raise Refused(f"there is no product {product}")
-    ex_a, ex_b = exchange_for(model, a), exchange_for(model, b)
+    prod = _product(product)
+    ex_a, ex_b = exchange_for(model, model_id, a), exchange_for(model, model_id, b)
     for sub, ex in ((a, ex_a), (b, ex_b)):
         if ex is None:
             return no_uptake(model_id, sub)
     sa, sb = shelf.SUBSTRATES[a], shelf.SUBSTRATES[b]
     carbon = uptake * sa["carbons"]
-    dm = demand(model, prod["metabolite"])
+    dm = product_reaction(model, model_id, product)
+    if dm is None:
+        return no_route(model_id, product)
     rows = []
     for i in range(points):
         share = 1 - i / (points - 1)  # the share of the carbon fed as `a`
@@ -260,8 +323,8 @@ def describe(model: Model, model_id: str) -> dict[str, Any]:
         **published,
         "added": _ADDED.get(model_id, []),
         "growthReaction": growth_reaction(model),
-        "substrates": {s: exchange_for(model, s) is not None for s in shelf.SUBSTRATES},
-        "products": {p: v["metabolite"] in model.metabolites for p, v in shelf.PRODUCTS.items()},
+        "substrates": {s: exchange_for(model, model_id, s) is not None for s in shelf.SUBSTRATES},
+        "products": {p: has_route(model, model_id, p) for p in shelf.PRODUCTS},
         "cobra": cobra.__version__,
     }
 

@@ -174,6 +174,9 @@ const PAIRS = [
   ['ProformaGrid', 'ProformaGrid'],
   ['ProformaRunResult', 'ProformaRunResult'],
   ['TraceStep', 'TraceStep'],
+  // A follow-up carries its conversation's earlier turns in words.
+  ['PriorTurn', 'PriorTurn'],
+  ['AskRequest', 'AskRequest'],
 ];
 
 let compared = 0;

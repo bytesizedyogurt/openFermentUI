@@ -61,7 +61,9 @@
     "ids:propose": "cd core && uv run python ../scripts/resolve-identifiers.py",
     "ids:apply": "cd core && uv run python ../scripts/resolve-identifiers.py --apply",
     "thread:propose": "cd core && uv run python ../scripts/thread-p.py",
-    "thread:apply": "cd core && uv run python ../scripts/thread-p.py --apply"
+    "thread:apply": "cd core && uv run python ../scripts/thread-p.py --apply",
+    "thread:propose:q": "cd core && uv run python ../scripts/thread-p.py --thread Q",
+    "thread:apply:q": "cd core && uv run python ../scripts/thread-p.py --thread Q --apply"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.0",

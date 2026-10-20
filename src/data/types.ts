@@ -51,11 +51,14 @@ export type ParameterFamily =
   | 'cultivation'
   | 'downstream'
   // OF-BLD-014 §2.1 — thread P's polyhydroxyalkanoates.
-  | 'polymer';
+  | 'polymer'
+  // The yeast-ethanol program (thread Q): growth, product and price kinetics.
+  | 'kinetics';
 
 /**
- * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — and
- * the polymer family OF-BLD-014 §2.1 adds: twenty-nine fields in six.
+ * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
+ * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
+ * yeast-ethanol program (thread Q) adds: forty fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -92,7 +95,19 @@ export type FieldId =
   | 'pha_titre'
   | 'pha_yield_substrate'
   | 'pha_productivity'
-  | 'pha_mw';
+  | 'pha_mw'
+  // Family 7 — growth and product kinetics (thread Q)
+  | 'monod_ks'
+  | 'biomass_yield_substrate'
+  | 'ethanol_yield_substrate'
+  | 'ethanol_titre'
+  | 'ethanol_productivity'
+  | 'ethanol_inhibition_ki'
+  | 'ethanol_max_conc'
+  | 'substrate_inhibition_ki'
+  | 'ethanol_lp_alpha'
+  | 'ethanol_lp_beta'
+  | 'ethanol_mesp';
 
 /**
  * Analytical method behind a PTM or functional measurement (OF-COR-001 §17
@@ -174,7 +189,9 @@ export type CorpusThread =
   | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
   | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O'
   /** PHA from waste cellulosic sugars, program two (OF-BLD-014 §2.2). */
-  | 'P';
+  | 'P'
+  /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
+  | 'Q';
 
 export type SourceType =
   | 'journal-article'
@@ -183,7 +200,9 @@ export type SourceType =
   | 'patent'
   | 'book'
   | 'industry-report'
-  | 'preprint';
+  | 'preprint'
+  /** An entry in a curated database, such as a strain page of the Saccharomyces Genome Database. */
+  | 'database-entry';
 
 export interface PaperSection {
   id: string;
@@ -215,6 +234,13 @@ export interface Paper {
   doi?: string;
   pmcid?: string;
   pmid?: string;
+  /**
+   * Where Intake fetches the text of a source Europe PMC does not hold: an
+   * OSTI report's purl, an SGD strain entry's address. Written by
+   * `pnpm thread:apply:q` from a person's include list; a strain entry has
+   * no other identifier.
+   */
+  sourceUrl?: string;
   /** Whether `sections` hold the paper's own text or the curator's notes. */
   textSource: 'full-text' | 'curation-note';
   /** Openly retrievable vs. needs institutional access (OF-COR-001 §19). */
@@ -229,6 +255,8 @@ export interface Paper {
   // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
   /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
   license?: string;
+  /** Who served the fetched full text, when `textSource` is 'full-text'. */
+  fetchedFrom?: FetchSource;
   /** Why the last fetch halted, when `ingest` is a failure state. */
   ingestReason?: string;
 }
@@ -1341,6 +1369,54 @@ export interface AnswerPlan {
   runbookDraft?: RunbookDraft | null;
 }
 
+/**
+ * One earlier turn sent with a follow-up (models.py PriorTurn): the question
+ * and the plan's words. No id, value or quote travels; the follow-up's own
+ * tools find whatever it cites.
+ */
+export interface PriorTurn {
+  question: string;
+  claims: string[];
+  gaps: string[];
+  declined: string | null;
+}
+
+/** What the browser posts to /api/ask and /api/ask/stream (models.py AskRequest). */
+export interface AskRequest {
+  question: string;
+  maxEvidence: number;
+  mode: 'agent' | 'single';
+  /** The conversation's earlier turns, oldest first. */
+  history: PriorTurn[];
+}
+
+/**
+ * One question asked in Live mode, and what came back: the steps as they
+ * arrived, then the plan or the failure in words. Kept in its conversation,
+ * so a follow-up reads it, and a citation followed and returned from, or a
+ * reload, finds it where it was.
+ */
+export interface LiveTurn {
+  id: string;
+  question: string;
+  askedAt: string;
+  steps: TraceStep[];
+  plan: AnswerPlan | null;
+  error: { message: string; remedy: string } | null;
+  /** `running` until the plan or the failure arrives. A turn a reload cut short reads `interrupted`. */
+  status: 'running' | 'answered' | 'failed' | 'stopped' | 'interrupted';
+  /** Set when the stream replayed a recording rather than running (OF-BLD-014 §10.3). */
+  replay?: { recordedAt: string; standIn: boolean } | null;
+}
+
+/** A Live-mode conversation: its turns, oldest first. Durable. */
+export interface LiveConversation {
+  id: string;
+  title: string;
+  startedAt: string;
+  turns: LiveTurn[];
+}
+
 // ── Intake (OF-BLD-012 §2.5, §5) ────────────────────────────────────────
 //
 // Mirrors of the Pydantic models in core/openferment_core/models.py; `pnpm
@@ -1348,13 +1424,23 @@ export interface AnswerPlan {
 // `FetchedSection` is the same shape as `PaperSection` above and is compared
 // against it.
 
-/** What the JATS <license> element said, stored beside every fetched text. */
+/**
+ * What the JATS <license> element said, or what an OSTI report or an SGD
+ * strain entry states of itself, stored beside every fetched text.
+ */
 export interface FetchLicense {
   href: string | null;
   text: string | null;
 }
 
 export type FetchStatus = Extract<IngestStatus, 'complete' | 'failed:fetch' | 'failed:parse'>;
+
+/**
+ * Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
+ * Saccharomyces Genome Database strain entry. Absent from what an older
+ * service sent, which was always Europe PMC.
+ */
+export type FetchSource = 'europepmc' | 'osti' | 'sgd';
 
 /**
  * What one fetch produced. A failure is a result with a reason rather than an
@@ -1368,8 +1454,9 @@ export interface FetchResult {
   fetchedAt: string;
   license: FetchLicense | null;
   sections: PaperSection[];
-  /** Size of the XML as received. */
+  /** Size of the document as received: the XML, the PDF or the JSON. */
   bytes: number;
+  source?: FetchSource;
 }
 
 /** One row of GET /api/intake/status. */
@@ -1383,6 +1470,7 @@ export interface IntakeStatus {
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
+  source?: FetchSource;
 }
 
 /**
@@ -1397,6 +1485,8 @@ export interface OverlayPaper {
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
+  /** Who served the text, so the reader names it rather than assuming Europe PMC. */
+  source?: FetchSource;
 }
 
 /**
@@ -2089,6 +2179,12 @@ export interface GeneosModelInfo {
   /** The sugar a view opens on: one the model can take up. */
   feed: string;
   notes: string[];
+  /**
+   * The product a view opens on, and every product the shelf names a route
+   * to in this model ('phb', 'ethanol'); the worker decides what it makes.
+   */
+  product: string;
+  products: string[];
 }
 
 export type GeneosKind = 'ceiling' | 'frontier' | 'mix';

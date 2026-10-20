@@ -1092,9 +1092,9 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
   },
   {
     feature: 'Validation metrics',
-    fidelity: 'Visual — nothing has been scored',
+    fidelity: 'Real, from the service when it is running',
     notes:
-      'No extractor has been run against this corpus, so no precision, recall or F1 figure exists anywhere in the build. The scoring code is real and sits unused; the screen shows the planned gold set, the one row an ontology gap blocks, and the difficulty cases the set has to include.',
+      'Witness scores the extractor\'s run (claude-1) against the curated records on the papers it fetched, and labels the figures provisional with the number of records they stand on. With the service down, or before any run, it shows the planned gold set and the difficulty cases instead, and no figure.',
   },
   {
     feature: 'Leave-one-out methodology',
@@ -1155,7 +1155,7 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
     feature: 'Agent chat — live mode',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc on Claude Opus 5.5, with Claude Sonnet 5.5 when Opus declines or is unavailable, when the service is running: one retrieval, one structured response, and the browser renders every value from the cited record — the prose carries no numbers of its own. With the service down the switch says so and the turn runs scripted.',
+      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down a question says so; nothing scripted answers in its place.',
   },
   {
     feature: 'Retrieval inspector and tool traces',
@@ -1401,15 +1401,15 @@ function AboutSection() {
             <span className="font-num">{ONTOLOGY.length}</span> fields
           </Row>
           <Row label="Extractor">
-            None. No extractor has been run against this corpus, so no record carries a run label
-            and no screen reports precision, recall or F1. Every record was transcribed by hand from
-            the curation document; the run field on a record stays empty until there is a run to
-            fill it.
+            The seed records were transcribed by hand from the curation document and carry no run
+            label. With the service running, the extractor&rsquo;s candidates (run claude-1) arrive
+            through the overlay, each anchored to a sentence of a fetched paper and unverified until a
+            named reviewer decides; Witness scores that run.
           </Row>
           <Row label="Agent">
             Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
-            flows and no model is called. Live: Postdoc on Claude Opus 5.5 (Sonnet 5.5 as fallback) through openferment-core,
-            values rendered from the cited records.
+            flows and no model is called. Live: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
+            Sonnet 5.5 as fallback by default), values rendered from the cited records.
           </Row>
           <Row label="Retrieval">
             Local lexical scorer over the section text held in the build — the curator&rsquo;s note
@@ -1421,8 +1421,9 @@ function AboutSection() {
           <Row label="Storage">
             Split by lifetime. Reference data — papers, protocols, molecules, vocabulary — is never
             mutated and is read from the build every load. The Durable tier — depositions, review
-            decisions and runbook locks — is written to IndexedDB in this browser, because a
-            fermentation at hour 14 with timers running cannot be lost to a page reload. Everything
+            decisions, runbook locks and Postdoc&rsquo;s Live conversations — is written to
+            IndexedDB in this browser, because a fermentation at hour 14 with timers running cannot
+            be lost to a page reload, and neither can a question somebody is halfway through. Everything
             else is memory only and resets: open panels, density, theme, simulation speed. No
             localStorage, no sessionStorage, no cookies, no telemetry, and nothing leaves the
             browser. &ldquo;Reset demo data&rdquo; clears the durable store as well as memory.

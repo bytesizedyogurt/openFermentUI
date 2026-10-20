@@ -8,11 +8,15 @@
       "scope": "central carbon",
       "route": "SPLIT then PHAC, built in the worker",
       "licence": "test fixture",
-      "source": "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model",
+      "source": "STAND-IN toy network built in the geneOS worker (4 metabolites, 6 reactions), for tests and fixtures; not a published model",
       "unavailable": null,
       "feed": "glucose",
       "notes": [
-        "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model"
+        "STAND-IN toy network built in the geneOS worker (4 metabolites, 6 reactions), for tests and fixtures; not a published model"
+      ],
+      "product": "phb",
+      "products": [
+        "phb"
       ]
     },
     {
@@ -27,6 +31,10 @@
       "feed": "fructose",
       "notes": [
         "Its phb_c carries no formula; g per g uses the repeat unit's formula, as for the other models."
+      ],
+      "product": "phb",
+      "products": [
+        "phb"
       ]
     }
   ]
