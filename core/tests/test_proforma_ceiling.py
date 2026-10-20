@@ -165,6 +165,27 @@ def test_records_of_another_strain_map_to_the_species_models_and_say_so(pool):
     assert "another strain's network bounds it" in r.matchWords
 
 
+def test_the_organism_line_counts_the_records_that_name_a_strain_and_those_that_name_none(pool):
+    """OF-BLD-019 §5.R, finding 4: on the live data 3 of sc-yeast-1's 18
+    yield records name CEN.PK113-7D and 15 name no catalogued strain, and the
+    card said every one was of CEN.PK113-7D. The line counts both, and the
+    species rows say how many records they cover."""
+    ceiling(OVER_ALL)
+    unnamed = dict(pool.records_by_id["standin-ethanol_yield_substrate-1"], id="standin-ethanol_yield_substrate-3",
+                   value=0.44, strainId=None, organismText="ST9681, a STAND-IN clone name")
+    rs = [*pool.records, unnamed]
+    c = check(SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
+    assert c.yieldRecords == 4 and c.strains == ["s-cerevisiae-cenpk113-7d"] and c.species == ["saccharomyces cerevisiae"]
+    w = c.organismWords
+    assert "3 of the 4 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D" in w, w
+    assert "1 names no catalogued strain" in w and "the Yeast ethanol program's species" in w, w
+    assert not w.startswith("the strain of the records its yield binds"), w
+    r = row(c)
+    assert r.match == "species" and "4 of the 4 records the yield binds are read as of it" in r.matchWords, r.matchWords
+    # Every record of the strain: said as all of them.
+    assert "all 3 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D" in check(pool).organismWords
+
+
 def test_a_host_filter_on_the_models_strain_maps_by_strain(pool):
     ceiling(OVER_ALL)
     c = check(pool, host="s-cerevisiae-s288c")
@@ -201,13 +222,18 @@ def test_a_fermos_fit_feeds_the_yield_the_check_reads(pool):
     ceiling(OVER_ALL)
     c = check(pool, fits={"yield": fc.artifactId})
     assert c.yieldBinding == "artifact" and c.yieldSource.id == fc.artifactId and c.yieldRecords == 0
-    assert row(c).yieldGPerG == pytest.approx(fc.yieldInterval.median)
+    # The yield the fit feeds: its Yp/s at the hour its median sugar runs out (§5.R).
+    fed = next(f for f in proforma.fit_info(artifacts.get(fc.artifactId), ETHANOL).feeds if f.key == "yield")
+    assert row(c).yieldGPerG == pytest.approx(fed.value)
 
 
 def test_the_pha_draft_reads_its_records_unclipped_and_says_its_run_clips(pool, monkeypatch):
     c = check(pool, scenario="sc-pha-1", include_archived=True)
     assert c.product == "phb" and c.substrate == "glucose" and c.models == ["RehMBEL1391"]
     assert proforma.PHA_CLIP_NOTE in c.notes and "fermentable sugar" in c.sugarWords
+    # A STAND-IN RehMBEL1391 ceiling on glucose: a state the published network
+    # cannot reach (it has no glucose uptake reaction, test_geneos_live, so
+    # geneOS keeps none), written here only to exercise the unclipped reading.
     ceiling(0.25, model="RehMBEL1391", product="phb")
     monkeypatch.setattr(proforma, "yield_cap", lambda: (0.25, "a-cap"))
     c = check(pool, scenario="sc-pha-1", include_archived=True)
@@ -215,6 +241,24 @@ def test_the_pha_draft_reads_its_records_unclipped_and_says_its_run_clips(pool, 
     # The PHA records are 0.22, 0.3, 0.36: read as they are, not clipped to the cap.
     assert r.match == "strain" and r.flag == "above" and c.yieldHigh == pytest.approx(0.36)
     assert len(r.recordsAbove) == 2
+
+
+def test_a_model_fed_another_sugar_is_not_sent_to_compute_on_this_one(pool):
+    """OF-BLD-019 §5.R, finding 5: the PHA draft reads glucose, and its one
+    matching model, RehMBEL1391, opens on fructose (the published network
+    has no glucose uptake reaction: test_geneos_live), so geneOS keeps no
+    glucose ceiling for it. The card says what it lacks and why, names the
+    ceiling on file on its own sugar, and sends nobody to compute one."""
+    fructose = ceiling(0.3, model="RehMBEL1391", product="phb", substrate="fructose")
+    for host in ("c-necator-h16", None):
+        c = check(pool, scenario="sc-pha-1", include_archived=True, host=host)
+        assert c.models == ["RehMBEL1391"] and c.rows == [] and c.otherSugars == ["fructose"]
+        assert "One is computed" not in c.empty and "choose PHB, glucose" not in c.empty, c.empty
+        assert "No geneOS ceiling for PHB on glucose is on file for RehMBEL1391" in c.empty, c.empty
+        assert "computes a ceiling only on a sugar the network takes up" in c.empty, c.empty
+        assert "its shelf entry feeds it fructose" in c.empty and fructose.id in c.empty, c.empty
+    # A model fed this flowsheet's sugar is still sent to compute one.
+    assert "One is computed in geneOS → Model: choose ethanol, glucose" in check(pool).empty
 
 
 def test_it_is_refused_in_words_as_the_binding_is(pool):

@@ -34,6 +34,19 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   // generates through the real code, each `{_fixture, response}`.
   const PROTOTYPE = join(process.cwd(), 'core/tests/fixtures/prototype');
   const prototype = async (name) => JSON.parse(await readFile(join(PROTOTYPE, name), 'utf8')).response;
+  // OF-BLD-019 §5.R — the recorded answer for the fermOS fits a query names
+  // (`?fits=<JSON object>`), matched input by input, or null.
+  const sameFits = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+  const fitsAnswer = (raw, recorded) => {
+    let asked = null;
+    try {
+      asked = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!asked || typeof asked !== 'object' || Array.isArray(asked)) return null;
+    return (recorded ?? []).find((r) => sameFits(asked, r.fits)) ?? null;
+  };
   const HEALTH = JSON.stringify({
     ok: true,
     service: 'openferment-core (smoke double)',
@@ -410,20 +423,18 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       const q = new URL(req.url ?? '/', 'http://double').searchParams;
       const flowsheet = q.get('flowsheet') ?? '';
       // OF-BLD-019 §5.1: with fermOS fits chosen, the binding the real code
-      // made with the stand-in forecast for every input it feeds; any other
-      // choice is a 422 in words.
+      // made with the stand-in forecast for every input it feeds; §5.R: and
+      // with the other choices the browser tests make (`others`: the fit for
+      // titre and yield, bound; the forecast's productivity beside the fit's
+      // titre, refused), each as the real code answered; any other choice is
+      // a 422 in words.
       if (q.get('fits')) {
         proformaBinds.push(Object.fromEntries(q));
         const fixture = await prototype('proforma-bind-fits.json');
-        let asked = null;
-        try {
-          asked = JSON.parse(q.get('fits'));
-        } catch {
-          /* answered below */
-        }
-        const same = asked && flowsheet === fixture.flowsheet && JSON.stringify(Object.entries(asked).sort()) === JSON.stringify(Object.entries(fixture.fits).sort());
-        res.writeHead(same ? 200 : 422, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(same ? fixture.body : { detail: `the double holds no binding of ${flowsheet} with these fits` }));
+        const answer = fitsAnswer(q.get('fits'), [{ fits: fixture.fits, status: 200, body: fixture.body }, ...(fixture.others ?? [])]);
+        const found = flowsheet === fixture.flowsheet && answer;
+        res.writeHead(found ? answer.status : 422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(found ? answer.body : { detail: `the double holds no binding of ${flowsheet} with these fits` }));
       }
       const answers = (await prototype('proforma-bind.json'))[q.get('includeArchived') === 'true' ? 'on' : 'off'];
       const answer = answers[flowsheet] ?? {
@@ -445,7 +456,24 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       const scenarioId = q.get('scenarioId') ?? '';
       const seeds = await prototype('proforma-scenarios-archived.json');
       const flowsheet = seeds.find((sc) => sc.id === scenarioId)?.flowsheet ?? q.get('flowsheet') ?? '';
-      const answer = (await prototype('proforma-ceiling-check.json'))[flags.ceilingOnFile ? 'onFile' : 'none'][flowsheet];
+      const recorded = await prototype('proforma-ceiling-check.json');
+      // §5.R: with fermOS fits chosen, the check the real code made of
+      // sc-yeast-1 with that choice (`fitted`), read or refused in its words;
+      // any other choice is a 422 in words, as the binding's is.
+      if (q.get('fits')) {
+        const fitted = flowsheet === 'ethanol_glucose_v0' && fitsAnswer(q.get('fits'), recorded.fitted[flags.ceilingOnFile ? 'onFile' : 'none']);
+        res.writeHead(fitted ? fitted.status : 422, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify(
+            !fitted
+              ? { detail: `the double holds no ceiling check of ${flowsheet || 'no flowsheet'} with these fits` }
+              : fitted.status === 200
+                ? { ...fitted.body, scenarioId }
+                : fitted.body,
+          ),
+        );
+      }
+      const answer = recorded[flags.ceilingOnFile ? 'onFile' : 'none'][flowsheet];
       if (!answer) {
         res.writeHead(422, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ detail: `there is no seed scenario ${scenarioId}, and ${flowsheet || 'no flowsheet'} is not one a scenario made here can run` }));

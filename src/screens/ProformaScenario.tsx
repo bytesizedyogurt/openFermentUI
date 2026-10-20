@@ -862,7 +862,8 @@ function FermosFitSlot({
   flowsheetId: string;
   chosen: Record<string, string>;
   onChoose: (fits: Record<string, string>) => void;
-  onStop: () => void;
+  /** Stop using these artifacts: only the inputs each feeds are cleared (§5.R). */
+  onStop: (artifactIds: string[]) => void;
 }) {
   const route = useRoute();
   const sent = route.query.get('fit');
@@ -905,8 +906,10 @@ function FermosFitSlot({
       <h3 className="font-medium text-body">Use a fermOS fit</h3>
       <p className="text-caption text-ink-soft mb-2">
         A fit of a deposited run can give the fermenter its titre, its yield on sugar and its batch time. The service computes each
-        from the fit&rsquo;s forecast: titre from the final product, yield from product made over sugar used, and productivity as the
-        titre over the hour the median sugar runs out. The run then names the fit as the source of each.
+        from the fit&rsquo;s forecast, drawn again to the hour its median sugar runs out (found between the forecast&rsquo;s points, so
+        the length it was asked to run does not move them): titre from the final product, yield from product made over sugar used,
+        and productivity as that titre over that hour. A fit&rsquo;s productivity feeds the fermenter only beside its own titre, since
+        the batch time is the titre over the productivity. The run then names the fit as the source of each.
       </p>
       {arrived && (
         <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
@@ -935,7 +938,7 @@ function FermosFitSlot({
       {missing.length > 0 && (
         <p className="text-caption text-signal-warn">
           The fit this scenario uses, {missing.join(', ')}, is not on file here any more.{' '}
-          <button className="underline hover:text-accent" onClick={onStop}>
+          <button className="underline hover:text-accent" onClick={() => onStop(missing)}>
             Stop using it
           </button>
         </p>
@@ -991,7 +994,7 @@ function FermosFitSlot({
                   {inUse ? (
                     <span className="text-caption">
                       In use for {Object.entries(chosen).filter(([, id]) => id === f.artifactId).map(([k]) => k).join(', ')}.{' '}
-                      <button className="underline hover:text-accent" onClick={onStop} data-testid="fermos-fit-stop">
+                      <button className="underline hover:text-accent" onClick={() => onStop([f.artifactId])} data-testid="fermos-fit-stop">
                         Stop using this fit
                       </button>
                     </span>
@@ -1515,7 +1518,11 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               flowsheetId={flowsheetId}
               chosen={chosenFits}
               onChoose={(fits) => setFits(scenario.id, fits)}
-              onStop={() => clearFit(scenario.id)}
+              onStop={(ids) =>
+                Object.entries(chosenFits)
+                  .filter(([, id]) => ids.includes(id))
+                  .forEach(([key]) => clearFit(scenario.id, key))
+              }
             />
           )}
           <div className="mt-3 text-caption text-ink-soft">

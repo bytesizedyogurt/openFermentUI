@@ -970,6 +970,12 @@ async function main() {
   // binds titre, yield and productivity to it, each shown as an artifact
   // with its link, the binding asked of the service with the fits; the
   // choice survives a reload, and stopping it puts the records back.
+  // OF-BLD-019 §5.R: the Ceiling check reads the yield the forecast feeds
+  // (finding 7); the index says the inputs have a fit chosen, not that the
+  // service bound one (8); choosing the kinetic fit for titre and yield
+  // leaves the forecast's productivity beside another titre, which the
+  // service refuses in words naming titre (1); and stopping the forecast
+  // clears its productivity alone, the fit's titre and yield staying (6).
   let fitFails = 0;
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -1016,11 +1022,46 @@ async function main() {
         problems.push(`the binding was not asked of the service with the fits chosen: ${JSON.stringify(asked)}`);
       if (/Waiting for a source: [^.]*productivity/i.test(await page.locator('[data-testid="proforma-waiting"]').innerText({ timeout: 3000 }).catch(() => '')))
         problems.push('productivity still waits with the forecast chosen');
+      // §5.R (7): the Ceiling check reads the yield the forecast feeds, as the service reads it.
+      const ceilingSource = page.locator('[data-testid="ceiling-yield-source"]');
+      await page.locator('[data-testid="ceiling-yield-source"][data-binding="artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (
+        (await ceilingSource.getAttribute('data-binding', { timeout: 3000 }).catch(() => null)) !== 'artifact' ||
+        (await ceilingSource.getAttribute('href', { timeout: 3000 }).catch(() => null)) !== `#/biorepo/artifacts/${chosen}`
+      )
+        problems.push('the ceiling check does not read the yield the chosen forecast feeds');
       await page.waitForTimeout(700);
       await page.reload({ waitUntil: 'networkidle' });
       await page.locator('[data-testid="input-titre"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await shown()).length) problems.push('the fit chosen does not survive a reload');
-      await page.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
+      // §5.R (8): the index binds without the fits, so it says a fit is chosen, never that one is bound.
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const indexCard = page.locator('[data-testid="biosteam-card"][data-scenario="sc-yeast-1"] [data-testid="scenario-inputs"]');
+      await indexCard.waitFor({ timeout: 8000 }).catch(() => {});
+      const counted = await indexCard.innerText({ timeout: 3000 }).catch(() => '');
+      if (!/3 with a fermOS fit chosen/.test(counted) || /from a fermOS fit/.test(counted))
+        problems.push(`the index does not say the inputs have a fit chosen: ${JSON.stringify(counted.slice(0, 160))}`);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="input-titre"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      // §5.R (1): the kinetic fit for titre and yield leaves the forecast's productivity beside another titre: refused, naming titre.
+      const kinetic = await fitOption.getAttribute('data-artifact', { timeout: 3000 }).catch(() => null);
+      await fitOption.locator('[data-testid="fermos-fit-use"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="bind-problem"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const refusal = await page.locator('[data-testid="bind-problem"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (!refusal.includes(`productivity from growth_forecast ${chosen}`) || !refusal.includes(`titre is from ${kinetic}`))
+        problems.push(`the forecast's productivity beside the fit's titre is not refused naming titre: ${JSON.stringify(refusal.slice(0, 200))}`);
+      if (!/In use for productivity\./.test(await option.innerText({ timeout: 3000 }).catch(() => '')))
+        problems.push("the forecast's card does not say it is in use for productivity alone");
+      // §5.R (6): stopping the forecast clears its productivity alone; the fit's titre and yield stay.
+      await option.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="input-productivity"] [data-testid="source-records"]').waitFor({ timeout: 8000 }).catch(() => {});
+      for (const key of ['titre', 'yield']) {
+        const link = await page.locator(`[data-testid="input-${key}"] [data-testid="source-artifact"]`).getAttribute('href', { timeout: 3000 }).catch(() => null);
+        if (link !== `#/biorepo/artifacts/${kinetic}`) problems.push(`stopping the forecast cleared the fit chosen for ${key} (${link})`);
+      }
+      if (!(await page.locator('[data-testid="input-productivity"] [data-testid="source-records"]').count())) problems.push('stopping the forecast does not put the records back under productivity');
+      if (!/In use for titre, yield\./.test(await fitOption.innerText({ timeout: 3000 }).catch(() => ''))) problems.push("the fit's card no longer says it is in use for titre and yield");
+      await fitOption.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
       await page.locator('[data-testid="input-titre"] [data-testid="source-records"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[data-testid="source-artifact"]').count()) !== 0) problems.push('stopping the fit does not put the records back');
     } catch (e) {
@@ -1032,7 +1073,7 @@ async function main() {
       fitFails++;
       console.log(`✗ fermos fit   ${problems.join('; ')}`);
     } else {
-      console.log('✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, kept across a reload, and stopping it puts the records back');
+      console.log("✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, read by the ceiling check, kept across a reload and counted on the index as chosen; the fit's titre beside the forecast's productivity is refused naming titre, stopping the forecast clears its productivity alone, and stopping the fit puts the records back");
     }
     await page.close();
   }

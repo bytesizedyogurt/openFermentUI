@@ -794,14 +794,33 @@ BRIDGE_LABELS = {"biomass": "Dry cell weight (STAND-IN)", "product": "Ethanol (S
                  "substrate": "Glucose (STAND-IN)"}
 
 
+def _bridge_fits() -> tuple[str, str]:
+    """The bridge's STAND-IN fit and its forecast, kept in the current store
+    (artifacts.folder()) through the real code: their ids, the fit's first."""
+    from . import fermos
+    from .models import FermosSeries
+
+    series = [FermosSeries.model_validate({**x, "measureId": f"standin-{x['role']}", "label": BRIDGE_LABELS[x["role"]]})
+              for x in fermos_sample_series()]
+    fit = fermos.fit(BRIDGE_DEPOSITION, series)
+    fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=STANDIN_FORECAST_H)
+    return fit.kineticArtifactId, fc.artifactId
+
+
+def _bridge_choices(fit_id: str, forecast_id: str) -> list[dict[str, str]]:
+    """The fits the browser tests choose (OF-BLD-019 §5.R): the kinetic fit
+    for the two inputs it feeds, and the forecast's productivity beside the
+    fit's titre and yield, which the binding refuses in words."""
+    return [{"titre": fit_id, "yield": fit_id}, {"titre": fit_id, "yield": fit_id, "productivity": forecast_id}]
+
+
 def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
     import tempfile
     from types import SimpleNamespace
 
-    from . import artifacts, fermos, proforma
+    from . import artifacts, proforma
     from . import intake as _intake
     from .flowsheets import shelf as _shelf
-    from .models import FermosSeries
 
     rs = _standin_yeast_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
@@ -822,21 +841,26 @@ def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
         try:
             _intake.DATA_DIR = Path(tmp)
             none = listed()
-            series = [FermosSeries.model_validate({**x, "measureId": f"standin-{x['role']}", "label": BRIDGE_LABELS[x["role"]]})
-                      for x in fermos_sample_series()]
-            fit = fermos.fit(BRIDGE_DEPOSITION, series)
-            fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=STANDIN_FORECAST_H)
+            fit_id, fc_id = _bridge_fits()
             on_file = listed()
-            info = proforma.fit_info(artifacts.get(fc.artifactId), proforma.ETHANOL)
-            fits = {f.key: fc.artifactId for f in info.feeds if not f.refused}
+            info = proforma.fit_info(artifacts.get(fc_id), proforma.ETHANOL)
+            fits = {f.key: fc_id for f in info.feeds if not f.refused}
             assert set(fits) == set(proforma.FIT_KEYS), "the stand-in forecast no longer feeds every input"
             body = proforma.bind_flowsheet(proforma.ETHANOL, pool=pool, fits=fits).model_dump(mode="json")
-            kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0})
-                    for i in (fit.kineticArtifactId, fc.artifactId)]
+            # §5.R: the other choices the browser tests make, each bound or
+            # refused in the service's words.
+            others = []
+            for chosen in _bridge_choices(fit_id, fc_id):
+                try:
+                    others.append({"fits": chosen, "status": 200, "body": proforma.bind_flowsheet(
+                        proforma.ETHANOL, pool=pool, fits=chosen).model_dump(mode="json")})
+                except proforma.ScenarioRefused as e:
+                    others.append({"fits": chosen, "status": 422, "body": {"detail": str(e)}})
+            kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0}) for i in (fit_id, fc_id)]
         finally:
             _intake.DATA_DIR = saved
     return ({"fermos-fits.json": {"none": none, "onFile": on_file},
-             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body}}, kept)
+             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body, "others": others}}, kept)
 
 
 # §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and
@@ -1303,7 +1327,9 @@ def prototype_ceiling_check() -> dict[str, Any]:
     """GET /api/proforma/ceiling-check for the double, through the real code
     over the stand-in records: each seed scenario's check with no ceiling on
     file (a fresh install) and with the STAND-IN ceiling on file, by the
-    flowsheet it runs."""
+    flowsheet it runs; and (§5.R) sc-yeast-1's with each choice of the
+    bridge's fit and forecast the browser tests make, read or refused in the
+    service's words (`fitted`, by the same two states)."""
     import tempfile
     from types import SimpleNamespace
 
@@ -1320,16 +1346,29 @@ def prototype_ceiling_check() -> dict[str, Any]:
             out[body.flowsheet] = {"status": 200, "body": body.model_dump(mode="json")}
         return out
 
+    def fitted(choices: list[dict[str, str]]) -> list[dict[str, Any]]:
+        out = []
+        for chosen in choices:
+            try:
+                body = proforma.ceiling_check(proforma.YEAST_SCENARIO_ID, pool=pool, fits=chosen)
+                out.append({"fits": chosen, "status": 200, "body": body.model_dump(mode="json")})
+            except proforma.ScenarioRefused as e:
+                out.append({"fits": chosen, "status": 422, "body": {"detail": str(e)}})
+        return out
+
     saved = _intake.DATA_DIR
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
-            none = checked()
+            fit_id, fc_id = _bridge_fits()
+            choices = [{k: fc_id for k in proforma.FIT_KEYS}, *_bridge_choices(fit_id, fc_id)]
+            none, fitted_none = checked(), fitted(choices)
             standin_ceiling(STANDIN_CEILING_MODEL, "ethanol", "glucose", STANDIN_CEILING_G_PER_G)
-            on_file = checked()
+            on_file, fitted_on_file = checked(), fitted(choices)
         finally:
             _intake.DATA_DIR = saved
-    return {"proforma-ceiling-check.json": {"none": none, "onFile": on_file}}
+    return {"proforma-ceiling-check.json": {"none": none, "onFile": on_file,
+                                            "fitted": {"none": fitted_none, "onFile": fitted_on_file}}}
 
 
 # OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code

@@ -55,33 +55,33 @@
             "fitArtifactId": "45abd7656f83a2a6",
             "productSeries": "Ethanol (STAND-IN)",
             "substrateSeries": "Glucose (STAND-IN)",
-            "batchTimeH": 83.63636363636364,
+            "batchTimeH": 82.9164214090859,
             "feeds": [
               {
                 "key": "titre",
                 "unit": "g L-1",
-                "value": 12.495454299689357,
-                "low": 12.020800571779992,
-                "high": 12.991372706837803,
-                "derivation": "the final product of forecast da439bc5419ed413, as kept: its median, with the 5th and 95th percentile of its band for readings",
+                "value": 12.402460413209695,
+                "low": 11.969078154412315,
+                "high": 12.899758675277175,
+                "derivation": "the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings",
                 "refused": null
               },
               {
                 "key": "yield",
                 "unit": "g g-1",
-                "value": 0.20605931448869083,
-                "low": 0.19412567528133784,
-                "high": 0.2185841975261077,
-                "derivation": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, as kept: its median, with the 5th and 95th percentile",
+                "value": 0.20523209622693878,
+                "low": 0.1934502858639274,
+                "high": 0.21756178245739488,
+                "derivation": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
                 "refused": null
               },
               {
                 "key": "productivity",
                 "unit": "g L-1 h-1",
-                "value": 0.14940217097454664,
-                "low": 0.14372696335823903,
-                "high": 0.15533163019045199,
-                "derivation": "titre over batch time: the final product of forecast da439bc5419ed413, as kept over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
+                "value": 0.14957785445200902,
+                "low": 0.14435111828283456,
+                "high": 0.15557543917185543,
+                "derivation": "titre over batch time: the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
                 "refused": null
               }
             ],

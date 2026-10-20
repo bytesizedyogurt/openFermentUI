@@ -355,7 +355,7 @@ function BiosteamCard({
       {counts && (
         <p className="text-caption text-ink-soft mb-3 font-num" data-testid="scenario-inputs">
           {counts.total} inputs: {counts.records} {counts.bound ? 'bound to records' : 'can bind to records'}
-          {counts.computed > 0 && `, ${counts.computed} from a fermOS fit`}
+          {counts.computed > 0 && `, ${counts.computed} with a fermOS fit chosen`}
           {counts.assumed > 0 && `, ${counts.assumed} assumed`}
           {counts.conventions > 0 && `, ${counts.conventions} by convention`}, {counts.waiting} waiting for an assumption
         </p>
