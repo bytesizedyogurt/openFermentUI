@@ -427,6 +427,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_geneos().items(),
         *prototype_fermos().items(),
         *prototype_proforma().items(),
+        *prototype_pureos().items(),
         *prototype_proposals().items(),
     ):
         path = out / name
@@ -934,6 +935,43 @@ def prototype_proforma() -> dict[str, Any]:
 
     return {"proforma-scenarios.json": [info], "proforma-run.json": run.model_dump(mode="json"),
             "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True)}
+
+
+# OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code
+# (pureos.trains, pureos.train) from the run prototype_proforma makes: the
+# same artifact artifacts.json carries, whose tables are the stand-in's and
+# say so in `tablesSource`. With the switch off the list is empty, because
+# the run is sc-pha-1's and PHA is archived; the page says so.
+def prototype_pureos() -> dict[str, Any]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, proforma, pureos
+    from . import intake as _intake
+    from .models import InputAssumption, ProformaRunRequest
+
+    rs = _standin_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
+         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
+    saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_call
+            proforma.yield_cap = lambda: None
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
+            art = artifacts.get(run.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
+        finally:
+            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    scenarios = pureos.seed_scenarios()
+
+    def listed(include_archived: bool) -> list[dict[str, Any]]:
+        return [pureos.summary(t).model_dump(mode="json") for t in pureos.trains(include_archived, arts=[art], scenarios=scenarios)]
+
+    train = pureos.train(proforma.SCENARIO_ID, arts=[art], scenarios=scenarios)
+    return {"pureos-trains.json": listed(False), "pureos-trains-archived.json": listed(True),
+            "pureos-train.json": train.model_dump(mode="json")}
 
 
 def rebuild_fermos_sample(out: Path = FERMOS_SAMPLE) -> Path:

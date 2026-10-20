@@ -800,6 +800,41 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
 
+# ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+
+
+def _record_lookup():
+    try:
+        return load_corpus().record
+    except FileNotFoundError:
+        return None
+
+
+@app.get("/api/pureos/trains")
+def pureos_trains(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The trains on file: the newest Proforma run of each scenario, read
+    unit by unit from its stream table, with its overall recovery. A train of
+    an archived program is left out unless `?includeArchived=true` asks for it.
+    A read: it starts no simulator."""
+    from . import pureos
+
+    return [pureos.summary(t).model_dump(mode="json")
+            for t in pureos.trains(include_archived=includeArchived, record_lookup=_record_lookup())]
+
+
+@app.get("/api/pureos/train/{key}")
+def pureos_train(key: str) -> dict:
+    """One train: the newest run of the scenario `key` names, or the run whose
+    artifact id it is. 404 says how a run gets there; a deep link opens
+    whatever program it belongs to, and the page names it."""
+    from . import pureos
+
+    try:
+        return pureos.train(key, record_lookup=_record_lookup()).model_dump(mode="json")
+    except pureos.TrainNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+
+
 # ── Tools (OF-BLD-014 §3.4, E.6) ─────────────────────────────────────────
 
 

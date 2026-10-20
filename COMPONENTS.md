@@ -180,7 +180,7 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 **Harvest, capture, recovery.** `/pureos` · chord `g u`
 
-Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it.
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 §4.1): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, the product in and out and the share it passes on toward the product stream, read by the service (`core/openferment_core/pureos.py`) from the run artifact's stream table and never typed; the front page lists the trains on file. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`). Choosing a train is not built, and the four subsystems below remain stubs.
 
 | Subsystem | Key | State |
 |---|---|---|
@@ -297,7 +297,8 @@ inventory of what happens to exist — and because a name with nothing under it
 is a smaller problem than a system with no name for the thing it is missing.
 
 **A destination can be thin and still be in the rail.** pureOS has a screen,
-the unit-operation vocabulary and no process model. fermOS had a screen and five
+the unit-operation vocabulary and no process model of its own: it reads the
+train a Proforma run simulated, and decides nothing yet. fermOS had a screen and five
 named subsystems with no code until kinetics arrived, fitted from depositions
 alone; transport, operating mode, scale and control are still named and not
 built. Putting them in the navigation from day one means that when the work

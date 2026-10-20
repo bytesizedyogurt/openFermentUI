@@ -56,6 +56,8 @@ const ROUTES = [
   ['/fermos', 'fermOS — Fits'],
   ['/fermos/forecast', 'fermOS — Forecast'],
   ['/pureos', 'pureOS'],
+  // OF-BLD-019 §4.1 — the train of the run Proforma priced, by scenario; PHA's, so under its banner.
+  ['/pureos/train/sc-pha-1', 'pureOS — train of a run, unit by unit'],
   ['/proforma', 'Proforma'],
   ['/proforma/scenario/sc-s1', 'Proforma — scenario S1'],
   ['/proforma/scenario/sc-s2', 'Proforma — scenario S2'],
@@ -968,6 +970,60 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §4.1 — pureOS reads the train from the run Proforma priced.
+  //
+  // With the switch off the front page lists no train and says whose it hides
+  // and how a run gets there. The train of sc-pha-1 (the double's run, PHA's)
+  // opens by link under its banner: three units in run order, the first
+  // forming the product and drawing no bar, the centrifuge's recovery as the
+  // service read it; a click cuts the stream table to that unit's streams,
+  // and a vocabulary step linked by ?op= is outlined on the front page.
+  let trainFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    try {
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="pureos-trains-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const empty = await page.locator('[data-testid="pureos-trains-empty"]').innerText().catch(() => '');
+      if (!/No train for an active program/.test(empty) || !/Proforma/.test(empty)) problems.push(`the empty list does not say how a train gets there: ${JSON.stringify(empty.slice(0, 160))}`);
+      if (!/PHA/.test(empty)) problems.push('the empty list does not say it hides a PHA train');
+      await page.goto(`http://localhost:${PORT}/#/pureos/train/sc-pha-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="train-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[role="note"][data-archived-program="pha"]').count()) !== 1) problems.push('the train of a PHA scenario does not open under its banner');
+      const units = await page.locator('[data-testid="train-unit"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-unit')).join());
+      if (units !== 'R1,C1,D1') problems.push(`the units are not listed in run order: ${units}`);
+      const bars = await page.locator('[data-testid="recovery-row"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-bar')}`).join());
+      if (bars !== 'R1:none,C1:drawn,D1:drawn') problems.push(`the recovery figure draws ${bars}`);
+      const body = await page.locator('main').innerText();
+      if (!/no PHB enters R1: the product is formed here/.test(body)) problems.push('a unit no product enters does not say so');
+      if (!/95\.0%/.test(body)) problems.push("the centrifuge's recovery is not shown as the service read it");
+      await page.locator('[data-testid="train-unit"][data-unit="C1"] button').first().click();
+      await page.waitForTimeout(300);
+      const cut = await page.locator('[data-testid="train-stream"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stream')).join());
+      if (cut !== 'broth,spent_medium,wet_solids') problems.push(`clicking C1 shows the streams ${cut}`);
+      await page.locator('[data-testid="train-streams-all"]').click();
+      await page.waitForTimeout(300);
+      if ((await page.locator('[data-testid="train-stream"]').count()) !== 6) problems.push('Show every stream does not bring the whole table back');
+      await page.goto(`http://localhost:${PORT}/#/pureos?op=molecular-sieve`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      if ((await page.locator('#op-molecular-sieve[data-focused="true"]').count()) !== 1) problems.push('a step linked by ?op= is not outlined');
+      await page.goto(`http://localhost:${PORT}/#/pureos/train/sc-nothing`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="train-none"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/no Proforma run of sc-nothing is on file/.test(await page.locator('[data-testid="train-none"]').innerText().catch(() => ''))) problems.push('a scenario with no run does not say how a run gets there');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      trainFails++;
+      console.log(`✗ train        ${problems.join('; ')}`);
+    } else {
+      console.log('✓ train        no train for an active program, and whose is hidden; sc-pha-1 under its banner, three units in order, a unit no product enters drawn as words, a click cuts the streams, ?op= outlines a step, a scenario with no run says how one gets there');
+    }
+    await page.close();
+  }
+
   await browser.close();
   server.close();
 
@@ -980,7 +1036,8 @@ async function main() {
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || overlayFails || confineFails || guildFails || emptyFails) process.exit(1);
+  console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
 }
 
 main();

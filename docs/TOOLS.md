@@ -38,6 +38,21 @@ when the row is read, by `basis_provenance` over its inputs as they stand
 then, never copied from the stored file: a record rejected since it was
 computed brings the row, and a claim citing it, down with it.
 
+**pureOS reads trains** (OF-BLD-019 §4.1). `pureos_read` holds three kinds:
+`unit-operation` (the vocabulary, each with the BioSTEAM classes that perform
+it), `train` (the newest Proforma run of a scenario, one row a scenario, its
+id the scenario's, or the run's artifact id when no scenario claims the run)
+and `train-unit` (one unit of a train, id `<train>:<unit>`, in run order).
+A read by a scenario id or a run's artifact id returns the train and every
+unit of it; `kind: train-unit` narrows to the units. Every number in a train
+row's `detail` (product in and out, what is lost and to which outlet, the
+recovery, the cumulative share still on the path) is read by
+`pureos.train_of` from the run artifact's stream table, never typed and never
+simulated again; the row's mark is the run's, worked out as for any artifact
+row. This is a kind of the existing read, not a thirtieth tool: the registry
+stays closed at twenty-nine. `GET /api/pureos/trains` and
+`GET /api/pureos/train/{key}` serve the same reading to the browser.
+
 Before round one, `module_stores.coverage` sweeps every module for what the
 question names and hands the model the map. A follow-up is swept with the
 earlier questions it reads (at most four), never with the earlier answers,
@@ -49,7 +64,7 @@ word and never by a model:
 
 | State | Means | Computed from |
 |---|---|---|
-| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact; an active person; a scheduled check |
+| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, and a train or a unit of one read from a run; an active person; a scheduled check |
 | `fenced` | held back | a clearance of `watch-*`, `blocked` or `unknown` (Dominion's action for it is to run clearance first); a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
 | `approved` | a person or a source stands behind it | a record `measured`, `gold`, `verified` or `curated`; a protocol's current version; a lesson; a paper fetched with full text |
 | `locked` | frozen for a test | a runbook with `lockedAt`; a check run |

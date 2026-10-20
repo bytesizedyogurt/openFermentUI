@@ -1800,6 +1800,98 @@ class ProformaTables(BaseModel):
 ProformaRunResult.model_rebuild()
 
 
+# ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+#
+# A train is read from one `proforma.run` artifact's stream and unit tables
+# (pureos.train_of) and never typed: the product is the component the run's
+# price is per, else the largest component of its product stream, and every
+# mass below is that component's kg/hr in the run's base case. A unit's
+# outlets that lead on toward the product stream (directly, through later
+# units, or round a recycle) carry the product onward; the others lose it.
+
+
+class TrainUnit(BaseModel):
+    """One unit of a run's train, in run order, with the product's flow
+    through it as the stream table states it."""
+
+    id: str
+    unitClass: str
+    line: str | None = None
+    order: int
+    ins: list[str] = Field(default_factory=list)
+    outs: list[str] = Field(default_factory=list)
+    # Whether any of its outlets leads on to the product stream.
+    onPath: bool
+    # Every component, kg/hr, summed over its inlets and its outlets.
+    massIn: float
+    massOut: float
+    # The product's kg/hr; None when the run names no product.
+    productIn: float | None = None
+    productOut: float | None = None
+    # Of productOut: what leaves by an outlet leading on, and what does not.
+    productOnward: float | None = None
+    productLost: float | None = None
+    # The outlets that carry product off the path.
+    lostTo: list[str] = Field(default_factory=list)
+    # productOnward / productIn; None, with `note` saying why, when no
+    # product enters the unit or the unit is off the path.
+    recovery: float | None = None
+    # 1 less the product lost at this unit and every on-path unit before it,
+    # over everything the path delivers or loses; None off the path.
+    cumulative: float | None = None
+    note: str | None = None
+
+
+class Train(BaseModel):
+    """A run's train as pureOS reads it, for `/pureos/train/:scenarioId`
+    and `pureos_read`."""
+
+    # The scenario the run belongs to (the basis's `scenario`, else the one
+    # seed scenario whose modelId is the run's flowsheet); None when no
+    # scenario claims it, and the train is then known by its artifact id.
+    scenarioId: str | None = None
+    scenarioName: str | None = None
+    artifactId: str
+    flowsheet: str | None = None
+    createdAt: str
+    provenance: Provenance
+    program: str | None = None
+    tablesSource: str | None = None
+    # The stream the run's TEA prices, and the component traced through it.
+    productStream: str | None = None
+    product: str | None = None
+    # How the product was read from the run, in words.
+    productBasis: str
+    # The product's kg/hr in the product stream, the sum of every unit's
+    # productLost, and productOut over the two together.
+    productOut: float | None = None
+    productLost: float | None = None
+    overallRecovery: float | None = None
+    units: list[TrainUnit] = Field(default_factory=list)
+    streams: list[StreamRow] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+    # How many runs of this scenario are on file; the newest is read.
+    runs: int = 1
+    note: str | None = None
+
+
+class TrainSummary(BaseModel):
+    """One train on file, for pureOS's index: the newest run of a scenario."""
+
+    scenarioId: str | None = None
+    scenarioName: str | None = None
+    artifactId: str
+    flowsheet: str | None = None
+    createdAt: str
+    provenance: Provenance
+    program: str | None = None
+    product: str | None = None
+    unitCount: int
+    overallRecovery: float | None = None
+    runs: int = 1
+    note: str | None = None
+
+
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
 
 

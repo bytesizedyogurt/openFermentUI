@@ -113,6 +113,9 @@ class Row:
     # species. A question naming the species, in full or abbreviated, names
     # the row (OF-BLD-016 D10).
     species: tuple[str, ...] = ()
+    # Other ids a read by id finds the row by: a train's run artifact, and a
+    # train's units by their train's scenario and run (OF-BLD-019 §4.1).
+    alt_ids: tuple[str, ...] = ()
 
     @property
     def ref(self) -> str:
@@ -470,9 +473,52 @@ class Stores:
         yield from self._artifacts("fermos")
 
     def _pureos(self) -> Iterable[Row]:
-        for u in self._get("projection")["pureos"]["unitOperations"]:
+        ops = self._get("projection")["pureos"]["unitOperations"]
+        for u in ops:
+            classes = u.get("biosteamClasses") or []
             yield Row("pureos", "unit-operation", u["id"], u["label"], "open", "in the vocabulary",
-                      words=" ".join([u["stage"], u.get("note") or ""]), detail={"stage": u["stage"], "note": u.get("note")})
+                      words=" ".join([u["stage"], u.get("note") or "", *classes]),
+                      detail={"stage": u["stage"], "note": u.get("note"), "biosteamClasses": classes})
+        yield from self._trains({c: u["id"] for u in ops for c in u.get("biosteamClasses") or []})
+
+    def _trains(self, operation: dict[str, str]) -> Iterable[Row]:
+        """The train of each scenario's newest Proforma run (OF-BLD-019 §4.1),
+        and one row a unit of it, read by `pureos.train_of` from the run's
+        stream table: the same numbers pureOS → Train shows. A read by the
+        scenario's id or the run's artifact id finds the train and its units;
+        the mark is the run's, worked out from its inputs as they stand."""
+        from . import pureos
+
+        scenarios = self._get("projection")["proforma"]["scenarios"]
+        runs = [a for a in self._get("artifacts") if a.tool == pureos.RUN]
+        for key, group in pureos._runs(runs, scenarios).items():
+            a = group[0]
+            mark = self._artifact_mark(a)
+            tr = pureos.train_of(a, scenarios=scenarios, provenance=mark, runs=len(group),
+                                 record_lookup=self._record_lookup)
+            name = tr.scenarioName or tr.flowsheet or a.id
+            ids = tuple(x for x in (tr.scenarioId, a.id) if x and x != key)
+            yield Row("pureos", "train", key, f"Train of {name}", "open", "computed", provenance=mark,
+                      names=tuple(x for x in (tr.scenarioName,) if x), alt_ids=ids,
+                      words=" ".join(["train recovery", tr.flowsheet or "", tr.product or "",
+                                      *(u.unitClass for u in tr.units), *(operation.get(u.unitClass, "") for u in tr.units)]),
+                      detail={"artifactId": a.id, "scenarioId": tr.scenarioId, "flowsheet": tr.flowsheet,
+                              "product": tr.product, "productStream": tr.productStream, "productBasis": tr.productBasis,
+                              "overallRecovery": tr.overallRecovery, "units": [u.id for u in tr.units],
+                              "runsOnFile": tr.runs, "tablesSource": tr.tablesSource, "note": tr.note,
+                              "cite": "cite the train or a unit of it by its ref; its numbers are read from the run artifact"},
+                      program=tr.program)
+            for u in tr.units:
+                yield Row("pureos", "train-unit", f"{key}:{u.id}", f"{u.id} ({u.unitClass}) in the train of {name}", "open",
+                          "computed", provenance=mark, id_names=False, alt_ids=(key, *ids),
+                          words=" ".join([u.unitClass, operation.get(u.unitClass, ""), tr.flowsheet or ""]),
+                          detail={"artifactId": a.id, "unit": u.id, "unitClass": u.unitClass,
+                                  "operation": operation.get(u.unitClass), "order": u.order, "onPath": u.onPath,
+                                  "product": tr.product, "productIn": u.productIn, "productOut": u.productOut,
+                                  "productLost": u.productLost, "lostTo": u.lostTo, "recovery": u.recovery,
+                                  "cumulative": u.cumulative, "massIn": u.massIn, "massOut": u.massOut, "note": u.note,
+                                  "unitOfMass": tr.tableUnits.get("massFlow")},
+                          program=tr.program)
 
     def _proforma(self) -> Iterable[Row]:
         for s in self._get("projection")["proforma"]["scenarios"]:
@@ -564,7 +610,7 @@ KINDS = {
     "runbooks": ("runbook", "protocol"),
     "geneos": ("host", "pathway", "model", "artifact"),
     "fermos": ("artifact",),
-    "pureos": ("unit-operation",),
+    "pureos": ("unit-operation", "train", "train-unit"),
     "proforma": ("scenario", "artifact"),
     "biorepo": ("record", "candidate", "artifact", "witness-run"),
     "guild": ("person", "check"),
@@ -593,7 +639,7 @@ def find(stores: Stores, module: str, *, ids: Iterable[str] = (), words: str = "
         rows = [r for r in rows if r.state == state]
     wanted = {i.strip() for i in ids if i.strip()}
     if wanted:
-        rows = [r for r in rows if r.id in wanted or r.ref in wanted]
+        rows = [r for r in rows if r.id in wanted or r.ref in wanted or wanted.intersection(r.alt_ids)]
     query = _tokens(words)
     if query:
         scored = []

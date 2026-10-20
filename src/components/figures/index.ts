@@ -10,3 +10,4 @@ export { TrajectoryBand, toTable as trajectoryTable, type TrajectoryBandProps, t
 export { Distribution, toTable as distributionTable, type DistributionProps } from './Distribution';
 export { Tornado, toTable as tornadoTable, sorted as tornadoSorted, type TornadoProps, type TornadoRow } from './Tornado';
 export { IntervalLedger, toTable as intervalLedgerTable, type IntervalLedgerProps, type IntervalLedgerRow } from './IntervalLedger';
+export { RecoveryByUnit, toTable as recoveryByUnitTable, noBar as recoveryNoBar, type RecoveryByUnitProps } from './RecoveryByUnit';

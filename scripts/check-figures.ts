@@ -13,6 +13,8 @@
  * 5. What the review of Phase 6 found (§6.R): a modeled mark is held out of
  *    the median, a ceiling's rule keeps its own provenance, and a yield is
  *    held against a sugar's ceiling only when it was measured on that sugar.
+ * 6. OF-BLD-019 §4.1: RecoveryByUnit draws one row per unit, never divides a
+ *    recovery out of a unit no product enters, and keeps the run's provenance.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -25,6 +27,8 @@ import { toTable as frontierTable } from '../src/components/figures/Frontier';
 import { toTable as distributionTable } from '../src/components/figures/Distribution';
 import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
+import { noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
+import type { TrainUnit } from '../src/data/types';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
 import { YIELD_FIELD, yieldFieldKnown, yieldsOnSugar } from '../src/lib/geneos';
@@ -163,6 +167,28 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   const d = await gatherLinks([{ label: 'x', artifactId: 'p' }], async () => { throw new ArtifactsDown('The service is not running.'); });
   if (!d.down || d.links.length) problems.push('a service that is down is not said');
   ok.push('the dossier draws ceiling, forecast, price in that order, names an artifact that is missing, and says when the service is down');
+}
+
+// 6 — OF-BLD-019 §4.1: a train's recovery, one row per unit. A unit no
+// product enters, or one off the path, has no recovery: it says why in words
+// and draws no bar, and no cell holds NaN or Infinity.
+{
+  const unit = (id: string, over: Partial<TrainUnit>): TrainUnit => ({
+    id, unitClass: 'Unit', line: null, order: 0, ins: [], outs: [], onPath: true, massIn: 1, massOut: 1,
+    productIn: 1, productOut: 1, productOnward: 1, productLost: 0, lostTo: [], recovery: 1, cumulative: 1, note: null, ...over,
+  });
+  const units = [
+    unit('R', { productIn: 0, recovery: null, note: 'no E enters R: the product is formed here' }),
+    unit('C', { productIn: 52, productOnward: 47, productLost: 5, recovery: 47 / 52, cumulative: 0.9, lostTo: ['centrate'] }),
+    unit('W', { onPath: false, recovery: null, cumulative: null, productOnward: null, productLost: null, note: "off the product's path" }),
+  ];
+  const rows = recoveryTable({ title: 't', product: 'E', units, provenance: 'demo', massUnit: 'kg/hr' }).rows;
+  if (rows.length !== units.length) problems.push(`RecoveryByUnit's table has ${rows.length} rows for ${units.length} units`);
+  if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a RecoveryByUnit cell holds NaN or Infinity');
+  if (rows[0][7] !== '—' || !String(rows[0][10]).includes('formed here')) problems.push('a unit no product enters is given a recovery, or not told why');
+  if (noBar(units[0]) == null || noBar(units[2]) == null || noBar(units[1]) != null) problems.push('RecoveryByUnit draws a bar for a unit with no recovery, or none for one with');
+  if (rows.some((r) => r[9] !== 'demo')) problems.push("a RecoveryByUnit row loses the run's provenance");
+  ok.push(`tables: recovery by unit ${rows.length}, one row per unit; a unit with no product in says why and draws no bar`);
 }
 
 if (problems.length) {

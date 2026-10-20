@@ -1,0 +1,19 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "scenarioId": "sc-pha-1",
+      "scenarioName": "PHA from cellulosic sugar — draft flowsheet",
+      "artifactId": "c88399e09c348cad",
+      "flowsheet": "pha_sugar_v0",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "provenance": "demo",
+      "program": "pha",
+      "product": "PHB",
+      "unitCount": 3,
+      "overallRecovery": 0.95,
+      "runs": 1,
+      "note": null
+    }
+  ]
+}

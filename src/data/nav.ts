@@ -297,6 +297,15 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
+    // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
+    label: 'Train',
+    to: '/pureos/train',
+    descriptor: 'the units of the run Proforma priced, and what each passes on',
+    aliases: ['train', 'step recovery', 'recovery by unit', 'stream table', 'mass balance by unit'],
+    icon: Filter,
+    owner: 'pureOS',
+  },
+  {
     label: 'Molecules',
     to: '/dominion/molecules',
     descriptor: 'targets and markets',

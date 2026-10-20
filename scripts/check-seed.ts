@@ -1178,6 +1178,25 @@ for (const f of CLEARANCE_FINDINGS) {
       fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
 }
 
+// ── a BioSTEAM class is one step (OF-BLD-019 §4.1) ─────────────────────
+//
+// pureOS → Train links each unit of a run to the vocabulary's step its
+// BioSTEAM class performs. A class two steps both claim would link a unit to
+// whichever came first, so no class may be named twice; a name is BioSTEAM's
+// own spelling (test_pureos holds each to a class the installed package
+// defines).
+{
+  const claimed = new Map<string, string>();
+  for (const op of UNIT_OPERATIONS) {
+    for (const cls of op.biosteamClasses ?? []) {
+      if (!/^[A-Z][A-Za-z0-9_]*$/.test(cls)) fail(`unit operation ${op.id}: "${cls}" is not a BioSTEAM class name`);
+      const other = claimed.get(cls);
+      if (other) fail(`unit operation ${op.id}: the BioSTEAM class ${cls} is already ${other}'s; a class is one step`);
+      claimed.set(cls, op.id);
+    }
+  }
+}
+
 // ── programs (OF-BLD-016 §2.1, E.1′, D7) ───────────────────────────────
 //
 // A program is data, and its letters are the rule. Every thread a paper

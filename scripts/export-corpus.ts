@@ -364,7 +364,8 @@ const modulesProjection = {
     pathways: PATHWAYS.map((x) => ({ id: x.id, label: x.label, products: x.products })),
   },
   pureos: {
-    unitOperations: UNIT_OPERATIONS.map((u) => ({ id: u.id, label: u.label, stage: u.stage, note: u.note ?? null })),
+    // OF-BLD-019 §4.1 — the BioSTEAM classes an entry names, so a train's unit reads as the vocabulary's step.
+    unitOperations: UNIT_OPERATIONS.map((u) => ({ id: u.id, label: u.label, stage: u.stage, note: u.note ?? null, biosteamClasses: u.biosteamClasses ?? [] })),
   },
   proforma: {
     scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId, program: programOf('scenario', x.id), example: isExample('scenario', x.id) })),

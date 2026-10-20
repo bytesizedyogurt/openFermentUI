@@ -199,6 +199,10 @@ const PAIRS = [
   ['AskRequest', 'AskRequest'],
   // OF-BLD-016 §2.1 — a program is data.
   ['Program', 'Program'],
+  // OF-BLD-019 §4.1 — pureOS reads the train from the run Proforma priced.
+  ['TrainUnit', 'TrainUnit'],
+  ['Train', 'Train'],
+  ['TrainSummary', 'TrainSummary'],
 ];
 
 let compared = 0;

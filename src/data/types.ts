@@ -906,6 +906,12 @@ export interface UnitOperation {
   /** Chemistry detail, e.g. the resin family for a chromatography step. */
   resin?: string;
   note?: string;
+  /**
+   * The BioSTEAM unit classes this step is (OF-BLD-019 §4.1), so a unit in a
+   * train a flowsheet ran links to the step it performs. Names only, as
+   * BioSTEAM spells its classes; a step BioSTEAM has no class for names none.
+   */
+  biosteamClasses?: string[];
 }
 
 export type GeneticElementKind =
@@ -2947,4 +2953,77 @@ export interface ProformaTables {
   diagramNote: string | null;
   unitOrder: string[];
   tableUnits: Record<string, string>;
+}
+
+// ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+//
+// Mirrors models.py. A train is read by the service (pureos.train_of) from
+// one `proforma.run` artifact's stream and unit tables; the browser shows it
+// and computes nothing. Masses are the product's kg/hr in the run's base case.
+
+/** One unit of a run's train, in run order. */
+export interface TrainUnit {
+  id: string;
+  unitClass: string;
+  line: string | null;
+  order: number;
+  ins: string[];
+  outs: string[];
+  /** Whether any of its outlets leads on to the product stream. */
+  onPath: boolean;
+  massIn: number;
+  massOut: number;
+  /** The product's kg/hr; null when the run names no product. */
+  productIn: number | null;
+  productOut: number | null;
+  productOnward: number | null;
+  productLost: number | null;
+  /** The outlets that carry product off the path. */
+  lostTo: string[];
+  /** productOnward / productIn; null, with `note` saying why, when none enters or the unit is off the path. */
+  recovery: number | null;
+  /** 1 less the product lost here and at every on-path unit before, over all the path delivers or loses. */
+  cumulative: number | null;
+  note: string | null;
+}
+
+/** A run's train as pureOS reads it (`GET /api/pureos/train/:key`). */
+export interface Train {
+  scenarioId: string | null;
+  scenarioName: string | null;
+  artifactId: string;
+  flowsheet: string | null;
+  createdAt: string;
+  provenance: Provenance;
+  program: string | null;
+  tablesSource: string | null;
+  productStream: string | null;
+  product: string | null;
+  /** How the product was read from the run, in words. */
+  productBasis: string;
+  productOut: number | null;
+  productLost: number | null;
+  overallRecovery: number | null;
+  units: TrainUnit[];
+  streams: StreamRow[];
+  tableUnits: Record<string, string>;
+  /** How many runs of this scenario are on file; the newest is read. */
+  runs: number;
+  note: string | null;
+}
+
+/** One train on file, for pureOS's index (`GET /api/pureos/trains`). */
+export interface TrainSummary {
+  scenarioId: string | null;
+  scenarioName: string | null;
+  artifactId: string;
+  flowsheet: string | null;
+  createdAt: string;
+  provenance: Provenance;
+  program: string | null;
+  product: string | null;
+  unitCount: number;
+  overallRecovery: number | null;
+  runs: number;
+  note: string | null;
 }
