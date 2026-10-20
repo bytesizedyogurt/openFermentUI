@@ -114,9 +114,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * What the double has on file that a test may switch (OF-BLD-019 §5.1):
    * `fermosFitsOnFile` serves GET /api/fermos/fits as a service with the
    * fixture's fit and forecast on file, else as one with none, which is how a
-   * fresh install starts.
+   * fresh install starts. `ceilingOnFile` (OF-BLD-019 §5.2) serves
+   * GET /api/proforma/ceiling-check as a service with the fixture's STAND-IN
+   * geneOS ceiling on file, else with none, as a fresh install starts.
    */
-  const flags = { fermosFitsOnFile: false };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false };
+  /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
+  const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
   const proformaReferences = [];
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
@@ -423,6 +427,26 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(answer.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(answer.body));
     }
+    // OF-BLD-019 §5.2 — a scenario's yield read against the geneOS ceiling,
+    // as the real code read it over the stand-in records with no ceiling on
+    // file and with the STAND-IN ceiling on file (flags.ceilingOnFile picks),
+    // by the flowsheet the scenario runs: a seed's own, or the one a scenario
+    // made here names, answered under the id asked; anything else is the
+    // service's 422 in words.
+    if (url === '/api/proforma/ceiling-check' && req.method === 'GET') {
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      ceilingChecks.push(Object.fromEntries(q));
+      const scenarioId = q.get('scenarioId') ?? '';
+      const seeds = await prototype('proforma-scenarios-archived.json');
+      const flowsheet = seeds.find((sc) => sc.id === scenarioId)?.flowsheet ?? q.get('flowsheet') ?? '';
+      const answer = (await prototype('proforma-ceiling-check.json'))[flags.ceilingOnFile ? 'onFile' : 'none'][flowsheet];
+      if (!answer) {
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `there is no seed scenario ${scenarioId}, and ${flowsheet || 'no flowsheet'} is not one a scenario made here can run` }));
+      }
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ...answer.body, scenarioId }));
+    }
     // (d): a seed scenario's run by its id; a scenario made in the browser
     // gets the run of the seed scenario on the flowsheet it names, under its
     // own id (the stand-in's artifact still names the seed scenario in its
@@ -547,5 +571,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proposalActs, thermoCalls, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proposalActs, thermoCalls, ceilingChecks, flags } };
 }

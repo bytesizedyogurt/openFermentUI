@@ -187,6 +187,9 @@ const PAIRS = [
   // OF-BLD-019 §5.1 — a fermOS fit feeds the fermenter.
   ['FitFeed', 'FitFeed'],
   ['FermosFitInfo', 'FermosFitInfo'],
+  // OF-BLD-019 §5.2 — a scenario's yield read against the geneOS ceiling.
+  ['CeilingRow', 'CeilingRow'],
+  ['CeilingCheck', 'CeilingCheck'],
   // OF-BLD-019 §2.1 — the shelf of flowsheets and the run's tables.
   ['FlowsheetInput', 'FlowsheetInput'],
   ['FlowsheetInfo', 'FlowsheetInfo'],

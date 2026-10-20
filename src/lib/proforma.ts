@@ -6,6 +6,7 @@
 import type {
   Artifact,
   BasisInput,
+  CeilingCheck,
   ComputedBasis,
   CostLine,
   FermosFitInfo,
@@ -365,6 +366,41 @@ export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fi
 /** The scenario page a fit is sent to, with the fit to attach when it opens. */
 export const sendFitPath = (scenarioId: string, artifactId: string) =>
   `/proforma/scenario/${encodeURIComponent(scenarioId)}?fit=${encodeURIComponent(artifactId)}`;
+
+// ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+//
+// A scenario's fermenter yield beside the newest stored geneOS ceiling of
+// each shelf model of its organism, on its flowsheet's sugar, as the service
+// computes it on read. A flag, never a bound: nothing here computes a
+// number, and the binding and the run are untouched.
+
+/** What the check is asked with: the scenario as its page binds it. */
+export interface CeilingAsk {
+  scenarioId: string;
+  /** Sent for a scenario made here alone: the service reads a seed scenario's own. */
+  flowsheet?: string | null;
+  host: string | null;
+  includeArchived: boolean;
+  /** The fermOS fits a person chose, by input key (§5.1). */
+  fits?: Record<string, string>;
+  /** The yield's assumption, when a person typed one; the rest do not bear on the check. */
+  assumptions?: InputAssumption[];
+}
+
+/** `GET /api/proforma/ceiling-check`: a service that predates it says so in words. */
+export async function ceilingCheck(ask: CeilingAsk, signal?: AbortSignal): Promise<CeilingCheck> {
+  const q = new URLSearchParams({ scenarioId: ask.scenarioId, includeArchived: ask.includeArchived ? 'true' : 'false' });
+  if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
+  if (ask.host) q.set('host', ask.host);
+  if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
+  if (ask.assumptions && ask.assumptions.length > 0) q.set('assumptions', JSON.stringify(ask.assumptions));
+  try {
+    return await call<CeilingCheck>(`/api/proforma/ceiling-check?${q.toString()}`, { signal });
+  } catch (e) {
+    if (!noEndpoint(e)) throw e;
+    throw new RagRefused(404, 'This service has no ceiling check, so it cannot read this scenario\u2019s yield against a geneOS ceiling yet.');
+  }
+}
 
 // ── One run, as every reader reads it (D1) ──────────────────────────────
 

@@ -33,13 +33,14 @@ import {
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
 import { archivedProgramOf, useProgramLookup, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import type { FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import type { CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
 import { durableAvailable } from '@/lib/durable';
 import {
   FIT_TOOL_WORDS,
   ProformaDown,
   SIMULATOR_SAYS,
+  ceilingCheck,
   fermosFits,
   fitsFrom,
   modellerQuestions,
@@ -64,7 +65,7 @@ import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
-import { Tornado } from '@/components/figures';
+import { CEILING_NOTES, Tornado } from '@/components/figures';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { RunReport, SOURCE_WORDS, inputLabels } from './ProformaBiosteam';
 
@@ -1009,17 +1010,196 @@ function FermosFitSlot({
   );
 }
 
-/**
- * The ceiling check (OF-BLD-019 §5.2, D11): a slot by structure. It draws
- * only when a stored geneOS ceiling meets this scenario's yield, which §5.2
- * reads; until then it holds nothing and shows nothing.
- */
-function CeilingCheckSlot({ check }: { check: { flagged: boolean; words: string } | null }) {
-  if (!check) return null;
+/** How a ceiling-check row's flag reads in its chip. */
+const CEILING_FLAG_WORDS: Record<CeilingRow['flag'], string> = {
+  above: 'Above the ceiling: check the basis',
+  within: 'At or under the ceiling',
+  'no-yield': 'No yield to read yet',
+};
+
+/** A g g⁻¹ or mol mol⁻¹ value, or a dash where there is none. */
+const ceilingNum = (v: number | null | undefined, digits = 4) => (v == null ? '—' : fmt(v, digits));
+
+/** The scenario's yield as the check read it: where it comes from. */
+function CeilingYieldSource({ check }: { check: CeilingCheck }) {
+  const src = check.yieldSource;
+  if (check.yieldBinding === 'records')
+    return (
+      <span className="chip" data-testid="ceiling-yield-source" data-binding="records">
+        {check.yieldRecords} record{check.yieldRecords === 1 ? '' : 's'}
+      </span>
+    );
+  if (check.yieldBinding === 'assumption')
+    return (
+      <span className="chip" data-testid="ceiling-yield-source" data-binding="assumption">
+        assumption by {src?.by ?? 'a named person'}
+      </span>
+    );
+  if (check.yieldBinding === 'artifact' && src?.id)
+    return (
+      <a className="chip hover:text-accent" href={href(`/biorepo/artifacts/${src.id}`)} data-testid="ceiling-yield-source" data-binding="artifact">
+        fermOS fit {src.id}
+      </a>
+    );
   return (
-    <Card className={cx('p-4', check.flagged && 'border-signal-warn/50')} data-testid="ceiling-check">
+    <span className="chip" data-testid="ceiling-yield-source" data-binding={check.yieldBinding}>
+      waiting
+    </span>
+  );
+}
+
+/**
+ * The ceiling check (OF-BLD-019 §5.2, D11): the fermenter's yield, as this
+ * scenario binds it, beside the newest stored geneOS ceiling of each shelf
+ * model of its organism, on its flowsheet's sugar, both on the ceiling's own
+ * footing (g per g, and mol per mol at its conventions), as the service
+ * computes it on read. A yield above a ceiling is flagged in words for a
+ * reviewer; nothing is clamped and the run keeps the yield as bound. With no
+ * ceiling on file it says so and links to where one is computed.
+ */
+function CeilingCheckSlot({ check, problem }: { check: CeilingCheck | null; problem: string | null }) {
+  if (!check && !problem) return null;
+  return (
+    <Card className={cx('p-4', check?.flagged && 'border-signal-warn/50')} data-testid="ceiling-check" data-flagged={check?.flagged ? 'true' : 'false'}>
       <h2 className="font-serif text-section-title font-semibold mb-1">Ceiling check</h2>
-      <p className="text-body">{check.words}</p>
+      <p className="text-caption text-ink-soft mb-2">
+        The fermenter&rsquo;s yield beside the most a published reaction network of its organism can make from its sugar, as geneOS
+        computed and kept it. A flag, never a bound: a yield above a ceiling is marked for a reviewer to check its basis, and the run
+        keeps the yield as bound.
+      </p>
+      {problem && (
+        <p className="text-caption text-signal-warn" data-testid="ceiling-problem">
+          The ceiling check could not be read: {problem}
+        </p>
+      )}
+      {check && (
+        <div className="space-y-3">
+          <div className="text-body" data-testid="ceiling-yield">
+            <span className="font-medium">The scenario&rsquo;s yield: </span>
+            {check.yieldValue == null ? (
+              <span className="text-ink-soft">none yet</span>
+            ) : (
+              <>
+                <span className="font-num">{fmt(check.yieldValue, 4)}</span>
+                {check.yieldLow != null && check.yieldHigh != null && check.yieldLow !== check.yieldHigh && (
+                  <span className="font-num">
+                    {' '}
+                    ({fmt(check.yieldLow, 4)}–{fmt(check.yieldHigh, 4)})
+                  </span>
+                )}{' '}
+                <span className="font-num">{check.yieldUnit}</span>
+              </>
+            )}{' '}
+            <CeilingYieldSource check={check} /> <span className="text-caption text-ink-soft">{check.yieldWords}.</span>
+          </div>
+          <p className="text-caption text-ink-soft" data-testid="ceiling-organism">
+            Organism: {check.organismWords}. Sugar: {check.sugarWords}.
+          </p>
+          {check.rows.length === 0 && check.empty && (
+            <p className="text-body" data-testid="ceiling-empty">
+              {check.empty}{' '}
+              <a className="text-accent hover:underline" href={href(check.computeAt)} data-testid="ceiling-compute">
+                Open geneOS → Model
+              </a>
+            </p>
+          )}
+          {check.rows.map((r) => (
+            <div
+              key={r.artifactId}
+              className={cx('rounded-card border p-3', r.flag === 'above' ? 'border-signal-warn/45 bg-signal-warn/[0.06]' : 'border-line')}
+              data-testid="ceiling-row"
+              data-model={r.modelId}
+              data-flag={r.flag}
+            >
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="font-medium">{r.modelName}</span>
+                <span className={cx('chip', r.flag === 'above' && 'text-signal-warn')} data-testid="ceiling-flag">
+                  {CEILING_FLAG_WORDS[r.flag]}
+                </span>
+              </div>
+              <table className="w-full text-body">
+                <thead>
+                  <tr className="text-caption text-ink-soft text-left">
+                    <th className="py-1 pr-2 font-medium" />
+                    <th className="py-1 pr-2 font-medium">g {r.product} per g {r.substrate}</th>
+                    <th className="py-1 pr-2 font-medium">mol per mol</th>
+                    <th className="py-1 font-medium">Its basis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-line/60 align-top" data-testid="ceiling-ceiling">
+                    <td className="py-1.5 pr-2">Ceiling, {r.modelId} on {r.substrate}</td>
+                    <td className="py-1.5 pr-2 font-num" data-testid="ceiling-value">
+                      {fmt(r.ceilingGPerG, 4)}
+                    </td>
+                    <td className="py-1.5 pr-2 font-num">{ceilingNum(r.ceilingMolPerMol)}</td>
+                    <td className="py-1.5 text-caption">
+                      <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/biorepo/artifacts/${r.artifactId}`)} data-testid="ceiling-artifact">
+                        {r.artifactId}
+                      </a>{' '}
+                      <ProvenanceBadge p={r.provenance} /> {r.modelBasis}, kept {r.createdAt.slice(0, 10)}
+                      {r.older > 0 && `; the newest of ${r.older + 1} on file`}
+                    </td>
+                  </tr>
+                  <tr className="border-t border-line/60 align-top" data-testid="ceiling-scenario">
+                    <td className="py-1.5 pr-2">This scenario&rsquo;s yield</td>
+                    <td className="py-1.5 pr-2 font-num">
+                      {ceilingNum(r.yieldGPerG)}
+                      {r.yieldLowGPerG != null && r.yieldHighGPerG != null && r.yieldLowGPerG !== r.yieldHighGPerG && (
+                        <span className="text-caption">
+                          {' '}
+                          ({fmt(r.yieldLowGPerG, 4)}–{fmt(r.yieldHighGPerG, 4)})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2 font-num">{ceilingNum(r.yieldMolPerMol)}</td>
+                    <td className="py-1.5 text-caption">{check.yieldWords}, at the ceiling&rsquo;s conventions</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="text-body mt-2" data-testid="ceiling-words">
+                {r.words}
+              </p>
+              {r.recordsAbove.length > 0 && (
+                <ul className="text-caption mt-1 space-y-0.5">
+                  {r.recordsAbove.map((id) => (
+                    <li key={id} data-testid="ceiling-record-above">
+                      <span className="font-num">{id}</span> is above this ceiling.{' '}
+                      <a className="text-accent hover:underline" href={href(`/guild?record=${id}`)}>
+                        Ask a reviewer to check its basis
+                      </a>
+                      .
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-caption text-ink-soft mt-1">{r.matchWords}.</p>
+              {r.conventions.length > 0 && (
+                <details className="mt-1">
+                  <summary className="text-caption text-ink-soft cursor-pointer hover:text-accent">The conventions the ceiling&rsquo;s basis names</summary>
+                  <ul className="text-caption text-ink-soft mt-1">
+                    {r.conventions.map((c) => (
+                      <li key={c}>{c}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          ))}
+          {check.otherSugars.length > 0 && (
+            <p className="text-caption text-ink-soft">
+              Ceilings of {check.models.join(', ')} on {check.otherSugars.join(', ')} are on file too; this scenario&rsquo;s sugar is{' '}
+              {check.substrate}, so they are left aside.
+            </p>
+          )}
+          <ul className="text-caption text-ink-soft space-y-0.5">
+            {check.rows.length > 0 && CEILING_NOTES.map((n) => <li key={n}>{n}</li>)}
+            {check.notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Card>
   );
 }
@@ -1068,6 +1248,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const [runProblem, setRunProblem] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [ceiling, setCeiling] = useState<CeilingCheck | null>(null);
+  const [ceilingProblem, setCeilingProblem] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -1101,6 +1283,24 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     return () => ctrl.abort();
   }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey]);
+
+  // The ceiling check (OF-BLD-019 §5.2, D11): the yield as this page binds
+  // it (host, fits, and the yield's assumption when a person typed one),
+  // read by the service against the newest stored geneOS ceilings.
+  const yieldAssumed = JSON.stringify(assumptions.filter((a) => a.key === 'yield'));
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setCeiling(null);
+    setCeilingProblem(null);
+    const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
+    ceilingCheck(
+      { scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, host, includeArchived, fits, assumptions: JSON.parse(yieldAssumed) as InputAssumption[] },
+      ctrl.signal,
+    )
+      .then(setCeiling)
+      .catch((e: unknown) => !ctrl.signal.aborted && setCeilingProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey, yieldAssumed]);
 
   // The newest run this browser saw, read back from its artifact (D6).
   const runId = scenario.lastRunId ?? null;
@@ -1344,7 +1544,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           )}
         </Card>
 
-        <CeilingCheckSlot check={null} />
+        <CeilingCheckSlot check={ceiling} problem={ceilingProblem} />
 
         {runId && loadProblem && !view && (
           <Callout kind="warn">

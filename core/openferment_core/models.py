@@ -1695,6 +1695,97 @@ class FermosFitInfo(BaseModel):
     refused: str | None = None
 
 
+# ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+#
+# A scenario's fermenter yield read against the newest stored geneOS
+# ceiling of each shelf model of its organism, on its flowsheet's sugar.
+# A flag, never a bound: nothing is clamped, and the binding and the run
+# are untouched. Computed on read (GET /api/proforma/ceiling-check) and
+# kept nowhere; every number is the ceiling artifact's, a record's, a
+# person's assumption's or a fit's, converted through units.py and the
+# conventions the ceiling's own basis names.
+
+
+class CeilingRow(BaseModel):
+    """One stored ceiling beside the scenario's yield, both on the ceiling's
+    own footing, grams of product per gram of sugar and mol per mol."""
+
+    modelId: str
+    # The model as geneOS's shelf names it, and as the ceiling's basis names it.
+    modelName: str
+    modelBasis: str
+    # The strain the reconstruction describes, and how the scenario's organism
+    # maps to it: 'strain' (the same strain) or 'species' (another strain of
+    # its species), with the words that say so.
+    host: str | None = None
+    match: Literal["strain", "species"]
+    matchWords: str
+    product: str
+    substrate: str
+    # The newest stored `geneos.ceiling` of this model, product and sugar, and
+    # how many older ones it stands in front of.
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    older: int = 0
+    # The ceiling as its artifact holds it.
+    ceilingGPerG: float
+    ceilingMolPerMol: float | None = None
+    # The product and sugar conventions the ceiling's basis names, in its words.
+    conventions: list[str] = Field(default_factory=list)
+    # The scenario's yield in the ceiling's basis: g per g through units.py,
+    # and mol per mol at the ceiling's own conventions (its molPerMol over its
+    # gPerG); None where the yield waits or the ceiling is zero.
+    yieldGPerG: float | None = None
+    yieldLowGPerG: float | None = None
+    yieldHighGPerG: float | None = None
+    yieldMolPerMol: float | None = None
+    # 'above' when the yield or its high end exceeds the ceiling; 'within' at
+    # or under it; 'no-yield' when the yield waits for a source.
+    flag: Literal["above", "within", "no-yield"]
+    words: str
+    # The bound records whose own value is above the ceiling, each for a
+    # reviewer to check its basis.
+    recordsAbove: list[str] = Field(default_factory=list)
+
+
+class CeilingCheck(BaseModel):
+    """GET /api/proforma/ceiling-check: one scenario's fermenter yield beside
+    every stored ceiling of its organism's shelf models on its sugar."""
+
+    scenarioId: str
+    flowsheet: str
+    # What the flowsheet makes and the sugar its feed is, as geneOS names them.
+    product: str
+    substrate: str
+    sugarWords: str
+    # The scenario's organism: its host filter, else the strains its yield's
+    # records name, else its program's one species; and how that was read.
+    host: str | None = None
+    strains: list[str] = Field(default_factory=list)
+    species: list[str] = Field(default_factory=list)
+    organismWords: str
+    # The shelf models of that organism with a route to the product.
+    models: list[str] = Field(default_factory=list)
+    # The yield as the scenario binds it, in the input's unit.
+    yieldBinding: Literal["records", "assumption", "artifact", "waiting"]
+    yieldValue: float | None = None
+    yieldLow: float | None = None
+    yieldHigh: float | None = None
+    yieldUnit: str
+    yieldSource: BasisSource | None = None
+    yieldRecords: int = 0
+    yieldWords: str
+    rows: list[CeilingRow] = Field(default_factory=list)
+    flagged: bool = False
+    # With no ceiling on file: what is missing, and where one is computed.
+    empty: str | None = None
+    computeAt: str
+    # Sugars other stored ceilings of these models are on, left aside here.
+    otherSugars: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 # ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────
 #
 # The shelf is data (flowsheets/shelf.py, D2). A run is one `proforma.run`

@@ -1339,3 +1339,249 @@ def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
             extra.append(BasisInput(name="fit batch time", value=info.batchTimeH, unit="h", source=BasisSource(
                 kind="artifact", id=aid, note="the hour the forecast's median sugar runs out; productivity is the titre over it")))
     return extra
+
+
+# ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+#
+# A flag, never a bound. A scenario's fermenter yield, as the scenario binds
+# it (its records' median and range, a person's assumption with its range,
+# or a fermOS fit's Yp/s), is set beside the newest stored `geneos.ceiling`
+# of each model on geneOS's shelf that is of the scenario's organism and has
+# a route to its product, on the sugar its flowsheet's feed is. Both are put
+# on the ceiling's own footing: grams of product per gram of sugar through
+# units.py, and mol per mol at the conventions the ceiling's basis names
+# (the artifact's own molPerMol over its gPerG). A yield, or its high end,
+# above a ceiling is flagged in words asking a reviewer to check its basis;
+# nothing is clamped, and no binding or run changes. Computed on read and
+# kept nowhere, as GET /api/fermos/fits is; it starts no worker.
+#
+# The organism, from what the tree gives: the scenario's host filter when it
+# has one; else the strains the yield's records name (their `strainId`);
+# else, when the yield binds no record of a catalogued strain, the program's
+# one species (every host the program catalogues is of it, as module_stores
+# reads it). A shelf model is the scenario's when its host is one of those
+# strains ('strain') or of one of those species ('species': geneOS's yeast
+# reconstructions, iMM904 and Yeast9, are of S288C, and thread Q's records
+# are mostly of CEN.PK113-7D), each said so on its row.
+
+# The sugar each scenario flowsheet's feed is, as geneOS names its
+# substrates: the glucose-to-ethanol flowsheet's is glucose (FEED_CARBON);
+# the PHA draft's is a fermentable sugar, and its yield cap reads the glucose
+# ceiling (yield_cap), so its check reads glucose too.
+CEILING_SUGAR: dict[str, str] = {ETHANOL: "glucose", FLOWSHEET: "glucose"}
+_G_PER_G = "g g-1"
+CEILING_KEPT = "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+PHA_CLIP_NOTE = ("The PHA draft's run clips record yields above the highest glucose ceiling on the shelf to it "
+                 "(OF-BLD-014 §8.3); this check reads each record unclipped.")
+
+
+def _input_named(art, name: str):
+    return next((i for i in art.inputs if i.name == name), None)
+
+
+def _ceiling_of(art, name: str) -> str | None:
+    """What a ceiling's basis names: its model by the shelf id the model
+    input's source carries, its product and substrate by their values."""
+    i = _input_named(art, name)
+    if i is None:
+        return None
+    return (str(i.source.id) if i.source.id else None) if name == "model" else str(i.value)
+
+
+def _strain_labels() -> tuple[dict[str, str], dict[str, str]]:
+    """Each catalogued strain's label ('Saccharomyces cerevisiae S288C') and
+    each program's one species, when every host it catalogues is of that
+    species, from the projection export:corpus writes (module_stores reads
+    the same). Both empty with no projection here."""
+    from . import module_stores
+
+    try:
+        hosts = module_stores._projection()["geneos"]["hosts"]
+    except (module_stores.ProjectionMissing, KeyError, TypeError, ValueError):
+        return {}, {}
+    labels = {h["id"]: h["name"] for h in hosts if h.get("id") and h.get("name")}
+    by_program: dict[str, set[str]] = {}
+    for h in hosts:
+        if h.get("program"):
+            by_program.setdefault(h["program"], set()).add(module_stores.species_of(h.get("name") or "") or "")
+    return labels, {p: next(iter(sp)) for p, sp in by_program.items() if len(sp) == 1 and "" not in sp}
+
+
+def _species_words(species: str) -> str:
+    return species[:1].upper() + species[1:]
+
+
+def _yield_words(inp) -> str:
+    if inp.binding == "records":
+        n = len(inp.records)
+        return (f"the median of {n} records, with the lowest and the highest" if n >= 3 else
+                f"the middle of {n} records, with both" if n == 2 else "one record, held fixed")
+    if inp.binding == "assumption":
+        by = inp.source.by if inp.source else None
+        return f"a named person's assumption{f' ({by})' if by else ''}, with its low and its high"
+    if inp.binding == "artifact":
+        aid = inp.source.id if inp.source else None
+        return f"a fermOS fit's Yp/s{f' ({aid})' if aid else ''}, its median with its 5th and 95th percentile"
+    return "nothing yet: the yield waits for a record, a named person's assumption or a fermOS fit"
+
+
+_CHECK_WHAT = {
+    "records": "a reviewer should check the basis of each record above it (another sugar counted, the product "
+               "measured otherwise, another organism)",
+    "assumption": "a reviewer should check what the assumption rests on, and the basis of the yield it was taken from",
+    "artifact": "a reviewer should check the basis of the fit's readings (the product and sugar series, and their units)",
+}
+
+
+def _row_words(flag: str, binding: str, value_above: bool) -> str:
+    if flag == "no-yield":
+        return "The scenario's yield waits for a source, so there is nothing to read against this ceiling."
+    if flag == "within":
+        return "The scenario's yield, its high end included, is at or under this ceiling."
+    lead = ("The scenario's yield is above this ceiling" if value_above
+            else "The scenario's yield is under this ceiling, but its high end is above it")
+    return (f"{lead}. A yield above the most this network makes from this sugar rests on another basis, or is wrong, "
+            f"so {_CHECK_WHAT.get(binding, _CHECK_WHAT['records'])}. It is flagged, not clamped: the binding and the "
+            "run keep the yield as bound.")
+
+
+def ceiling_check(scenario_id: str, flowsheet: str | None = None, *, include_archived: bool = False,
+                  host: str | None = None, assumptions: list | None = None, fits: dict[str, str] | None = None,
+                  pool=None):
+    """GET /api/proforma/ceiling-check: a scenario's fermenter yield beside
+    the newest stored geneOS ceiling of each shelf model of its organism, on
+    its flowsheet's sugar (D11). The scenario is a seed's by its id, or one
+    made here by the flowsheet it names (flowsheet_of); its yield is bound as
+    its page binds it, with the person's assumptions and the fermOS fits
+    chosen. Refused in words as the binding is; a scenario of a program the
+    switch hides, as GET /api/proforma/bind refuses it. A read: it keeps
+    nothing, starts no worker, and changes no binding or run."""
+    from . import artifacts, evidence_pool, geneos, geneos_models, module_stores, programs, units
+    from .models import CeilingCheck, CeilingRow
+
+    fid = flowsheet_of(scenario_id, flowsheet)
+    info = runnable(fid)
+    if _hidden(info.program, include_archived):
+        held = programs.program_by_id(info.program)
+        raise ScenarioRefused(
+            f"{fid} belongs to the archived program {held.name if held else info.program}; "
+            "Settings → Programs → Show archived programs and examples reads it")
+    sugar = CEILING_SUGAR.get(fid)
+    product = PRODUCTS.get(fid, fid)
+    if sugar is None or product not in geneos_models.PRODUCTS:
+        raise ScenarioRefused(f"{fid} names no product and sugar a geneOS ceiling is computed for")
+    pool = pool or evidence_pool.load(include_archived=True)
+    # The yield as the scenario binds it: the PHA draft's records unclipped
+    # (cap=None), so the check reads each record as it is (D11).
+    inputs = bind(pool.records, host, assumptions, cap=None) if fid == FLOWSHEET else bind_inputs(
+        fid, pool.records, host, assumptions)
+    apply_fits(inputs, fits or {}, fid)
+    inp = next((i for i in inputs if i.key == "yield"), None)
+    if inp is None:
+        raise ScenarioRefused(f"{fid} takes no yield, so no ceiling bounds it")
+
+    def g(v):
+        if v is None:
+            return None
+        try:
+            return units.convert(float(v), inp.unit or _G_PER_G, _G_PER_G)
+        except (TypeError, ValueError) as e:
+            raise ScenarioRefused(f"the yield's unit, {inp.unit}, does not convert to {_G_PER_G}: "
+                                  f"{units.explain_refusal(inp.unit or '', _G_PER_G) or e}") from None
+
+    # The organism (the header above says how it is read).
+    labels, program_species = _strain_labels()
+    by_id = getattr(pool, "records_by_id", None) or {r["id"]: r for r in pool.records}
+    bound_rows = [by_id.get(r) or {} for r in (inp.recordIds if inp.binding == "records" else [])]
+    if host:
+        strains = [host]
+        whose = f"the host the scenario is narrowed to, {labels.get(host, host)}"
+        same = "the host the scenario is narrowed to"
+    else:
+        strains = sorted({str(r["strainId"]) for r in bound_rows if r.get("strainId")})
+        whose = (f"the strain{'s' if len(strains) != 1 else ''} of the records its yield binds, "
+                 + ", ".join(labels.get(s, s) for s in strains)) if strains else ""
+        same = "a strain of the records the yield binds"
+    species = {sp for s in strains if (sp := module_stores.species_of(labels.get(s, "")))}
+    if not host:
+        # A record of no catalogued strain names its organism in the paper's words.
+        species |= {sp for r in bound_rows if not r.get("strainId")
+                    if (sp := module_stores.species_of(r.get("organismText") or ""))}
+    species_list = sorted(species)
+    if not species_list and not host and info.program in program_species:
+        species_list = [program_species[info.program]]
+        held = programs.program_by_id(info.program)
+        whose = (f"{whose}; " if whose else "") + (
+            f"the {held.name if held else info.program} program, every host of which is "
+            f"{_species_words(species_list[0])}, as no record the yield binds names a catalogued strain")
+    if not whose:
+        whose = "nothing the tree can read: no host is chosen, and the yield binds no record of a catalogued strain"
+    organism = whose + (f" ({', '.join(_species_words(s) for s in species_list)})" if species_list else "")
+
+    matched: list[tuple[Any, str, str]] = []
+    for m in geneos_models.SHELF.values():
+        if product not in m.products or not m.host:
+            continue
+        label = labels.get(m.host) or m.name
+        if m.host in strains:
+            matched.append((m, "strain", f"{m.id} is a reconstruction of {label}, {same}"))
+            continue
+        sp = module_stores.species_of(label)
+        if sp and sp in species_list:
+            matched.append((m, "species", f"{m.id} is a reconstruction of {label}, and the scenario's organism is of "
+                                          f"its species, {_species_words(sp)}: another strain's network bounds it only "
+                                          "as far as the two networks agree"))
+
+    stored = [a for a in artifacts.all_artifacts() if a.tool == geneos.CEILING]
+    product_label = geneos_models.PRODUCTS[product]["label"]
+    value, low, high = g(inp.value), g(inp.low), g(inp.high)
+    top = high if high is not None else value
+    rows: list[CeilingRow] = []
+    other_sugars: set[str] = set()
+    for m, how, words in matched:
+        mine = [a for a in stored if _ceiling_of(a, "model") == m.id and _ceiling_of(a, "product") == product
+                and isinstance(a.output.get("gPerG"), (int, float))]
+        on = [a for a in mine if _ceiling_of(a, "substrate") == sugar]
+        other_sugars |= {str(_ceiling_of(a, "substrate")) for a in mine if a not in on and _ceiling_of(a, "substrate")}
+        if not on:
+            continue
+        newest = on[0]  # all_artifacts lists the newest first
+        ceiling = float(newest.output["gPerG"])
+        mol = newest.output.get("molPerMol")
+        ratio = float(mol) / ceiling if isinstance(mol, (int, float)) and ceiling > 0 else None
+        if value is None:
+            flag, value_above = "no-yield", False
+        else:
+            value_above = value > ceiling
+            flag = "above" if value_above or (top is not None and top > ceiling) else "within"
+        above = [r.id for r in inp.records if (g(r.value) or 0.0) > ceiling] if inp.binding == "records" else []
+        conventions = [f"{i.name}: {i.source.note}" for i in newest.inputs
+                       if i.name in ("product", "substrate", "uptake") and i.source.note]
+        rows.append(CeilingRow(
+            modelId=m.id, modelName=m.name, modelBasis=str(_input_named(newest, "model").value), host=m.host,
+            match=how, matchWords=words, product=product, substrate=sugar, artifactId=newest.id,
+            provenance=newest.provenance, createdAt=newest.createdAt, older=len(on) - 1, ceilingGPerG=ceiling,
+            ceilingMolPerMol=float(mol) if isinstance(mol, (int, float)) else None, conventions=conventions,
+            yieldGPerG=value, yieldLowGPerG=low, yieldHighGPerG=high,
+            yieldMolPerMol=value * ratio if value is not None and ratio is not None else None,
+            flag=flag, words=_row_words(flag, inp.binding, value_above), recordsAbove=above))
+
+    models = [m.id for m, _, _ in matched]
+    compute_at = f"/geneos/model?product={product}&substrate={sugar}" + (f"&model={models[0]}" if models else "")
+    empty = None
+    if not matched:
+        empty = (f"No reaction network on geneOS's shelf is of this scenario's organism with a route to "
+                 f"{product_label}, so no ceiling bounds this yield. geneOS → Model lists the shelf.")
+    elif not rows:
+        empty = (f"No geneOS ceiling for {product_label} on {sugar} is on file for {', '.join(models)}. One is "
+                 f"computed in geneOS → Model: choose {product_label}, {sugar} and the model, and the ceiling is kept.")
+    notes = [CEILING_KEPT] + ([PHA_CLIP_NOTE] if fid == FLOWSHEET and inp.binding == "records" else [])
+    return CeilingCheck(
+        scenarioId=scenario_id, flowsheet=fid, product=product, substrate=sugar,
+        sugarWords=(f"the flowsheet's feed is {sugar}" if fid != FLOWSHEET else
+                    f"the PHA draft's feed is a fermentable sugar; its yield cap reads the {sugar} ceiling, and so does this check"),
+        host=host, strains=strains, species=species_list, organismWords=organism, models=models,
+        yieldBinding=inp.binding, yieldValue=inp.value, yieldLow=inp.low, yieldHigh=inp.high, yieldUnit=inp.unit,
+        yieldSource=inp.source, yieldRecords=len(inp.records), yieldWords=_yield_words(inp), rows=rows,
+        flagged=any(r.flag == "above" for r in rows), empty=empty, computeAt=compute_at,
+        otherSugars=sorted(other_sugars), notes=notes)

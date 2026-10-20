@@ -2848,6 +2848,79 @@ export interface FermosFitInfo {
   refused: string | null;
 }
 
+// ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+//
+// A scenario's fermenter yield beside the newest stored geneOS ceiling of
+// each shelf model of its organism, on its flowsheet's sugar, as
+// `GET /api/proforma/ceiling-check` computes it on read. A flag, never a
+// bound: the browser shows it and computes no number of its own.
+
+/** One stored ceiling beside the scenario's yield, both in the ceiling's basis. */
+export interface CeilingRow {
+  modelId: string;
+  /** The model as geneOS's shelf names it, and as the ceiling's basis names it. */
+  modelName: string;
+  modelBasis: string;
+  /** The strain the reconstruction describes. */
+  host: string | null;
+  /** How the scenario's organism maps to the model: the same strain, or another strain of its species. */
+  match: 'strain' | 'species';
+  matchWords: string;
+  product: string;
+  substrate: string;
+  /** The newest stored `geneos.ceiling` of this model, product and sugar; how many older ones it stands in front of. */
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  older: number;
+  ceilingGPerG: number;
+  ceilingMolPerMol: number | null;
+  /** The product and sugar conventions the ceiling's basis names, in its words. */
+  conventions: string[];
+  /** The scenario's yield in the ceiling's basis: g per g, and mol per mol at the ceiling's own conventions. */
+  yieldGPerG: number | null;
+  yieldLowGPerG: number | null;
+  yieldHighGPerG: number | null;
+  yieldMolPerMol: number | null;
+  /** 'above' when the yield or its high end exceeds the ceiling; never a clamp. */
+  flag: 'above' | 'within' | 'no-yield';
+  words: string;
+  /** The bound records whose own value is above the ceiling, each for a reviewer to check its basis. */
+  recordsAbove: string[];
+}
+
+/** `GET /api/proforma/ceiling-check`: one scenario's yield beside every stored ceiling of its organism on its sugar. */
+export interface CeilingCheck {
+  scenarioId: string;
+  flowsheet: string;
+  product: string;
+  substrate: string;
+  sugarWords: string;
+  host: string | null;
+  /** The scenario's organism: its host filter, else its yield's records' strains, else its program's one species. */
+  strains: string[];
+  species: string[];
+  organismWords: string;
+  /** The shelf models of that organism with a route to the product. */
+  models: string[];
+  yieldBinding: 'records' | 'assumption' | 'artifact' | 'waiting';
+  yieldValue: number | null;
+  yieldLow: number | null;
+  yieldHigh: number | null;
+  yieldUnit: string;
+  yieldSource: BasisSource | null;
+  yieldRecords: number;
+  yieldWords: string;
+  rows: CeilingRow[];
+  flagged: boolean;
+  /** With no ceiling on file: what is missing, and where one is computed. */
+  empty: string | null;
+  computeAt: string;
+  /** Sugars other stored ceilings of these models are on, left aside here. */
+  otherSugars: string[];
+  notes: string[];
+}
+
 export interface HistogramBin {
   low: number;
   high: number;

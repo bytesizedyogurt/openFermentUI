@@ -375,6 +375,23 @@ def _fits_param(raw: str | None) -> dict[str, str]:
     return fits
 
 
+def _assumptions_param(raw: str | None) -> list:
+    """`?assumptions=` on GET /api/proforma/ceiling-check: a JSON list of
+    named persons' assumptions, as ProformaRunRequest.assumptions carries
+    them."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from .models import InputAssumption
+
+    if not raw:
+        return []
+    try:
+        return TypeAdapter(list[InputAssumption]).validate_json(raw)
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
+                                                    "low, high, by and at, as a run takes them") from None
+
+
 @app.get("/api/proforma/status")
 def proforma_status() -> dict:
     """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
@@ -473,6 +490,29 @@ def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool
     try:
         return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
                                        fits=chosen).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/proforma/ceiling-check")
+def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
+                           includeArchived: bool = False, fits: str | None = None,  # noqa: N803
+                           assumptions: str | None = None) -> dict:
+    """A scenario's fermenter yield read against the newest stored geneOS
+    ceiling of each shelf model of its organism, on its flowsheet's sugar
+    (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
+    made in the browser by the flowsheet it names; `?fits=` and
+    `?assumptions=` (JSON) bind its yield as its page binds it. A yield above
+    a ceiling is flagged, never clamped. A read: it keeps nothing, starts no
+    worker and changes no binding or run. Refused in words (422) as the
+    binding is."""
+    from . import proforma
+
+    chosen = _fits_param(fits)
+    typed = _assumptions_param(assumptions)
+    try:
+        return proforma.ceiling_check(scenarioId, flowsheet, include_archived=includeArchived, host=host,
+                                      assumptions=typed, fits=chosen).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

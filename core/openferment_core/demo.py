@@ -435,6 +435,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_fermos().items(),
         *bridge.items(),
         *proforma_fixtures.items(),
+        *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
         *prototype_proposals().items(),
@@ -1240,6 +1241,81 @@ def prototype_proforma() -> dict[str, Any]:
             "proforma-run-yeast.json": yeast.model_dump(mode="json"),
             "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references,
             PROFORMA_RUN_ARTIFACTS: [yeast_art.model_dump(mode="json")]}
+
+
+# OF-BLD-019 §5.2: a scenario's yield read against the geneOS ceiling. A
+# STAND-IN ceiling, labelled so in its basis and never computed by any
+# model: its model input is an assumption (so it is `demo`) carrying the
+# shelf id it stands in for, so the check maps it to the yeast scenario as
+# it maps a real ceiling of that model. STANDIN_CEILING_G_PER_G is a setting
+# of this fixture, between the yeast stand-in yields' median and their
+# highest, so the browser tests see the flag; its mol per mol is taken at
+# the conventions geneos_models states, as a real ceiling's is.
+STANDIN_CEILING_G_PER_G = 0.47
+STANDIN_CEILING_MODEL = "Yeast9"
+STANDIN_CEILING_NOTE = ("STAND-IN ceiling for tests and the browser double: not computed by {model} or any model; "
+                        "a value set between the stand-in yields so the flag shows")
+
+
+def standin_ceiling(model_id: str, product: str, substrate: str, g_per_g: float, *, at: str = AT,
+                    version: str = "STAND-IN ceiling 1"):
+    """Keep one STAND-IN `geneos.ceiling` artifact in the current store
+    (artifacts.folder()), in the shape the geneOS worker writes, for the
+    shelf model `model_id`; return it. Its basis is geneos's own but for the
+    model input, an assumption that says what it is."""
+    from . import artifacts, atomic, geneos, geneos_models
+    from .basis import basis_provenance
+    from .models import Artifact, BasisInput, BasisSource, ComputedBasis
+
+    inputs = [BasisInput(name="model", value=f"STAND-IN for {model_id}", unit="", source=BasisSource(
+        kind="assumption", id=model_id, by="openFerment test fixture", note=STANDIN_CEILING_NOTE.format(model=model_id)))]
+    inputs += [i for i in geneos._inputs(model_id, product, [substrate]) if i.name != "model"]
+    mol = g_per_g * geneos_models.SUBSTRATES[substrate]["molarMass"] / geneos_models.PRODUCTS[product]["molarMass"]
+    output = {"modelId": model_id, "product": product, "substrate": substrate,
+              "exchange": geneos_models.exchange_id(model_id, substrate), "uptake": geneos_models.UPTAKE,
+              "flux": mol * geneos_models.UPTAKE, "molPerMol": mol, "gPerG": g_per_g, "solver": "STAND-IN",
+              "status": "optimal"}
+    aid = artifacts.artifact_id(geneos.CEILING, version, inputs)
+    basis = ComputedBasis(tool=geneos.CEILING, toolVersion=version, inputs=inputs, artifactId=aid, at=at)
+    art = Artifact(id=aid, tool=geneos.CEILING, toolVersion=version, inputs=inputs, output=output,
+                   outputHash=artifacts.output_hash(output), provenance=basis_provenance(basis, {}, {}), createdAt=at,
+                   durationMs=0)
+    artifacts.folder().mkdir(parents=True, exist_ok=True)
+    atomic.write_text(artifacts.folder() / f"{aid}.json", art.model_dump_json(indent=2) + "\n")
+    return art
+
+
+def prototype_ceiling_check() -> dict[str, Any]:
+    """GET /api/proforma/ceiling-check for the double, through the real code
+    over the stand-in records: each seed scenario's check with no ceiling on
+    file (a fresh install) and with the STAND-IN ceiling on file, by the
+    flowsheet it runs."""
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import intake as _intake
+    from . import proforma
+
+    rs = _standin_records() + _standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+
+    def checked() -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for sid in (proforma.YEAST_SCENARIO_ID, proforma.SCENARIO_ID):
+            body = proforma.ceiling_check(sid, include_archived=True, pool=pool)
+            out[body.flowsheet] = {"status": 200, "body": body.model_dump(mode="json")}
+        return out
+
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            none = checked()
+            standin_ceiling(STANDIN_CEILING_MODEL, "ethanol", "glucose", STANDIN_CEILING_G_PER_G)
+            on_file = checked()
+        finally:
+            _intake.DATA_DIR = saved
+    return {"proforma-ceiling-check.json": {"none": none, "onFile": on_file}}
 
 
 # OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code

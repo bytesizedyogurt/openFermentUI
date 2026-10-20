@@ -1021,6 +1021,81 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §5.2 — a scenario's yield read against the geneOS ceiling.
+  //
+  // With the switch off, sc-yeast-1's page asks the service for its Ceiling
+  // check. With no ceiling on file (a fresh install) the card shows the
+  // yield and its source and says no ceiling is on file, linking to geneOS →
+  // Model on the product, the sugar and a model; with the double's STAND-IN
+  // ceiling on file it shows both bases (the ceiling's model, sugar, value,
+  // provenance and artifact link; the scenario's yield and its source) and
+  // the flag in words, with the record above it linked to a reviewer. The
+  // yield shown is the binding's own: nothing is clamped.
+  let ceilingFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    page.on('console', (m) => {
+      if (m.type() === 'error' && !IGNORE.some((re) => re.test(m.text()))) problems.push(m.text());
+    });
+    const answers = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-ceiling-check.json'), 'utf8')).response;
+    const none = answers.none.ethanol_glucose_v0.body;
+    const onFile = answers.onFile.ethanol_glucose_v0.body;
+    const card = page.locator('[data-testid="ceiling-check"]');
+    const close = (text, want) => Math.abs(Number(String(text).trim()) - want) < 1e-3;
+    try {
+      doubleState.flags.ceilingOnFile = false;
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="ceiling-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const empty = await page.locator('[data-testid="ceiling-empty"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (!/No geneOS ceiling for ethanol on glucose is on file/.test(empty) || !/geneOS → Model/.test(empty))
+        problems.push(`with no ceiling on file the card does not say so and where one is computed: ${JSON.stringify(empty.slice(0, 200))}`);
+      const compute = await page.locator('[data-testid="ceiling-compute"]').getAttribute('href', { timeout: 3000 }).catch(() => null);
+      if (compute !== `#${none.computeAt}`) problems.push(`the empty card does not link to geneOS → Model on the product, sugar and model (${compute})`);
+      const yieldLine = await page.locator('[data-testid="ceiling-yield"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (!yieldLine.includes(String(none.yieldValue)) || !/3 records/.test(yieldLine)) problems.push(`the card does not show the yield as bound, with its source: ${JSON.stringify(yieldLine.slice(0, 160))}`);
+      if (await page.locator('[data-testid="ceiling-row"]').count()) problems.push('a ceiling is drawn with none on file');
+      const asked = doubleState.ceilingChecks.at(-1);
+      if (!asked || asked.scenarioId !== 'sc-yeast-1' || asked.includeArchived !== 'false' || 'flowsheet' in asked)
+        problems.push(`the check was not asked for the seed scenario with the switch: ${JSON.stringify(asked)}`);
+
+      doubleState.flags.ceilingOnFile = true;
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="ceiling-row"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const want = onFile.rows[0];
+      const row = page.locator(`[data-testid="ceiling-row"][data-model="${want.modelId}"]`);
+      if ((await row.getAttribute('data-flag', { timeout: 3000 }).catch(() => null)) !== 'above') problems.push('the row above its ceiling is not flagged above');
+      if ((await card.getAttribute('data-flagged').catch(() => null)) !== 'true') problems.push('the card is not marked flagged');
+      const ceilingRow = await row.locator('[data-testid="ceiling-ceiling"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (!ceilingRow.includes(want.modelId) || !/glucose/.test(ceilingRow) || !close(await row.locator('[data-testid="ceiling-value"]').innerText().catch(() => ''), want.ceilingGPerG))
+        problems.push(`the ceiling's basis is not shown with its model, sugar and value: ${JSON.stringify(ceilingRow.slice(0, 200))}`);
+      if ((await row.locator('[data-testid="ceiling-artifact"]').getAttribute('href').catch(() => null)) !== `#/biorepo/artifacts/${want.artifactId}`)
+        problems.push('the ceiling does not link to its artifact');
+      if (!ceilingRow.includes(want.modelBasis)) problems.push('the ceiling does not say what its basis names it (the STAND-IN label)');
+      const scenarioRow = await row.locator('[data-testid="ceiling-scenario"]').innerText({ timeout: 3000 }).catch(() => '');
+      if (!scenarioRow.includes(String(want.yieldGPerG)) || !scenarioRow.includes(String(want.yieldHighGPerG)))
+        problems.push(`the scenario's yield is not shown beside the ceiling as bound, unclamped: ${JSON.stringify(scenarioRow.slice(0, 160))}`);
+      const words = await row.locator('[data-testid="ceiling-words"]').innerText().catch(() => '');
+      if (!/reviewer should check the basis/.test(words) || !/not clamped/.test(words)) problems.push(`the flag is not said in words: ${JSON.stringify(words.slice(0, 200))}`);
+      const above = await row.locator('[data-testid="ceiling-record-above"]').allInnerTexts().catch(() => []);
+      if (above.length !== want.recordsAbove.length || !above.every((t, i) => t.includes(want.recordsAbove[i])))
+        problems.push(`the records above the ceiling are not listed for a reviewer (${above.length})`);
+      if (!(await row.locator(`a[href="#/guild?record=${want.recordsAbove[0]}"]`).count())) problems.push('a record above the ceiling does not link to its review');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    } finally {
+      doubleState.flags.ceilingOnFile = false;
+    }
+    if (problems.length) {
+      ceilingFails++;
+      console.log(`✗ ceiling      ${problems.join('; ')}`);
+    } else {
+      console.log('✓ ceiling      sc-yeast-1 with no ceiling on file shows its yield and source and says where one is computed; with the STAND-IN ceiling on file both bases show (model, sugar, value, provenance, artifact; the yield as bound, unclamped), flagged above in words, the record above it linked to a reviewer');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
   //    quotes are listed rather than dropped.
   //
@@ -1742,6 +1817,7 @@ async function main() {
   console.log(`${1 - referenceFails}/1 Proforma reference pages — each held to its package's own test, every section read from its run`);
   console.log(`${1 - compareFails}/1 Compare — BioSTEAM scenarios side by side from their newest runs, pins kept`);
   console.log(`${1 - fitFails}/1 fermOS fit — the slot says how a fit gets made, and a chosen forecast feeds titre, yield and productivity`);
+  console.log(`${1 - ceilingFails}/1 ceiling check — a scenario's yield beside the geneOS ceiling, flagged above in words, never clamped`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
@@ -1749,7 +1825,7 @@ async function main() {
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails) process.exit(1);
 }
 
 main();
