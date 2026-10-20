@@ -110,7 +110,12 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/Postdoc.tsx',
       'core/openferment_core/postdoc_agent.py',
       'core/openferment_core/validate.py',
+      // OF-BLD-015 §7.1–§7.4 — the module stores it sweeps and reads, the
+      // audit log its writes land in, and the proposals its gates make.
+      'core/openferment_core/module_stores.py',
       'core/openferment_core/tools/',
+      'core/openferment_core/audit.py',
+      'core/openferment_core/proposals.py',
       'core/openferment_core/evidence_pool.py',
     ],
     surfacedAs: 'the rail, /postdoc',

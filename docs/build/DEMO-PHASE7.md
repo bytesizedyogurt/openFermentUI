@@ -56,6 +56,8 @@ scripted stand-in in place of the model.
 | 7 | **What is waiting for a person on Home right now, and which Primer lesson teaches measuring dry cell weight?** | Home, Primer | The review queue (candidates awaiting a person; nothing on this machine for a check) and the lesson found by its words, *OD750 and dry cell weight*. $0.003, 9 s. |
 | 8 | **Draft a runbook for PHB in Cupriavidus necator H16 on fructose: use the PHB content records on that strain and the fructose ceiling on its model as a bound.** | BioRepo, geneOS, `yield_ceiling`, Dominion, Runbooks, `draft_runbook` | The one that does work: a draft runbook appears under the answer with its predictions written by the service, the ceiling as a bound; **Turn into a runbook** opens it, **Lock predictions** locks it, Runbooks → Ledger counts it. 7 claims, 0 dropped. $0.006, 23 s. The first `draft_runbook` call was refused (a measure's unit did not match) and the model corrected it; both lines show in the trace. |
 
+| 9 | **Do three things for the PHB programme and tell me what you did: compute and keep the PHB yield ceiling on the e_coli_core model for xylose; propose that the brazzein runbook rb-brazzein be locked before its pilot run; and write a notebook note that the fructose ceiling on RehMBEL1391 is the only bound we hold for C. necator H16.** | geneOS write, Runbooks, Home write | The writes: *Wrote geneOS: ceiling e_coli_core · open* (a finding: the core model takes no xylose), and *Proposed to Home: note · waits for a person on Home*. It read rb-brazzein, saw it is already locked, and proposed no lock, saying so. Then open **Home**: the card **Awaiting you** holds the note with one button; with a reviewer name set, press it, and it is kept under your name. `GET /api/audit` shows both lines marked as the model's. 3 claims, 1 dropped. $0.0067, 27 s. |
+
 Question 8 asks for fructose because that is the feed the stored H16 ceiling
 is on, and the strain's content records are on waste oils: asked for xylose,
 Haiku searches everything and then says, correctly, that no xylose record for
@@ -76,5 +78,8 @@ H16 exists, and drafts nothing. That is also a fair thing to show.
 - **The read tools go out non-strict** to the model: the API refuses a
   request with eighteen strict tools as too large. Their inputs are validated
   by the registry the same way, before anything runs.
-- **Writes** (§7.3) and **gates with Home cards** (§7.4) are the next steps;
-  Postdoc reads every module today and writes nothing but a runbook draft.
+- **Writes land marked as the model's.** A ceiling or a forecast is an
+  artifact; a hand-written candidate is `unverified` in the review queue; a
+  fetch prepares a paper. Anything at a gate (lock, sign, publish, bench, a
+  note, a check) is a proposal on Home, and only a named person can carry it
+  out. The audit log is `core/data/audit.jsonl` (`GET /api/audit`).

@@ -104,7 +104,7 @@ fetched, extracted and decided (OF-BLD-012 §2.1); the seed itself does not chan
                     count toward 6 of them
 ```
 
-## Postdoc runs on Claude Opus
+## Postdoc runs on a model, and reaches every module
 
 Postdoc's answers come from a real model call, routed through `core/` — a
 Python service (`openferment-core`) that is the first surface of the tool layer
@@ -114,16 +114,24 @@ fails the build if anything under `src/` so much as names it.
 
 ```
 browser ──POST /api/ask/stream──▶ FastAPI
-                                    ├─ the loop: Claude Opus 5.5 calls its tools —
-                                    │    search_records, search_passages, convert_units —
+                                    ├─ the coverage pass, code: all eleven modules swept for what the
+                                    │    question names; the map goes in round one and is the first trace line
+                                    ├─ the loop: the model calls its tools — search_records, search_passages,
+                                    │    convert_units, yield_ceiling, growth_forecast, selling_price,
+                                    │    draft_runbook, and a read and a write tool for every module —
                                     │    each step streamed to the browser as it completes
                                     ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
-                                    ├─ a refusal or outage: asked again once, on Sonnet 5.5
+                                    ├─ a refusal or outage: asked again once, on the fallback model
                                     ├─ validate_plan: no number, nothing cited that no tool returned,
                                     │    every quote in its passage word for word
-                                    └─ AnswerPlan, with its trace and why it stopped
-browser ◀───────────────────────────┘   renders values from the cited records and artifacts
+                                    └─ AnswerPlan, with its trace, its coverage map and why it stopped
+browser ◀───────────────────────────┘   renders values from the cited records, rows and artifacts
 ```
+
+Every model call in this build runs **`claude-haiku-5-5` at effort `medium`** by the owner's
+rule (`OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`, `OPENFERMENT_INDEX_MODEL`,
+`OPENFERMENT_EFFORT` in `core/.env`); `llm.py`'s defaults, with those unset, are Claude Opus 5.5
+falling back to Claude Sonnet 5.5.
 
 `POST /api/ask` answers with the same plan in one response, and `mode: 'single'` keeps the
 earlier path: one BM25 retrieval over `corpus.json`, one structured response. Text inside a tool
@@ -167,8 +175,8 @@ criteria now rather than a parallel implementation: `pnpm test:live` asks the
 real pipeline each one and checks the plan cites the records a human said were
 the answer. `pnpm verify` stays offline and needs no key.
 
-Every model call goes through `core/openferment_core/llm.py`. It asks **Claude Opus
-5.5** first and **Claude Sonnet 5.5** when Opus declines or is unavailable, and it
+Every model call goes through `core/openferment_core/llm.py`. With nothing set it asks **Claude Opus
+5.5** first and **Claude Sonnet 5.5** when Opus declines or is unavailable (this build sets Haiku for both, above), and it
 records which model answered in the plan's `usage.models`, shown beside the cost.
 Both models reject forced tool use, so the plan comes back through structured
 outputs: JSON that matches the schema, checked by the API, with no free-text way to
@@ -187,14 +195,41 @@ Sonnet answers; the plan shows the exact cost. Set a spend limit in the Anthropi
 console first, not because the volume is risky, but because a cap turns a runaway
 loop from a bill into a bug report.
 
+### Postdoc reaches every module
+
+Found in use on 2026-10-16: asked what is open in Dominion, Postdoc said the corpus held
+nothing, while the Dominion screen showed the molecules. It could read records and passages and
+nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
+
+- **Before its first turn, code sweeps all eleven modules** for what the question names and
+  hands the model the map. The trace's first line opens to one line a module; the footer says
+  *Searched eleven, found in two: Dominion (1), Runbooks (1) · read in part: Runbooks, fermOS,
+  BioRepo* (what still lives only in a browser is named).
+- **Every module has a read tool** (`dominion_read` … `home_read`) returning rows in one shape
+  with one computed state: `open`, `fenced`, `approved`, `locked`, `proposed`, `retired`. A
+  claim cites rows the way it cites records, and the screen shows each under the claim with
+  its state. A row no tool returned in that run cannot be cited.
+- **Every module has a write tool** (`dominion_write` … `home_write`), and it never touches a
+  store: each action calls the module's own write function or refuses in words naming the
+  person who makes the change. What a model writes lands in the open lane marked as the
+  model's, in the audit log (`GET /api/audit`), until a person promotes it.
+- **Seven gates** (publish, spend, lock, sign, personnel, bench, notebook) stop an action and
+  turn it into a proposal. Home shows each as a card with one button; the button carries it
+  out in the reviewer's name, and nothing is signed by a model.
+
+`pnpm check:tools` holds the three rules in `verify`; `pnpm eval:o` runs ten cross-module
+questions and scores whether the right modules were read and the footer names them (on Haiku,
+2026-10-20: searched 80 %, footer 100 %, five cents).
+
 ### The same tools, from an assistant outside the app
 
 `core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
-seven tools Postdoc uses, with the registry's own schemas, and two more:
+twenty-nine tools Postdoc uses, with the registry's own schemas, and two more:
 `ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`. The
 registry's rules hold there as everywhere: a number typed into an input is
-refused. No tool writes to BioRepo, to Guild's ledger or to anything a person
-signs.
+refused, a write goes through the module's own write function, and anything at
+a gate becomes a proposal a person carries out on Home. No tool signs for a
+person.
 
 A Claude Code session in this repository picks it up from `.mcp.json`. For
 Claude Desktop, add this to `claude_desktop_config.json`, with the path to your
@@ -284,8 +319,10 @@ cd core && uv run python -m openferment_core.demo --prototype   # the prototype'
 ```
 
 The service also answers `GET /api/tools` (each tool's name, description and input schema) and
-`POST /api/tools/{name}`, the same registry Postdoc's loop calls: today `search_records`,
-`convert_units`, `search_passages` and `yield_ceiling`. A tool input carries ids and words; a number typed into one refuses the call.
+`POST /api/tools/{name}`, the same registry Postdoc's loop calls: the seven OF-BLD-014 tools and
+a read and a write tool for every module (`docs/TOOLS.md`). A tool input carries ids and words; a number typed into one refuses the call.
+`pnpm check:tools` is the stage of `verify` that holds the write tools to their module's write
+functions and the gates to a named person; `pnpm eval:o` runs eval set O live.
 Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
 a call that could pass `OPENFERMENT_DAILY_BUDGET_USD` (25 by default, `core/.env.example`).
 
@@ -674,6 +711,11 @@ Recorded here because the app records them rather than papering over them:
   `blocked` rather than silently dropped; extending the ontology is a product decision.
 - **D5 is an open question, not an answer.** Whether *C. reinhardtii* encodes a Fam20-family
   kinase wants an HMM search of the v6.1 proteome against Pfam PF03881. The app labels it open.
+- **The audit log and the proposals stay on the machine.** `core/data/audit.jsonl` and
+  `core/data/proposals.json` are gitignored and are not on the data branch, so a proposal made
+  on one machine is answered on that machine. Haiku still types a count or an ordinal into a
+  claim now and then, and the validator drops that claim whole; the prompt forbids it, and
+  across the ten eval-O questions it happened once.
 - **The UI copy migration from the synthetic corpus is done but not proven exhaustive.** OF-COR-001
   replaced the data; the strings describing that data were corrected screen by screen afterwards,
   and several rounds of audit each turned up more. Anything phrased as "synthetic", "fictional",
