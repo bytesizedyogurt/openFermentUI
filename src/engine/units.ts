@@ -297,6 +297,14 @@ export const ALIASES: Record<string, string> = {
   'usd per gallon': 'USD gal⁻¹',
   '$/kg': 'USD kg⁻¹',
   'USD/kg': 'USD kg⁻¹',
+  // Thread Q's papers. A dot or nothing between the factors, and an hour
+  // written out; each spelling is one unit and no other.
+  'g.l-1': 'g L⁻¹',
+  'g.l−1': 'g L⁻¹',
+  'g l-1h-1': 'g L⁻¹ h⁻¹',
+  'g l−1h−1': 'g L⁻¹ h⁻¹',
+  'g/l hr': 'g L⁻¹ h⁻¹',
+  'g/l/hr': 'g L⁻¹ h⁻¹',
   m: 'mol L⁻¹',
   mm: 'mmol L⁻¹',
   um: 'µmol L⁻¹',
@@ -309,6 +317,18 @@ export const ALIASES: Record<string, string> = {
   l: 'L',
   'm3': 'm³',
 };
+
+/**
+ * Grams per gram with each gram labelled by what it weighs — g EtOH/g glucose,
+ * gx/g, gDW gglucose⁻¹, g biomass [g glucose]⁻¹. The labels name the yield,
+ * which the field already says; the unit is grams per gram. Each gram must
+ * stand alone after its separator, so g kg⁻¹ and mg g⁻¹ never match. Read
+ * against the stripped spelling; units.py holds the same two patterns.
+ */
+export const LABELLED_MASS_RATIO = [
+  /^g(?:\s*[a-z]+)?\s*\/\s*g(?:\s*[a-z]+)?$/,
+  /^g(?:\s*[a-z]+)?(?:\s*\[\s*|\s+)g(?:\s*[a-z]+)?\s*\]?\s*-1$/,
+];
 
 export function normalizeUnit(raw: string): string | null {
   const t = raw.trim();
@@ -326,6 +346,7 @@ export function normalizeUnit(raw: string): string | null {
   for (const key of Object.keys(U)) {
     if (strip(key) === target) return key;
   }
+  if (LABELLED_MASS_RATIO.some((re) => re.test(target.trim()))) return 'g g⁻¹';
   return null;
 }
 

@@ -43,6 +43,22 @@ const OUT_RESOLVERS = 'core/tests/fixtures/resolvers.json';
 // ── normalise: raw notation → table key, and its family ────────────────
 const NORMALIZE_INPUTS = [
   'g/L', // the commonest alias
+  // Thread Q's spellings: separators, and grams per gram with labelled grams.
+  'g.L−1',
+  'g L-1h-1',
+  'g/L hr',
+  'g EtOH/g Glucose',
+  'g ethanol [g glucose]−1',
+  'g biomass [g glucose]−1',
+  'gDW gglucose−1',
+  'gx/g',
+  'gx g−1',
+  'gE gG –1',
+  // … and what must stay apart: a kilogram, a milligram, a rate, a volume.
+  'g kg-1',
+  'mg g-1',
+  'g gX-1 h-1',
+  'gx/l',
   'mg L-1', // ASCII superscript, matched by the fallback
   'mg·L⁻¹', // middot separator (the §5.3 example)
   'mg⋅L⁻¹', // dot operator, the other middot

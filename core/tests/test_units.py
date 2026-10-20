@@ -362,3 +362,22 @@ def test_no_definition_the_extractor_reads_carries_a_numeral():
             assert found, f"{field_id} no longer carries a numeral; take it off the exception list"
             continue
         assert found is None, f"{field_id}: its name or definition carries {found!r}"
+
+
+# Thread Q's papers write a yield's grams with what they weigh. Grams per gram
+# whatever the labels; a kilogram, a milligram, a rate or a volume stays apart.
+@pytest.mark.parametrize("raw", [
+    "g EtOH/g Glucose", "g ethanol [g glucose]−1", "g biomass [g glucose]−1",
+    "gDW gglucose−1", "gx/g", "gx g−1", "gE gG –1",
+])
+def test_a_labelled_gram_per_gram_is_grams_per_gram(raw):
+    assert normalize(raw) == "g g⁻¹"
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("g kg-1", None), ("gx/l", None), ("g gX-1 h-1", None),
+    ("mg g-1", "mg g⁻¹"), ("g.L−1", "g L⁻¹"), ("g L-1h-1", "g L⁻¹ h⁻¹"), ("g/L hr", "g L⁻¹ h⁻¹"),
+])
+def test_what_a_labelled_ratio_must_not_swallow(raw, expected):
+    assert normalize(raw) == expected
+
