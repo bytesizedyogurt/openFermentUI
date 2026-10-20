@@ -573,9 +573,28 @@ async function main() {
       if (!(await page.locator('button:has-text("Accept")').isDisabled())) {
         problems.push('accept is enabled for a reviewer with no name');
       }
+      // OF-BLD-015 §7.4 — a proposal waits on Home; unsigned, its buttons do nothing.
+      await page.goto(`http://localhost:${PORT}/#/`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="home-proposals"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="home-proposal"]').count()) !== 1) problems.push('Home does not show the one proposal the service holds');
+      if ((await page.locator('[data-testid="home-proposals-unsigned"]').count()) !== 1) problems.push('an unnamed reviewer is not told to set a name before acting on a proposal');
+      if (!(await page.locator('[data-testid="home-proposal"] button').first().isDisabled())) problems.push('a proposal button is enabled for a reviewer with no name');
       await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
       await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
       await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="home-proposal"] button').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const proposalButton = (await page.locator('[data-testid="home-proposal"] button').first().innerText().catch(() => '')).trim();
+      if (!/Lock predictions/.test(proposalButton)) problems.push(`the proposal's button does not say what the gate does: ${JSON.stringify(proposalButton)}`);
+      await page.locator('[data-testid="home-proposal"] button').first().click();
+      await page.waitForTimeout(700);
+      const acted = doubleState.proposalActs[0];
+      if (!acted) problems.push('pressing the proposal button posted nothing to the service');
+      else if (acted.verb !== 'carry-out' || acted.person !== REVIEWER) problems.push(`the proposal was acted on as ${JSON.stringify(acted)}, not carried out by the name in Settings`);
+      if (!/#\/runbooks/.test(page.url())) problems.push(`carrying out a browser-side gate did not take the person to the runbooks: ${page.url()}`);
+      await page.goto(`http://localhost:${PORT}/#/`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(500);
+      if ((await page.locator('[data-testid="home-proposal"]').count()) !== 0) problems.push('a carried-out proposal is still on Home');
       await page.goto(`http://localhost:${PORT}/#/guild?record=cl1-B5-a07dd73c`, { waitUntil: 'networkidle' });
       await page.locator('text=cl1-B5-a07dd73c').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(700);

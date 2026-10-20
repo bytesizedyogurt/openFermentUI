@@ -55,6 +55,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * nothing. `guildPosts` is what the browser sent, in order.
    */
   const guildLedger = { version: 1, people: [], evidence: [] };
+  /**
+   * Proposals as the double holds them (OF-BLD-015 §7.4): the fixture's,
+   * marked done or dismissed when the browser posts. `proposalActs` is what
+   * the browser sent, in order, with the person who signed it.
+   */
+  let proposals = null;
+  const proposalActs = [];
   const guildPosts = [];
   /**
    * Practice as the double holds it (OF-BLD-013 §4). A draft is a fixed
@@ -335,6 +342,32 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       }
       return res.end();
     }
+    if (url.startsWith('/api/proposals') && !seedOnly) {
+        if (proposals === null) proposals = await prototype('proposals.json');
+        if (req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify(proposals.filter((p) => p.state === 'proposed')));
+        }
+        const [id, verb] = url.slice('/api/proposals/'.length).split('/');
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        const { person, reason } = JSON.parse(body);
+        const found = proposals.find((p) => p.id === id);
+        if (!found || !person || person.length < 2) {
+          res.writeHead(422, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ detail: 'a proposal is carried out or dismissed by a named person' }));
+        }
+        found.state = verb === 'dismiss' ? 'dismissed' : 'done';
+        found.carriedOutBy = person;
+        found.result = verb === 'dismiss' ? reason : `handed to ${person}: ${found.how}`;
+        proposalActs.push({ id, verb, person });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(found));
+      }
+      if (url === '/api/audit' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end('[]');
+      }
     if (url === '/api/biorepo/overlay') {
         // Answered late on purpose: a screen mounted before the overlay arrives
         // has to cope with it arriving — Guild's queue in particular (§7.3) —
@@ -353,5 +386,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proposalActs } };
 }

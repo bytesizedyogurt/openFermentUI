@@ -37,7 +37,7 @@ scripted stand-in in place of the model.
    tool returned is dropped before it reaches the screen. Click one: it opens
    the module's page.
 4. **The footer** — *Searched eleven, found in two: Dominion (1), Runbooks
-   (1) · read in part: Runbooks, fermOS, BioRepo, Home*. The last part names
+   (1) · read in part: Runbooks, fermOS, BioRepo*. The last part names
    what still lives only in the browser (depositions, unposted decisions).
 5. **Claims carry no numbers.** When one is dropped, *Answered: 4 claims
    kept, 1 dropped* says so, and the reason is in the Inspector. That is Rule 1

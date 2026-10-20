@@ -383,6 +383,31 @@ def prototype_artifact():
     return art.model_copy(update={"createdAt": AT, "durationMs": 0})
 
 
+# OF-BLD-015 §7.4: one proposal a model made at a gate, through the real
+# store in a scratch directory, so Home's card and the smoke have one to
+# press. The time and the id are fixed, so the file is the same every run.
+PROPOSAL_ID = "pr-standin000001"
+
+
+def prototype_proposals() -> dict[str, Any]:
+    from . import audit, proposals
+    from .tools import gates
+
+    with _scratch() as scratch:
+        saved = (proposals.PATH, audit.PATH)
+        proposals.PATH, audit.PATH = Path(scratch) / "proposals.json", Path(scratch) / "audit.jsonl"
+        try:
+            made = proposals.propose(module="runbooks", action="lock", gate=gates.BY_ID["lock"],
+                                     title="Runbooks: lock a runbook's predictions before a run — rb-brazzein",
+                                     why="the draft's predictions are in hand and a run is planned", by="stand-in model",
+                                     target="rb-brazzein", note="lock before the pilot run so the ledger can score it",
+                                     ask_id="ask-standin", effort="medium")
+        finally:
+            proposals.PATH, audit.PATH = saved
+    made = made.model_copy(update={"id": PROPOSAL_ID, "at": AT})
+    return {"proposals.json": [made.model_dump(mode="json")]}
+
+
 def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     from . import artifacts
 
@@ -402,6 +427,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_geneos().items(),
         *prototype_fermos().items(),
         *prototype_proforma().items(),
+        *prototype_proposals().items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
