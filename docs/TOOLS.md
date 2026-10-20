@@ -170,7 +170,8 @@ stays open to be dismissed. The store's locks are let go while the action
 runs (the proposal is marked running in the service), so a long extraction
 never holds up another proposal.
 
-The rules a proposal holds to (OF-BLD-016 §1.R), in `proposals.propose`:
+The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_to_rule_one` and
+`shown` have them on 2026-10-20):
 
 - **Rule 1.** Its note, target, field values, title and why hold no number
   (`validate.find_number`), and its target is one id or none. A write that
@@ -187,6 +188,9 @@ The rules a proposal holds to (OF-BLD-016 §1.R), in `proposals.propose`:
   ids, as Guild's checks serve theirs; the store keeps every word. Home shows
   it to the lead and assessors alone (`mayQueue`), never to the person it
   names (`shownTo`), through `shownProposals` in `src/lib/proposals.ts`.
+- **Not filtered by program.** A proposal is work waiting for a person, so
+  Home's card lists every open one whatever the program switch says (the
+  service double's lock proposal names `rb-brazzein`, an example runbook).
 
 ## The MCP server
 

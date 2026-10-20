@@ -4,34 +4,46 @@ Read this before touching anything. Each line below is something a previous
 session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 §4.2.
 
-## The active build (OF-BLD-015 Part B, then OF-BLD-017 Part C)
-
-The branch is `claude/of-bld-015-postdoc`, from `main` at `6097df7` (OF-BLD-014 merged in
-pull request #8). Its documents are `docs/build/OF-BLD-015-phase7.md` (Part B, "Postdoc
-reaches everything"; its run sheet is folded into `docs/DEMO.md` by OF-BLD-016 §4.2); Part C
-("Postdoc remembers", OF-BLD-017 Phase 5) is committed beside them when it starts. The closing
-truth pass deletes `docs/build/`.
+## The active build (OF-BLD-016)
 
 OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
-tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`. Its document
-is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits are
-`OF-BLD-016 §n.m: <what>`, and its Part A amends OF-BLD-014 Part A below.
+tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`, with
+OF-BLD-015 Phase 7 (`claude/of-bld-015-postdoc` at `7298143`) merged in as a
+merge commit. Its document is `docs/build/OF-BLD-016.md`, its prompt
+`docs/build/PROMPT-016.md`, and its Part A amends OF-BLD-014 Part A
+(`docs/build/OF-BLD-014.md`, A.1–A.7). The pull request is
+`claude/of-bld-016-demo → main`; Sean merges it, then runs `deploy.sh` on the
+Mini, which serves `main` (D8).
 
 - **"Next phase", "continue" and "go on"** mean Part A of `docs/build/OF-BLD-016.md`: start the
   session (`bash scripts/session-start.sh`), pay what `## Live owed` in `STATE.md` lists and this
   machine can run, find the first step whose id is missing from
   `git log --format=%s | grep -o 'OF-BLD-016 §[0-9]*\.[0-9A-Z]*' | sort -u`, and execute to the
   end of that step's phase. One commit per step, `OF-BLD-016 §n.m: <what>`, `pnpm verify` green
-  before each.
-- **The build documents are committed, for the length of the builds.** A cloud session starts
-  from a fresh clone, so `docs/build/` holds OF-BLD-014's document, OF-BLD-015 Phase 7's and
-  OF-BLD-016's on the work branch. OF-BLD-015's closing pass owns the folder's deletion. Every
-  other spec stays out of git, as "Where the documents live" says.
+  before each, every commit pushed.
+- **The session is unattended.** Where OF-BLD-014 A.5 says "Ask", take the default in Part D,
+  record the choice in `STATE.md` under the step, and go on. One exception stops the session: a
+  change that would delete corpus data, a record, a candidate, a decision, an artifact or a
+  person's entry. Archive and flag instead (D1, D3).
+- **The wall clock.** `date -u` at the start of every step. From 10:30 UTC start no new step:
+  finish the one in hand, make verify green, push, write the report (A.7) and stop. A step that
+  cannot go green by then is reverted and named in the report. Past two thirds of the context,
+  finish the step, commit, push, stop and name the next step.
+- **Spend.** The night's cap is 1.50 USD; Appendix 3 estimates under 1.00. A batch costing three
+  times its estimate stops and is reported (§4.1's thread Q scorecard did, at $0.7528).
 - **Every model call openFerment makes runs `claude-haiku-5-5` at effort `medium`**: primary,
   fallback, index, eval. `OPENFERMENT_MODEL`, `OPENFERMENT_FALLBACK_MODEL`,
   `OPENFERMENT_INDEX_MODEL` and `OPENFERMENT_EFFORT` carry it (the environment in a cloud
   session; `core/.env` on the Mini); `llm.py`'s defaults are untouched. Numbers in `STATE.md`
-  dated from 2026-10-16 are Haiku's.
+  dated from 2026-10-16 are Haiku's. The build session itself runs on Opus.
+- **The build documents are committed, for the length of the builds.** A cloud session starts
+  from a fresh clone, so `docs/build/` holds OF-BLD-014's document, OF-BLD-015 Phase 7's and
+  OF-BLD-016's on the work branch. OF-BLD-016 leaves the folder in place: OF-BLD-015's closing
+  pass owns its deletion. Every other spec stays out of git, as "Where the documents live" says.
+- **The run sheet is `docs/DEMO.md`** (§4.2): start on the Mini and the fallback on a laptop,
+  what to point at, the eleven questions in order with what each showed on 2026-10-20, and
+  **Steer around**. `docs/questions-yeast.txt` holds the eleven for `pnpm ask:batch`.
+  `docs/DEMO-YEAST.md` and `DEMO-PHASE7.md` are folded into it and gone.
 - **The key in a cloud session** arrives as `OPENFERMENT_API_KEY`, and
   `scripts/session-start.sh` writes it to `core/.env`. Leave `ANTHROPIC_API_KEY` unset in the
   session's environment: Claude Code reads that name for its own sign-in. The key never
@@ -39,10 +51,10 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
 - **Data from live runs** travels on the branch `openferment-data` (`pnpm data:push`,
   `pnpm data:pull`). Fetched full text, the audit log and the proposals stay on the machine.
 - **Stop conditions**: verify red for a cause outside the step; a fact the prompt states
-  turns out false when measured; a write tool that would reach a store with no write function
-  and no clean refusal; a key that could reach a response, a log, the browser or git; a
-  change that would let a second account read the owner's conversations with no visibility
-  check in the way.
+  turns out false when measured (the tree wins, and the report says so); a write tool that
+  would reach a store with no write function and no clean refusal; a key that could reach a
+  response, a log, the browser or git; a change that would let a second account read the
+  owner's conversations with no visibility check in the way; a deletion of the kinds above.
 
 ## The map is closed
 
@@ -494,6 +506,17 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   a whole sentence or table row of the passage, or a run of them, word for
   word after `normalize_text`; anything else zeroes the grade and is
   counted, never repaired, cache included.
+- **The scorecard is measured on thread Q, and the lane is held on
+  hybrid.** `rageval --thread` narrows the questions to one thread's papers
+  while every search still runs over the whole index
+  (`pnpm rag:questions --n 100 --thread Q` keeps `questions-Q.jsonl` beside
+  the old set). On 2026-10-20 the rule chose `bm25+rerank` (0.5942 against
+  hybrid's 0.4587), and search stays on `hybrid`: `core/data/index/config.json`
+  keeps it, because each reranked search is a model call of about twenty
+  seconds. `GET /api/rag/report` fills `laneInUse` from `config.json`, and
+  Witness → Retrieval names both the lane in use and the rule's choice. To
+  adopt the rule's lane, copy the `lane` the report names into
+  `config.json` on the Mini.
 - **The default lane is chosen by a number.** `rageval.choose_lane`: mean
   nDCG@10 on K and S; `bm25` holds until a lane scores higher, and a lane
   that calls a model per question must lead the best free lane by 0.02. K is
@@ -560,7 +583,8 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   the code, and the smoke and golden path watch the panel draw it.
 - **`pnpm ask:batch <file>`** asks a file of questions through the loop and
   keeps each plan under `core/data/live/` (on the data branch);
-  `docs/build/questions-pha.txt` holds Appendix 4's ten.
+  `docs/build/questions-pha.txt` holds OF-BLD-014 Appendix 4's ten (PHA,
+  archived), and `docs/questions-yeast.txt` the run sheet's eleven.
 
 ## Postdoc reaches every module (OF-BLD-015 Phase 7)
 
@@ -944,8 +968,11 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
 - OF-BLD specs arrive as files at repo root for the session (`OF-BLD-0NN.md`,
   `PROMPT.md`) and are deleted before the final commit of that session; they
   live in Notion. Never commit them.
+- `docs/DEMO.md` — the one run sheet. `docs/TOOLS.md` — the tool registry,
+  the gates, the program switch and the proposal rules.
 - A build's own document is the exception, for the length of its build
-  (OF-BLD-014's decision D1, kept by OF-BLD-015): `docs/build/` holds it on
-  the work branch, and the closing truth pass deletes the folder. OF-BLD-014's
-  `docs/build/OF-BLD-014.md` and `PROMPT.md` are still on `main`, its §10.4
-  having been left undone; the OF-BLD-015 truth pass removes them with its own.
+  (OF-BLD-014's decision D1, kept by OF-BLD-015 and OF-BLD-016):
+  `docs/build/` holds OF-BLD-014's, OF-BLD-015 Phase 7's and OF-BLD-016's
+  documents and prompts on the work branch, and OF-BLD-015's closing truth
+  pass deletes the folder. OF-BLD-014's `docs/build/OF-BLD-014.md` and
+  `PROMPT.md` are still on `main`, its §10.4 having been left undone.
