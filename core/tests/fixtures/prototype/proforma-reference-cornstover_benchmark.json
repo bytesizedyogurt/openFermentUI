@@ -117,7 +117,7 @@
           "product.price": 0.5,
           "tea.sales": 69600000.0,
           "tea.material_cost": 52800000.0,
-          "tea.installed_equipment_cost": 33600000.0,
+          "tea.installed_equipment_cost": 50400000.0,
           "tea.utility_cost": 7200000.0,
           "units.get_heating_duty()": 9.0,
           "units.get_cooling_duty()": 13.0,
@@ -140,9 +140,9 @@
           "otherMaterialCost": 4800000.0,
           "utilityCost": 7200000.0,
           "purchaseCost": 16800000.0,
-          "installedEquipmentCost": 33600000.0,
-          "FCI": 33600000.0,
-          "TCI": 33600000.0,
+          "installedEquipmentCost": 50400000.0,
+          "FCI": 50400000.0,
+          "TCI": 50400000.0,
           "FOC": 4000000.0,
           "laborCost": 2000000.0,
           "capitalRecovery": 5600000.0,
@@ -483,10 +483,10 @@
             "expression": "tea.installed_equipment_cost",
             "label": "installed equipment cost",
             "unit": "USD",
-            "measured": 33600000.0,
+            "measured": 50400000.0,
             "package": 209112840.52373964,
             "rtol": 0.05,
-            "relDiff": 0.8393212013387311,
+            "relDiff": 0.7589818020080966,
             "within": false
           },
           {
@@ -541,7 +541,7 @@
           }
         ]
       },
-      "outputHash": "6ba3d5b86aa1cf0fa1421f5f51d2b070c217103a318a3d59277db7c6c119a743",
+      "outputHash": "bfaf4a7f52c3448aeb02557d5efcaddd880608a38ee54fca4fc64f1ffab4401e",
       "provenance": "computed",
       "createdAt": "2026-09-15T09:00:00Z",
       "durationMs": 0,

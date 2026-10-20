@@ -717,5 +717,137 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('fermOS \u2192 Forecast sends a fit to Proforma', /Send to Proforma/.test(forecastPage) && /sendFitPath/.test(forecastPage));
 }
 
+// OF-BLD-019 \u00a73.R \u2014 the Phase 3 review's findings, each held here where a
+// pure function or the page's source can hold it (the smoke holds the
+// pages). Namespace imports, so a function a finding needs and the tree
+// lacks fails its own check rather than the whole script.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const pb = (await import('../src/screens/ProformaBiosteam')) as unknown as Record<string, any>;
+  const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../core/tests/fixtures/prototype/${name}`, import.meta.url), 'utf8')).response;
+  const shelf = fixture('proforma-shelf.json') as { id: string; reference: boolean; inputs: { key: string; name: string; unit: string }[] }[];
+  const ethanol = shelf.find((f) => f.id === 'ethanol_glucose_v0')!;
+  const corn = shelf.find((f) => f.id === 'corn_drygrind')!;
+  const bound = (fixture('proforma-scenarios.json') as any[]).find((s) => s.id === 'sc-yeast-1');
+  const call = (fn: string, ...args: unknown[]) => {
+    try {
+      return typeof pf[fn] === 'function' ? pf[fn](...args) : typeof pb[fn] === 'function' ? pb[fn](...args) : undefined;
+    } catch (e) {
+      return `threw ${String(e)}`;
+    }
+  };
+
+  // (5, high) The yeast page asks its own flowsheet's questions: with titre
+  // and yield waiting, no question and no line of the exported text is PHA's.
+  const waiting = { ...bound, inputs: bound.inputs.map((i: any) => (['titre', 'yield'].includes(i.key) ? { ...i, binding: 'waiting', records: [], value: null } : i)) };
+  const qs = (call('modellerQuestions', waiting.inputs, null, 'ethanol_glucose_v0') ?? []) as { key: string; question: string }[];
+  const text = String(call('questionsText', waiting, null) ?? '');
+  check('the yeast scenario\u2019s questions for a process modeller are its own flowsheet\u2019s, never PHA\u2019s fixed words',
+    qs.some((q) => q.key === 'titre') && qs.some((q) => q.key === 'yield') && !qs.some((q) => /PHA|hydrolysate/.test(q.question)) && !/PHA|hydrolysate/.test(text) && /titre/.test(text),
+    qs.map((q) => q.question));
+  const phaQs = (call('modellerQuestions', [{ key: 'titre', label: 'PHA titre at harvest', binding: 'waiting' }], null, 'pha_sugar_v0') ?? []) as { question: string }[];
+  check('the PHA draft keeps its own questions', /PHA titre/.test(phaQs[0]?.question ?? ''), phaQs);
+
+  // (6, high; 20) What a run read back is credited to whoever set it: on
+  // the ethanol flowsheet the glucose and water fed, the conversion and the
+  // batch time follow from the records and the person's assumptions, never
+  // from the reference model; on a reference plant every value is the
+  // package's own default, named and in its unit, as the shelf lists it.
+  const rb = (call('readBackRows', { glucoseFedKgPerH: 1, waterFedKgPerH: 2, fermenterConversion: 0.5, batchTimeH: 3, rateOfReturn: 0.1, somethingNew: 4 }, ethanol) ?? []) as {
+    key: string;
+    origin: string;
+    label: string;
+    unit: string;
+  }[];
+  const origin = (k: string) => rb.find((r) => r.key === k)?.origin;
+  check('what the case gave from its inputs is never credited to the reference model',
+    ['glucoseFedKgPerH', 'waterFedKgPerH', 'fermenterConversion', 'batchTimeH'].every((k) => origin(k) === 'case') && origin('rateOfReturn') === 'setting' && origin('somethingNew') === 'read', rb);
+  const biosteamSrc = readFileSync(new URL('../src/screens/ProformaBiosteam.tsx', import.meta.url), 'utf8');
+  check('no read-back heading credits the reference model with a value a person or a record set', !/What the reference model supplied/.test(biosteamSrc));
+  const cornRb = (call('readBackRows', { cornFeed: 46380, depreciation: 'MACRS7' }, corn) ?? []) as { key: string; origin: string; label: string; unit: string }[];
+  const cornFeed = cornRb.find((r) => r.key === 'cornFeed');
+  check('a reference plant\u2019s read-back names each default and its unit, as the shelf lists it, and credits the package',
+    cornFeed?.label === 'corn fed' && cornFeed?.unit === 'kg h-1' && cornRb.every((r) => r.origin === 'setting'), cornRb);
+
+  // (27) The left-out line names the flowsheet's own feed.
+  const left = String(call('leftOutWords', { leftOutNoCarbon: 14, leftOutOtherCarbon: 2 }, 'ethanol_glucose_v0') ?? '');
+  check('the ethanol inputs\u2019 left-out line names glucose, not the PHA rule\u2019s sugar or hydrolysate',
+    /glucose/.test(left) && !/hydrolysate/.test(left) && /a sugar or a hydrolysate/.test(String(call('leftOutWords', { leftOutNoCarbon: 1, leftOutOtherCarbon: 1 }, 'pha_sugar_v0') ?? '')), left);
+
+  // (3) A flowsheet with a program files its scenario there and nowhere else.
+  check('New scenario offers only the flowsheet\u2019s own program when it has one',
+    JSON.stringify(call('programsFor', { program: 'pha' }, ['yeast', 'casein', 'pha'])) === '["pha"]' &&
+      JSON.stringify(call('programsFor', { program: null }, ['yeast', 'casein'])) === '["yeast","casein"]');
+
+  // (4) A time the service wrote in UTC says so.
+  check('a run\u2019s time says it is UTC', call('stamp', '2026-10-21T01:00:00Z') === '2026-10-21 01:00 UTC', call('stamp', '2026-10-21T01:00:00Z'));
+  for (const f of ['Proforma.tsx', 'ProformaBiosteam.tsx', 'ProformaReference.tsx', 'Compare.tsx', 'ProformaScenario.tsx']) {
+    const src = readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8');
+    check(`${f} cuts no UTC time to a bare minute or date`, !/replace\('T', ' '\)\.slice\(0, 16\)|createdAt\.slice\(0, 10\)/.test(src));
+  }
+
+  // (12) A table's CSV carries the run's numbers, not the screen's strings.
+  const yeastArt = (fixture('artifacts.json') as any[]).find((a) => a.tool === 'proforma.run' && a.output?.flowsheet === 'ethanol_glucose_v0');
+  const view = pf.runViewOfArtifact(yeastArt);
+  const st = call('streamsTable', view) as { headers: string[]; rows: unknown[][]; csv?: unknown[][] } | undefined;
+  const csv = st?.csv ?? st?.rows ?? [];
+  const numericCols = [4, 5, 6, 8];
+  check('the streams CSV carries the run\u2019s numbers, each column parsing as a number where the run holds one',
+    csv.length === view.tables.streams.length &&
+      csv.every((r, i) => numericCols.every((c) => {
+        const raw = [view.tables.streams[i].T, view.tables.streams[i].P, view.tables.streams[i].massFlow, null, view.tables.streams[i].price][[4, 5, 6, 7, 8].indexOf(c)];
+        return raw == null ? r[c] === '' : Number(r[c]) === raw;
+      })),
+    csv[0]);
+  const eq = call('equipmentTable', view) as { csv?: unknown[][] } | undefined;
+  check('the equipment CSV carries the run\u2019s numbers', !!eq?.csv && eq.csv.every((r, i) => {
+    const u = [...view.tables.units].sort((a: any, b: any) => a.order - b.order)[i];
+    return (u.installedCost == null ? r[3] === '' : Number(r[3]) === u.installedCost) && (u.power == null ? r[7] === '' : Number(r[7]) === u.power);
+  }));
+
+  // (10) The cost breakdown's note puts sales in its annual unit beside the one-off capital sums.
+  const note = String(call('costBreakdownNote', view) ?? '');
+  check('the cost breakdown\u2019s note gives sales a year and capital once', /sales [\d,.]+ USD\/yr/.test(note) && /total capital [\d,.]+ USD\b/.test(note), note);
+
+  // (11) An infeasible base case's empty breakdown says why, not "run it again".
+  const empty = call('costBreakdownEmpty', { ...view, basePrice: null, baseInfeasible: 'Infeasible: this yield is above the theoretical yield', tables: { ...view.tables, tea: null } }) as { what: string; where: string } | undefined;
+  check('an infeasible base case\u2019s empty breakdown names the base case, not a rerun',
+    !!empty && /base case could not run/.test(`${empty.what} ${empty.where}`) && !/run the scenario again/.test(`${empty.what} ${empty.where}`), empty);
+
+  // (28) The sliders' cost lines, split as the flowsheet splits its grid,
+  // take no word the TEA breakdown above uses for another quantity.
+  const teaLabels = new Set((view.tables.tea?.lines ?? []).map((l: { label: string }) => l.label));
+  const sliderLabels = Object.values((pb.SLIDER_LINE_LABEL ?? {}) as Record<string, string>);
+  check('the sliders’ cost lines share no label with the TEA breakdown’s lines',
+    sliderLabels.length === 6 && teaLabels.size > 0 && !sliderLabels.some((l) => teaLabels.has(l)) && !sliderLabels.includes('Utilities'), { sliderLabels, tea: [...teaLabels] });
+
+  // (2) Home's pinned card reads what is pinned: Cost model v0 for the
+  // authored surfaces alone, and no modeled tick for a BioSTEAM scenario.
+  const yeastSc = useStore.getState().scenarios.find((s) => s.id === 'sc-yeast-1')!;
+  const s1 = useStore.getState().scenarios.find((s) => s.id === 'sc-s1')!;
+  const card = call('pinnedCard', [yeastSc]) as { prov: string | null; words: string } | undefined;
+  const authored = call('pinnedCard', [s1]) as { prov: string | null; words: string } | undefined;
+  check('Home\u2019s pinned card says Cost model v0 for an authored surface alone, and puts no modeled tick on a BioSTEAM scenario',
+    !!card && card.prov === null && !/Cost model v0/.test(card.words) && authored?.prov === 'demo' && /Cost model v0/.test(authored.words), { card, authored });
+  const home = readFileSync(new URL('../src/screens/Home.tsx', import.meta.url), 'utf8');
+  check('Home\u2019s pinned card is drawn from pinnedCard', /pinnedCard\(/.test(home) && !/pinned \u2014 open the\s+comparison\. Cost model v0/.test(home));
+
+  // (26) New scenario is never disabled, in any spelling: the header button
+  // and the empty state's.
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  // An opening tag, its attributes' braces read whole (an arrow's `>` is not the tag's end).
+  const header = /<Button\b(?:[^>{]|\{[^}]*\})*data-testid="new-scenario"(?:[^>{]|\{[^}]*\})*>/.exec(index)?.[0] ?? '';
+  const emptyAction = /action=\{\s*<Button\b(?:[^>{]|\{[^}]*\})*>/.exec(index)?.[0] ?? '';
+  check('New scenario, on the header and in the empty state, carries no disabled attribute in any spelling',
+    !!header && !!emptyAction && !/\bdisabled\b/.test(header) && !/\bdisabled\b/.test(emptyAction), { header, emptyAction });
+
+  // (21, 8) A run the service holds for a scenario is found by the page, the
+  // index card and Compare, not only the one this browser kept.
+  for (const f of ['ProformaScenario.tsx', 'Proforma.tsx', 'Compare.tsx']) {
+    const src = readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8');
+    check(`${f} asks the service for a scenario\u2019s newest run`, /proformaNewestRun\(/.test(src));
+  }
+})();
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

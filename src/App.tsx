@@ -196,7 +196,10 @@ function Screen() {
       // OF-BLD-019 §3.3 — 'reference' is a reserved second segment: a
       // reference biorefinery's page by its shelf id; with no id, the index,
       // whose Reference runs row lists them.
-      if (b === 'reference') return c ? <ProformaReference flowsheetId={c} /> : <Proforma />;
+      // Keyed by id (OF-BLD-019 §3.R, findings 13, 24): a run still in flight
+      // when the reader moves to the other reference lands on the page that
+      // asked, never on this one.
+      if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
       return <Proforma />;
     case 'runbooks':
       // 'protocols' and 'depositions' are reserved second segments. Runbook ids

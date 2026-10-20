@@ -1065,6 +1065,13 @@ def _standin_reference(flowsheet: str) -> dict[str, Any]:
                       "installedCost": installed, "purchaseCost": installed / 2.0,
                       "heatingDuty": heat, "coolingDuty": cool, "power": kw})
     installed_total = sum(u["installedCost"] for u in units)
+    # The TEA prices installation on the purchase costs as a whole, with a
+    # STAND-IN Lang factor, as the corn plant's TEA does with its own: so the
+    # TEA's installed equipment cost is not the sum of the units' (OF-BLD-019
+    # §3.R, finding 19), and a page that summed the units would show another
+    # number than the TEA's.
+    lang = 3.0
+    tea_installed = installed_total / 2.0 * lang
     sales = product * price * hours + credit * hours
     heating = sum(u["heatingDuty"] or 0.0 for u in units) / 1e6
     cooling = sum(u["coolingDuty"] or 0.0 for u in units) / 1e6
@@ -1074,15 +1081,15 @@ def _standin_reference(flowsheet: str) -> dict[str, Any]:
         "basis": "kg of the STAND-IN product", "operatingHours": hours, "sales": sales,
         "materialCost": annual["feedstock"] + annual["otherMaterials"], "feedstockCost": annual["feedstock"],
         "otherMaterialCost": annual["otherMaterials"], "utilityCost": annual["utilities"],
-        "purchaseCost": installed_total / 2.0, "installedEquipmentCost": installed_total, "FCI": installed_total,
-        "TCI": installed_total, "FOC": annual["fixedOperating"], "laborCost": annual["fixedOperating"] / 2.0,
+        "purchaseCost": installed_total / 2.0, "installedEquipmentCost": tea_installed, "FCI": tea_installed,
+        "TCI": tea_installed, "FOC": annual["fixedOperating"], "laborCost": annual["fixedOperating"] / 2.0,
         "capitalRecovery": annual["capitalRecovery"], "coproductCredits": credit * hours, "IRR": 0.1, "incomeTax": None,
         "lines": [{"key": k, "label": words[k], "usdPerYear": a, "perUnit": a / (product * hours), "reads": PROFORMA_STANDIN}
                   for k, a in annual.items()],
     }
     measured = {
         "tea.IRR": tea["IRR"], "feedstock.price": feed_price, "product.price": price, "tea.sales": sales,
-        "tea.material_cost": tea["materialCost"], "tea.installed_equipment_cost": installed_total,
+        "tea.material_cost": tea["materialCost"], "tea.installed_equipment_cost": tea_installed,
         "tea.utility_cost": tea["utilityCost"], "units.get_heating_duty()": heating, "units.get_cooling_duty()": cooling,
         "units.get_electricity_consumption()": power, "units.get_electricity_production()": 0.0,
     }
@@ -1092,7 +1099,7 @@ def _standin_reference(flowsheet: str) -> dict[str, Any]:
         outputs = {"mespUsdPerGal": price * 3.0, "mespUsdPerKg": price, "ethanolDensityKgPerGal": 3.0,
                    "settings": {"rateOfReturn": 0.1, "operatingDays": hours / 24.0, "incomeTax": 0.35,
                                 "startYear": 2007, "endYear": 2037}}
-    read_back = {i.key: ("STAND-IN" if i.dimension == "schedule" else 1.0) for i in info.inputs}
+    read_back = {i.key: ("STAND-IN" if i.dimension == "schedule" else lang if i.key == "langFactor" else 1.0) for i in info.inputs}
     return {
         "flowsheet": flowsheet, "simulator": PROFORMA_STANDIN, "package": f"STAND-IN for {flowsheet}",
         **outputs, "references": [PROFORMA_STANDIN], "measured": measured, "readBack": read_back,

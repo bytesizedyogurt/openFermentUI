@@ -36,13 +36,16 @@ import { PageHeader, Card, Button, EmptyState, Callout, cx } from '@/components/
 import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
-import { cell, inputLabels } from '@/screens/ProformaBiosteam';
+import { cell } from '@/screens/ProformaBiosteam';
 import {
   ProformaDown,
+  newestRunId,
   proformaArtifact,
+  proformaNewestRun,
   proformaShelf,
   runInputs,
   runViewOfArtifact,
+  stamp,
   viewPrice,
   type RunInput,
   type RunView,
@@ -156,7 +159,7 @@ export default function Compare() {
 // ── BioSTEAM scenarios, from their newest runs ──────────────────────────
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
-const when = (iso: string | null) => (iso ? iso.replace('T', ' ').slice(0, 16) : '');
+const when = (iso: string | null) => (iso ? stamp(iso) : '');
 
 interface Column {
   scenario: Scenario;
@@ -165,6 +168,8 @@ interface Column {
   runId: string | null;
   view: RunView | null;
   problem: string | null;
+  /** Whether the service has answered for this scenario's newest run. */
+  asked: boolean;
 }
 
 /** An input's source in words, with its range, as the run's basis states it. */
@@ -188,7 +193,22 @@ export function inputWords(i: RunInput): string {
 function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
   const [shelf, setShelf] = useState<FlowsheetInfo[]>([]);
   const [arts, setArts] = useState<Record<string, Artifact | string>>({});
-  const runIds = scenarios.map((s) => s.lastRunId ?? '').join('|');
+  // Each scenario's newest run on the service (§3.R, findings 8 and 21): a
+  // run made in another browser, by the API or by Postdoc is compared too;
+  // the run this browser kept stands in only where the service holds none.
+  const [served, setServed] = useState<Record<string, Artifact | null>>({});
+  const scenarioIds = scenarios.map((s) => s.id).join('|');
+  useEffect(() => {
+    const ctrl = new AbortController();
+    for (const id of scenarioIds.split('|').filter(Boolean)) {
+      proformaNewestRun(id, ctrl.signal)
+        .then((art) => setServed((m) => ({ ...m, [id]: art })))
+        .catch(() => !ctrl.signal.aborted && setServed((m) => ({ ...m, [id]: null })));
+    }
+    return () => ctrl.abort();
+  }, [scenarioIds]);
+  const runIdOf = (s: Scenario) => newestRunId(served[s.id], s.lastRunId);
+  const runIds = scenarios.map((s) => (served[s.id] ? '' : (s.lastRunId ?? ''))).join('|');
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -215,18 +235,30 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
 
   const columns: Column[] = scenarios.map((scenario) => {
     const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
-    const runId = scenario.lastRunId ?? null;
-    const got = runId ? arts[runId] : undefined;
+    const runId = runIdOf(scenario);
+    const got = served[scenario.id] ?? (runId ? arts[runId] : undefined);
     const art = got && typeof got !== 'string' ? got : null;
     const view = art ? runViewOfArtifact(art) : null;
     const problem = typeof got === 'string' ? got : art && !view ? `${runId} is not a scenario run: it was kept by ${art.tool}.` : null;
-    return { scenario, flowsheetId, flowsheet: shelf.find((f) => f.id === flowsheetId) ?? null, runId, view, problem };
+    return { scenario, flowsheetId, flowsheet: shelf.find((f) => f.id === flowsheetId) ?? null, runId, view, problem, asked: scenario.id in served };
   });
 
   const flowsheets = [...new Set(columns.map((c) => c.flowsheetId))];
   const basisOf = (c: Column) => c.flowsheet?.priceBasis ?? 'on the basis its flowsheet states';
-  const labels = Object.assign({}, ...columns.map((c) => inputLabels(null, c.flowsheet)));
-  const inputsOf = (c: Column) => (c.view ? runInputs(c.view, c.flowsheet, labels) : []);
+  // Each column's inputs carry its own flowsheet's names (§3.R, finding 16):
+  // two flowsheets share keys (titre, yield, productivity), so with more
+  // than one flowsheet a row is the key, and each cell names its input.
+  const several = flowsheets.length > 1;
+  const inputsOf = (c: Column) => (c.view ? runInputs(c.view, c.flowsheet) : []);
+  const rowLabel = (k: string) => {
+    if (several) return k;
+    for (const c of columns) {
+      const named = c.flowsheet?.inputs.find((i) => i.key === k)?.name ?? inputsOf(c).find((i) => i.key === k)?.label;
+      if (named) return named;
+    }
+    return k;
+  };
+  const cellWords = (i: RunInput) => (several ? `${i.label}: ${inputWords(i)}` : inputWords(i));
   const inputKeys = [...new Set(columns.flatMap((c) => [...(c.flowsheet?.inputs.map((i) => i.key) ?? []), ...inputsOf(c).map((i) => i.key)]))];
   const lineKeys: { key: string; label: string }[] = [];
   for (const c of columns)
@@ -248,7 +280,7 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
       ['Price, 95th percentile', ...columns.map((c) => priceCell(c)?.high ?? '')],
       ...lineKeys.map((l) => [`${l.label} (per unit of the price's basis)`, ...columns.map((c) => lineOf(c, l.key)?.perUnit ?? '')]),
       ['Base-case price', ...columns.map((c) => c.view?.basePrice ?? '')],
-      ...inputKeys.map((k) => [`Input: ${labels[k] ?? k}`, ...columns.map((c) => (c.view ? inputWords(inputOf(c, k) ?? { key: k, label: k, kind: 'absent', unit: '', count: 0, low: null, high: null, value: null, by: null, note: null }) : ''))]),
+      ...inputKeys.map((k) => [`Input: ${rowLabel(k)}`, ...columns.map((c) => (c.view ? cellWords(inputOf(c, k) ?? { key: k, label: k, kind: 'absent', unit: '', count: 0, low: null, high: null, value: null, by: null, note: null }) : ''))]),
     ];
     exportCSV('biosteam-comparison.csv', headers, rows);
   };
@@ -310,7 +342,9 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
               <td className={cx(td, 'text-caption text-ink-soft')}>Newest run</td>
               {columns.map((c) => (
                 <td key={c.scenario.id} className={cx(td, 'text-caption')}>
-                  {!c.runId ? (
+                  {!c.runId && !c.asked ? (
+                    <span className="text-ink-soft">Asking the service for its newest run…</span>
+                  ) : !c.runId ? (
                     <span data-testid="compare-not-run">
                       Not run yet.{' '}
                       <a className="text-accent hover:underline" href={href(`/proforma/scenario/${c.scenario.id}`)}>
@@ -409,12 +443,12 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
             </tr>
             {inputKeys.map((k) => (
               <tr key={k} className="border-b border-line/60" data-testid="compare-input-row" data-input={k}>
-                <td className={cx(td, 'text-caption')}>{labels[k] ?? k}</td>
+                <td className={cx(td, 'text-caption', several && 'font-num')}>{rowLabel(k)}</td>
                 {columns.map((c) => {
                   const i = inputOf(c, k);
                   return (
                     <td key={c.scenario.id} className={cx(td, 'text-caption')} data-kind={i?.kind ?? 'none'}>
-                      {!c.view ? '—' : i ? inputWords(i) : <span className="text-ink-soft">not an input of this flowsheet</span>}
+                      {!c.view ? '—' : i ? cellWords(i) : <span className="text-ink-soft">not an input of this flowsheet</span>}
                     </td>
                   );
                 })}

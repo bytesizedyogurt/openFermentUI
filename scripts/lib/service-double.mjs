@@ -136,6 +136,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
   const proformaReferences = [];
+  /**
+   * The runs this double holds, by scenario id: the artifact id of the run a
+   * POST /api/proforma/run answered, as the service keeps every run it made
+   * (OF-BLD-019 §3.R). A test may set or clear it, as a service with runs on
+   * file or a fresh one.
+   */
+  const proformaRunsOnFile = new Map();
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
   const thermoKept = new Map();
   const thermoCalls = [];
@@ -511,8 +518,24 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
       if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
       const run = await prototype(name);
+      proformaRunsOnFile.set(asked.scenarioId, run.artifactId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(bySeed[asked.scenarioId] ? run : { ...run, scenarioId: asked.scenarioId }));
+    }
+    // OF-BLD-019 §3.R — a scenario's newest run on the service: the artifact
+    // of the run this double answered for it (from artifacts.json, as the
+    // artifact store answers it by id), or none; a blank id is the service's
+    // 422 in words.
+    if (url === '/api/proforma/runs' && req.method === 'GET') {
+      const sid = (new URL(req.url ?? '/', 'http://double').searchParams.get('scenarioId') ?? '').trim();
+      if (!sid) {
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: "a read of a scenario's runs names the scenario it belongs to" }));
+      }
+      const id = proformaRunsOnFile.get(sid);
+      const artifact = id ? ((await prototype('artifacts.json')).find((a) => a.id === id) ?? null) : null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ scenarioId: sid, artifact }));
     }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
@@ -605,5 +628,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proposalActs, thermoCalls, ceilingChecks, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, flags } };
 }

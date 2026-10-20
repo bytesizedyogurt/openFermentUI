@@ -20,7 +20,7 @@ import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { activePrograms, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Modal } from './ui';
-import { ProformaDown, defaultProgram, proformaShelf, sendFitPath } from '@/lib/proforma';
+import { ProformaDown, defaultProgram, programsFor, proformaShelf, sendFitPath } from '@/lib/proforma';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
 export function NoFlowsheetLine({ showArchived }: { showArchived: boolean }) {
@@ -102,6 +102,12 @@ export function NewScenarioDialog({
     [showArchived],
   );
   const flowsheet = choices.find((f) => f.id === chosen) ?? (choices.length === 1 ? choices[0] : null);
+  // A flowsheet that belongs to a program files its scenarios there alone
+  // (OF-BLD-019 §3.R, finding 3); a general one under any program offered.
+  const fileable = useMemo(() => {
+    const ids = programsFor(flowsheet, offered.map((p) => p.id));
+    return offered.filter((p) => ids.includes(p.id));
+  }, [flowsheet, offered]);
 
   // The name follows the flowsheet until a person types one; the program is
   // the flowsheet's own when it is offered, else the active program.
@@ -114,7 +120,7 @@ export function NewScenarioDialog({
 
   const create = () => {
     if (!flowsheet || !name.trim()) return;
-    const id = createScenario(flowsheet.id, name, program);
+    const id = createScenario(flowsheet.id, name, fileable.some((p) => p.id === program) ? program : (fileable[0]?.id ?? program));
     onClose();
     navigate(attachFit ? sendFitPath(id, attachFit) : `/proforma/scenario/${id}`);
     toast({ text: `Scenario made on ${flowsheet.title}; it has not run yet`, kind: 'success' });
@@ -200,7 +206,7 @@ export function NewScenarioDialog({
                   value={program ?? ''}
                   onChange={(e) => setProgram((e.target.value || null) as ProgramId | null)}
                 >
-                  {offered.map((p) => (
+                  {fileable.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                       {p.status === 'archived' ? ' (archived)' : ''}

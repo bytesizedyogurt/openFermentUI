@@ -1,0 +1,82 @@
+"""A scenario's newest run on the service (OF-BLD-019 §3.R, findings 8 and
+21): `GET /api/proforma/runs?scenarioId=` answers the newest stored
+`proforma.run` whose basis names the scenario, or none, so Proforma's page,
+its index card and Compare find a run made from another browser, by
+Postdoc's run_flowsheet or by the API, as pureOS and selling_price do.
+
+Every record and assumption here is a FIXTURE written in the test; the runs
+go through the real binding and artifact code over demo.py's closed-form
+STAND-IN evaluator, with no simulator.
+"""
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from openferment_core import artifacts, demo, intake, proforma
+from openferment_core.models import InputAssumption, ProformaRunRequest
+
+ETHANOL = "ethanol_glucose_v0"
+BY = "openFerment test fixture"
+MADE_HERE = "sc-k3x9q-1"  # an id as the browser's createScenario makes them
+
+
+@pytest.fixture()
+def standin(monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(proforma, "call", demo._standin_call)
+    monkeypatch.setattr(proforma, "yield_cap", lambda: None)
+    rs = demo._standin_records() + demo._standin_yeast_records()
+    return SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+
+
+@pytest.fixture()
+def client(monkeypatch, standin):
+    from openferment_core import api, evidence_pool
+
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: standin)
+    return TestClient(api.app, base_url="http://127.0.0.1")
+
+
+def assume(key, value, low=None, high=None):
+    return InputAssumption(key=key, value=value, low=value if low is None else low, high=value if high is None else high,
+                           by=BY, at="2026-10-20", note="a STAND-IN for a test")
+
+
+ASSUMED = [assume("plant_scale", 100000.0), assume("glucose_price", 0.4, 0.3, 0.5)]
+
+
+def test_a_scenario_with_no_run_on_the_service_reads_as_none(client):
+    r = client.get("/api/proforma/runs?scenarioId=sc-yeast-1")
+    assert r.status_code == 200 and r.json() == {"scenarioId": "sc-yeast-1", "artifact": None}
+    # A read: it starts no simulator.
+    assert proforma.status()["status"] in ("cold", "failed")
+
+
+def test_the_newest_run_of_each_scenario_is_found_by_the_scenario_its_basis_names(client, standin):
+    seeded = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=ASSUMED, samples=8), pool=standin)
+    made = proforma.run(ProformaRunRequest(scenarioId=MADE_HERE, flowsheet=ETHANOL, assumptions=ASSUMED, samples=8),
+                        pool=standin)
+    got = client.get("/api/proforma/runs?scenarioId=sc-yeast-1").json()
+    assert got["scenarioId"] == "sc-yeast-1" and got["artifact"]["id"] == seeded.artifactId
+    assert got["artifact"]["tool"] == proforma.RUN
+    assert [i["value"] for i in got["artifact"]["inputs"] if i["name"] == "scenario"] == ["sc-yeast-1"]
+    assert client.get(f"/api/proforma/runs?scenarioId={MADE_HERE}").json()["artifact"]["id"] == made.artifactId
+    # The answer is the artifact as the store keeps it, the one pureOS and selling_price read.
+    assert got["artifact"] == artifacts.get(seeded.artifactId).model_dump(mode="json")
+    assert proforma.latest_run("sc-yeast-1").id == seeded.artifactId
+    # A newer run of the same scenario is the one answered.
+    newer = proforma.run(ProformaRunRequest(scenarioId="sc-yeast-1", assumptions=[assume("plant_scale", 200000.0),
+                                                                                    ASSUMED[1]], samples=8), pool=standin)
+    assert newer.artifactId != seeded.artifactId
+    assert client.get("/api/proforma/runs?scenarioId=sc-yeast-1").json()["artifact"]["id"] == newer.artifactId
+    # Another scenario's run is never answered for this one.
+    assert client.get("/api/proforma/runs?scenarioId=sc-pha-1").json()["artifact"] is None
+
+
+def test_a_blank_scenario_is_refused_in_words(client):
+    r = client.get("/api/proforma/runs?scenarioId=%20")
+    assert r.status_code == 422 and "names the scenario" in r.json()["detail"]
+    assert client.get("/api/proforma/runs").status_code == 422

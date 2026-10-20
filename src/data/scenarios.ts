@@ -271,7 +271,7 @@ export const SCENARIOS: Scenario[] = [
     kind: 'biosteam',
     name: 'Glucose to ethanol — draft flowsheet',
     description:
-      "A BioSTEAM flowsheet of our own: a batch fermenter feeding the ethanol purification train of the reference designs. Titre, yield, productivity and the glucose in the feed bind to thread Q records; the price of glucose and the plant's size wait for a named person's assumption.",
+      "A BioSTEAM flowsheet of our own: a batch fermenter feeding the ethanol purification train of the reference designs. The price of glucose and the plant's size are a named person's assumptions by design; the inputs table says which process inputs the service bound to thread Q records on this machine.",
     product: 'Fuel-grade ethanol',
     dims: [],
     point: {},

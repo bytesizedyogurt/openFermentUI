@@ -43,15 +43,20 @@ import { NewScenarioDialog, NoFlowsheetLine, inputSourceWords } from '@/componen
 import {
   BENCHMARK_EXPECTED,
   BENCHMARK_FLOWSHEET,
+  LEGACY_BENCHMARK_TOOL,
   ProformaDown,
   SIMULATOR_SAYS,
   type BenchmarkOutput,
   type PriceRead,
   type ReferenceResponse,
   inputCounts,
+  newestRunId,
   proformaArtifact,
   proformaBind,
+  proformaNewestRun,
   proformaReference,
+  referenceChecks,
+  stamp,
   referencePath,
   proformaScenarios,
   proformaShelf,
@@ -62,8 +67,8 @@ import {
 
 const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
-/** When an artifact was computed, as a date and a minute. */
-const when = (iso: string) => iso.replace('T', ' ').slice(0, 16);
+/** When an artifact was computed, as a date and a minute, in UTC as the service writes it (§3.R, finding 4). */
+const when = stamp;
 
 const programName = (id: string | null | undefined) => (id ? (PROGRAM_BY_ID[id as keyof typeof PROGRAM_BY_ID]?.name ?? id) : null);
 
@@ -114,6 +119,12 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
   const price = art ? referencePrice(info, art) : null;
   const isBenchmark = info.id === BENCHMARK_FLOWSHEET;
   const bench = isBenchmark && art ? (art.output as unknown as BenchmarkOutput) : null;
+  // The benchmark kept before reference runs held their tables (§3.R,
+  // findings 0, 15, 22): its price, said to be what it is.
+  const legacy = art?.tool === LEGACY_BENCHMARK_TOOL;
+  // How many of the package test's values this run holds (§3.R, finding 30).
+  const checks = referenceChecks(art);
+  const within = checks.filter((c) => c.within).length;
   return (
     <Card className="p-4 flex flex-col" data-testid="reference-card" data-flowsheet={info.id}>
       <div className="flex items-start justify-between gap-2 mb-1">
@@ -156,9 +167,21 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
           ) : (
             <p className="text-body text-ink-soft">The run holds no price the shelf names for this flowsheet.</p>
           )}
+          {legacy && state?.note && (
+            <p className="text-caption text-ink-soft" data-testid="reference-legacy">
+              {state.note}
+            </p>
+          )}
+          {checks.length > 0 && (
+            <p className="text-caption font-num" data-testid="reference-within">
+              {within} of {checks.length} values of <span className="font-num">{info.packageTest?.split('::').pop() ?? 'its package’s test'}</span> within
+              the package&rsquo;s tolerance on this run.
+            </p>
+          )}
           {bench && typeof bench.mespUsdPerGal === 'number' && (
             <p className="text-caption text-ink-soft">
-              Expected <span className="font-num">{BENCHMARK_EXPECTED.usdPerGal}</span>; this run is{' '}
+              Expected <span className="font-num">{BENCHMARK_EXPECTED.usdPerGal}</span>, as this build measured it when Proforma was first built
+              on BioSTEAM; this run is{' '}
               <span className="font-num">
                 {fmt(((bench.mespUsdPerGal - BENCHMARK_EXPECTED.usdPerGal) / BENCHMARK_EXPECTED.usdPerGal) * 100, 2)} %
               </span>{' '}
@@ -176,8 +199,8 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
             <details className="text-caption text-ink-soft">
               <summary className="cursor-pointer hover:text-ink">What the package set, read back from it</summary>
               <p className="mt-1">
-                From <span className="font-num">{bench.package}</span> on BioSTEAM{' '}
-                <span className="font-num">{bench.biosteam}</span>; rate of return{' '}
+                From <span className="font-num">{bench.package}</span> on{' '}
+                <span className="font-num">{bench.simulator ?? (bench.biosteam ? `biosteam ${bench.biosteam}` : 'BioSTEAM')}</span>; rate of return{' '}
                 <span className="font-num">{fmt(bench.settings.rateOfReturn * 100, 3)} %</span>, income tax{' '}
                 <span className="font-num">{fmt(bench.settings.incomeTax * 100, 3)} %</span>,{' '}
                 <span className="font-num">{fmt(bench.settings.operatingDays, 4)}</span> operating days, plant life{' '}
@@ -197,7 +220,7 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
       )}
       <div className="flex flex-wrap items-center gap-2 mt-auto pt-1">
         <Button onClick={run} disabled={busy} data-testid="reference-run">
-          <Play size={13} /> {busy ? 'Running…' : art ? 'Rerun' : 'Run'}
+          <Play size={13} /> {busy ? 'Running…' : art && !legacy ? 'Rerun' : 'Run'}
         </Button>
         <LinkButton to={referencePath(info.id)}>
           <BookOpen size={13} /> Its page
@@ -276,7 +299,18 @@ function BiosteamCard({
   const showArchived = useStore((s) => s.showArchived);
   const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const runId = scenario.lastRunId ?? null;
+  // The service's newest run of this scenario, made in any browser, by the
+  // API or by Postdoc (§3.R, findings 8 and 21), else the one this browser
+  // kept; undefined until the service answers.
+  const [served, setServed] = useState<Artifact | null | undefined>(undefined);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    proformaNewestRun(scenario.id, ctrl.signal)
+      .then(setServed)
+      .catch(() => !ctrl.signal.aborted && setServed(null));
+    return () => ctrl.abort();
+  }, [scenario.id]);
+  const runId = newestRunId(served, scenario.lastRunId);
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
 
   // OF-BLD-019 §2.R: a scenario made here is bound by the service as its page
@@ -300,12 +334,16 @@ function BiosteamCard({
     setArt(null);
     setProblem(null);
     if (!runId) return;
+    if (served && served.id === runId) {
+      setArt(served);
+      return;
+    }
     const ctrl = new AbortController();
     proformaArtifact(runId, ctrl.signal)
       .then(setArt)
       .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [runId]);
+  }, [runId, served]);
 
   const flowsheet = shelf.find((f) => f.id === flowsheetId) ?? null;
   const asked = madeHere && !info;
@@ -335,7 +373,7 @@ function BiosteamCard({
       </p>
       {scenario.description && <p className="text-body text-ink-soft mb-2">{scenario.description}</p>}
       <div className="mb-3 flex-1">
-        {!runId && (
+        {!runId && served !== undefined && (
           <p className="text-body" data-testid="scenario-not-run">
             Not run yet.
           </p>
@@ -512,8 +550,9 @@ export default function Proforma() {
         </h2>
         <p className="text-body text-ink-soft mb-3">
           Published biorefineries from the BioSTEAM project&rsquo;s own <span className="font-num">biorefineries</span>{' '}
-          package, run whole with every setting the package&rsquo;s own. Reproducing the price a package version gives
-          shows this installation simulates and prices a biorefinery as its authors do, before it prices anything new.
+          package, run whole with every setting the package&rsquo;s own, before Proforma prices anything new. Each run is
+          held to the values the package&rsquo;s own test asserts, and its card says how many of them it holds: how close
+          this installation comes to the plant as its authors built it.
         </p>
         {shelf && references.length === 0 && (
           <p className="text-body text-ink-soft">The shelf holds no reference biorefinery for the programs showing.</p>

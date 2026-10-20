@@ -36,6 +36,8 @@ export interface CostWaterfallProps {
   provenance: Provenance;
   basis?: ComputedBasis[];
   notes?: string[];
+  /** Why there is nothing to draw, when the caller knows better than the default (OF-BLD-019 §3.R, finding 11). */
+  empty?: { what: string; where: string };
   csvName?: string;
 }
 
@@ -100,7 +102,7 @@ export function CostWaterfall(props: CostWaterfallProps) {
       csvName={props.csvName ?? 'cost-breakdown'}
       basis={props.basis}
       notes={props.notes}
-      empty={props.lines.length ? null : { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' }}
+      empty={props.lines.length ? null : (props.empty ?? { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' })}
     >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={props.title} data-testid="waterfall">
         <line x1={x(0)} x2={x(0)} y1={T} y2={H - T} stroke="currentColor" strokeOpacity={0.4} />

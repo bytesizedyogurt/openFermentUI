@@ -33,7 +33,7 @@ import {
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
 import { archivedProgramOf, useProgramLookup, useStore } from '@/store';
 import { href, navigate, useRoute } from '@/router';
-import type { CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import type { Artifact, CeilingCheck, CeilingRow, FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
 import { durableAvailable } from '@/lib/durable';
 import {
@@ -43,8 +43,11 @@ import {
   ceilingCheck,
   fermosFits,
   fitsFrom,
+  leftOutWords,
   modellerQuestions,
+  newestRunId,
   proformaArtifact,
+  proformaNewestRun,
   proformaBind,
   proformaScenarios,
   proformaShelf,
@@ -53,6 +56,7 @@ import {
   runProformaScenario,
   runViewOfArtifact,
   runViewOfResult,
+  stamp,
   type RunView,
   type SimulatorStatus,
 } from '@/lib/proforma';
@@ -808,7 +812,7 @@ function InputsTable({
                 ))}
                 {(i.leftOutNoCarbon > 0 || i.leftOutOtherCarbon > 0) && (
                   <div className="text-caption text-ink-soft">
-                    Left out: {i.leftOutNoCarbon} naming no carbon source, {i.leftOutOtherCarbon} on a feed other than a sugar or a hydrolysate.
+                    {leftOutWords(i, flowsheet?.id ?? null)}
                   </div>
                 )}
                 {i.binding === 'assumption' && (
@@ -1140,7 +1144,7 @@ function CeilingCheckSlot({ check, problem }: { check: CeilingCheck | null; prob
                       <a className="font-num underline underline-offset-2 hover:text-accent" href={href(`/biorepo/artifacts/${r.artifactId}`)} data-testid="ceiling-artifact">
                         {r.artifactId}
                       </a>{' '}
-                      <ProvenanceBadge p={r.provenance} /> {r.modelBasis}, kept {r.createdAt.slice(0, 10)}
+                      <ProvenanceBadge p={r.provenance} /> {r.modelBasis}, kept {stamp(r.createdAt)}
                       {r.older > 0 && `; the newest of ${r.older + 1} on file`}
                     </td>
                   </tr>
@@ -1305,11 +1309,29 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey, yieldAssumed]);
 
-  // The newest run this browser saw, read back from its artifact (D6).
-  const runId = scenario.lastRunId ?? null;
+
+  // The newest run: the service's, which holds every run any browser, the
+  // API or Postdoc made of this scenario (§3.R, findings 8 and 21), else the
+  // one this browser kept (D6), read back from its artifact. `served` is
+  // undefined until the service answers.
+  const [served, setServed] = useState<Artifact | null | undefined>(undefined);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    proformaNewestRun(scenario.id, ctrl.signal)
+      .then(setServed)
+      .catch(() => !ctrl.signal.aborted && setServed(null));
+    return () => ctrl.abort();
+  }, [scenario.id]);
+  const runId = newestRunId(served, scenario.lastRunId);
   useEffect(() => {
     setLoadProblem(null);
     if (!runId) return;
+    if (served && served.id === runId) {
+      const v = runViewOfArtifact(served);
+      if (v) setView(v);
+      else setLoadProblem(`${runId} is not a scenario run: it was kept by ${served.tool}.`);
+      return;
+    }
     const ctrl = new AbortController();
     proformaArtifact(runId, ctrl.signal)
       .then((art) => {
@@ -1319,14 +1341,24 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
       })
       .catch((e: unknown) => !ctrl.signal.aborted && setLoadProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [runId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId, served]);
 
-  // While a run is in hand: its seconds, and the worker's status every few.
+  // While a run is in hand: its seconds.
   useEffect(() => {
     if (!running) return;
     const t0 = Date.now();
     setElapsed(0);
     const tick = window.setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
+    return () => window.clearInterval(tick);
+  }, [running]);
+
+  // While a run is in hand, or the simulator is starting, the worker's
+  // status every few seconds: Run waits while it starts (§3.R, finding 7),
+  // and comes back when it is ready.
+  const starting = status?.status === 'starting';
+  useEffect(() => {
+    if (!running && !starting) return;
     const poll = window.setInterval(() => {
       proformaStatus()
         .then(setStatus)
@@ -1334,11 +1366,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           /* the line keeps the last status it read */
         });
     }, 3000);
-    return () => {
-      window.clearInterval(tick);
-      window.clearInterval(poll);
-    };
-  }, [running]);
+    return () => window.clearInterval(poll);
+  }, [running, starting]);
 
   const flowsheet = shelf?.find((f) => f.id === flowsheetId) ?? null;
 
@@ -1393,7 +1422,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
       });
   };
 
-  const questions = bound ? modellerQuestions(bound.inputs, view) : [];
+  const questions = bound ? modellerQuestions(bound.inputs, view, flowsheetId) : [];
 
   return (
     <div data-testid="proforma-biosteam">
@@ -1425,7 +1454,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           {flowsheet && <>, from {flowsheet.source}</>}
         </span>
         <span>· Program: <span className="text-ink">{program ? program.name : 'none (general)'}</span></span>
-        <span>· {madeHere ? `made in this browser${scenario.createdAt ? ` ${scenario.createdAt.slice(0, 10)}` : ''}` : 'shipped with openFerment'}</span>
+        <span>· {madeHere ? `made in this browser${scenario.createdAt ? ` ${stamp(scenario.createdAt)}` : ''}` : 'shipped with openFerment'}</span>
         {view ? <ProvenanceBadge p={view.provenance} /> : <span className="chip">not run yet</span>}
       </div>
 
@@ -1439,15 +1468,15 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
       )}
 
       <div className="space-y-4">
-        {!view && !runId && (
+        {!view && !runId && served !== undefined && (
           <Card className="p-4" data-testid="scenario-not-run">
             <h2 className="font-serif text-section-title font-semibold mb-1">This scenario has not run yet</h2>
             <p className="text-body text-ink-soft">
               {madeHere
-                ? `Made in this browser${scenario.createdAt ? ` on ${scenario.createdAt.slice(0, 10)}` : ''}${program ? `, in ${program.name}` : ''}. `
+                ? `Made in this browser${scenario.createdAt ? ` on ${stamp(scenario.createdAt)}` : ''}${program ? `, in ${program.name}` : ''}. `
                 : ''}
-              It holds no input value of its own: a run binds its process inputs to records and takes every other input from a named
-              person&rsquo;s assumption. Give every input that waits a source, then run it.
+              Neither this browser nor the service holds a run of it. It holds no input value of its own: a run binds its process inputs to
+              records and takes every other input from a named person&rsquo;s assumption. Give every input that waits a source, then run it.
             </p>
           </Card>
         )}
@@ -1532,10 +1561,15 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" onClick={go} disabled={running || !bound || bound.waiting.length > 0}>
+            <Button variant="primary" onClick={go} disabled={running || starting || !bound || bound.waiting.length > 0}>
               <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
             </Button>
             <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
+            {starting && !running && (
+              <span className="text-caption text-ink-soft" data-testid="run-waits">
+                Run waits until it has started; this line asks again every few seconds.
+              </span>
+            )}
           </div>
           {bound && bound.waiting.length > 0 && (
             <p className="text-caption text-signal-warn mt-2" data-testid="proforma-waiting">
@@ -1560,7 +1594,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
         )}
 
         {view && (
-          <RunReport view={view} priceBasis={priceBasis} labels={labels} unitLabels={unitLabels} scenarioId={scenario.id} csvName={scenario.id} />
+          <RunReport view={view} priceBasis={priceBasis} labels={labels} unitLabels={unitLabels} scenarioId={scenario.id} csvName={scenario.id} flowsheet={flowsheet} />
         )}
 
         {view && (

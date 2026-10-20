@@ -41,7 +41,9 @@ import { ProvenanceBadge, Tick } from '@/components/Provenance';
 import {
   BENCHMARK_EXPECTED,
   BENCHMARK_FLOWSHEET,
+  LEGACY_BENCHMARK_TOOL,
   ProformaDown,
+  REFERENCE_TOOL,
   SIMULATOR_SAYS,
   basisInput,
   proformaReference,
@@ -49,6 +51,7 @@ import {
   referencePrice,
   runProformaReference,
   runViewOfReference,
+  stamp,
   type ReferenceResponse,
 } from '@/lib/proforma';
 import { CostBreakdown, DiagramCard, EquipmentTable, ReadBack, StreamsTable, UtilitiesCard, cell } from '@/screens/ProformaBiosteam';
@@ -113,6 +116,11 @@ function RegressionCard({
   packageTest: string | null;
   id: string;
 }) {
+  // Only a reference run is checked against the package's test; the
+  // benchmark kept before reference runs held their checks measured a price
+  // alone, so nothing stands beside the package's values for it (§3.R).
+  const checked = art?.tool === REFERENCE_TOOL;
+  art = checked ? art : null;
   const rows = regressionRows(regression, checks, !!art);
   const t = regressionTable(rows);
   const within = rows.filter((r) => r.within === true).length;
@@ -299,13 +307,22 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
   const isBenchmark = flowsheetId === BENCHMARK_FLOWSHEET;
   const mespGal = num(o.mespUsdPerGal);
   const title = info?.title ?? flowsheetId;
+  // The benchmark kept before reference runs held their tables (OF-BLD-014
+  // §8.2): shown, price only, with the note that says so; Run makes the full
+  // reference run.
+  const legacy = art?.tool === LEGACY_BENCHMARK_TOOL;
+  // A 404 in words: the service holds no such reference (§3.R, finding 14).
+  // The page then claims nothing about it and offers no run.
+  const missing = !!problem && !state;
 
   return (
     <div data-testid="proforma-reference" data-flowsheet={flowsheetId}>
       <PageHeader
-        eyebrow={`${flowsheetId} · reference biorefinery`}
+        eyebrow={missing ? flowsheetId : `${flowsheetId} · reference biorefinery`}
         title={title}
-        subtitle={info?.description ?? 'A published biorefinery from the BioSTEAM project’s own biorefineries package, run whole on its package’s defaults.'}
+        subtitle={
+          missing ? undefined : (info?.description ?? 'A published biorefinery from the BioSTEAM project’s own biorefineries package, run whole on its package’s defaults.')
+        }
         actions={
           <LinkButton to="/proforma">
             <BookOpen size={14} /> Proforma
@@ -317,9 +334,19 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
         <div className="mb-4">
           <Callout kind="warn">
             <span data-testid="reference-problem">{problem}</span>
+            {missing && (
+              <span className="block mt-1">
+                <a className="text-accent hover:underline" href={href('/proforma')}>
+                  Proforma
+                </a>
+                &rsquo;s Reference runs row lists the reference biorefineries this service holds.
+              </span>
+            )}
           </Callout>
         </div>
       )}
+      {missing ? null : (
+      <>
       {state?.note && <p className="text-caption text-ink-soft mb-3" data-testid="reference-note">{state.note}</p>}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-caption text-ink-soft" data-testid="reference-meta">
@@ -358,7 +385,7 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
         <Card className="p-4" data-testid="reference-run-card">
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="primary" onClick={run} disabled={busy || !state} data-testid="reference-run">
-              <Play size={14} /> {busy ? 'Running…' : art ? 'Rerun' : 'Run'}
+              <Play size={14} /> {busy ? 'Running…' : art && !legacy ? 'Rerun' : 'Run'}
             </Button>
             <span className="text-caption text-ink-soft" data-testid="reference-status">
               {state ? SIMULATOR_SAYS[state.simulator.status] : problem ? 'The simulator is the service’s.' : 'Asking the service…'}
@@ -411,7 +438,7 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
                 <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${art.id}`)}>
                   {art.id}
                 </a>
-                , computed <span className="font-num">{art.createdAt.replace('T', ' ').slice(0, 16)}</span>
+                , computed <span className="font-num">{stamp(art.createdAt)}</span>
                 {art.durationMs > 0 && (
                   <>
                     {' '}
@@ -450,7 +477,7 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
             <EquipmentTable view={view} csvName={flowsheetId} />
             <UtilitiesCard view={view} csvName={flowsheetId} />
             <DiagramCard view={view} csvName={flowsheetId} />
-            <ReadBack view={view} />
+            <ReadBack view={view} flowsheet={info} />
           </>
         )}
 
@@ -465,6 +492,8 @@ export default function ProformaReference({ flowsheetId }: { flowsheetId: string
           </Card>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

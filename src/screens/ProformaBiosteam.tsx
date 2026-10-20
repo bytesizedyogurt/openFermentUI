@@ -16,9 +16,9 @@
 // artifact through `runViewOfReference`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { FlowsheetInfo, ScenarioInput } from '@/data/types';
+import type { CostLine, FlowsheetInfo, ScenarioInput } from '@/data/types';
 import { href } from '@/router';
-import { evaluateGrid, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
+import { evaluateGrid, COST_LINES } from '@/engine/grids';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
 import { Card } from '@/components/ui';
@@ -30,7 +30,10 @@ import {
   asResultGrid,
   baseCaseRefusal,
   diagramSrc,
+  readBackRows,
+  stamp,
   viewPrice,
+  type ReadBackRow,
   type RunView,
 } from '@/lib/proforma';
 
@@ -42,6 +45,9 @@ export const SOURCE_WORDS: Record<string, string> = {
   artifact: 'artifact',
   convention: 'convention',
 };
+
+/** A number as a CSV cell: the run's own value, unrounded; empty where the run holds none. */
+export const raw = (v: number | null | undefined): number | string => (v == null || !Number.isFinite(v) ? '' : v);
 
 /** A number as a table cell: thousands grouped from a thousand up, else a few significant places. */
 export function cell(v: number | null | undefined, digits = 3): string {
@@ -60,7 +66,7 @@ function Section({
 }: {
   title: string;
   reads: string;
-  csv?: { name: string; headers: string[]; rows: (string | number)[][] };
+  csv?: { name: string; headers: string[]; rows: (string | number)[][]; csv?: (string | number)[][] };
   testid: string;
   children: ReactNode;
 }) {
@@ -69,7 +75,7 @@ function Section({
       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
         <h2 className="font-serif text-section-title font-semibold">{title}</h2>
         {csv && (
-          <button className="chip" data-testid={`csv-${testid}`} onClick={() => exportCSV(`${csv.name}.csv`, csv.headers, csv.rows)}>
+          <button className="chip" data-testid={`csv-${testid}`} onClick={() => exportCSV(`${csv.name}.csv`, csv.headers, csv.csv ?? csv.rows)}>
             <Download size={12} aria-hidden /> CSV
           </button>
         )}
@@ -158,7 +164,7 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
         </a>
         {view.createdAt && (
           <>
-            , computed <span className="font-num">{view.createdAt.replace('T', ' ').slice(0, 16)}</span>
+            , computed <span className="font-num">{stamp(view.createdAt)}</span>
           </>
         )}
         {view.durationMs != null && (
@@ -189,6 +195,7 @@ export function CostBreakdown({
   totalLabel?: string;
 }) {
   const tea = view.tables.tea;
+  const note = costBreakdownNote(view);
   return (
     <div data-testid="cost-breakdown">
       <CostWaterfall
@@ -199,17 +206,36 @@ export function CostBreakdown({
         annualUnit={u(view, 'annual', 'USD/yr')}
         provenance={view.provenance}
         basis={[view.basis]}
-        notes={
-          tea
-            ? [
-                `Read from BioSTEAM's ${tea.teaClass} object for the base case: sales ${cell(tea.sales)}, installed equipment ${cell(tea.installedEquipmentCost)}, fixed capital ${cell(tea.FCI)}, total capital ${cell(tea.TCI)} USD, over ${cell(tea.operatingHours)} operating hours a year.`,
-              ]
-            : undefined
-        }
+        notes={note ? [note] : undefined}
+        empty={costBreakdownEmpty(view)}
         csvName={`${csvName}-cost-breakdown`}
       />
     </div>
   );
+}
+
+/**
+ * The line under the cost breakdown (§3.R, finding 10): sales are a year's,
+ * in the run's annual unit; the capital sums are one-off, in its cost unit.
+ */
+export function costBreakdownNote(view: RunView): string | null {
+  const tea = view.tables.tea;
+  if (!tea) return null;
+  return `Read from BioSTEAM's ${tea.teaClass} object for the base case: sales ${cell(tea.sales)} ${u(view, 'annual', 'USD/yr')}; installed equipment ${cell(tea.installedEquipmentCost)}, fixed capital ${cell(tea.FCI)} and total capital ${cell(tea.TCI)} ${u(view, 'cost', 'USD')}, once; over ${cell(tea.operatingHours)} operating hours a year.`;
+}
+
+/**
+ * Why the breakdown is empty (§3.R, finding 11): a base case that could not
+ * run keeps no TEA, and running again gives the same case; only a run
+ * stored before the tables is helped by running again.
+ */
+export function costBreakdownEmpty(view: RunView): { what: string; where: string } {
+  if (view.baseInfeasible)
+    return {
+      what: `the base case could not run: ${baseCaseRefusal(view.baseInfeasible)}.`,
+      where: 'Every input at its value is a case the flowsheet cannot hold, so it has no TEA to break down; change the input the reason names, then run it.',
+    };
+  return { what: 'this run kept no TEA breakdown.', where: 'A run of a flowsheet with a TEA keeps one from OF-BLD-019 on; run the scenario again.' };
 }
 
 // ── Sensitivity, the distribution, the sliders ──────────────────────────
@@ -248,6 +274,21 @@ export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView
   );
 }
 
+/**
+ * The grid's cost lines, as the flowsheets split them (§3.R, finding 28):
+ * the fermentation section's utilities apart from the downstream units',
+ * which is not how the TEA breakdown above splits the same plant, so no line
+ * here takes a word the waterfall uses for another quantity.
+ */
+export const SLIDER_LINE_LABEL: Record<CostLine, string> = {
+  capex: 'Capital: what the price leaves after the operating lines',
+  media: 'Feed and other materials bought',
+  utilities: 'Fermentation section\u2019s utilities',
+  labor: 'Labour',
+  downstream: 'Downstream units\u2019 utilities and supplies',
+  other: 'Other fixed operating cost',
+};
+
 /** Three inputs moved over the run's grid, with the interpolation the authored scenarios use. */
 export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
   const g = view.grid;
@@ -261,7 +302,8 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
     <Card className="p-4" data-testid="proforma-sliders">
       <h2 className="font-serif text-section-title font-semibold mb-1">Move three inputs over the run's grid</h2>
       <p className="text-caption text-ink-soft mb-3">
-        Interpolated between the {g.msp.length} grid cases the service simulated; the other inputs stay at their base value.
+        Interpolated between the {g.msp.length} grid cases the service simulated; the other inputs stay at their base value. The cost lines
+        are split as the flowsheet splits its grid, the fermentation section apart from the downstream units, not as the breakdown above.
         {g.infeasible > 0 && ` ${g.infeasible} cases could not run, and a point near one shows no price.`}
       </p>
       <div className="space-y-3">
@@ -293,7 +335,7 @@ export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunVie
           <tbody>
             {COST_LINES.map((l) => (
               <tr key={l} className="border-t border-line/50">
-                <td className="py-0.5">{COST_LINE_LABEL[l]}</td>
+                <td className="py-0.5">{SLIDER_LINE_LABEL[l]}</td>
                 <td className="py-0.5 text-right font-num">{fmt(r.costLines[l], 3)}</td>
               </tr>
             ))}
@@ -331,7 +373,21 @@ export function streamsTable(view: RunView) {
       .join('; '),
     cell(s.price),
   ]);
-  return { headers, rows };
+  // The CSV carries the run's own numbers, unrounded and ungrouped (§3.R, finding 12).
+  const csv = view.tables.streams.map((s) => [
+    s.id,
+    s.source ?? 'feed',
+    s.sink ?? 'out',
+    s.phase,
+    raw(s.T),
+    raw(s.P),
+    raw(s.massFlow),
+    Object.entries(s.massFlows)
+      .map(([k, v]) => `${k} ${raw(v)}`)
+      .join('; '),
+    raw(s.price),
+  ]);
+  return { headers, rows, csv };
 }
 
 export function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
@@ -362,7 +418,10 @@ export function equipmentTable(view: RunView) {
   const rows = [...view.tables.units]
     .sort((a, b) => a.order - b.order)
     .map((x) => [x.id, x.unitClass, x.line ?? '', cell(x.installedCost), cell(x.purchaseCost), cell(x.heatingDuty), cell(x.coolingDuty), cell(x.power)]);
-  return { headers, rows };
+  const csv = [...view.tables.units]
+    .sort((a, b) => a.order - b.order)
+    .map((x) => [x.id, x.unitClass, x.line ?? '', raw(x.installedCost), raw(x.purchaseCost), raw(x.heatingDuty), raw(x.coolingDuty), raw(x.power)]);
+  return { headers, rows, csv };
 }
 
 export function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
@@ -390,7 +449,15 @@ export function utilitiesTable(view: RunView) {
         ['Electricity produced', cell(d.electricityProduction), d.electricityProductionUnit],
       ]
     : [];
-  return { headers, rows };
+  const csv = d
+    ? [
+        ['Heating', raw(d.heating), d.heatingUnit],
+        ['Cooling', raw(d.cooling), d.coolingUnit],
+        ['Electricity consumed', raw(d.electricityConsumption), d.electricityConsumptionUnit],
+        ['Electricity produced', raw(d.electricityProduction), d.electricityProductionUnit],
+      ]
+    : [];
+  return { headers, rows, csv };
 }
 
 export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
@@ -445,25 +512,61 @@ export function DiagramCard({ view, csvName }: { view: RunView; csvName: string 
   );
 }
 
-// ── What the reference model supplied ───────────────────────────────────
+// ── What the run read back, credited to whoever set it ──────────────────
 
-export function ReadBack({ view }: { view: RunView }) {
-  const entries = Object.entries(view.readBack);
-  if (!entries.length) return null;
+/** Each group's heading and line, by who set its values (§3.R, findings 6 and 20). */
+const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: (reference: boolean) => string; reads: (reference: boolean) => string }[] = [
+  {
+    origin: 'setting',
+    title: (reference) => (reference ? 'What the package set' : 'What the package, BioSTEAM and the run\u2019s conventions set'),
+    reads: (reference) =>
+      reference
+        ? 'Each the package\u2019s own default, read back from its objects after the run; nobody typed these.'
+        : 'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
+  },
+  {
+    origin: 'case',
+    title: () => 'What this case gave',
+    reads: () =>
+      'Set by this case\u2019s bound records and named assumptions, through BioSTEAM\u2019s units, and read back after the base case ran; the reference model supplied none of these.',
+  },
+  {
+    origin: 'read',
+    title: () => 'Also read back from the run',
+    reads: () => 'Read from the run\u2019s objects after the base case ran; this page does not know which setting each one is, so it credits nobody.',
+  },
+];
+
+export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
+  const rows = readBackRows(view.readBack, flowsheet);
+  if (!rows.length) return null;
+  const reference = !!flowsheet?.reference;
   return (
-    <Card className="p-4">
-      <h2 className="font-serif text-section-title font-semibold mb-1">What the reference model supplied</h2>
-      <p className="text-caption text-ink-soft mb-2">Read back from the units and the finance model after the base case ran; nobody typed these.</p>
-      <table className="w-full text-caption" data-testid="proforma-readback">
-        <tbody>
-          {entries.map(([k, v]) => (
-            <tr key={k} className="border-t border-line/50">
-              <td className="py-0.5">{k}</td>
-              <td className="py-0.5 text-right font-num">{fmt(v, 4)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <Card className="p-4" data-testid="proforma-readback">
+      {READ_BACK_GROUPS.map((g) => {
+        const these = rows.filter((r) => r.origin === g.origin);
+        if (!these.length) return null;
+        return (
+          <div key={g.origin} className="mb-3 last:mb-0" data-testid="readback-group" data-origin={g.origin}>
+            <h2 className="font-serif text-section-title font-semibold mb-1">{g.title(reference)}</h2>
+            <p className="text-caption text-ink-soft mb-2">{g.reads(reference)}</p>
+            <table className="w-full text-caption">
+              <tbody>
+                {these.map((r) => (
+                  <tr key={r.key} className="border-t border-line/50" data-testid="readback-row" data-key={r.key}>
+                    <td className="py-0.5 pr-2">
+                      {r.label}
+                      {r.label !== r.key && <span className="font-num text-ink-soft"> ({r.key})</span>}
+                    </td>
+                    <td className="py-0.5 px-1.5 text-right font-num">{typeof r.value === 'number' ? fmt(r.value, 4) : r.value}</td>
+                    <td className="py-0.5 pl-1.5 font-num text-ink-soft">{r.unit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </Card>
   );
 }
@@ -484,7 +587,7 @@ export function inputLabels(inputs: ScenarioInput[] | null, flowsheet: Flowsheet
  * Every section of one run, in the order a reader takes them: the result,
  * the cost breakdown, the sensitivity, the distribution, the sliders when
  * the run walked a grid, the streams, the equipment, the utilities, the
- * diagram, and what the reference model supplied.
+ * diagram, and what the run read back, each value credited to whoever set it.
  */
 export function RunReport({
   view,
@@ -493,6 +596,7 @@ export function RunReport({
   unitLabels,
   scenarioId,
   csvName,
+  flowsheet = null,
 }: {
   view: RunView;
   priceBasis: string;
@@ -501,6 +605,8 @@ export function RunReport({
   unitLabels: Record<string, string>;
   scenarioId: string;
   csvName: string;
+  /** The run's flowsheet as the shelf lists it: which read-back value each input or setting gave. */
+  flowsheet?: FlowsheetInfo | null;
 }) {
   return (
     <div className="space-y-4" data-testid="run-report">
@@ -513,7 +619,7 @@ export function RunReport({
       <EquipmentTable view={view} csvName={csvName} />
       <UtilitiesCard view={view} csvName={csvName} />
       <DiagramCard view={view} csvName={csvName} />
-      <ReadBack view={view} />
+      <ReadBack view={view} flowsheet={flowsheet} />
     </div>
   );
 }

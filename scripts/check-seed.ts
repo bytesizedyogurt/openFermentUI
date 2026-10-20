@@ -128,6 +128,13 @@ for (const s of SCENARIOS) {
     if (!BIOSTEAM_FLOWSHEETS.includes(s.modelId)) fail(`${s.id}: flowsheet ${s.modelId} is not one the service holds`);
     if (s.dims.length || s.assumptions.length || Object.keys(s.point).length)
       fail(`${s.id}: a BioSTEAM scenario authors no dims, point or assumptions; its inputs come from the service`);
+    // OF-BLD-019 §3.R (findings 9, 25): which inputs bind to records and
+    // which wait is the service's to say, on the inputs table, from the
+    // records on this machine; a description that states it is false on any
+    // machine whose records bind differently (sc-yeast-1 said productivity
+    // binds while the table showed it waiting).
+    if (/\bbinds? to thread [A-Z]\b|\bwaits? for\b/i.test(s.description))
+      fail(`${s.id}: a BioSTEAM scenario's description names no binding outcome ("binds to thread …", "waits for …"); the inputs table reads it from the service`);
   }
 }
 

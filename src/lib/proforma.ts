@@ -100,8 +100,9 @@ const noEndpoint = (e: unknown) =>
  * is not a reference it holds.
  */
 export async function proformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
+  let ref: ReferenceResponse;
   try {
-    return await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { signal });
+    ref = await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { signal });
   } catch (e) {
     if (noEndpoint(e)) {
       if (id === BENCHMARK_FLOWSHEET) {
@@ -110,10 +111,28 @@ export async function proformaReference(id: string, signal?: AbortSignal): Promi
       }
       return { artifact: null, simulator: await proformaStatus(signal), note: `This service has no reference endpoint, so it cannot run ${id} yet.` };
     }
-    if (e instanceof RagRefused && e.status === 404) return { artifact: null, simulator: await proformaStatus(signal), note: e.message };
+    // A 404 in words is the service saying the id is not a reference it
+    // holds (OF-BLD-019 §3.R, finding 14): the caller says so, and offers no
+    // run of something that is not there.
     throw e;
   }
+  // The corn stover benchmark kept before reference runs held their tables
+  // (OF-BLD-014 §8.2, `proforma_benchmark`) is still the service's run of
+  // that plant, and the one Postdoc's selling_price cites: with no reference
+  // run on file, it is shown, price only, said to be what it is (§3.R,
+  // findings 0, 15, 22).
+  if (id === BENCHMARK_FLOWSHEET && !ref.artifact) {
+    const old = await proformaBenchmark(signal).catch(() => null);
+    if (old?.artifact) return { ...ref, artifact: old.artifact, note: LEGACY_BENCHMARK_NOTE };
+  }
+  return ref;
 }
+
+/** The tool the benchmark was kept under before reference runs held their tables (proforma.BENCHMARK). */
+export const LEGACY_BENCHMARK_TOOL = 'proforma_benchmark';
+
+export const LEGACY_BENCHMARK_NOTE =
+  'This is the benchmark run this service kept when Proforma was first built on BioSTEAM (OF-BLD-014 §8.2): its price and settings, with no table and no check against the package’s test. Run makes the full reference run, with its tables and its checks.';
 
 /** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
 export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
@@ -129,6 +148,39 @@ export async function runProformaReference(id: string, signal?: AbortSignal): Pr
 /** One artifact the service keeps (`GET /api/biorepo/artifacts/{id}`). */
 export const proformaArtifact = (id: string, signal?: AbortSignal) =>
   call<Artifact>(`/api/biorepo/artifacts/${encodeURIComponent(id)}`, { signal });
+
+/** `GET /api/proforma/runs?scenarioId=`: a scenario's newest run on the service, or none. */
+export interface ScenarioRunsResponse {
+  scenarioId: string;
+  artifact: Artifact | null;
+}
+
+/**
+ * The newest run the service holds for a scenario (OF-BLD-019 §3.R,
+ * findings 8 and 21): the `proforma.run` whose basis names it, made in any
+ * browser, by Postdoc's run_flowsheet or by the API, the one pureOS and
+ * selling_price read. Null when it holds none, or when the service predates
+ * the read (the page then falls back to the run this browser kept).
+ */
+export async function proformaNewestRun(scenarioId: string, signal?: AbortSignal): Promise<Artifact | null> {
+  try {
+    const r = await call<ScenarioRunsResponse>(`/api/proforma/runs?scenarioId=${encodeURIComponent(scenarioId)}`, { signal });
+    return r.artifact ?? null;
+  } catch (e) {
+    if (noEndpoint(e)) return null;
+    throw e;
+  }
+}
+
+/**
+ * Which run a reader shows: the service's newest when it answered with one
+ * (it holds every run any browser made, this one's included), else the run
+ * this browser kept.
+ */
+export const newestRunId = (served: Artifact | null | undefined, kept: string | null | undefined): string | null => served?.id ?? kept ?? null;
+
+/** A time the service wrote (ISO, in UTC), as a date and a minute that say they are UTC (§3.R, finding 4). */
+export const stamp = (iso: string) => `${iso.replace('T', ' ').slice(0, 16)} UTC`;
 
 /** A price read from a run, with the words that say per what. */
 export interface PriceRead {
@@ -239,6 +291,18 @@ export function defaultProgram<T extends string>(flowsheet: FlowsheetInfo | null
   return offered[0] ?? null;
 }
 
+/**
+ * The programs a new scenario may be filed under (OF-BLD-019 §3.R, finding
+ * 3): a flowsheet that belongs to a program files its scenarios there and
+ * nowhere else (a PHA flowsheet filed under Yeast ethanol would bring an
+ * archived program's content into the default view); a general flowsheet
+ * may go under any program offered.
+ */
+export function programsFor<T extends string>(flowsheet: { program?: string | null } | null, offered: T[]): T[] {
+  const own = flowsheet?.program as T | null | undefined;
+  return own ? offered.filter((p) => p === own) : offered;
+}
+
 export interface BenchmarkResponse {
   artifact: Artifact | null;
   simulator: SimulatorStatus;
@@ -247,7 +311,10 @@ export interface BenchmarkResponse {
 /** What the benchmark's artifact holds, as `flowsheets/cornstover_benchmark.py` writes it. */
 export interface BenchmarkOutput {
   package: string;
-  biosteam: string;
+  /** The benchmark kept before reference runs (OF-BLD-014 §8.2) names BioSTEAM's version here. */
+  biosteam?: string;
+  /** A reference run names its simulator and version here instead ('biosteam 2.54.0'; §3.R, findings 18, 29). */
+  simulator?: string;
   mespUsdPerGal: number;
   mespUsdPerKg: number;
   settings: { rateOfReturn: number; operatingDays: number; incomeTax: number; startYear: number; endYear: number };
@@ -651,39 +718,132 @@ export function asResultGrid(modelId: string, g: ProformaGrid): ResultGrid {
   };
 }
 
-/** The question a process modeller is asked about each input that rests on an assumption. */
-export const QUESTION: Record<string, string> = {
-  recovery:
-    'What share of cell mass does a solids centrifuge recover from a PHA broth at this scale, and what does a second pass or a flocculant change?',
-  sugarPrice:
-    'What does a kilogram of fermentable sugar from this feedstock cost delivered to the fermenter, after pretreatment and hydrolysis?',
-  sugarFeed: 'What plant size, in sugar fed per hour, is a sensible first commercial train for this product?',
-  titre: 'What PHA titre at harvest is credible for a fed-batch on hydrolysate sugars in this host?',
-  yield: 'What PHA yield on sugar holds at scale, and how far below the network ceiling does a real culture sit?',
-  content: 'What PHA share of dry cell mass is reached at harvest without losing productivity?',
-  productivity: 'What volumetric productivity holds across a full batch, including the growth phase?',
+/**
+ * The question a process modeller is asked about each input that rests on an
+ * assumption, by flowsheet then input key (OF-BLD-019 §3.R, finding 5): two
+ * flowsheets share keys (titre, yield, productivity) and a yeast page must
+ * never ask PHA's questions. A flowsheet with no question of its own for an
+ * input asks where it should come from.
+ */
+export const QUESTIONS: Record<string, Record<string, string>> = {
+  pha_sugar_v0: {
+    recovery:
+      'What share of cell mass does a solids centrifuge recover from a PHA broth at this scale, and what does a second pass or a flocculant change?',
+    sugarPrice:
+      'What does a kilogram of fermentable sugar from this feedstock cost delivered to the fermenter, after pretreatment and hydrolysis?',
+    sugarFeed: 'What plant size, in sugar fed per hour, is a sensible first commercial train for this product?',
+    titre: 'What PHA titre at harvest is credible for a fed-batch on hydrolysate sugars in this host?',
+    yield: 'What PHA yield on sugar holds at scale, and how far below the network ceiling does a real culture sit?',
+    content: 'What PHA share of dry cell mass is reached at harvest without losing productivity?',
+    productivity: 'What volumetric productivity holds across a full batch, including the growth phase?',
+  },
+  ethanol_glucose_v0: {
+    feed_glucose_conc:
+      'What glucose concentration in the fermenter’s feed does this yeast tolerate at scale, before the sugar or the ethanol it makes slows the batch?',
+    titre: 'What ethanol titre at harvest is credible for this strain on a glucose batch, before the ethanol stops the yeast?',
+    yield: 'What ethanol yield on glucose holds at scale, and how far below the theoretical yield do glycerol, cell mass and other by-products keep a real batch?',
+    productivity: 'What volumetric productivity holds over a whole batch, the lag and the slow finish included?',
+    plant_scale: 'What plant size, in ethanol fermented a year, is a sensible first commercial train for this process?',
+    glucose_price: 'What does a kilogram of glucose cost delivered to the fermenter, from the sugar this plant would buy?',
+  },
 };
 
 /**
  * The inputs that rest on an assumption, ordered by how strongly they move
- * the price in the latest run (|Spearman ρ|), each with its question; the
- * flowsheet's omissions follow. Inputs absent from a run keep input order.
+ * the price in the latest run (|Spearman ρ|), each with its flowsheet's
+ * question; the flowsheet's omissions follow. Inputs absent from a run keep
+ * input order.
  */
 export function modellerQuestions(
   inputs: ScenarioInput[],
   run: { sensitivity: InputSensitivity[] } | null,
+  flowsheet: string | null,
 ): { key: string; label: string; rho: number | null; question: string }[] {
   const rho = new Map((run?.sensitivity ?? []).map((s) => [s.key, s.rho]));
+  const own = (flowsheet ? QUESTIONS[flowsheet] : undefined) ?? {};
   return inputs
     .filter((i) => i.binding === 'assumption' || i.binding === 'waiting')
-    .map((i, n) => ({ key: i.key, label: i.label, rho: rho.get(i.key) ?? null, question: QUESTION[i.key] ?? `Where should ${i.label} come from?`, n }))
+    .map((i, n) => ({ key: i.key, label: i.label, rho: rho.get(i.key) ?? null, question: own[i.key] ?? `Where should ${i.label} come from?`, n }))
     // An input the run did not rank (held fixed, or no run yet) follows every ranked one.
     .sort((a, b) => (b.rho == null ? -1 : Math.abs(b.rho)) - (a.rho == null ? -1 : Math.abs(a.rho)) || a.n - b.n)
     .map(({ n: _n, ...q }) => q);
 }
 
+/** What a record left out of a binding was fed, in words, by the flowsheet's own feed (§3.R, finding 27). */
+const FEED_WORDS: Record<string, string> = { pha_sugar_v0: 'a sugar or a hydrolysate', ethanol_glucose_v0: 'glucose' };
+
+/** The inputs table's line on the records a binding left out, naming the flowsheet's own feed. */
+export const leftOutWords = (i: { leftOutNoCarbon: number; leftOutOtherCarbon: number }, flowsheet: string | null) =>
+  `Left out: ${i.leftOutNoCarbon} naming no carbon source, ${i.leftOutOtherCarbon} on a feed other than ${FEED_WORDS[flowsheet ?? ''] ?? 'this flowsheet’s own feed'}.`;
+
+// ── What a run read back, credited to whoever set it (§3.R, findings 6, 20) ──
+//
+// A run's `readBack` holds both what the inputs leave to the package or to
+// BioSTEAM (the finance model, a unit's defaults, the run's conventions) and
+// what the case gave from its inputs (the glucose fed is the plant's scale
+// over the bound yield; the batch time is titre over productivity). A
+// reference plant runs whole on its package's defaults, so everything it
+// reads back is the package's, named and in its unit as the shelf lists it.
+// A key this page does not know is shown as read back, crediting nobody.
+
+export interface ReadBackRow {
+  key: string;
+  label: string;
+  unit: string;
+  value: number | string;
+  /** 'setting': the package's, BioSTEAM's or a convention; 'case': set by this case's records and assumptions through BioSTEAM; 'read': not known here. */
+  origin: 'setting' | 'case' | 'read';
+}
+
+const READ_BACK: Record<string, { case: string[]; setting: string[] }> = {
+  ethanol_glucose_v0: {
+    case: ['fermenterConversion', 'batchTimeH', 'beerEthanolGPerL', 'glucoseFedKgPerH', 'waterFedKgPerH', 'productEthanolMassFraction', 'reactors', 'reactorVolumeM3'],
+    setting: [
+      'theoreticalYieldGPerG', 'denaturantFraction', 'vesselLimitM3', 'workingVolumeFraction', 'cleaningTimeH', 'temperatureK', 'operatingHours',
+      'rateOfReturn', 'operatingDays', 'startYear', 'endYear', 'incomeTax', 'langFactor',
+    ],
+  },
+  pha_sugar_v0: {
+    case: [],
+    setting: [
+      'cakeMoisture', 'dryerMoisture', 'vesselLimitM3', 'oxygenTarget', 'temperatureK', 'rateOfReturn', 'operatingDays', 'startYear', 'endYear',
+      'incomeTax', 'ammoniaPriceUsdPerKg', 'packageGlucosePriceUsdPerKg',
+    ],
+  },
+};
+
+export function readBackRows(readBack: Record<string, unknown>, flowsheet: FlowsheetInfo | null): ReadBackRow[] {
+  const declared = new Map((flowsheet?.inputs ?? []).map((i) => [i.key, i]));
+  const known = flowsheet ? READ_BACK[flowsheet.id] : undefined;
+  return Object.entries(readBack)
+    .filter((e): e is [string, number | string] => typeof e[1] === 'number' || typeof e[1] === 'string')
+    .map(([key, value]) => {
+      const d = declared.get(key);
+      const origin: ReadBackRow['origin'] = flowsheet?.reference ? 'setting' : known?.case.includes(key) ? 'case' : known?.setting.includes(key) ? 'setting' : 'read';
+      return { key, label: d?.name ?? key, unit: d?.unit ?? '', value, origin };
+    });
+}
+
+/**
+ * Home's Pinned scenarios card, from what is pinned (§3.R, finding 2): Cost
+ * model v0 and its modeled tick belong to the authored surfaces alone; a
+ * BioSTEAM scenario is compared from its newest run, which carries its own
+ * provenance, so the card puts no tick of its own on one.
+ */
+export function pinnedCard(pinned: Scenario[]): { prov: Provenance | null; words: string } {
+  const authored = pinned.filter((s) => s.kind !== 'biosteam').length;
+  const biosteam = pinned.length - authored;
+  const head = `${pinned.length} pinned — open the comparison.`;
+  if (!biosteam) return { prov: 'demo', words: `${head} Cost model v0 — illustrative economics, not validated.` };
+  if (!authored) return { prov: null, words: `${head} Each is compared from its newest run, with the provenance that run computes.` };
+  return {
+    prov: null,
+    words: `${head} The BioSTEAM scenarios are compared from their newest runs, each with its own provenance; the authored ones are Cost model v0 — illustrative economics, not validated.`,
+  };
+}
+
 export function questionsText(scenario: ProformaScenarioInfo, run: { sensitivity: InputSensitivity[] } | null): string {
-  const qs = modellerQuestions(scenario.inputs, run);
+  const qs = modellerQuestions(scenario.inputs, run, scenario.flowsheet);
   const lines = [
     `Questions for a process modeller: ${scenario.name} (${scenario.flowsheet})`,
     '',

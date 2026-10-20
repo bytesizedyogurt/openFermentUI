@@ -30,6 +30,7 @@ import {
 import { useStore, provenanceOf, useProgramFilter, useProgramLookup, isExample, type ProgramEntityKind } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
 import { conversationShows } from '@/lib/programShows';
+import { pinnedCard } from '@/lib/proforma';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
 import { ELEVEN } from '@/data/nav';
@@ -286,23 +287,33 @@ function ResumeCard({
   kicker: string;
   title: string;
   meta?: ReactNode;
-  prov: ProvKind;
+  /** The provenance tick, or null for a card that shows no value of its own to tick (§3.R, finding 2). */
+  prov: ProvKind | null;
   children?: ReactNode;
 }) {
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-caption uppercase tracking-wide text-ink-soft">{kicker}</div>
+        <ArrowUpRight size={13} className="text-ink-soft shrink-0" aria-hidden />
+      </div>
+      <div className="text-body font-medium mt-0.5 leading-snug">{title}</div>
+      {meta && <div className="text-caption text-ink-soft mt-0.5">{meta}</div>}
+      {children && <div className="mt-2">{children}</div>}
+    </>
+  );
   return (
     <a
       href={href(to)}
       className="card p-3 block transition-colors hover:border-accent/45 hover:bg-accent-wash/40"
     >
-      <Tick p={prov} className="h-full">
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-caption uppercase tracking-wide text-ink-soft">{kicker}</div>
-          <ArrowUpRight size={13} className="text-ink-soft shrink-0" aria-hidden />
-        </div>
-        <div className="text-body font-medium mt-0.5 leading-snug">{title}</div>
-        {meta && <div className="text-caption text-ink-soft mt-0.5">{meta}</div>}
-        {children && <div className="mt-2">{children}</div>}
-      </Tick>
+      {prov ? (
+        <Tick p={prov} className="h-full">
+          {body}
+        </Tick>
+      ) : (
+        <div className="h-full">{body}</div>
+      )}
     </a>
   );
 }
@@ -614,6 +625,7 @@ export default function Home() {
   // One that cites an archived program waits until the switch shows it.
   const lastLive = liveConversations.find((c) => c.turns.length > 0 && conversationShows(c, shows)) ?? null;
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
+  const pinned = useMemo(() => pinnedCard(pinnedScenarios), [pinnedScenarios]);
   // A run in progress shows while its protocol's program does (§2.2).
   const runInProgress = activeRunId ? (runs[activeRunId] ?? null) : null;
   const activeRun = runInProgress && shows('protocol', runInProgress.protocolId) ? runInProgress : null;
@@ -1020,13 +1032,10 @@ export default function Home() {
                   to="/biorepo/compare"
                   kicker="Pinned scenarios"
                   title={pinnedScenarios.map((s) => s.name).join(' · ')}
-                  prov="demo"
-                  meta={
-                    <>
-                      <span className="font-num">{pinnedScenarios.length}</span> pinned — open the
-                      comparison. Cost model v0 — illustrative economics, not validated.
-                    </>
-                  }
+                  // What is pinned decides the line and the tick (OF-BLD-019
+                  // §3.R, finding 2): Cost model v0 is the authored surfaces'.
+                  prov={pinned.prov}
+                  meta={<span data-testid="pinned-scenarios">{pinned.words}</span>}
                 />
               )}
             </div>

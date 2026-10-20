@@ -477,7 +477,9 @@ async function main() {
       await page.locator(`[data-testid="new-scenario-flowsheet"][data-flowsheet="${flowsheetId}"] input`).check();
       await page.locator('[data-testid="new-scenario-name"]').fill(name);
       await page.locator('[data-testid="new-scenario-create"]').click();
-      await page.locator('[data-testid="scenario-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+      // The page's own card (the index's cards carry the same test id), drawn
+      // once the service has said it holds no run of the scenario (§3.R).
+      await page.locator('[data-testid="proforma-biosteam"] [data-testid="scenario-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
       const made = /#\/proforma\/scenario\/(sc-[^/?]+)$/.exec(page.url())?.[1] ?? null;
       const said = await page.locator('main').innerText().catch(() => '');
       if (!made) problems.push(`New scenario on ${flowsheetId} did not land on a scenario page (${page.url()})`);
@@ -669,8 +671,27 @@ async function main() {
       await page.waitForTimeout(700);
       await page.reload({ waitUntil: 'networkidle' });
       await sections('sc-pha-1 after a reload');
-      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
+      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d UTC in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
         problems.push('after a reload sc-pha-1 does not read its newest run back from the artifact');
+
+      // OF-BLD-019 §3.R (findings 8, 21): a run the service holds is found
+      // by a browser that kept none, on the page and on the index card.
+      {
+        const fresh = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        fresh.on('pageerror', (e) => problems.push(`page error (a fresh browser): ${e.message}`));
+        if (!(await setShowArchived(fresh, true))) problems.push('the archive switch did not turn on in a fresh browser');
+        await fresh.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
+        await fresh.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const shown = await fresh.locator('[data-testid="run-result"]').innerText().catch(() => '');
+        if (!shown.includes(run.artifactId) || (await fresh.locator('[data-testid="scenario-not-run"]').count()))
+          problems.push(`a browser that kept no run does not show the run the service holds for sc-pha-1 (${JSON.stringify(shown.slice(0, 120))})`);
+        await fresh.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+        const freshCard = fresh.locator('[data-testid="biosteam-card"][data-scenario="sc-pha-1"]');
+        await freshCard.locator('[data-testid="scenario-price"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if (!(await freshCard.locator('[data-testid="scenario-price"]').count()) || (await freshCard.locator('[data-testid="scenario-not-run"]').count()))
+          problems.push('the index card of a browser that kept no run does not read the run the service holds');
+        await fresh.close();
+      }
 
       // A scenario made from the shelf, run by its flowsheet.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
@@ -823,6 +844,44 @@ async function main() {
         if ((await count('[data-testid="artifact-inputs"] tbody tr')) !== ref.artifact.inputs.length) lacks.push(`its run ${ref.artifact.id} read back by its id`);
         if (lacks.length) problems.push(`${id}: the page lacks ${lacks.join(', ')}`);
       }
+      // OF-BLD-019 §3.R (findings 13, 24): a run still in flight when the
+      // reader moves to the other reference lands on the page that asked,
+      // never on the one now open.
+      {
+        const stover = fixture('proforma-reference-cornstover_benchmark.json');
+        await page.goto(`http://localhost:${PORT}/#/proforma/reference/corn_drygrind`, { waitUntil: 'networkidle' });
+        await page.locator('[data-testid="reference-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+        let release;
+        const held = new Promise((r) => (release = r));
+        await page.route('**/api/proforma/reference/corn_drygrind', async (r) => {
+          if (r.request().method() !== 'POST') return r.continue();
+          await held;
+          return r.continue();
+        });
+        await page.locator('[data-testid="reference-run"]').click();
+        await page.evaluate(() => {
+          window.location.hash = '#/proforma/reference/cornstover_benchmark';
+        });
+        await page.locator('[data-testid="proforma-reference"][data-flowsheet="cornstover_benchmark"] [data-testid="reference-price"]').waitFor({ timeout: 8000 }).catch(() => {});
+        release();
+        await page.waitForTimeout(800);
+        await page.unroute('**/api/proforma/reference/corn_drygrind');
+        const h1 = await page.locator('h1').innerText().catch(() => '');
+        const shownPrice = Number(await page.locator('[data-testid="reference-price"]').innerText().catch(() => 'NaN'));
+        const caption = await page.locator('[data-testid="regression-table"]').innerText().catch(() => '');
+        if (!h1.includes(stover.flowsheet.title) || !(Math.abs(shownPrice - stover.artifact.output[stover.flowsheet.priceOutput]) < 1e-3) || !/test_cornstover/.test(caption))
+          problems.push(`a corn run answered after the reader moved on lands on the corn stover page (${JSON.stringify(h1)}, ${shownPrice})`);
+        if (await page.locator('[data-testid="reference-run"]:has-text("Running")').count()) problems.push('the corn stover page shows the corn plant\u2019s run as its own');
+      }
+      // The index's reference cards say how many of their package test's values the run holds (finding 30).
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      for (const id of ['cornstover_benchmark', 'corn_drygrind']) {
+        const checks = fixture(`proforma-reference-${id}.json`).artifact.output.checks;
+        const card = page.locator(`[data-testid="reference-card"][data-flowsheet="${id}"]`);
+        await card.locator('[data-testid="reference-within"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const within = await card.locator('[data-testid="reference-within"]').innerText().catch(() => '');
+        if (!within.startsWith(`${checks.filter((c) => c.within).length} of ${checks.length} values of test_`)) problems.push(`the ${id} card does not say how many of its package test's values the run holds (${JSON.stringify(within)})`);
+      }
       // The index's reference cards link to their pages.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
       const link = page.locator('[data-testid="reference-card"][data-flowsheet="corn_drygrind"] [data-testid="reference-title"]');
@@ -830,6 +889,23 @@ async function main() {
       await link.click().catch(() => {});
       await page.locator('[data-testid="proforma-reference"]').waitFor({ timeout: 8000 }).catch(() => {});
       if (!/#\/proforma\/reference\/corn_drygrind$/.test(page.url())) problems.push(`the corn reference card does not open its page (${page.url()})`);
+
+      // OF-BLD-019 §3.R (finding 14): an id that is no reference on the shelf
+      // says the service's words and claims nothing: no reference subtitle,
+      // no run, no "not run yet". (Its own page: the service's 404 is a
+      // console line by design.)
+      const bad = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      bad.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+      for (const id of ['nope', 'ethanol_glucose_v0']) {
+        await bad.goto(`http://localhost:${PORT}/#/proforma/reference/${id}`, { waitUntil: 'networkidle' });
+        await bad.locator('[data-testid="reference-problem"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const said = await bad.locator('[data-testid="reference-problem"]').innerText().catch(() => '');
+        const body = await bad.locator('main').innerText().catch(() => '');
+        if (!said.includes(`${id} is not a reference biorefinery on the shelf`)) problems.push(`/proforma/reference/${id} does not say the service's words (${JSON.stringify(said.slice(0, 120))})`);
+        if ((await bad.locator('[data-testid="reference-run"]').count()) || /Not run on this service yet|A published biorefinery|· reference biorefinery/i.test(body))
+          problems.push(`/proforma/reference/${id} still presents a reference biorefinery that has not run`);
+      }
+      await bad.close();
     } catch (e) {
       problems.push(String(e).slice(0, 160));
     }
@@ -883,6 +959,8 @@ async function main() {
       if ((await page.locator('[data-testid="scenario-pin"]').getAttribute('aria-pressed')) !== 'true') problems.push(`${who} did not pin`);
     };
     try {
+      // A service with no run on file yet: the runs earlier flows made are forgotten (§3.R).
+      doubleState.proformaRunsOnFile.clear();
       if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
       await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
       await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
@@ -891,12 +969,26 @@ async function main() {
       await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
       await typeYeast();
+      // OF-BLD-019 §3.R (finding 7): while the simulator is starting, Run
+      // waits and says so, and comes back once the status line reads it
+      // ready (or cold) again.
+      await page.waitForTimeout(700);
+      await page.route('**/api/proforma/status', (r) => r.fulfill({ json: { status: 'starting', error: null } }));
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="run-status"][data-status="starting"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="run-waits"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const startingRun = page.getByRole('button', { name: 'Run the scenario' });
+      if (!(await startingRun.isDisabled().catch(() => false)) || !(await count('[data-testid="run-waits"]')))
+        problems.push('Run is offered while the simulator is starting, or the page does not say it waits');
+      await page.unroute('**/api/proforma/status');
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /Run the scenario/.test(b.textContent ?? '') && !b.disabled), null, { timeout: 9000 }).catch(() => {});
+      if (await startingRun.isDisabled().catch(() => true)) problems.push('Run does not come back once the simulator has started');
       await runAndPin('sc-yeast-1');
       // §2.R: after a reload the yeast scenario reads its newest run back from its artifact, as sc-pha-1 does.
       await page.waitForTimeout(700);
       await page.reload({ waitUntil: 'networkidle' });
       await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
-      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
+      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d UTC in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
         problems.push('after a reload sc-yeast-1 does not read its newest run back from the artifact');
 
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
@@ -919,6 +1011,16 @@ async function main() {
         const cols = await page.locator('[data-testid="compare-column"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-scenario')).join());
         if (cols !== want.join()) problems.push(`Compare shows ${cols || 'nothing'}, not ${want.join()}`);
       };
+      // OF-BLD-019 §3.R (finding 2): Home's pinned card reads what is
+      // pinned: two BioSTEAM scenarios are not Cost model v0, and the card
+      // puts no modeled tick of its own on them.
+      await page.goto(`http://localhost:${PORT}/#/`, { waitUntil: 'networkidle' });
+      const pinnedLine = page.locator('[data-testid="pinned-scenarios"]');
+      await pinnedLine.waitFor({ timeout: 8000 }).catch(() => {});
+      const pinnedWords = await pinnedLine.innerText().catch(() => '');
+      const pinnedTick = await page.locator('a:has([data-testid="pinned-scenarios"]) .tick').count();
+      if (!/compared from its newest run/.test(pinnedWords) || /Cost model v0/.test(pinnedWords) || pinnedTick !== 0)
+        problems.push(`Home's pinned card calls BioSTEAM scenarios Cost model v0 or ticks them modeled (${JSON.stringify(pinnedWords)}, ${pinnedTick} tick)`);
       await compared(['sc-yeast-1', made]);
       const prices = (await page.locator('[data-testid="compare-price"]').allInnerTexts()).map(Number);
       if (prices.length !== 2 || prices.some((v) => !(Math.abs(v - yeast.quantiles.p50) < 1e-3))) problems.push(`Compare does not read each price from its run (${prices.join(', ')})`);
@@ -949,6 +1051,24 @@ async function main() {
       const differ = await page.locator('[data-testid="compare-bases-differ"]').innerText().catch(() => '');
       if (!/bases differ/i.test(differ) || !/PHA/.test(differ) || !/ethanol/i.test(differ)) problems.push(`scenarios on two flowsheets are not said to differ in basis (${JSON.stringify(differ.slice(0, 120))})`);
       if (!(await count('[data-testid="compare-authored"]'))) problems.push('the authored compare is gone for the archived example');
+
+      // OF-BLD-019 §3.R (findings 21, 16): a run the service holds for
+      // sc-pha-1, made outside this browser, joins its column; and with two
+      // flowsheets on the table each cell names its own flowsheet's input,
+      // in the page and in the CSV.
+      const phaRun = fixture('proforma-run.json');
+      doubleState.proformaRunsOnFile.set('sc-pha-1', phaRun.artifactId);
+      await compared(['sc-pha-1', 'sc-yeast-1', made]);
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="compare-input-row"][data-input="titre"] td[data-kind="record"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if (await count('[data-testid="compare-not-run"]')) problems.push('Compare does not read the run the service holds for sc-pha-1');
+      const titreCells = await page.locator('[data-testid="compare-input-row"][data-input="titre"] td[data-kind]').allInnerTexts();
+      if (!/^PHA titre at harvest: /.test(titreCells[0] ?? '') || !/^ethanol titre at harvest: /.test(titreCells[1] ?? ''))
+        problems.push(`with two flowsheets an input cell is not labelled by its own flowsheet (${JSON.stringify(titreCells.map((t) => t.slice(0, 40)))})`);
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.locator('[data-testid="compare-csv"]').click()]);
+      const csvText = download ? readFileSync(await download.path(), 'utf8') : '';
+      const titreLine = csvText.split('\n').find((l) => l.startsWith('Input: titre') || l.startsWith('"Input: titre')) ?? '';
+      if (!/PHA titre at harvest: /.test(titreLine) || !/ethanol titre at harvest: /.test(titreLine)) problems.push(`the comparison CSV labels an input with another flowsheet's name (${JSON.stringify(titreLine.slice(0, 160))})`);
     } catch (e) {
       problems.push(String(e).slice(0, 160));
     }
@@ -1362,6 +1482,10 @@ async function main() {
       if (!/Ran\s+2026-09-15/.test(ranBench) || !/Expected 1\.968/.test(ranBench) || !(await benchCard.locator('[data-testid="reference-price"]').count()) ||
         !(await benchCard.getByRole('button', { name: 'Rerun' }).count()))
         problems.push('the benchmark\u2019s reference card does not read its newest reference run with the price its package gave');
+      // OF-BLD-019 §3.R (findings 18, 29): what the package set names the simulator the run was on.
+      const benchSim = await benchCard.locator('details').textContent().catch(() => '');
+      const ranSim = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-reference-cornstover_benchmark.json'), 'utf8')).response.artifact.output.simulator;
+      if (!benchSim.includes(`on ${ranSim}`)) problems.push(`the benchmark card's disclosure does not name the simulator its run was on (${JSON.stringify(benchSim.slice(0, 120))})`);
       const benchRef = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-reference-cornstover_benchmark.json'), 'utf8')).response;
       await page.route('**/api/proforma/reference/cornstover_benchmark', (r) =>
         r.request().method() === 'GET' ? r.fulfill({ json: { ...benchRef, artifact: null } }) : r.continue(),
@@ -1375,6 +1499,45 @@ async function main() {
         problems.push('the benchmark\u2019s reference card does not show its empty state with the package it will run');
       if (!(await benchCard.getByRole('button', { name: 'Run' }).count())) problems.push('the benchmark\u2019s reference card offers no run');
       if (!/The simulator has not started on this service yet/.test(bench)) problems.push('the benchmark\u2019s reference card has no status line');
+      // OF-BLD-019 §3.R (findings 0, 15, 22): a service that holds the
+      // benchmark run kept before reference runs (OF-BLD-014 §8.2,
+      // proforma_benchmark) and no reference run shows that run, price only,
+      // said to be what it is, on the card and on the page; Run still makes
+      // the full reference run. The legacy artifact is built here from the
+      // reference fixture's own output, as GET /api/proforma/benchmark keeps it.
+      {
+        const o = benchRef.artifact.output;
+        const legacy = {
+          ...benchRef.artifact,
+          id: 'b0b0b0b0b0b0b0b0',
+          tool: 'proforma_benchmark',
+          toolVersion: 'benchmark 1',
+          output: { package: o.package, biosteam: o.simulator, mespUsdPerGal: o.mespUsdPerGal, mespUsdPerKg: o.mespUsdPerKg, settings: o.settings, references: o.references },
+        };
+        await page.route('**/api/proforma/reference/cornstover_benchmark', (r) =>
+          r.request().method() === 'GET' ? r.fulfill({ json: { ...benchRef, artifact: null } }) : r.continue(),
+        );
+        await page.route('**/api/proforma/benchmark', (r) =>
+          r.request().method() === 'GET' ? r.fulfill({ json: { artifact: legacy, simulator: { status: 'cold', error: null } } }) : r.continue(),
+        );
+        await page.goto(`http://localhost:${PORT}/#/settings`, { waitUntil: 'networkidle' });
+        await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+        await benchCard.locator('[data-testid="reference-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const kept = await benchCard.innerText().catch(() => '');
+        const keptPrice = Number(await benchCard.locator('[data-testid="reference-price"]').innerText().catch(() => 'NaN'));
+        if (!(Math.abs(keptPrice - o.mespUsdPerGal) < 1e-3) || !kept.includes(legacy.id) || /Not run on this service yet/.test(kept) || !/first built on BioSTEAM/.test(kept))
+          problems.push(`the benchmark card does not show the benchmark run the service kept (${JSON.stringify(kept.slice(0, 200))})`);
+        if (!(await benchCard.getByRole('button', { name: 'Run', exact: true }).count())) problems.push('the benchmark card does not offer the full reference run beside the kept benchmark');
+        await page.goto(`http://localhost:${PORT}/#/proforma/reference/cornstover_benchmark`, { waitUntil: 'networkidle' });
+        await page.locator('[data-testid="reference-price"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const keptPage = await page.locator('main').innerText().catch(() => '');
+        if (!(Math.abs(Number(await page.locator('[data-testid="reference-price"]').innerText().catch(() => 'NaN')) - o.mespUsdPerGal) < 1e-3) ||
+          !/first built on BioSTEAM/.test(await page.locator('[data-testid="reference-note"]').innerText().catch(() => '')) ||
+          (await page.locator('[data-testid="regression-summary"]').count()) || /Not run on this service yet\. A run is/.test(keptPage))
+          problems.push('the benchmark page does not show the kept benchmark run, price only, without claiming it was checked against the package\u2019s test');
+        await page.unroute('**/api/proforma/reference/cornstover_benchmark');
+        await page.unroute('**/api/proforma/benchmark');
+      }
       // OF-BLD-016 §3.1 — Postdoc speaks only through the service. With
       // nothing answering (health and the ask both refused), the page says
       // so and how to start it, keeps the conversation asked above, and

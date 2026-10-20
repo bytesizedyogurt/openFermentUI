@@ -533,6 +533,22 @@ def proforma_run(req: ProformaRunRequest) -> dict:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
 
 
+@app.get("/api/proforma/runs")
+def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
+    """A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
+    stored `proforma.run` whose basis names the scenario (`latest_run`, the
+    one pureOS and selling_price read), or none. A read: it runs nothing and
+    starts no simulator. The scenario is named by id, so no program filter
+    applies (a link opens what it names)."""
+    from . import proforma
+
+    sid = scenarioId.strip()
+    if not sid:
+        raise HTTPException(status_code=422, detail="a read of a scenario's runs names the scenario it belongs to")
+    art = proforma.latest_run(sid)
+    return {"scenarioId": sid, "artifact": art.model_dump(mode="json") if art else None}
+
+
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
 
 
