@@ -2406,6 +2406,8 @@ export interface ToolResult {
   draft: RunbookDraft | null;
   /** Module rows a plan may cite (OF-BLD-015 §7.2). */
   rows: ModuleRow[];
+  /** The whole of what a summary cuts to the cap, for the endpoint and the MCP server; never citable (OF-BLD-019 §6.1). */
+  data: Record<string, unknown> | null;
 }
 
 // ── Runbook drafts (OF-BLD-014 §9.2) ─────────────────────────────────────

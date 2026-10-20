@@ -5,7 +5,12 @@ Postdoc's loop, `GET /api/tools` and `POST /api/tools/{name}`, and the MCP
 server (`core/openferment_core/mcp_server.py`). A tool is in `WHITELIST` or
 it does not exist. Every input carries ids and words: a JSON number anywhere
 outside `k` and `limit` refuses the call, and every refusal is a result with
-`error` set. A summary over 9,000 characters is replaced by an error.
+`error` set. A summary over 9,000 characters is replaced by an error; a tool
+whose whole output is longer (`stream_table`) cuts its own summary, says how
+much it left out, and carries the whole in `ToolResult.data`, which the
+endpoint and the MCP server return and no model reads. The registry is closed
+at thirty-two names; `test_tools.NAMES` is the one literal list of them in the
+tests, and every other count there is derived from `WHITELIST`.
 
 The names below are the registry's. The build document writes `dominion.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
@@ -22,6 +27,43 @@ underscore.
 | `growth_forecast` | a kept kinetic fit's artifact id | one evidence id and the final values as intervals |
 | `selling_price` | a scenario id | the kept run's price, or which inputs wait for a source; never runs a scenario |
 | `draft_runbook` | a title, a product, a strain, items by evidence or field, measures | a draft whose numbers the service wrote |
+
+## Proforma's two (OF-BLD-019 §6.1)
+
+| Tool | In | Out |
+|---|---|---|
+| `run_flowsheet` | a scenario id, nothing else | runs the scenario as the service binds it through `proforma.run`, keeps one `proforma.run` artifact and returns its evidence id (the artifact id), the median price with its 5th to 95th percentile, each input's binding and the cost lines; or refuses with `proforma.run`'s own words (the 422's) naming the inputs that wait |
+| `stream_table` | a run's artifact id (`proforma.run` or `proforma.reference`) | the base case's stream table, the plant's feeds and products first, cut to the cap with the number of streams left out; the whole table in `ToolResult.data`; the run's evidence id |
+
+Both go out loose, as the module tools do. `run_flowsheet` is a free write:
+it spends no model money, and **it is at no gate** (`gates.py` is unchanged:
+a run keeps one artifact in the open lane, as a ceiling does). It is audited
+like every module write, `agent: model` with the model id, the effort and the
+ask id, `module: proforma`, `action: run`, and the tool's name in `detail`.
+The service holds no person's assumption (they are typed in Proforma and kept
+in the browser's Durable tier), so the model never supplies one: an input no
+record binds waits, and the call refuses naming it. A scenario made with New
+scenario lives in the browser that made it and is refused in words, as is an
+authored cost surface and, with the switch off, an archived scenario. The run
+is `tools/writes.py`'s `run_scenario`, the same function `proforma_write`'s
+`run` calls, so `check:tools` reads the one call to `proforma.run` there; its
+rule 2b fails when any other tool file reaches `proforma.run` or
+`audit.append` itself.
+
+`stream_table` reads through `proforma.tables_of`, so a scenario's run and a
+reference biorefinery's (§2.2) read alike; anything else is refused in words,
+as is an archived run with the switch off. Each summary row names the stream,
+the unit it leaves and the unit it enters (none for a feed or a product), its
+phase, T, P, mass flow, price and largest components, to four significant
+digits; `data` holds every number as the run kept it.
+
+A run is cited like any computed value: both tools return it as one
+`Evidence` whose id is the artifact's (a scenario's run is its median price,
+a reference run the price its package gives on its own defaults), so it
+enters `SeenSet` and a claim citing it is kept, and a claim citing a run no
+tool returned in this conversation is dropped. Postdoc's prompt (rule 8)
+says a price, a cost or a recovery read from a run cites that run's evidence
+id.
 
 ## The read tools (OF-BLD-015 §7.2)
 
@@ -49,9 +91,10 @@ row's `detail` (product in and out, what is lost and to which outlet, the
 recovery, the cumulative share still on the path) is read by
 `pureos.train_of` from the run artifact's stream table, never typed and never
 simulated again; the row's mark is the run's, worked out as for any artifact
-row. This is a kind of the existing read, not a tool of its own.
-`GET /api/pureos/trains` and `GET /api/pureos/train/{key}` serve the same
-reading to the browser.
+row. This is a kind of the existing read, not a tool of its own. Proforma's
+rows list every scenario's runs and, since §6.1, the reference biorefineries'
+runs (`proforma.reference`). `GET /api/pureos/trains` and
+`GET /api/pureos/train/{key}` serve the same reading to the browser.
 
 Before round one, `module_stores.coverage` sweeps every module for what the
 question names and hands the model the map. A follow-up is swept with the
@@ -78,9 +121,9 @@ modules it holds for.
 ## thermosteam answers property questions (OF-BLD-019 §4.2)
 
 The thirtieth name, added by the build document's authority (OF-BLD-019
-Part C.8 and §4.2): the registry is closed at thirty, and `check:tools` fails
-when a name in `WHITELIST` has no tool registered or no mention here.
-OF-BLD-019 §6.1 adds `run_flowsheet` and `stream_table` later.
+Part C.8 and §4.2), before Proforma's two (§6.1), which close the registry at
+thirty-two; `check:tools` (rule 5) fails when a name in `WHITELIST` has no
+tool registered or no mention here.
 
 | Tool | In | Out |
 |---|---|---|
@@ -139,9 +182,10 @@ take. With the switch off:
   question names something archived; the trace reads *found in archived
   program PHA (hidden)*, no hidden row's ref reaches the model, and the
   code writes a gap naming the switch.
-- With the switch off, `yield_ceiling`, `selling_price` and `draft_runbook`
-  refuse an archived model, product, scenario or strain with *archived
-  (hidden)* and name Settings → Programs, and no tool's description or schema
+- With the switch off, `yield_ceiling`, `selling_price`, `run_flowsheet`,
+  `stream_table` and `draft_runbook` refuse an archived model, product,
+  scenario, run or strain with *archived (hidden)* and name Settings →
+  Programs, and no tool's description or schema
   names an archived model, product or scenario (`programs.archived_target`,
   `offered`; §2.R). `growth_forecast` reads the browser's run and the write
   tools are filtered by nothing beyond the pool they read.
@@ -177,7 +221,7 @@ audited as `finding`.
 | `geneos_write` | `ceiling`, `frontier`, `mix` | computes and keeps an artifact; returns an evidence id | `geneos.ceiling` and kin |
 | `fermos_write` | `forecast` | forecasts from a kept fit and keeps it | `fermos.forecast_run` |
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
-| `proforma_write` | `run` | runs the BioSTEAM scenario on the bound inputs, or refuses naming what waits | `proforma.run` |
+| `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
 | `proforma_write` | `bind` | refused: an assumption is a named person's, in the Durable tier | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
 | `biorepo_write` | `decide` | refused: a decision is a person's | — |
@@ -250,4 +294,6 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
 Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-two. `test_mcp` counts them.
+thirty-four in all. `test_mcp` counts them from `WHITELIST`, and holds
+`run_flowsheet` and `stream_table` to the registry's own descriptions and
+schemas.

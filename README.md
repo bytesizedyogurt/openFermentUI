@@ -283,7 +283,7 @@ from the same coverage call, so it could not miss.
 ### The same tools, from an assistant outside the app
 
 `core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
-thirty tools Postdoc uses, with the registry's own schemas, and two more:
+thirty-two tools Postdoc uses, with the registry's own schemas, and two more:
 `ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`. The
 registry's rules hold there as everywhere: a number typed into an input is
 refused, a write goes through the module's own write function, and anything at
@@ -381,8 +381,9 @@ cd core && uv run python -m openferment_core.demo --prototype   # the prototype'
 ```
 
 The service also answers `GET /api/tools` (each tool's name, description and input schema) and
-`POST /api/tools/{name}`, the same registry Postdoc's loop calls: the seven OF-BLD-014 tools and
-a read and a write tool for every module (`docs/TOOLS.md`). A tool input carries ids and words; a number typed into one refuses the call.
+`POST /api/tools/{name}`, the same registry Postdoc's loop calls: the seven OF-BLD-014 tools,
+a read and a write tool for every module, thermosteam's `thermo_props`, and Proforma's
+`run_flowsheet` and `stream_table` (`docs/TOOLS.md`). A tool input carries ids and words; a number typed into one refuses the call.
 `pnpm check:tools` is the stage of `verify` that holds the write tools to their module's write
 functions and the gates to a named person; `pnpm eval:o` runs eval set O live.
 Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
@@ -491,7 +492,7 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:core         #   the Python service, 1,579 tests (1 skipped) on 2026-10-20: retrieval, units,
                          #   anchoring, match_run, biorepo.write, the computed-value basis, the artifact store
                          #   and replay, llm.py's roles, cached tokens, tool turns and daily cap, the registry's
-                         #   thirty tools, its gates and the proposals they make, the coverage sweep, the
+                         #   thirty-two tools, its gates and the proposals they make, the coverage sweep, the
                          #   program switch on the pool, the passages, the module rows and the coverage map,
                          #   the worker runner, the geneOS worker on a toy network worked by hand and Appendix
                          #   2's bundled-model ceilings, fermOS's fits and forecast band on synthetic runs,

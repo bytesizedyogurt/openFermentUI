@@ -253,6 +253,9 @@ ARTIFACT_MODULE = {
     "growth_fit": "fermos", "kinetic_fit": "fermos", "growth_forecast": "fermos",
     "geneos.ceiling": "geneos", "geneos.frontier": "geneos", "geneos.mix": "geneos",
     "proforma.run": "proforma", "proforma_benchmark": "proforma",
+    # A reference biorefinery's run (OF-BLD-019 §2.2), so Proforma's rows
+    # list the reference runs beside the scenarios' (§6.1).
+    "proforma.reference": "proforma",
 }
 
 

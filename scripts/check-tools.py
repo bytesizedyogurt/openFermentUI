@@ -11,6 +11,10 @@ Fails when:
    `from .. import guild as g` is the module it is; a store's exception or
    constant may be named, a store module handed around bare or a dynamic
    import may not;
+2b. a tool file other than `tools/writes.py` reaches `proforma.run` or
+   `audit.append` itself (OF-BLD-019 §6.1): `run_flowsheet` is a free,
+   audited write, and runs through `writes.run_scenario`, so rule 2 reads its
+   one call to `proforma.run`;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -20,9 +24,9 @@ Fails when:
    is a gate the other still promises;
 5. the registry is not the closed list: a name in `WHITELIST` with no tool
    registered under it, or one `docs/TOOLS.md` never names in backticks
-   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, by the build
-   document's authority; a name added to the code alone is a tool nobody
-   wrote down).
+   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, and §6.1
+   `run_flowsheet` and `stream_table`, by the build document's authority; a
+   name added to the code alone is a tool nobody wrote down).
 
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
@@ -67,6 +71,8 @@ except Exception as e:  # a module with no tool, or a tool outside WHITELIST, fa
 ALLOWED_WRITES = (
     "geneos.ceiling", "geneos.frontier", "geneos.mix",
     "fermos.forecast_run",
+    # proforma_write's run and the registry's run_flowsheet alike, both through
+    # writes.run_scenario (OF-BLD-019 §6.1; rule 2b).
     "proforma.run",
     "extract.add_candidate",
     "intake.fetch_paper",
@@ -234,6 +240,21 @@ for fn in ALLOWED_WRITES:
     if fn not in reached:
         fail(f"tools/writes.py no longer calls {fn}(): the action it served has lost its write function, or the table is stale")
 
+# 2b. an audited write outside writes.py goes through it (OF-BLD-019 §6.1)
+THROUGH_WRITES = ("proforma.run", "audit.append")
+for other in sorted(Path(writes.__file__).parent.glob("*.py")):
+    if other.name == "writes.py":
+        continue
+    other_tree = ast.parse(other.read_text(encoding="utf-8"))
+    other_chains: list[tuple[str, list[str], int, set[str]]] = []
+    _chains(other_tree, _scope(other_tree, {}, package), package, other_chains)
+    for root, attrs, line, targets in other_chains:
+        for target in sorted(targets):
+            member, _ = _reach(target.split(".") + attrs)
+            if member in THROUGH_WRITES:
+                fail(f"tools/{other.name} line {line} reaches {member} itself: a tool that writes and audits goes "
+                     f"through tools/writes.py, where rule 2 reads it")
+
 # 3. a gated action completes only with a person's name on it
 data = Path(os.environ["OPENFERMENT_DATA_DIR"])
 assert intake.DATA_DIR == data, "the throwaway data directory is not in use"
@@ -289,6 +310,6 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches {' or '.join(THROUGH_WRITES)}; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
       f"written down")

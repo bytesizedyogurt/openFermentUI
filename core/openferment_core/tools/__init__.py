@@ -9,8 +9,11 @@ The whitelist is closed, added phase by phase: `search_records` and
 (6), `growth_forecast` (7), `selling_price` (8), `draft_runbook` (9); then one
 read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
 Messages API refuses a dot in a tool name, and its write pair (§7.3); then
-`thermo_props` (OF-BLD-019 §4.2), a read offered loose. Thirty names. A tool
-outside it is a new document.
+`thermo_props` (OF-BLD-019 §4.2), a read offered loose; then Proforma's two
+(OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
+`stream_table`, a read of a kept run's streams. Thirty-two names. A tool
+outside it is a new document. `test_tools.NAMES` is the one literal list the
+tests hold the registry to; every other count is derived from `WHITELIST`.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
 file, a field or a scenario, and the service looks the quantity up. A JSON
@@ -21,7 +24,9 @@ number anywhere in a tool's input, outside the two count fields `k` and
 TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
 returns more is a defect in the tool, and the result says so in place of the
-oversized summary.
+oversized summary. A tool whose whole output is larger (a stream table) cuts
+its own summary, says how much it left out, and carries the whole in `data`,
+which the endpoint and the MCP server return and no model reads.
 
 THE PROGRAM SWITCH (OF-BLD-016 §2.3) is not a tool input: no model sets it.
 It rides in `ToolContext.include_archived`, from the request that started the
@@ -39,7 +44,7 @@ from pydantic import BaseModel, ValidationError
 
 from ..models import ToolInfo, ToolResult
 
-# The names E.6 and OF-BLD-015 allow, whichever have been built.
+# The names E.6, OF-BLD-015 and OF-BLD-019 §6.1 allow, whichever have been built.
 WHITELIST = (
     "search_records",
     "convert_units",
@@ -74,6 +79,10 @@ WHITELIST = (
     "home_write",
     # OF-BLD-019 §4.2 — thermosteam answers property questions, a read.
     "thermo_props",
+    # OF-BLD-019 §6.1 — a flowsheet run and the stream table it kept, both
+    # loose (the module tools' grammar, §7.2).
+    "run_flowsheet",
+    "stream_table",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -211,6 +220,7 @@ def run(name: str, raw: Any, ctx: ToolContext | None = None) -> ToolResult:
                 "rows": [],
                 "passages": [],
                 "evidence": [],
+                "data": None,
                 "error": f"{name} returned a summary of {size} characters, over the {MAX_SUMMARY_CHARS} a model may read.",
             }
         )

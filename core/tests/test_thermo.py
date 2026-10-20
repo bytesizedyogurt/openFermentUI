@@ -252,8 +252,10 @@ def _tool(**fields):
     return tools.run("thermo_props", raw, tools.ToolContext(pool_factory=lambda: _titres(TITRE), include_archived=True))
 
 
-def test_the_tool_is_a_loose_read_in_the_closed_registry_of_thirty():
-    assert "thermo_props" in tools.WHITELIST and len(tools.WHITELIST) == 30
+def test_the_tool_is_a_loose_read_in_the_closed_registry():
+    # The registry's count is test_tools.NAMES' (OF-BLD-019 §6.1); thermo_props
+    # is the first name after the module pairs.
+    assert tools.WHITELIST[tools.WHITELIST.index("home_write") + 1] == "thermo_props"
     assert tools.REGISTRY["thermo_props"].strict is False
     schema = next(t for t in tools.infos() if t.name == "thermo_props").inputSchema
     assert set(schema["properties"]) == {"artifactId", "streamId", "preset", "recordId"}

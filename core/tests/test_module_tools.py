@@ -161,8 +161,10 @@ def test_the_module_tools_go_out_loose_and_the_rest_strict():
 
     sent = [llm.tool_param(t["name"], t["description"], t["input_schema"], t["strict"]) for t in postdoc_agent._tool_defs()]
     assert [t["name"] for t in sent if t["strict"]] == list(tools.WHITELIST[:7])
-    # The module tools and thermosteam's read (OF-BLD-019 §4.2) go out loose.
-    assert {t["name"] for t in sent if not t["strict"]} == {f"{m}_{w}" for m in module_stores.MODULES for w in ("read", "write")} | {"thermo_props"}
+    # Every tool after the seven goes out loose: the module pairs, and
+    # OF-BLD-019's thermo_props (§4.2), run_flowsheet and stream_table (§6.1).
+    assert {t["name"] for t in sent if not t["strict"]} == set(tools.WHITELIST[7:])
+    assert {f"{m}_{w}" for m in module_stores.MODULES for w in ("read", "write")} <= set(tools.WHITELIST[7:])
     assert "refused its input" in tools.run("dominion_read", {"ids": "hot-start-taq", "words": "", "kind": "", "state": "",
                                                               "limit": 5}).error
 

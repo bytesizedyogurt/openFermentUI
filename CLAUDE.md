@@ -98,10 +98,11 @@ Mini, which serves `main` (D8).
   the next model with a fresh conversation. Both models REJECT forced tool
   use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
   live in `llm.PRICES`; `usage.models` records which model answered. The
-  seven OF-BLD-014 tools go out strict; the twenty-two module tools and
-  `thermo_props` go out loose, because eighteen strict tools compile to a
-  grammar the API refuses (OF-BLD-015 §7.2, measured 2026-10-19), and
-  `tools.run` validates every input alike before anything runs.
+  seven OF-BLD-014 tools go out strict; the twenty-two module tools,
+  `thermo_props` and OF-BLD-019's `run_flowsheet` and `stream_table` go out
+  loose, because eighteen strict tools compile to a grammar the API refuses
+  (OF-BLD-015 §7.2, measured 2026-10-19), and `tools.run` validates every
+  input alike before anything runs.
 
 ## Rule 1 and its mirror
 
@@ -464,17 +465,20 @@ Mini, which serves `main` (D8).
   otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
   Offline tests charge a file of their own (`core/tests/conftest.py`).
 - **`converse` is one tool turn on one model.** Each tool strict unless the
-  registry marks it loose (the twenty-two module tools and `thermo_props`, see above),
+  registry marks it loose (the twenty-two module tools, `thermo_props` and
+  the two Proforma tools, see above),
   `tool_choice` `auto` or `none` and nothing else (anything else is refused
   before it is sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
-- **One tool registry, closed at thirty names** (`tools/__init__.py`, E.6
+- **One tool registry, closed at thirty-two names** (`tools/__init__.py`, E.6
   and OF-BLD-015 §7.2–§7.3: the seven below, then one read and one write tool
   a module, named `<module>_read` and `<module>_write`; then `thermo_props`,
   OF-BLD-019 §4.2, thermosteam's answer for a run's stream or a preset, kept
-  as an artifact). `check:tools` fails when a name in `WHITELIST` is not
-  registered or not named in `docs/TOOLS.md`.
+  as an artifact; then OF-BLD-019 §6.1's `run_flowsheet` and `stream_table`).
+  `check:tools` fails when a name in `WHITELIST` is not registered or not
+  named in `docs/TOOLS.md`. `test_tools.NAMES` is the one literal list of
+  them in the tests; every other test derives its count from `WHITELIST`.
   Postdoc's loop, `GET /api/tools` / `POST /api/tools/{name}` and the MCP
   server all go through `tools.run`. **Tool inputs carry ids and words:** a
   JSON number anywhere in an input outside top-level `k` and `limit` refuses
@@ -676,7 +680,8 @@ Mini, which serves `main` (D8).
   `core/data/live/eval-o.json`.
 - **The MCP server needs no change for any of it**: it lists `tools.infos()`
   and calls `tools.run`, so the module tools appear there with the same marks
-  and gates; `test_mcp` counts thirty-two.
+  and gates; `test_mcp` counts thirty-four (the registry's thirty-two and
+  its own two, derived from `WHITELIST`).
 
 ## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
 
@@ -789,6 +794,20 @@ Mini, which serves `main` (D8).
   never runs a scenario; given `proforma_benchmark` it cites the stored
   benchmark run (the NREL 2011 corn stover design) in USD per gallon. The double's Proforma fixtures come from
   `demo.py --prototype` with a STAND-IN evaluator in place of BioSTEAM.
+- **Postdoc runs a flowsheet and reads its streams** (OF-BLD-019 §6.1).
+  `run_flowsheet` takes a scenario id and nothing else and runs it as the
+  service binds it: a free write through `proforma.run` (compute, no model
+  money), at no gate, audited with the model as agent. The service holds no
+  person's assumption, so an input no record binds waits and the tool returns
+  the 422's words. It and `proforma_write`'s `run` are one function,
+  `writes.run_scenario`, so `check:tools` reads the one call to `proforma.run`
+  in `writes.py`; its rule 2b fails when any other tool file reaches
+  `proforma.run` or `audit.append`. `stream_table` reads a `proforma.run` or
+  `proforma.reference` artifact's stream table through `proforma.tables_of`,
+  cut to the cap (feeds and products first, the count left out said), the
+  whole table in `ToolResult.data`, which no model reads. Both return the run
+  as one `Evidence` whose id is the artifact's, so a claim cites the run as it
+  cites a ceiling, and `proforma_read` lists reference runs too.
 
 ## Runbooks keep score (OF-BLD-014 Phase 9)
 

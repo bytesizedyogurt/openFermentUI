@@ -21,7 +21,14 @@ made lands in the open lane: an artifact with its basis, a candidate
 
 THE GATES. An action in `gates.GATES` writes nothing: it becomes a proposal
 with `state: proposed`, and Home shows it with one button (§7.4). The spend
-gate is reached at run time, when the budget refuses an extraction.
+gate is reached at run time, when the budget refuses an extraction. A
+flowsheet run is at no gate: it spends no model money and keeps one artifact
+in the open lane, as a ceiling does.
+
+ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
+registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
+`run_scenario` below, so the one call to `proforma.run` stays in this file,
+where `check:tools` reads it, and both are refused, run and audited alike.
 
 Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
 ref), `fields` (names to words, what the action needs), `note` (the model's
@@ -66,7 +73,8 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     },
     "pureos": {},
     "proforma": {
-        "run": ("run the BioSTEAM scenario named in target on the bound inputs and keep the run", ()),
+        "run": ("run the BioSTEAM scenario named in target as the service binds it and keep the run, as run_flowsheet "
+                "does; refused naming the inputs that wait for a person's assumption", ()),
         "bind": ("bind an assumption to a scenario input", ("key", "value", "basis")),
     },
     "biorepo": {
@@ -231,25 +239,80 @@ def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
                       evidence=[r.evidence])
 
 
-def _proforma_run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
-    from .. import proforma
+RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenario's page, under their reviewer "
+             "name; a model never supplies one. Say in gaps which inputs wait.")
+
+
+def run_scenario(tool: str, scenario_id: str, note: str, ctx: ToolContext) -> ToolResult:
+    """Run one BioSTEAM scenario as the service binds it, keep the run and
+    mark it as the model's (OF-BLD-019 §6.1). The service holds no person's
+    assumption (they live in the browser's Durable tier), so none is passed:
+    an input with no record waits, and the refusal is proforma.run's own
+    words (what `POST /api/proforma/run` answers with a 422)."""
+    from .. import programs, proforma, pureos
     from ..models import ProformaRunRequest
     from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
 
-    scenario = inp.target or proforma.SCENARIO_ID
+    sid = (scenario_id or "").strip()
+    if not sid:
+        return ToolResult(error=f"{tool} refused: name the scenario to run by its id (proforma_read lists them)")
     try:
-        r = proforma.run(ProformaRunRequest(scenarioId=scenario), pool=ctx.pool)
+        refused = programs.archived_refusal(tool, [("scenario", sid)], ctx.include_archived)
+    except FileNotFoundError:  # no projection here: nothing is known to be archived
+        refused = None
+    if refused:
+        return ToolResult(error=refused)
+    seed = {s["id"]: s for s in pureos.seed_scenarios()}
+    if seed and sid not in seed:
+        held = ", ".join(sorted(k for k, s in seed.items() if s.get("kind") == "biosteam"))
+        return ToolResult(error=f"{tool} refused: {sid} is not a scenario this service holds. A scenario made with New "
+                                f"scenario lives in the browser that made it, and a person runs it on its page in "
+                                f"Proforma; the service's BioSTEAM scenarios are {held or 'none'}")
+    if seed and seed[sid].get("kind") != "biosteam":
+        return ToolResult(error=f"{tool} refused: {sid} is an authored cost surface, not a BioSTEAM flowsheet; "
+                                "nothing runs it")
+    try:
+        r = proforma.run(ProformaRunRequest(scenarioId=sid), pool=ctx.pool)
     except proforma.ScenarioRefused as e:
-        return ToolResult(error=f"proforma_write refused: {e}")
+        waits = f" {RUN_WAITS}" if "wait for a source" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {e}.{waits}")
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        return ToolResult(error=f"proforma_write could not run the scenario: {e}")
-    aid = getattr(r, "artifactId", None)
-    ev = getattr(r, "evidence", None)
-    _audit(ctx, "proforma", "run", "open", scenario, {"artifactId": aid, "note": inp.note})
-    return ToolResult(summary={"state": "open", "scenario": scenario, "artifactId": aid,
-                               "evidenceId": getattr(ev, "id", None),
-                               "meaning": "the run is kept as an artifact in the open lane, marked as the model's"},
-                      evidence=[ev] if ev is not None else [])
+        return ToolResult(error=f"{tool} could not run the scenario: {e}")
+    ev = r.evidence
+    _audit(ctx, "proforma", "run", "open", sid, {"artifactId": r.artifactId, "evidenceId": ev.id, "tool": tool,
+                                                  "note": note})
+    tea = r.tea
+    return ToolResult(
+        summary={
+            "state": "open",
+            "scenarioId": sid,
+            "flowsheet": r.flowsheet,
+            "artifactId": r.artifactId,
+            "evidenceId": ev.id,
+            "provenance": r.provenance,
+            "median": ev.value,
+            "interval": ev.interval.model_dump() if ev.interval else None,
+            "basePrice": r.basePrice,
+            "unit": r.priceBasis,
+            "samples": r.samples,
+            "feasible": r.feasible,
+            "infeasible": r.infeasible,
+            "inputs": [{"key": i.key, "label": i.label, "binding": i.binding, "records": len(i.recordIds),
+                        "source": i.source.kind if i.source else None} for i in r.inputs],
+            "costLines": [{"key": ln.key, "label": ln.label, "perUnit": ln.perUnit} for ln in tea.lines] if tea else [],
+            "streams": len(r.streams),
+            "units": len(r.units),
+            "leavesOut": r.leavesOut,
+            "meaning": "the scenario ran as the service binds it and is kept as one run artifact in the open lane, "
+                       "marked as the model's in the audit log; cite its price, a cost line or a recovery by the "
+                       "evidence id; stream_table reads its streams and pureos_read its train",
+        },
+        evidence=[ev],
+    )
+
+
+def _proforma_run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    return run_scenario("proforma_write", inp.target, inp.note, ctx)
 
 
 def _biorepo_candidate(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:

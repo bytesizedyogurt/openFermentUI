@@ -1187,6 +1187,10 @@ class ToolResult(BaseModel):
     draft: "RunbookDraft | None" = None
     # Module rows a plan may cite (OF-BLD-015 §7.2).
     rows: list[ModuleRow] = Field(default_factory=list)
+    # The whole of what a summary cuts to the cap, for the HTTP endpoint and
+    # the MCP server: a model reads `summary` alone (OF-BLD-019 §6.1:
+    # `stream_table`'s whole stream table). Nothing here is citable.
+    data: dict[str, Any] | None = None
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────

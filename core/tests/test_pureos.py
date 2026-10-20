@@ -273,9 +273,8 @@ def test_an_archived_train_is_hidden_and_a_read_by_its_id_says_whose(pool):  # n
 
 def test_the_kinds_name_trains_and_the_registry_stays_closed():
     assert module_stores.KINDS["pureos"] == ("unit-operation", "train", "train-unit")
-    # A train is a kind of pureos_read, never a tool of its own; the thirtieth
-    # name is thermo_props, which OF-BLD-019 §4.2 adds by the document's authority.
-    assert len(tools.WHITELIST) == 30 and "pureos_train" not in tools.WHITELIST
+    assert [n for n in tools.WHITELIST if n.startswith("pureos")] == ["pureos_read", "pureos_write"], \
+        "a train is a kind of pureos_read, never a tool of its own"
     described = next(t for t in tools.infos() if t.name == "pureos_read").description
     assert "train-unit" in described and "artifact id" in described
 
