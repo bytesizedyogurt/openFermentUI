@@ -1378,46 +1378,68 @@ def prototype_ceiling_check() -> dict[str, Any]:
                                             "fitted": {"none": fitted_none, "onFile": fitted_on_file}}}
 
 
-# OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code
-# (pureos.trains, pureos.train) from the run prototype_proforma makes: the
-# same artifact artifacts.json carries, whose tables are the stand-in's and
-# say so in `tablesSource`. With the switch off the list is empty, because
-# the run is sc-pha-1's and PHA is archived; the page says so.
-def prototype_pureos() -> dict[str, Any]:
+def _kept_standin_runs(then=None) -> list:
+    """The two runs the double keeps (OF-BLD-019 §7.R): sc-pha-1's and
+    sc-yeast-1's, made through the real code with the STAND-IN evaluator
+    exactly as prototype_proforma makes them, so their ids are the ones
+    artifacts.json carries. `then(arts)`, given, runs while the scratch
+    store still holds the runs (thermo.py reads a run's streams there)."""
     import tempfile
     from types import SimpleNamespace
 
-    from . import artifacts, proforma, pureos
+    from . import artifacts, proforma
     from . import intake as _intake
     from .models import InputAssumption, ProformaRunRequest
 
     rs = _standin_records()
     pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    ry = _standin_records() + _standin_yeast_records()
+    pool_y = SimpleNamespace(records=ry, records_by_id={r["id"]: r for r in ry})
     a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
          for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
+    ay = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
+          for k, v, lo, hi in YEAST_STANDIN_ASSUMED]
     saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
     with tempfile.TemporaryDirectory() as tmp:
         try:
             _intake.DATA_DIR = Path(tmp)
             proforma.call = _standin_call
             proforma.yield_cap = lambda: None
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
-            art = artifacts.get(run.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
+            runs = [proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool),
+                    proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool_y)]
+            arts = [artifacts.get(r.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0}) for r in runs]
+            if then is not None:
+                then(arts)
         finally:
             _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    return arts
+
+
+# OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code
+# (pureos.trains, pureos.train) from the runs prototype_proforma makes: the
+# same artifacts artifacts.json carries, whose tables are the stand-in's and
+# say so in `tablesSource`. §7.R: both kept runs, sc-pha-1's and
+# sc-yeast-1's, so with the switch off the list holds the yeast train and
+# says it hides PHA's, and the double answers either train by its scenario
+# or its run's id (`pureos-train.json` PHA's, `pureos-train-yeast.json`).
+def prototype_pureos() -> dict[str, Any]:
+    from . import proforma, pureos
+
+    arts = _kept_standin_runs()
     scenarios = pureos.seed_scenarios()
 
     def listed(include_archived: bool) -> list[dict[str, Any]]:
-        return [pureos.summary(t).model_dump(mode="json") for t in pureos.trains(include_archived, arts=[art], scenarios=scenarios)]
+        return [pureos.summary(t).model_dump(mode="json") for t in pureos.trains(include_archived, arts=arts, scenarios=scenarios)]
 
-    train = pureos.train(proforma.SCENARIO_ID, arts=[art], scenarios=scenarios)
+    train = pureos.train(proforma.SCENARIO_ID, arts=arts, scenarios=scenarios)
+    yeast = pureos.train(proforma.YEAST_SCENARIO_ID, arts=arts, scenarios=scenarios)
     return {"pureos-trains.json": listed(False), "pureos-trains-archived.json": listed(True),
-            "pureos-train.json": train.model_dump(mode="json")}
+            "pureos-train.json": train.model_dump(mode="json"), "pureos-train-yeast.json": yeast.model_dump(mode="json")}
 
 
 # OF-BLD-019 §4.2: thermosteam's answers for the double, made by the real
-# thermo.py over the stand-in run prototype_pureos reads (one question a
-# stream of it), the azeotrope preset and a beer at a STAND-IN titre record's
+# thermo.py over the stand-in runs prototype_pureos reads (one question a
+# stream of each, §7.R), the azeotrope preset and a beer at a STAND-IN titre record's
 # titre. thermosteam is replaced by a closed-form STAND-IN that knows three
 # chemicals and refuses any other in words, as the library refuses a chemical
 # it lacks; every number it gives is invented and its `library` says so.
@@ -1462,21 +1484,15 @@ def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
 
 
 def prototype_thermo() -> dict[str, Any]:
-    import tempfile
     from types import SimpleNamespace
 
-    from . import artifacts, proforma, thermo
-    from . import intake as _intake
-    from .models import InputAssumption, ProformaRunRequest, ThermoPropsRequest
+    from . import proforma, thermo
+    from .models import ThermoPropsRequest
 
-    rs = _standin_records()
-    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
     titre = {"id": "standin-ethanol_titre-0", "paperId": "Q999", "field": "ethanol_titre", "value": 80.0,
              "unit": "g L-1", "provenance": "unverified", "status": "unverified", "primary": True,
              "organismText": "STAND-IN organism"}
     titres = SimpleNamespace(records=[titre], records_by_id={titre["id"]: titre}, record=lambda i: {titre["id"]: titre}.get(i))
-    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
-         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
     entries: list[dict[str, Any]] = []
 
     def ask(req: ThermoPropsRequest) -> None:
@@ -1491,20 +1507,17 @@ def prototype_thermo() -> dict[str, Any]:
             art = art.model_copy(update={"createdAt": AT, "durationMs": 0})
             entries.append({"request": asked, "status": 200, "body": art.model_dump(mode="json")})
 
-    saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
-    with tempfile.TemporaryDirectory() as tmp:
-        try:
-            _intake.DATA_DIR = Path(tmp)
-            proforma.call = _standin_call
-            proforma.yield_cap = lambda: None
-            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
-            proforma.call = _standin_thermo_call
-            for s in proforma.tables_of(artifacts.get(run.artifactId)).streams:
-                ask(ThermoPropsRequest(artifactId=run.artifactId, streamId=s.id))
-            ask(ThermoPropsRequest(preset=thermo.AZEOTROPE))
-            ask(ThermoPropsRequest(preset=thermo.BEER, recordId=titre["id"]))
-        finally:
-            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    # §7.R: one question a stream of each kept run, sc-pha-1's and
+    # sc-yeast-1's, so the yeast train's Properties card is answered too.
+    def asked(arts: list) -> None:
+        proforma.call = _standin_thermo_call
+        for art in arts:
+            for st in proforma.tables_of(art).streams:
+                ask(ThermoPropsRequest(artifactId=art.id, streamId=st.id))
+        ask(ThermoPropsRequest(preset=thermo.AZEOTROPE))
+        ask(ThermoPropsRequest(preset=thermo.BEER, recordId=titre["id"]))
+
+    _kept_standin_runs(then=asked)
     return {"thermo-props.json": {"entries": entries}}
 
 

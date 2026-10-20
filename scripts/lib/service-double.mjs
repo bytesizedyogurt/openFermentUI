@@ -130,8 +130,11 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * fresh install starts. `ceilingOnFile` (OF-BLD-019 §5.2) serves
    * GET /api/proforma/ceiling-check as a service with the fixture's STAND-IN
    * geneOS ceiling on file, else with none, as a fresh install starts.
+   * `pureosYeastOnFile` (OF-BLD-019 §7.R) lists and serves sc-yeast-1's
+   * train beside sc-pha-1's; off, the double holds the PHA run alone, so
+   * pureOS's empty list for the active program is drawn.
    */
-  const flags = { fermosFitsOnFile: false, ceilingOnFile: false };
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true };
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -347,18 +350,25 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       return res.end(JSON.stringify(await prototype(on ? 'proforma-shelf-archived.json' : 'proforma-shelf.json')));
     }
     // OF-BLD-019 §4.1 — pureOS's trains, read by the real code from the
-    // stand-in run: the list with the program switch off (empty: the run is
-    // PHA's) and, asked with ?includeArchived=true, on; one train by its
-    // scenario or its run's artifact id, else the service's 404 in its words.
+    // stand-in runs: the list with the program switch off (§7.R: the yeast
+    // run's train; PHA's is archived) and, asked with ?includeArchived=true,
+    // on; one train by its scenario or its run's artifact id, either run's,
+    // else the service's 404 in its words. With flags.pureosYeastOnFile off
+    // the double holds no yeast run, so the empty list's words stay tested.
+    const yeastTrain = (t) => t.scenarioId === 'sc-yeast-1' || t.program === 'yeast';
     if (url === '/api/pureos/trains' && req.method === 'GET') {
       const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      const listed = await prototype(on ? 'pureos-trains-archived.json' : 'pureos-trains.json');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(await prototype(on ? 'pureos-trains-archived.json' : 'pureos-trains.json')));
+      return res.end(JSON.stringify(flags.pureosYeastOnFile ? listed : listed.filter((t) => !yeastTrain(t))));
     }
     if (url.startsWith('/api/pureos/train/') && req.method === 'GET') {
-      const key = url.slice('/api/pureos/train/'.length);
-      const train = await prototype('pureos-train.json');
-      if (key !== train.scenarioId && key !== train.artifactId) {
+      const key = decodeURIComponent(url.slice('/api/pureos/train/'.length));
+      const trains = [await prototype('pureos-train.json'), await prototype('pureos-train-yeast.json')].filter(
+        (t) => flags.pureosYeastOnFile || !yeastTrain(t),
+      );
+      const train = trains.find((t) => key === t.scenarioId || key === t.artifactId);
+      if (!train) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ detail: `no Proforma run of ${key} is on file here: run the scenario in Proforma, and pureOS reads its train from that run` }));
       }

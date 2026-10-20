@@ -849,5 +849,56 @@ await (async () => {
   }
 })();
 
+// OF-BLD-019 \u00a77.R (2) \u2014 Compare reads a fermOS fit as the input's source.
+// proforma.basis_inputs names a fit-bound input `<key> fit`, `<key> fit low`
+// and `<key> fit high` (source artifact), and a productivity the fit gave
+// carries `fit batch time`. runInputs reads them as one row for the key,
+// of kind artifact with the fit's range and id, never as 'not in this
+// run's basis' beside a raw 'titre fit' row.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  let words: ((i: unknown) => string) | null = null;
+  try {
+    words = ((await import('../src/screens/Compare')) as unknown as Record<string, any>).inputWords ?? null;
+  } catch {
+    words = null;
+  }
+  const src = (id: string, note: string) => ({ kind: 'artifact', id, note });
+  const basisIn = (name: string, value: number, unit: string, source: object) => ({ name, value, unit, source });
+  const view = {
+    basis: {
+      inputs: [
+        basisIn('flowsheet', 0, '', { kind: 'convention' }),
+        basisIn('titre fit', 80, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('titre fit low', 70, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('titre fit high', 90, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('productivity fit', 2, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('productivity fit low', 1.5, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('productivity fit high', 2.5, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('fit batch time', 40, 'h', src('fitA', 'the hour the median sugar runs out')),
+        basisIn('yield record', 0.4, 'g g-1', { kind: 'record', id: 'r1' }),
+      ],
+    },
+  };
+  const flowsheet = { inputs: ['titre', 'yield', 'productivity'].map((key) => ({ key, name: key, unit: '', kind: 'bound' })) };
+  let rows: any[] = [];
+  try {
+    rows = typeof pf.runInputs === 'function' ? pf.runInputs(view, flowsheet) : [];
+  } catch (e) {
+    rows = [{ threw: String(e) }];
+  }
+  const titre = rows.find((r) => r.key === 'titre');
+  const prod = rows.find((r) => r.key === 'productivity');
+  check('Compare reads a titre a fermOS fit fed as one artifact row with the fit\u2019s value, range and id',
+    titre?.kind === 'artifact' && titre.value === 80 && titre.low === 70 && titre.high === 90 && titre.by === 'fitA', titre);
+  check('no input row is keyed by a fit\u2019s own basis name', !rows.some((r) => / fit$|^fit /.test(String(r.key))), rows.map((r) => r.key));
+  check('a productivity from a fit names the fit\u2019s batch time', prod?.kind === 'artifact' && /40 h/.test(String(prod?.note ?? '')), prod);
+  const said = words && titre ? words(titre) : '';
+  check('Compare\u2019s words for a fitted input name the artifact and its range, never \u201cnot in this run\u2019s basis\u201d',
+    /fitA/.test(said) && /70/.test(said) && /90/.test(said) && !/not in this run/.test(said), said);
+  const compareSrc = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
+  check('Compare links an artifact-fed input to its artifact', /data-testid="compare-input-artifact"/.test(compareSrc));
+})();
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

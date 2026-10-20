@@ -1874,17 +1874,34 @@ async function main() {
   // forming the product and drawing no bar, the centrifuge's recovery as the
   // service read it; a click cuts the stream table to that unit's streams,
   // and a vocabulary step linked by ?op= is outlined on the front page.
+  // §7.R: with the double's yeast run on file the list holds the yeast
+  // train (the empty list is drawn with flags.pureosYeastOnFile off), and
+  // sc-yeast-1's page links to its run's train: R1, D302, U301 in run
+  // order, Properties on the beer and the ethanol.
   let trainFails = 0;
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const problems = [];
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
     try {
+      // §7.R: with no yeast run on file the list for the active program is
+      // empty and says so; with the double's yeast run it lists that train
+      // and says it hides PHA's.
+      doubleState.flags.pureosYeastOnFile = false;
       await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="pureos-trains-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
       const empty = await page.locator('[data-testid="pureos-trains-empty"]').innerText().catch(() => '');
       if (!/No train for an active program/.test(empty) || !/Proforma/.test(empty)) problems.push(`the empty list does not say how a train gets there: ${JSON.stringify(empty.slice(0, 160))}`);
       if (!/PHA/.test(empty)) problems.push('the empty list does not say it hides a PHA train');
+      doubleState.flags.pureosYeastOnFile = true;
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="pureos-train-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      const rows = await page.locator('[data-testid="pureos-train-row"]').allInnerTexts();
+      const yeastName = fixture('pureos-train-yeast.json').scenarioName;
+      if (rows.length !== 1 || !rows[0].includes(yeastName)) problems.push(`the active program's list is not the yeast train alone: ${JSON.stringify(rows)}`);
+      if (await page.locator('[data-testid="pureos-trains-empty"]').count()) problems.push('the empty list shows beside the yeast train');
+      if (!/PHA/.test(await page.locator('[data-testid="pureos-trains"]').innerText().catch(() => ''))) problems.push('the list does not say it hides a PHA train');
       await page.goto(`http://localhost:${PORT}/#/pureos/train/sc-pha-1`, { waitUntil: 'networkidle' });
       await page.locator('[data-testid="train-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
       if ((await page.locator('[role="note"][data-archived-program="pha"]').count()) !== 1) problems.push('the train of a PHA scenario does not open under its banner');
@@ -1928,6 +1945,30 @@ async function main() {
       await water.locator('[data-testid="thermo-props"]').waitFor({ timeout: 8000 }).catch(() => {});
       if ((await water.locator('[data-testid="thermo-props"]').count()) !== 1) problems.push('a stored answer is not read back on the next visit');
       if (doubleState.thermoCalls.filter((c) => c.method === 'POST').length !== asked) problems.push('reading a stored answer asked thermosteam again');
+      // §7.R (finding 0): Appendix 1's last step. The yeast scenario's run
+      // on file, its page links to pureOS's train of that run; the train
+      // opens with the run's units in run order, and its Properties card
+      // opens on the beer and the ethanol and answers on a press.
+      const yeastRun = fixture('proforma-run-yeast.json');
+      doubleState.proformaRunsOnFile.set('sc-yeast-1', yeastRun.artifactId);
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="train-link"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const yeastLink = await page.locator('[data-testid="train-link"]').getAttribute('href').catch(() => null);
+      if (yeastLink !== `#/pureos/train/${yeastRun.artifactId}`) problems.push(`sc-yeast-1's page does not link to its run's train (${yeastLink})`);
+      else {
+        await page.locator('[data-testid="train-link"]').click();
+        await page.locator('[data-testid="train-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+        if (await page.locator('[data-testid="train-none"]').count()) problems.push('the yeast run\'s train is said not to be on file');
+        const yeastUnits = await page.locator('[data-testid="train-unit"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-unit')).join());
+        if (yeastUnits !== yeastRun.unitOrder.join()) problems.push(`the yeast train's units are not the run's, in run order: ${yeastUnits}`);
+        const yeastPanels = await page.locator('[data-testid="thermo-panel"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stream')).join());
+        if (yeastPanels !== 'beer,ethanol') problems.push(`the yeast train's Properties card opens on ${yeastPanels}`);
+        const ethanol = page.locator('[data-testid="thermo-panel"][data-stream="ethanol"]');
+        await ethanol.getByRole('button', { name: 'Ask thermosteam' }).click().catch(() => {});
+        await ethanol.locator('[data-testid="thermo-props"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if (!/Density/.test(await ethanol.innerText().catch(() => ''))) problems.push('the ethanol stream of the yeast train is not answered');
+      }
+      doubleState.proformaRunsOnFile.delete('sc-yeast-1');
       await page.goto(`http://localhost:${PORT}/#/pureos?op=molecular-sieve`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(400);
       if ((await page.locator('#op-molecular-sieve[data-focused="true"]').count()) !== 1) problems.push('a step linked by ?op= is not outlined');
@@ -1941,7 +1982,7 @@ async function main() {
       trainFails++;
       console.log(`✗ train        ${problems.join('; ')}`);
     } else {
-      console.log('✓ train        no train for an active program, and whose is hidden; sc-pha-1 under its banner, three units in order, a unit no product enters drawn as words, a click cuts the streams; Properties on the broth and the product, a chemical the library lacks refused in words, another stream answered with its library and artifact and read back from what is stored; ?op= outlines a step, a scenario with no run says how one gets there');
+      console.log('✓ train        no train for an active program, and whose is hidden; the yeast train listed once its run is on file; sc-pha-1 under its banner, three units in order, a unit no product enters drawn as words, a click cuts the streams; Properties on the broth and the product, a chemical the library lacks refused in words, another stream answered with its library and artifact and read back from what is stored; sc-yeast-1\u2019s page links to its run\u2019s train, three units in run order, Properties on the beer and the ethanol, answered; ?op= outlines a step, a scenario with no run says how one gets there');
     }
     await page.close();
   }

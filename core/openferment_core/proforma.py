@@ -28,6 +28,9 @@ Status = Literal["cold", "starting", "ready", "failed"]
 _WORKER: SimWorker | None = None
 _STATE: dict[str, Any] = {"status": "cold", "error": None}
 _LOCK = threading.Lock()
+# Set when a start in progress has settled, ready or failed (OF-BLD-019
+# §7.R): a request arriving while another starts the worker waits on it.
+_SETTLED = threading.Event()
 
 
 def worker() -> SimWorker:
@@ -47,7 +50,9 @@ def _warm() -> None:
         worker().ping(timeout_s=START_TIMEOUT_S)
         _STATE.update(status="ready", error=None)
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
-        _STATE.update(status="failed", error=str(e))
+        _STATE.update(status="failed", error=str(e) or type(e).__name__)
+    finally:
+        _SETTLED.set()
 
 
 def start(background: bool = True) -> dict[str, Any]:
@@ -55,6 +60,7 @@ def start(background: bool = True) -> dict[str, Any]:
     with _LOCK:
         if _STATE["status"] in ("cold", "failed"):
             _STATE.update(status="starting", error=None)
+            _SETTLED.clear()
             go = True
         else:
             go = False
@@ -67,11 +73,18 @@ def start(background: bool = True) -> dict[str, Any]:
 
 
 def call(op: str, args: dict[str, Any]) -> Any:
-    """A request on the warm worker; the first one starts it and waits."""
+    """A request on the warm worker; the first one starts it and waits, and
+    one arriving while another starts it waits for that start, as long as
+    a start may take (OF-BLD-019 §7.R), then says in words why it cannot
+    run: the start's own error, or that the simulator is still starting."""
     if _STATE["status"] != "ready":
         start(background=False)
+    if _STATE["status"] == "starting":
+        _SETTLED.wait(timeout=START_TIMEOUT_S)
+    if _STATE["status"] == "starting":
+        raise WorkerError("the Proforma simulator is still starting; try again in a minute")
     if _STATE["status"] != "ready":
-        raise WorkerError(f"the Proforma simulator could not start: {_STATE['error']}")
+        raise WorkerError(f"the Proforma simulator could not start: {_STATE['error'] or 'it gave no reason'}")
     return worker().call(op, args)
 
 

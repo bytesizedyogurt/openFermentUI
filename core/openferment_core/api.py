@@ -368,7 +368,9 @@ def _fits_param(raw: str | None) -> dict[str, str]:
         return {}
     try:
         fits = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
+        # OF-BLD-019 §7.R: JSON nested past Python's recursion limit is
+        # malformed like any other, refused in words, never a bare 500.
         fits = None
     if not isinstance(fits, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in fits.items()):
         raise HTTPException(status_code=422, detail="fits is a JSON object of input key to the id of a kept fermOS fit")
@@ -387,7 +389,7 @@ def _assumptions_param(raw: str | None) -> list:
         return []
     try:
         return TypeAdapter(list[InputAssumption]).validate_json(raw)
-    except ValidationError:
+    except (ValidationError, RecursionError):
         raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
                                                     "low, high, by and at, as a run takes them") from None
 

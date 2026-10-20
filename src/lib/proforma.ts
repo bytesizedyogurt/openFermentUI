@@ -625,25 +625,52 @@ export interface RunInput {
   note: string | null;
 }
 
+/** A fit-fed input's basis names: `<key> fit`, `<key> fit low`, `<key> fit high` (proforma._FIT_NAME). */
+const FIT_NAME = /^(\w+) fit(?: (low|high))?$/;
+
 /**
  * Each input the run's flowsheet takes, as the run's basis names it (D1):
  * `<key> record` once per record, `<key>`, `<key> low` and `<key> high` for an
- * assumption, `<key>` alone for an artifact, a model or a convention. The
+ * assumption, `<key>` alone for an artifact, a model or a convention, and
+ * `<key> fit`, `<key> fit low` and `<key> fit high` for a fermOS fit (its
+ * artifact, read as the input's source with the fit's range). The
  * range of a record-bound input is the lowest and highest record value the
  * basis lists; every other number is the basis's own.
  */
 export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels: Record<string, string> = {}): RunInput[] {
   const keys = (flowsheet?.inputs ?? []).map((i) => i.key);
   // A run whose flowsheet the shelf no longer holds still names its inputs.
+  // An input a fermOS fit fed is named `<key> fit`, `<key> fit low` and
+  // `<key> fit high` (proforma._FIT_NAME, OF-BLD-019 §5.1): its key is the
+  // input's own, never `<key> fit` (§7.R).
   for (const i of view.basis.inputs) {
-    const m = /^(.+?) (record|low|high)$/.exec(i.name);
-    const key = m ? m[1] : null;
+    const fit = FIT_NAME.exec(i.name);
+    const m = fit ? null : /^(.+?) (record|low|high)$/.exec(i.name);
+    const key = fit ? fit[1] : m ? m[1] : null;
     if (key && !keys.includes(key)) keys.push(key);
   }
   return keys.map((key) => {
     const declared = flowsheet?.inputs.find((i) => i.key === key);
     const label = labels[key] ?? declared?.name ?? key;
     const records = view.basis.inputs.filter((i) => i.name === `${key} record` && i.source.kind === 'record');
+    const fitted = view.basis.inputs.find((i) => i.name === `${key} fit` && i.source.kind === 'artifact');
+    if (fitted && !records.length) {
+      const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} fit ${p}` && i.source.kind === 'artifact')?.value);
+      // A productivity the fit gave is its titre over the hour its median
+      // sugar runs out: the basis names that hour, and so does the row.
+      const batch = view.basis.inputs.find((i) => i.name === 'fit batch time' && i.source.kind === 'artifact' && i.source.id === fitted.source.id);
+      const hours = num(batch?.value);
+      const notes = [
+        `a fermOS fit${fitted.source.note ? `: ${fitted.source.note}` : ''}`,
+        key === 'productivity' && batch && hours != null ? `the fit's batch time ${String(Number(hours.toPrecision(4)))} ${batch.unit}`.trim() : null,
+      ];
+      return {
+        key, label, kind: 'artifact', unit: fitted.unit || declared?.unit || '', count: 0,
+        low: part('low'), high: part('high'),
+        value: typeof fitted.value === 'number' || typeof fitted.value === 'string' ? fitted.value : null,
+        by: fitted.source.id ?? null, note: notes.filter(Boolean).join('; '),
+      };
+    }
     const own = view.basis.inputs.find((i) => i.name === key);
     const unit = records[0]?.unit ?? own?.unit ?? declared?.unit ?? '';
     if (records.length) {

@@ -14,6 +14,20 @@
       "overallRecovery": 0.95,
       "runs": 1,
       "note": null
+    },
+    {
+      "scenarioId": "sc-yeast-1",
+      "scenarioName": "Glucose to ethanol — draft flowsheet",
+      "artifactId": "77a6c3ec1f9c6739",
+      "flowsheet": "ethanol_glucose_v0",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "provenance": "demo",
+      "program": "yeast",
+      "product": "Ethanol",
+      "unitCount": 3,
+      "overallRecovery": 1.0,
+      "runs": 1,
+      "note": null
     }
   ]
 }

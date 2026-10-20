@@ -80,3 +80,24 @@ def test_a_blank_scenario_is_refused_in_words(client):
     r = client.get("/api/proforma/runs?scenarioId=%20")
     assert r.status_code == 422 and "names the scenario" in r.json()["detail"]
     assert client.get("/api/proforma/runs").status_code == 422
+
+
+# OF-BLD-019 §7.R (finding 3): a `?fits=` or `?assumptions=` nested past
+# Python's recursion limit is refused in words, as any other malformed
+# value is, never a bare 500.
+@pytest.mark.parametrize("path,params,name,words", [
+    ("/api/proforma/bind", {"flowsheet": ETHANOL}, "fits", "fits is a JSON object"),
+    ("/api/proforma/ceiling-check", {"scenarioId": "sc-yeast-1"}, "fits", "fits is a JSON object"),
+    ("/api/proforma/ceiling-check", {"scenarioId": "sc-yeast-1"}, "assumptions", "assumptions is a JSON list"),
+])
+def test_deeply_nested_json_in_a_query_is_refused_in_words(monkeypatch, standin, path, params, name, words):
+    from openferment_core import api, evidence_pool
+
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: standin)
+    c = TestClient(api.app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    # Past Python's json recursion limit (about ten thousand), inside a URL
+    # an HTTP client still sends.
+    for deep in ("[" * 12000, '[{"a":' * 3000):
+        r = c.get(path, params={**params, name: deep})
+        assert r.status_code == 422, (r.status_code, r.text[:200])
+        assert words in r.json()["detail"]

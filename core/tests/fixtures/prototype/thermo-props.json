@@ -316,6 +316,871 @@
       },
       {
         "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "glucose"
+        },
+        "status": 200,
+        "body": {
+          "id": "d33424dc50f10e32",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "glucose",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Glucose",
+              "value": 27777.777777777777,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream glucose of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "glucose",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Glucose": 1.0
+            },
+            "density": 1540.0,
+            "Cp": 1.2,
+            "viscosity": 0.002,
+            "bubblePoint": 595.0,
+            "dewPoint": 605.0,
+            "vapourAtBubble": {
+              "Glucose": 1.0
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "9907d5e86af48516e5a90c15637ec55069f02a2a283087b6ba0463e611fa61e3",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "process_water"
+        },
+        "status": 200,
+        "body": {
+          "id": "f054ceca80e89932",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "process_water",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Water",
+              "value": 462962.9629629629,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream process_water of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "process_water",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Water": 1.0
+            },
+            "density": 1000.0,
+            "Cp": 4.2,
+            "viscosity": 0.001,
+            "bubblePoint": 368.0,
+            "dewPoint": 378.0,
+            "vapourAtBubble": {
+              "Water": 1.0
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "32ce13ccc4ae2fd40a5c081f8e7fae11a26e25055f2953764b9fda4a25bbca05",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "vent"
+        },
+        "status": 422,
+        "body": {
+          "detail": "the STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented holds Ethanol, Glucose, Water alone; it has no CO2"
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "beer"
+        },
+        "status": 200,
+        "body": {
+          "id": "c332b96e528ec1c6",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "beer",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Ethanol",
+              "value": 12500.0,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Glucose",
+              "value": 2777.7777777777774,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Water",
+              "value": 462962.9629629629,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream beer of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "beer",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Ethanol": 0.02613746369796709,
+              "Glucose": 0.005808325266214908,
+              "Water": 0.968054211035818
+            },
+            "density": 995.1127545687771,
+            "Cp": 4.135527589545014,
+            "viscosity": 0.0010110358180058085,
+            "bubblePoint": 368.7434656340755,
+            "dewPoint": 378.7434656340755,
+            "vapourAtBubble": {
+              "Ethanol": 0.02613746369796709,
+              "Glucose": 0.005808325266214908,
+              "Water": 0.968054211035818
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "1ec6c26502d4cae1eab1930c8eb066de6c538f9eabb840491a42bf3fe53ace40",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "stillage"
+        },
+        "status": 200,
+        "body": {
+          "id": "67e7c2b7ff8721a1",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "stillage",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Glucose",
+              "value": 2777.7777777777774,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Water",
+              "value": 462962.9629629629,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream stillage of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "stillage",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Glucose": 0.005964214711729622,
+              "Water": 0.9940357852882704
+            },
+            "density": 1002.0957309184992,
+            "Cp": 4.182107355864812,
+            "viscosity": 0.0010059642147117298,
+            "bubblePoint": 369.3538767395626,
+            "dewPoint": 379.3538767395626,
+            "vapourAtBubble": {
+              "Glucose": 0.005964214711729622,
+              "Water": 0.9940357852882704
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "c898d63b73f3a485f05c08f876dcb589f9308851266d6a64013a226b8a362437",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "distillate"
+        },
+        "status": 200,
+        "body": {
+          "id": "e2b244142ef794d1",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "distillate",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Ethanol",
+              "value": 12500.0,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream distillate of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "distillate",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Ethanol": 1.0
+            },
+            "density": 790.0,
+            "Cp": 2.4,
+            "viscosity": 0.0012,
+            "bubblePoint": 346.0,
+            "dewPoint": 356.0,
+            "vapourAtBubble": {
+              "Ethanol": 1.0
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "fc61997b3fd4cfac059da301a95749702cee9f63339beda858c8a165fb089249",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
+          "artifactId": "77a6c3ec1f9c6739",
+          "streamId": "ethanol"
+        },
+        "status": 200,
+        "body": {
+          "id": "d4c5a1e5a21686a2",
+          "tool": "thermo_props",
+          "toolVersion": "thermo props 1 · thermosteam 0.54.2",
+          "inputs": [
+            {
+              "name": "question",
+              "value": "stream",
+              "unit": "",
+              "source": {
+                "kind": "convention",
+                "id": null,
+                "note": "a stream of a Proforma run, at its own temperature, pressure and phase",
+                "by": null
+              }
+            },
+            {
+              "name": "stream",
+              "value": "ethanol",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "T",
+              "value": 298.15,
+              "unit": "K",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "P",
+              "value": 101325.0,
+              "unit": "Pa",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "phase",
+              "value": "l",
+              "unit": "",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "flow Ethanol",
+              "value": 12500.0,
+              "unit": "kg/hr",
+              "source": {
+                "kind": "artifact",
+                "id": "77a6c3ec1f9c6739",
+                "note": "a stream of the run's stream table",
+                "by": null
+              }
+            },
+            {
+              "name": "library",
+              "value": "thermosteam 0.54.2",
+              "unit": "",
+              "source": {
+                "kind": "model",
+                "id": "thermosteam@0.54.2",
+                "note": "BioSTEAM's property engine: its chemical database and its mixture and activity models, as shipped",
+                "by": null
+              }
+            }
+          ],
+          "output": {
+            "kind": "stream",
+            "subject": "stream ethanol of run 77a6c3ec1f9c6739",
+            "runArtifactId": "77a6c3ec1f9c6739",
+            "streamId": "ethanol",
+            "preset": null,
+            "recordId": null,
+            "library": "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented",
+            "T": 298.15,
+            "P": 101325.0,
+            "phase": "l",
+            "TSource": "given",
+            "PSource": "given",
+            "massFractions": {
+              "Ethanol": 1.0
+            },
+            "density": 790.0,
+            "Cp": 2.4,
+            "viscosity": 0.0012,
+            "bubblePoint": 346.0,
+            "dewPoint": 356.0,
+            "vapourAtBubble": {
+              "Ethanol": 1.0
+            },
+            "units": {
+              "density": "kg/m^3",
+              "Cp": "J/g/K",
+              "viscosity": "Pa*s",
+              "T": "K",
+              "P": "Pa",
+              "bubblePoint": "K",
+              "dewPoint": "K",
+              "massFractions": "kg/kg",
+              "vapourAtBubble": "mol/mol"
+            },
+            "solved": null,
+            "notes": [
+              "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+            ]
+          },
+          "outputHash": "37d885dc8d0824f24ce2603dd4419dd3d170b9a950d06ff4afc0ab741d541f2a",
+          "provenance": "demo",
+          "createdAt": "2026-09-15T09:00:00Z",
+          "durationMs": 0,
+          "seed": null
+        }
+      },
+      {
+        "request": {
           "preset": "ethanol-water-azeotrope"
         },
         "status": 200,

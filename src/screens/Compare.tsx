@@ -182,7 +182,9 @@ export function inputWords(i: RunInput): string {
     case 'assumption':
       return `assumption by ${i.by ?? 'nobody named'}: ${i.value == null ? '' : fmt(i.value, 4)}${u}${i.low != null && i.high != null ? `, range ${range(i.low, i.high)}` : ''}`;
     case 'artifact':
-      return `artifact ${i.by ?? ''}${i.value != null ? `: ${fmt(i.value, 4)}${u}` : ''}`.trim();
+      // A fermOS fit's value with its range, and what the basis says of it
+      // (§7.R): the run took this input from a kept artifact.
+      return `artifact ${i.by ?? ''}${i.value != null ? `: ${typeof i.value === 'number' ? fmt(i.value, 4) + u : i.value}` : ''}${i.low != null && i.high != null ? `, range ${range(i.low, i.high)}` : ''}${i.note ? `; ${i.note}` : ''}`.trim();
     case 'absent':
       return i.note ?? 'not in this run\u2019s basis';
     default:
@@ -449,6 +451,18 @@ function BiosteamCompare({ scenarios }: { scenarios: Scenario[] }) {
                   return (
                     <td key={c.scenario.id} className={cx(td, 'text-caption')} data-kind={i?.kind ?? 'none'}>
                       {!c.view ? '—' : i ? cellWords(i) : <span className="text-ink-soft">not an input of this flowsheet</span>}
+                      {c.view && i?.kind === 'artifact' && i.by && (
+                        <>
+                          {' '}
+                          <a
+                            className="text-accent underline underline-offset-2"
+                            href={href(`/biorepo/artifacts/${encodeURIComponent(i.by)}`)}
+                            data-testid="compare-input-artifact"
+                          >
+                            open the artifact
+                          </a>
+                        </>
+                      )}
                     </td>
                   );
                 })}

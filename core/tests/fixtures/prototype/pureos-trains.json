@@ -1,4 +1,19 @@
 {
   "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
-  "response": []
+  "response": [
+    {
+      "scenarioId": "sc-yeast-1",
+      "scenarioName": "Glucose to ethanol — draft flowsheet",
+      "artifactId": "77a6c3ec1f9c6739",
+      "flowsheet": "ethanol_glucose_v0",
+      "createdAt": "2026-09-15T09:00:00Z",
+      "provenance": "demo",
+      "program": "yeast",
+      "product": "Ethanol",
+      "unitCount": 3,
+      "overallRecovery": 1.0,
+      "runs": 1,
+      "note": null
+    }
+  ]
 }

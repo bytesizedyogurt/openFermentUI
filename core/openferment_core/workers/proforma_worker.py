@@ -74,6 +74,7 @@ from thermosteam.utils import chemical_cache
 from .. import flowsheets
 from ..flowsheets.shelf import TABLE_UNITS
 from . import serve
+from .dot_names import stable_names
 
 _BUILT: dict[str, Any] = {}
 
@@ -344,7 +345,12 @@ def diagram(system: Any, draw: bool | None = None) -> dict[str, Any]:
     if not here:
         return {"diagram": None, "diagramNote": DOT_MISSING}
     try:
-        svg = system.diagram(format="svg", display=False).pipe(format="svg").decode("utf-8")
+        # BioSTEAM names each node by its object's address; renamed by their
+        # order in the digraph, two builds of one plant draw one SVG, so a
+        # drawn run replays (OF-BLD-019 §7.R, workers/dot_names.py).
+        graph = system.diagram(format="svg", display=False)
+        graph.body[:] = stable_names(list(graph.body))
+        svg = graph.pipe(format="svg").decode("utf-8")
     except Exception as e:  # Graphviz is here and could not draw it: say so, list the units
         return {"diagram": None, "diagramNote": f"Graphviz could not draw this flowsheet on the host that made this run "
                                                f"({type(e).__name__}); the units are listed in run order."}

@@ -1,0 +1,202 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "scenarioId": "sc-yeast-1",
+    "scenarioName": "Glucose to ethanol — draft flowsheet",
+    "artifactId": "77a6c3ec1f9c6739",
+    "flowsheet": "ethanol_glucose_v0",
+    "createdAt": "2026-09-15T09:00:00Z",
+    "provenance": "demo",
+    "program": "yeast",
+    "tablesSource": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+    "productStream": "ethanol",
+    "product": "Ethanol",
+    "productBasis": "Ethanol in ethanol: the component the run's price is per (kg of fuel-grade ethanol, as the product leaves its tank)",
+    "productOut": 12500.0,
+    "productLost": 0.0,
+    "overallRecovery": 1.0,
+    "units": [
+      {
+        "id": "R1",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 0,
+        "ins": [
+          "glucose",
+          "process_water"
+        ],
+        "outs": [
+          "vent",
+          "beer"
+        ],
+        "onPath": true,
+        "massIn": 490740.7407407407,
+        "massOut": 490740.7407407407,
+        "productIn": 0.0,
+        "productOut": 12500.0,
+        "productOnward": 12500.0,
+        "productLost": 0.0,
+        "lostTo": [],
+        "recovery": null,
+        "cumulative": 1.0,
+        "note": "no Ethanol enters R1: the product is formed here"
+      },
+      {
+        "id": "D302",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 1,
+        "ins": [
+          "beer"
+        ],
+        "outs": [
+          "stillage",
+          "distillate"
+        ],
+        "onPath": true,
+        "massIn": 478240.7407407407,
+        "massOut": 478240.7407407407,
+        "productIn": 12500.0,
+        "productOut": 12500.0,
+        "productOnward": 12500.0,
+        "productLost": 0.0,
+        "lostTo": [],
+        "recovery": 1.0,
+        "cumulative": 1.0,
+        "note": null
+      },
+      {
+        "id": "U301",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 2,
+        "ins": [
+          "distillate"
+        ],
+        "outs": [
+          "ethanol"
+        ],
+        "onPath": true,
+        "massIn": 12500.0,
+        "massOut": 12500.0,
+        "productIn": 12500.0,
+        "productOut": 12500.0,
+        "productOnward": 12500.0,
+        "productLost": 0.0,
+        "lostTo": [],
+        "recovery": 1.0,
+        "cumulative": 1.0,
+        "note": null
+      }
+    ],
+    "streams": [
+      {
+        "id": "glucose",
+        "source": null,
+        "sink": "R1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 27777.777777777777,
+        "massFlows": {
+          "Glucose": 27777.777777777777
+        },
+        "price": 0.4
+      },
+      {
+        "id": "process_water",
+        "source": null,
+        "sink": "R1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 462962.9629629629,
+        "massFlows": {
+          "Water": 462962.9629629629
+        },
+        "price": null
+      },
+      {
+        "id": "vent",
+        "source": "R1",
+        "sink": null,
+        "phase": "g",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12500.0,
+        "massFlows": {
+          "CO2": 12500.0
+        },
+        "price": null
+      },
+      {
+        "id": "beer",
+        "source": "R1",
+        "sink": "D302",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 478240.7407407407,
+        "massFlows": {
+          "Water": 462962.9629629629,
+          "Ethanol": 12500.0,
+          "Glucose": 2777.7777777777774
+        },
+        "price": null
+      },
+      {
+        "id": "stillage",
+        "source": "D302",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 465740.7407407407,
+        "massFlows": {
+          "Water": 462962.9629629629,
+          "Glucose": 2777.7777777777774
+        },
+        "price": null
+      },
+      {
+        "id": "distillate",
+        "source": "D302",
+        "sink": "U301",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12500.0,
+        "massFlows": {
+          "Ethanol": 12500.0
+        },
+        "price": null
+      },
+      {
+        "id": "ethanol",
+        "source": "U301",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 12500.0,
+        "massFlows": {
+          "Ethanol": 12500.0
+        },
+        "price": null
+      }
+    ],
+    "tableUnits": {
+      "T": "K",
+      "P": "Pa",
+      "massFlow": "kg/hr",
+      "price": "USD/kg",
+      "cost": "USD",
+      "duty": "kJ/hr",
+      "power": "kW",
+      "annual": "USD/yr",
+      "perUnit": "USD per unit of the price's basis"
+    },
+    "runs": 1,
+    "note": null
+  }
+}

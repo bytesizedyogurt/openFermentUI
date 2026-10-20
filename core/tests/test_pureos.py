@@ -355,6 +355,23 @@ def test_the_double_serves_what_the_code_reads_from_the_same_run():
     assert pureos.train_of(run).model_dump(mode="json") == served
 
 
+def test_every_run_the_double_keeps_has_its_train_listed_and_served():
+    """OF-BLD-019 §7.R (finding 0): the double keeps sc-pha-1's run and
+    sc-yeast-1's, and lists and serves a train for each, so pureOS → Train
+    after a run of the yeast scenario is drawn by the browser tests."""
+    kept = json.loads((PROTOTYPE / "artifacts.json").read_text(encoding="utf-8"))["response"]
+    runs = [Artifact.model_validate(a) for a in kept if a["tool"] == "proforma.run"]
+    assert len(runs) >= 2
+    listed = json.loads((PROTOTYPE / "pureos-trains-archived.json").read_text(encoding="utf-8"))["response"]
+    active = json.loads((PROTOTYPE / "pureos-trains.json").read_text(encoding="utf-8"))["response"]
+    served = [json.loads((PROTOTYPE / f).read_text(encoding="utf-8"))["response"]
+              for f in ("pureos-train.json", "pureos-train-yeast.json")]
+    assert {r.id for r in runs} == {t["artifactId"] for t in listed} == {t["artifactId"] for t in served}
+    assert [t["scenarioId"] for t in active] == ["sc-yeast-1"]
+    for run in runs:
+        assert pureos.train_of(run).model_dump(mode="json") in served
+
+
 # ── pureos_read: trains and their units, by id ───────────────────────────
 
 
