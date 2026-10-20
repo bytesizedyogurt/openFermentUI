@@ -9,6 +9,11 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 The prototype build runs on `claude/of-bld-014-prototype`. Its document is
 `docs/build/OF-BLD-014.md`. §10.4 of that document removes this section.
 
+OF-BLD-016 (one active program, nothing invented on screen, Postdoc with every
+tool) runs on `claude/of-bld-016-demo`, cut from `main` at `7e3ebb0`. Its document
+is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits are
+`OF-BLD-016 §n.m: <what>`, and its Part A amends OF-BLD-014 Part A below.
+
 - **"Next phase", "continue" and "go on"** mean Part A.1 of the document: start the session
   (`bash scripts/session-start.sh`, once §1.3 has landed), pay what `## Live owed` in `STATE.md`
   lists and this machine can run, find the first step whose id is missing from
