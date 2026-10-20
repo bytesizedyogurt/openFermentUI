@@ -43,11 +43,13 @@ else
   echo "dense vectors: huggingface.co does not answer here, so they are not built (pnpm ready says why)"
 fi
 
-# §6.2 — the published C. necator reconstruction, at its pinned commit and
-# checked against its hash. GitHub answers on every lane; a mismatch fails.
+# §6.2 — the published reconstructions geneOS fetches, each checked against
+# its hash: C. necator (RehMBEL1391) and yeast (Yeast9) at their pinned
+# commits from GitHub, which answers on every lane, and yeast iMM904 from
+# BiGG Models' address. A mismatch, or a server that does not answer, fails.
 # geneos:fetch checks a file already here against the hash, and fetches it
 # again only when it is missing or does not match.
-echo "geneOS models: RehMBEL1391"
+echo "geneOS models: RehMBEL1391, iMM904, Yeast9"
 pnpm --silent geneos:fetch || status=1
 
 exit "$status"

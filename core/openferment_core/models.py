@@ -1017,6 +1017,10 @@ class GeneosModelInfo(BaseModel):
     # The sugar a view opens on: one the model can take up.
     feed: str
     notes: list[str] = Field(default_factory=list)
+    # The product a view opens on, and every product the shelf names a route
+    # to in this model ("phb", "ethanol"); the worker decides what it makes.
+    product: str
+    products: list[str] = Field(default_factory=list)
 
 
 GeneosKind = Literal["ceiling", "frontier", "mix"]

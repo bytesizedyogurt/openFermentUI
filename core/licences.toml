@@ -101,6 +101,24 @@ by = "Sean Creighton"
 date = 2026-10-15
 why = "The genome-scale reconstruction of Cupriavidus necator H16, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker; accepted under D4 for this research prototype."
 
+[data.Yeast9]
+licence = "CC-BY-4.0"
+source = "github.com/SysBioChalmers/yeast-GEM, model/yeast-GEM.xml (release v9.1.1)"
+revision = "2d594ae1c4a2d550ccef120d96a58c7bbf586255"
+sha256 = "30842b15eefb0ef7e36cbdea86a9efddfacf69a871c8b054165faa9af9f6c8eb"
+by = "Sean Creighton"
+date = 2026-10-20
+why = "Yeast9, the consensus genome-scale reconstruction of Saccharomyces cerevisiae (Zhang et al., Molecular Systems Biology 2024, doi:10.1038/s44320-024-00060-7), fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. The repository's LICENSE.md is CC-BY-4.0, read 2026-10-20: a use credits Zhang et al. and the yeast-GEM community, which the shelf's notes and every result's basis do."
+
+[data.iMM904]
+licence = "BiGG Models terms: educational, research and non-profit use; commercial use by agreement with UC San Diego"
+source = "bigg.ucsd.edu/static/models/iMM904.xml (BiGG Models; Mo, Palsson and Herrgård, BMC Systems Biology 2009, PMID 19321003)"
+revision = 'ETag "017c86841952cc365f20a8b466292b31", Last-Modified 2019-11-01'
+sha256 = "a4bcff4f8f2228a5b1553264c3bcb1e8a8093907754446007f3f3b529d29d3e1"
+by = "Sean Creighton"
+date = 2026-10-20
+why = "The genome-scale reconstruction of Saccharomyces cerevisiae S288C as BiGG Models serves it, fetched by pnpm geneos:fetch into core/data/models/ and read as data by the geneOS worker for an ethanol ceiling. Sean named it in his instruction of 2026-10-20 for the yeast-ethanol demo. BiGG's terms (bigg.ucsd.edu/license, read 2026-10-20) permit educational, research and non-profit use without fee, require the copyright notice and the paragraphs after it to travel with every copy, and leave commercial use to an agreement with UC San Diego's Technology Transfer and Intellectual Property Services. Not a permissive licence: the file is not committed, and data-sync carries no model file, so no copy leaves the machine that fetched it. Commercial use is a question for Sean before any such use."
+
 [data.iJO1366]
 licence = "as BiGG publishes it; ships inside cobra 0.32.1"
 source = "BiGG Models, bundled with cobra as iJO1366"

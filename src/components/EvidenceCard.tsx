@@ -8,7 +8,7 @@ import { ExternalLink } from 'lucide-react';
 import type { BasisInput, Evidence, ExtractionRecord } from '@/data/types';
 import { useStore } from '@/store';
 import { CeilingGap } from './figures';
-import { yieldsOnSugar } from '@/lib/geneos';
+import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
 import { fmt } from '@/engine/units';
 import { href } from '@/router';
 import { ProvenanceBadge, Tick } from './Provenance';
@@ -19,12 +19,17 @@ function sourceWords(input: BasisInput): string {
   return [s.kind, what, s.by ? `(${s.by})` : ''].filter(Boolean).join(' ');
 }
 
-/** A ceiling drawn beside every reported PHA yield (OF-BLD-014 §6.4). */
+/**
+ * A ceiling drawn beside every reported yield of its product (OF-BLD-014
+ * §6.4): a PHB ceiling beside PHA yields, an ethanol ceiling beside ethanol
+ * yields. The product is the one the ceiling's basis names.
+ */
 function InlineCeiling({ evidence }: { evidence: Evidence }) {
   const records = useStore((s) => s.records);
-  // Held against the ceiling: the yields measured on the sugar it was computed for.
+  // Held against the ceiling: the yields of its product measured on the sugar it was computed for.
   const sugar = String(evidence.basis.inputs.find((i) => i.name === 'substrate')?.value ?? '');
-  const yields = yieldsOnSugar(records as ExtractionRecord[], sugar).on;
+  const product = productOfBasis(evidence.basis.inputs);
+  const yields = yieldsOnSugar(records as ExtractionRecord[], sugar, product).on;
   const model = evidence.basis.inputs.find((i) => i.name === 'model')?.source.id ?? 'model';
   return (
     <div className="mt-2" data-testid="inline-ceiling">
@@ -32,7 +37,7 @@ function InlineCeiling({ evidence }: { evidence: Evidence }) {
         title="The reported yields beside this ceiling"
         records={yields}
         unit={evidence.unit}
-        quantity="PHB yield on substrate"
+        quantity={productWords(product).quantity}
         ceilings={[{ value: Number(evidence.value), model: `${model} ceiling`, basis: evidence.basis, provenance: evidence.provenance }]}
         csvName={`ceiling-${evidence.id}`}
       />

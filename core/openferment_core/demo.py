@@ -629,9 +629,10 @@ def prototype_draft_stream(overlay: dict[str, Any]) -> tuple[list[dict[str, Any]
 # STAND-IN, computed by the real worker and the real artifact code and kept
 # nowhere. The shelf the double lists holds the toy, labelled, and the
 # C. necator model as a fetched file not on this machine, so a strain page
-# shows its card and says so. Dates are fixed so the files are the same on
-# every run.
-GENEOS_TOY_NOTE = "STAND-IN toy network built in the geneOS worker (3 metabolites, 4 reactions), for tests and fixtures; not a published model"
+# shows its card and says so. The double's view is of PHB alone; the yeast
+# models stay out of it. Dates are fixed so the files are the same on every
+# run.
+GENEOS_TOY_NOTE = "STAND-IN toy network built in the geneOS worker (4 metabolites, 6 reactions), for tests and fixtures; not a published model"
 
 
 def _fixed(result):
@@ -648,12 +649,13 @@ def prototype_geneos() -> dict[str, Any]:
     models = [
         GeneosModelInfo(id="toy", name="Toy network (STAND-IN)", host=None, scope="central carbon",
                         route="SPLIT then PHAC, built in the worker", licence="test fixture", source=GENEOS_TOY_NOTE,
-                        unavailable=None, feed="glucose", notes=[GENEOS_TOY_NOTE]),
+                        unavailable=None, feed="glucose", notes=[GENEOS_TOY_NOTE], product="phb", products=["phb"]),
         GeneosModelInfo(id=c_necator.id, name=c_necator.name, host=c_necator.host, scope=c_necator.scope,
                         route=c_necator.route, licence=c_necator.licence,
-                        source=f"{c_necator.fetched.repository} at {c_necator.fetched.commit}",
+                        source=c_necator.fetched.source,
                         unavailable=f"{c_necator.id}'s file is not on this machine: run pnpm geneos:fetch",
-                        feed=c_necator.feed, notes=list(c_necator.notes)),
+                        feed=c_necator.feed, notes=list(c_necator.notes), product=c_necator.product,
+                        products=list(c_necator.products)),
     ]
     subs = list(shelf.SUBSTRATES)
     return {

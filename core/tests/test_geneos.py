@@ -39,6 +39,77 @@ def test_a_sugar_the_network_cannot_take_up_is_a_finding_with_no_number():
     assert out == {"finding": "this reconstruction has no uptake reaction for xylose", "modelId": "toy", "substrate": "xylose"}
 
 
+def test_a_secreted_product_is_the_flux_out_through_its_exchange():
+    # The same 20 of the intermediate can each leave as one ethanol through
+    # EX_etoh_e: 2 mol per mol, and 2 × 46.069 / 180.156 g per g. No demand
+    # is added for a product defined by its exchange.
+    m = gw.build_toy()
+    out = gw.ceiling(m, "toy", "ethanol", "glucose")
+    assert out["status"] == "optimal" and out["exchange"] == "EX_glc__D_e"
+    assert out["flux"] == pytest.approx(20.0) and out["molPerMol"] == pytest.approx(2.0)
+    assert out["gPerG"] == pytest.approx(2 * 46.069 / 180.156)
+    assert not [r.id for r in m.reactions if r.id.startswith("DM_")], "an exchange-defined product needs no demand"
+    f = gw.frontier(gw.build_toy(), "toy", "ethanol", "glucose")["points"]
+    assert f[0]["flux"] == pytest.approx(20) and f[-1]["flux"] == pytest.approx(0)
+
+
+def test_a_product_the_network_has_no_route_to_is_a_finding_with_no_number():
+    m = gw.build_toy()
+    m.remove_reactions([m.reactions.get_by_id("EX_etoh_e")])
+    assert not gw.has_route(m, "toy", "ethanol") and gw.has_route(m, "toy", "phb")
+    want = {"finding": "this reconstruction has no route to ethanol", "modelId": "toy", "product": "ethanol"}
+    assert gw.ceiling(m, "toy", "ethanol", "glucose") == want
+    assert gw.frontier(m, "toy", "ethanol", "glucose") == want
+    with pytest.raises(gw.Refused, match="no product nothing"):
+        gw.ceiling(m, "toy", "nothing", "glucose")
+
+
+# A model whose exchanges are numbered, as Yeast9's are: the toy with its
+# glucose and ethanol exchanges renamed, mapped by a stand-in shelf entry.
+MAPPED = shelf.ShelfModel(
+    id="mapped", name="Toy network, numbered (STAND-IN)", host=None, scope="central carbon", bundled="toy",
+    products=("ethanol",), exchanges={"glucose": "r_0001", "ethanol": "r_0002"},
+    exchange_names={"glucose": "D-glucose exchange", "ethanol": "ethanol exchange"},
+)
+
+
+def numbered_toy() -> gw.Model:
+    m = gw.build_toy()
+    for old, new, name in (("EX_glc__D_e", "r_0001", "D-glucose exchange"), ("EX_etoh_e", "r_0002", "ethanol exchange")):
+        r = m.reactions.get_by_id(old)
+        r.id, r.name = new, name
+    m.repair()
+    return m
+
+
+def test_an_exchange_the_shelf_maps_is_used_in_place_of_the_bigg_id(monkeypatch):
+    assert shelf.exchange_id("Yeast9", "glucose") == "r_1714" and shelf.exchange_id("Yeast9", "ethanol") == "r_1761"
+    assert shelf.exchange_id("iMM904", "glucose") == "EX_glc__D_e" and shelf.exchange_id("iMM904", "ethanol") == "EX_etoh_e"
+    assert shelf.exchange_id("toy", "xylose") == "EX_xyl__D_e", "a model off the shelf reads BiGG's ids"
+    for m in shelf.SHELF.values():
+        assert set(m.exchange_names) <= set(m.exchanges), f"{m.id} checks a name for an exchange it does not map"
+        assert set(m.exchanges) <= set(shelf.SUBSTRATES) | set(shelf.PRODUCTS)
+        assert m.product in shelf.PRODUCTS and set(m.products) <= set(shelf.PRODUCTS)
+    monkeypatch.setitem(shelf.SHELF, "mapped", MAPPED)
+    m = numbered_toy()
+    gw.check_exchange_names(m, MAPPED)
+    out = gw.ceiling(m, "mapped", "ethanol", "glucose")
+    assert out["exchange"] == "r_0001" and out["flux"] == pytest.approx(20.0)
+    assert gw.describe(m, "mapped")["substrates"]["glucose"] and gw.describe(m, "mapped")["products"]["ethanol"]
+    # Under BiGG's ids the same network has neither the feed nor the route.
+    assert gw.ceiling(numbered_toy(), "toy", "ethanol", "glucose")["finding"] == "this reconstruction has no uptake reaction for glucose"
+
+
+def test_a_file_whose_mapped_exchange_changed_its_name_is_refused():
+    m = numbered_toy()
+    m.reactions.get_by_id("r_0002").name = "ethanolamine exchange"
+    with pytest.raises(gw.Refused, match="names r_0002 'ethanolamine exchange', not 'ethanol exchange'"):
+        gw.check_exchange_names(m, MAPPED)
+    m.remove_reactions([m.reactions.get_by_id("r_0001")])
+    with pytest.raises(gw.Refused, match="has no reaction r_0001"):
+        gw.check_exchange_names(m, MAPPED)
+
+
 def test_an_unbalanced_add_on_is_refused_whole():
     m = gw.build_toy()
     for mid in ("accoa_c", "coa_c", "nadph_c", "nadp_c", "h_c"):
@@ -65,10 +136,13 @@ def test_a_round_trip_through_the_worker():
     try:
         assert w.ping()
         d = w.call("describe", {"modelId": "toy"})
-        assert (d["reactions"], d["metabolites"], d["growthReaction"]) == (4, 3, "GROWTH")
+        assert (d["reactions"], d["metabolites"], d["growthReaction"]) == (6, 4, "GROWTH")
         assert d["substrates"] == {"glucose": True, "fructose": False, "xylose": False}
+        assert d["products"] == {"phb": True, "ethanol": True} and d["added"] == ["DM_phb_c"]
         c = w.call("ceiling", {"modelId": "toy", "product": "phb", "substrate": "glucose"})
         assert c["flux"] == pytest.approx(20.0)
+        e = w.call("ceiling", {"modelId": "toy", "product": "ethanol", "substrate": "glucose"})
+        assert e["flux"] == pytest.approx(20.0) and e["gPerG"] == pytest.approx(2 * 46.069 / 180.156)
         with pytest.raises(WorkerError, match="no model nothing"):
             w.call("describe", {"modelId": "nothing"})
     finally:
@@ -109,6 +183,64 @@ def test_a_file_whose_hash_does_not_match_is_set_aside(monkeypatch, tmp_path):
     assert not model.fetched.local.exists()
     assert model.fetched.local.with_suffix(".xml.mismatch").exists()
     assert calls[0][:2] == ["git", "clone"]
+
+
+def url_model(body: bytes) -> shelf.ShelfModel:
+    import hashlib
+
+    f = shelf.UrlFile(url="https://models.example/m.xml", revision="test", path="example/m.xml",
+                      sha256=hashlib.sha256(body).hexdigest(), licence="test")
+    return shelf.ShelfModel(id="m", name="a file at an address (STAND-IN)", host=None, scope="central carbon", fetched=f)
+
+
+def test_a_file_at_an_address_is_downloaded_whole_and_checked(monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    model = url_model(b"<sbml>the published file</sbml>")
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        return b"<sbml>the published file</sbml>"
+
+    def no_git(cmd, check):
+        raise AssertionError("a file at an address is not fetched by git")
+
+    assert geneos.fetch(model, run=no_git, get=get) == tmp_path / "models" / "example" / "m.xml"
+    assert asked == ["https://models.example/m.xml"] and shelf.available(model) is None
+    geneos.fetch(model, run=no_git, get=lambda url: pytest.fail("a present file that matches is not fetched again"))
+
+
+def test_a_file_at_an_address_whose_hash_does_not_match_is_set_aside(monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    model = url_model(b"<sbml>the published file</sbml>")
+    with pytest.raises(geneos.GeneosUnavailable, match="m: the file at https://models.example/m.xml hashes to .* stop condition"):
+        geneos.fetch(model, get=lambda url: b"<sbml>something else</sbml>")
+    assert not model.fetched.local.exists() and model.fetched.local.with_suffix(".xml.mismatch").exists()
+    assert "pnpm geneos:fetch" in shelf.available(model)
+
+    def down(url):
+        raise geneos.GeneosUnavailable(f"{url} could not be fetched: ConnectError")
+
+    with pytest.raises(geneos.GeneosUnavailable, match="^m: https://models.example/m.xml could not be fetched"):
+        geneos.fetch(model, get=down)
+
+
+def test_fetch_reports_every_fetched_model_and_fails_when_one_does(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    tried = []
+
+    def fake(model, **kw):
+        tried.append(model.id)
+        if model.id == "iMM904":
+            raise geneos.GeneosUnavailable("iMM904: https://bigg.ucsd.edu/static/models/iMM904.xml could not be fetched")
+        return model.fetched.local
+
+    monkeypatch.setattr(geneos, "fetch", fake)
+    assert geneos.main(["fetch"]) == 1
+    assert tried == ["RehMBEL1391", "iMM904", "Yeast9"], "every fetched model is tried, one failing or not"
+    out = capsys.readouterr()
+    assert "✓ RehMBEL1391 at 00c70c5" in out.out and "✓ Yeast9 at 2d594ae1c4a2d550ccef120d96a58c7bbf586255" in out.out
+    assert "✗ iMM904: https://bigg.ucsd.edu" in out.err
 
 
 # ── §6.3: the ceiling, the frontier and the sugar mix ──────────────────
@@ -197,10 +329,19 @@ def test_the_endpoints(store):
     from openferment_core import api
 
     c = TestClient(api.app, base_url="http://127.0.0.1")
-    shelf_ids = [m["id"] for m in c.get("/api/geneos/models").json()]
-    assert shelf_ids == ["e_coli_core", "iJO1366", "RehMBEL1391"]
-    unfetched = next(m for m in c.get("/api/geneos/models").json() if m["id"] == "RehMBEL1391")
-    assert "pnpm geneos:fetch" in unfetched["unavailable"]
+    listed = c.get("/api/geneos/models").json()
+    assert [m["id"] for m in listed] == ["e_coli_core", "iJO1366", "RehMBEL1391", "iMM904", "Yeast9"]
+    assert {m["id"]: (m["product"], m["products"]) for m in listed} == {
+        "e_coli_core": ("phb", ["phb"]), "iJO1366": ("phb", ["phb"]), "RehMBEL1391": ("phb", ["phb"]),
+        "iMM904": ("ethanol", ["ethanol"]), "Yeast9": ("ethanol", ["ethanol"]),
+    }
+    for mid in ("RehMBEL1391", "iMM904", "Yeast9"):
+        unfetched = next(m for m in listed if m["id"] == mid)
+        assert "pnpm geneos:fetch" in unfetched["unavailable"]
+    yeast = {m["id"]: m for m in listed if m["host"] == "s-cerevisiae"}
+    assert set(yeast) == {"iMM904", "Yeast9"} and yeast["iMM904"]["source"].startswith("https://bigg.ucsd.edu/")
+    assert yeast["Yeast9"]["source"] == "https://github.com/SysBioChalmers/yeast-GEM at v9.1.1 (2d594ae1c4a2d550ccef120d96a58c7bbf586255)"
+    assert c.post("/api/geneos/ceiling", json={"modelId": "Yeast9", "product": "ethanol", "substrate": "glucose"}).status_code == 409
     ok = c.post("/api/geneos/ceiling", json={"modelId": "e_coli_core", "substrate": "glucose"}).json()
     assert ok["evidence"]["value"] == pytest.approx(0.4779, rel=REL)
     finding = c.post("/api/geneos/ceiling", json={"modelId": "e_coli_core", "substrate": "xylose"}).json()
@@ -221,6 +362,26 @@ def test_yield_ceiling_takes_ids_and_words_and_returns_one_evidence(store):
     finding = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"})
     assert finding.evidence == [] and "no uptake reaction" in finding.summary["finding"]
     assert "a number was typed" in (tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": 10}).error or "")
+
+
+def test_yield_ceiling_takes_ethanol_and_names_each_models_products(store):
+    from openferment_core import tools
+
+    schema = tools.REGISTRY["yield_ceiling"].info().inputSchema["properties"]
+    assert "Yeast9 (ethanol)" in schema["modelId"]["description"] and "iMM904 (ethanol)" in schema["modelId"]["description"]
+    assert "RehMBEL1391 (phb)" in schema["modelId"]["description"]
+    assert schema["product"]["description"] == "The product: phb, ethanol."
+    # The core model carries E. coli's own ethanol route; the redox balance of
+    # glucose to ethanol allows two per glucose.
+    r = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "ethanol", "substrate": "glucose"})
+    assert r.error is None and r.summary["what"].startswith("most ethanol from glucose")
+    assert r.summary["molPerMol"] == pytest.approx(2.0, rel=REL)
+    product = next(i for i in r.evidence[0].basis.inputs if i.name == "product")
+    assert product.value == "ethanol" and product.source.note.startswith("secreted through EX_etoh_e; ethanol C2H6O")
+    # The store fixture's data folder holds no model files.
+    refused = tools.run("yield_ceiling", {"modelId": "Yeast9", "product": "ethanol", "substrate": "glucose"})
+    assert "Yeast9's file is not on this machine: run pnpm geneos:fetch" in (refused.error or "")
+    assert "no product nothing" in (tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "nothing", "substrate": "glucose"}).error or "")
 
 
 def test_an_answer_does_not_depend_on_what_the_worker_solved_before():

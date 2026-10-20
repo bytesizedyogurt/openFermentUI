@@ -70,9 +70,22 @@ def test_a_mix_carries_evidence_with_its_basis():
     assert r.evidence.value == pytest.approx(min(p["gPerG"] for p in r.output["points"]))
 
 
-# R11 — the licence ledger and the shelf pin the same file.
-def test_the_licence_ledger_pins_the_file_the_shelf_fetches():
-    ledger = tomllib.loads((CORE / "licences.toml").read_text(encoding="utf-8"))["data"]["RehMBEL1391"]
-    f = shelf.SHELF["RehMBEL1391"].fetched
-    assert (ledger["sha256"], ledger["revision"], ledger["licence"]) == (f.sha256, f.commit, f.licence)
-    assert f.path in ledger["source"] and Path(f.repository).name in ledger["source"]
+# R11 — the licence ledger and the shelf pin the same file, for every model
+# the shelf fetches: a file at a commit and a file at an address alike.
+@pytest.mark.parametrize("model_id", [m.id for m in shelf.SHELF.values() if m.fetched])
+def test_the_licence_ledger_pins_the_file_the_shelf_fetches(model_id):
+    ledger = tomllib.loads((CORE / "licences.toml").read_text(encoding="utf-8"))["data"][model_id]
+    model = shelf.SHELF[model_id]
+    f = model.fetched
+    assert (ledger["sha256"], ledger["revision"], ledger["licence"]) == (f.sha256, f.revision, f.licence)
+    assert ledger["licence"] == model.licence, "the shelf shows the licence the ledger records"
+    if isinstance(f, shelf.UrlFile):
+        assert f.url.removeprefix("https://") in ledger["source"]
+    else:
+        assert f.path in ledger["source"] and Path(f.repository).name in ledger["source"]
+
+
+def test_every_fetched_model_is_on_the_ledger():
+    data = tomllib.loads((CORE / "licences.toml").read_text(encoding="utf-8"))["data"]
+    assert {m.id for m in shelf.SHELF.values() if m.fetched} == {"RehMBEL1391", "iMM904", "Yeast9"}
+    assert {m.id for m in shelf.SHELF.values()} <= set(data), "a model on the shelf has no licence line"

@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import type { Artifact, Band, ComputedBasis, HistogramBin, Runbook } from '@/data/types';
 import { useStore } from '@/store';
 import { ArtifactsDown, getArtifact } from '@/lib/artifacts';
-import { yieldsOnSugar } from '@/lib/geneos';
+import { productOfBasis, productWords, yieldsOnSugar } from '@/lib/geneos';
 import { INFEASIBLE_WORDS } from '@/lib/proforma';
 import { CeilingGap, Distribution, TrajectoryBand } from '@/components/figures';
 import { Card } from './ui';
@@ -78,12 +78,15 @@ function Figure({ link }: { link: Link }) {
   if (a.tool === 'geneos.ceiling') {
     const sugar = String(a.inputs.find((i) => i.name === 'substrate')?.value ?? 'glucose');
     const model = String(a.inputs.find((i) => i.name === 'model')?.value ?? 'a reaction network');
+    // Beside the reported yields of the product the ceiling is for.
+    const product = productOfBasis(a.inputs);
+    const reported = productWords(product).reported;
     return (
       <CeilingGap
         title={`What is the most this network allows on ${sugar}?`}
-        records={yieldsOnSugar(records, sugar).on}
+        records={yieldsOnSugar(records, sugar, product).on}
         unit="g g-1"
-        quantity="PHA yield on substrate"
+        quantity={`${reported.charAt(0).toUpperCase()}${reported.slice(1)} on substrate`}
         ceilings={[{ value: Number(o.gPerG), model, basis: basisOf(a), provenance: a.provenance }]}
         csvName={`dossier-ceiling-${a.id}`}
       />

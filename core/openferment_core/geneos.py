@@ -2,10 +2,11 @@
 
 The geneOS worker does the flux balance analysis in a process of its own;
 this module holds the one `SimWorker` that runs it, tells the worker where a
-fetched model file lives, and fetches that file:
+fetched model file lives, and fetches those files:
 
-    pnpm geneos:fetch     the C. necator reconstruction at its pinned commit,
-                          into core/data/models/, checked against its sha256
+    pnpm geneos:fetch     every fetched model on the shelf into core/data/models/,
+                          checked against its sha256: RehMBEL1391 and Yeast9 at
+                          their pinned commits by git, iMM904 from BiGG's address
 
 A hash that does not match is a stop condition (§6.2): the file is moved
 aside, never used, and the command fails.
@@ -20,12 +21,13 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from . import artifacts, geneos_models as shelf
+from . import artifacts, atomic, geneos_models as shelf
 from .models import BasisInput, BasisSource, Evidence, GeneosModelInfo, GeneosResult
 from .workers import SimWorker
 
-# Loading iJO1366 takes a few seconds and a frontier a little longer; the
-# first call on a cold worker pays both. A setting, not a measurement.
+# Loading iJO1366 takes a few seconds, Yeast9 (an 11.5 MB file) a few more,
+# and a frontier a little longer; the first call on a cold worker pays both.
+# A setting, not a measurement.
 WORKER_TIMEOUT_S = 180.0
 
 _WORKER: SimWorker | None = None
@@ -100,7 +102,7 @@ def _model_input(model_id: str) -> BasisInput:
     entry = shelf.SHELF[model_id]
     if entry.fetched:
         f = entry.fetched
-        note = f"{f.repository} at {f.commit}, {f.path}, sha256 {f.sha256} ({f.licence})"
+        note = f"{f.where}, sha256 {f.sha256} ({f.licence})"
     else:
         note = f"bundled with cobra as {entry.bundled} ({entry.licence})"
     return BasisInput(name="model", value=entry.name, unit="", source=BasisSource(kind="model", id=model_id, note=note))
@@ -116,24 +118,36 @@ def _route_input(model_id: str) -> BasisInput | None:
         note=f"{', '.join(r['id'] for r in addon['reactions'])}; the route {addon['source'].removeprefix('model: ')} carries, each reaction checked for mass balance"))
 
 
-def _conventions(product: str, substrates: list[str]) -> list[BasisInput]:
+def _exchange_words(model_id: str, key: str) -> str:
+    """The exchange as the model's own file names it: the id, and the name
+    the shelf checks it by where the shelf maps it."""
+    rid = shelf.exchange_id(model_id, key)
+    entry = shelf.SHELF.get(model_id)
+    name = entry.exchange_names.get(key) if entry else None
+    return f"{rid} ({name} in the file)" if name else rid
+
+
+def _conventions(model_id: str, product: str, substrates: list[str]) -> list[BasisInput]:
     prod = shelf.PRODUCTS[product]
+    how = (f"secreted through {_exchange_words(model_id, product)}" if "exchange" in prod
+           else f"a demand on {prod['metabolite']}")
     out = [
         BasisInput(name="uptake", value=shelf.UPTAKE, unit=shelf.UPTAKE_UNIT, source=BasisSource(
             kind="convention", note="the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it")),
         BasisInput(name="product", value=product, unit="", source=BasisSource(
-            kind="convention", note=f"a demand on {prod['metabolite']}; {prod['note']}")),
+            kind="convention", note=f"{how}; {prod['note']}")),
     ]
     for i, sub in enumerate(substrates):
         s = shelf.SUBSTRATES[sub]
         out.append(BasisInput(name="substrate" if len(substrates) == 1 else f"substrate {'ab'[i]}", value=sub, unit="",
-                              source=BasisSource(kind="convention", note=f"through {s['exchange']}, {s['molarMass']} g mol-1, {s['carbons']} carbons")))
+                              source=BasisSource(kind="convention",
+                                                 note=f"through {_exchange_words(model_id, sub)}, {s['molarMass']} g mol-1, {s['carbons']} carbons")))
     return out
 
 
 def _inputs(model_id: str, product: str, substrates: list[str]) -> list[BasisInput]:
     route = _route_input(model_id)
-    return [_model_input(model_id), *([route] if route else []), *_conventions(product, substrates)]
+    return [_model_input(model_id), *([route] if route else []), *_conventions(model_id, product, substrates)]
 
 
 def _value(inputs: list[BasisInput], name: str) -> str:
@@ -192,6 +206,11 @@ def _label(model_id: str, what: str) -> str:
     return f"{what}, {entry.name if entry else model_id}{f' ({entry.scope})' if entry else ''}"
 
 
+def _named(product: str) -> str:
+    """The product as a result's label names it: PHB, ethanol."""
+    return shelf.PRODUCTS[product]["label"]
+
+
 def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True, allow_toy: bool = False) -> GeneosResult:
     finding = _check(model_id, product, [substrate], allow_toy)
     if finding:
@@ -199,7 +218,7 @@ def ceiling(model_id: str, product: str, substrate: str, *, keep: bool = True, a
     art = artifacts.compute(CEILING, _inputs(model_id, product, [substrate]), keep=keep)
     out = art.output
     ev = Evidence(
-        id=f"ev-{art.id}", label=_label(model_id, f"most {product.upper()} from {substrate}"),
+        id=f"ev-{art.id}", label=_label(model_id, f"most {_named(product)} from {substrate}"),
         value=out["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="ceiling",
     )
     return GeneosResult(kind="ceiling", modelId=model_id, product=product, substrates=[substrate],
@@ -213,7 +232,7 @@ def frontier(model_id: str, product: str, substrate: str, *, keep: bool = True, 
     art = artifacts.compute(FRONTIER, _inputs(model_id, product, [substrate]), keep=keep)
     top = max(art.output["points"], key=lambda p: p["gPerG"])
     ev = Evidence(
-        id=f"ev-{art.id}", label=_label(model_id, f"{product.upper()} against growth on {substrate}"),
+        id=f"ev-{art.id}", label=_label(model_id, f"{_named(product)} against growth on {substrate}"),
         value=top["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="frontier",
     )
     return GeneosResult(kind="frontier", modelId=model_id, product=product, substrates=[substrate],
@@ -231,7 +250,7 @@ def mix(model_id: str, product: str, a: str, b: str, *, keep: bool = True, allow
     # with it to the figure (§6.R).
     low = min(art.output["points"], key=lambda p: p["gPerG"])
     ev = Evidence(
-        id=f"ev-{art.id}", label=_label(model_id, f"lowest {product.upper()} ceiling across mixtures of {a} and {b}"),
+        id=f"ev-{art.id}", label=_label(model_id, f"lowest {_named(product)} ceiling across mixtures of {a} and {b}"),
         value=low["gPerG"], unit="g g-1", provenance=art.provenance, basis=artifacts.basis_of(art), figure="mix",
     )
     return GeneosResult(kind="mix", modelId=model_id, product=product, substrates=[a, b],
@@ -244,13 +263,17 @@ def models() -> list[GeneosModelInfo]:
     for m in shelf.SHELF.values():
         out.append(GeneosModelInfo(
             id=m.id, name=m.name, host=m.host, scope=m.scope, route=m.route, licence=m.licence,
-            source=(f"{m.fetched.repository} at {m.fetched.commit}" if m.fetched else f"bundled with cobra as {m.bundled}"),
+            source=(m.fetched.source if m.fetched else f"bundled with cobra as {m.bundled}"),
             unavailable=shelf.available(m), feed=m.feed, notes=list(m.notes),
+            product=m.product, products=list(m.products),
         ))
     return out
 
 
-# ── fetching the published file ────────────────────────────────────────
+# ── fetching the published files ───────────────────────────────────────
+
+# How long a download from a model server may take. A setting.
+DOWNLOAD_TIMEOUT_S = 120.0
 
 
 def sha256_of(path: Path) -> str:
@@ -261,44 +284,77 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def fetch(model: shelf.ShelfModel = shelf.SHELF["RehMBEL1391"], *, run=subprocess.run) -> Path:
-    """Clone the pinned commit without its blobs, check out the one file, and
-    verify its hash. Returns the file's path; raises on a mismatch."""
+def download(url: str) -> bytes:
+    """The bytes a server publishes at `url`, following its redirects (BiGG
+    answers http:// with a 301); a failure is said in words."""
+    import httpx
+
+    try:
+        response = httpx.get(url, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT_S)
+        response.raise_for_status()
+    except httpx.HTTPError as e:
+        raise GeneosUnavailable(f"{url} could not be fetched: {type(e).__name__}: {e}") from e
+    return response.content
+
+
+def fetch(model: shelf.ShelfModel = shelf.SHELF["RehMBEL1391"], *, run=subprocess.run, get=download) -> Path:
+    """Bring the model's file and verify its hash: for a file in git, clone
+    the pinned commit without its blobs and check out the one file; for a
+    file at an address, download it and write it whole (atomic.write_bytes).
+    Returns the file's path; raises on a mismatch."""
     f = model.fetched
     assert f is not None, f"{model.id} is not a fetched model"
     if f.local.is_file() and sha256_of(f.local) == f.sha256:
         return f.local  # present and the pinned file: nothing to fetch
-    clone = f.local.parents[len(Path(f.path).parts) - 1]
-    if not (clone / ".git").is_dir():
-        clone.parent.mkdir(parents=True, exist_ok=True)
-        run(["git", "clone", "--filter=blob:none", "--no-checkout", "--quiet", f.repository, str(clone)], check=True)
-    run(["git", "-C", str(clone), "checkout", "--quiet", f.commit, "--", f.path], check=True)
+    if isinstance(f, shelf.UrlFile):
+        try:
+            body = get(f.url)
+        except GeneosUnavailable as e:
+            raise GeneosUnavailable(f"{model.id}: {e}") from e
+        atomic.write_bytes(f.local, body)
+        at = f.url
+    else:
+        clone = f.local.parents[len(Path(f.path).parts) - 1]
+        if not (clone / ".git").is_dir():
+            clone.parent.mkdir(parents=True, exist_ok=True)
+            run(["git", "clone", "--filter=blob:none", "--no-checkout", "--quiet", f.repository, str(clone)], check=True)
+        run(["git", "-C", str(clone), "checkout", "--quiet", f.commit, "--", f.path], check=True)
+        at = f.commit
     got = sha256_of(f.local)
     if got != f.sha256:
         aside = f.local.with_suffix(f.local.suffix + ".mismatch")
         shutil.move(str(f.local), aside)
         raise GeneosUnavailable(
-            f"{model.id}: the file at {f.commit} hashes to {got}, not the pinned {f.sha256}. "
+            f"{model.id}: the file at {at} hashes to {got}, not the pinned {f.sha256}. "
             f"It was moved to {aside.name} and is not used. This is a stop condition (OF-BLD-014 §6.2)."
         )
     return f.local
 
 
 def main(argv: list[str]) -> int:
+    """Fetch every fetched model on the shelf and say what became of each;
+    one that fails does not stop the others, and fails the command."""
     if argv[:1] != ["fetch"]:
         print("usage: python -m openferment_core.geneos fetch", file=sys.stderr)
         return 2
-    model = shelf.SHELF["RehMBEL1391"]
-    try:
-        path = fetch(model)
-    except subprocess.CalledProcessError as e:
-        print(f"✗ git failed ({e.returncode}) fetching {model.fetched.repository}", file=sys.stderr)
-        return 1
-    except GeneosUnavailable as e:
-        print(f"✗ {e}", file=sys.stderr)
-        return 1
-    print(f"✓ {model.id} at {model.fetched.commit}: {path.relative_to(shelf.model_dir().parent.parent)}, sha256 {model.fetched.sha256}")
-    return 0
+    status = 0
+    for model in shelf.SHELF.values():
+        f = model.fetched
+        if f is None:
+            continue
+        try:
+            path = fetch(model)
+        except subprocess.CalledProcessError as e:
+            print(f"✗ {model.id}: git failed ({e.returncode}) fetching {f.repository}", file=sys.stderr)
+            status = 1
+            continue
+        except GeneosUnavailable as e:
+            print(f"✗ {e}", file=sys.stderr)
+            status = 1
+            continue
+        at = f"from {f.url}" if isinstance(f, shelf.UrlFile) else f"at {f.commit}"
+        print(f"✓ {model.id} {at}: {path.relative_to(shelf.model_dir().parent.parent)}, sha256 {f.sha256}")
+    return status
 
 
 if __name__ == "__main__":

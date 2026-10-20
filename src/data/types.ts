@@ -2179,6 +2179,12 @@ export interface GeneosModelInfo {
   /** The sugar a view opens on: one the model can take up. */
   feed: string;
   notes: string[];
+  /**
+   * The product a view opens on, and every product the shelf names a route
+   * to in this model ('phb', 'ethanol'); the worker decides what it makes.
+   */
+  product: string;
+  products: string[];
 }
 
 export type GeneosKind = 'ceiling' | 'frontier' | 'mix';

@@ -131,9 +131,10 @@ export const SUBSYSTEMS: Subsystem[] = [
     label: 'Model',
     status: 'live',
     state:
-      'Flux balance analysis on a shelf of published reaction networks: the most PHB each allows from a ' +
-      'sugar, its production envelope and a sugar-mix line, each kept as an artifact and drawn beside the ' +
-      'reported yields. No time axis and no vessel; strain design is not built.',
+      'Flux balance analysis on a shelf of published reaction networks: the most of a product each allows ' +
+      'from a sugar (PHB from the E. coli and C. necator models, ethanol from the yeast models Yeast9 and ' +
+      'iMM904), its production envelope and a sugar-mix line, each kept as an artifact and drawn beside the ' +
+      'reported yields of that product. No time axis and no vessel; strain design is not built.',
     implementedIn: [
       'core/openferment_core/geneos.py',
       'core/openferment_core/geneos_models.py',
