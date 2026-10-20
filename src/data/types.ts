@@ -1498,11 +1498,30 @@ export interface ProposalAction {
   actingId?: string | null;
 }
 
+/**
+ * What the question names in one archived program, hidden from the sweep
+ * while archived programs are hidden (OF-BLD-016 §2.3; models.py
+ * ArchivedCoverage). The trace says "found in archived program PHA (hidden)".
+ */
+export interface ArchivedCoverage {
+  /** The program's id and name, as `src/data/programs.ts` declares them. */
+  program: string;
+  name: string;
+  /** The question's own words that named it. */
+  entities: string[];
+  count: number;
+  modules: ModuleName[];
+}
+
 export interface CoverageMap {
   entities: string[];
   searched: number;
   found: number;
   modules: ModuleCoverage[];
+  /** Whether archived programs were swept: the browser's switch (OF-BLD-016 §2.3). Absent on a plan saved before it. */
+  includeArchived?: boolean;
+  /** What the question names in archived programs, left out. Absent on a plan saved before it. */
+  archived?: ArchivedCoverage[];
 }
 
 export interface AnswerPlanUsage {
@@ -1571,6 +1590,12 @@ export interface AskRequest {
   mode: 'agent' | 'single';
   /** The conversation's earlier turns, oldest first. */
   history: PriorTurn[];
+  /**
+   * The store's `showArchived` switch (OF-BLD-016 §2.3). Off, the service
+   * leaves archived programs out of the pool, the passages, the coverage pass
+   * and every read tool.
+   */
+  includeArchived: boolean;
 }
 
 /**
@@ -2612,6 +2637,8 @@ export interface RagSearchRequest {
   k: number;
   /** A lane by name, or null for the chosen one. */
   lane: string | null;
+  /** The store's `showArchived` switch; off leaves archived programs' passages out (OF-BLD-016 §2.3). */
+  includeArchived: boolean;
 }
 
 /** What `POST /api/rag/search` returns (OF-BLD-014 §4.4). */

@@ -20,7 +20,9 @@ PROJECTION = json.loads(module_stores.PROJECTION.read_text())
 
 
 def stores(pool_):  # noqa: F811
-    return module_stores.Stores(module_stores.seed_sources(lambda: pool_))
+    # The whole seed, archived programs shown: the sweep as it was before the
+    # program switch (OF-BLD-016 §2.3); test_programs holds the switch off.
+    return module_stores.Stores(module_stores.seed_sources(lambda: pool_), include_archived=True)
 
 
 def by_module(cmap):

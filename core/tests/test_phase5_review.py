@@ -63,7 +63,7 @@ def test_an_oversized_summary_keeps_no_ids(pool, monkeypatch):  # noqa: F811
 def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F811
     hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
                                      text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None: retrieve.Detail(
+    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
         hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.05, models=["claude-haiku-5-5"])))
     monkeypatch.setenv("OPENFERMENT_ASK_BUDGET_USD", "0.04")
     script = Script([papers()], [papers("again")], plan())
@@ -76,7 +76,7 @@ def test_a_searchs_model_spend_is_the_questions(pool, monkeypatch):  # noqa: F81
 def test_a_cached_search_is_not_charged_twice(pool, monkeypatch):  # noqa: F811
     hit = PassageHit(passage=Passage(id="X1:s1:0", paperId="X1", sectionId="s1", heading="Results", kind="prose",
                                      text=SENTENCE, start=0, end=len(SENTENCE)), score=1.0, lanes={"bm25": 1})
-    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None: retrieve.Detail(
+    monkeypatch.setattr(retrieve, "search_detail", lambda q, k=8, lane=None, ask=None, include_archived=False: retrieve.Detail(
         hits=[hit], lane="bm25+rerank", usage=Usage(costUsd=0.01)))
     script = Script([papers()], [papers()], plan())
     out = postdoc_agent.ask("q?", converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
@@ -97,7 +97,7 @@ def test_the_stream_cancels_its_question_when_the_reader_goes(monkeypatch):
 
     seen = {}
 
-    def fake(question, on_step=None, cancelled=None, history=None):
+    def fake(question, on_step=None, cancelled=None, history=None, include_archived=False):
         seen["cancelled"] = cancelled
         seen["history"] = history
         on_step(postdoc_agent.TraceStep(n=1, kind="tool", tool="t", input={}, summary="s", ms=0, ok=True))

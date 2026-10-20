@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, rageval, retrieve, tools, witness
+from . import artifacts, biorepo, checks, extract, fermos, geneos, guard, guild, intake, passages, postdoc_agent, practice, programs, rageval, retrieve, tools, witness
 from .corpus import load_corpus
 from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 from .models import (
@@ -142,10 +142,12 @@ CORPUS_MISSING = (
 )
 
 
-def _ask_agent(question: str, on_step=None, cancelled=None, history=None) -> AnswerPlan:
+def _ask_agent(question: str, on_step=None, cancelled=None, history=None, include_archived: bool = False) -> AnswerPlan:
     """The bounded loop (OF-BLD-014 §5.2) over the evidence pool as it stands,
-    with the conversation's earlier turns when the question is a follow-up."""
-    ctx = tools.ToolContext()
+    with the conversation's earlier turns when the question is a follow-up.
+    The browser's program switch rides in the tools' context (OF-BLD-016
+    §2.3): off, archived programs are left out of everything the loop reads."""
+    ctx = tools.ToolContext(include_archived=include_archived)
     try:
         ctx.pool  # loaded now, so a missing corpus declines in words
     except FileNotFoundError as e:
@@ -170,7 +172,7 @@ def ask(request: AskRequest) -> AnswerPlan:
     if not question:
         return AnswerPlan(question="", declined="Ask a question and Postdoc will answer it.")
     if request.mode == "agent":
-        return _ask_agent(question, history=request.history)
+        return _ask_agent(question, history=request.history, include_archived=request.includeArchived)
 
     try:
         corpus = load_corpus()
@@ -179,7 +181,10 @@ def ask(request: AskRequest) -> AnswerPlan:
         return AnswerPlan(question=question, declined=CORPUS_MISSING)
 
     limit = max(1, min(request.maxEvidence, MAX_EVIDENCE))
-    records = corpus.search(question, limit=limit)
+    # The switch holds here too (OF-BLD-016 §2.3): an archived program's
+    # records are neither given to the model nor accepted from it.
+    records = [r for r in corpus.search(question, limit=MAX_EVIDENCE if not request.includeArchived else limit)
+               if not programs.hides(programs.program_of_record(r), request.includeArchived)][:limit]
     log.info(
         "ask: %r → %d records%s",
         question[:80],
@@ -195,7 +200,8 @@ def ask(request: AskRequest) -> AnswerPlan:
 
     result = validate_claims(
         raw.get("claims") or [],
-        corpus.records_by_id,
+        {rid: r for rid, r in corpus.records_by_id.items()
+         if not programs.hides(programs.program_of_record(r), request.includeArchived)},
         corpus.papers_by_id,
     )
 
@@ -252,7 +258,8 @@ def _stream_events(request: AskRequest):
                 plan = ask(request)
             else:
                 plan = _ask_agent(question, on_step=lambda s: events.put(("step", s.model_dump(mode="json"))),
-                                  cancelled=gone.is_set, history=request.history)
+                                  cancelled=gone.is_set, history=request.history,
+                                  include_archived=request.includeArchived)
             events.put(("plan", plan.model_dump(mode="json")))
         except Exception as e:  # the stream must end in words, never hang
             log.exception("ask stream failed")
@@ -828,13 +835,15 @@ def audit_read(limit: int = 200) -> list[AuditEntry]:
 
 
 @app.post("/api/tools/{name}", response_model=ToolResult)
-def tools_run(name: str, body: dict[str, Any]) -> ToolResult:
+def tools_run(name: str, body: dict[str, Any], includeArchived: bool = False) -> ToolResult:  # noqa: N803 (the wire name)
     """Run one tool through the registry, the same path Postdoc's loop and
     the MCP server take. A refusal is a result with `error` set; an unknown
-    tool is a 404."""
+    tool is a 404. The program switch is a query parameter,
+    `?includeArchived=true`, and rides in the tool's context: the body is the
+    tool's input, and no input carries it (OF-BLD-016 §2.3)."""
     if name not in tools.REGISTRY:
         raise HTTPException(status_code=404, detail=f"no tool named {name!r}")
-    return tools.run(name, body)
+    return tools.run(name, body, tools.ToolContext(include_archived=includeArchived))
 
 
 # ── Passage retrieval (OF-BLD-014 Phase 4) ───────────────────────────────
@@ -853,7 +862,8 @@ def rag_search(request: RagSearchRequest) -> RagSearchResponse:
     that cannot run here is a 409 that says why; a paid lane's helper calls
     are held to the daily cap like every model call."""
     try:
-        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane)
+        detail = retrieve.search_detail(request.question, k=max(1, min(request.k, 20)), lane=request.lane,
+                                        include_archived=request.includeArchived)
     except retrieve.LaneUnavailable as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
     except (llm.ModelUnavailable, llm.ModelRefused, spend.BudgetSettingInvalid) as e:

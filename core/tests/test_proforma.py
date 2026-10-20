@@ -134,7 +134,7 @@ def test_the_scenario_endpoints(store, monkeypatch):
     from openferment_core import api, evidence_pool
 
     rs = [rec("t", "pha_titre", 10.0, "g/L"), rec("k", "pha_titre", 20.0, "g/L", strain="p-putida-kt2440")]
-    monkeypatch.setattr(evidence_pool, "load", lambda: SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
+    monkeypatch.setattr(evidence_pool, "load", lambda include_archived=False: SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs}))
     c = TestClient(api.app, base_url="http://127.0.0.1")
     [sc] = c.get("/api/proforma/scenarios").json()
     assert sc["id"] == "sc-pha-1" and sc["hosts"] == ["c-necator-h16", "p-putida-kt2440"]

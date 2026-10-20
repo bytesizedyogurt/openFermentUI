@@ -23,6 +23,13 @@ answer's footer says the module was read in part. Nothing here syncs.
 
 `coverage(question)` is code and calls no model: it finds the rows the
 question names, and the modules it names, before Postdoc's first turn.
+
+THE PROGRAM SWITCH (OF-BLD-016 §2.3, E.2′). Every row carries the program it
+belongs to (`programs.py`, as the browser's `programOf` resolves it), and a
+row of an archived program is left out of every module unless the store is
+built with `include_archived=True`, the browser's switch. Off is the default.
+The sweep still looks among the hidden rows for what the question names, and
+says so in one line a program: "found in archived program PHA (hidden)".
 """
 from __future__ import annotations
 
@@ -32,7 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from .models import CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
+from . import programs
+from .models import ArchivedCoverage, CoverageHit, CoverageMap, ModuleCoverage, ModuleRow
 
 PROJECTION = Path(__file__).parent / "data" / "modules.json"
 
@@ -97,6 +105,8 @@ class Row:
     # Whether the bare id counts as a name. A paper's id ("H16") is too short
     # to tell from a strain's designation, so a source is named by its title.
     id_names: bool = True
+    # The program the row belongs to, or None when it is general (§2.3).
+    program: str | None = None
 
     @property
     def ref(self) -> str:
@@ -201,12 +211,12 @@ def _strain_aliases() -> dict[str, str]:
     return json.loads(CORPUS_PATH.read_text()).get("strainAliases") or {}
 
 
-def default_sources(pool_factory: Callable[[], Any] | None = None) -> Sources:
+def default_sources(pool_factory: Callable[[], Any] | None = None, include_archived: bool = False) -> Sources:
     from . import artifacts, checks, evidence_pool, geneos, guild, intake, proposals, witness
 
     return Sources(
         projection=_projection,
-        pool=pool_factory or evidence_pool.load,
+        pool=pool_factory or (lambda: evidence_pool.load(include_archived=include_archived)),
         artifacts=artifacts.all_artifacts,
         guild=guild.read,
         checks=checks.read,
@@ -253,20 +263,28 @@ def _headline(output: Any) -> dict[str, Any]:
     return out
 
 
-def _artifact_row(module: str, a: Any, provenance: str) -> Row:
+def _artifact_row(module: str, a: Any, provenance: str, program: str | None = None) -> Row:
     inputs = [f"{i.name}={i.value}" for i in a.inputs if isinstance(getattr(i, "value", None), str)][:MAX_ITEMS]
     return Row(module=module, kind="artifact", id=a.id, label=f"{a.tool} artifact", state="open", status="computed",
-               provenance=provenance, words=" ".join([a.tool, *inputs]),
+               provenance=provenance, words=" ".join([a.tool, *inputs]), program=program,
                detail={"tool": a.tool, "createdAt": a.createdAt, "inputs": inputs, "output": _headline(a.output),
                        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"})
 
 
 class Stores:
-    """Every module's rows, loaded on first use and kept for one question."""
+    """Every module's rows, loaded on first use and kept for one question.
 
-    def __init__(self, sources: Sources | None = None, pool_factory: Callable[[], Any] | None = None) -> None:
-        self.sources = sources or default_sources(pool_factory)
+    `rows` is what the question may see: with `include_archived` off (the
+    default) a row of an archived program is left out, and `hidden` holds it,
+    so the sweep can say the question named it."""
+
+    def __init__(self, sources: Sources | None = None, pool_factory: Callable[[], Any] | None = None,
+                 include_archived: bool = False) -> None:
+        self.sources = sources or default_sources(pool_factory, include_archived)
+        self.include_archived = include_archived
+        self._all: dict[str, list[Row]] = {}
         self._rows: dict[str, list[Row]] = {}
+        self._hidden: dict[str, list[Row]] = {}
         self._errors: dict[str, str] = {}
         self._cache: dict[str, Any] = {}
 
@@ -278,14 +296,38 @@ class Stores:
     def pool(self) -> Any:
         return self._get("pool")
 
-    def rows(self, module: str) -> list[Row]:
-        if module not in self._rows:
+    def all_rows(self, module: str) -> list[Row]:
+        """Every row the module holds, archived programs' included."""
+        if module not in self._all:
             try:
-                self._rows[module] = list(getattr(self, f"_{module}")())
+                self._all[module] = list(getattr(self, f"_{module}")())
             except Exception as e:  # one module failing is said, and the rest are read
-                self._rows[module] = []
+                self._all[module] = []
                 self._errors[module] = f"{LABEL[module]} could not be read: {type(e).__name__}: {e}"
+        return self._all[module]
+
+    def rows(self, module: str) -> list[Row]:
+        """The rows this question may see."""
+        if module not in self._rows:
+            every = self.all_rows(module)
+            self._rows[module] = [r for r in every if not programs.hides(r.program, self.include_archived)]
+            self._hidden[module] = [r for r in every if programs.hides(r.program, self.include_archived)]
         return self._rows[module]
+
+    def hidden(self, module: str) -> list[Row]:
+        """The module's rows left out because their program is archived."""
+        self.rows(module)
+        return self._hidden[module]
+
+    def _record_lookup(self, record_id: str) -> Any:
+        pool = self.pool()
+        return pool.record(record_id) or pool.corpus.record(record_id)
+
+    def _artifact_program(self, a: Any) -> str | None:
+        try:
+            return programs.program_of_artifact(a, self._record_lookup)
+        except Exception:  # a pool that cannot load leaves the id to speak
+            return programs.program_of_artifact(a)
 
     def error(self, module: str) -> str | None:
         self.rows(module)
@@ -308,10 +350,11 @@ class Stores:
     def _artifacts(self, module: str) -> Iterable[Row]:
         for a in self._get("artifacts"):
             if ARTIFACT_MODULE.get(a.tool) == module:
-                yield _artifact_row(module, a, self._artifact_mark(a))
+                yield _artifact_row(module, a, self._artifact_mark(a), self._artifact_program(a))
 
     def _dominion(self) -> Iterable[Row]:
         p = self._get("projection")["dominion"]
+        product_program = {m["id"]: m.get("program") for m in p["molecules"]}
         for m in p["molecules"]:
             yield Row("dominion", "molecule", m["id"], m["name"], clearance_state(m["clearanceState"]), m["clearanceState"],
                       provenance=m.get("provenance"), names=tuple(m.get("aliases") or ()),
@@ -322,14 +365,15 @@ class Stores:
                       detail={"clearance": m["clearanceLabel"], "category": m["category"],
                               "defaultStrainId": m.get("defaultStrainId"), "processCode": m.get("processCode"),
                               "unitOperationIds": m.get("unitOperationIds") or [], "pathwayIds": m.get("pathwayIds") or [],
-                              "note": m.get("note")})
+                              "note": m.get("note")}, program=m.get("program"))
         for f in p["findings"]:
             fid = f"{f['productId']}.{f['jurisdictionId']}"
             yield Row("dominion", "finding", fid, f"Clearance finding: {f['productId']} in {f['jurisdictionId']}",
                       clearance_state(f["state"]), f["state"], provenance=f.get("provenance"),
                       words=" ".join([f["productId"], f.get("summary") or ""] + [x["title"] for x in f.get("patents") or []]),
                       detail={"productId": f["productId"], "jurisdiction": f["jurisdictionId"], "summary": f.get("summary"),
-                              "readAt": f.get("readAt"), "patents": f.get("patents") or []})
+                              "readAt": f.get("readAt"), "patents": f.get("patents") or []},
+                      program=product_program.get(f["productId"]))
 
     def _runbooks(self) -> Iterable[Row]:
         p = self._get("projection")["runbooks"]
@@ -342,29 +386,33 @@ class Stores:
                       names=names,
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + r.get("predictions", [])),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
-                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", [])})
+                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", [])},
+                      program=r.get("program"))
         for x in p["protocols"]:
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + x.get("organisms", [])),
                       detail={"category": x["category"], "organisms": x.get("organisms", []),
-                              "currentVersion": x["currentVersion"], "versions": x.get("versions", [])})
+                              "currentVersion": x["currentVersion"], "versions": x.get("versions", [])},
+                      program=x.get("program"))
 
     def _geneos(self) -> Iterable[Row]:
         p = self._get("projection")["geneos"]
         aliases: dict[str, list[str]] = {}
         for alias, sid in self._get("strain_aliases").items():
             aliases.setdefault(sid, []).append(alias)
+        host_program = {h["id"]: h.get("program") for h in p["hosts"]}
         for h in p["hosts"]:
             yield Row("geneos", "host", h["id"], h["name"], "open", "in the catalogue",
                       names=tuple(aliases.get(h["id"], ())), words=" ".join(h.get("badges") or []),
-                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []})
+                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []}, program=h.get("program"))
         for x in p["pathways"]:
             yield Row("geneos", "pathway", x["id"], x["label"], "open", "in the catalogue",
                       words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []})
         for m in self._get("shelf"):
             ok = m.unavailable is None
             yield Row("geneos", "model", m.id, m.name, "open" if ok else "fenced", "on the shelf" if ok else "not fetched",
-                      words=m.host or "", detail={"host": m.host, "unavailable": m.unavailable})
+                      words=m.host or "", detail={"host": m.host, "unavailable": m.unavailable},
+                      program=host_program.get(m.host or ""))
         yield from self._artifacts("geneos")
 
     def _fermos(self) -> Iterable[Row]:
@@ -379,7 +427,8 @@ class Stores:
         for s in self._get("projection")["proforma"]["scenarios"]:
             yield Row("proforma", "scenario", s["id"], s["name"], "open", s["kind"],
                       words=" ".join([s.get("product") or "", s.get("modelId") or ""]),
-                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId")})
+                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId")},
+                      program=s.get("program"))
         yield from self._artifacts("proforma")
 
     def _biorepo(self) -> Iterable[Row]:
@@ -390,9 +439,10 @@ class Stores:
                       provenance=r.get("provenance") or "unverified",
                       words=" ".join(str(r.get(k) or "") for k in ("field", "paperId", "strainId", "organism", "productId",
                                                                    "carbonSource")),
-                      detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")})
+                      detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")},
+                      program=programs.program_of_record(r))
         for a in self._get("artifacts"):
-            yield _artifact_row("biorepo", a, self._artifact_mark(a))
+            yield _artifact_row("biorepo", a, self._artifact_mark(a), self._artifact_program(a))
         for run in self._get("witness"):
             outcomes: dict[str, int] = {}
             for x in run.results:
@@ -419,7 +469,8 @@ class Stores:
         for lesson in self._get("projection")["primer"]["lessons"]:
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
                       words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
-                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])})
+                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])},
+                      program=lesson.get("program"))
 
     def _intake(self) -> Iterable[Row]:
         fetched = self._get("intake")
@@ -429,13 +480,14 @@ class Stores:
             yield Row("intake", "source", paper["id"], paper.get("title") or paper["id"], intake_state(ingest), ingest,
                       words=str(paper.get("year") or ""),
                       detail={"textSource": status.textSource if status is not None else paper.get("textSource"),
-                              "reason": status.reason if status is not None else None}, id_names=False)
+                              "reason": status.reason if status is not None else None}, id_names=False,
+                      program=programs.program_of_paper(paper["id"]))
 
     def _home(self) -> Iterable[Row]:
         for r in self.pool().records:
             if r.get("source") == "candidate" and record_state(r.get("provenance"), r.get("status")) == "proposed":
                 yield Row("home", "review", r["id"], f"Awaiting review: {r.get('measurement') or r['id']}", "proposed",
-                          "awaiting review", detail={"paperId": r.get("paperId")})
+                          "awaiting review", detail={"paperId": r.get("paperId")}, program=programs.program_of_record(r))
         for c in self._get("checks").checks:
             if c.state in ("proposed", "scheduled"):
                 # Who a check names is never shown before it is run.
@@ -476,11 +528,12 @@ def _tokens(text: str) -> set[str]:
 
 
 def find(stores: Stores, module: str, *, ids: Iterable[str] = (), words: str = "", kind: str | None = None,
-         state: str | None = None) -> list[Row]:
+         state: str | None = None, hidden: bool = False) -> list[Row]:
     """A module's rows by id or ref, by words, by kind and by state; every
     filter given is applied. Words rank by how many of them a row holds, its
-    label, names and words together; a row holding none is left out."""
-    rows = stores.rows(module)
+    label, names and words together; a row holding none is left out. With
+    `hidden`, the same search among the rows archived programs left out."""
+    rows = stores.hidden(module) if hidden else stores.rows(module)
     if kind:
         rows = [r for r in rows if r.kind == kind]
     if state:
@@ -558,9 +611,41 @@ def module_named(module: str, question: str) -> bool:
     return any(w in words for w in MODULE_WORDS[module])
 
 
-def coverage(question: str, stores: Stores | None = None) -> CoverageMap:
-    """Every module swept for what the question names, in code."""
-    stores = stores or Stores()
+def _archived(question: str, stores: Stores) -> list[ArchivedCoverage]:
+    """What the question names among the rows archived programs left out,
+    one entry a program, and an archived program the question names by its
+    own name or id ("PHA", "casein"). Empty when archived programs show."""
+    if stores.include_archived:
+        return []
+    found: dict[str, ArchivedCoverage] = {}
+
+    def entry(program_id: str) -> ArchivedCoverage:
+        if program_id not in found:
+            p = programs.program_by_id(program_id)
+            found[program_id] = ArchivedCoverage(program=program_id, name=p.name if p else program_id)
+        return found[program_id]
+
+    q = f" {norm(question)} "
+    for p in programs.programs():
+        if p.status == "archived" and any(f" {n} " in q for n in {norm(p.name), norm(p.id)} if len(n) >= MIN_NAME):
+            entry(p.id).entities.append(p.name)
+    for module in MODULES:
+        for row, name in named_rows(question, stores.hidden(module)):
+            e = entry(str(row.program))
+            e.count += 1
+            if name not in e.entities:
+                e.entities.append(name)
+            if module not in e.modules:
+                e.modules.append(module)  # type: ignore[arg-type]
+    order = [p.id for p in programs.programs()]
+    return [found[k] for k in sorted(found, key=lambda k: order.index(k) if k in order else len(order))]
+
+
+def coverage(question: str, stores: Stores | None = None, include_archived: bool | None = None) -> CoverageMap:
+    """Every module swept for what the question names, in code. Archived
+    programs are left out unless the store was built with them (or, with no
+    store given, `include_archived` asks for them)."""
+    stores = stores or Stores(include_archived=bool(include_archived))
     entities: list[str] = []
     out: list[ModuleCoverage] = []
     for module in MODULES:
@@ -581,7 +666,8 @@ def coverage(question: str, stores: Stores | None = None) -> CoverageMap:
         out.append(ModuleCoverage(module=module, label=LABEL[module], count=len(hits),  # type: ignore[arg-type]
                                   hits=[r.hit() for r in hits[:COVERAGE_HITS]], named=named,
                                   partial=PARTIAL.get(module), error=stores.error(module)))
-    return CoverageMap(entities=entities, searched=len(out), found=sum(1 for m in out if m.count), modules=out)
+    return CoverageMap(entities=entities, searched=len(out), found=sum(1 for m in out if m.count), modules=out,
+                       includeArchived=stores.include_archived, archived=_archived(question, stores))
 
 
 NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
@@ -591,9 +677,34 @@ def in_words(n: int) -> str:
     return NUMBER_WORDS[n] if 0 <= n < len(NUMBER_WORDS) else str(n)
 
 
+def archived_line(a: ArchivedCoverage) -> str:
+    """`found in archived program PHA (hidden)`, the words the trace says."""
+    return f"found in archived program {a.name} (hidden)"
+
+
+SWITCH = "Settings → Programs has the switch that shows archived programs; turn it on to include them."
+
+
+def archived_gap(a: ArchivedCoverage) -> str:
+    """The gap a plan carries for what an archived program hid, in words
+    written by code; the names the question used go in only when they hold
+    no number."""
+    from .validate import find_number
+
+    named = ", ".join(a.entities)
+    with_names = f"What the question names in {a.name} ({named}) is hidden: {a.name} is an archived program. {SWITCH}"
+    if named and not find_number(with_names):
+        return with_names
+    return f"What the question names in {a.name} is hidden: {a.name} is an archived program. {SWITCH}"
+
+
 def footer(cmap: CoverageMap) -> str:
-    """`searched eleven, found in three`, as the trace and the footer say it."""
-    return f"searched {in_words(cmap.searched)}, found in {in_words(cmap.found) if cmap.found else 'none'}"
+    """`searched eleven, found in three`, as the trace and the footer say it,
+    and what an archived program hid."""
+    out = f"searched {in_words(cmap.searched)}, found in {in_words(cmap.found) if cmap.found else 'none'}"
+    for a in cmap.archived:
+        out += f" · {archived_line(a)}"
+    return out
 
 
 def for_model(cmap: CoverageMap, said_in: str = "question") -> str:
@@ -620,6 +731,12 @@ def for_model(cmap: CoverageMap, said_in: str = "question") -> str:
         if m.partial:
             head += f". Read in part: {m.partial}"
         lines.append(head)
+    for a in cmap.archived:
+        lines.append(
+            f"- {archived_line(a)}: the question names {', '.join(repr(e) for e in a.entities)}, which belongs to "
+            f"{a.name}, an archived program. Its papers, records, passages and rows are hidden from this question and "
+            "no tool returns them; do not search for them or answer about them. The service adds a gap that says so "
+            "and names the switch that shows them.")
     return "\n".join(lines)
 
 
@@ -636,4 +753,6 @@ def trace_lines(cmap: CoverageMap) -> list[str]:
         if m.partial:
             line += " · read in part"
         out.append(line)
+    for a in cmap.archived:
+        out.append(f"{a.name} · {archived_line(a)}")
     return out

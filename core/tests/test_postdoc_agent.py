@@ -27,7 +27,7 @@ def passages_found(monkeypatch):
     """`search_passages` finds the one stand-in passage for any question."""
     calls: list[str] = []
 
-    def search_detail(question, k=8, lane=None, ask=None):
+    def search_detail(question, k=8, lane=None, ask=None, include_archived=False):
         calls.append(question)
         return retrieve.Detail(hits=[PassageHit(passage=PASSAGE, score=1 / 61, lanes={"bm25": 1})], lane="bm25")
 
@@ -412,3 +412,40 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
     asked, cmap = first["messages"][2]["content"]
     assert asked["text"].startswith(postdoc_agent.FOLLOW_UP) and asked["text"].endswith("And which models sit on their pages?")
     assert cmap["text"].startswith("COVERAGE MAP")
+
+
+# ── the program switch (OF-BLD-016 §2.3) ──────────────────────────────────
+
+
+ARCHIVED_QUESTION = "What PHB yield did Cupriavidus necator H16 reach on glucose?"
+
+
+def test_with_the_switch_off_an_archived_name_gets_the_line_and_a_gap_naming_the_switch(pool):  # noqa: F811
+    script = Script(plan(claim(support="unsupported")))
+    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script, ctx=tools.ToolContext(pool_factory=lambda: pool))
+    assert out.coverage is not None and out.coverage.includeArchived is False
+    assert [a.name for a in out.coverage.archived] == ["PHA"]
+    # The coverage line, in the trace and in the map round one carries.
+    assert out.trace[0].summary.endswith("found in archived program PHA (hidden)")
+    assert out.trace[0].input["modules"][-1] == "PHA · found in archived program PHA (hidden)"
+    _, cmap = script.calls[0]["messages"][0]["content"]
+    assert "found in archived program PHA (hidden)" in cmap["text"]
+    # A gap, written by code, names the program and the switch.
+    switch = [g for g in out.gaps if "Settings → Programs" in g]
+    assert len(switch) == 1 and "PHA is an archived program" in switch[0]
+
+
+def test_with_the_switch_on_the_same_question_is_swept_as_before(pool):  # noqa: F811
+    script = Script(plan(claim(support="unsupported")))
+    out = postdoc_agent.ask(ARCHIVED_QUESTION, converse=script,
+                            ctx=tools.ToolContext(pool_factory=lambda: pool, include_archived=True))
+    assert out.coverage is not None and out.coverage.includeArchived is True and out.coverage.archived == []
+    assert "archived" not in out.trace[0].summary
+    assert not [g for g in out.gaps if "Settings → Programs" in g]
+    assert "c-necator-h16" in [h.id for m in out.coverage.modules for h in m.hits]
+
+
+def test_a_question_naming_nothing_archived_gets_no_line_and_no_gap(pool):  # noqa: F811
+    out = postdoc_agent.ask("How much ethanol from glucose?", converse=Script(plan(claim(support="unsupported"))),
+                            ctx=tools.ToolContext(pool_factory=lambda: pool))
+    assert out.coverage is not None and out.coverage.archived == [] and out.gaps == []

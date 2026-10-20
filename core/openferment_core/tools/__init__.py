@@ -21,6 +21,12 @@ TOOL OUTPUT DISCIPLINE. A tool summarises in code before a model reads
 anything. `summary` is at most `MAX_SUMMARY_CHARS` as JSON; a tool that
 returns more is a defect in the tool, and the result says so in place of the
 oversized summary.
+
+THE PROGRAM SWITCH (OF-BLD-016 §2.3) is not a tool input: no model sets it.
+It rides in `ToolContext.include_archived`, from the request that started the
+run (`AskRequest.includeArchived`, `?includeArchived=` on
+`POST /api/tools/{name}`, the MCP server's environment), and the pool, the
+passages and every module's rows read through it. Off is the default.
 """
 from __future__ import annotations
 
@@ -93,6 +99,10 @@ class ToolContext:
     # tools, so an audit line names the model that asked for the write and
     # not the chain's first name; empty for a call from outside the app.
     model: str = ""
+    # The browser's "show archived programs" switch, from the request
+    # (OF-BLD-016 §2.3). Off, the pool, the passages and the module rows
+    # leave archived programs out. Never a tool input.
+    include_archived: bool = False
 
     @property
     def pool(self) -> Any:
@@ -100,7 +110,7 @@ class ToolContext:
             if self.pool_factory is None:
                 from .. import evidence_pool
 
-                self.pool_factory = evidence_pool.load
+                self.pool_factory = lambda: evidence_pool.load(include_archived=self.include_archived)
             self._pool = self.pool_factory()
         return self._pool
 
@@ -110,7 +120,8 @@ class ToolContext:
             if self.stores_factory is None:
                 from .. import module_stores
 
-                self.stores_factory = lambda: module_stores.Stores(pool_factory=lambda: self.pool)
+                self.stores_factory = lambda: module_stores.Stores(pool_factory=lambda: self.pool,
+                                                                   include_archived=self.include_archived)
             self._stores = self.stores_factory()
         return self._stores
 

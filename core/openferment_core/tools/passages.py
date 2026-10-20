@@ -4,7 +4,9 @@ Wraps `retrieve.search` on the lane the scorecard chose. The summary gives each
 hit's passage id, paper title, year, section heading and text, the text cut to
 `TEXT_CHARS`, so the model reads sentences it may then quote by passage id;
 the passages themselves travel in `ToolResult.passages`, which is what a quote
-is checked against.
+is checked against. Archived programs' passages are left out unless the
+context's switch (`ToolContext.include_archived`, from the request) shows
+them (OF-BLD-016 §2.3).
 """
 from __future__ import annotations
 
@@ -38,7 +40,7 @@ def _paper_meta(ctx: ToolContext, paper_id: str) -> dict:
 def _run(inp: SearchPassagesInput, ctx: ToolContext) -> ToolResult:
     k = max(1, min(inp.k, MAX_K))
     try:
-        detail = retrieve.search_detail(inp.query, k=k)
+        detail = retrieve.search_detail(inp.query, k=k, include_archived=ctx.include_archived)
     except retrieve.LaneUnavailable as e:
         return ToolResult(error=f"The papers cannot be searched here: {e}")
     hits = []
@@ -59,6 +61,7 @@ def _run(inp: SearchPassagesInput, ctx: ToolContext) -> ToolResult:
     summary = {"query": inp.query, "lane": detail.lane, "count": len(hits), "passages": hits}
     if detail.note:
         summary["note"] = detail.note
+
     return ToolResult(summary=summary, passages=[h.passage for h in detail.hits], recordIds=[], usage=detail.usage)
 
 

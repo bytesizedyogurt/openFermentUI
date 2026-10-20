@@ -1,4 +1,8 @@
-"""`search_records`: the records Postdoc may cite, found by words (OF-BLD-014 §3.4)."""
+"""`search_records`: the records Postdoc may cite, found by words (OF-BLD-014 §3.4).
+
+It searches `ctx.pool`, which leaves archived programs' records and
+candidates out unless the request's switch shows them (OF-BLD-016 §2.3); the
+switch is never an input here."""
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator

@@ -245,6 +245,22 @@ class ProposalAction(BaseModel):
     actingId: str | None = None
 
 
+class ArchivedCoverage(BaseModel):
+    """What the question names in one archived program, left out of the
+    sweep while archived programs are hidden (OF-BLD-016 §2.3, E.2′): the
+    trace says "found in archived program PHA (hidden)" and the plan carries a
+    gap naming the switch."""
+
+    # The program's id and its name, as src/data/programs.ts declares them.
+    program: str
+    name: str
+    # The question's own words that named it.
+    entities: list[str] = Field(default_factory=list)
+    # How many hidden rows the question names, and the modules they sit in.
+    count: int = 0
+    modules: list[ModuleName] = Field(default_factory=list)
+
+
 class CoverageMap(BaseModel):
     """The sweep, module by module, in the order the rail lists them."""
 
@@ -253,6 +269,10 @@ class CoverageMap(BaseModel):
     searched: int = 0
     found: int = 0
     modules: list[ModuleCoverage] = Field(default_factory=list)
+    # OF-BLD-016 §2.3: whether archived programs were swept (the browser's
+    # switch), and, when they were not, what the question names in them.
+    includeArchived: bool = False
+    archived: list[ArchivedCoverage] = Field(default_factory=list)
 
 
 class AnswerPlan(BaseModel):
@@ -332,6 +352,11 @@ class AskRequest(BaseModel):
     # The earlier turns of the same conversation, oldest first. The agent
     # reads the last few as context; `single` mode ignores them.
     history: list[PriorTurn] = Field(default_factory=list)
+    # OF-BLD-016 §2.3: the browser's "show archived programs" switch. Off,
+    # the evidence pool, the passages, the coverage pass and every read tool
+    # leave archived programs out. It rides in the tools' context from this
+    # request; no tool input carries it.
+    includeArchived: bool = False
 
 
 # ── Programs (OF-BLD-016 §2.1, E.1′, E.2′) ──────────────────────────────
@@ -1453,6 +1478,9 @@ class RagSearchRequest(BaseModel):
     k: int = 8
     # A lane by name, or None for the chosen one.
     lane: str | None = None
+    # OF-BLD-016 §2.3: the browser's switch; off leaves archived programs'
+    # passages out.
+    includeArchived: bool = False
 
 
 class RagSearchResponse(BaseModel):
