@@ -386,11 +386,13 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
 - **Three programs, one corpus.** Threads A–O are the hand-curated casein
   program; thread P is PHA from waste cellulosic sugars and thread Q ethanol
   from glucose by wild-type *S. cerevisiae*, each proposed by rule and
-  approved by a person (see "The seed" above). The thread letters are written
-  as `[A-Q]` in three places — `byEntryId` in `src/data/papers.ts`,
-  `src/sim/chat.ts` and the chip pattern in `scripts/golden-path.mjs` — and a
-  new letter changes all three. Home's Programs strip counts each program
-  live from the store.
+  approved by a person (see "The seed" above). Since OF-BLD-016 yeast is the
+  one active program and casein and PHA are archived behind one switch (see
+  "Programs" below). The thread letters are declared in
+  `src/data/programs.ts` and written as a class in one place in code,
+  `byEntryId` in `src/data/papers.ts`, which `check:seed` holds to them.
+  Home's Programs strip counts the active program live from the store and
+  names the archived ones in one muted line.
 - **A strain alias carries the designation.** `STRAIN_ALIASES` maps `h16` and
   `kt2440` spellings, never a species alone, so a value measured on another
   strain of the species stays apart. Extracted values carry `organismText`
@@ -777,11 +779,94 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   predictions as ceiling, forecast, price, keeping what loads. The double
   replays `ask-draft-stream.jsonl` for a question that starts with "Draft".
 
+## Programs (OF-BLD-016)
+
+- **A program is data.** `src/data/programs.ts` declares three: **Yeast
+  ethanol** (`yeast`, thread Q, active), **Casein** (`casein`, threads A–O,
+  archived) and **PHA** (`pha`, thread P, archived), each with a name, its
+  letters, a status and one line. `Program` is in `types.ts`, `models.py`
+  and `PAIRS`. Archived means hidden, never deleted (D1): the papers,
+  records, strains, products, scenarios, protocols, runbooks and lessons
+  stay in the repository, and the guards that rest on them (`check:anchors`,
+  `check:lock`, the export fixtures on B5, the golden path) still run on
+  them. Deleting them is a later document, with those guards rewritten
+  first.
+- **`programOf` says which program an entity belongs to** (`src/store.ts`):
+  a paper by its thread letter, a record or candidate by its paper, a
+  strain, product, scenario, protocol or module by its own `program` field,
+  a lesson by its own or its module's, a runbook by its own field, else its
+  product's, else its strain's, a deposition by its runbook, else its
+  protocol. An entity with no program is general and always shows.
+  `activePrograms()`, `programVisible`, `archivedProgramOf` and the hook
+  `useProgramFilter()` are the one selector every list, count, chooser,
+  search and suggested prompt filters through; a screen never writes its own
+  test. `core/openferment_core/programs.py` (`program_of`, `shows`, `hides`)
+  is the service's copy, reading the `programs` that `export:corpus` writes
+  into `corpus.json` and `modules.json`, with a `program` (null for general)
+  on every row.
+- **One switch, `showArchived`.** Durable (`snapshotOf`, `applyDurable`),
+  off by default, and outside `seedState`, so clearing the browser's data
+  keeps it. Settings → Programs (`/settings/programs`,
+  `PROGRAMS_SETTINGS_PATH`) lists the three programs and holds it, as *Show
+  archived programs and examples*. A list it empties says what it hides,
+  whose, and where the switch is (`HiddenByArchive`). A deep link to an
+  archived entity still opens it, under `ArchivedBanner`, which names the
+  program and links to the switch; `useProgramScope` shows that entity's own
+  program on its page and nothing of another. Live conversations are the
+  person's history and are not filtered, and neither is Home's proposals
+  card.
+- **Examples hide with the archive** (§3.3, D3). `example: true` marks a
+  seed runbook, protocol, scenario, module (its lessons inherit) or
+  deposition that describes a run nobody made: all ten runbooks, the seven
+  casein protocols, `sc-s1…s3`, modules m0–m5. `PR-OD-01`, `PR-CIP-01` and
+  m6 teach generic methods and stay, and a deposition is an example only by
+  its own flag. `isExample` feeds `programVisible`, so the one switch shows
+  both, and `ArchivedBanner` says when a page is an example. The flag is
+  outside `canonical()`, so the eight lock digests are unchanged;
+  `check:seed` fails on a runbook carrying a locked prediction with no
+  deposition behind it and no `example`. The service lists examples to
+  Postdoc marked (`example: true` in a module row's `detail`) rather than
+  hiding them, and the coverage pass does not count them as hidden.
+- **The service takes the switch from the request, never from a model.**
+  `includeArchived` (default false) on `AskRequest` and `RagSearchRequest`;
+  `?includeArchived=true` on `POST /api/tools/{name}`, a query parameter
+  because the body is the tool's input; `OPENFERMENT_INCLUDE_ARCHIVED` for
+  the MCP server (unset: off), never a client. It rides in
+  `ToolContext.include_archived`, and a tool input that carries it is
+  refused like any extra field. `src/lib/postdoc.ts` and `src/lib/rag.ts`
+  send the store's switch with every question and every search. With it
+  off, `evidence_pool` leaves out every record and candidate on an A–P
+  paper (counted in `EvidencePool.hidden`), retrieval drops archived
+  passages from each ranking before fusion and before any reader grades,
+  and `Stores.rows` leaves archived module rows out; an artifact's program
+  is what its inputs name.
+- **A question that names something archived is told so.** With the switch
+  off the coverage pass fills `CoverageMap.archived` (`ArchivedCoverage`,
+  in `PAIRS`), the trace says *found in archived program PHA (hidden)*, and
+  the code, not the model, writes a gap naming Settings → Programs. No
+  hidden row's ref reaches the model, and a read tool asked by id for a
+  hidden row says which archived program holds it.
+- **What keeps everything**: the callers that measure, or that a person
+  opened by id. `proforma.scenario` and `run`, `rageval` (its `--thread`
+  narrows the questions, never the index), and eval set O
+  (`evalo.INCLUDE_ARCHIVED`). `ask:batch` follows the API's default, off.
+  The write tools and the compute tools (`yield_ceiling`, `selling_price`,
+  `growth_forecast`, `draft_runbook`) are filtered by nothing beyond the
+  pool they read.
+- **`check:seed` holds the letters to the programs**: a thread with papers
+  and no program, a program with no letter, a letter in two programs, a gap
+  in the letters, and a `program` field naming nothing each fail it. The
+  class `byEntryId` writes in `src/data/papers.ts` is held to
+  `THREAD_LETTER_CLASS`, which `programs.ts` builds (`[A-Q]` today), so a
+  new thread changes `programs.ts` first and `check:seed` names what has not
+  followed.
+
 ## Persistence tiers
 
 - The **Durable** tier persists depositions, review decisions, runbook locks,
   this browser's copy of Guild's ledger with what it still owes the service,
-  the lessons finished here, and Postdoc's Live conversations across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
+  the lessons finished here, Postdoc's Live conversations and the program
+  switch (`showArchived`) across a refresh (OF-BLD-006 §4.6: `snapshotOf`, `hydrateDurable`,
   `saveDurable` in `src/store.ts`). Reference and Ephemeral tiers stay in
   memory. The review queue and its `accept` / `reject` / `skip` / `gold`
   actions already exist in `src/screens/Guild.tsx` and `reviewRecord` —

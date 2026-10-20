@@ -8,10 +8,35 @@ This repository implements **OF-DES-001 v0.1** (front-end design and working-sim
 against the corpus of **OF-COR-001 v1.0** (`docs/OF-COR-001.md`). It is the design proven at
 full fidelity, the faculty demo, and the executable spec for the eventual production build.
 
-## The program it is built around
+## The programs it is built around
 
-Not a generic demo. The corpus serves three real research programs. The first, threads A to O,
-was curated by hand before Intake existed, and most screens are populated from it:
+The corpus serves three research programs, declared as data in `src/data/programs.ts`. One is
+active and two are archived. An archived program's papers, values, strains, products,
+scenarios, protocols, runbooks and lessons stay in the repository and leave every default
+view, count, suggested question and Postdoc evidence pool; one switch, Settings → Programs →
+*Show archived programs and examples*, brings them all back exactly as they were. Nothing is
+deleted (OF-BLD-016).
+
+| Program | Threads | Status | Papers in the seed |
+|---|---|---|---|
+| Yeast ethanol | Q | active | 22 |
+| Casein | A–O | archived | 132 |
+| PHA | P | archived | 35 |
+
+**Yeast ethanol, the active program**: ethanol from glucose by wild-type *Saccharomyces
+cerevisiae* in batch, thread Q, proposed by a fixed rule (`pnpm thread:propose:q`) and applied
+on Sean Creighton's approval on 2026-10-20: **22 sources**, two NREL reports from OSTI (the corn
+stover design report by Humbird et al. and its successor by Tao et al.), the Saccharomyces Genome
+Database entries for S288C and CEN.PK113-7D, and 18 open-access kinetics and physiology papers,
+all 22 fetched with full text. Extraction on Haiku anchored **163** values to sentences, all
+`unverified` until a person decides them in Guild. geneOS carries two reconstructions of
+*S. cerevisiae* S288C, Yeast9 and iMM904, each giving an ethanol ceiling on glucose; Proforma's
+stored BioSTEAM benchmark prices the Humbird design. Its hosts are the two SGD strains. There is
+no ethanol product in Dominion's catalogue yet. `docs/DEMO.md` is the run sheet for showing it.
+Home's **Programs** strip counts this program live and names the archived two in one line.
+
+**Casein, archived**: threads A to O, curated by hand before Intake existed, around one
+question:
 
 > **Can phosphorylated bovine β-casein be expressed in the cell-wall-deficient
 > *Chlamydomonas reinhardtii* strain cw15?**
@@ -34,26 +59,17 @@ measured on a casein or on a secreted product), secreted yields sit two to three
 β-lactoglobulin, and whether *C. reinhardtii* even has a Fam20-family kinase is an **open
 question the app labels as open** rather than answering.
 
-The second program is **PHA from waste cellulosic sugars**, thread P (OF-BLD-014 Phase 2). Its
-papers are proposed by a fixed Europe PMC search rule (`pnpm thread:propose`) and enter the
-seed only on a named person's approval (`pnpm thread:apply`). It holds no hand-curated record:
-every number on a thread P paper arrives through Intake and a Guild decision. Two hosts
-(*Cupriavidus necator* H16, *Pseudomonas putida* KT2440), two products (PHB, mcl-PHA) and five
-polymer ontology fields are in place for it. As of 2026-10-15 the thread holds **35 papers**
-(P1–P35), proposed by the rule held to title and abstract and approved by Sean Creighton on
-2026-10-14; all 35 return full text from Europe PMC (`STATE.md` has what extraction has done
-since).
+**PHA, archived**: polyhydroxyalkanoates from waste cellulosic sugars, thread P (OF-BLD-014
+Phase 2). Its 35 papers (P1–P35) were proposed by the fixed Europe PMC rule
+(`pnpm thread:propose`) and approved by Sean Creighton on 2026-10-14 (`pnpm thread:apply`); all 35 are
+fetched with full text, and extraction has anchored **303** values on them, each `unverified`.
+It holds no hand-curated record. Two hosts (*Cupriavidus necator* H16, *Pseudomonas putida*
+KT2440), two products (PHB, mcl-PHA), five polymer ontology fields and the BioSTEAM scenario
+`sc-pha-1` belong to it.
 
-The third program is **ethanol from glucose by wild-type *Saccharomyces cerevisiae* in batch**,
-thread Q, proposed by the same rule module (`pnpm thread:propose:q`) and applied on Sean
-Creighton's approval on 2026-10-20: **22 sources**, two NREL reports from OSTI (the corn stover
-design report by Humbird et al. and its successor by Tao et al.), the Saccharomyces Genome
-Database entries for S288C and CEN.PK113-7D, and 18 open-access kinetics and physiology papers,
-all 22 fetched with full text. Extraction on Haiku anchored **163** values to sentences (all
-`unverified` until a person decides them in Guild). geneOS carries two reconstructions of
-*S. cerevisiae* S288C, Yeast9 and iMM904, each giving an ethanol ceiling on glucose; Proforma's
-stored BioSTEAM benchmark prices the Humbird design. `docs/DEMO.md` is the run sheet for showing it.
-Home's **Programs** strip counts each program live.
+The seed's runbooks, the seven casein protocols, the three authored cost scenarios and the casein
+lessons describe runs nobody made. They are flagged `example: true`, hidden with the archived
+programs, and shown by the same switch under a banner that says so.
 
 ## What is real, and what is modeled
 

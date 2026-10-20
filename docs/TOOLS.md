@@ -60,6 +60,46 @@ Read in part: depositions, runbooks adopted or locked in a browser, and
 review decisions not yet posted stay in that browser. The footer names the
 modules it holds for.
 
+## The program switch (OF-BLD-016 §2.3, §3.3)
+
+Casein (threads A–O) and PHA (thread P) are archived programs; yeast ethanol
+(thread Q) is active (`src/data/programs.ts`, `programs.py`). Whether a run
+sees the archived two is not a tool input, and no model sets it. It rides in
+`ToolContext.include_archived`, set by whatever started the run:
+
+| Caller | Where the switch comes from |
+|---|---|
+| Postdoc's loop | `AskRequest.includeArchived` on `/api/ask` and `/api/ask/stream`; the browser sends Settings → Programs' switch with every question |
+| `POST /api/tools/{name}` | the query parameter `?includeArchived=true`; the body is the tool's input, and no input carries the switch |
+| the MCP server | `OPENFERMENT_INCLUDE_ARCHIVED` in its environment (unset: off), never a client |
+
+Off is the default everywhere. A tool input that names `includeArchived`
+(`geneos_read` sent it, say) is refused like any field the tool does not
+take. With the switch off:
+
+- `search_records` reads an evidence pool with every record and candidate
+  on a thread A–P paper left out, counted in `EvidencePool.hidden`.
+- `search_passages` drops archived passages from each ranking before
+  fusion, reading past `DEPTH` so a ranking still holds `DEPTH`.
+- Every read tool's rows are tagged in the store with the program they
+  belong to (`module_stores.Row.program`, as the browser's `programOf`
+  resolves it; an artifact by what its inputs name: a record's paper, a
+  model's host, a product), and archived rows are left out. A row asked for
+  by id says which archived program holds it.
+- The coverage pass before round one fills `CoverageMap.archived` when the
+  question names something archived; the trace reads *found in archived
+  program PHA (hidden)*, no hidden row's ref reaches the model, and the
+  code writes a gap naming the switch.
+- The compute tools (`yield_ceiling`, `growth_forecast`,
+  `selling_price`, `draft_runbook`) and the write tools are filtered by
+  nothing beyond the pool they read.
+
+**Examples.** A seed runbook, protocol, scenario or lesson that describes a
+run nobody made carries `example: true` in its row's `detail`. The browser
+hides examples with the archived programs; the read tools list them, marked,
+with the switch off too, so a read can say a runbook is an example, and the
+coverage pass does not count them as hidden.
+
 ## The write tools (OF-BLD-015 §7.3)
 
 The pair of each read: `dominion_write` … `home_write`. One input for all:
