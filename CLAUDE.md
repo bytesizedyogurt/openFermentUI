@@ -1034,6 +1034,69 @@ Mini, which serves `main` (D8).
   question no longer names, is keyed by its subject, and keeps the ask
   button after a 503.
 
+## The bridges (OF-BLD-019 Phase 5)
+
+- **A fermOS fit is a source, never a copy** (D10). `proforma.fit_info`
+  reads what one kept `kinetic_fit` or `growth_forecast` gives `FIT_KEYS`
+  (titre, yield, productivity), or why not; `GET /api/fermos/fits?flowsheet=`
+  lists every one (`FermosFitInfo`, `FitFeed`, in `PAIRS`) and keeps nothing.
+  There is no `batch_simulation`. A kinetic fit is forecast under its run's own
+  starting values and length (`fermos.forecast_for`) and kept nowhere. Titre
+  is the forecast's final product, yield its `yieldInterval` (product made over
+  sugar used: the kinetic fit holds no Yp/s), productivity the titre over the
+  batch time, the hour the median sugar runs out. `fermos.to_run_out` finds
+  that hour between grid points (linear between the last point with sugar and
+  the first without, the grid drawn again to that bracket until a step is at
+  most `RUN_OUT_STEP`, 2 %, of the hour, at most `RUN_OUT_PASSES` times) and
+  draws the forecast again to it with the same fit, starting values and seed,
+  kept nowhere, so a feed does not move with how long the forecast ran.
+  Refused in words naming the parameter: μ or Xmax unidentified (and what run
+  would identify it), no Yp/s, no sugar series, sugar that does not run out,
+  a product series naming another product (`PRODUCT_WORDS`), a damaged fit
+  file (`fit_of` refuses it; the list keeps the rest). `forecast` compares
+  units through `units.normalize`; `fermos-1` is not bumped.
+- **A person chooses, input by input; a model never does.**
+  `ProformaRunRequest.fits` and `?fits=` on `/bind` and the ceiling check
+  carry the choice. `apply_fits` binds each chosen input to the artifact
+  (`binding: 'artifact'`, sampled across its band) and the basis names it per
+  input (`<key> fit`, `… fit low`, `… fit high`) with the `fit batch time`, so
+  the fit's provenance enters through `basis_provenance`. **A fit's
+  productivity feeds only beside titre from the same fit**; otherwise refused,
+  naming what titre is, and never bound to the fit behind the person's back.
+  The browser keeps the choice in `proformaFits` (Durable, by scenario and
+  input); **Use a fermOS fit** on the scenario page and **Send to Proforma**
+  on fermOS → Forecast (`?fit=` on the scenario's page) choose, and stopping
+  one fit clears only the inputs it feeds. No tool reads or writes fits.
+- **The ceiling check is a flag, never a bound** (D11).
+  `proforma.ceiling_check` (`GET /api/proforma/ceiling-check`; `CeilingCheck`
+  and `CeilingRow` in `PAIRS`) binds the yield as the page binds it and sets
+  it beside the newest stored `geneos.ceiling` of each shelf model of the
+  scenario's organism on `CEILING_SUGAR` (glucose for both flowsheets), in
+  g g⁻¹ through `units.convert` and in mol mol⁻¹ at the artifact's own
+  `molPerMol` over `gPerG`. A value or high end above is `above`, naming the
+  records above; nothing is clamped (a test holds the binding, the run and
+  its artifact id unchanged). Computed on read, kept nowhere, it starts no
+  worker; every refusal is a 422 in words. The PHA draft's records are read
+  unclipped (`cap=None`) while its run still clips (`PHA_CLIP_NOTE`).
+- **How a strain maps to a model.** `Scenario` carries no strain: the
+  organism is the host filter when one is chosen, else each bound record's
+  strain, else the species its `organismText` opens with, else the program's
+  one species when every host it catalogues is of one species. A shelf model
+  is the scenario's when its `host` is one of those strains (`match: strain`)
+  or of those species (`match: species`, said on the row); a model with no
+  host maps to none. `organismWords` counts each kind as it is (3 of
+  `sc-yeast-1`'s 18 yield records name CEN.PK113-7D, 15 name no catalogued
+  strain), and each row says how many records it covers. With no ceiling on
+  file the card names `computeAt`, and never sends a model whose shelf `feed`
+  is another sugar (RehMBEL1391) to compute on glucose. GeneOSModel lists the
+  scenarios above the chosen model's ceiling.
+- **The double** answers both from what `demo.py --prototype` records
+  through the real code over a STAND-IN ethanol run and a STAND-IN ceiling
+  (`demo`): `fermos-fits.json`, `proforma-bind-fits.json` (with `others`),
+  `proforma-ceiling-check.json` (with `fitted`), picked by
+  `flags.fermosFitsOnFile` and `flags.ceilingOnFile`, both off as a fresh
+  install starts; any other choice of fits is a 422 in words.
+
 ## Runbooks keep score (OF-BLD-014 Phase 9)
 
 - **Three prediction kinds.** A `Prediction` with no `kind` is a point, held

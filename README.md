@@ -96,10 +96,10 @@ archived programs (above).
 | Guild's competence ledger | **Real, when kept** — people, sign-offs, runs and lessons passed, in `core/data/guild.json` on the Mini, which is personnel data and never enters git; levels are computed from it and never stored. With no ledger, Guild and Home's Workforce card say so and offer the form to add the first person, as the lead |
 | Witnessed checks | **Real, when run** — proposed each night by fixed rules over the ledger, with every reason written out; scheduled, dismissed or run at the bench by a named assessor, whose calls and words become witnessed entries on the ledger. The brief beside each check is model-written words with no number, told what the ledger shows and never who. Kept in `core/data/checks.json` on the Mini, out of git |
 | Practice scenarios and tutor sessions | **Model-written words over copied values** — the model drafts each scenario and asks each tutor question, writing no number of its own; every value in a scenario's evidence pane is copied by the service from the protocol step, material or bench run it cites. A session goes on a person's ledger only when that person is on it. Kept in `core/data/practice.json` on the Mini, out of git |
-| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): for ethanol, Yeast9 (yeast-GEM v9.1.1) and iMM904, two reconstructions of *S. cerevisiae* S288C, each giving **0.5114** g g⁻¹ on glucose (OF-BLD-016 B.1); for PHB (archived), `e_coli_core` and `iJO1366` as bundled with cobra with the phaCAB route added, and `RehMBEL1391` for *C. necator* H16, fetched at its pinned commit and hash. A ceiling has no time axis and no vessel; geneOS → Model draws thread Q's reported ethanol yields beside it and rings one above it for a reviewer |
+| Yield ceilings | **Computed by flux balance analysis** on published reaction networks (geneOS → Model): for ethanol, Yeast9 (yeast-GEM v9.1.1) and iMM904, two reconstructions of *S. cerevisiae* S288C, each giving **0.5114** g g⁻¹ on glucose (OF-BLD-016 B.1); for PHB (archived), `e_coli_core` and `iJO1366` as bundled with cobra with the phaCAB route added, and `RehMBEL1391` for *C. necator* H16, fetched at its pinned commit and hash. A ceiling has no time axis and no vessel; geneOS → Model draws thread Q's reported ethanol yields beside it and rings one above it for a reviewer, and Proforma's ceiling check reads a scenario's fermenter yield against it, flagged and never clamped (OF-BLD-019 Phase 5) |
 | Computed values | **Computed, with a basis** — a value no paper states (a converted unit, a yield ceiling, a fitted rate, a price) carries the calculation behind it: the tool, its version and every input with its source. Its provenance follows from those sources (`basis_provenance`), and BioRepo → Artifacts keeps each one and replays it. **25** kept in this checkout and on `openferment-data` |
 | Retrieval | **Real, measured** — 88 fetched papers cut into **7,179** passages of their own words, with meaning vectors from `BAAI/bge-small-en-v1.5`. Witness → Retrieval's scorecard is measured on thread Q (2026-10-20T07:46:46Z): K 85 questions, S 83, F empty; the rule's score (mean nDCG@10 on K and S) bm25 0.4226, bm25+expand 0.4294, hybrid 0.4587, bm25+rerank **0.5942**, hybrid+rerank not scored. The rule chose bm25+rerank; search is held on **hybrid** (`core/data/index/config.json`), because each reranked search is a model call of about twenty seconds, and Witness names both the lane in use (`laneInUse`) and the rule's choice |
-| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. No run is deposited, so nothing real has been fitted: fermOS says *No run deposited yet* and names the readings to deposit and where |
+| Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (OF-BLD-019 Phase 5). No run is deposited, so nothing real has been fitted and no fit is on file to feed a scenario: fermOS says *No run deposited yet* and names the readings to deposit and where |
 | Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. The seed's ten runbooks (eight of them locked) are examples, so by default the ledger counts zero and says why; no run has tested a prediction. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
 | Simulation economics, authored | **Modeled, and examples** — the three scenarios S1–S3 are illustrative casein cost surfaces written by hand, not validated, labelled *Cost model v0*, and hidden with the archive |
 | Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it, as it cites the newest kept run of a seed BioSTEAM scenario the program switch shows; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. No reference run and no scenario run is kept in this checkout |
@@ -516,7 +516,7 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field, and the
                          #   provenance ranking is one list on both sides
   pnpm check:reference   #   reference content is domain knowledge, never a result
-  pnpm test:core         #   the Python service, 1,733 tests (1 skipped) on 2026-10-20: retrieval, units,
+  pnpm test:core         #   the Python service, 1,742 tests (1 skipped) on 2026-10-20: retrieval, units,
                          #   anchoring, match_run, biorepo.write, the computed-value basis, the artifact store
                          #   and replay, llm.py's roles, cached tokens, tool turns and daily cap, the registry's
                          #   thirty-two tools, its gates and the proposals they make, the coverage sweep, the
@@ -534,7 +534,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   and stream_table, selling_price reading the yeast scenario's run, one archive rule
                          #   for every reader of a run, and check:tools' rule 2b planted in a copy of the package;
                          #   pureOS's trains read from a run's stream table, recovery by pass, and thermosteam's
-                         #   questions, refusals and status codes against a stand-in worker
+                         #   questions, refusals and status codes against a stand-in worker; a scenario's newest
+                         #   run on the service; a fermOS fit feeding a scenario, its run-out found between grid
+                         #   points and every refusal; the ceiling check, flagged and never clamped
   pnpm test:sim          #   the real BioSTEAM worker answers: the corn plant run whole and read back, glucose to
                          #   ethanol converging on stand-in inputs, one result whatever the warm worker built
                          #   before, thermosteam's answers and the ethanol train read by pass among them
@@ -692,6 +694,9 @@ dynamics: a genome-scale model gives a yield ceiling with no time axis, and
 titre is fermOS's output rather than geneOS's. **fermOS → pureOS** is the
 harvest step, which pays for a choice made back in geneOS — secreted or
 intracellular — so the handoff carries product location, not just a titre.
+Two more reach Proforma (OF-BLD-019 Phase 5, below): **fermOS → Proforma** is a fit a person
+chooses as the source of a scenario's titre, yield and productivity, and **geneOS → Proforma** is
+the ceiling a scenario's fermenter yield is read against, flagged and never clamped.
 
 **fermOS fits what a run measured**: kinetics is built from depositions alone,
 and the other four subsystems are named and not built. It is the one that
@@ -869,6 +874,45 @@ Every screen reads the service and the runs it kept; none prices anything in the
   *Clear this browser's data* drops them all. The service keeps the runs, each one artifact, and
   holds no scenario made here: such a scenario runs by the flowsheet it names, and the run's
   basis carries the scenario's id.
+
+### fermOS and geneOS reach Proforma (OF-BLD-019 Phase 5)
+
+**A fermOS fit is a source, never a copy** (D10). `GET /api/fermos/fits?flowsheet=` lists every
+kept kinetic fit and forecast with what each can give the flowsheet's titre, yield and
+productivity, or why not, in words; a GET keeps nothing. A kinetic fit is forecast under its run's
+own starting values and length, and kept nowhere. Titre is the forecast's final product, yield
+its product made over sugar used (the kinetic fit holds no Yp/s of its own), and productivity the
+titre over the batch time, the hour the forecast's median sugar runs out. That hour is found
+between grid points, by drawing the grid again until one step is at most 2 % of the hour, and the
+forecast is drawn again to it with the same fit, starting values and seed, so what a fit feeds does
+not depend on how long its forecast was asked to run. Each value is the median with its 5th and
+95th percentile. A fit is refused in words naming the parameter: μ or Xmax not identified (and
+what run would identify it), no Yp/s, no sugar series, sugar that does not run out, another
+product than the scenario's, or a damaged file (the other fits still list). Productivity comes
+from a fit only beside titre from the same fit; otherwise the binding and the run are refused,
+naming what titre is. A person chooses the fit, input by input, under **Use a fermOS fit** on the
+scenario page or with **Send to Proforma** on fermOS → Forecast; a model never picks one. The
+choice is kept in this browser by scenario and input, goes with the binding and the run as
+`fits`, and the run's basis names the artifact for each input it feeds, and the batch time, so
+the run's provenance follows the fit's. No fit is on file in this checkout.
+
+**The ceiling check is a flag, never a bound** (D11). `GET /api/proforma/ceiling-check` sets the
+scenario's fermenter yield, bound as its page binds it (records, a named person's assumption, or
+a fit), beside the newest stored geneOS ceiling of each shelf model of its organism, on its
+flowsheet's sugar (glucose), in g g⁻¹ through `units.py` and in mol mol⁻¹ at the ceiling's own
+ratio. A yield whose value or high end is above a ceiling is flagged, with the records above it,
+and asks a reviewer to check their basis; nothing is clamped, and the binding, the run and its
+artifact are the same with a ceiling on file as without. It is computed when read, kept nowhere,
+and starts no worker. The organism is the scenario's host filter when one is chosen, else each
+bound record's strain, else the species its paper's words name, else the program's one species,
+and the card counts each kind; a model matches by strain, or by species and says so, and a model
+with no host matches no scenario. With no ceiling on file it says where one is computed, and does
+not send a model fed another sugar to compute one on glucose. geneOS → Model lists the scenarios
+above the chosen model's ceiling. On this checkout's data `sc-yeast-1`'s yield binds 18 records,
+0.22–0.518 g g⁻¹: 3 name CEN.PK113-7D and 15 no catalogued strain, so iMM904 and Yeast9 (both
+S288C) match by species, and the high end is above both their ceilings (0.5114 g g⁻¹) and
+flagged, naming one record. The PHA draft's check reads its records unclipped, while its run
+still clips a yield above the glucose ceiling (OF-BLD-014 §8.3).
 
 ### pureOS reads the train, and thermosteam answers (OF-BLD-019 Phase 4)
 

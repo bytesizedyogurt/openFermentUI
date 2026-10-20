@@ -117,8 +117,33 @@ fields on its program's papers that pass the aggregate gate and name a feed the 
 takes as their carbon source, converted by `units.py`. Glucose to ethanol binds
 its feed concentration, titre and yield to thread Q's records today; its
 productivity waits, because no thread Q productivity record names a carbon
-source. What no record binds waits for a named person's assumption, and the
-run's basis names every record and assumption it used.
+source. What no record binds waits for a named person's assumption (or, for
+titre, yield and productivity, a fermOS fit a person chooses, below), and the
+run's basis names every record, assumption and fit it used.
+
+Two more carry the reactor and the organism into the price, and both are built
+(OF-BLD-019 Phase 5).
+
+**fermOS → Proforma is a fit a person chooses.** A kept kinetic fit or
+forecast can be the source of a scenario's titre, yield and productivity
+(`proforma.fit_info` and `apply_fits`, `GET /api/fermos/fits`): titre the
+forecast's final product, yield its product made over sugar used, productivity
+the titre over the hour its median sugar runs out, found between grid points
+and drawn again to that hour (`fermos.to_run_out`). Nothing is copied: the run's
+basis names the fit for each input it feeds, so the run's provenance follows
+the fit's. A person chooses it, on the scenario page or with Send to Proforma on
+fermOS → Forecast, and a fit's productivity feeds only beside its own titre; a
+fit that cannot give an input is refused naming the parameter.
+
+**geneOS → Proforma is a flag, never a bound.** The ceiling check
+(`proforma.ceiling_check`, `GET /api/proforma/ceiling-check`) sets a scenario's
+fermenter yield, as bound, beside the newest stored geneOS ceiling of each shelf
+model of its organism on its flowsheet's sugar, flags a yield above it with the
+records above, and changes nothing: the binding, the run and its artifact are
+the same with a ceiling on file as without. The organism is read from the bound
+records' strains and species, a model matches by strain or by species, and the
+check is computed when read and kept nowhere. geneOS → Model lists the
+scenarios above a model's ceiling.
 
 **fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
 real runs in a specific vessel, so they come from Deposition. fermOS is the
@@ -192,7 +217,7 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. Transport, operating mode, scale-up and control are not built.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). Transport, operating mode, scale-up and control are not built.
 
 | Subsystem | Key | State |
 |---|---|---|
