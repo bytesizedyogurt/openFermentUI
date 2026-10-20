@@ -49,9 +49,9 @@ row's `detail` (product in and out, what is lost and to which outlet, the
 recovery, the cumulative share still on the path) is read by
 `pureos.train_of` from the run artifact's stream table, never typed and never
 simulated again; the row's mark is the run's, worked out as for any artifact
-row. This is a kind of the existing read, not a thirtieth tool: the registry
-stays closed at twenty-nine. `GET /api/pureos/trains` and
-`GET /api/pureos/train/{key}` serve the same reading to the browser.
+row. This is a kind of the existing read, not a tool of its own.
+`GET /api/pureos/trains` and `GET /api/pureos/train/{key}` serve the same
+reading to the browser.
 
 Before round one, `module_stores.coverage` sweeps every module for what the
 question names and hands the model the map. A follow-up is swept with the
@@ -74,6 +74,40 @@ word and never by a model:
 Read in part: depositions, runbooks adopted or locked in a browser, and
 review decisions not yet posted stay in that browser. The footer names the
 modules it holds for.
+
+## thermosteam answers property questions (OF-BLD-019 §4.2)
+
+The thirtieth name, added by the build document's authority (OF-BLD-019
+Part C.8 and §4.2): the registry is closed at thirty, and `check:tools` fails
+when a name in `WHITELIST` has no tool registered or no mention here.
+OF-BLD-019 §6.1 adds `run_flowsheet` and `stream_table` later.
+
+| Tool | In | Out |
+|---|---|---|
+| `thermo_props` | a Proforma run's artifact id and one of its stream ids; or the preset `ethanol-water-azeotrope`; or `beer-at-titre-of` with an ethanol titre record's id (every field a string, an empty one meaning "not this") | one evidence id a property thermosteam answered (density, heat capacity, viscosity, bubble point, dew point), the mixture's mass fractions and conditions, and the library's version; a chemical the library lacks refused in words |
+
+Offered loose, as the module tools are. A question carries ids and words;
+the service fills every number (`core/openferment_core/thermo.py`): a
+stream's composition, temperature, pressure and phase are its row of the
+run's stream table, and the run is a source of the answer; the azeotrope is
+the composition at which the library's own vapour-liquid equilibrium gives a
+vapour of the liquid's composition, at the library's default pressure; a
+beer is water and ethanol at the record's titre, read through `units.py` into
+kg m⁻³ and solved in the worker for the mass fraction that holds that much
+ethanol in a cubic metre of the mixture at its own density (the beer's cells,
+residual sugar and dissolved CO2 are not in it, and the answer says so). A
+temperature or pressure nobody gave is the library's own Stream default,
+said so. The Proforma worker asks thermosteam (op `thermo_props`); the answer
+is one `thermo_props` artifact whose basis names the library and its version,
+with provenance from `basis_provenance`: `computed` for the azeotrope, the
+weakest of that and the record's or the run's otherwise (`demo` for a run
+resting on an assumption). Each property is its own `Evidence`, id
+`<artifact id>:<property>`, which `SeenSet` keeps and a claim cites like any
+computed value. With the switch off, a run of an archived program is refused
+as its train is hidden. `POST /api/thermo/props` asks and
+`GET /api/thermo/props` reads the stored answer to the same question (or
+`{"artifact": null}`), starting no simulator; pureOS → Train and fermOS show
+it in a **Properties** card.
 
 ## The program switch (OF-BLD-016 §2.3, §3.3)
 
@@ -215,5 +249,5 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
-Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`.
-`test_mcp` counts them.
+Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
+thirty-two. `test_mcp` counts them.

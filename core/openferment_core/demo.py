@@ -428,6 +428,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
         *prototype_fermos().items(),
         *prototype_proforma().items(),
         *prototype_pureos().items(),
+        *prototype_thermo().items(),
         *prototype_proposals().items(),
     ):
         path = out / name
@@ -1073,6 +1074,99 @@ def prototype_pureos() -> dict[str, Any]:
     train = pureos.train(proforma.SCENARIO_ID, arts=[art], scenarios=scenarios)
     return {"pureos-trains.json": listed(False), "pureos-trains-archived.json": listed(True),
             "pureos-train.json": train.model_dump(mode="json")}
+
+
+# OF-BLD-019 §4.2: thermosteam's answers for the double, made by the real
+# thermo.py over the stand-in run prototype_pureos reads (one question a
+# stream of it), the azeotrope preset and a beer at a STAND-IN titre record's
+# titre. thermosteam is replaced by a closed-form STAND-IN that knows three
+# chemicals and refuses any other in words, as the library refuses a chemical
+# it lacks; every number it gives is invented and its `library` says so.
+THERMO_STANDIN = "STAND-IN for the browser tests: a closed form in place of thermosteam; every number invented"
+# Invented: density kg/m^3, heat capacity J/g/K, viscosity Pa*s, boiling K.
+_THERMO_STANDIN_CHEMICALS = {"Water": (1000.0, 4.2, 0.001, 373.0), "Ethanol": (790.0, 2.4, 0.0012, 351.0),
+                             "Glucose": (1540.0, 1.2, 0.002, 600.0)}
+
+
+def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
+    from .workers import WorkerError
+
+    table = _THERMO_STANDIN_CHEMICALS
+    if op != "thermo_props":
+        raise WorkerError(f"KeyError: the {THERMO_STANDIN} answers thermo_props alone, not {op!r}")
+    solve = args.get("solve") or None
+    if solve and solve["kind"] == "titre":
+        w = solve["kgPerM3"] / table[solve["solvent"]][0]
+        flows = {solve["solvent"]: 1.0 - w, solve["solute"]: w}
+    elif solve and solve["kind"] == "azeotrope":
+        flows = {solve["light"]: 0.95, solve["heavy"]: 0.05}
+    else:
+        flows = {k: float(v) for k, v in (args.get("components") or {}).items() if v}
+    lacking = sorted(n for n in flows if n not in table)
+    if lacking:
+        raise WorkerError(f"Refused: the {THERMO_STANDIN} holds {', '.join(sorted(table))} alone; it has no "
+                          f"{', '.join(lacking)}")
+    total = sum(flows.values())
+    w = {k: v / total for k, v in flows.items()}
+    boil = sum(w[k] * table[k][3] for k in w)
+    return {
+        "library": THERMO_STANDIN, "T": args.get("T") or 298.15, "P": args.get("P") or 101325.0,
+        "phase": args.get("phase") or "l", "TSource": "given" if args.get("T") is not None else "thermosteam's Stream default",
+        "PSource": "given" if args.get("P") is not None else "thermosteam's Stream default", "massFractions": w,
+        "density": 1.0 / sum(w[k] / table[k][0] for k in w), "Cp": sum(w[k] * table[k][1] for k in w),
+        "viscosity": sum(w[k] * table[k][2] for k in w), "bubblePoint": boil - 5.0, "dewPoint": boil + 5.0,
+        "vapourAtBubble": w, "units": {"density": "kg/m^3", "Cp": "J/g/K", "viscosity": "Pa*s", "T": "K", "P": "Pa",
+                                       "bubblePoint": "K", "dewPoint": "K", "massFractions": "kg/kg",
+                                       "vapourAtBubble": "mol/mol"},
+        "solved": {"kind": solve["kind"], "how": THERMO_STANDIN} if solve else None, "notes": [THERMO_STANDIN],
+    }
+
+
+def prototype_thermo() -> dict[str, Any]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, proforma, thermo
+    from . import intake as _intake
+    from .models import InputAssumption, ProformaRunRequest, ThermoPropsRequest
+
+    rs = _standin_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+    titre = {"id": "standin-ethanol_titre-0", "paperId": "Q999", "field": "ethanol_titre", "value": 80.0,
+             "unit": "g L-1", "provenance": "unverified", "status": "unverified", "primary": True,
+             "organismText": "STAND-IN organism"}
+    titres = SimpleNamespace(records=[titre], records_by_id={titre["id"]: titre}, record=lambda i: {titre["id"]: titre}.get(i))
+    a = [InputAssumption(key=k, value=v, low=lo, high=hi, by="openFerment test fixture", at="2026-10-15", note=PROFORMA_STANDIN)
+         for k, v, lo, hi in (("recovery", 0.95, 0.9, 0.98), ("sugarPrice", 0.4, 0.3, 0.5), ("sugarFeed", 10000.0, 10000.0, 10000.0))]
+    entries: list[dict[str, Any]] = []
+
+    def ask(req: ThermoPropsRequest) -> None:
+        asked = {k: v for k, v in req.model_dump().items() if v}
+        try:
+            art = thermo.props(req, pool=titres)
+        except thermo.ThermoNotFound as e:
+            entries.append({"request": asked, "status": 404, "body": {"detail": str(e)}})
+        except thermo.ThermoRefused as e:
+            entries.append({"request": asked, "status": 422, "body": {"detail": str(e)}})
+        else:
+            art = art.model_copy(update={"createdAt": AT, "durationMs": 0})
+            entries.append({"request": asked, "status": 200, "body": art.model_dump(mode="json")})
+
+    saved = (_intake.DATA_DIR, proforma.call, proforma.yield_cap)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_call
+            proforma.yield_cap = lambda: None
+            run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
+            proforma.call = _standin_thermo_call
+            for s in proforma.tables_of(artifacts.get(run.artifactId)).streams:
+                ask(ThermoPropsRequest(artifactId=run.artifactId, streamId=s.id))
+            ask(ThermoPropsRequest(preset=thermo.AZEOTROPE))
+            ask(ThermoPropsRequest(preset=thermo.BEER, recordId=titre["id"]))
+        finally:
+            _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
+    return {"thermo-props.json": {"entries": entries}}
 
 
 def rebuild_fermos_sample(out: Path = FERMOS_SAMPLE) -> Path:

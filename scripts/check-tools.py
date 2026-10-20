@@ -17,7 +17,12 @@ Fails when:
    character is refused;
 4. the gate table in `docs/TOOLS.md` and `gates.GATES` name different gates:
    the list lives in both places, one row a gate, and a row dropped from one
-   is a gate the other still promises.
+   is a gate the other still promises;
+5. the registry is not the closed list: a name in `WHITELIST` with no tool
+   registered under it, or one `docs/TOOLS.md` never names in backticks
+   (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, by the build
+   document's authority; a name added to the code alone is a tool nobody
+   wrote down).
 
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
@@ -266,6 +271,12 @@ for missing in sorted(documented - coded):
     fail(f"docs/TOOLS.md names gate {missing!r} and gates.py has no such row")
 for missing in sorted(coded - documented):
     fail(f"gates.py has gate {missing!r} and docs/TOOLS.md has no row for it")
+# 5. the registry is the closed list, and every name of it is written down
+for name in tools.WHITELIST:
+    if name not in tools.REGISTRY:
+        fail(f"{name} is in WHITELIST and no tool is registered under it")
+    if f"`{name}`" not in doc:
+        fail(f"{name} is in WHITELIST and docs/TOOLS.md never names it")
 lines = audit.read()
 if any(a.agent == "person" for a in lines):
     fail("a person's line entered the audit log with no person's name")
@@ -279,4 +290,5 @@ if errors:
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
       f"{len(ALLOWED_WRITES)} module write functions; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
-      f"{len(coded)} gates in gates.py and docs/TOOLS.md alike")
+      f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
+      f"written down")

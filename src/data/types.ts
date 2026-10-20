@@ -3092,3 +3092,53 @@ export interface TrainSummary {
   runs: number;
   note: string | null;
 }
+
+// ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+//
+// A question names a mixture on file, never a number: a stream of a Proforma
+// run, or a preset the service fills (`ethanol-water-azeotrope`, or
+// `beer-at-titre-of` an ethanol titre record). The answer is one
+// `thermo_props` artifact whose `output` is a `ThermoProps`.
+
+/** `POST /api/thermo/props` (and the same question as `GET` query parameters). */
+export interface ThermoPropsRequest {
+  artifactId?: string | null;
+  streamId?: string | null;
+  preset?: string | null;
+  recordId?: string | null;
+}
+
+/** What a `thermo_props` artifact holds: thermosteam's answer for one mixture, in the library's units. */
+export interface ThermoProps {
+  /** stream, ethanol-water-azeotrope or beer-at-titre-of. */
+  kind: string;
+  /** The mixture in words. */
+  subject: string;
+  runArtifactId: string | null;
+  streamId: string | null;
+  preset: string | null;
+  recordId: string | null;
+  /** "thermosteam <version>", read in the worker. */
+  library: string;
+  T: number;
+  P: number;
+  phase: string;
+  /** "given" (the stream's own) or "thermosteam's Stream default". */
+  TSource: string;
+  PSource: string;
+  massFractions: Record<string, number>;
+  density: number | null;
+  Cp: number | null;
+  viscosity: number | null;
+  /** Temperatures at the mixture's own pressure. */
+  bubblePoint: number | null;
+  dewPoint: number | null;
+  /** The first bubble's mole fractions. */
+  vapourAtBubble: Record<string, number> | null;
+  /** The library's unit for each key above. */
+  units: Record<string, string>;
+  /** A preset's solve: what was found, and how, in words. */
+  solved: Record<string, unknown> | null;
+  /** A property the library could not compute, with its reason; what the mixture leaves out. */
+  notes: string[];
+}

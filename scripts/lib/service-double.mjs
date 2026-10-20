@@ -110,6 +110,9 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const proformaRuns = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
   const proformaReferences = [];
+  /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
+  const thermoKept = new Map();
+  const thermoCalls = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -330,6 +333,36 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-019 §4.2 — thermosteam's answers, made by the real thermo.py
+    // over the stand-in run with a stand-in in place of thermosteam: a POST
+    // answers from the fixture (200, or the service's 404 or 422 in its
+    // words) and keeps what it answered, so a GET of the same question finds
+    // it stored, as the service's does; a question the fixture never asked
+    // is the service's 404.
+    if (url === '/api/thermo/props' && (req.method === 'GET' || req.method === 'POST')) {
+      const keyOf = (q) => ['artifactId', 'streamId', 'preset', 'recordId'].map((k) => q[k] ?? '').join('|');
+      let asked;
+      if (req.method === 'GET') {
+        asked = Object.fromEntries(new URL(req.url ?? '/', 'http://double').searchParams);
+      } else {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        asked = JSON.parse(body || '{}');
+      }
+      thermoCalls.push({ method: req.method, ...asked });
+      const entry = (await prototype('thermo-props.json')).entries.find((e) => keyOf(e.request) === keyOf(asked));
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: 'no run, stream or record like this is on file here' }));
+      }
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ artifact: thermoKept.get(keyOf(asked)) ?? null }));
+      }
+      if (entry.status === 200) thermoKept.set(keyOf(asked), entry.body);
+      res.writeHead(entry.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(entry.body));
+    }
     // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
     // and a run made through the real code with a stand-in evaluator.
     //
@@ -480,5 +513,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaReferences, proposalActs } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaReferences, proposalActs, thermoCalls } };
 }

@@ -48,7 +48,8 @@ def test_every_read_tool_has_its_write_tool_in_the_whitelist():
     names = {t.name for t in tools.infos()}
     for m in module_stores.MODULES:
         assert {f"{m}_read", f"{m}_write"} <= names
-    assert len(tools.WHITELIST) == 7 + 2 * len(module_stores.MODULES)
+    # The seven, a pair a module, and thermo_props (OF-BLD-019 §4.2).
+    assert len(tools.WHITELIST) == 7 + 2 * len(module_stores.MODULES) + 1
 
 
 def test_a_write_tool_never_touches_a_store():

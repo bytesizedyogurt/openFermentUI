@@ -12,9 +12,17 @@
 // (`biosteamClasses` in src/data/vocabulary.ts) links to that step on pureOS's
 // front page. A deep link to an archived program's train opens under the
 // banner naming it, as every page opened by id does.
+//
+// PROPERTIES (§4.2, D9): the broth and the product stream, and any other
+// stream a person picks, as thermosteam answers for them at the stream's own
+// temperature, pressure and phase. The page names the run and the stream; the
+// service reads the stream from the run and asks thermosteam in the Proforma
+// worker, and the answer is one `thermo_props` artifact (PropertiesPanel).
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Download, Filter } from 'lucide-react';
 import type { StreamRow, Train, TrainUnit } from '@/data/types';
+import { trainSubjects } from '@/lib/thermo';
+import { PropertiesPanel } from '@/components/PropertiesPanel';
 import { operationForClass } from '@/data/vocabulary';
 import { PureosDown, PureosRefused, RUN_WORDS, productIn, pureosTrain, share, streamsOf } from '@/lib/pureos';
 import { exportCSV } from '@/lib/csv';
@@ -189,7 +197,61 @@ function TrainView({ train, unit, choose }: { train: Train; unit: TrainUnit | nu
       </section>
 
       <StreamTable train={train} unit={unit} clear={() => unit && choose(unit.id)} />
+
+      <TrainProperties train={train} />
     </>
+  );
+}
+
+function TrainProperties({ train }: { train: Train }) {
+  const subjects = useMemo(() => trainSubjects(train), [train]);
+  const [other, setOther] = useState('');
+  const shown = [
+    ...subjects,
+    ...(other && !subjects.some((s) => s.streamId === other) ? [{ role: 'Stream', streamId: other }] : []),
+  ];
+  return (
+    <section className="mt-5" aria-labelledby="train-properties-title" data-testid="thermo-card">
+      <SectionTitle
+        right={
+          <label className="text-caption text-ink-soft flex items-center gap-1.5 whitespace-nowrap">
+            Another stream
+            <select className="input" aria-label="Another stream" value={other} onChange={(e) => setOther(e.target.value)}>
+              <option value="">none</option>
+              {train.streams.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.id}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      >
+        <span id="train-properties-title">Properties</span>
+      </SectionTitle>
+      <p className="text-caption text-ink-soft mb-2">
+        Density, heat capacity, viscosity, and bubble and dew points, as thermosteam (BioSTEAM&rsquo;s property engine)
+        computes them for a stream of this run at the stream&rsquo;s own temperature, pressure and phase. The page names the
+        run and the stream; the service reads the stream from the run, and nothing is typed. A chemical thermosteam&rsquo;s
+        library lacks is refused in words.
+      </p>
+      {shown.length === 0 && (
+        <p className="text-body text-ink-soft">This run names no broth or product stream; pick a stream above to ask about it.</p>
+      )}
+      <div className="grid md:grid-cols-2 gap-3">
+        {shown.map((s) => (
+          <PropertiesPanel
+            key={s.streamId}
+            title={
+              <>
+                {s.role}: <span className="font-num">{s.streamId}</span>
+              </>
+            }
+            question={{ artifactId: train.artifactId, streamId: s.streamId }}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 

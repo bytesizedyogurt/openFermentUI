@@ -54,6 +54,7 @@ from .models import (
     FetchResult,
     ForecastRequest,
     ProformaRunRequest,
+    ThermoPropsRequest,
     ForecastResult,
     GeneosModelInfo,
     GeneosResult,
@@ -439,6 +440,54 @@ def proforma_run(req: ProformaRunRequest) -> dict:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
+
+
+# ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+
+
+def _thermo_answer(fn, req: ThermoPropsRequest):
+    from . import evidence_pool, thermo
+
+    try:
+        # A person names the run or the record by id, so archived programs'
+        # records resolve too; the page says which program a run is of. Only
+        # a record needs the pool.
+        kind, _ = thermo.question(req)
+        return fn(req, pool=evidence_pool.load(include_archived=True) if kind == thermo.BEER else None)
+    except thermo.ThermoNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except thermo.ThermoRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+
+
+@app.post("/api/thermo/props", response_model=Artifact)
+def thermo_props(req: ThermoPropsRequest) -> Artifact:
+    """thermosteam's density, heat capacity, viscosity and bubble and dew
+    points for a run's stream, or a preset: one `thermo_props` artifact,
+    computed in the Proforma worker or returned as stored. 404 for a run,
+    stream or record not on file; 422 for a question that cannot be asked,
+    a chemical the library lacks among them, in words; 503 when the worker
+    cannot answer."""
+    from . import thermo
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return _thermo_answer(thermo.props, req)
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
+
+
+@app.get("/api/thermo/props")
+def thermo_props_stored(artifactId: str | None = None, streamId: str | None = None,  # noqa: N803 (the wire names)
+                        preset: str | None = None, recordId: str | None = None) -> dict:
+    """The answer stored for the same question, as `{"artifact": …}`, or
+    `{"artifact": null}` when it has not been asked here: a read, which
+    starts no simulator. The same 404 and 422 as the POST."""
+    from . import thermo
+
+    art = _thermo_answer(thermo.stored, ThermoPropsRequest(artifactId=artifactId, streamId=streamId, preset=preset,
+                                                           recordId=recordId))
+    return {"artifact": art.model_dump(mode="json") if art else None}
 
 
 def _warm_proforma() -> None:

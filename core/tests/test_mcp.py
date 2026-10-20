@@ -94,7 +94,9 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
     names = [t.name for t in listed]
     reads = [f"{m}_read" for m in module_stores.MODULES]
     writes = [f"{m}_write" for m in module_stores.MODULES]
-    assert len(names) == 7 + len(reads) + len(writes) + 2 == 31
+    # The seven, a read and a write a module, thermo_props (OF-BLD-019 §4.2),
+    # and the server's own two.
+    assert len(names) == 7 + len(reads) + len(writes) + 1 + 2 == 32 and "thermo_props" in names
     assert set(reads) | set(writes) <= set(names)
     by_name = {t.name: t for t in listed}
     # A read says what state it computes; a write says which actions a gate stops.

@@ -1955,6 +1955,65 @@ class TrainSummary(BaseModel):
     note: str | None = None
 
 
+# ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+#
+# A question names a mixture already on file, never a number: a stream of a
+# Proforma run (its artifact id and the stream's id), or a preset the service
+# fills — `ethanol-water-azeotrope` (the composition the library's own VLE
+# gives) or `beer-at-titre-of` an ethanol titre record (the record's value
+# through units.py into a water–ethanol mass fraction). thermo.py keeps the
+# answer as one `thermo_props` artifact.
+
+
+class ThermoPropsRequest(BaseModel):
+    """`POST /api/thermo/props`: a run's stream, or a preset (with its
+    record for `beer-at-titre-of`). Ids and words only."""
+
+    artifactId: str | None = None
+    streamId: str | None = None
+    preset: str | None = None
+    recordId: str | None = None
+
+
+class ThermoProps(BaseModel):
+    """What a `thermo_props` artifact holds (its `output`): thermosteam's
+    answer for one mixture, every number the library's, in its units."""
+
+    # stream, ethanol-water-azeotrope or beer-at-titre-of.
+    kind: str
+    # The mixture in words, as a page and a label say it.
+    subject: str
+    runArtifactId: str | None = None
+    streamId: str | None = None
+    preset: str | None = None
+    recordId: str | None = None
+    # "thermosteam <version>", read in the worker.
+    library: str
+    T: float
+    P: float
+    phase: str
+    # "given" (the stream's own) or "thermosteam's Stream default".
+    TSource: str
+    PSource: str
+    # kg/kg, as the library holds the mixture.
+    massFractions: dict[str, float] = Field(default_factory=dict)
+    density: float | None = None
+    Cp: float | None = None
+    viscosity: float | None = None
+    # Temperatures at the mixture's own pressure.
+    bubblePoint: float | None = None
+    dewPoint: float | None = None
+    # The first bubble's mole fractions.
+    vapourAtBubble: dict[str, float] | None = None
+    # The library's units for each key above.
+    units: dict[str, str] = Field(default_factory=dict)
+    # A preset's solve: what was found, and how, in words.
+    solved: dict[str, Any] | None = None
+    # A property the library could not compute, with its reason; and what
+    # the mixture leaves out.
+    notes: list[str] = Field(default_factory=list)
+
+
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────
 
 

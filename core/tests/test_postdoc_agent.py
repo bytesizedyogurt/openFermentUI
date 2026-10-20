@@ -401,7 +401,7 @@ def test_one_run_sweeps_first_offers_every_tool_and_opens_with_the_earlier_turns
     first = script.calls[0]
     # Every tool in the registry is offered: the reads loose, the seven strict.
     offered = {t["name"]: t["strict"] for t in first["tools"]}
-    assert set(offered) == {i.name for i in tools.infos()} and len(offered) == 29
+    assert set(offered) == {i.name for i in tools.infos()} and len(offered) == 30
     assert sorted(n for n, strict in offered.items() if strict) == [
         "convert_units", "draft_runbook", "growth_forecast", "search_passages",
         "search_records", "selling_price", "yield_ceiling"]

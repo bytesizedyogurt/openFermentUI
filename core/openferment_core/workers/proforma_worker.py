@@ -22,15 +22,27 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 read back and every table; numbers rounded to the digits
                 the basis states, so a replay compares the plant and not
                 the order BioSTEAM sums a set of units in
+    thermo_props  thermosteam's answer for one mixture (OF-BLD-019 §4.2, D9):
+                a Stream on the library's own chemicals at T and P, and its
+                density, heat capacity, viscosity, bubble and dew points;
+                thermo.py keeps it as one artifact
 
 The tables are read through BioSTEAM's own attributes and methods, never
 recomputed: the TEA object's sales, material and utility cost, installed
 equipment cost, FCI, TCI, FOC and IRR; each unit's costs, heat utilities and
 power utility; the UnitGroup's duties in the units it states; and
 `System.diagram` as SVG when Graphviz's `dot` is on the path (D8).
+
+THERMOSTEAM ANSWERS, NEVER GUESSES (D9). A chemical is looked up in the
+library by its name; one the library lacks, or cannot build, refuses the
+whole question in words naming it. A property the library cannot compute for
+this mixture is left out with the library's own reason, never filled. The
+units are the library's (`stream_units_of_measure`), and a temperature or
+pressure nobody gave is the library's own Stream default, said so.
 """
 from __future__ import annotations
 
+import inspect
 import itertools
 import math
 import shutil
@@ -40,6 +52,7 @@ from typing import Any, Iterator
 
 import biosteam as bst  # imported here so the cost is paid at start
 import numpy as np
+import thermosteam as tmo  # BioSTEAM's property engine, loaded with it
 from scipy.stats import qmc
 
 from .. import flowsheets
@@ -446,6 +459,189 @@ def _op_reference(args):
     return reference(str(args["flowsheet"]), int(args.get("digits", 17)))
 
 
+# ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+
+# The properties asked of every mixture: (output key, the Stream attribute,
+# the key of its unit in thermosteam's stream_units_of_measure).
+PROPERTIES = (("density", "rho"), ("Cp", "Cp"), ("viscosity", "mu"))
+# Numerical settings of the two solves, not quantities of any process: how
+# finely the azeotrope's bracket is scanned, how many halvings refine it, and
+# when the titre's fixed point has settled.
+AZEOTROPE_SCAN = 100
+AZEOTROPE_HALVINGS = 60
+TITRE_TOLERANCE = 1e-12
+TITRE_ITERATIONS = 100
+
+_THERMOS: dict[tuple[str, ...], Any] = {}
+
+
+def stream_defaults() -> tuple[float, float, str]:
+    """The temperature, pressure and phase thermosteam gives a Stream nobody
+    set them on, read from the library's own signature."""
+    params = inspect.signature(tmo.Stream.__init__).parameters
+    return float(params["T"].default), float(params["P"].default), str(params["phase"].default)
+
+
+def library_units() -> dict[str, str]:
+    from thermosteam.units_of_measure import stream_units_of_measure as su
+
+    out = {key: str(su[attr]) for key, attr in PROPERTIES}
+    out.update(T=str(su["T"]), P=str(su["P"]), bubblePoint=str(su["T"]), dewPoint=str(su["T"]),
+               massFractions="kg/kg", vapourAtBubble="mol/mol")
+    return out
+
+
+def thermo_of(names: list[str]) -> Any:
+    """One property package for these chemicals, each looked up in the
+    library by name; kept, since a lookup costs a database read. A chemical
+    the library lacks or cannot build refuses the question, naming it."""
+    key = tuple(sorted(set(names)))
+    if key in _THERMOS:
+        return _THERMOS[key]
+    chemicals, lacking, broken = [], [], []
+    for name in key:
+        try:
+            chemicals.append(tmo.Chemical(name))
+        except LookupError:
+            lacking.append(name)
+        except Exception as e:  # in the database, and the library cannot build it
+            broken.append(f"{name} ({type(e).__name__}: {e})")
+    said = []
+    if lacking:
+        said.append(f"thermosteam's chemical library has no chemical named {', '.join(lacking)}")
+    if broken:
+        said.append(f"thermosteam could not build {', '.join(broken)} from its library")
+    if said:
+        raise Refused("; ".join(said) + ". It answers for the library's own chemicals and guesses no other.")
+    try:
+        th = tmo.Thermo(chemicals)
+    except Exception as e:
+        raise Refused(f"thermosteam could not make one property package of {', '.join(key)}: {type(e).__name__}: {e}") from e
+    _THERMOS[key] = th
+    return th
+
+
+def _mixture(th: Any, flows: dict[str, float], T: float, P: float, phase: str, by: str = "mass") -> Any:
+    s = tmo.Stream(None, thermo=th, phase=phase, T=T, P=P)  # None: kept out of BioSTEAM's registry
+    target = s.imass if by == "mass" else s.imol
+    for name, v in flows.items():
+        target[name] = float(v)
+    return s
+
+
+def _finite(what: str, fn: Any, notes: list[str]) -> float | None:
+    try:
+        v = float(fn())
+    except Exception as e:
+        notes.append(f"{what}: thermosteam could not compute it for this mixture ({type(e).__name__}: {e})")
+        return None
+    if not math.isfinite(v):
+        notes.append(f"{what}: thermosteam gave no finite value for this mixture")
+        return None
+    return v
+
+
+def _titre(th: Any, solute: str, solvent: str, kg_m3: float, T: float, P: float, phase: str) -> tuple[float, dict]:
+    """The solute's mass fraction at which its mass per volume of the mixture,
+    at the mixture's own density as thermosteam computes it, is the titre: a
+    fixed point w = c / rho(w), from the pure solvent's density."""
+    w = 0.0
+    for n in range(1, TITRE_ITERATIONS + 1):
+        rho = float(_mixture(th, {solvent: 1.0 - w, solute: w}, T, P, phase).rho)
+        nxt = kg_m3 / rho
+        if not 0.0 <= nxt < 1.0:
+            raise Refused(f"a titre of {kg_m3:g} kg/m^3 is not below the density thermosteam gives the mixture "
+                          f"({rho:g} kg/m^3), so no {solvent}–{solute} mixture holds it")
+        if abs(nxt - w) <= TITRE_TOLERANCE:
+            return nxt, {"kind": "titre", "solute": solute, "solvent": solvent, "kgPerM3": kg_m3, "iterations": n,
+                         "how": "the mass fraction at which the solute per volume of the mixture, at the mixture's "
+                                "own density as thermosteam computes it, equals the titre (a fixed point)"}
+        w = nxt
+    raise Refused(f"the mass fraction for a titre of {kg_m3:g} kg/m^3 did not settle in {TITRE_ITERATIONS} steps")
+
+
+def _azeotrope(th: Any, light: str, heavy: str, T: float, P: float) -> tuple[float, dict]:
+    """The liquid whose first bubble, by thermosteam's own vapour-liquid
+    equilibrium at P, has the liquid's own composition: where y(x) - x for the
+    light chemical turns from positive to not, scanned and then halved."""
+
+    def gap(x: float) -> float:
+        b = _mixture(th, {light: x, heavy: 1.0 - x}, T, P, "l", by="mol").bubble_point_at_P(P)
+        return float(dict(zip(b.IDs, b.y))[light]) - x
+
+    xs = [i / AZEOTROPE_SCAN for i in range(1, AZEOTROPE_SCAN)]
+    gaps = [gap(x) for x in xs]
+    bracket = next(((xs[i], xs[i + 1]) for i in range(len(xs) - 1) if gaps[i] > 0 >= gaps[i + 1]), None)
+    if bracket is None:
+        raise Refused(f"thermosteam's own vapour-liquid equilibrium gives {light} and {heavy} no azeotrope at {P:g} Pa")
+    lo, hi = bracket
+    for _ in range(AZEOTROPE_HALVINGS):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if gap(mid) > 0 else (lo, mid)
+    x = (lo + hi) / 2
+    return x, {"kind": "azeotrope", "light": light, "heavy": heavy, "moleFraction": x, "P": P,
+               "how": "the liquid whose first bubble, by thermosteam's own vapour-liquid equilibrium at this pressure, "
+                      "has the liquid's own composition: y - x of the lighter chemical scanned for its change of sign, "
+                      "then halved"}
+
+
+def thermo_props(components: dict[str, float], T: float | None = None, P: float | None = None,
+                 phase: str | None = None, solve: dict[str, Any] | None = None) -> dict[str, Any]:
+    """D9: a Stream on the library's chemicals at T and P, and what the
+    library says of it. `components` are mass flows or fractions (only their
+    ratios matter); `solve` asks for the composition of a titre or an
+    azeotrope instead. A T, P or phase not given is the library's default."""
+    T0, P0, phase0 = stream_defaults()
+    T_from = "given" if T is not None else "thermosteam's Stream default"
+    P_from = "given" if P is not None else "thermosteam's Stream default"
+    T, P, phase = float(T if T is not None else T0), float(P if P is not None else P0), str(phase or phase0)
+    if phase not in ("l", "g", "s"):
+        raise Refused(f"a mixture in phases {phase!r} keeps no split by phase here; thermosteam is asked about one phase, "
+                      "l, g or s, and not asked to guess the split")
+    names = [n for n, v in components.items() if v and float(v) > 0]
+    if solve and solve.get("kind") == "titre":
+        names = [solve["solvent"], solve["solute"]]
+    elif solve and solve.get("kind") == "azeotrope":
+        names = [solve["heavy"], solve["light"]]
+    elif solve:
+        raise Refused(f"there is no solve {solve.get('kind')!r}")
+    if not names:
+        raise Refused("the mixture carries nothing: every flow is zero")
+    th = thermo_of(names)
+    solved = None
+    if solve and solve["kind"] == "titre":
+        w, solved = _titre(th, solve["solute"], solve["solvent"], float(solve["kgPerM3"]), T, P, phase)
+        flows = {solve["solvent"]: 1.0 - w, solve["solute"]: w}
+        s = _mixture(th, flows, T, P, phase)
+    elif solve and solve["kind"] == "azeotrope":
+        x, solved = _azeotrope(th, solve["light"], solve["heavy"], T, P)
+        s = _mixture(th, {solve["light"]: x, solve["heavy"]: 1.0 - x}, T, P, phase, by="mol")
+    else:
+        s = _mixture(th, {n: float(components[n]) for n in names}, T, P, phase)
+    total = float(s.F_mass)
+    fractions = {i: float(m) / total for i, m in zip(s.chemicals.IDs, s.mass) if m}
+    notes: list[str] = []
+    out: dict[str, Any] = {key: _finite(key, lambda a=attr: getattr(s, a), notes) for key, attr in PROPERTIES}
+    try:
+        b = s.bubble_point_at_P(P)
+        out["bubblePoint"] = _finite("bubblePoint", lambda: b.T, notes)
+        out["vapourAtBubble"] = {i: float(y) for i, y in zip(b.IDs, b.y)}
+    except Exception as e:
+        notes.append(f"bubblePoint: thermosteam could not compute it for this mixture ({type(e).__name__}: {e})")
+        out["bubblePoint"], out["vapourAtBubble"] = None, None
+    out["dewPoint"] = _finite("dewPoint", lambda: s.dew_point_at_P(P).T, notes)
+    return {
+        "library": f"thermosteam {version('thermosteam')}", "T": T, "P": P, "phase": phase,
+        "TSource": T_from, "PSource": P_from, "massFractions": fractions, **out,
+        "units": library_units(), "solved": solved, "notes": notes,
+    }
+
+
+def _op_thermo_props(args):
+    return thermo_props(dict(args.get("components") or {}), args.get("T"), args.get("P"), args.get("phase"),
+                        args.get("solve") or None)
+
+
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
                int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None)
@@ -471,7 +667,7 @@ def _op_benchmark(args):
 
 
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
-            "run": _op_run, "reference": _op_reference}
+            "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props}
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")

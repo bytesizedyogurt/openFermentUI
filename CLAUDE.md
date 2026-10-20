@@ -98,10 +98,10 @@ Mini, which serves `main` (D8).
   the next model with a fresh conversation. Both models REJECT forced tool
   use (`tool_choice` "tool"/"any" is a 400); never reintroduce it. Prices
   live in `llm.PRICES`; `usage.models` records which model answered. The
-  seven OF-BLD-014 tools go out strict; the twenty-two module tools go out
-  loose, because eighteen strict tools compile to a grammar the API refuses
-  (OF-BLD-015 §7.2, measured 2026-10-19), and `tools.run` validates every
-  input alike before anything runs.
+  seven OF-BLD-014 tools go out strict; the twenty-two module tools and
+  `thermo_props` go out loose, because eighteen strict tools compile to a
+  grammar the API refuses (OF-BLD-015 §7.2, measured 2026-10-19), and
+  `tools.run` validates every input alike before anything runs.
 
 ## Rule 1 and its mirror
 
@@ -464,14 +464,17 @@ Mini, which serves `main` (D8).
   otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
   Offline tests charge a file of their own (`core/tests/conftest.py`).
 - **`converse` is one tool turn on one model.** Each tool strict unless the
-  registry marks it loose (the twenty-two module tools, see above),
+  registry marks it loose (the twenty-two module tools and `thermo_props`, see above),
   `tool_choice` `auto` or `none` and nothing else (anything else is refused
   before it is sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
-- **One tool registry, closed at twenty-nine names** (`tools/__init__.py`, E.6
+- **One tool registry, closed at thirty names** (`tools/__init__.py`, E.6
   and OF-BLD-015 §7.2–§7.3: the seven below, then one read and one write tool
-  a module, named `<module>_read` and `<module>_write`).
+  a module, named `<module>_read` and `<module>_write`; then `thermo_props`,
+  OF-BLD-019 §4.2, thermosteam's answer for a run's stream or a preset, kept
+  as an artifact). `check:tools` fails when a name in `WHITELIST` is not
+  registered or not named in `docs/TOOLS.md`.
   Postdoc's loop, `GET /api/tools` / `POST /api/tools/{name}` and the MCP
   server all go through `tools.run`. **Tool inputs carry ids and words:** a
   JSON number anywhere in an input outside top-level `k` and `limit` refuses
@@ -486,8 +489,8 @@ Mini, which serves `main` (D8).
   reports the stderr tail of a crash; `workers.serve` answers on a
   duplicate of fd 1 with fd 1 pointed at stderr, so a library's printing
   never reaches the stream. `cobra` is imported in the geneOS worker alone
-  and `biosteam` in the Proforma worker and `flowsheets/` alone;
-  `test_workers` greps for both.
+  and `biosteam` and `thermosteam` in the Proforma worker and `flowsheets/`
+  alone; `test_workers` greps for all three.
 
 ## Passages and search (OF-BLD-014 Phase 4)
 
@@ -673,7 +676,7 @@ Mini, which serves `main` (D8).
   `core/data/live/eval-o.json`.
 - **The MCP server needs no change for any of it**: it lists `tools.infos()`
   and calls `tools.run`, so the module tools appear there with the same marks
-  and gates; `test_mcp` counts thirty-one.
+  and gates; `test_mcp` counts thirty-two.
 
 ## Figures and geneOS's ceiling (OF-BLD-014 Phase 6)
 

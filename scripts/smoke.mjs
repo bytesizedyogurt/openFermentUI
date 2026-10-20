@@ -922,6 +922,12 @@ async function main() {
         problems.push('fermOS with no run does not name the readings to deposit and where');
       if ((await page.getByRole('button', { name: /sample run/i }).count()) !== 0) problems.push('fermOS still offers an invented run');
       if (doubleState.fermosCalls.some((c) => c.path === '/api/fermos/fit')) problems.push('fermOS asked for a fit with no run deposited');
+      // OF-BLD-019 §4.2 — Properties of a broth, with no titre record of an
+      // active program on file: it says what fills it and asks nothing.
+      const brothCard = await page.locator('[data-testid="broth-properties-empty"]').innerText().catch(() => '');
+      if (!/No ethanol titre record/.test(brothCard) || !/thread Q/.test(brothCard) || !/Intake/.test(brothCard))
+        problems.push('fermOS’s Properties card with no titre record does not say what fills it');
+      if (doubleState.thermoCalls.some((c) => c.preset)) problems.push('fermOS asked thermosteam about a beer with no titre record picked');
       await page.goto(`http://localhost:${PORT}/#/fermos/forecast`, { waitUntil: 'networkidle' });
       if (!/No fit to forecast from yet/.test(await page.locator('body').innerText())) problems.push('fermOS → Forecast does not say there is no fit yet');
       // OF-BLD-014 §8.2, OF-BLD-019 §3.1 — the benchmark's reference card, on
@@ -1300,6 +1306,32 @@ async function main() {
       await page.locator('[data-testid="train-streams-all"]').click();
       await page.waitForTimeout(300);
       if ((await page.locator('[data-testid="train-stream"]').count()) !== 6) problems.push('Show every stream does not bring the whole table back');
+      // OF-BLD-019 §4.2 — the Properties card opens on the broth and the
+      // product, reads what is stored for each (nothing yet) and asks on a
+      // press: the double's stand-in refuses the PHA broth's chemicals in
+      // words, as thermosteam refuses one its library lacks. Another stream
+      // picked is answered with the library's name and its artifact, and on
+      // the next visit it is read back from what is stored without asking.
+      const panels = await page.locator('[data-testid="thermo-panel"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stream')).join());
+      if (panels !== 'broth,product') problems.push(`the Properties card opens on ${panels}`);
+      const broth = page.locator('[data-testid="thermo-panel"][data-stream="broth"]');
+      await broth.getByRole('button', { name: 'Ask thermosteam' }).click();
+      await broth.locator('[data-testid="thermo-refused"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/it has no Cells, PHB/.test(await broth.innerText().catch(() => ''))) problems.push('a chemical the library lacks is not refused in words');
+      await page.locator('select[aria-label="Another stream"]').selectOption('process_water');
+      const water = page.locator('[data-testid="thermo-panel"][data-stream="process_water"]');
+      await water.getByRole('button', { name: 'Ask thermosteam' }).click();
+      await water.locator('[data-testid="thermo-props"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const answer = await water.innerText().catch(() => '');
+      if (!/Density/.test(answer) || !/kg\/m\^3/.test(answer) || !/Bubble point/.test(answer) || !/Computed by STAND-IN/.test(answer) || !/Artifact\s+[0-9a-f]{16}/.test(answer))
+        problems.push(`the answer for a stream does not show its properties, library and artifact: ${JSON.stringify(answer.slice(-260))}`);
+      const asked = doubleState.thermoCalls.filter((c) => c.method === 'POST').length;
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="train-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('select[aria-label="Another stream"]').selectOption('process_water');
+      await water.locator('[data-testid="thermo-props"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await water.locator('[data-testid="thermo-props"]').count()) !== 1) problems.push('a stored answer is not read back on the next visit');
+      if (doubleState.thermoCalls.filter((c) => c.method === 'POST').length !== asked) problems.push('reading a stored answer asked thermosteam again');
       await page.goto(`http://localhost:${PORT}/#/pureos?op=molecular-sieve`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(400);
       if ((await page.locator('#op-molecular-sieve[data-focused="true"]').count()) !== 1) problems.push('a step linked by ?op= is not outlined');
@@ -1313,7 +1345,7 @@ async function main() {
       trainFails++;
       console.log(`✗ train        ${problems.join('; ')}`);
     } else {
-      console.log('✓ train        no train for an active program, and whose is hidden; sc-pha-1 under its banner, three units in order, a unit no product enters drawn as words, a click cuts the streams, ?op= outlines a step, a scenario with no run says how one gets there');
+      console.log('✓ train        no train for an active program, and whose is hidden; sc-pha-1 under its banner, three units in order, a unit no product enters drawn as words, a click cuts the streams; Properties on the broth and the product, a chemical the library lacks refused in words, another stream answered with its library and artifact and read back from what is stored; ?op= outlines a step, a scenario with no run says how one gets there');
     }
     await page.close();
   }

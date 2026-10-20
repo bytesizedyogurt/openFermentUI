@@ -208,6 +208,9 @@ const PAIRS = [
   ['TrainUnit', 'TrainUnit'],
   ['Train', 'Train'],
   ['TrainSummary', 'TrainSummary'],
+  // OF-BLD-019 §4.2 — thermosteam answers property questions.
+  ['ThermoPropsRequest', 'ThermoPropsRequest'],
+  ['ThermoProps', 'ThermoProps'],
 ];
 
 let compared = 0;
