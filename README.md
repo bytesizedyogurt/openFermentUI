@@ -215,7 +215,9 @@ nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
 - **Before its first turn, code sweeps all eleven modules** for what the question names and
   hands the model the map. The trace's first line opens to one line a module; the footer says
   *Searched eleven, found in two: Dominion (1), Runbooks (1) · read in part: Runbooks, fermOS,
-  BioRepo* (what still lives only in a browser is named).
+  BioRepo* (what still lives only in a browser is named). A follow-up ("which of those are
+  fenced?") is swept together with the earlier questions it reads, never with the earlier
+  answers, so the map follows the conversation.
 - **Every module has a read tool** (`dominion_read` … `home_read`) returning rows in one shape
   with one computed state: `open`, `fenced`, `approved`, `locked`, `proposed`, `retired`. A
   claim cites rows the way it cites records, and the screen shows each under the claim with
@@ -223,14 +225,24 @@ nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
 - **Every module has a write tool** (`dominion_write` … `home_write`), and it never touches a
   store: each action calls the module's own write function or refuses in words naming the
   person who makes the change. What a model writes lands in the open lane marked as the
-  model's, in the audit log (`GET /api/audit`), until a person promotes it.
+  model's, in the audit log (`GET /api/audit`), until a person promotes it. A candidate a
+  model writes by hand is anchored to a sentence like the extractor's, kept in its own file
+  (`candidates/hand/`), and never counted as an extraction: the extractor still runs on the
+  paper, and Witness never scores it.
 - **Seven gates** (publish, spend, lock, sign, personnel, bench, notebook) stop an action and
   turn it into a proposal. Home shows each as a card with one button; the button carries it
-  out in the reviewer's name, and nothing is signed by a model.
+  out in the reviewer's name, and nothing is signed by a model. A proposal's words hold no
+  number, one ask leaves one open proposal of a kind, and a proposed check shows only to the
+  lead and assessors, never to the person it names. A model may propose a check and never
+  record one: an assessor runs it at the bench.
+- **A plan's gaps and its decline are held to the number rule** like its claims: one holding
+  a number is dropped and named, and the decline the code writes stands in.
 
-`pnpm check:tools` holds the three rules in `verify`; `pnpm eval:o` runs ten cross-module
-questions and scores whether the right modules were read and the footer names them (on Haiku,
-2026-10-20: searched 80 %, footer 100 %, five cents).
+`pnpm check:tools` holds the three rules in `verify`, reading `tools/writes.py` as parsed
+Python so a write function reached through an aliased import is still caught; `pnpm eval:o`
+runs ten cross-module questions and scores whether the right modules were read (on Haiku,
+2026-10-20: searched 80 %, five cents). The footer is not scored: its key and the footer come
+from the same coverage call, so it could not miss.
 
 ### The same tools, from an assistant outside the app
 
@@ -438,7 +450,8 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:reference   #   reference content is domain knowledge, never a result
   pnpm test:core         #   the Python service: retrieval, units, anchoring, match_run, biorepo.write,
                          #   the computed-value basis, the artifact store and replay, llm.py's roles, cached
-                         #   tokens, tool turns and daily cap, the tool registry and its five tools, the worker runner,
+                         #   tokens, tool turns and daily cap, the tool registry's twenty-nine tools, its gates and
+                         #   the proposals they make, the coverage sweep, the worker runner,
                          #   the geneOS worker on a toy network worked by hand and Appendix 2's bundled-model ceilings,
                          #   fermOS's growth and kinetic fits and its forecast band on synthetic runs,
                          #   Postdoc's loop and its budget against a scripted model, the plan validator, the ask stream,
@@ -449,14 +462,15 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:sim          #   the real BioSTEAM worker answers (pytest marker sim)
   pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
   pnpm check:tools       #   every module has a read and a write tool; a write goes through its module's write
-                         #   function; a gated action waits for a person's name; docs/TOOLS.md's gate table is gates.py's
+                         #   function, followed through every import and alias; a gated action waits for a person's
+                         #   name; docs/TOOLS.md's gate table is gates.py's
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
   pnpm check:store       #   the store's contracts: the overlay is authoritative, a record remembers its original
   pnpm check:guild       #   Guild's ladder, the sample team, the gate in both modes, what runs, lessons, practice and
-                         #   checks write to the ledger, and who may see a check
+                         #   checks write to the ledger, and who may see a check, or a proposal to check someone
   pnpm check:lock        #   locked runbooks are byte-for-byte what they were locked as, the eight seed digests included
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table

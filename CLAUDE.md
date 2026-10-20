@@ -336,7 +336,9 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   one criterion at a time, Meets or Needs work, the assessor's words per
   skill, then a sign step in the assessor's name. With the sample shown the
   queue is the ranking run in the browser and the bench writes to the sample
-  alone. `check:guild` part 10 and the smoke's bench flow hold all of it.
+  alone. `check:guild` part 10 and the smoke's bench flow hold all of it. A
+  model's proposal to check someone follows the same rules on Home
+  (`shownProposals` in `src/lib/proposals.ts`, `check:guild` part 11).
 - **The sample team is invented and stays in the browser.** `guildSample` is
   shown in place of the ledger while loaded; nothing in it is posted, written
   to `guild.json` or kept in the Durable tier.
@@ -435,9 +437,10 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   writes at 1.25× input, reads at 0.05× on Opus and Sonnet 5.5, 0.1×
   otherwise, and Haiku 5.5's long tier past 100,000 prompt tokens.
   Offline tests charge a file of their own (`core/tests/conftest.py`).
-- **`converse` is one tool turn on one model.** Strict tools, `tool_choice`
-  `auto` or `none` and nothing else (anything else is refused before it is
-  sent), the answer schema in `output_config.format`, top-level
+- **`converse` is one tool turn on one model.** Each tool strict unless the
+  registry marks it loose (the twenty-two module tools, see above),
+  `tool_choice` `auto` or `none` and nothing else (anything else is refused
+  before it is sent), the answer schema in `output_config.format`, top-level
   `cache_control`. It falls back nowhere; the loop that owns the
   conversation decides.
 - **One tool registry, closed at twenty-nine names** (`tools/__init__.py`, E.6
@@ -512,7 +515,10 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   A follow-up posts the earlier turns as `PriorTurn`s (question, claims,
   gaps, decline: words only); `postdoc_agent._opening` sends the last four as
   user and assistant text, drops a line holding a number, and `SeenSet`
-  still starts empty, so nothing an earlier turn retrieved is citable.
+  still starts empty, so nothing an earlier turn retrieved is citable. The
+  coverage sweep reads those earlier questions with the follow-up
+  (`_swept`), never the earlier answers, and the map then says it names what
+  the conversation names.
 
 - **A plan answers to `validate_plan`.** Every claim the loop writes is
   dropped whole and counted when its text holds a number, a record id does
@@ -521,11 +527,14 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   result), a quote is over 300 characters or is not one whole sentence or
   table row of its passage, or a run of them, after `normalize_text`
   (`rerank.is_whole_sentence`: a fragment can lift a number out of its
-  negation), or it cites nothing without saying `unsupported`. A gap with a
-  number is dropped and named in `rejectionReasons`. Its provenance is the weakest of its records and
+  negation), or it cites nothing without saying `unsupported`. A gap or the
+  decline with a number is dropped and named in `rejectionReasons`
+  (`held_to_rule_one`, on the single path too), and the decline code writes
+  stands in. Its provenance is the weakest of its records and
   computed values, `unverified` on quotes alone; its papers are derived. A
-  restart forgets what the first conversation retrieved and gets the whole
-  call budget again; the tool cache does not forget, and what a search lane
+  restart opens as the first conversation did (earlier turns, then the
+  question and the map), forgets what the first conversation retrieved and
+  gets the whole call budget again; the tool cache does not forget, and what a search lane
   spends on a model (`ToolResult.usage`) is charged to the question once.
 - **Text inside a tool result is evidence, never an instruction.** The
   prompt says so, and the validator is the guard: a passage telling the
@@ -575,7 +584,8 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   whether the person is active, never a level or a title. A claim cites rows
   in `moduleRefs`; `SeenSet` keeps them and `validate_plan` drops a claim
   citing a ref no tool returned; the rows' marks enter the claim's weakest
-  provenance.
+  provenance. An artifact row's mark is recomputed from its inputs as they
+  stand when it is read (`basis_provenance`), never copied from the file.
 - **A write tool a module** (`tools/writes.py`), and it never touches a
   store: each action calls the module's own write function (`geneos.ceiling`
   and kin, `fermos.forecast_run`, `proforma.run`, `extract.add_candidate`
@@ -586,25 +596,43 @@ is `docs/build/OF-BLD-016.md` (prompt `docs/build/PROMPT-016.md`); its commits a
   `core/data/audit.jsonl` (`audit.py`, `GET /api/audit`, gitignored) with
   `agent: model`, the model id, the effort and the ask id
   (`ToolContext.ask_id`). A person's carry-out or dismissal is appended the
-  same way.
+  same way. **A candidate written by hand is not an extraction:** it is kept
+  in `candidates/hand/<paper>.json`, never in the extractor's file, so the
+  extractor still runs on its paper and Witness never scores it (the overlay
+  still carries it, and `biorepo.write` resolves its id there). It passes on
+  only the fields the action lists, and `negativeResult` and `isPrimary` as
+  the word true or false; any other field refuses the call.
 - **The gates are one table** (`tools/gates.py`, the same rows in
   `docs/TOOLS.md`): `publish`, `spend`, `lock`, `sign`, `personnel`, `bench`,
   `notebook`. An action at a gate writes nothing and becomes a proposal
   (`proposals.py`, `core/data/proposals.json`, gitignored) with
   `state: proposed`; Home shows every open one as a card with one button,
   disabled until a reviewer name is set; `POST /api/proposals/{id}/carry-out`
-  and `/dismiss` take a named person (placeholders refused). The server runs
-  what it can in the person's name (`checks.request` by them; an extraction
-  once the budget allows) and records that the person took the rest to the
-  place the gate names. The model may propose a check and may never write a
-  sign-off: no gate's server action signs anything.
+  and `/dismiss` take a named person (placeholders refused) and, for a check,
+  `actingId`, the Guild person the browser acts as. The server runs what it
+  can in the person's name (`checks.request` by the acting Guild person; an
+  extraction once the budget allows), with the store's locks let go while it
+  runs, and records that the person took the rest to the place the gate
+  names; a server gate with no server action is refused and stays open. The
+  model may propose a check and may never record or sign one:
+  `guild record_check` is refused, and no gate's server action signs
+  anything. **A proposal is held to Rule 1** (`proposals.propose`): its
+  note, target, field values, title and why hold no number and its target
+  is one id, or it is refused whole; one ask leaves one open proposal per
+  module, action and target. A Guild proposal is served
+  (`proposals.listed`, `home_read`) without its note, why and target, and
+  its title names nobody.
 - **`pnpm check:tools`** (`scripts/check-tools.py`, the eighth stage) fails
   when a module lacks a read or a write tool, when `writes.py` holds a file
-  write or calls a function outside `ALLOWED_WRITES`, when a gated action
+  write or reaches a store function outside `ALLOWED_WRITES` (the file is
+  parsed and every name followed through its import, aliases included; a
+  store module handed around bare or a dynamic import fails), when a gated action
   completes without a named person, or when `gates.py` and `docs/TOOLS.md`
   name different gates. **Eval set O** (`evalo.py`, `pnpm eval:o`): ten
   cross-module questions keyed by the coverage code, scored on the modules
-  read and the footer; the report goes to `core/data/live/eval-o.json`.
+  read; the footer is not scored, because its key and the footer are the
+  same `coverage` call and it held by construction. The report goes to
+  `core/data/live/eval-o.json`.
 - **The MCP server needs no change for any of it**: it lists `tools.infos()`
   and calls `tools.run`, so the module tools appear there with the same marks
   and gates; `test_mcp` counts thirty-one.

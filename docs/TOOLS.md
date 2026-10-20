@@ -33,7 +33,16 @@ empty), `limit` (at most 20). One output, `ModuleRow`: `ref`
 (`<module>/<kind>/<id>`, what a claim cites in `moduleRefs`), `label`,
 `state`, `status` (the module's own word), `provenance` (the mark, or null),
 `detail`. The count of every match by state rides on the summary, and a
-module read in part says so.
+module read in part says so. An artifact row's `provenance` is worked out
+when the row is read, by `basis_provenance` over its inputs as they stand
+then, never copied from the stored file: a record rejected since it was
+computed brings the row, and a claim citing it, down with it.
+
+Before round one, `module_stores.coverage` sweeps every module for what the
+question names and hands the model the map. A follow-up is swept with the
+earlier questions it reads (at most four), never with the earlier answers,
+which are the model's words, and the map then says what the conversation
+names.
 
 `state` is one enum, computed by `module_stores.py` from the module's own
 word and never by a model:
@@ -57,7 +66,11 @@ The pair of each read: `dominion_write` … `home_write`. One input for all:
 `action`, `target` (an id), `fields` (names to words), `note` (why). A write
 tool never touches a store: each action calls the module's own write
 function, where the module's rules live, and `check:tools` fails when this
-file reaches a file. Every write that goes through lands in the open lane
+file reaches a file or a store function `ALLOWED_WRITES` does not name. It
+reads `writes.py` as parsed Python and follows every name through its import,
+aliases included, so `from ..biorepo import write as keep` is caught as
+`biorepo.write`; a store module handed around bare, `getattr` on one, and
+`importlib` or `__import__` fail too. Every write that goes through lands in the open lane
 and is appended to the audit log (`core/data/audit.jsonl`, `GET /api/audit`)
 with `agent: model`, the model id (the one answering the run, after any
 fallback), the effort and the ask id. A call from `POST /api/tools/{name}` or
@@ -73,13 +86,14 @@ audited as `finding`.
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
 | `proforma_write` | `run` | runs the BioSTEAM scenario on the bound inputs, or refuses naming what waits | `proforma.run` |
 | `proforma_write` | `bind` | refused: an assumption is a named person's, in the Durable tier | — |
-| `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…` | `extract.add_candidate` (§2.4's rules) |
+| `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
 | `biorepo_write` | `decide` | refused: a decision is a person's | — |
 | `intake_write` | `fetch` | fetches and prepares a corpus paper's full text | `intake.fetch_paper` |
 | `intake_write` | `extract` | extracts a fetched paper; at the budget, a `spend` proposal | `extract.extract_paper` |
 | `intake_write` | `add` | refused: a source enters through a person's approval | — |
 | `runbooks_write` | `draft` | refused: use `draft_runbook` | — |
 | `runbooks_write` | `revise_protocol` | refused: protocols are seed, revised in the browser | — |
+| `guild_write` | `record_check` | refused: an assessor runs a check at the bench, criterion by criterion | — |
 | `guild_write`, `home_write`, `runbooks_write` | gated actions | a proposal (below) | `proposals.propose` |
 | `dominion_write`, `pureos_write`, `primer_write` | any | refused: curated seed, no write function | — |
 
@@ -99,15 +113,41 @@ places.
 | `spend` | spend past the ask or the daily budget | `intake extract` when the budget refuses | the server extracts when the budget allows |
 | `lock` | lock a prediction a person will test | `runbooks lock` | takes the person to the runbook to press Lock predictions |
 | `sign` | sign a Guild entry | `guild evidence`, `guild person`, `guild policy` | takes the person to Guild to record it in their name |
-| `personnel` | mark a personnel check | `guild propose_check`, `guild record_check` | the server asks for the check in the person's name (`checks.request`) |
+| `personnel` | mark a personnel check | `guild propose_check` | the server asks for the check in the person's name, by the Guild person the browser acts as (`checks.request`) |
 | `bench` | send a protocol to the bench | `runbooks deposit`, `runbooks run` | takes the person to the protocols to start the deposition |
 | `notebook` | write a note under a person's name | `home note` | the server keeps the note under the person's name (the notebook itself lands with OF-BLD-017 §5.3) |
 
 A proposal is carried out or dismissed by a named person (the reviewer name
 in Settings; placeholders are refused), and each carries their name and the
 time. `POST /api/proposals/{id}/carry-out` and `/dismiss` take `{person,
-reason}`. The model may propose a check and may never write a sign-off: no
-gate's server action signs anything.
+reason, actingId}`: `actingId` is the Guild person the browser is acting as,
+and a check is asked for by them, because Guild knows people by id and the
+reviewer name is words; with none, a check proposal is refused in words. The
+model may propose a check and may never record or sign one: no gate's server
+action signs anything, and `guild record_check` is refused. A server gate is
+marked done only when its server action ran; one with none is refused and
+stays open to be dismissed. The store's locks are let go while the action
+runs (the proposal is marked running in the service), so a long extraction
+never holds up another proposal.
+
+The rules a proposal holds to (OF-BLD-016 §1.R), in `proposals.propose`:
+
+- **Rule 1.** Its note, target, field values, title and why hold no number
+  (`validate.find_number`), and its target is one id or none. A write that
+  breaks either is refused whole, never repaired, and the model reports the
+  refusal in `gaps`. The title is the code's words and the target's id; a
+  spend proposal's why is the code's words, not the budget's figures.
+- **One of a kind.** One ask makes one open proposal per module, action and
+  target; a second (a restart, a call worded otherwise) is refused naming
+  the one waiting. Once it is carried out or dismissed, the ask may propose
+  it again.
+- **Who a check names is never shown before it is run.** A Guild proposal's
+  title names nobody. `GET /api/proposals` (`proposals.listed`) and
+  `home_read` serve it without its note, why and target, and keep its field
+  ids, as Guild's checks serve theirs; the store keeps every word. Home shows
+  it to the lead and assessors alone (`mayQueue`), never to the person it
+  names (`shownTo`), and to nobody while the sample team is shown
+  (`shownProposals` in `src/lib/proposals.ts`).
 
 ## The MCP server
 
