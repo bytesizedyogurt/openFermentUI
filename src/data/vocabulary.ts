@@ -227,6 +227,14 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     stage: 'harvest',
     scale: 'all',
     note: 'disc-stack at production scale',
+    biosteamClasses: [
+      'SolidsCentrifuge',
+      'LiquidsCentrifuge',
+      'LiquidsSplitCentrifuge',
+      'LiquidsRatioCentrifuge',
+      'SolidLiquidsSplitCentrifuge',
+      'SLLECentrifuge',
+    ],
   },
   {
     id: 'microfiltration',
@@ -323,6 +331,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     id: 'crystallisation',
     label: 'Crystallisation',
     stage: 'isolation',
+    biosteamClasses: ['BatchCrystallizer'],
   },
   {
     id: 'precipitation',
@@ -335,18 +344,39 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     label: 'Liquid-liquid extraction',
     stage: 'recovery',
     note: 'terpene recovery',
+    biosteamClasses: [
+      'LLEUnit',
+      'LLESettler',
+      'LLECentrifuge',
+      'MixerSettler',
+      'MultiStageMixerSettlers',
+      'LiquidsSettler',
+      'LiquidsSplitSettler',
+      'LiquidsPartitionSettler',
+    ],
   },
   {
     id: 'distillation',
     label: 'Distillation / rectification',
     stage: 'purification',
-    note: 'terpene finishing',
+    note: 'terpene finishing; the beer column and rectifier of an ethanol plant',
+    biosteamClasses: ['Distillation', 'BinaryDistillation', 'ShortcutColumn', 'MESHDistillation', 'AdiabaticMultiStageVLEColumn'],
+  },
+  {
+    // OF-BLD-019 §4.1 — the step after the rectifier in every fuel-ethanol
+    // train BioSTEAM ships; vocabulary, so it carries no number.
+    id: 'molecular-sieve',
+    label: 'Molecular sieve dehydration',
+    stage: 'purification',
+    note: 'adsorbs the water distillation cannot take past the ethanol-water azeotrope',
+    biosteamClasses: ['MolecularSieve'],
   },
   {
     id: 'spray-dry',
     label: 'Spray drying',
     stage: 'drying',
     note: 'ambient-stable powder',
+    biosteamClasses: ['SprayDryer'],
   },
   {
     id: 'lyophilisation',
@@ -614,6 +644,15 @@ export const STORAGE_FORMATS_BY_ID = byId(STORAGE_FORMATS);
 export const REGULATORY_PATHWAYS_BY_ID = byId(REGULATORY_PATHWAYS);
 export const SCALES_BY_ID = byId(SCALES);
 export const CLEARANCE_STATES_BY_ID = byId(CLEARANCE_STATES);
+
+/**
+ * The vocabulary's step for a BioSTEAM unit class, or null (OF-BLD-019 §4.1).
+ * A class names at most one step (`check:seed` holds it), so a unit in a
+ * train links to one entry or to none.
+ */
+export function operationForClass(unitClass: string): UnitOperation | null {
+  return UNIT_OPERATIONS.find((op) => op.biosteamClasses?.includes(unitClass)) ?? null;
+}
 
 /**
  * Display order for the stage vocabulary, fermenter to vial. Used to group the

@@ -34,6 +34,19 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   // generates through the real code, each `{_fixture, response}`.
   const PROTOTYPE = join(process.cwd(), 'core/tests/fixtures/prototype');
   const prototype = async (name) => JSON.parse(await readFile(join(PROTOTYPE, name), 'utf8')).response;
+  // OF-BLD-019 §5.R — the recorded answer for the fermOS fits a query names
+  // (`?fits=<JSON object>`), matched input by input, or null.
+  const sameFits = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+  const fitsAnswer = (raw, recorded) => {
+    let asked = null;
+    try {
+      asked = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (!asked || typeof asked !== 'object' || Array.isArray(asked)) return null;
+    return (recorded ?? []).find((r) => sameFits(asked, r.fits)) ?? null;
+  };
   const HEALTH = JSON.stringify({
     ok: true,
     service: 'openferment-core (smoke double)',
@@ -108,6 +121,34 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const geneosCalls = [];
   const fermosCalls = [];
   const proformaRuns = [];
+  /** The bindings the browser asked for with fermOS fits chosen (OF-BLD-019 §5.1): each query, as sent. */
+  const proformaBinds = [];
+  /**
+   * What the double has on file that a test may switch (OF-BLD-019 §5.1):
+   * `fermosFitsOnFile` serves GET /api/fermos/fits as a service with the
+   * fixture's fit and forecast on file, else as one with none, which is how a
+   * fresh install starts. `ceilingOnFile` (OF-BLD-019 §5.2) serves
+   * GET /api/proforma/ceiling-check as a service with the fixture's STAND-IN
+   * geneOS ceiling on file, else with none, as a fresh install starts.
+   * `pureosYeastOnFile` (OF-BLD-019 §7.R) lists and serves sc-yeast-1's
+   * train beside sc-pha-1's; off, the double holds the PHA run alone, so
+   * pureOS's empty list for the active program is drawn.
+   */
+  const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true };
+  /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
+  const ceilingChecks = [];
+  /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
+  const proformaReferences = [];
+  /**
+   * The runs this double holds, by scenario id: the artifact id of the run a
+   * POST /api/proforma/run answered, as the service keeps every run it made
+   * (OF-BLD-019 §3.R). A test may set or clear it, as a service with runs on
+   * file or a fresh one.
+   */
+  const proformaRunsOnFile = new Map();
+  /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
+  const thermoKept = new Map();
+  const thermoCalls = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -236,7 +277,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       }
       if (url.startsWith('/api/biorepo/artifacts/')) {
         const [id, action] = url.slice('/api/biorepo/artifacts/'.length).split('/');
-        const found = (await prototype('artifacts.json')).find((a) => a.id === id);
+        // OF-BLD-019 §2.R: a reference run the double serves at
+        // /api/proforma/reference/:id reads back by its id too, as the
+        // service keeps every artifact it returns (the cards link to it).
+        const referenceRuns = await Promise.all(
+          ['cornstover_benchmark', 'corn_drygrind'].map((f) => prototype(`proforma-reference-${f}.json`).then((r) => r.artifact).catch(() => null)),
+        );
+        const found = [...(await prototype('artifacts.json')), ...referenceRuns.filter(Boolean)].find((a) => a.id === id);
         if (!found) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ detail: `no artifact '${id}'` }));
@@ -272,6 +319,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
+    // flowsheet, as the real code listed them over an empty store and over
+    // the stand-in fit and forecast (flags.fermosFitsOnFile picks which);
+    // a flowsheet the fixture does not hold is the service's 422.
+    if (url === '/api/fermos/fits' && req.method === 'GET') {
+      const flowsheet = new URL(req.url ?? '/', 'http://double').searchParams.get('flowsheet') ?? '';
+      const answers = (await prototype('fermos-fits.json'))[flags.fermosFitsOnFile ? 'onFile' : 'none'];
+      const answer = answers[flowsheet] ?? { status: 422, body: { detail: `there is no flowsheet ${flowsheet} on the shelf` } };
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(answer.body));
+    }
     // OF-BLD-014 §8.2 — a service whose simulator has yet to run: the
     // Benchmark card's empty state.
     if (url === '/api/proforma/status' && req.method === 'GET') {
@@ -282,18 +340,212 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ artifact: null, simulator: { status: 'cold', error: null } }));
     }
-    // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
-    // and a run made through the real code with a stand-in evaluator.
-    if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
+    // OF-BLD-019 §2.1 — the shelf of flowsheets, with the program switch off
+    // and, asked with ?includeArchived=true, on. `url` has lost its query
+    // string, so the switch is read from the request's own URL (§3.1: the
+    // index asks with the switch on and was served the switch-off shelf).
+    if (url.startsWith('/api/proforma/shelf') && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(await prototype('proforma-scenarios.json')));
+      return res.end(JSON.stringify(await prototype(on ? 'proforma-shelf-archived.json' : 'proforma-shelf.json')));
     }
+    // OF-BLD-019 §4.1 — pureOS's trains, read by the real code from the
+    // stand-in runs: the list with the program switch off (§7.R: the yeast
+    // run's train; PHA's is archived) and, asked with ?includeArchived=true,
+    // on; one train by its scenario or its run's artifact id, either run's,
+    // else the service's 404 in its words. With flags.pureosYeastOnFile off
+    // the double holds no yeast run, so the empty list's words stay tested.
+    const yeastTrain = (t) => t.scenarioId === 'sc-yeast-1' || t.program === 'yeast';
+    if (url === '/api/pureos/trains' && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      const listed = await prototype(on ? 'pureos-trains-archived.json' : 'pureos-trains.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(flags.pureosYeastOnFile ? listed : listed.filter((t) => !yeastTrain(t))));
+    }
+    if (url.startsWith('/api/pureos/train/') && req.method === 'GET') {
+      const key = decodeURIComponent(url.slice('/api/pureos/train/'.length));
+      const trains = [await prototype('pureos-train.json'), await prototype('pureos-train-yeast.json')].filter(
+        (t) => flags.pureosYeastOnFile || !yeastTrain(t),
+      );
+      const train = trains.find((t) => key === t.scenarioId || key === t.artifactId);
+      if (!train) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `no Proforma run of ${key} is on file here: run the scenario in Proforma, and pureOS reads its train from that run` }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(train));
+    }
+    // OF-BLD-019 §2.2 — a reference biorefinery: its shelf entry, a run made
+    // through the real code with the stand-in in place of BioSTEAM, and the
+    // package test's values. GET reads it; POST answers as a run would, and
+    // is recorded. An id that is not a reference on the shelf is a 404.
+    const reference = url.match(/^\/api\/proforma\/reference\/([A-Za-z0-9_]+)$/);
+    if (reference && (req.method === 'GET' || req.method === 'POST')) {
+      const id = reference[1];
+      if (req.method === 'POST') proformaReferences.push(id);
+      let fixture;
+      try {
+        fixture = await prototype(`proforma-reference-${id}.json`);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `${id} is not a reference biorefinery on the shelf` }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(fixture));
+    }
+    // OF-BLD-019 §4.2 — thermosteam's answers, made by the real thermo.py
+    // over the stand-in run with a stand-in in place of thermosteam: a POST
+    // answers from the fixture (200, or the service's 404 or 422 in its
+    // words) and keeps what it answered, so a GET of the same question finds
+    // it stored, as the service's does; a question the fixture never asked
+    // is the service's 404.
+    if (url === '/api/thermo/props' && (req.method === 'GET' || req.method === 'POST')) {
+      const keyOf = (q) => ['artifactId', 'streamId', 'preset', 'recordId'].map((k) => q[k] ?? '').join('|');
+      let asked;
+      if (req.method === 'GET') {
+        asked = Object.fromEntries(new URL(req.url ?? '/', 'http://double').searchParams);
+      } else {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        asked = JSON.parse(body || '{}');
+      }
+      thermoCalls.push({ method: req.method, ...asked });
+      const entry = (await prototype('thermo-props.json')).entries.find((e) => keyOf(e.request) === keyOf(asked));
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: 'no run, stream or record like this is on file here' }));
+      }
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ artifact: thermoKept.get(keyOf(asked)) ?? null }));
+      }
+      if (entry.status === 200) thermoKept.set(keyOf(asked), entry.body);
+      res.writeHead(entry.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(entry.body));
+    }
+    // OF-BLD-014 §8.4 — the BioSTEAM scenarios, bound over stand-in records,
+    // and runs made through the real code with a stand-in evaluator.
+    // OF-BLD-019 §2.3 (b): the seed's scenarios with the program switch off
+    // (sc-yeast-1) and, asked with ?includeArchived=true, on (sc-pha-1 too);
+    // the switch is read from the request's own URL, which keeps its query.
+    if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype(on ? 'proforma-scenarios-archived.json' : 'proforma-scenarios.json')));
+    }
+    // (c): a shelf flowsheet bound as a scenario made in the browser shows it,
+    // or the service's refusal in its words, each as demo.py --prototype
+    // recorded it for the switch off and on.
+    if (url === '/api/proforma/bind' && req.method === 'GET') {
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      const flowsheet = q.get('flowsheet') ?? '';
+      // OF-BLD-019 §5.1: with fermOS fits chosen, the binding the real code
+      // made with the stand-in forecast for every input it feeds; §5.R: and
+      // with the other choices the browser tests make (`others`: the fit for
+      // titre and yield, bound; the forecast's productivity beside the fit's
+      // titre, refused), each as the real code answered; any other choice is
+      // a 422 in words.
+      if (q.get('fits')) {
+        proformaBinds.push(Object.fromEntries(q));
+        const fixture = await prototype('proforma-bind-fits.json');
+        const answer = fitsAnswer(q.get('fits'), [{ fits: fixture.fits, status: 200, body: fixture.body }, ...(fixture.others ?? [])]);
+        const found = flowsheet === fixture.flowsheet && answer;
+        res.writeHead(found ? answer.status : 422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(found ? answer.body : { detail: `the double holds no binding of ${flowsheet} with these fits` }));
+      }
+      const answers = (await prototype('proforma-bind.json'))[q.get('includeArchived') === 'true' ? 'on' : 'off'];
+      const answer = answers[flowsheet] ?? {
+        status: 422,
+        body: { detail: `there is no flowsheet ${flowsheet} on the shelf; it holds ${Object.keys(answers).filter((k) => k !== 'toy').join(', ')}` },
+      };
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(answer.body));
+    }
+    // OF-BLD-019 §5.2 — a scenario's yield read against the geneOS ceiling,
+    // as the real code read it over the stand-in records with no ceiling on
+    // file and with the STAND-IN ceiling on file (flags.ceilingOnFile picks),
+    // by the flowsheet the scenario runs: a seed's own, or the one a scenario
+    // made here names, answered under the id asked; anything else is the
+    // service's 422 in words.
+    if (url === '/api/proforma/ceiling-check' && req.method === 'GET') {
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      ceilingChecks.push(Object.fromEntries(q));
+      const scenarioId = q.get('scenarioId') ?? '';
+      const seeds = await prototype('proforma-scenarios-archived.json');
+      const flowsheet = seeds.find((sc) => sc.id === scenarioId)?.flowsheet ?? q.get('flowsheet') ?? '';
+      const recorded = await prototype('proforma-ceiling-check.json');
+      // §5.R: with fermOS fits chosen, the check the real code made of
+      // sc-yeast-1 with that choice (`fitted`), read or refused in its words;
+      // any other choice is a 422 in words, as the binding's is.
+      if (q.get('fits')) {
+        const fitted = flowsheet === 'ethanol_glucose_v0' && fitsAnswer(q.get('fits'), recorded.fitted[flags.ceilingOnFile ? 'onFile' : 'none']);
+        res.writeHead(fitted ? fitted.status : 422, { 'Content-Type': 'application/json' });
+        return res.end(
+          JSON.stringify(
+            !fitted
+              ? { detail: `the double holds no ceiling check of ${flowsheet || 'no flowsheet'} with these fits` }
+              : fitted.status === 200
+                ? { ...fitted.body, scenarioId }
+                : fitted.body,
+          ),
+        );
+      }
+      const answer = recorded[flags.ceilingOnFile ? 'onFile' : 'none'][flowsheet];
+      if (!answer) {
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `there is no seed scenario ${scenarioId}, and ${flowsheet || 'no flowsheet'} is not one a scenario made here can run` }));
+      }
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ...answer.body, scenarioId }));
+    }
+    // (d): a seed scenario's run by its id; a scenario made in the browser
+    // gets the run of the seed scenario on the flowsheet it names, under its
+    // own id (the stand-in's artifact still names the seed scenario in its
+    // basis); anything else is the service's 422, in words.
     if (url === '/api/proforma/run' && req.method === 'POST') {
       let body = '';
       for await (const chunk of req) body += chunk;
-      proformaRuns.push(JSON.parse(body || '{}'));
+      const asked = JSON.parse(body || '{}');
+      proformaRuns.push(asked);
+      const seeds = await prototype('proforma-scenarios-archived.json');
+      const bySeed = { 'sc-pha-1': 'proforma-run.json', 'sc-yeast-1': 'proforma-run-yeast.json' };
+      const byFlowsheet = { pha_sugar_v0: 'proforma-run.json', ethanol_glucose_v0: 'proforma-run-yeast.json' };
+      const name = bySeed[asked.scenarioId] ?? (asked.scenarioId ? byFlowsheet[asked.flowsheet] : undefined);
+      const refuse = (detail) => {
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail }));
+      };
+      if (!name)
+        return refuse(
+          asked.flowsheet
+            ? `${asked.flowsheet} is not a flowsheet a scenario made here can run`
+            : `there is no seed scenario ${asked.scenarioId}; the seed's BioSTEAM scenarios are sc-pha-1, sc-yeast-1, and a scenario made here names the flowsheet it runs`,
+        );
+      // Inputs that still wait are refused as the service refuses them (§3.2).
+      const seed = seeds.find((sc) => sc.id === asked.scenarioId);
+      const bound = seed ?? seeds.find((sc) => sc.flowsheet === asked.flowsheet);
+      const typed = new Set([...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
+      const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
+      if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
+      const run = await prototype(name);
+      proformaRunsOnFile.set(asked.scenarioId, run.artifactId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(await prototype('proforma-run.json')));
+      return res.end(JSON.stringify(bySeed[asked.scenarioId] ? run : { ...run, scenarioId: asked.scenarioId }));
+    }
+    // OF-BLD-019 §3.R — a scenario's newest run on the service: the artifact
+    // of the run this double answered for it (from artifacts.json, as the
+    // artifact store answers it by id), or none; a blank id is the service's
+    // 422 in words.
+    if (url === '/api/proforma/runs' && req.method === 'GET') {
+      const sid = (new URL(req.url ?? '/', 'http://double').searchParams.get('scenarioId') ?? '').trim();
+      if (!sid) {
+        res.writeHead(422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: "a read of a scenario's runs names the scenario it belongs to" }));
+      }
+      const id = proformaRunsOnFile.get(sid);
+      const artifact = id ? ((await prototype('artifacts.json')).find((a) => a.id === id) ?? null) : null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ scenarioId: sid, artifact }));
     }
     // OF-BLD-014 §6.4 — geneOS's shelf and its computations, from the toy
     // network's fixtures: a ceiling or envelope for the sugar asked, the mix.
@@ -386,5 +638,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proposalActs } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, flags } };
 }

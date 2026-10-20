@@ -10,3 +10,5 @@ export { TrajectoryBand, toTable as trajectoryTable, type TrajectoryBandProps, t
 export { Distribution, toTable as distributionTable, type DistributionProps } from './Distribution';
 export { Tornado, toTable as tornadoTable, sorted as tornadoSorted, type TornadoProps, type TornadoRow } from './Tornado';
 export { IntervalLedger, toTable as intervalLedgerTable, type IntervalLedgerProps, type IntervalLedgerRow } from './IntervalLedger';
+export { CostWaterfall, toTable as costWaterfallTable, bars as costWaterfallBars, type CostWaterfallProps, type WaterfallLine, type WaterfallBar } from './CostWaterfall';
+export { RecoveryByUnit, toTable as recoveryByUnitTable, noBar as recoveryNoBar, type RecoveryByUnitProps } from './RecoveryByUnit';

@@ -9,7 +9,9 @@ and purification, wastewater treatment, co-products (`LEAVES_OUT`).
 
 Every input is set by the caller; this module holds no value for any of them.
 Everything else is the reference biorefinery's (`biorefineries.cornstover`)
-or BioSTEAM's own, and is read back after each run and listed (`read_back`),
+or BioSTEAM's own (the utility prices and the plant cost index are
+BioSTEAM's defaults, set at the start of every case: OF-BLD-019 §2.R), and
+is read back after each run and listed (`read_back`),
 so the screen can name its source. Appendix 3's five traps are handled where
 they bite and marked "trap n".
 """
@@ -19,6 +21,8 @@ from typing import Any
 
 import biosteam as bst
 import thermosteam as tmo
+
+from . import utility_settings
 
 NAME = "pha_sugar_v0"
 
@@ -110,6 +114,7 @@ class Built:
         self.flowsheet = bst.main_flowsheet.get_flowsheet()
         self.system = bst.System.from_units("pha_sys", units=[self.M1, self.R1, self.C1, self.D1])
         self.tea = None
+        self.price: float | None = None
 
     def gap(self) -> float:
         flow_in = sum(s.F_mass for s in self.R1.ins)
@@ -149,6 +154,10 @@ def simulate(b: Built, values: dict[str, float]) -> None:
     _check(v)
     bst.main_flowsheet.set_flowsheet(b.flowsheet)
     bst.settings.set_thermo(b.thermo)
+    # BioSTEAM's own utility prices and plant cost index for every case
+    # (OF-BLD-019 §2.R; the basis names them, read_back reads them).
+    bst.process_tools.default_utilities()
+    bst.process_tools.default_CEPCI()
     x_phb, x_cells, x_burn = conversions(b, v)
     if x_burn < 0:
         raise Infeasible("carbon")
@@ -190,6 +199,7 @@ def read_back(b: Built) -> dict[str, float]:
         "incomeTax": float(tea.income_tax),
         "ammoniaPriceUsdPerKg": float(b.ammonia.price),
         "packageGlucosePriceUsdPerKg": float(b.cs.price["Glucose"]) if "Glucose" in b.cs.price else float("nan"),
+        **utility_settings(b.system.units),
     }
 
 
@@ -204,7 +214,10 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
     # price would depend on what ran before. Start every case from zero, so
     # a case gives one price whatever came first and an artifact replays.
     tea._sales = 0.0
-    price = float(tea.solve_price(product)) * float(product.F_mass) / pha
+    # The product stream's price as the TEA solved it, kept for `parts`, so
+    # the run's cost breakdown is read at the same price.
+    b.price = float(tea.solve_price(product))
+    price = b.price * float(product.F_mass) / pha
     hours = float(tea.operating_hours)
     per_kg = 1.0 / (pha * hours)
     media = (b.feed.cost + b.ammonia.cost) * hours * per_kg
@@ -227,3 +240,14 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
         "readBack": read_back(b),
         "conversions": dict(zip(("polymer", "cells", "respiration"), conversions(b, {k: float(values[k]) for k in values}))),
     }
+
+
+def parts(b: Built) -> dict[str, Any]:
+    """What the worker reads the run's tables from after the base case
+    (OF-BLD-019 §2.1): the system, its TEA (the reference biorefinery's
+    finance model), the dried product, the sugar as the main feedstock, the
+    price the TEA solved for the product stream, and the PHA it contains as
+    the flow the price is per."""
+    product = b.D1.outs[0]
+    return {"system": b.system, "tea": b.tea, "product": product, "feedstock": b.feed, "price": b.price,
+            "basis_flow": float(product.imass["PHB"]), "basis": "kg of PHA contained in dried cell mass"}

@@ -50,3 +50,9 @@ def evaluate(system: Any, values: dict[str, float]) -> dict[str, float]:
     system.simulate()
     top, bottom = s.outs
     return {"topEthanol": float(top.imass["Ethanol"]), "topWater": float(top.imass["Water"]), "bottomTotal": float(bottom.F_mass)}
+
+
+def parts(system: Any) -> dict[str, Any]:
+    """What the worker reads the run's tables from: the system alone, since
+    the toy prices nothing and has no TEA."""
+    return {"system": system}

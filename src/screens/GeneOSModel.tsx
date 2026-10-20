@@ -20,11 +20,18 @@
 // with its own program's models and records (`useProgramScope`). When nothing
 // on the shelf shows, the view says what is hidden and where the switch is.
 // With the switch on, all as before.
+//
+// SCENARIOS ABOVE A CEILING (OF-BLD-019 §5.2, D11). Under the chosen model
+// and sugar, each Proforma scenario in view whose yield, as it binds it, is
+// above that model's newest stored ceiling is listed with a link to it. The
+// service reads it (GET /api/proforma/ceiling-check, after the ceilings here
+// are computed and kept); the view keeps the rings for records as before,
+// and clamps nothing.
 import { useEffect, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
-import type { ExtractionRecord, GeneosModelInfo, GeneosResult } from '@/data/types';
+import type { CeilingCheck, ExtractionRecord, GeneosModelInfo, GeneosResult, InputAssumption, Scenario } from '@/data/types';
 import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { useProgramFilter, useStore, type ProgramEntityKind, useProgramScope } from '@/store';
+import { archivedProgramOf, useProgramFilter, useProgramLookup, useStore, type ProgramEntityKind, useProgramScope } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, LinkButton } from '@/components/ui';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
@@ -44,6 +51,7 @@ import {
   type FrontierPointOut,
   type MixPointOut,
 } from '@/lib/geneos';
+import { ceilingCheck } from '@/lib/proforma';
 
 const UNIT = 'g g⁻¹';
 
@@ -75,6 +83,13 @@ export default function GeneOSModel() {
   const [refused, setRefused] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [busy, setBusy] = useState(false);
+  const scenarios = useStore((s) => s.scenarios);
+  const createdScenarioIds = useStore((s) => s.createdScenarioIds);
+  const proformaAssumptions = useStore((s) => s.proformaAssumptions);
+  const proformaFits = useStore((s) => s.proformaFits);
+  const showArchived = useStore((s) => s.showArchived);
+  const lookup = useProgramLookup();
+  const [aboveCeiling, setAboveCeiling] = useState<{ scenario: Scenario; check: CeilingCheck }[]>([]);
 
   const substrate = route.query.get('substrate') ?? 'glucose';
   const modelId = route.query.get('model') ?? '';
@@ -161,6 +176,50 @@ export default function GeneOSModel() {
       .finally(() => !ctrl.signal.aborted && setBusy(false));
     return () => ctrl.abort();
   }, [shelf, chosen?.id, substrate, product, usable]);
+
+  // OF-BLD-019 §5.2 — the Proforma scenarios in view, each asked of the
+  // service once the ceilings above are computed and kept: the yield as the
+  // scenario binds it (its flowsheet when made here, its fermOS fits, the
+  // yield's assumption when typed), against the newest stored ceilings.
+  const scenarioAsks = useMemo(
+    () =>
+      scenarios
+        .filter((s) => s.kind === 'biosteam' && inView('scenario', s.id))
+        .map((s) => ({
+          scenario: s,
+          ask: {
+            scenarioId: s.id,
+            flowsheet: createdScenarioIds.includes(s.id) ? (s.flowsheetId ?? s.modelId) : null,
+            host: null,
+            includeArchived: showArchived || archivedProgramOf('scenario', s.id, lookup) !== null,
+            fits: proformaFits[s.id] ?? {},
+            assumptions: (proformaAssumptions[s.id] ?? []).filter((a: InputAssumption) => a.key === 'yield'),
+          },
+        })),
+    [scenarios, inView, createdScenarioIds, showArchived, lookup, proformaFits, proformaAssumptions],
+  );
+  const asksKey = JSON.stringify(scenarioAsks.map((x) => x.ask));
+  useEffect(() => {
+    setAboveCeiling([]);
+    if (!loaded || !chosen) return;
+    const ctrl = new AbortController();
+    Promise.allSettled(scenarioAsks.map(({ scenario, ask }) => ceilingCheck(ask, ctrl.signal).then((check) => ({ scenario, check })))).then(
+      (results) => {
+        if (ctrl.signal.aborted) return;
+        setAboveCeiling(
+          results.flatMap((r) =>
+            r.status === 'fulfilled' &&
+            r.value.check.product === product &&
+            r.value.check.rows.some((x) => x.modelId === chosen.id && x.substrate === substrate && x.flag === 'above')
+              ? [r.value]
+              : [],
+          ),
+        );
+      },
+    );
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, chosen?.id, substrate, product, asksKey]);
 
   // Only the yields of this product measured on this sugar are held against its ceilings.
   const { on: yields, elsewhere } = useMemo(
@@ -297,6 +356,25 @@ export default function GeneOSModel() {
               .
             </div>
           ))}
+        </section>
+      )}
+
+      {chosen && aboveCeiling.length > 0 && (
+        <section aria-label="Scenarios above a ceiling" className="space-y-1.5" data-testid="scenarios-above-ceiling">
+          <h3 className="font-medium text-reading">Proforma scenarios whose yield is above {chosen.id}&rsquo;s ceiling on {substrate}</h3>
+          {aboveCeiling.map(({ scenario, check }) => {
+            const r = check.rows.find((x) => x.modelId === chosen.id && x.substrate === substrate);
+            return (
+              <div key={scenario.id} className="rounded-card border border-signal-warn/45 bg-signal-warn/[0.06] p-2 text-body" data-testid="scenario-above-ceiling" data-scenario={scenario.id}>
+                <a className="text-accent hover:underline" href={href(`/proforma/scenario/${scenario.id}`)}>
+                  {scenario.name}
+                </a>{' '}
+                binds a yield whose {r && r.yieldGPerG != null && r.yieldGPerG > r.ceilingGPerG ? 'value' : 'high end'} is above this ceiling ({check.yieldWords}). It is
+                flagged, not clamped: its Ceiling check says which{' '}
+                {check.yieldBinding === 'records' ? 'records a reviewer should check' : 'basis a reviewer should check'}.
+              </div>
+            );
+          })}
         </section>
       )}
 

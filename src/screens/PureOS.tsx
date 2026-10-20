@@ -1,4 +1,5 @@
-// pureOS — everything downstream of the fermenter (OF-BLD-008 §4, OF-BLD-011 §4).
+// pureOS — everything downstream of the fermenter (OF-BLD-008 §4, OF-BLD-011 §4,
+// OF-BLD-019 §4.1).
 //
 // THE THIRD OF THE THREE STAGES. geneOS asks what the cell CAN do; fermOS asks
 // what a vessel DOES achieve; pureOS asks how product becomes vial. The seam
@@ -8,37 +9,43 @@
 // because a reader who does not know where the decision was made will look for
 // it in the wrong place.
 //
-// NOT EMPTY, BUT NEARLY. The unit-operation vocabulary and `ProcessTrain.tsx`
-// belong here rather than to Proforma, and the distinction is the point of the
-// split: PROFORMA PRICES A TRAIN, PUREOS DECIDES IT. Asking what a
-// centrifugation step costs at 10 m³ is an economics question; asking whether
-// centrifugation or filtration is the right step for a cell-wall-deficient
-// alga is a process question, and the two were sitting in the same place.
+// PUREOS READS THE TRAIN A FLOWSHEET RAN (OF-BLD-019 §4.1, D1). Proforma's run
+// is one artifact holding BioSTEAM's stream and unit tables for its base case;
+// the service reads that artifact unit by unit (`core/openferment_core/
+// pureos.py`) and this page lists the trains on file, one a scenario, with the
+// overall recovery the service read from the stream table. Each opens at
+// /pureos/train/:scenarioId (PureOSTrain.tsx). Nothing here types a recovery
+// or simulates anything: a train exists when somebody ran a scenario.
 //
-// So this screen surfaces the vocabulary that already exists — real entries,
-// no invention — and names the decisions that would need code. Nothing here is
-// fabricated: every operation listed is one a molecule in the catalogue
-// actually declares.
-import { useMemo } from 'react';
-import { Filter } from 'lucide-react';
+// THE VOCABULARY STAYS. The unit-operation vocabulary belongs here rather than
+// to Proforma, and the distinction is the point of the split: PROFORMA PRICES
+// A TRAIN, PUREOS DECIDES IT. Asking what a centrifugation step costs at 10 m³
+// is an economics question; asking whether centrifugation or filtration is the
+// right step for a cell-wall-deficient alga is a process question. Each entry
+// names the BioSTEAM classes that perform it, so a unit in a run's train links
+// to its step (`?op=` highlights it below). Every operation listed is one a
+// molecule in the catalogue declares or a train BioSTEAM ships runs; none is
+// invented, and choosing a train is still not built.
+import { useEffect, useMemo, useState } from 'react';
 import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
-import type { UnitOperationStage } from '@/data/types';
-import { href } from '@/router';
-import { useProgramFilter } from '@/store';
+import { PROGRAMS, isArchived } from '@/data/programs';
+import type { ProgramId, TrainSummary, UnitOperationStage } from '@/data/types';
+import { href, useRoute } from '@/router';
+import { useProgramFilter, useStore } from '@/store';
+import { PureosDown, PureosRefused, pureosTrains, share, trainPath } from '@/lib/pureos';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
+import { ProvenanceBadge } from '@/components/Provenance';
 import { ComponentTag } from '@/components/ComponentTag';
+import { HiddenByArchive } from '@/components/HiddenByArchive';
 import { UnbuiltList } from '@/components/Unbuilt';
 import { SubsystemShelf } from '@/components/ReferenceView';
 
+// Recovery per unit is no longer here: the trains above read it from a run.
 const PLANNED = [
   {
     what: 'Train selection',
-    why: 'Propose a train for a molecule and a host, rather than reading back one somebody already wrote down.',
-  },
-  {
-    what: 'Recovery and yield modelling',
-    why: 'Carry a step yield through the train, so the number at the vial is derived rather than asserted.',
+    why: 'Propose a train for a molecule and a host, rather than reading back one a flowsheet already ran.',
   },
   {
     what: 'Formulation and storage',
@@ -50,7 +57,110 @@ const PLANNED = [
   },
 ];
 
+/**
+ * The trains on file (OF-BLD-019 §4.1): the newest Proforma run of each
+ * scenario, with the overall recovery the service read from its stream table.
+ * The service sends every train; the program switch filters them here, so
+ * the list can say what it hides and whose.
+ */
+function TrainsOnFile() {
+  const [trains, setTrains] = useState<TrainSummary[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const showArchived = useStore((s) => s.showArchived);
+  const shows = useProgramFilter();
+  useEffect(() => {
+    const ctrl = new AbortController();
+    pureosTrains(ctrl.signal)
+      .then(setTrains)
+      .catch((e) => {
+        if (ctrl.signal.aborted) return;
+        setProblem(e instanceof PureosDown ? `${e.message} ${e.remedy}` : e instanceof PureosRefused ? e.message : String(e));
+      });
+    return () => ctrl.abort();
+  }, []);
+  const visible = (t: TrainSummary) =>
+    (showArchived || !isArchived(t.program as ProgramId | null)) && (!t.scenarioId || shows('scenario', t.scenarioId));
+  const listed = (trains ?? []).filter(visible);
+  const hidden = (trains ?? []).filter((t) => !visible(t));
+  const hiddenPrograms = PROGRAMS.filter((p) => hidden.some((t) => t.program === p.id));
+  return (
+    <section className="mt-5" aria-labelledby="pureos-trains" data-testid="pureos-trains">
+      <SectionTitle right={<span className="font-num text-caption text-ink-soft">{trains ? `${listed.length} on file` : ''}</span>}>
+        <span id="pureos-trains">Trains on file</span>
+      </SectionTitle>
+      {problem && (
+        <Callout kind="warn" title="The trains are read from the service">
+          <p className="text-ink">{problem}</p>
+        </Callout>
+      )}
+      {!problem && !trains && <p className="text-body text-ink-soft">Reading the runs on file…</p>}
+      {trains && listed.length === 0 && (
+        <Card className="p-4" data-testid="pureos-trains-empty">
+          <p className="text-body text-ink">No train for an active program is on file yet.</p>
+          <p className="text-body text-ink-soft mt-1">
+            A train is read from a Proforma run: open a scenario in{' '}
+            <a className="text-accent hover:underline" href={href('/proforma')}>
+              Proforma
+            </a>
+            , give each input a source (records, or an assumption under your name), and run it. pureOS then reads the
+            run's units and streams here, with the recovery at each step.
+          </p>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft mt-2">
+              <HiddenByArchive
+                subject={`${hidden.length} ${hidden.length === 1 ? 'train' : 'trains'} on file`}
+                plural={hidden.length !== 1}
+                programs={hiddenPrograms}
+              />
+            </p>
+          )}
+        </Card>
+      )}
+      {listed.length > 0 && (
+        <Card className="px-4 py-1">
+          <ul>
+            {listed.map((t) => (
+              <li key={t.artifactId} className="py-2.5 border-b border-line/70 last:border-0" data-testid="pureos-train-row">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <a className="text-body text-ink hover:text-accent" href={href(trainPath(t))}>
+                    {t.scenarioName ?? t.flowsheet ?? t.artifactId}
+                  </a>
+                  <span className="text-caption text-ink-soft font-num">{t.flowsheet}</span>
+                  <ProvenanceBadge p={t.provenance} compact />
+                  <span className="ml-auto font-num text-caption text-ink" title="the share of the product the path delivers to the product stream">
+                    {t.overallRecovery == null ? 'no recovery read' : `${share(t.overallRecovery)} recovered`}
+                  </span>
+                </div>
+                <div className="text-caption text-ink-soft mt-0.5">
+                  {t.unitCount} units · product {t.product ?? 'not named'} · run {t.createdAt}
+                  {t.runs > 1 ? ` · newest of ${t.runs}` : ''}
+                  {t.note ? ` · ${t.note}` : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {hidden.length > 0 && (
+            <p className="text-caption text-ink-soft py-2">
+              <HiddenByArchive
+                subject={`${hidden.length} more ${hidden.length === 1 ? 'train' : 'trains'}`}
+                plural={hidden.length !== 1}
+                programs={hiddenPrograms}
+              />
+            </p>
+          )}
+        </Card>
+      )}
+    </section>
+  );
+}
+
 export default function PureOS() {
+  // A unit in a train links here with `?op=<id>`: the step is outlined and
+  // brought into view, so a BioSTEAM class reads as the vocabulary's word.
+  const focus = useRoute().query.get('op');
+  useEffect(() => {
+    if (focus) document.getElementById(`op-${focus}`)?.scrollIntoView({ block: 'center' });
+  }, [focus]);
   // The catalogue as it shows under the program switch (OF-BLD-016 §2), so
   // these counts agree with Dominion's and Home's.
   const shows = useProgramFilter();
@@ -89,7 +199,7 @@ export default function PureOS() {
       <PageHeader
         eyebrow="Harvest, capture, recovery"
         title="pureOS"
-        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. Proforma prices a train; pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
+        subtitle="Everything after the fermenter: harvest, disruption, capture, polishing, recovery and storage. pureOS reads the train a flowsheet ran, unit by unit, from the run Proforma priced; Proforma prices a train, pureOS decides it — whether centrifugation or filtration suits a cell-wall-deficient host is a process question, not an economics one."
       />
 
       <Callout kind="warn" title="The train starts with a decision made in geneOS">
@@ -130,12 +240,16 @@ export default function PureOS() {
         />
       </div>
 
-      <Callout kind="info" title="This is a vocabulary, not a process model">
-        Everything below is a name for a step and the stage it belongs to. Nothing here computes a
-        yield, chooses an operation, or knows whether a train is a good one — those are the pieces
-        that are not built. What exists is the shared language the rest of the platform describes a
-        train in, which is worth surfacing because it is real.
-      </Callout>
+      <TrainsOnFile />
+
+      <div className="mt-5">
+        <Callout kind="info" title="The vocabulary is names, not a process model">
+          Everything below is a name for a step and the stage it belongs to, with the BioSTEAM classes
+          that perform it. A train above is read from a run somebody made; nothing here chooses an
+          operation or knows whether a train is a good one — those are the pieces that are not built.
+          What exists is the shared language the rest of the platform describes a train in.
+        </Callout>
+      </div>
 
       <div className="mt-5 space-y-5">
         {byStage.map(({ stage, ops }) => (
@@ -156,7 +270,16 @@ export default function PureOS() {
                 {ops.map((op) => {
                   const used = usage.get(op.id) ?? 0;
                   return (
-                    <li key={op.id} className="py-2.5 border-b border-line/70 last:border-0">
+                    <li
+                      key={op.id}
+                      id={`op-${op.id}`}
+                      data-testid="pureos-operation"
+                      data-focused={focus === op.id ? 'true' : undefined}
+                      className={cx(
+                        'py-2.5 border-b border-line/70 last:border-0',
+                        focus === op.id && 'rounded-input ring-2 ring-accent/60 px-2 -mx-2',
+                      )}
+                    >
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <span className="font-num text-body text-ink">{op.label}</span>
                         {op.resin && (
@@ -182,6 +305,11 @@ export default function PureOS() {
                       {op.note && (
                         <div className="text-body text-ink-soft mt-0.5">{op.note}</div>
                       )}
+                      {op.biosteamClasses && op.biosteamClasses.length > 0 && (
+                        <div className="text-caption text-ink-soft mt-0.5">
+                          BioSTEAM: <span className="font-num">{op.biosteamClasses.join(', ')}</span>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -194,7 +322,7 @@ export default function PureOS() {
       <div className="mt-6">
         <UnbuiltList
           title="What pureOS will hold"
-          note="The vocabulary above is the part that exists. Everything here would need code, and none of it has any."
+          note="The trains on file and the vocabulary are the parts that exist. Everything here would need code, and none of it has any."
           items={PLANNED}
         />
       </div>
@@ -202,7 +330,7 @@ export default function PureOS() {
       <SubsystemShelf owner="pureOS" />
 
       <div className="mt-5">
-        <ComponentTag component="pureOS" action={`${UNIT_OPERATIONS.length} operations, no process model`} />
+        <ComponentTag component="pureOS" action={`${UNIT_OPERATIONS.length} operations; trains read from Proforma's runs`} />
       </div>
     </>
   );

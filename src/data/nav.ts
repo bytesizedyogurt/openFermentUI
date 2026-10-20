@@ -297,6 +297,33 @@ export const SUB_VIEWS: (NavSurface & { owner: string })[] = [
     owner: 'fermOS',
   },
   {
+    // OF-BLD-019 §4.1 — 'train' is reserved under /pureos: /pureos/train/:scenarioId.
+    label: 'Train',
+    to: '/pureos/train',
+    descriptor: 'the units of the run Proforma priced, and what each passes on',
+    aliases: ['train', 'step recovery', 'recovery by unit', 'stream table', 'mass balance by unit'],
+    icon: Filter,
+    owner: 'pureOS',
+  },
+  {
+    // OF-BLD-019 §3.3 — 'reference' is reserved under /proforma: a reference
+    // biorefinery's page, /proforma/reference/:id, one a shelf entry.
+    label: 'Corn ethanol reference',
+    to: '/proforma/reference/corn_drygrind',
+    descriptor: 'the dry-grind corn plant run whole, beside its package\u2019s own test',
+    aliases: ['reference', 'reference biorefinery', 'dry grind', 'corn ethanol', 'package test', 'regression values'],
+    icon: LineChart,
+    owner: 'Proforma',
+  },
+  {
+    label: 'Corn stover benchmark',
+    to: '/proforma/reference/cornstover_benchmark',
+    descriptor: 'the NREL 2011 corn stover design run whole, beside its package\u2019s own test',
+    aliases: ['benchmark', 'corn stover', 'nrel 2011', 'reference run'],
+    icon: LineChart,
+    owner: 'Proforma',
+  },
+  {
     label: 'Molecules',
     to: '/dominion/molecules',
     descriptor: 'targets and markets',
@@ -470,6 +497,10 @@ export const REDIRECTS: Record<string, string> = {
   '/biorepo/papers': '/biorepo/paper',
   '/biorepo/ingest': '/intake/ingest',
   '/proforma/compare': '/biorepo/compare',
+  // OF-BLD-019 §3.3 — the benchmark's card and the old BioSTEAM page became
+  // the reference page of the corn stover benchmark.
+  '/proforma/benchmark': '/proforma/reference/cornstover_benchmark',
+  '/proforma/biosteam': '/proforma/reference/cornstover_benchmark',
 
   // ── OF-BLD-006 legacy, re-pointed at the CURRENT destination ────────
   // These were already redirects; their targets moved underneath them, so
@@ -498,8 +529,9 @@ export const REDIRECTS: Record<string, string> = {
  * anybody remembering to add it.
  */
 const PATTERN_REDIRECTS: [RegExp, string][] = [
-  // /proforma/sc-s1 → /proforma/scenario/sc-s1 (but not /proforma/scenario/…)
-  [/^\/proforma\/(?!scenario(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
+  // /proforma/sc-s1 → /proforma/scenario/sc-s1 (but not /proforma/scenario/…,
+  // nor the reserved /proforma/reference, OF-BLD-019 §3.3)
+  [/^\/proforma\/(?!(?:scenario|reference)(?:\/|$))([^/]+)$/, '/proforma/scenario/$1'],
   // /simulate/sc-s1 → /proforma/scenario/sc-s1. The `compare` exclusion is
   // redundant now that exact entries run first, and is kept so the pattern is
   // still correct on its own if that entry is ever removed.

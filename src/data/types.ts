@@ -666,6 +666,21 @@ export interface Scenario {
    * opened under ArchivedBanner by a link. Never part of a lock digest.
    */
   example?: boolean;
+  /**
+   * The shelf flowsheet a `biosteam` scenario runs (OF-BLD-019 D2): an id
+   * from `GET /api/proforma/shelf`, and nothing else about its structure.
+   * Absent on an authored surface. A scenario a person makes with New
+   * scenario always names one (§3.1).
+   */
+  flowsheetId?: string;
+  /**
+   * The id of the newest `proforma.run` artifact this browser saw for the
+   * scenario (OF-BLD-019 D6), or absent/null when it has not run here. The
+   * price on Proforma's index is read from that artifact, never kept here.
+   */
+  lastRunId?: string | null;
+  /** When a person made the scenario here (ISO time); absent on a seeded one. */
+  createdAt?: string;
 }
 
 export interface GridPointResult {
@@ -906,6 +921,12 @@ export interface UnitOperation {
   /** Chemistry detail, e.g. the resin family for a chromatography step. */
   resin?: string;
   note?: string;
+  /**
+   * The BioSTEAM unit classes this step is (OF-BLD-019 §4.1), so a unit in a
+   * train a flowsheet ran links to the step it performs. Names only, as
+   * BioSTEAM spells its classes; a step BioSTEAM has no class for names none.
+   */
+  biosteamClasses?: string[];
 }
 
 export type GeneticElementKind =
@@ -2385,6 +2406,8 @@ export interface ToolResult {
   draft: RunbookDraft | null;
   /** Module rows a plan may cite (OF-BLD-015 §7.2). */
   rows: ModuleRow[];
+  /** The whole of what a summary cuts to the cap, for the endpoint and the MCP server; never citable (OF-BLD-019 §6.1). */
+  data: Record<string, unknown> | null;
 }
 
 // ── Runbook drafts (OF-BLD-014 §9.2) ─────────────────────────────────────
@@ -2719,8 +2742,13 @@ export interface ScenarioInput {
   key: string;
   label: string;
   unit: string;
-  /** 'records': bound records; 'assumption': a named person typed it; 'waiting': neither, so the run is refused. */
-  binding: 'records' | 'assumption' | 'waiting';
+  /**
+   * 'records': bound records; 'assumption': a named person typed it;
+   * 'artifact': a fermOS fit or forecast a person chose computes it, its
+   * source naming the artifact (OF-BLD-019 §5.1, D10); 'waiting': none of
+   * these, so the run is refused.
+   */
+  binding: 'records' | 'assumption' | 'artifact' | 'waiting';
   value: number | null;
   low: number | null;
   high: number | null;
@@ -2762,6 +2790,135 @@ export interface ProformaRunRequest {
   assumptions: InputAssumption[];
   host: string | null;
   seed: number;
+  /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
+  samples?: number;
+  /**
+   * The shelf flowsheet a scenario made in this browser runs (OF-BLD-019
+   * §2.3, D6). A seed scenario runs its own and sends none; any other id runs
+   * this flowsheet, bound as `GET /api/proforma/bind` binds it.
+   */
+  flowsheet?: string | null;
+  /**
+   * The fermOS fits a person chose, by input key (titre, yield,
+   * productivity), each a kept `kinetic_fit` or `growth_forecast` artifact id
+   * (OF-BLD-019 §5.1, D10). The service computes each value from it.
+   */
+  fits?: Record<string, string>;
+}
+
+/**
+ * What one fermOS artifact gives one input of a flowsheet (OF-BLD-019 §5.1):
+ * the value in the input's unit with the 5th and 95th percentile of the
+ * forecast's band for readings, or why it gives nothing, naming the parameter.
+ */
+export interface FitFeed {
+  key: string;
+  unit: string;
+  value: number | null;
+  low: number | null;
+  high: number | null;
+  /** How the value is computed from the artifact, in words. */
+  derivation: string;
+  /** Why it gives nothing; null when it gives the value. */
+  refused: string | null;
+}
+
+/**
+ * A kinetic fit or forecast fermOS keeps, and what it can feed one shelf
+ * flowsheet (`GET /api/fermos/fits?flowsheet=`). A person picks it; a model
+ * never does.
+ */
+export interface FermosFitInfo {
+  artifactId: string;
+  /** 'kinetic_fit' or 'growth_forecast'. */
+  tool: string;
+  provenance: Provenance;
+  createdAt: string;
+  flowsheet: string;
+  /** The run the fit was made on, and the kinetic fit a forecast rests on. */
+  depositionId: string | null;
+  fitArtifactId: string | null;
+  productSeries: string | null;
+  substrateSeries: string | null;
+  /** The hour the forecast's median sugar runs out: the batch time a productivity is the titre over. */
+  batchTimeH: number | null;
+  feeds: FitFeed[];
+  flags: string[];
+  /** Why it feeds nothing at all, in words. */
+  refused: string | null;
+}
+
+// ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+//
+// A scenario's fermenter yield beside the newest stored geneOS ceiling of
+// each shelf model of its organism, on its flowsheet's sugar, as
+// `GET /api/proforma/ceiling-check` computes it on read. A flag, never a
+// bound: the browser shows it and computes no number of its own.
+
+/** One stored ceiling beside the scenario's yield, both in the ceiling's basis. */
+export interface CeilingRow {
+  modelId: string;
+  /** The model as geneOS's shelf names it, and as the ceiling's basis names it. */
+  modelName: string;
+  modelBasis: string;
+  /** The strain the reconstruction describes. */
+  host: string | null;
+  /** How the scenario's organism maps to the model: the same strain, or another strain of its species. */
+  match: 'strain' | 'species';
+  matchWords: string;
+  product: string;
+  substrate: string;
+  /** The newest stored `geneos.ceiling` of this model, product and sugar; how many older ones it stands in front of. */
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  older: number;
+  ceilingGPerG: number;
+  ceilingMolPerMol: number | null;
+  /** The product and sugar conventions the ceiling's basis names, in its words. */
+  conventions: string[];
+  /** The scenario's yield in the ceiling's basis: g per g, and mol per mol at the ceiling's own conventions. */
+  yieldGPerG: number | null;
+  yieldLowGPerG: number | null;
+  yieldHighGPerG: number | null;
+  yieldMolPerMol: number | null;
+  /** 'above' when the yield or its high end exceeds the ceiling; never a clamp. */
+  flag: 'above' | 'within' | 'no-yield';
+  words: string;
+  /** The bound records whose own value is above the ceiling, each for a reviewer to check its basis. */
+  recordsAbove: string[];
+}
+
+/** `GET /api/proforma/ceiling-check`: one scenario's yield beside every stored ceiling of its organism on its sugar. */
+export interface CeilingCheck {
+  scenarioId: string;
+  flowsheet: string;
+  product: string;
+  substrate: string;
+  sugarWords: string;
+  host: string | null;
+  /** The scenario's organism: its host filter, else its yield's records' strains, else its program's one species. */
+  strains: string[];
+  species: string[];
+  organismWords: string;
+  /** The shelf models of that organism with a route to the product. */
+  models: string[];
+  yieldBinding: 'records' | 'assumption' | 'artifact' | 'waiting';
+  yieldValue: number | null;
+  yieldLow: number | null;
+  yieldHigh: number | null;
+  yieldUnit: string;
+  yieldSource: BasisSource | null;
+  yieldRecords: number;
+  yieldWords: string;
+  rows: CeilingRow[];
+  flagged: boolean;
+  /** With no ceiling on file: what is missing, and where one is computed. */
+  empty: string | null;
+  computeAt: string;
+  /** Sugars other stored ceilings of these models are on, left aside here. */
+  otherSugars: string[];
+  notes: string[];
 }
 
 export interface HistogramBin {
@@ -2802,4 +2959,320 @@ export interface ProformaRunResult {
   leavesOut: string[];
   priceBasis: string;
   evidence: Evidence;
+  // OF-BLD-019 §2.1 (D1): the base case's tables, read from the one run
+  // artifact; ProformaTables says what each holds.
+  flowsheet: string | null;
+  tablesSource: string | null;
+  tea: TeaBreakdown | null;
+  streams: StreamRow[];
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+  tableUnits: Record<string, string>;
+}
+
+// ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────
+// Mirrors of core/openferment_core/models.py; check:plan diffs the fields.
+// The shelf is data (flowsheets/shelf.py, D2), served at
+// GET /api/proforma/shelf. A run is one `proforma.run` artifact (D1) whose
+// output holds every table below, read by the worker from BioSTEAM's own
+// objects. Units are BioSTEAM's: T in K, P in Pa, flows in kg/hr, a unit's
+// duties in kJ/hr and power in kW, costs in USD, annual amounts in USD/yr
+// (`tableUnits`); UtilityDuties carries the unit the UnitGroup states.
+
+/** One input a shelf flowsheet takes: the ontology fields that bind it, or none for an assumption or a convention. */
+export interface FlowsheetInput {
+  key: string;
+  name: string;
+  /** The unit table's family where the unit has one (massConc, yield, volProd, costUSD), else massFlow or fraction. */
+  dimension: string;
+  unit: string;
+  fields: string[];
+  kind: 'process' | 'economic' | 'convention';
+  note: string;
+}
+
+export interface FlowsheetInfo {
+  id: string;
+  title: string;
+  description: string;
+  /** The package and version ('biorefineries 2.35.1, cornstover'), or 'this repository'. */
+  source: string;
+  /** A program id from programs.ts; null for a general flowsheet. */
+  program: string | null;
+  /** A published reference biorefinery, run whole on its package's defaults. */
+  reference: boolean;
+  inputs: FlowsheetInput[];
+  outputs: string[];
+  priceOutput: string | null;
+  priceBasis: string | null;
+  leavesOut: string[];
+  gridInputs: string[];
+  /** A reference biorefinery's own regression test, cited as file::test; its values come from the installed file (PackageRegression). */
+  packageTest: string | null;
+}
+
+// OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
+// defaults and is kept as one `proforma.reference` artifact: the package's
+// outputs, the quantities its own test asserts as this installation
+// computed them (`measured`), the defaults read back (`readBack`), the
+// test's values beside them (`regression`, `checks`), and every table a
+// `proforma.run` artifact holds. The test's values are parsed from the
+// installed test file; none is typed here.
+
+/** One value a package's own test asserts, as its test file writes it. */
+export interface RegressionValue {
+  /** The expression the test asserts on ('tea.IRR', 'units.get_heating_duty()'). */
+  expression: string;
+  label: string;
+  unit: string;
+  package: number;
+  rtol: number;
+}
+
+/** A reference biorefinery's regression values, read from the package's installed test file. */
+export interface PackageRegression {
+  package: string;
+  file: string;
+  test: string;
+  values: RegressionValue[];
+}
+
+/** One of the package test's values beside what this installation computed. */
+export interface RegressionCheck {
+  expression: string;
+  label: string;
+  unit: string;
+  measured: number | null;
+  package: number;
+  rtol: number;
+  /** |measured − package| / |package|; null when the package's value is zero. */
+  relDiff: number | null;
+  within: boolean;
+}
+
+/** GET and POST /api/proforma/reference/:id. */
+export interface ProformaReference {
+  flowsheet: FlowsheetInfo;
+  /** The newest stored `proforma.reference` run, or null before the first. */
+  artifact: Artifact | null;
+  regression: PackageRegression | null;
+  simulator: { status: 'cold' | 'starting' | 'ready' | 'failed'; error: string | null };
+}
+
+/** One stream of the base case: source and sink unit (null for a feed or a product). */
+export interface StreamRow {
+  id: string;
+  source: string | null;
+  sink: string | null;
+  phase: string;
+  T: number;
+  P: number;
+  massFlow: number;
+  massFlows: Record<string, number>;
+  price: number | null;
+}
+
+/** One unit operation, in run order. Duties and power are null where the unit has none. */
+export interface UnitRow {
+  id: string;
+  unitClass: string;
+  line: string | null;
+  order: number;
+  ins: string[];
+  outs: string[];
+  installedCost: number;
+  purchaseCost: number;
+  heatingDuty: number | null;
+  coolingDuty: number | null;
+  power: number | null;
+}
+
+/** BioSTEAM's UnitGroup totals, each with the unit the UnitGroup states. */
+export interface UtilityDuties {
+  group: string;
+  heating: number;
+  heatingUnit: string;
+  cooling: number;
+  coolingUnit: string;
+  electricityConsumption: number;
+  electricityConsumptionUnit: string;
+  electricityProduction: number;
+  electricityProductionUnit: string;
+}
+
+/** One line of the price, per year and per unit of the price's basis; the lines sum to the product's revenue. */
+export interface TeaLine {
+  key: 'feedstock' | 'otherMaterials' | 'utilities' | 'otherVariable' | 'fixedOperating' | 'capitalRecovery' | 'coproductCredits';
+  label: string;
+  usdPerYear: number;
+  perUnit: number | null;
+  reads: string;
+}
+
+/** The TEA object's own numbers for the base case, read through its attributes. */
+export interface TeaBreakdown {
+  teaClass: string;
+  product: string;
+  feedstock: string | null;
+  productPrice: number | null;
+  basisFlow: number | null;
+  basis: string | null;
+  operatingHours: number;
+  sales: number;
+  materialCost: number;
+  feedstockCost: number | null;
+  otherMaterialCost: number;
+  utilityCost: number;
+  purchaseCost: number;
+  installedEquipmentCost: number;
+  FCI: number;
+  TCI: number;
+  FOC: number;
+  laborCost: number | null;
+  capitalRecovery: number;
+  coproductCredits: number;
+  IRR: number | null;
+  incomeTax: number | null;
+  lines: TeaLine[];
+}
+
+/** What a reader takes from a `proforma.run` artifact (proforma.tables_of). */
+export interface ProformaTables {
+  flowsheet: string | null;
+  tablesSource: string | null;
+  tea: TeaBreakdown | null;
+  streams: StreamRow[];
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  /** SVG text when Graphviz's dot was on the path (D8); else null, with the words why and the units in run order. */
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+  tableUnits: Record<string, string>;
+}
+
+// ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+//
+// Mirrors models.py. A train is read by the service (pureos.train_of) from
+// one `proforma.run` artifact's stream and unit tables; the browser shows it
+// and computes nothing. Masses are the product's kg/hr in the run's base case.
+
+/** One unit of a run's train, in run order. */
+export interface TrainUnit {
+  id: string;
+  unitClass: string;
+  line: string | null;
+  order: number;
+  ins: string[];
+  outs: string[];
+  /** Whether any of its outlets leads on to the product stream. */
+  onPath: boolean;
+  massIn: number;
+  massOut: number;
+  /** The product's kg/hr; null when the run names no product. */
+  productIn: number | null;
+  productOut: number | null;
+  productOnward: number | null;
+  productLost: number | null;
+  /** The outlets that carry product off the path. */
+  lostTo: string[];
+  /** productOnward / productIn; null, with `note` saying why, when none enters or the unit is off the path. */
+  recovery: number | null;
+  /** 1 less the product lost here and at every on-path unit before, over all the path delivers or loses. */
+  cumulative: number | null;
+  note: string | null;
+}
+
+/** A run's train as pureOS reads it (`GET /api/pureos/train/:key`). */
+export interface Train {
+  scenarioId: string | null;
+  scenarioName: string | null;
+  artifactId: string;
+  flowsheet: string | null;
+  createdAt: string;
+  provenance: Provenance;
+  program: string | null;
+  tablesSource: string | null;
+  productStream: string | null;
+  product: string | null;
+  /** How the product was read from the run, in words. */
+  productBasis: string;
+  productOut: number | null;
+  productLost: number | null;
+  overallRecovery: number | null;
+  units: TrainUnit[];
+  streams: StreamRow[];
+  tableUnits: Record<string, string>;
+  /** How many runs of this scenario are on file; the newest is read. */
+  runs: number;
+  note: string | null;
+}
+
+/** One train on file, for pureOS's index (`GET /api/pureos/trains`). */
+export interface TrainSummary {
+  scenarioId: string | null;
+  scenarioName: string | null;
+  artifactId: string;
+  flowsheet: string | null;
+  createdAt: string;
+  provenance: Provenance;
+  program: string | null;
+  product: string | null;
+  unitCount: number;
+  overallRecovery: number | null;
+  runs: number;
+  note: string | null;
+}
+
+// ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+//
+// A question names a mixture on file, never a number: a stream of a Proforma
+// run, or a preset the service fills (`ethanol-water-azeotrope`, or
+// `beer-at-titre-of` an ethanol titre record). The answer is one
+// `thermo_props` artifact whose `output` is a `ThermoProps`.
+
+/** `POST /api/thermo/props` (and the same question as `GET` query parameters). */
+export interface ThermoPropsRequest {
+  artifactId?: string | null;
+  streamId?: string | null;
+  preset?: string | null;
+  recordId?: string | null;
+}
+
+/** What a `thermo_props` artifact holds: thermosteam's answer for one mixture, in the library's units. */
+export interface ThermoProps {
+  /** stream, ethanol-water-azeotrope or beer-at-titre-of. */
+  kind: string;
+  /** The mixture in words. */
+  subject: string;
+  runArtifactId: string | null;
+  streamId: string | null;
+  preset: string | null;
+  recordId: string | null;
+  /** "thermosteam <version>", read in the worker. */
+  library: string;
+  T: number;
+  P: number;
+  phase: string;
+  /** "given" (the stream's own) or "thermosteam's Stream default". */
+  TSource: string;
+  PSource: string;
+  massFractions: Record<string, number>;
+  density: number | null;
+  Cp: number | null;
+  viscosity: number | null;
+  /** Temperatures at the mixture's own pressure. */
+  bubblePoint: number | null;
+  dewPoint: number | null;
+  /** The first bubble's mole fractions. */
+  vapourAtBubble: Record<string, number> | null;
+  /** The library's unit for each key above. */
+  units: Record<string, string>;
+  /** A preset's solve: what was found, and how, in words. */
+  solved: Record<string, unknown> | null;
+  /** A property the library could not compute, with its reason; what the mixture leaves out. */
+  notes: string[];
 }

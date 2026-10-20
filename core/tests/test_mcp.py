@@ -94,7 +94,10 @@ def test_the_server_counts_every_module_tool_with_its_marks_and_gates():
     names = [t.name for t in listed]
     reads = [f"{m}_read" for m in module_stores.MODULES]
     writes = [f"{m}_write" for m in module_stores.MODULES]
-    assert len(names) == 7 + len(reads) + len(writes) + 2 == 31
+    # The registry's whole list and the server's two: the count is derived,
+    # and test_tools.NAMES is the one literal list (OF-BLD-019 §6.1).
+    assert len(names) == len(tools.WHITELIST) + len(mcp_server.EXTRA)
+    assert {"thermo_props", "run_flowsheet", "stream_table"} <= set(names)
     assert set(reads) | set(writes) <= set(names)
     by_name = {t.name: t for t in listed}
     # A read says what state it computes; a write says which actions a gate stops.
@@ -117,3 +120,18 @@ def test_a_gated_write_through_the_server_is_a_proposal_not_a_write(store, monke
     assert line.agent == "model" and line.askId is None  # no ask owns a call from outside the app
     refused = _text(asyncio.run(server.call_tool("pureos_write", {"action": "add", "target": "", "fields": {}, "note": ""})))
     assert "no write function" in refused["error"]
+
+
+# ── OF-BLD-019 §6.1: a flowsheet run and its stream table, with no change here ──
+
+
+def test_the_server_offers_run_flowsheet_and_stream_table_as_the_registry_does(store):
+    listed = {t.name: t for t in asyncio.run(mcp_server.build().list_tools())}
+    for name in ("run_flowsheet", "stream_table"):
+        assert listed[name].description == tools.REGISTRY[name].description
+        assert listed[name].input_schema == tools.REGISTRY[name].info().inputSchema
+    server = mcp_server.build()
+    for name, args in (("stream_table", {"artifactId": "0123456789abcdef"}), ("run_flowsheet", {"scenarioId": "sc-pha-1"}),
+                       ("run_flowsheet", {"scenarioId": "sc-pha-1", "samples": 9})):
+        through = _text(asyncio.run(server.call_tool(name, args)))
+        assert through == json.loads(tools.run(name, args).model_dump_json(exclude_none=True)) and through["error"]

@@ -1,0 +1,235 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "none": {
+      "cornstover_benchmark": {
+        "status": 422,
+        "body": {
+          "detail": "cornstover_benchmark is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "corn_drygrind": {
+        "status": 422,
+        "body": {
+          "detail": "corn_drygrind is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": []
+      },
+      "pha_sugar_v0": {
+        "status": 200,
+        "body": []
+      },
+      "toy": {
+        "status": 422,
+        "body": {
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+        }
+      }
+    },
+    "onFile": {
+      "cornstover_benchmark": {
+        "status": 422,
+        "body": {
+          "detail": "cornstover_benchmark is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "corn_drygrind": {
+        "status": 422,
+        "body": {
+          "detail": "corn_drygrind is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": [
+          {
+            "artifactId": "da439bc5419ed413",
+            "tool": "growth_forecast",
+            "provenance": "computed",
+            "createdAt": "2026-09-15T09:00:00Z",
+            "flowsheet": "ethanol_glucose_v0",
+            "depositionId": "dep-standin-ethanol",
+            "fitArtifactId": "45abd7656f83a2a6",
+            "productSeries": "Ethanol (STAND-IN)",
+            "substrateSeries": "Glucose (STAND-IN)",
+            "batchTimeH": 82.9164214090859,
+            "feeds": [
+              {
+                "key": "titre",
+                "unit": "g L-1",
+                "value": 12.402460413209695,
+                "low": 11.969078154412315,
+                "high": 12.899758675277175,
+                "derivation": "the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile of its band for readings",
+                "refused": null
+              },
+              {
+                "key": "yield",
+                "unit": "g g-1",
+                "value": 0.20523209622693878,
+                "low": 0.1934502858639274,
+                "high": 0.21756178245739488,
+                "derivation": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+                "refused": null
+              },
+              {
+                "key": "productivity",
+                "unit": "g L-1 h-1",
+                "value": 0.14957785445200902,
+                "low": 0.14435111828283456,
+                "high": 0.15557543917185543,
+                "derivation": "titre over batch time: the final product of forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere) over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
+                "refused": null
+              }
+            ],
+            "flags": [],
+            "refused": null
+          },
+          {
+            "artifactId": "45abd7656f83a2a6",
+            "tool": "kinetic_fit",
+            "provenance": "computed",
+            "createdAt": "2026-09-15T09:00:00Z",
+            "flowsheet": "ethanol_glucose_v0",
+            "depositionId": "dep-standin-ethanol",
+            "fitArtifactId": "45abd7656f83a2a6",
+            "productSeries": "Ethanol (STAND-IN)",
+            "substrateSeries": "Glucose (STAND-IN)",
+            "batchTimeH": null,
+            "feeds": [
+              {
+                "key": "titre",
+                "unit": "g L-1",
+                "value": 5.578025286513549,
+                "low": 5.484919564233223,
+                "high": 5.663757900788552,
+                "derivation": "the final product of the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile of its band for readings",
+                "refused": null
+              },
+              {
+                "key": "yield",
+                "unit": "g g-1",
+                "value": 0.12604466085650495,
+                "low": 0.1243969589074855,
+                "high": 0.12784207888996105,
+                "derivation": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+                "refused": null
+              },
+              {
+                "key": "productivity",
+                "unit": "g L-1 h-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "titre over batch time: the final product of the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere over the hour its median sugar runs out, the 5th and 95th percentile of the product over the same hour",
+                "refused": "productivity is titre over batch time, and the forecast's median sugar does not run out within its 32.5 h, so it gives no batch time; a forecast on fermOS → Forecast run until the sugar is spent does"
+              }
+            ],
+            "flags": [],
+            "refused": null
+          }
+        ]
+      },
+      "pha_sugar_v0": {
+        "status": 200,
+        "body": [
+          {
+            "artifactId": "da439bc5419ed413",
+            "tool": "growth_forecast",
+            "provenance": "computed",
+            "createdAt": "2026-09-15T09:00:00Z",
+            "flowsheet": "pha_sugar_v0",
+            "depositionId": "dep-standin-ethanol",
+            "fitArtifactId": "45abd7656f83a2a6",
+            "productSeries": "Ethanol (STAND-IN)",
+            "substrateSeries": "Glucose (STAND-IN)",
+            "batchTimeH": null,
+            "feeds": [
+              {
+                "key": "titre",
+                "unit": "g L-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              },
+              {
+                "key": "yield",
+                "unit": "g g-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              },
+              {
+                "key": "productivity",
+                "unit": "g L-1 h-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              }
+            ],
+            "flags": [],
+            "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+          },
+          {
+            "artifactId": "45abd7656f83a2a6",
+            "tool": "kinetic_fit",
+            "provenance": "computed",
+            "createdAt": "2026-09-15T09:00:00Z",
+            "flowsheet": "pha_sugar_v0",
+            "depositionId": "dep-standin-ethanol",
+            "fitArtifactId": "45abd7656f83a2a6",
+            "productSeries": "Ethanol (STAND-IN)",
+            "substrateSeries": "Glucose (STAND-IN)",
+            "batchTimeH": null,
+            "feeds": [
+              {
+                "key": "titre",
+                "unit": "g L-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              },
+              {
+                "key": "yield",
+                "unit": "g g-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              },
+              {
+                "key": "productivity",
+                "unit": "g L-1 h-1",
+                "value": null,
+                "low": null,
+                "high": null,
+                "derivation": "",
+                "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+              }
+            ],
+            "flags": [],
+            "refused": "its product series, Ethanol (STAND-IN), is ethanol, not phb, the product of pha_sugar_v0"
+          }
+        ]
+      },
+      "toy": {
+        "status": 422,
+        "body": {
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+        }
+      }
+    }
+  }
+}

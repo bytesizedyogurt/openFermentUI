@@ -151,8 +151,8 @@ const S3: CostModel = {
 
 export const COST_MODELS: CostModel[] = [S1, S2, S3];
 
-/** The flowsheets `core/openferment_core/flowsheets/` holds for a scenario (§8.3). */
-export const BIOSTEAM_FLOWSHEETS = ['pha_sugar_v0'];
+/** The flowsheets `core/openferment_core/flowsheets/` holds for a scenario (§8.3; OF-BLD-019 §2.3). */
+export const BIOSTEAM_FLOWSHEETS = ['pha_sugar_v0', 'ethanol_glucose_v0'];
 
 // ── Scenarios ─────────────────────────────────────────────────────────
 
@@ -253,6 +253,26 @@ export const SCENARIOS: Scenario[] = [
     description:
       'BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only. Every input names its source: the thread P records it binds to, the reference model, or the person who typed it.',
     product: 'PHB in dried cell mass',
+    dims: [],
+    point: {},
+    pinned: false,
+    assumptions: [],
+  },
+  // OF-BLD-019 §2.3 (D6) — the yeast program's shipped BioSTEAM scenario, so a
+  // fresh install has one to open: glucose to ethanol on the shelf's
+  // flowsheet of our own. Its inputs bind on the service
+  // (`GET /api/proforma/scenarios`) and it runs there (`POST /api/proforma/run`);
+  // like sc-pha-1 it authors nothing of its own.
+  {
+    id: 'sc-yeast-1',
+    program: 'yeast',
+    modelId: 'ethanol_glucose_v0',
+    flowsheetId: 'ethanol_glucose_v0',
+    kind: 'biosteam',
+    name: 'Glucose to ethanol — draft flowsheet',
+    description:
+      "A BioSTEAM flowsheet of our own: a batch fermenter feeding the ethanol purification train of the reference designs. The price of glucose and the plant's size are a named person's assumptions by design; the inputs table says which process inputs the service bound to thread Q records on this machine.",
+    product: 'Fuel-grade ethanol',
     dims: [],
     point: {},
     pinned: false,

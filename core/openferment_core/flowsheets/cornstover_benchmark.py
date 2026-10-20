@@ -25,10 +25,62 @@ REFERENCES = [
 ]
 
 
-def run() -> dict[str, Any]:
+def _settings(tea: Any) -> dict[str, Any]:
+    years = tea.duration
+    return {
+        "rateOfReturn": float(tea.IRR),
+        "operatingDays": float(tea.operating_days),
+        "incomeTax": float(tea.income_tax),
+        "startYear": int(years[0]),
+        "endYear": int(years[1]),
+    }
+
+
+# ── its reference run (OF-BLD-019 §2.2) ─────────────────────────────────
+# The same plant through GET/POST /api/proforma/reference/cornstover_benchmark,
+# as one `proforma.reference` artifact with every table. `run()` below stays
+# the benchmark's; both build their plant afresh inside the worker's
+# `package_defaults()` (the benchmark since OF-BLD-019 §2.R), the reference
+# run under the name `cornstover.load()` gives it.
+
+
+def load() -> Any:
     from biorefineries import cornstover as cs
 
-    br = cs.Biorefinery()
+    return cs.Biorefinery("corn stover ethanol", load=False, save=False)
+
+
+def parts(br: Any) -> dict[str, Any]:
+    """The system, the package's TEA, the ethanol at the price the package
+    solved for it as it built the plant, and the corn stover feedstock."""
+    return {"system": br.system, "tea": br.tea, "product": br.ethanol, "feedstock": br.cornstover,
+            "price": None, "basis_flow": float(br.ethanol.F_mass), "basis": "kg of the ethanol product stream"}
+
+
+def outputs(br: Any) -> dict[str, Any]:
+    from biorefineries import cornstover as cs
+
+    per_kg = float(br.ethanol.price)
+    return {
+        "package": f"{PACKAGE}@{version('biorefineries')}",
+        "mespUsdPerGal": per_kg * float(cs.ethanol_density_kggal),
+        "mespUsdPerKg": per_kg,
+        "ethanolDensityKgPerGal": float(cs.ethanol_density_kggal),
+        "settings": _settings(br.tea),
+        "references": REFERENCES,
+    }
+
+
+def run() -> dict[str, Any]:
+    """The benchmark: the package's plant built afresh (`load=False`,
+    `save=False`, so the package's own cache neither hands back a plant an
+    earlier call built nor keeps this one), its price solved as the package
+    solves it. The worker calls it inside `package_defaults()`, so the
+    utility prices and cost index the plant sets as it builds go back
+    afterwards (OF-BLD-019 §2.R)."""
+    from biorefineries import cornstover as cs
+
+    br = cs.Biorefinery(load=False, save=False)
     tea = br.cornstover_tea
     per_kg = float(tea.solve_price(br.ethanol))
     years = tea.duration

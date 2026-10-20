@@ -46,7 +46,7 @@ import numpy as np
 from scipy.optimize import least_squares, lsq_linear
 from scipy.stats import t as student_t
 
-from . import artifacts
+from . import artifacts, units
 from .models import (
     Band,
     BasisInput,
@@ -348,9 +348,8 @@ WHAT_IDENTIFIES = {
 }
 
 
-def check_forecastable(fit_: KineticFit) -> None:
-    if fit_.reason or not fit_.params:
-        raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+def unidentified(fit_: KineticFit) -> str | None:
+    """The first of μ and Xmax this fit does not identify, by name, or None."""
     names = [p.name for p in fit_.params]
     for name in ("mu", "Xmax"):
         p = param(fit_, name)
@@ -360,8 +359,17 @@ def check_forecastable(fit_: KineticFit) -> None:
         var = fit_.covariance[k][k] if p and k < len(fit_.covariance) and k < len(fit_.covariance[k]) else math.inf
         pinned = p is not None and p.low > 0 and p.value - 1.96 * math.sqrt(max(var, 0.0)) > 0
         if not pinned:
-            raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
-                             f"what would identify it is {WHAT_IDENTIFIES[name]}")
+            return name
+    return None
+
+
+def check_forecastable(fit_: KineticFit) -> None:
+    if fit_.reason or not fit_.params:
+        raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+    name = unidentified(fit_)
+    if name:
+        raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
+                         f"what would identify it is {WHAT_IDENTIFIES[name]}")
 
 
 def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: float | None = None,
@@ -434,7 +442,11 @@ def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: flo
         finals.append({"role": role, "unit": unit, "low": float(lo[-1]), "median": float(md[-1]), "high": float(hi[-1])})
 
     yield_iv = None
-    if "product" in curves and "substrate" in curves and roles["product"].unit == roles["substrate"].unit and "g" in roles["product"].unit:
+    # One mass concentration, however it is spelled ('g L-1', 'g/L'): the
+    # units engine's normal form decides (§5.R), never the raw strings.
+    if ("product" in curves and "substrate" in curves and "g" in roles["product"].unit
+            and units.normalize(roles["product"].unit) is not None
+            and units.normalize(roles["product"].unit) == units.normalize(roles["substrate"].unit)):
         # The process, not the readings: yield is taken from the draws before
         # any reading scatter is added (§7.R).
         p, sub = clean["product"][:, :end], clean["substrate"][:, :end]
@@ -481,10 +493,14 @@ def _fit_from(inputs: list[BasisInput]) -> KineticFit:
     return KineticFit.model_validate_json(str(i.value))
 
 
+def _start_of(inputs) -> StartValues:
+    """The starting values a forecast's basis names (none: the run's own)."""
+    return StartValues(**{x.name.split(" ")[1]: float(x.value) for x in inputs if x.name.startswith("start ")})
+
+
 def _run_forecast(inputs, seed):
-    start = StartValues(**{x.name.split(" ")[1]: float(x.value) for x in inputs if x.name.startswith("start ")})
     dur = next((float(x.value) for x in inputs if x.name == "duration"), None)
-    return forecast(_fit_from(inputs), start, dur, SEED if seed is None else seed)
+    return forecast(_fit_from(inputs), _start_of(inputs), dur, SEED if seed is None else seed)
 
 
 artifacts.register(FORECAST, VERSION, _run_forecast)
@@ -529,3 +545,144 @@ def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | No
         provenance=art.provenance, basis=artifacts.basis_of(art), figure="trajectory",
     )
     return ForecastResult(**out, artifactId=None if sample else art.id, evidence=ev, sample=sample, notes=list(FORECAST_NOTES))
+
+
+# ── what a fit feeds a flowsheet (OF-BLD-019 §5.1, D10) ────────────────
+#
+# A person sends a kept fit, or a kept forecast, to a Proforma scenario; the
+# binding (proforma.fit_info) reads what it gives from the forecast: titre
+# from the final product, yield from product made over sugar used (Yp/s),
+# and the batch time from the hour the median sugar runs out. A forecast is
+# read as it was kept; a kinetic fit is forecast here under the fitted run's
+# own starting values and length, seeded, exactly as `growth_forecast`
+# forecasts it, and that forecast is kept nowhere: the fit is the source the
+# scenario names. `batch_simulation` does not exist in this tree.
+
+FEEDABLE = (KINETIC, FORECAST)
+# How a refusal names a parameter.
+SYMBOL = {"mu": "μ", "Xmax": "Xmax"}
+
+
+def fit_of(art: Any) -> KineticFit:
+    """The kinetic fit a kept fermOS artifact rests on: a kinetic fit's own
+    output, or the fit a forecast's basis names. Refused in words when the
+    artifact is neither, or its fit is not on file."""
+    if art.tool == KINETIC:
+        return KineticFit.model_validate(art.output)
+    if art.tool == FORECAST:
+        try:
+            return _fit_from(art.inputs)
+        except (StopIteration, artifacts.ArtifactNotFound) as e:
+            raise FitRefused(f"the kinetic fit forecast {art.id} rests on is not on file") from e
+        except artifacts.ArtifactDamaged as e:
+            # One damaged file refuses what rests on it, in words; it never
+            # takes the other fits down with it (§5.R).
+            raise FitRefused(f"the kinetic fit forecast {art.id} rests on cannot be read: {e}") from e
+    raise FitRefused(f"{art.id} is a {art.tool}, not a kinetic fit or a forecast fermOS keeps")
+
+
+def fit_artifact_of(art: Any) -> str | None:
+    """The kept kinetic fit an artifact is or rests on, by id."""
+    if art.tool == KINETIC:
+        return art.id
+    i = next((x for x in art.inputs if x.name == "kinetic fit" and x.source.kind == "artifact"), None)
+    return i.source.id if i else None
+
+
+def deposition_of(art: Any) -> str | None:
+    """The run a fit was made on: its readings' deposition, through the fit a forecast rests on."""
+    found = next((x.source.id for x in art.inputs if x.source.kind == "deposition"), None)
+    if found or art.tool != FORECAST:
+        return found
+    fid = fit_artifact_of(art)
+    try:
+        return next((x.source.id for x in artifacts.get(fid).inputs if x.source.kind == "deposition"), None) if fid else None
+    except (artifacts.ArtifactNotFound, artifacts.ArtifactDamaged):
+        return None
+
+
+# The run-out hour (OF-BLD-019 §5.R). A forecast lays its GRID points over
+# the whole length asked and stops at the first point where its median sugar
+# is spent, which can lie a whole step past the hour the sugar runs out: a
+# forecast asked for 3000 h steps by about 30 h. Past that hour the curves
+# keep making product from sugar pushed below zero, so the titre, the yield
+# and the batch time a fit feeds would move with the length a person typed.
+# The hour is found instead by linear interpolation of the median sugar
+# between the last point with sugar left and the first without, on a grid
+# drawn again to the bracket's end until one step is at most RUN_OUT_STEP of
+# the hour (a grid to the bracket's end steps by about 1 % of it); then the
+# forecast is drawn again to that hour, with the same fit, starting values
+# and seed, and kept nowhere. The draws do not depend on the length, so each
+# redraw is the same DRAWS parameter sets. On test_proforma_fermos' stand-in
+# fit, forecasts asked to run from about one run-out to three hundred feed
+# batch times within 1 % of each other (STATE.md, §5.R).
+RUN_OUT_STEP = 0.02
+RUN_OUT_PASSES = 8
+
+
+def _bracket(fc: dict[str, Any]) -> tuple[float, float, float, float] | None:
+    """The last grid hour with median sugar left and the first without, and
+    the median sugar at each; None when the sugar does not run out after the
+    start."""
+    times = fc.get("times") or []
+    band = next((b for b in fc.get("bands") or [] if b["role"] == "substrate"), None)
+    runs = fc.get("substrateRunsOutH")
+    if band is None or runs is None or len(times) < 2 or runs <= times[0]:
+        return None
+    t1, t2 = float(times[-2]), float(times[-1])
+    s1, s2 = float(band["median"][-2]), float(band["median"][-1])
+    if not (s1 > 0 >= s2):
+        return None
+    return t1, t2, s1, s2
+
+
+def to_run_out(fit_: KineticFit, fc: dict[str, Any], start: StartValues | None = None,
+               seed: int = SEED) -> dict[str, Any] | None:
+    """`fc` drawn again to the hour its median sugar runs out, found between
+    grid points (RUN_OUT_STEP above), its `substrateRunsOutH` that hour (the
+    last point it reaches); None when its sugar does not run out after the
+    start. Pure, and kept nowhere."""
+    found = _bracket(fc)
+    if found is None:
+        return None
+    for _ in range(RUN_OUT_PASSES):
+        t1, t2, s1, s2 = found
+        hour = t1 + (t2 - t1) * s1 / (s1 - s2)
+        if t2 - t1 <= RUN_OUT_STEP * hour:
+            break
+        finer = _bracket(forecast(fit_, start, t2, seed))
+        if finer is None:
+            break
+        found = finer
+    again = forecast(fit_, start, hour, seed)
+    again["substrateRunsOutH"] = float(again["times"][-1])
+    return again
+
+
+def forecast_for(art: Any) -> tuple[dict[str, Any], str]:
+    """The forecast an artifact feeds a flowsheet from, and how it was had, in
+    words. A kinetic fit whose μ or Xmax is not identified is refused naming
+    the parameter and what run would identify it. A forecast whose median
+    sugar runs out is drawn again to that hour (to_run_out), so what it feeds
+    does not depend on the length it was asked to run."""
+    fit_ = fit_of(art)
+    if fit_.reason or not fit_.params:
+        raise FitRefused(f"it holds no kinetic fit: {fit_.reason or 'no parameters'}")
+    name = unidentified(fit_)
+    if name:
+        raise FitRefused(f"{SYMBOL[name]} ({name}) is not identified by the run it was fitted to (its interval "
+                         f"reaches zero); what would identify it is {WHAT_IDENTIFIES[name]}")
+    if art.tool == FORECAST:
+        fc, how = dict(art.output), f"forecast {art.id}"
+        start, seed = _start_of(art.inputs), int(art.output.get("seed", SEED))
+    else:
+        fc, how = forecast(fit_, StartValues(), None, SEED), (
+            f"the forecast of fit {art.id} under its run's own starting values and length, seed {SEED}, "
+            f"{DRAWS} draws")
+        start, seed = StartValues(), SEED
+    again = to_run_out(fit_, fc, start, seed)
+    if again is None:
+        return fc, f"{how}, as kept" if art.tool == FORECAST else f"{how}, kept nowhere"
+    return again, (f"{how}, drawn again to the hour its median sugar runs out, found between its grid points "
+                   f"(the same fit, starting values and seed; kept nowhere)")
+

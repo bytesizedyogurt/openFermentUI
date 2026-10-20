@@ -84,6 +84,9 @@ PKG = Path(__file__).resolve().parent.parent / "openferment_core"
 ALLOWED = {
     "cobra": {"workers/geneos_worker.py"},
     "biosteam": {"workers/proforma_worker.py"},
+    # OF-BLD-019 §4.2: BioSTEAM's property engine, which the service reaches
+    # through the Proforma worker's `thermo_props` op and nowhere else.
+    "thermosteam": {"workers/proforma_worker.py"},
 }
 
 
@@ -93,7 +96,7 @@ def test_heavy_libraries_are_imported_in_their_worker_alone(lib):
     offenders = []
     for path in PKG.rglob("*.py"):
         rel = path.relative_to(PKG).as_posix()
-        if lib == "biosteam" and rel.startswith("flowsheets/"):
+        if lib in ("biosteam", "thermosteam") and rel.startswith("flowsheets/"):
             continue
         if rel in ALLOWED[lib]:
             continue

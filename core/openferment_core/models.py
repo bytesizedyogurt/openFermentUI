@@ -1187,6 +1187,10 @@ class ToolResult(BaseModel):
     draft: "RunbookDraft | None" = None
     # Module rows a plan may cite (OF-BLD-015 §7.2).
     rows: list[ModuleRow] = Field(default_factory=list)
+    # The whole of what a summary cuts to the cap, for the HTTP endpoint and
+    # the MCP server: a model reads `summary` alone (OF-BLD-019 §6.1:
+    # `stream_table`'s whole stream table). Nothing here is citable.
+    data: dict[str, Any] | None = None
 
 
 # ── geneOS (OF-BLD-014 §6.3) ───────────────────────────────────────────
@@ -1523,8 +1527,10 @@ class ScenarioInput(BaseModel):
     label: str
     unit: str
     # 'records': the median and range of bound records; 'assumption': a named
-    # person typed it; 'waiting': neither yet, so the scenario cannot run.
-    binding: Literal["records", "assumption", "waiting"]
+    # person typed it; 'artifact': a fermOS fit or forecast a person chose
+    # computes it (OF-BLD-019 §5.1, D10), its source naming the artifact;
+    # 'waiting': none of these yet, so the scenario cannot run.
+    binding: Literal["records", "assumption", "artifact", "waiting"]
     value: float | None = None
     low: float | None = None
     high: float | None = None
@@ -1571,6 +1577,22 @@ class ProformaRunRequest(BaseModel):
     assumptions: list[InputAssumption] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
+    # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
+    # default is proforma.SAMPLES, held equal by test_proforma, and
+    # proforma.run refuses more than proforma.MAX_SAMPLES, in words.
+    samples: int = 500
+    # The shelf flowsheet a scenario made in the browser runs (OF-BLD-019
+    # §2.3, D6): a seed scenario runs its own and needs none; a scenario id
+    # that is not a seed scenario's runs this one, bound as
+    # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
+    # id the shelf does not hold is refused in words.
+    flowsheet: str | None = None
+    # The fermOS fits a person chose, by input key: titre, yield and
+    # productivity, each the id of a kept `kinetic_fit` or `growth_forecast`
+    # artifact (OF-BLD-019 §5.1, D10). The service computes each value from
+    # the artifact; a model never picks one. A fit that cannot feed an input
+    # is refused in words naming the parameter.
+    fits: dict[str, str] = Field(default_factory=dict)
 
 
 class HistogramBin(BaseModel):
@@ -1611,6 +1633,541 @@ class ProformaRunResult(BaseModel):
     leavesOut: list[str]
     priceBasis: str
     evidence: Evidence
+    # OF-BLD-019 §2.1 (D1): the base case's tables, as the one run artifact
+    # holds them; `ProformaTables` says what each is. All defaulted, so a run
+    # stored before them still reads.
+    flowsheet: str | None = None
+    tablesSource: str | None = None
+    tea: TeaBreakdown | None = None
+    streams: list[StreamRow] = Field(default_factory=list)
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+
+
+# ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
+
+
+class FitFeed(BaseModel):
+    """What one fermOS artifact gives one input of a flowsheet: the value in
+    the input's unit, with the 5th and 95th percentile of the forecast's band
+    for readings, or why it gives nothing, in words naming the parameter."""
+
+    key: str
+    unit: str
+    value: float | None = None
+    low: float | None = None
+    high: float | None = None
+    # How the value is computed from the artifact, in words.
+    derivation: str
+    # Why it gives nothing; None when it gives the value.
+    refused: str | None = None
+
+
+class FermosFitInfo(BaseModel):
+    """A kinetic fit or a forecast fermOS keeps, and what it can feed one
+    shelf flowsheet (GET /api/fermos/fits). A person picks it; a model never
+    does."""
+
+    artifactId: str
+    # 'kinetic_fit' or 'growth_forecast'.
+    tool: str
+    provenance: Provenance
+    createdAt: str
+    flowsheet: str
+    # The run the fit was made on, and the kinetic fit a forecast rests on
+    # (a kinetic fit's own id for a fit).
+    depositionId: str | None = None
+    fitArtifactId: str | None = None
+    # The product and sugar series, by the labels the run gave them.
+    productSeries: str | None = None
+    substrateSeries: str | None = None
+    # The hour the forecast's median sugar runs out: the batch time a
+    # productivity is the titre over.
+    batchTimeH: float | None = None
+    feeds: list[FitFeed] = Field(default_factory=list)
+    # Words printed beside it, such as a product series that names no product.
+    flags: list[str] = Field(default_factory=list)
+    # Why it feeds nothing at all, in words.
+    refused: str | None = None
+
+
+# ── The geneOS ceiling check (OF-BLD-019 §5.2, D11) ─────────────────────
+#
+# A scenario's fermenter yield read against the newest stored geneOS
+# ceiling of each shelf model of its organism, on its flowsheet's sugar.
+# A flag, never a bound: nothing is clamped, and the binding and the run
+# are untouched. Computed on read (GET /api/proforma/ceiling-check) and
+# kept nowhere; every number is the ceiling artifact's, a record's, a
+# person's assumption's or a fit's, converted through units.py and the
+# conventions the ceiling's own basis names.
+
+
+class CeilingRow(BaseModel):
+    """One stored ceiling beside the scenario's yield, both on the ceiling's
+    own footing, grams of product per gram of sugar and mol per mol."""
+
+    modelId: str
+    # The model as geneOS's shelf names it, and as the ceiling's basis names it.
+    modelName: str
+    modelBasis: str
+    # The strain the reconstruction describes, and how the scenario's organism
+    # maps to it: 'strain' (the same strain) or 'species' (another strain of
+    # its species), with the words that say so.
+    host: str | None = None
+    match: Literal["strain", "species"]
+    matchWords: str
+    product: str
+    substrate: str
+    # The newest stored `geneos.ceiling` of this model, product and sugar, and
+    # how many older ones it stands in front of.
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    older: int = 0
+    # The ceiling as its artifact holds it.
+    ceilingGPerG: float
+    ceilingMolPerMol: float | None = None
+    # The product and sugar conventions the ceiling's basis names, in its words.
+    conventions: list[str] = Field(default_factory=list)
+    # The scenario's yield in the ceiling's basis: g per g through units.py,
+    # and mol per mol at the ceiling's own conventions (its molPerMol over its
+    # gPerG); None where the yield waits or the ceiling is zero.
+    yieldGPerG: float | None = None
+    yieldLowGPerG: float | None = None
+    yieldHighGPerG: float | None = None
+    yieldMolPerMol: float | None = None
+    # 'above' when the yield or its high end exceeds the ceiling; 'within' at
+    # or under it; 'no-yield' when the yield waits for a source.
+    flag: Literal["above", "within", "no-yield"]
+    words: str
+    # The bound records whose own value is above the ceiling, each for a
+    # reviewer to check its basis.
+    recordsAbove: list[str] = Field(default_factory=list)
+
+
+class CeilingCheck(BaseModel):
+    """GET /api/proforma/ceiling-check: one scenario's fermenter yield beside
+    every stored ceiling of its organism's shelf models on its sugar."""
+
+    scenarioId: str
+    flowsheet: str
+    # What the flowsheet makes and the sugar its feed is, as geneOS names them.
+    product: str
+    substrate: str
+    sugarWords: str
+    # The scenario's organism: its host filter, else the strains its yield's
+    # records name, else its program's one species; and how that was read.
+    host: str | None = None
+    strains: list[str] = Field(default_factory=list)
+    species: list[str] = Field(default_factory=list)
+    organismWords: str
+    # The shelf models of that organism with a route to the product.
+    models: list[str] = Field(default_factory=list)
+    # The yield as the scenario binds it, in the input's unit.
+    yieldBinding: Literal["records", "assumption", "artifact", "waiting"]
+    yieldValue: float | None = None
+    yieldLow: float | None = None
+    yieldHigh: float | None = None
+    yieldUnit: str
+    yieldSource: BasisSource | None = None
+    yieldRecords: int = 0
+    yieldWords: str
+    rows: list[CeilingRow] = Field(default_factory=list)
+    flagged: bool = False
+    # With no ceiling on file: what is missing, and where one is computed.
+    empty: str | None = None
+    computeAt: str
+    # Sugars other stored ceilings of these models are on, left aside here.
+    otherSugars: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+# ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────
+#
+# The shelf is data (flowsheets/shelf.py, D2). A run is one `proforma.run`
+# artifact (D1) holding the price, the sensitivity and, for its base case,
+# every table below, each read by the Proforma worker from BioSTEAM's own
+# objects; nothing recomputes them on read. Units are BioSTEAM's: a
+# stream's T in K and P in Pa, flows in kg/hr, a unit's duties in kJ/hr and
+# its power in kW, costs in USD, annual amounts in USD/yr; `tableUnits` in
+# the artifact names them, and UtilityDuties carries each unit as the
+# UnitGroup states it.
+
+
+class FlowsheetInput(BaseModel):
+    """One input a shelf flowsheet takes. It names the ontology fields whose
+    records bind it; with none, a named person's assumption or a stated
+    convention sets it. The file of the flowsheet holds no value for it."""
+
+    key: str
+    name: str
+    # The unit table's family where the unit has one (src/engine/units.ts:
+    # massConc, yield, volProd, costUSD), else a word: massFlow, fraction.
+    dimension: str
+    unit: str
+    fields: list[str] = Field(default_factory=list)
+    kind: Literal["process", "economic", "convention"]
+    note: str
+
+
+class FlowsheetInfo(BaseModel):
+    id: str
+    title: str
+    description: str
+    # The package and version it comes from ('biorefineries 2.35.1,
+    # cornstover'), or 'this repository'.
+    source: str
+    # A program id from src/data/programs.ts; None for a general flowsheet.
+    program: str | None = None
+    # A published reference biorefinery, run whole on its package's defaults.
+    reference: bool = False
+    inputs: list[FlowsheetInput] = Field(default_factory=list)
+    # The names its evaluation (or its whole run) reports.
+    outputs: list[str] = Field(default_factory=list)
+    # Which output is the price, and what it is a price of.
+    priceOutput: str | None = None
+    priceBasis: str | None = None
+    leavesOut: list[str] = Field(default_factory=list)
+    # The inputs a run's grid walks, for the sliders; none, no grid.
+    gridInputs: list[str] = Field(default_factory=list)
+    # A reference biorefinery's own regression test, cited as file::test
+    # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
+    # are read from the installed file (PackageRegression), never retyped.
+    packageTest: str | None = None
+
+
+# ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
+#
+# A published biorefinery runs whole on its package's defaults and is kept
+# as one `proforma.reference` artifact: the package's outputs, the
+# quantities its own test asserts as this installation computed them, the
+# defaults read back, and every table a `proforma.run` artifact holds. The
+# test's values come from the installed test file, parsed, with the file
+# and test named.
+
+
+class RegressionValue(BaseModel):
+    """One value a package's own test asserts, as its test file writes it."""
+
+    # The expression the test asserts on ('tea.IRR', 'units.get_heating_duty()').
+    expression: str
+    label: str
+    unit: str
+    # The value the test asserts, and the relative tolerance it allows.
+    package: float
+    rtol: float
+
+
+class PackageRegression(BaseModel):
+    """A reference biorefinery's regression values, read from the package's
+    installed test file: which package, which file, which test."""
+
+    package: str
+    file: str
+    test: str
+    values: list[RegressionValue] = Field(default_factory=list)
+
+
+class RegressionCheck(BaseModel):
+    """One of the package test's values beside what this installation computed."""
+
+    expression: str
+    label: str
+    unit: str
+    measured: float | None = None
+    package: float
+    rtol: float
+    # |measured − package| / |package|; None when the package's value is zero
+    # (the check is then |measured| within rtol of nothing, as numpy's allclose
+    # with its default absolute tolerance has it).
+    relDiff: float | None = None
+    within: bool
+
+
+class ProformaReference(BaseModel):
+    """GET and POST /api/proforma/reference/{id}: the shelf's entry, the
+    newest stored reference run (or None), the package test's values, and
+    where the simulator is."""
+
+    flowsheet: FlowsheetInfo
+    artifact: Artifact | None = None
+    regression: PackageRegression | None = None
+    simulator: dict[str, Any] = Field(default_factory=dict)
+
+
+class StreamRow(BaseModel):
+    """One stream of the base case, as BioSTEAM holds it after the run."""
+
+    id: str
+    # The unit it leaves and the unit it enters; None for a feed or a product.
+    source: str | None = None
+    sink: str | None = None
+    phase: str
+    T: float
+    P: float
+    massFlow: float
+    # Mass flow by component, the components that flow alone.
+    massFlows: dict[str, float] = Field(default_factory=dict)
+    # USD/kg, when the stream carries a price.
+    price: float | None = None
+
+
+class UnitRow(BaseModel):
+    """One unit operation, in run order."""
+
+    id: str
+    # The BioSTEAM class, and BioSTEAM's own name for its line.
+    unitClass: str
+    line: str | None = None
+    order: int
+    ins: list[str] = Field(default_factory=list)
+    outs: list[str] = Field(default_factory=list)
+    installedCost: float
+    purchaseCost: float
+    # None where the unit has no heat utility, or draws no power.
+    heatingDuty: float | None = None
+    coolingDuty: float | None = None
+    power: float | None = None
+
+
+class UtilityDuties(BaseModel):
+    """BioSTEAM's UnitGroup over the plant's units: each total with the unit
+    the UnitGroup states for it."""
+
+    group: str
+    heating: float
+    heatingUnit: str
+    cooling: float
+    coolingUnit: str
+    electricityConsumption: float
+    electricityConsumptionUnit: str
+    electricityProduction: float
+    electricityProductionUnit: str
+
+
+class TeaLine(BaseModel):
+    """One line of the price, per year and per unit of the price's basis.
+    The lines sum to the main product's revenue by construction."""
+
+    key: Literal["feedstock", "otherMaterials", "utilities", "otherVariable", "fixedOperating",
+                 "capitalRecovery", "coproductCredits"]
+    label: str
+    usdPerYear: float
+    perUnit: float | None = None
+    # Which attribute or method of the TEA object it is read from, in words.
+    reads: str
+
+
+class TeaBreakdown(BaseModel):
+    """The TEA object's own numbers for the base case, read through its
+    attributes and methods, never recomputed."""
+
+    teaClass: str
+    product: str
+    feedstock: str | None = None
+    # The product stream's price per kg as the run solved it (or as the
+    # package left it), and the flow in kg/hr the per-unit lines divide by.
+    productPrice: float | None = None
+    basisFlow: float | None = None
+    basis: str | None = None
+    operatingHours: float
+    sales: float
+    materialCost: float
+    feedstockCost: float | None = None
+    otherMaterialCost: float
+    utilityCost: float
+    purchaseCost: float
+    installedEquipmentCost: float
+    FCI: float
+    TCI: float
+    FOC: float
+    laborCost: float | None = None
+    # Sales less the annual operating cost: at a solved price, the return
+    # on and of the capital and the tax on it, as the cash-flow analysis
+    # requires.
+    capitalRecovery: float
+    coproductCredits: float
+    IRR: float | None = None
+    incomeTax: float | None = None
+    lines: list[TeaLine] = Field(default_factory=list)
+
+
+class ProformaTables(BaseModel):
+    """What a reader takes from a `proforma.run` artifact (proforma.tables_of):
+    the flowsheet, what made the tables, and the tables themselves."""
+
+    flowsheet: str | None = None
+    # 'BioSTEAM <version>, thermosteam <version>', or the stand-in's label.
+    tablesSource: str | None = None
+    tea: TeaBreakdown | None = None
+    streams: list[StreamRow] = Field(default_factory=list)
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    # SVG text when Graphviz's dot is on the path (D8); else None, the words
+    # why, and the units in run order.
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+
+
+# ProformaRunResult names the table models defined after it.
+ProformaRunResult.model_rebuild()
+
+
+# ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+#
+# A train is read from one `proforma.run` artifact's stream and unit tables
+# (pureos.train_of) and never typed: the product is the component the run's
+# price is per, else the largest component of its product stream, and every
+# mass below is that component's kg/hr in the run's base case. A unit's
+# outlets that lead on toward the product stream (directly, through later
+# units, or round a recycle) carry the product onward; the others lose it.
+
+
+class TrainUnit(BaseModel):
+    """One unit of a run's train, in run order, with the product's flow
+    through it as the stream table states it."""
+
+    id: str
+    unitClass: str
+    line: str | None = None
+    order: int
+    ins: list[str] = Field(default_factory=list)
+    outs: list[str] = Field(default_factory=list)
+    # Whether any of its outlets leads on to the product stream.
+    onPath: bool
+    # Every component, kg/hr, summed over its inlets and its outlets.
+    massIn: float
+    massOut: float
+    # The product's kg/hr; None when the run names no product.
+    productIn: float | None = None
+    productOut: float | None = None
+    # Of productOut: what leaves by an outlet leading on, and what does not.
+    productOnward: float | None = None
+    productLost: float | None = None
+    # The outlets that carry product off the path.
+    lostTo: list[str] = Field(default_factory=list)
+    # productOnward / productIn; None, with `note` saying why, when no
+    # product enters the unit or the unit is off the path.
+    recovery: float | None = None
+    # 1 less the product lost at this unit and every on-path unit before it,
+    # over everything the path delivers or loses; None off the path.
+    cumulative: float | None = None
+    note: str | None = None
+
+
+class Train(BaseModel):
+    """A run's train as pureOS reads it, for `/pureos/train/:scenarioId`
+    and `pureos_read`."""
+
+    # The scenario the run belongs to (the basis's `scenario`, else the one
+    # seed scenario whose modelId is the run's flowsheet); None when no
+    # scenario claims it, and the train is then known by its artifact id.
+    scenarioId: str | None = None
+    scenarioName: str | None = None
+    artifactId: str
+    flowsheet: str | None = None
+    createdAt: str
+    provenance: Provenance
+    program: str | None = None
+    tablesSource: str | None = None
+    # The stream the run's TEA prices, and the component traced through it.
+    productStream: str | None = None
+    product: str | None = None
+    # How the product was read from the run, in words.
+    productBasis: str
+    # The product's kg/hr in the product stream, the sum of every unit's
+    # productLost, and productOut over the two together.
+    productOut: float | None = None
+    productLost: float | None = None
+    overallRecovery: float | None = None
+    units: list[TrainUnit] = Field(default_factory=list)
+    streams: list[StreamRow] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+    # How many runs of this scenario are on file; the newest is read.
+    runs: int = 1
+    note: str | None = None
+
+
+class TrainSummary(BaseModel):
+    """One train on file, for pureOS's index: the newest run of a scenario."""
+
+    scenarioId: str | None = None
+    scenarioName: str | None = None
+    artifactId: str
+    flowsheet: str | None = None
+    createdAt: str
+    provenance: Provenance
+    program: str | None = None
+    product: str | None = None
+    unitCount: int
+    overallRecovery: float | None = None
+    runs: int = 1
+    note: str | None = None
+
+
+# ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+#
+# A question names a mixture already on file, never a number: a stream of a
+# Proforma run (its artifact id and the stream's id), or a preset the service
+# fills — `ethanol-water-azeotrope` (the composition the library's own VLE
+# gives) or `beer-at-titre-of` an ethanol titre record (the record's value
+# through units.py into a water–ethanol mass fraction). thermo.py keeps the
+# answer as one `thermo_props` artifact.
+
+
+class ThermoPropsRequest(BaseModel):
+    """`POST /api/thermo/props`: a run's stream, or a preset (with its
+    record for `beer-at-titre-of`). Ids and words only."""
+
+    artifactId: str | None = None
+    streamId: str | None = None
+    preset: str | None = None
+    recordId: str | None = None
+
+
+class ThermoProps(BaseModel):
+    """What a `thermo_props` artifact holds (its `output`): thermosteam's
+    answer for one mixture, every number the library's, in its units."""
+
+    # stream, ethanol-water-azeotrope or beer-at-titre-of.
+    kind: str
+    # The mixture in words, as a page and a label say it.
+    subject: str
+    runArtifactId: str | None = None
+    streamId: str | None = None
+    preset: str | None = None
+    recordId: str | None = None
+    # "thermosteam <version>", read in the worker.
+    library: str
+    T: float
+    P: float
+    phase: str
+    # "given" (the stream's own) or "thermosteam's Stream default".
+    TSource: str
+    PSource: str
+    # kg/kg, as the library holds the mixture.
+    massFractions: dict[str, float] = Field(default_factory=dict)
+    density: float | None = None
+    Cp: float | None = None
+    viscosity: float | None = None
+    # Temperatures at the mixture's own pressure.
+    bubblePoint: float | None = None
+    dewPoint: float | None = None
+    # The first bubble's mole fractions.
+    vapourAtBubble: dict[str, float] | None = None
+    # The library's units for each key above.
+    units: dict[str, str] = Field(default_factory=dict)
+    # A preset's solve: what was found, and how, in words.
+    solved: dict[str, Any] | None = None
+    # A property the library could not compute, with its reason; and what
+    # the mixture leaves out.
+    notes: list[str] = Field(default_factory=list)
 
 
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────

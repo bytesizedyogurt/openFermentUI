@@ -90,6 +90,61 @@ predicted in geneOS and consumed in pureOS, where it decides whether thermal
 clarification can replace most of the capture chromatography. Store it once in
 geneOS. Do not duplicate it.
 
+Two more seams carry data rather than a decision, and both are built
+(OF-BLD-019 Phase 4).
+
+**Proforma → pureOS is the run artifact.** A Proforma run keeps one
+`proforma.run` artifact holding BioSTEAM's stream and unit tables for its base
+case (OF-BLD-019 D1). pureOS reads the train from that artifact, unit by unit,
+and simulates nothing again: the flowsheet, its units and its mass balance are
+BioSTEAM's, run in Proforma's worker, and pureOS reads the recovery out of
+them.
+
+**pureOS → thermosteam goes through the Proforma worker.** A stream's physical
+properties (density, heat capacity, viscosity, bubble and dew points) are
+thermosteam's, BioSTEAM's property engine, asked in the Proforma worker where it
+is already loaded. The service names a run's stream or a preset, never a
+number, and keeps the answer as a `thermo_props` artifact; fermOS asks the same
+worker about water and ethanol at a measured titre.
+
+One more carries records into a flowsheet, and it is built too (OF-BLD-019
+Phase 2).
+
+**BioRepo → Proforma is the binding.** A scenario's flowsheet holds no input
+value of its own: for each input records can set, Proforma's shelf names the
+ontology fields that bind it, and the service binds it to the records of those
+fields on its program's papers that pass the aggregate gate and name a feed the flowsheet
+takes as their carbon source, converted by `units.py`. Glucose to ethanol binds
+its feed concentration, titre and yield to thread Q's records today; its
+productivity waits, because no thread Q productivity record names a carbon
+source. What no record binds waits for a named person's assumption (or, for
+titre, yield and productivity, a fermOS fit a person chooses, below), and the
+run's basis names every record, assumption and fit it used.
+
+Two more carry the reactor and the organism into the price, and both are built
+(OF-BLD-019 Phase 5).
+
+**fermOS → Proforma is a fit a person chooses.** A kept kinetic fit or
+forecast can be the source of a scenario's titre, yield and productivity
+(`proforma.fit_info` and `apply_fits`, `GET /api/fermos/fits`): titre the
+forecast's final product, yield its product made over sugar used, productivity
+the titre over the hour its median sugar runs out, found between grid points
+and drawn again to that hour (`fermos.to_run_out`). Nothing is copied: the run's
+basis names the fit for each input it feeds, so the run's provenance follows
+the fit's. A person chooses it, on the scenario page or with Send to Proforma on
+fermOS → Forecast, and a fit's productivity feeds only beside its own titre; a
+fit that cannot give an input is refused naming the parameter.
+
+**geneOS → Proforma is a flag, never a bound.** The ceiling check
+(`proforma.ceiling_check`, `GET /api/proforma/ceiling-check`) sets a scenario's
+fermenter yield, as bound, beside the newest stored geneOS ceiling of each shelf
+model of its organism on its flowsheet's sugar, flags a yield above it with the
+records above, and changes nothing: the binding, the run and its artifact are
+the same with a ceiling on file as without. The organism is read from the bound
+records' strains and species, a model matches by strain or by species, and the
+check is computed when read and kept nowhere. geneOS → Model lists the
+scenarios above a model's ceiling.
+
 **fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
 real runs in a specific vessel, so they come from Deposition. fermOS is the
 component that most needs the Assay loop and the one that cannot be built out of
@@ -162,7 +217,7 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. Transport, operating mode, scale-up and control are not built.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). Transport, operating mode, scale-up and control are not built.
 
 | Subsystem | Key | State |
 |---|---|---|
@@ -180,7 +235,9 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 **Harvest, capture, recovery.** `/pureos` · chord `g u`
 
-Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it.
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 Phase 4): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, mass in and out, the product in and out, the product it passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery, read by the service (`core/openferment_core/pureos.py`, `GET /api/pureos/trains`, `GET /api/pureos/train/{key}`) from the run artifact's stream table and never typed; the front page lists the trains on file. Recovery is credited by pass: a unit whose passes BioSTEAM keeps apart (`SEPARATE_PASSES`, the process heat exchanger) is counted only on the pass that carries the product on, and product a unit on the path takes in and lets out by no outlet is lost there. A train's mark is its run's, worked out from the run's inputs as they stand when it is read. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. A **Properties** card asks thermosteam, through the Proforma worker, about the broth, the product stream or any stream of the run (`core/openferment_core/thermo.py`, `src/components/PropertiesPanel.tsx`); fermOS carries the same card for a measured titre. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`), and `thermo_props` asks thermosteam. With the service down each says so. Choosing a train is not built, and the four subsystems below remain stubs.
+
+Views: [Train](#) `/pureos/train`
 
 | Subsystem | Key | State |
 |---|---|---|
@@ -193,11 +250,19 @@ Everything after the fermenter: harvest, disruption, capture, polishing, recover
 
 **Cost, scale, uncertainty.** `/proforma` · chord `g c`
 
-Techno-economics over authored response surfaces. Prices a process; does not choose one.
+Techno-economics on BioSTEAM: published reference biorefineries run whole, and scenarios made from a flowsheet on the shelf, every input bound to records, to a fermOS fit a person chose, or to a named person's assumption. Prices a process; does not choose one. The authored response surfaces S1–S3 step aside for the archived casein examples and are not deleted.
+
+Views: [Corn ethanol reference](#) `/proforma/reference/corn_drygrind` · [Corn stover benchmark](#) `/proforma/reference/cornstover_benchmark`
+
+**Proforma runs flowsheets from a shelf** (OF-BLD-019 Phase 2). The shelf is data (`core/openferment_core/flowsheets/shelf.py`, `GET /api/proforma/shelf`): two published reference biorefineries from the `biorefineries` package, the NREL corn stover design (`cornstover_benchmark`) and the dry-grind corn ethanol plant (`corn_drygrind`, the yeast program's reference), each run whole on its package's own defaults and held to its package's own test values, read from the installed test file; and two flowsheets of this repository that a scenario runs, glucose to ethanol (`ethanol_glucose_v0`, run by `sc-yeast-1`, yeast ethanol) and PHA from sugar (`pha_sugar_v0`, run by `sc-pha-1`, archived). BioSTEAM runs in the Proforma worker, where every plant builds as it would in a worker that had built nothing before. Each run is one artifact holding the price, the sensitivity and the base case's TEA breakdown, stream table, unit table, utility duties and diagram (`proforma.run` for a scenario, `proforma.reference` for a reference biorefinery), and every reader reads that artifact; nothing is computed again on read. A scenario flowsheet's file holds no input value: an input the shelf ties to ontology fields binds to records of its program's papers, and one no record binds takes a fermOS fit a person chose or waits for a named person's assumption. `model` is a kind of basis source (a value the package, BioSTEAM or thermosteam sets as its own default, named with its version), not a provenance: a reference run, whose inputs are all `model` or stated conventions, is `computed`, and a scenario's run is the weakest of `computed` and its records', `demo` while an assumption remains. Postdoc and the MCP server run a seed scenario (`run_flowsheet`), read a run's streams (`stream_table`) and its price (`selling_price`), and ask thermosteam (`thermo_props`), through the same functions the screens call.
+
+**A reference biorefinery has a page** (OF-BLD-019 §3.3): `/proforma/reference/:id` (`src/screens/ProformaReference.tsx`) shows a published biorefinery from the `biorefineries` package run whole on its own defaults, its price as the shelf names it, and each value of the package's own regression test beside what the run measured, read from the run's `proforma.reference` artifact, then the same tables a scenario page shows. BioRepo → Compare (`/biorepo/compare`) sets two or more pinned BioSTEAM scenarios side by side from each one's newest run.
+
+**Proforma's screens read the run and price nothing** (OF-BLD-019 Phase 3). The index (`src/screens/Proforma.tsx`) has three rows: the reference runs, each with its newest stored price, when it ran, its provenance and how many of its package test's values it holds; the other flowsheets on the shelf, each with **New scenario from this**; and the scenarios of the programs the switch shows, with the newest run's price or *Not run yet*. **New scenario** (`src/components/NewScenarioDialog.tsx`) makes a `biosteam` scenario on a non-reference flowsheet, in that flowsheet's own program, and nothing is disabled because a list is empty. The scenario page (`/proforma/scenario/:id`, `src/screens/ProformaScenario.tsx`) is one page for a seed scenario and one made here: its inputs with their sources, Run with the worker's status, and every section of the newest run (`src/screens/ProformaBiosteam.tsx`): price, the TEA's cost breakdown as a waterfall closing on the run's own price, the tornado, the distribution, streams, equipment, utilities, diagram, the values read back and who set each, and the flowsheet's own questions; the newest run is the service's (`GET /api/proforma/runs`), else this browser's. Scenarios made here, the pins, the assumptions and the fermOS fits chosen are kept in this browser's Durable tier; the runs are kept by the service. The authored branch and the authored compare open the archived casein examples alone, and recharts stays there.
 
 | Component | Implemented in |
 |---|---|
-| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` |
+| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` |
 
 ### Runbooks
 
@@ -266,7 +331,7 @@ for the ones with a rail entry.
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
 | fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
-| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
+| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |
 | Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py`, `core/openferment_core/rageval.py`, `src/components/RetrievalScorecard.tsx` | a BioRepo tab, /biorepo/witness |
@@ -297,7 +362,8 @@ inventory of what happens to exist — and because a name with nothing under it
 is a smaller problem than a system with no name for the thing it is missing.
 
 **A destination can be thin and still be in the rail.** pureOS has a screen,
-the unit-operation vocabulary and no process model. fermOS had a screen and five
+the unit-operation vocabulary and no process model of its own: it reads the
+train a Proforma run simulated, and decides nothing yet. fermOS had a screen and five
 named subsystems with no code until kinetics arrived, fitted from depositions
 alone; transport, operating mode, scale and control are still named and not
 built. Putting them in the navigation from day one means that when the work
@@ -327,9 +393,13 @@ question. They were living in the same place, and now they are not.
 **One boundary is still open: mass balance.** It is listed under Proforma today,
 and a mass balance is a statement about a process train rather than about money.
 The cleaner split would be *pureOS specifies the train and its recovery;
-Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). Nothing in the code
-forces the question yet, and it is recorded here rather than settled quietly,
-because whoever builds it first will settle it by accident otherwise.
+Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). The code now
+answers it the other way, for the moment: the train is a flowsheet
+on Proforma's shelf, BioSTEAM closes its mass balance in the Proforma worker,
+and pureOS reads each unit's recovery out of the run artifact (OF-BLD-019
+Phase 4). pureOS specifies nothing yet. It is recorded here rather than settled
+quietly, because whoever builds train selection will otherwise settle it by
+accident.
 
 **Attribution survives the reorganisation.** `ComponentTag` names the component
 that did a piece of work, which is a different job from naming the surface you

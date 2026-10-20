@@ -1,0 +1,480 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "none": {
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": {
+          "scenarioId": "sc-yeast-1",
+          "flowsheet": "ethanol_glucose_v0",
+          "product": "ethanol",
+          "substrate": "glucose",
+          "sugarWords": "the flowsheet's feed is glucose",
+          "host": null,
+          "strains": [
+            "s-cerevisiae-cenpk113-7d"
+          ],
+          "species": [
+            "saccharomyces cerevisiae"
+          ],
+          "organismWords": "all 3 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D (Saccharomyces cerevisiae)",
+          "models": [
+            "iMM904",
+            "Yeast9"
+          ],
+          "yieldBinding": "records",
+          "yieldValue": 0.45,
+          "yieldLow": 0.4,
+          "yieldHigh": 0.48,
+          "yieldUnit": "g g-1",
+          "yieldSource": {
+            "kind": "record",
+            "id": null,
+            "note": "3 records of ethanol_yield_substrate",
+            "by": null
+          },
+          "yieldRecords": 3,
+          "yieldWords": "the median of 3 records, with the lowest and the highest",
+          "rows": [],
+          "flagged": false,
+          "empty": "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9. One is computed in geneOS → Model: choose ethanol, glucose and the model, and the ceiling is kept.",
+          "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+          "otherSugars": [],
+          "notes": [
+            "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+          ]
+        }
+      },
+      "pha_sugar_v0": {
+        "status": 200,
+        "body": {
+          "scenarioId": "sc-pha-1",
+          "flowsheet": "pha_sugar_v0",
+          "product": "phb",
+          "substrate": "glucose",
+          "sugarWords": "the PHA draft's feed is a fermentable sugar; its yield cap reads the glucose ceiling, and so does this check",
+          "host": null,
+          "strains": [
+            "c-necator-h16"
+          ],
+          "species": [
+            "cupriavidus necator"
+          ],
+          "organismWords": "all 3 records its yield binds name Cupriavidus necator H16 (Cupriavidus necator)",
+          "models": [
+            "RehMBEL1391"
+          ],
+          "yieldBinding": "records",
+          "yieldValue": 0.3,
+          "yieldLow": 0.22,
+          "yieldHigh": 0.36,
+          "yieldUnit": "g g-1",
+          "yieldSource": {
+            "kind": "record",
+            "id": null,
+            "note": "3 records of pha_yield_substrate",
+            "by": null
+          },
+          "yieldRecords": 3,
+          "yieldWords": "the median of 3 records, with the lowest and the highest",
+          "rows": [],
+          "flagged": false,
+          "empty": "No geneOS ceiling for PHB on glucose is on file for RehMBEL1391, and geneOS may never keep one: it computes a ceiling only on a sugar the network takes up, and its shelf entry feeds it fructose. geneOS → Model on RehMBEL1391 and glucose says whether the network takes up glucose.",
+          "computeAt": "/geneos/model?product=phb&substrate=glucose&model=RehMBEL1391",
+          "otherSugars": [],
+          "notes": [
+            "Computed on read and kept nowhere: the binding and the run keep the yield as bound.",
+            "The PHA draft's run clips record yields above the highest glucose ceiling on the shelf to it (OF-BLD-014 §8.3); this check reads each record unclipped."
+          ]
+        }
+      }
+    },
+    "onFile": {
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": {
+          "scenarioId": "sc-yeast-1",
+          "flowsheet": "ethanol_glucose_v0",
+          "product": "ethanol",
+          "substrate": "glucose",
+          "sugarWords": "the flowsheet's feed is glucose",
+          "host": null,
+          "strains": [
+            "s-cerevisiae-cenpk113-7d"
+          ],
+          "species": [
+            "saccharomyces cerevisiae"
+          ],
+          "organismWords": "all 3 records its yield binds name Saccharomyces cerevisiae CEN.PK113-7D (Saccharomyces cerevisiae)",
+          "models": [
+            "iMM904",
+            "Yeast9"
+          ],
+          "yieldBinding": "records",
+          "yieldValue": 0.45,
+          "yieldLow": 0.4,
+          "yieldHigh": 0.48,
+          "yieldUnit": "g g-1",
+          "yieldSource": {
+            "kind": "record",
+            "id": null,
+            "note": "3 records of ethanol_yield_substrate",
+            "by": null
+          },
+          "yieldRecords": 3,
+          "yieldWords": "the median of 3 records, with the lowest and the highest",
+          "rows": [
+            {
+              "modelId": "Yeast9",
+              "modelName": "Saccharomyces cerevisiae S288C (Yeast9)",
+              "modelBasis": "STAND-IN for Yeast9",
+              "host": "s-cerevisiae-s288c",
+              "match": "species",
+              "matchWords": "Yeast9 is a reconstruction of Saccharomyces cerevisiae S288C, and the scenario's organism is of its species, Saccharomyces cerevisiae (3 of the 3 records the yield binds are read as of it): another strain's network bounds it only as far as the two networks agree",
+              "product": "ethanol",
+              "substrate": "glucose",
+              "artifactId": "ffdb4e907e8916aa",
+              "provenance": "demo",
+              "createdAt": "2026-09-15T09:00:00Z",
+              "older": 0,
+              "ceilingGPerG": 0.47,
+              "ceilingMolPerMol": 1.8379673967309904,
+              "conventions": [
+                "uptake: the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+                "product: secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+                "substrate: through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons"
+              ],
+              "yieldGPerG": 0.45,
+              "yieldLowGPerG": 0.4,
+              "yieldHighGPerG": 0.48,
+              "yieldMolPerMol": 1.7597560181466931,
+              "flag": "above",
+              "words": "The scenario's yield is under this ceiling, but its high end is above it. A yield above the most this network makes from this sugar rests on another basis, or is wrong, so a reviewer should check the basis of each record above it (another sugar counted, the product measured otherwise, another organism). It is flagged, not clamped: the binding and the run keep the yield as bound.",
+              "recordsAbove": [
+                "standin-ethanol_yield_substrate-2"
+              ]
+            }
+          ],
+          "flagged": true,
+          "empty": null,
+          "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+          "otherSugars": [],
+          "notes": [
+            "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+          ]
+        }
+      },
+      "pha_sugar_v0": {
+        "status": 200,
+        "body": {
+          "scenarioId": "sc-pha-1",
+          "flowsheet": "pha_sugar_v0",
+          "product": "phb",
+          "substrate": "glucose",
+          "sugarWords": "the PHA draft's feed is a fermentable sugar; its yield cap reads the glucose ceiling, and so does this check",
+          "host": null,
+          "strains": [
+            "c-necator-h16"
+          ],
+          "species": [
+            "cupriavidus necator"
+          ],
+          "organismWords": "all 3 records its yield binds name Cupriavidus necator H16 (Cupriavidus necator)",
+          "models": [
+            "RehMBEL1391"
+          ],
+          "yieldBinding": "records",
+          "yieldValue": 0.3,
+          "yieldLow": 0.22,
+          "yieldHigh": 0.36,
+          "yieldUnit": "g g-1",
+          "yieldSource": {
+            "kind": "record",
+            "id": null,
+            "note": "3 records of pha_yield_substrate",
+            "by": null
+          },
+          "yieldRecords": 3,
+          "yieldWords": "the median of 3 records, with the lowest and the highest",
+          "rows": [],
+          "flagged": false,
+          "empty": "No geneOS ceiling for PHB on glucose is on file for RehMBEL1391, and geneOS may never keep one: it computes a ceiling only on a sugar the network takes up, and its shelf entry feeds it fructose. geneOS → Model on RehMBEL1391 and glucose says whether the network takes up glucose.",
+          "computeAt": "/geneos/model?product=phb&substrate=glucose&model=RehMBEL1391",
+          "otherSugars": [],
+          "notes": [
+            "Computed on read and kept nowhere: the binding and the run keep the yield as bound.",
+            "The PHA draft's run clips record yields above the highest glucose ceiling on the shelf to it (OF-BLD-014 §8.3); this check reads each record unclipped."
+          ]
+        }
+      }
+    },
+    "fitted": {
+      "none": [
+        {
+          "fits": {
+            "titre": "da439bc5419ed413",
+            "yield": "da439bc5419ed413",
+            "productivity": "da439bc5419ed413"
+          },
+          "status": 200,
+          "body": {
+            "scenarioId": "sc-yeast-1",
+            "flowsheet": "ethanol_glucose_v0",
+            "product": "ethanol",
+            "substrate": "glucose",
+            "sugarWords": "the flowsheet's feed is glucose",
+            "host": null,
+            "strains": [],
+            "species": [
+              "saccharomyces cerevisiae"
+            ],
+            "organismWords": "the Yeast ethanol program, every host of which is Saccharomyces cerevisiae, as the yield binds no record (Saccharomyces cerevisiae)",
+            "models": [
+              "iMM904",
+              "Yeast9"
+            ],
+            "yieldBinding": "artifact",
+            "yieldValue": 0.20523209622693878,
+            "yieldLow": 0.1934502858639274,
+            "yieldHigh": 0.21756178245739488,
+            "yieldUnit": "g g-1",
+            "yieldSource": {
+              "kind": "artifact",
+              "id": "da439bc5419ed413",
+              "note": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+              "by": null
+            },
+            "yieldRecords": 0,
+            "yieldWords": "a fermOS fit's Yp/s (da439bc5419ed413), its median with its 5th and 95th percentile",
+            "rows": [],
+            "flagged": false,
+            "empty": "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9. One is computed in geneOS → Model: choose ethanol, glucose and the model, and the ceiling is kept.",
+            "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+            "otherSugars": [],
+            "notes": [
+              "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+            ]
+          }
+        },
+        {
+          "fits": {
+            "titre": "45abd7656f83a2a6",
+            "yield": "45abd7656f83a2a6"
+          },
+          "status": 200,
+          "body": {
+            "scenarioId": "sc-yeast-1",
+            "flowsheet": "ethanol_glucose_v0",
+            "product": "ethanol",
+            "substrate": "glucose",
+            "sugarWords": "the flowsheet's feed is glucose",
+            "host": null,
+            "strains": [],
+            "species": [
+              "saccharomyces cerevisiae"
+            ],
+            "organismWords": "the Yeast ethanol program, every host of which is Saccharomyces cerevisiae, as the yield binds no record (Saccharomyces cerevisiae)",
+            "models": [
+              "iMM904",
+              "Yeast9"
+            ],
+            "yieldBinding": "artifact",
+            "yieldValue": 0.12604466085650495,
+            "yieldLow": 0.1243969589074855,
+            "yieldHigh": 0.12784207888996105,
+            "yieldUnit": "g g-1",
+            "yieldSource": {
+              "kind": "artifact",
+              "id": "45abd7656f83a2a6",
+              "note": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+              "by": null
+            },
+            "yieldRecords": 0,
+            "yieldWords": "a fermOS fit's Yp/s (45abd7656f83a2a6), its median with its 5th and 95th percentile",
+            "rows": [],
+            "flagged": false,
+            "empty": "No geneOS ceiling for ethanol on glucose is on file for iMM904, Yeast9. One is computed in geneOS → Model: choose ethanol, glucose and the model, and the ceiling is kept.",
+            "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+            "otherSugars": [],
+            "notes": [
+              "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+            ]
+          }
+        },
+        {
+          "fits": {
+            "titre": "45abd7656f83a2a6",
+            "yield": "45abd7656f83a2a6",
+            "productivity": "da439bc5419ed413"
+          },
+          "status": 422,
+          "body": {
+            "detail": "productivity from growth_forecast da439bc5419ed413 is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from da439bc5419ed413: the fermenter's batch time is the titre over the productivity, and here titre is from 45abd7656f83a2a6. To use it, choose da439bc5419ed413 for titre as well, or stop using it for productivity"
+          }
+        }
+      ],
+      "onFile": [
+        {
+          "fits": {
+            "titre": "da439bc5419ed413",
+            "yield": "da439bc5419ed413",
+            "productivity": "da439bc5419ed413"
+          },
+          "status": 200,
+          "body": {
+            "scenarioId": "sc-yeast-1",
+            "flowsheet": "ethanol_glucose_v0",
+            "product": "ethanol",
+            "substrate": "glucose",
+            "sugarWords": "the flowsheet's feed is glucose",
+            "host": null,
+            "strains": [],
+            "species": [
+              "saccharomyces cerevisiae"
+            ],
+            "organismWords": "the Yeast ethanol program, every host of which is Saccharomyces cerevisiae, as the yield binds no record (Saccharomyces cerevisiae)",
+            "models": [
+              "iMM904",
+              "Yeast9"
+            ],
+            "yieldBinding": "artifact",
+            "yieldValue": 0.20523209622693878,
+            "yieldLow": 0.1934502858639274,
+            "yieldHigh": 0.21756178245739488,
+            "yieldUnit": "g g-1",
+            "yieldSource": {
+              "kind": "artifact",
+              "id": "da439bc5419ed413",
+              "note": "Yp/s, product made over sugar used, from forecast da439bc5419ed413, drawn again to the hour its median sugar runs out, found between its grid points (the same fit, starting values and seed; kept nowhere): its median, with the 5th and 95th percentile",
+              "by": null
+            },
+            "yieldRecords": 0,
+            "yieldWords": "a fermOS fit's Yp/s (da439bc5419ed413), its median with its 5th and 95th percentile",
+            "rows": [
+              {
+                "modelId": "Yeast9",
+                "modelName": "Saccharomyces cerevisiae S288C (Yeast9)",
+                "modelBasis": "STAND-IN for Yeast9",
+                "host": "s-cerevisiae-s288c",
+                "match": "species",
+                "matchWords": "Yeast9 is a reconstruction of Saccharomyces cerevisiae S288C, and the scenario's organism is of its species, Saccharomyces cerevisiae: another strain's network bounds it only as far as the two networks agree",
+                "product": "ethanol",
+                "substrate": "glucose",
+                "artifactId": "ffdb4e907e8916aa",
+                "provenance": "demo",
+                "createdAt": "2026-09-15T09:00:00Z",
+                "older": 0,
+                "ceilingGPerG": 0.47,
+                "ceilingMolPerMol": 1.8379673967309904,
+                "conventions": [
+                  "uptake: the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+                  "product: secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+                  "substrate: through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons"
+                ],
+                "yieldGPerG": 0.20523209622693878,
+                "yieldLowGPerG": 0.1934502858639274,
+                "yieldHighGPerG": 0.21756178245739488,
+                "yieldMolPerMol": 0.8025742587827038,
+                "flag": "within",
+                "words": "The scenario's yield, its high end included, is at or under this ceiling.",
+                "recordsAbove": []
+              }
+            ],
+            "flagged": false,
+            "empty": null,
+            "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+            "otherSugars": [],
+            "notes": [
+              "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+            ]
+          }
+        },
+        {
+          "fits": {
+            "titre": "45abd7656f83a2a6",
+            "yield": "45abd7656f83a2a6"
+          },
+          "status": 200,
+          "body": {
+            "scenarioId": "sc-yeast-1",
+            "flowsheet": "ethanol_glucose_v0",
+            "product": "ethanol",
+            "substrate": "glucose",
+            "sugarWords": "the flowsheet's feed is glucose",
+            "host": null,
+            "strains": [],
+            "species": [
+              "saccharomyces cerevisiae"
+            ],
+            "organismWords": "the Yeast ethanol program, every host of which is Saccharomyces cerevisiae, as the yield binds no record (Saccharomyces cerevisiae)",
+            "models": [
+              "iMM904",
+              "Yeast9"
+            ],
+            "yieldBinding": "artifact",
+            "yieldValue": 0.12604466085650495,
+            "yieldLow": 0.1243969589074855,
+            "yieldHigh": 0.12784207888996105,
+            "yieldUnit": "g g-1",
+            "yieldSource": {
+              "kind": "artifact",
+              "id": "45abd7656f83a2a6",
+              "note": "Yp/s, product made over sugar used, from the forecast of fit 45abd7656f83a2a6 under its run's own starting values and length, seed 0, 200 draws, kept nowhere: its median, with the 5th and 95th percentile",
+              "by": null
+            },
+            "yieldRecords": 0,
+            "yieldWords": "a fermOS fit's Yp/s (45abd7656f83a2a6), its median with its 5th and 95th percentile",
+            "rows": [
+              {
+                "modelId": "Yeast9",
+                "modelName": "Saccharomyces cerevisiae S288C (Yeast9)",
+                "modelBasis": "STAND-IN for Yeast9",
+                "host": "s-cerevisiae-s288c",
+                "match": "species",
+                "matchWords": "Yeast9 is a reconstruction of Saccharomyces cerevisiae S288C, and the scenario's organism is of its species, Saccharomyces cerevisiae: another strain's network bounds it only as far as the two networks agree",
+                "product": "ethanol",
+                "substrate": "glucose",
+                "artifactId": "ffdb4e907e8916aa",
+                "provenance": "demo",
+                "createdAt": "2026-09-15T09:00:00Z",
+                "older": 0,
+                "ceilingGPerG": 0.47,
+                "ceilingMolPerMol": 1.8379673967309904,
+                "conventions": [
+                  "uptake: the substrate's uptake opened for a ceiling; every other bound stays as the model file publishes it",
+                  "product: secreted through r_1761 (ethanol exchange in the file); ethanol C2H6O (46.069 g mol-1, at the standard atomic weights the sugars' molar masses use), used to turn mol per mol into g per g",
+                  "substrate: through r_1714 (D-glucose exchange in the file), 180.156 g mol-1, 6 carbons"
+                ],
+                "yieldGPerG": 0.12604466085650495,
+                "yieldLowGPerG": 0.1243969589074855,
+                "yieldHighGPerG": 0.12784207888996105,
+                "yieldMolPerMol": 0.49290633443887444,
+                "flag": "within",
+                "words": "The scenario's yield, its high end included, is at or under this ceiling.",
+                "recordsAbove": []
+              }
+            ],
+            "flagged": false,
+            "empty": null,
+            "computeAt": "/geneos/model?product=ethanol&substrate=glucose&model=iMM904",
+            "otherSugars": [],
+            "notes": [
+              "Computed on read and kept nowhere: the binding and the run keep the yield as bound."
+            ]
+          }
+        },
+        {
+          "fits": {
+            "titre": "45abd7656f83a2a6",
+            "yield": "45abd7656f83a2a6",
+            "productivity": "da439bc5419ed413"
+          },
+          "status": 422,
+          "body": {
+            "detail": "productivity from growth_forecast da439bc5419ed413 is its titre over the hour its median sugar runs out, so it feeds the fermenter only beside titre from da439bc5419ed413: the fermenter's batch time is the titre over the productivity, and here titre is from 45abd7656f83a2a6. To use it, choose da439bc5419ed413 for titre as well, or stop using it for productivity"
+          }
+        }
+      ]
+    }
+  }
+}

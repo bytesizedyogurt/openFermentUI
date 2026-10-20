@@ -32,8 +32,9 @@ import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, Overlay } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, ProformaScenarioInfo, Scenario } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
+import { inputCounts, referencePrice } from '../src/lib/proforma';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -562,6 +563,342 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const ferm = readFileSync(new URL('../src/screens/FermOS.tsx', import.meta.url), 'utf8');
   check("fermOS filters its runs through shows('deposition')", /shows\('deposition', d\.id\)/.test(ferm));
 }
+
+// OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario on a
+// shelf flowsheet, and it is Durable: it survives a reload keyed by id, with
+// its flowsheet, name, program, pin, the assumptions typed for it and the id
+// of its newest run; a seeded scenario's newest run survives beside it; a
+// copy is made the same way; clearing this browser's data drops it. The
+// index's button opens the chooser: it never copies the first scenario in a
+// list, and it is never disabled because the list is empty (B.1).
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(false);
+  const id = st().createScenario('ethanol_glucose_v0', 'Glucose to ethanol, a first look', 'yeast');
+  const other = st().createScenario('ethanol_glucose_v0', 'A second one', 'yeast');
+  const made = st().scenarios.find((x) => x.id === id);
+  check('New scenario makes a biosteam scenario on its flowsheet, in its program, holding no input value and not run',
+    !!made && made.kind === 'biosteam' && made.flowsheetId === 'ethanol_glucose_v0' && made.program === 'yeast' &&
+      made.lastRunId === null && made.dims.length === 0 && Object.keys(made.point).length === 0 && made.assumptions.length === 0);
+  check('its id is time-based and its own', /^sc-[0-9a-z]+-\d+$/.test(id) && id !== other, [id, other]);
+  check('a scenario made in the active program shows with the switch off', programVisible('scenario', id, st()));
+  st().togglePin(id);
+  const typed = { key: 'glucose_price', value: 0.3, low: 0.2, high: 0.4, by: 'Sean Creighton', at: '2026-10-20', note: null };
+  st().setProformaAssumption(id, typed);
+  st().recordScenarioRun(id, 'a1b2c3d4e5f60718');
+  st().recordScenarioRun('sc-pha-1', '0f1e2d3c4b5a6978');
+  // OF-BLD-019 §3.3 — a seeded scenario pinned to compare stays pinned.
+  st().togglePin('sc-yeast-1');
+  const snap = snapshotOf(st());
+  const kept = snap.createdScenarios?.[id];
+  check('the snapshot keeps a scenario made here by id, with its flowsheet, name, program, pin and newest run',
+    !!kept && kept.flowsheetId === 'ethanol_glucose_v0' && kept.name === 'Glucose to ethanol, a first look' &&
+      kept.program === 'yeast' && kept.pinned === true && kept.lastRunId === 'a1b2c3d4e5f60718');
+  check("a seeded scenario's newest run rides beside them, and the seed is not saved whole",
+    snap.scenarioRuns?.['sc-pha-1'] === '0f1e2d3c4b5a6978' && !snap.createdScenarios?.['sc-pha-1'] && !snap.createdScenarios?.['sc-s1'],
+    snap.scenarioRuns);
+  check('the snapshot names the seeded scenarios pinned here, and no other, and no scenario made here',
+    JSON.stringify(snap.pinnedScenarios) === JSON.stringify(['sc-yeast-1']), snap.pinnedScenarios);
+  // A reload: a store that has lost both, and the assumptions typed for it.
+  useStore.setState((s) => ({
+    scenarios: s.scenarios
+      .filter((x) => x.id !== id && x.id !== other)
+      .map((x) => (x.id === 'sc-pha-1' ? { ...x, lastRunId: null } : x.id === 'sc-yeast-1' ? { ...x, pinned: false } : x)),
+    createdScenarioIds: [],
+    proformaAssumptions: {},
+  }));
+  st().applyDurable(snap);
+  const back = st().scenarios.find((x) => x.id === id);
+  check('after a reload the scenario made here is back, whole, and counted as made here',
+    !!back && back.flowsheetId === 'ethanol_glucose_v0' && back.pinned && back.lastRunId === 'a1b2c3d4e5f60718' &&
+      st().createdScenarioIds.includes(id) && st().createdScenarioIds.includes(other));
+  check('the assumption typed for it is back under its id', st().proformaAssumptions[id]?.[0]?.value === 0.3);
+  check('the seeded scenario has its newest run back', st().scenarios.find((x) => x.id === 'sc-pha-1')?.lastRunId === '0f1e2d3c4b5a6978');
+  check('the seeded scenario pinned here is pinned again after a reload, and no other seeded one',
+    st().scenarios.find((x) => x.id === 'sc-yeast-1')?.pinned === true &&
+      st().scenarios.filter((x) => !st().createdScenarioIds.includes(x.id) && x.pinned).map((x) => x.id).join() === 'sc-yeast-1');
+  st().applyDurable(snap);
+  check('a second hydrate does not make it twice', st().scenarios.filter((x) => x.id === id).length === 1 && st().createdScenarioIds.filter((x) => x === id).length === 1);
+  const copy = st().duplicateScenario(id);
+  const copied = st().scenarios.find((x) => x.id === copy);
+  check('a copy of it is made the same way: its own time-based id, Durable, the same flowsheet, not run',
+    copy !== id && st().createdScenarioIds.includes(copy) && copied?.flowsheetId === 'ethanol_glucose_v0' && copied?.lastRunId === null && copied?.program === 'yeast');
+  const pha = st().createScenario('pha_sugar_v0', 'PHA, made with the switch on', 'pha');
+  check('a scenario made in an archived program hides with the switch off and its link still names the program',
+    !programVisible('scenario', pha, st()) && programOf('scenario', pha, st()) === 'pha');
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data drops the scenarios made here, their newest runs and every pin',
+    !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId) &&
+      !st().scenarios.some((x) => x.pinned));
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  check('Proforma\u2019s New scenario opens the chooser: it copies no scenario and is not disabled for an empty list',
+    !/duplicateScenario/.test(index) && !/disabled=\{scenarios\.length === 0\}/.test(index) && /NewScenarioDialog/.test(index));
+}
+
+// OF-BLD-019 §3.3 — a reference biorefinery's page reads its package test
+// from the run (`output.checks`, through referenceChecks) and the service
+// (`regression`), and types no value of it (a decimal outside a Tailwind
+// class name fails); it shows the TEA's installed
+// equipment cost, never a sum over the units' (the corn TEA prices
+// installation with a Lang factor, so the two differ).
+{
+  const ref = readFileSync(new URL('../src/screens/ProformaReference.tsx', import.meta.url), 'utf8');
+  const code = ref.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check('the reference page reads its package test from the run and the service, and types no decimal value of its own',
+    /referenceChecks\(/.test(code) && /regression/.test(code) && !/(?<![-\w.])\d+\.\d+\b/.test(code), code.match(/(?<![-\w.])\d+\.\d+\b/g));
+  check("the reference page shows the TEA's own installed equipment cost and sums no unit's",
+    /tea\.installedEquipmentCost/.test(code) && !/\.installedCost\b/.test(code) && !/\.reduce\(/.test(code));
+  const compare = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
+  check('Compare reads each BioSTEAM scenario from its newest run artifact, and makes no price of its own',
+    /proformaArtifact\(/.test(compare) && /runViewOfArtifact\(/.test(compare) && /viewPrice\(/.test(compare) && !/basePrice\s*[-+]/.test(compare));
+}
+// OF-BLD-019 §2.R — what the index says of a run and a scenario is what the
+// service says. A reference card names how its price was had in no words of
+// its own beyond the shelf's: the corn plant's price is the package's own,
+// set, and its TEA solves the IRR at it, so the card may not say the package
+// solved or gave it (review 8 and 12). A scenario made here is counted as the
+// service binds it, as its page lists it, and a card that could not ask says
+// only what can bind (review 13).
+{
+  const fixture = <T,>(name: string): T =>
+    JSON.parse(readFileSync(new URL(`../core/tests/fixtures/prototype/${name}`, import.meta.url), 'utf8')).response as T;
+  const shelf = fixture<FlowsheetInfo[]>('proforma-shelf.json');
+  const corn = shelf.find((f) => f.id === 'corn_drygrind');
+  const price = corn?.priceOutput ? referencePrice(corn, { output: { [corn.priceOutput]: 0.5 } } as unknown as Artifact) : null;
+  check('the corn plant\u2019s card claims no solving and no giving of the price its package set',
+    !!price && !/solve|gives/i.test(price.reads) && price.basis === corn?.priceBasis, price);
+  const ethanol = shelf.find((f) => f.id === 'ethanol_glucose_v0');
+  const made = { id: 'sc-made-1', kind: 'biosteam', flowsheetId: 'ethanol_glucose_v0', modelId: 'ethanol_glucose_v0' } as unknown as Scenario;
+  const bound = fixture<{ off: Record<string, { status: number; body: ProformaScenarioInfo }> }>('proforma-bind.json').off.ethanol_glucose_v0.body;
+  const byService = inputCounts(made, bound, shelf, []);
+  check('a made scenario\u2019s card counts the inputs the service binds, as its page lists them',
+    !!byService && byService.bound && byService.total === bound.inputs.length &&
+      byService.waiting === bound.inputs.filter((i) => i.binding === 'waiting').length, byService);
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  check('the index asks the service to bind a scenario made here, and says only what can bind when it cannot ask',
+    /proformaBind\(/.test(index) && /can bind to records/.test(index) && !/bind to records when it runs/.test(index) && !!ethanol);
+}
+
+// OF-BLD-019 §5.1 (D10) — the fermOS fits a person chose for a scenario's
+// inputs are Durable, like its assumptions: which artifact feeds which input
+// survives a reload keyed by scenario and input, one input can stop using its
+// fit or all can, a choice made since load wins over the snapshot's, and
+// clearing this browser's data drops them. The page asks the service for the
+// fits and their values; Send to Proforma rides on fermOS → Forecast.
+{
+  const st = () => useStore.getState();
+  const fit = '1a2b3c4d5e6f7a8b';
+  const forecast = '8b7a6f5e4d3c2b1a';
+  st().setProformaFits('sc-yeast-1', { titre: forecast, yield: forecast, productivity: forecast });
+  st().setProformaFits('sc-yeast-1', { yield: fit });
+  check('choosing a fit binds the inputs it feeds, and a later choice replaces only its own inputs',
+    JSON.stringify(st().proformaFits['sc-yeast-1']) === JSON.stringify({ titre: forecast, yield: fit, productivity: forecast }), st().proformaFits);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps each scenario\u2019s fits by input', snap.proformaFits?.['sc-yeast-1']?.productivity === forecast, snap.proformaFits);
+  useStore.setState({ proformaFits: {} });
+  st().applyDurable(snap);
+  check('after a reload the fits are back under the scenario, input by input',
+    JSON.stringify(st().proformaFits['sc-yeast-1']) === JSON.stringify({ titre: forecast, yield: fit, productivity: forecast }), st().proformaFits);
+  st().setProformaFits('sc-yeast-1', { titre: fit });
+  st().applyDurable(snap);
+  check('a choice made since load wins over the snapshot\u2019s', st().proformaFits['sc-yeast-1']?.titre === fit, st().proformaFits);
+  st().clearProformaFit('sc-yeast-1', 'productivity');
+  check('one input can stop using its fit, and the others keep theirs',
+    !('productivity' in (st().proformaFits['sc-yeast-1'] ?? {})) && st().proformaFits['sc-yeast-1']?.yield === fit);
+  st().clearProformaFit('sc-yeast-1');
+  check('every input can stop using its fit at once', Object.keys(st().proformaFits['sc-yeast-1'] ?? {}).length === 0);
+  st().setProformaFits('sc-yeast-1', { titre: fit });
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data drops the fits chosen here', Object.keys(st().proformaFits).length === 0, st().proformaFits);
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  const forecastPage = readFileSync(new URL('../src/screens/FermOSForecast.tsx', import.meta.url), 'utf8');
+  check('the scenario page lists the fits the service keeps, and keeps the choice in the store',
+    /fermosFits\(/.test(page) && /setProformaFits|setFits\(scenario\.id/.test(page) && !/<FermosFitSlot fits=\{\[\]\}/.test(page));
+  check('fermOS \u2192 Forecast sends a fit to Proforma', /Send to Proforma/.test(forecastPage) && /sendFitPath/.test(forecastPage));
+}
+
+// OF-BLD-019 \u00a73.R \u2014 the Phase 3 review's findings, each held here where a
+// pure function or the page's source can hold it (the smoke holds the
+// pages). Namespace imports, so a function a finding needs and the tree
+// lacks fails its own check rather than the whole script.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const pb = (await import('../src/screens/ProformaBiosteam')) as unknown as Record<string, any>;
+  const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../core/tests/fixtures/prototype/${name}`, import.meta.url), 'utf8')).response;
+  const shelf = fixture('proforma-shelf.json') as { id: string; reference: boolean; inputs: { key: string; name: string; unit: string }[] }[];
+  const ethanol = shelf.find((f) => f.id === 'ethanol_glucose_v0')!;
+  const corn = shelf.find((f) => f.id === 'corn_drygrind')!;
+  const bound = (fixture('proforma-scenarios.json') as any[]).find((s) => s.id === 'sc-yeast-1');
+  const call = (fn: string, ...args: unknown[]) => {
+    try {
+      return typeof pf[fn] === 'function' ? pf[fn](...args) : typeof pb[fn] === 'function' ? pb[fn](...args) : undefined;
+    } catch (e) {
+      return `threw ${String(e)}`;
+    }
+  };
+
+  // (5, high) The yeast page asks its own flowsheet's questions: with titre
+  // and yield waiting, no question and no line of the exported text is PHA's.
+  const waiting = { ...bound, inputs: bound.inputs.map((i: any) => (['titre', 'yield'].includes(i.key) ? { ...i, binding: 'waiting', records: [], value: null } : i)) };
+  const qs = (call('modellerQuestions', waiting.inputs, null, 'ethanol_glucose_v0') ?? []) as { key: string; question: string }[];
+  const text = String(call('questionsText', waiting, null) ?? '');
+  check('the yeast scenario\u2019s questions for a process modeller are its own flowsheet\u2019s, never PHA\u2019s fixed words',
+    qs.some((q) => q.key === 'titre') && qs.some((q) => q.key === 'yield') && !qs.some((q) => /PHA|hydrolysate/.test(q.question)) && !/PHA|hydrolysate/.test(text) && /titre/.test(text),
+    qs.map((q) => q.question));
+  const phaQs = (call('modellerQuestions', [{ key: 'titre', label: 'PHA titre at harvest', binding: 'waiting' }], null, 'pha_sugar_v0') ?? []) as { question: string }[];
+  check('the PHA draft keeps its own questions', /PHA titre/.test(phaQs[0]?.question ?? ''), phaQs);
+
+  // (6, high; 20) What a run read back is credited to whoever set it: on
+  // the ethanol flowsheet the glucose and water fed, the conversion and the
+  // batch time follow from the records and the person's assumptions, never
+  // from the reference model; on a reference plant every value is the
+  // package's own default, named and in its unit, as the shelf lists it.
+  const rb = (call('readBackRows', { glucoseFedKgPerH: 1, waterFedKgPerH: 2, fermenterConversion: 0.5, batchTimeH: 3, rateOfReturn: 0.1, somethingNew: 4 }, ethanol) ?? []) as {
+    key: string;
+    origin: string;
+    label: string;
+    unit: string;
+  }[];
+  const origin = (k: string) => rb.find((r) => r.key === k)?.origin;
+  check('what the case gave from its inputs is never credited to the reference model',
+    ['glucoseFedKgPerH', 'waterFedKgPerH', 'fermenterConversion', 'batchTimeH'].every((k) => origin(k) === 'case') && origin('rateOfReturn') === 'setting' && origin('somethingNew') === 'read', rb);
+  const biosteamSrc = readFileSync(new URL('../src/screens/ProformaBiosteam.tsx', import.meta.url), 'utf8');
+  check('no read-back heading credits the reference model with a value a person or a record set', !/What the reference model supplied/.test(biosteamSrc));
+  const cornRb = (call('readBackRows', { cornFeed: 46380, depreciation: 'MACRS7' }, corn) ?? []) as { key: string; origin: string; label: string; unit: string }[];
+  const cornFeed = cornRb.find((r) => r.key === 'cornFeed');
+  check('a reference plant\u2019s read-back names each default and its unit, as the shelf lists it, and credits the package',
+    cornFeed?.label === 'corn fed' && cornFeed?.unit === 'kg h-1' && cornRb.every((r) => r.origin === 'setting'), cornRb);
+
+  // (27) The left-out line names the flowsheet's own feed.
+  const left = String(call('leftOutWords', { leftOutNoCarbon: 14, leftOutOtherCarbon: 2 }, 'ethanol_glucose_v0') ?? '');
+  check('the ethanol inputs\u2019 left-out line names glucose, not the PHA rule\u2019s sugar or hydrolysate',
+    /glucose/.test(left) && !/hydrolysate/.test(left) && /a sugar or a hydrolysate/.test(String(call('leftOutWords', { leftOutNoCarbon: 1, leftOutOtherCarbon: 1 }, 'pha_sugar_v0') ?? '')), left);
+
+  // (3) A flowsheet with a program files its scenario there and nowhere else.
+  check('New scenario offers only the flowsheet\u2019s own program when it has one',
+    JSON.stringify(call('programsFor', { program: 'pha' }, ['yeast', 'casein', 'pha'])) === '["pha"]' &&
+      JSON.stringify(call('programsFor', { program: null }, ['yeast', 'casein'])) === '["yeast","casein"]');
+
+  // (4) A time the service wrote in UTC says so.
+  check('a run\u2019s time says it is UTC', call('stamp', '2026-10-21T01:00:00Z') === '2026-10-21 01:00 UTC', call('stamp', '2026-10-21T01:00:00Z'));
+  for (const f of ['Proforma.tsx', 'ProformaBiosteam.tsx', 'ProformaReference.tsx', 'Compare.tsx', 'ProformaScenario.tsx']) {
+    const src = readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8');
+    check(`${f} cuts no UTC time to a bare minute or date`, !/replace\('T', ' '\)\.slice\(0, 16\)|createdAt\.slice\(0, 10\)/.test(src));
+  }
+
+  // (12) A table's CSV carries the run's numbers, not the screen's strings.
+  const yeastArt = (fixture('artifacts.json') as any[]).find((a) => a.tool === 'proforma.run' && a.output?.flowsheet === 'ethanol_glucose_v0');
+  const view = pf.runViewOfArtifact(yeastArt);
+  const st = call('streamsTable', view) as { headers: string[]; rows: unknown[][]; csv?: unknown[][] } | undefined;
+  const csv = st?.csv ?? st?.rows ?? [];
+  const numericCols = [4, 5, 6, 8];
+  check('the streams CSV carries the run\u2019s numbers, each column parsing as a number where the run holds one',
+    csv.length === view.tables.streams.length &&
+      csv.every((r, i) => numericCols.every((c) => {
+        const raw = [view.tables.streams[i].T, view.tables.streams[i].P, view.tables.streams[i].massFlow, null, view.tables.streams[i].price][[4, 5, 6, 7, 8].indexOf(c)];
+        return raw == null ? r[c] === '' : Number(r[c]) === raw;
+      })),
+    csv[0]);
+  const eq = call('equipmentTable', view) as { csv?: unknown[][] } | undefined;
+  check('the equipment CSV carries the run\u2019s numbers', !!eq?.csv && eq.csv.every((r, i) => {
+    const u = [...view.tables.units].sort((a: any, b: any) => a.order - b.order)[i];
+    return (u.installedCost == null ? r[3] === '' : Number(r[3]) === u.installedCost) && (u.power == null ? r[7] === '' : Number(r[7]) === u.power);
+  }));
+
+  // (10) The cost breakdown's note puts sales in its annual unit beside the one-off capital sums.
+  const note = String(call('costBreakdownNote', view) ?? '');
+  check('the cost breakdown\u2019s note gives sales a year and capital once', /sales [\d,.]+ USD\/yr/.test(note) && /total capital [\d,.]+ USD\b/.test(note), note);
+
+  // (11) An infeasible base case's empty breakdown says why, not "run it again".
+  const empty = call('costBreakdownEmpty', { ...view, basePrice: null, baseInfeasible: 'Infeasible: this yield is above the theoretical yield', tables: { ...view.tables, tea: null } }) as { what: string; where: string } | undefined;
+  check('an infeasible base case\u2019s empty breakdown names the base case, not a rerun',
+    !!empty && /base case could not run/.test(`${empty.what} ${empty.where}`) && !/run the scenario again/.test(`${empty.what} ${empty.where}`), empty);
+
+  // (28) The sliders' cost lines, split as the flowsheet splits its grid,
+  // take no word the TEA breakdown above uses for another quantity.
+  const teaLabels = new Set((view.tables.tea?.lines ?? []).map((l: { label: string }) => l.label));
+  const sliderLabels = Object.values((pb.SLIDER_LINE_LABEL ?? {}) as Record<string, string>);
+  check('the sliders’ cost lines share no label with the TEA breakdown’s lines',
+    sliderLabels.length === 6 && teaLabels.size > 0 && !sliderLabels.some((l) => teaLabels.has(l)) && !sliderLabels.includes('Utilities'), { sliderLabels, tea: [...teaLabels] });
+
+  // (2) Home's pinned card reads what is pinned: Cost model v0 for the
+  // authored surfaces alone, and no modeled tick for a BioSTEAM scenario.
+  const yeastSc = useStore.getState().scenarios.find((s) => s.id === 'sc-yeast-1')!;
+  const s1 = useStore.getState().scenarios.find((s) => s.id === 'sc-s1')!;
+  const card = call('pinnedCard', [yeastSc]) as { prov: string | null; words: string } | undefined;
+  const authored = call('pinnedCard', [s1]) as { prov: string | null; words: string } | undefined;
+  check('Home\u2019s pinned card says Cost model v0 for an authored surface alone, and puts no modeled tick on a BioSTEAM scenario',
+    !!card && card.prov === null && !/Cost model v0/.test(card.words) && authored?.prov === 'demo' && /Cost model v0/.test(authored.words), { card, authored });
+  const home = readFileSync(new URL('../src/screens/Home.tsx', import.meta.url), 'utf8');
+  check('Home\u2019s pinned card is drawn from pinnedCard', /pinnedCard\(/.test(home) && !/pinned \u2014 open the\s+comparison\. Cost model v0/.test(home));
+
+  // (26) New scenario is never disabled, in any spelling: the header button
+  // and the empty state's.
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  // An opening tag, its attributes' braces read whole (an arrow's `>` is not the tag's end).
+  const header = /<Button\b(?:[^>{]|\{[^}]*\})*data-testid="new-scenario"(?:[^>{]|\{[^}]*\})*>/.exec(index)?.[0] ?? '';
+  const emptyAction = /action=\{\s*<Button\b(?:[^>{]|\{[^}]*\})*>/.exec(index)?.[0] ?? '';
+  check('New scenario, on the header and in the empty state, carries no disabled attribute in any spelling',
+    !!header && !!emptyAction && !/\bdisabled\b/.test(header) && !/\bdisabled\b/.test(emptyAction), { header, emptyAction });
+
+  // (21, 8) A run the service holds for a scenario is found by the page, the
+  // index card and Compare, not only the one this browser kept.
+  for (const f of ['ProformaScenario.tsx', 'Proforma.tsx', 'Compare.tsx']) {
+    const src = readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8');
+    check(`${f} asks the service for a scenario\u2019s newest run`, /proformaNewestRun\(/.test(src));
+  }
+})();
+
+// OF-BLD-019 \u00a77.R (2) \u2014 Compare reads a fermOS fit as the input's source.
+// proforma.basis_inputs names a fit-bound input `<key> fit`, `<key> fit low`
+// and `<key> fit high` (source artifact), and a productivity the fit gave
+// carries `fit batch time`. runInputs reads them as one row for the key,
+// of kind artifact with the fit's range and id, never as 'not in this
+// run's basis' beside a raw 'titre fit' row.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  let words: ((i: unknown) => string) | null = null;
+  try {
+    words = ((await import('../src/screens/Compare')) as unknown as Record<string, any>).inputWords ?? null;
+  } catch {
+    words = null;
+  }
+  const src = (id: string, note: string) => ({ kind: 'artifact', id, note });
+  const basisIn = (name: string, value: number, unit: string, source: object) => ({ name, value, unit, source });
+  const view = {
+    basis: {
+      inputs: [
+        basisIn('flowsheet', 0, '', { kind: 'convention' }),
+        basisIn('titre fit', 80, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('titre fit low', 70, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('titre fit high', 90, 'g L-1', src('fitA', 'the forecast median titre')),
+        basisIn('productivity fit', 2, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('productivity fit low', 1.5, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('productivity fit high', 2.5, 'g L-1 h-1', src('fitA', 'titre over the run-out hour')),
+        basisIn('fit batch time', 40, 'h', src('fitA', 'the hour the median sugar runs out')),
+        basisIn('yield record', 0.4, 'g g-1', { kind: 'record', id: 'r1' }),
+      ],
+    },
+  };
+  const flowsheet = { inputs: ['titre', 'yield', 'productivity'].map((key) => ({ key, name: key, unit: '', kind: 'bound' })) };
+  let rows: any[] = [];
+  try {
+    rows = typeof pf.runInputs === 'function' ? pf.runInputs(view, flowsheet) : [];
+  } catch (e) {
+    rows = [{ threw: String(e) }];
+  }
+  const titre = rows.find((r) => r.key === 'titre');
+  const prod = rows.find((r) => r.key === 'productivity');
+  check('Compare reads a titre a fermOS fit fed as one artifact row with the fit\u2019s value, range and id',
+    titre?.kind === 'artifact' && titre.value === 80 && titre.low === 70 && titre.high === 90 && titre.by === 'fitA', titre);
+  check('no input row is keyed by a fit\u2019s own basis name', !rows.some((r) => / fit$|^fit /.test(String(r.key))), rows.map((r) => r.key));
+  check('a productivity from a fit names the fit\u2019s batch time', prod?.kind === 'artifact' && /40 h/.test(String(prod?.note ?? '')), prod);
+  const said = words && titre ? words(titre) : '';
+  check('Compare\u2019s words for a fitted input name the artifact and its range, never \u201cnot in this run\u2019s basis\u201d',
+    /fitA/.test(said) && /70/.test(said) && /90/.test(said) && !/not in this run/.test(said), said);
+  const compareSrc = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
+  check('Compare links an artifact-fed input to its artifact', /data-testid="compare-input-artifact"/.test(compareSrc));
+})();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);

@@ -184,12 +184,39 @@ const PAIRS = [
   ['InputSensitivity', 'InputSensitivity'],
   ['ProformaGrid', 'ProformaGrid'],
   ['ProformaRunResult', 'ProformaRunResult'],
+  // OF-BLD-019 §5.1 — a fermOS fit feeds the fermenter.
+  ['FitFeed', 'FitFeed'],
+  ['FermosFitInfo', 'FermosFitInfo'],
+  // OF-BLD-019 §5.2 — a scenario's yield read against the geneOS ceiling.
+  ['CeilingRow', 'CeilingRow'],
+  ['CeilingCheck', 'CeilingCheck'],
+  // OF-BLD-019 §2.1 — the shelf of flowsheets and the run's tables.
+  ['FlowsheetInput', 'FlowsheetInput'],
+  ['FlowsheetInfo', 'FlowsheetInfo'],
+  ['StreamRow', 'StreamRow'],
+  ['UnitRow', 'UnitRow'],
+  ['UtilityDuties', 'UtilityDuties'],
+  ['TeaLine', 'TeaLine'],
+  ['TeaBreakdown', 'TeaBreakdown'],
+  ['ProformaTables', 'ProformaTables'],
+  // OF-BLD-019 §2.2 — a reference biorefinery's run and its package's test.
+  ['RegressionValue', 'RegressionValue'],
+  ['PackageRegression', 'PackageRegression'],
+  ['RegressionCheck', 'RegressionCheck'],
+  ['ProformaReference', 'ProformaReference'],
   ['TraceStep', 'TraceStep'],
   // A follow-up carries its conversation's earlier turns in words.
   ['PriorTurn', 'PriorTurn'],
   ['AskRequest', 'AskRequest'],
   // OF-BLD-016 §2.1 — a program is data.
   ['Program', 'Program'],
+  // OF-BLD-019 §4.1 — pureOS reads the train from the run Proforma priced.
+  ['TrainUnit', 'TrainUnit'],
+  ['Train', 'Train'],
+  ['TrainSummary', 'TrainSummary'],
+  // OF-BLD-019 §4.2 — thermosteam answers property questions.
+  ['ThermoPropsRequest', 'ThermoPropsRequest'],
+  ['ThermoProps', 'ThermoProps'],
 ];
 
 let compared = 0;

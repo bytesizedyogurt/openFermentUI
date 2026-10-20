@@ -53,6 +53,7 @@ import Deposition from '@/screens/Deposition';
 import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
+import ProformaReference from '@/screens/ProformaReference';
 import Compare from '@/screens/Compare';
 import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
@@ -62,6 +63,7 @@ import Settings from '@/screens/Settings';
 import Architecture from '@/screens/Architecture';
 import GeneOS from '@/screens/GeneOS';
 import PureOS from '@/screens/PureOS';
+import PureOSTrain from '@/screens/PureOSTrain';
 import FermOS from '@/screens/FermOS';
 import Dominion from '@/screens/Dominion';
 import Depositions from '@/screens/Depositions';
@@ -184,9 +186,20 @@ function Screen() {
       // and left fermOS as the five reactor subsystems, none of which is built.
       return <FermOS />;
     case 'pureos':
+      // OF-BLD-019 §4.1 — 'train' is a reserved second segment: the units of
+      // the run Proforma priced, by scenario id or the run's artifact id. With
+      // no id it is the front page, which lists the trains on file.
+      if (b === 'train') return c ? <PureOSTrain scenarioId={c} /> : <PureOS />;
       return <PureOS />;
     case 'proforma':
       if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;
+      // OF-BLD-019 §3.3 — 'reference' is a reserved second segment: a
+      // reference biorefinery's page by its shelf id; with no id, the index,
+      // whose Reference runs row lists them.
+      // Keyed by id (OF-BLD-019 §3.R, findings 13, 24): a run still in flight
+      // when the reader moves to the other reference lands on the page that
+      // asked, never on this one.
+      if (b === 'reference') return c ? <ProformaReference key={c} flowsheetId={c} /> : <Proforma />;
       return <Proforma />;
     case 'runbooks':
       // 'protocols' and 'depositions' are reserved second segments. Runbook ids

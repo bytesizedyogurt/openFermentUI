@@ -28,7 +28,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -128,6 +128,12 @@ export interface DurableSnapshot {
    */
   proformaAssumptions?: Record<string, InputAssumption[]>;
   /**
+   * The fermOS fits a person chose for a scenario's inputs, by scenario id
+   * and input key: a kept kinetic fit's or forecast's artifact id
+   * (OF-BLD-019 §5.1). Optional for the same reason as `guild`.
+   */
+  proformaFits?: Record<string, Record<string, string>>;
+  /**
    * Runbooks adopted from a Postdoc draft (OF-BLD-014 §9.2), as adopted. A
    * lock on one is kept in `runbookLocks`, like a seeded runbook's.
    */
@@ -138,6 +144,25 @@ export interface DurableSnapshot {
    * same reason as `guild`.
    */
   liveConversations?: LiveConversation[];
+  /**
+   * Proforma scenarios a person made here from a shelf flowsheet
+   * (OF-BLD-019 D6), keyed by id: each with its flowsheet id, name, program,
+   * pin and the id of its newest run artifact. Their typed assumptions ride
+   * in `proformaAssumptions` under the same id. Optional for the same reason
+   * as `guild`.
+   */
+  createdScenarios?: Record<string, Scenario>;
+  /**
+   * The newest run artifact of each SEEDED scenario that ran here, by
+   * scenario id (a created scenario carries its own `lastRunId`).
+   */
+  scenarioRuns?: Record<string, string>;
+  /**
+   * The SEEDED scenarios pinned to compare here (OF-BLD-019 §3.3, D6), by id;
+   * a created scenario carries its own `pinned`. Every seeded scenario ships
+   * unpinned, so an id absent here is unpinned.
+   */
+  pinnedScenarios?: string[];
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

@@ -213,6 +213,19 @@ export function CommandPalette() {
         run: () => navigate('/guild'),
       },
       {
+        // OF-BLD-019 §3.1 — the chooser over the shelf, on Proforma's index.
+        id: 'a-new-scenario',
+        group: 'Actions',
+        label: 'New Proforma scenario',
+        hint: 'pick a flowsheet from the shelf',
+        aliases: ['new scenario', 'flowsheet', 'biosteam'],
+        icon: LineChart,
+        run: () => {
+          useStore.getState().setUI({ newScenarioOpen: true });
+          navigate('/proforma');
+        },
+      },
+      {
         id: 'a-newsc',
         group: 'Actions',
         label: 'New Proforma scenario from cw15 defaults',

@@ -107,8 +107,14 @@ name the record, the field or the unit, and the tool looks the value up.
 6. When a tool refuses, say in `gaps` what it refused and why.
 7. Cite only ids a tool returned to you in this conversation. A computed value \
 is cited by its evidence id.
-8. A price comes from a run a person produced. When selling_price refuses, \
-say which inputs wait for a source; never supply one yourself.
+8. A price comes from a flowsheet run: selling_price reads a person's newest \
+run, run_flowsheet runs a scenario as the service binds it, and stream_table \
+reads a kept run's streams. A price, a cost or a recovery read from a run is \
+cited by that run's evidence id, which is its artifact id and which those \
+three tools return; a train row pureos_read returned is cited by its ref in \
+moduleRefs. When run_flowsheet \
+or selling_price refuses, say in gaps which inputs wait for a source; never \
+supply one yourself: an assumption is a named person's, typed in Proforma.
 9. Conditions, settings and dates are numbers too. A temperature, a time \
 window, a year, a percentage, a pH, a rate of return, a table or figure \
 number or a concentration in claim text or in a gap discards it, even when \
@@ -267,6 +273,11 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Looked up records of {what} · {_count(len(result.recordIds), 'record')}"
     if name == "convert_units":
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
+    if name == "run_flowsheet":
+        return f"Ran the flowsheet of {inp.get('scenarioId')} · kept run {result.summary.get('artifactId')}"
+    if name == "stream_table":
+        cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
+        return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
     if name.endswith("_read") and name[: -len("_read")] in module_stores.LABEL:
         label = module_stores.LABEL[name[: -len("_read")]]
         what = [f'"{inp["words"]}"'] if inp.get("words") else []

@@ -21,6 +21,15 @@
 // takes the readings as sent, and each fit's basis says so (§7.R). The only route from here to a
 // kinetic model runs through Deposition.
 //
+// PROPERTIES OF A BROTH (OF-BLD-019 §4.2, D9). Below the fits, a person picks
+// an ethanol titre record of the active program, and thermosteam (BioSTEAM's
+// property engine, in the Proforma worker) gives the density, heat capacity
+// and boiling point of water and ethanol at that titre (the preset
+// `beer-at-titre-of`). A titre is a measured value, not a kinetic parameter:
+// it enters no fit and no forecast, and the card names the record it read, the
+// library's version and the artifact the answer is kept as. With no titre
+// record on file the card says what would fill it.
+//
 // This screen may be extended. Keep this header's reasoning with it.
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
@@ -28,7 +37,9 @@ import type { FermosFitResponse, FermosSeries, FitParam } from '@/data/types';
 import { useProgramFilter, useStore } from '@/store';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
-import { Callout, EmptyState, PageHeader } from '@/components/ui';
+import { Callout, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
+import { PropertiesPanel } from '@/components/PropertiesPanel';
+import { BEER, TITRE_FIELD } from '@/lib/thermo';
 import { ComponentTag } from '@/components/ComponentTag';
 import { SubsystemShelf } from '@/components/ReferenceView';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -217,6 +228,70 @@ function Fits() {
   );
 }
 
+function BrothProperties() {
+  const records = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  const titres = useMemo(
+    () =>
+      records.filter(
+        (r) => r.field === TITRE_FIELD && typeof r.value === 'number' && r.status !== 'rejected' && shows('record', r.id),
+      ),
+    [records, shows],
+  );
+  const [picked, setPicked] = useState('');
+  const chosen = titres.find((r) => r.id === picked) ?? null;
+  return (
+    <section className="mt-6" aria-labelledby="broth-properties-title" data-testid="broth-properties">
+      <SectionTitle
+        right={
+          titres.length > 0 && (
+            <label className="text-caption text-ink-soft flex items-center gap-1.5">
+              Titre record
+              <select className="input" aria-label="Titre record" value={picked} onChange={(e) => setPicked(e.target.value)}>
+                <option value="">pick one</option>
+                {titres.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.id} · {fmt(r.value as number)} {r.unit} · {r.paperId}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )
+        }
+      >
+        <span id="broth-properties-title">Properties of a broth</span>
+      </SectionTitle>
+      <p className="text-caption text-ink-soft mb-2">
+        Density, heat capacity, viscosity, and bubble and dew points of water and ethanol at a titre a paper measured, as
+        thermosteam (BioSTEAM&rsquo;s property engine) computes them. The page names the record; the service reads its value,
+        and nothing is typed. The beer&rsquo;s cells, residual sugar and dissolved carbon dioxide are not in the mixture.
+      </p>
+      {titres.length === 0 ? (
+        <p className="text-body text-ink-soft" data-testid="broth-properties-empty">
+          No ethanol titre record of an active program is on file yet. A titre extracted from a thread Q paper in{' '}
+          <a href={href('/intake')} className="text-accent hover:underline">
+            Intake
+          </a>
+          , anchored to its sentence, fills this: pick it here and thermosteam computes the density, heat capacity and
+          boiling point of water and ethanol at that titre.
+        </p>
+      ) : chosen ? (
+        <PropertiesPanel
+          key={chosen.id}
+          title={
+            <>
+              Water and ethanol at the titre of <span className="font-num">{chosen.id}</span>
+            </>
+          }
+          question={{ preset: BEER, recordId: chosen.id }}
+        />
+      ) : (
+        <p className="text-body text-ink-soft">Pick a titre record above to ask what thermosteam says of that beer.</p>
+      )}
+    </section>
+  );
+}
+
 export default function FermOS() {
   const route = useRoute();
   const onForecast = route.path.startsWith('/fermos/forecast');
@@ -232,6 +307,8 @@ export default function FermOS() {
       <OwnerTabs tabs={FERMOS_TABS} />
 
       {onForecast ? <FermOSForecast /> : <Fits />}
+
+      <BrothProperties />
 
       <div className="mt-6 space-y-4">
         <Callout kind="warn" title="Kinetic parameters come from runs, not from papers">

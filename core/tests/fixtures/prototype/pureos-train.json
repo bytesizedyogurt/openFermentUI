@@ -1,0 +1,195 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "scenarioId": "sc-pha-1",
+    "scenarioName": "PHA from cellulosic sugar — draft flowsheet",
+    "artifactId": "965796f3dc87a2ff",
+    "flowsheet": "pha_sugar_v0",
+    "createdAt": "2026-09-15T09:00:00Z",
+    "provenance": "demo",
+    "program": "pha",
+    "tablesSource": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+    "productStream": "product",
+    "product": "PHB",
+    "productBasis": "PHB in product: the component the run's price is per (kg of PHA contained in dried cell mass)",
+    "productOut": 2850.0,
+    "productLost": 150.0,
+    "overallRecovery": 0.95,
+    "units": [
+      {
+        "id": "R1",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 0,
+        "ins": [
+          "sugar",
+          "process_water"
+        ],
+        "outs": [
+          "broth"
+        ],
+        "onPath": true,
+        "massIn": 76666.66666666667,
+        "massOut": 76666.66666666667,
+        "productIn": 0.0,
+        "productOut": 3000.0,
+        "productOnward": 3000.0,
+        "productLost": 0.0,
+        "lostTo": [],
+        "recovery": null,
+        "cumulative": 1.0,
+        "note": "no PHB enters R1: the product is formed here"
+      },
+      {
+        "id": "C1",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 1,
+        "ins": [
+          "broth"
+        ],
+        "outs": [
+          "spent_medium",
+          "wet_solids"
+        ],
+        "onPath": true,
+        "massIn": 76666.66666666667,
+        "massOut": 76666.66666666667,
+        "productIn": 3000.0,
+        "productOut": 3000.0,
+        "productOnward": 2850.0,
+        "productLost": 150.0,
+        "lostTo": [
+          "spent_medium"
+        ],
+        "recovery": 0.95,
+        "cumulative": 0.95,
+        "note": null
+      },
+      {
+        "id": "D1",
+        "unitClass": "StandIn",
+        "line": "STAND-IN unit",
+        "order": 2,
+        "ins": [
+          "wet_solids"
+        ],
+        "outs": [
+          "product"
+        ],
+        "onPath": true,
+        "massIn": 3931.0344827586205,
+        "massOut": 3931.0344827586205,
+        "productIn": 2850.0,
+        "productOut": 2850.0,
+        "productOnward": 2850.0,
+        "productLost": 0.0,
+        "lostTo": [],
+        "recovery": 1.0,
+        "cumulative": 0.95,
+        "note": null
+      }
+    ],
+    "streams": [
+      {
+        "id": "sugar",
+        "source": null,
+        "sink": "R1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 10000.0,
+        "massFlows": {
+          "Glucose": 10000.0
+        },
+        "price": 0.4
+      },
+      {
+        "id": "process_water",
+        "source": null,
+        "sink": "R1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 66666.66666666667,
+        "massFlows": {
+          "Water": 66666.66666666667
+        },
+        "price": null
+      },
+      {
+        "id": "broth",
+        "source": "R1",
+        "sink": "C1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 76666.66666666667,
+        "massFlows": {
+          "Water": 66666.66666666667,
+          "Glucose": 5862.068965517242,
+          "PHB": 3000.0,
+          "Cells": 1137.9310344827582
+        },
+        "price": null
+      },
+      {
+        "id": "spent_medium",
+        "source": "C1",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 72735.63218390805,
+        "massFlows": {
+          "Water": 66666.66666666667,
+          "Glucose": 5862.068965517242,
+          "PHB": 150.00000000000014,
+          "Cells": 56.89655172413796
+        },
+        "price": null
+      },
+      {
+        "id": "wet_solids",
+        "source": "C1",
+        "sink": "D1",
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 3931.0344827586205,
+        "massFlows": {
+          "PHB": 2850.0,
+          "Cells": 1081.0344827586202
+        },
+        "price": null
+      },
+      {
+        "id": "product",
+        "source": "D1",
+        "sink": null,
+        "phase": "l",
+        "T": 298.15,
+        "P": 101325.0,
+        "massFlow": 3931.0344827586205,
+        "massFlows": {
+          "PHB": 2850.0,
+          "Cells": 1081.0344827586202
+        },
+        "price": null
+      }
+    ],
+    "tableUnits": {
+      "T": "K",
+      "P": "Pa",
+      "massFlow": "kg/hr",
+      "price": "USD/kg",
+      "cost": "USD",
+      "duty": "kJ/hr",
+      "power": "kW",
+      "annual": "USD/yr",
+      "perUnit": "USD per unit of the price's basis"
+    },
+    "runs": 1,
+    "note": null
+  }
+}

@@ -183,10 +183,11 @@ export const SUBSYSTEMS: Subsystem[] = [
     state:
       'Runs a BioSTEAM flowsheet over 500 seeded Latin-hypercube samples of inputs bound to records or to a named ' +
       'person\u2019s assumption, and shows the price as a distribution, what moves it, and the infeasible share by ' +
-      'reason. One draft flowsheet so far: fermentation, harvest and drying of PHA.',
+      'reason. Two flowsheets a scenario runs: glucose to ethanol for the yeast program, and the archived PHA draft.',
     implementedIn: [
       'core/openferment_core/proforma.py',
       'core/openferment_core/flowsheets/pha_sugar_v0.py',
+      'core/openferment_core/flowsheets/ethanol_glucose_v0.py',
       'core/openferment_core/workers/proforma_worker.py',
       'src/screens/ProformaBiosteam.tsx',
       'src/components/figures/Distribution.tsx',

@@ -1,0 +1,835 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": {
+    "off": {
+      "cornstover_benchmark": {
+        "status": 422,
+        "body": {
+          "detail": "cornstover_benchmark is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "corn_drygrind": {
+        "status": 422,
+        "body": {
+          "detail": "corn_drygrind is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": {
+          "id": "",
+          "name": "",
+          "product": "ethanol",
+          "flowsheet": "ethanol_glucose_v0",
+          "host": null,
+          "hosts": [
+            "s-cerevisiae-cenpk113-7d"
+          ],
+          "inputs": [
+            {
+              "key": "feed_glucose_conc",
+              "label": "glucose in the fermenter's feed",
+              "unit": "g L-1",
+              "binding": "records",
+              "value": 60.0,
+              "low": 20.0,
+              "high": 100.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of medium_component_conc",
+                "by": null
+              },
+              "recordIds": [
+                "standin-medium_component_conc-0",
+                "standin-medium_component_conc-1",
+                "standin-medium_component_conc-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-medium_component_conc-0",
+                  "paperId": "Q999",
+                  "value": 20.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-medium_component_conc-1",
+                  "paperId": "Q999",
+                  "value": 60.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-medium_component_conc-2",
+                  "paperId": "Q999",
+                  "value": 100.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "titre",
+              "label": "ethanol titre at harvest",
+              "unit": "g L-1",
+              "binding": "records",
+              "value": 60.0,
+              "low": 40.0,
+              "high": 90.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_titre",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_titre-0",
+                "standin-ethanol_titre-1",
+                "standin-ethanol_titre-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_titre-0",
+                  "paperId": "Q999",
+                  "value": 40.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_titre-1",
+                  "paperId": "Q999",
+                  "value": 60.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_titre-2",
+                  "paperId": "Q999",
+                  "value": 90.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "yield",
+              "label": "ethanol yield on glucose",
+              "unit": "g g-1",
+              "binding": "records",
+              "value": 0.45,
+              "low": 0.4,
+              "high": 0.48,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_yield_substrate",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_yield_substrate-0",
+                "standin-ethanol_yield_substrate-1",
+                "standin-ethanol_yield_substrate-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_yield_substrate-0",
+                  "paperId": "Q999",
+                  "value": 0.4,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_yield_substrate-1",
+                  "paperId": "Q999",
+                  "value": 0.45,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_yield_substrate-2",
+                  "paperId": "Q999",
+                  "value": 0.48,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "productivity",
+              "label": "ethanol volumetric productivity",
+              "unit": "g L-1 h-1",
+              "binding": "records",
+              "value": 1.8,
+              "low": 1.0,
+              "high": 2.5,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_productivity",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_productivity-0",
+                "standin-ethanol_productivity-1",
+                "standin-ethanol_productivity-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_productivity-0",
+                  "paperId": "Q999",
+                  "value": 1.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_productivity-1",
+                  "paperId": "Q999",
+                  "value": 1.8,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_productivity-2",
+                  "paperId": "Q999",
+                  "value": 2.5,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "plant_scale",
+              "label": "ethanol fermented in a year",
+              "unit": "t yr-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "glucose_price",
+              "label": "price of glucose",
+              "unit": "USD kg-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            }
+          ],
+          "waiting": [
+            "plant_scale",
+            "glucose_price"
+          ],
+          "leavesOut": [
+            "where the glucose comes from: it arrives as clean glucose, priced as such",
+            "cell mass and by-products: the glucose the yield does not turn into ethanol leaves unconverted in the stillage",
+            "the scrubber that recovers ethanol from the fermenter's gas",
+            "stillage handling and co-products",
+            "wastewater treatment and the boiler"
+          ],
+          "priceBasis": "USD per kg of fuel-grade ethanol, as the product leaves its tank"
+        }
+      },
+      "pha_sugar_v0": {
+        "status": 422,
+        "body": {
+          "detail": "pha_sugar_v0 belongs to the archived program PHA; Settings → Programs → Show archived programs and examples binds it"
+        }
+      },
+      "toy": {
+        "status": 422,
+        "body": {
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+        }
+      }
+    },
+    "on": {
+      "cornstover_benchmark": {
+        "status": 422,
+        "body": {
+          "detail": "cornstover_benchmark is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "corn_drygrind": {
+        "status": 422,
+        "body": {
+          "detail": "corn_drygrind is a reference biorefinery: it runs whole on its package's own defaults, not as a scenario's flowsheet"
+        }
+      },
+      "ethanol_glucose_v0": {
+        "status": 200,
+        "body": {
+          "id": "",
+          "name": "",
+          "product": "ethanol",
+          "flowsheet": "ethanol_glucose_v0",
+          "host": null,
+          "hosts": [
+            "s-cerevisiae-cenpk113-7d"
+          ],
+          "inputs": [
+            {
+              "key": "feed_glucose_conc",
+              "label": "glucose in the fermenter's feed",
+              "unit": "g L-1",
+              "binding": "records",
+              "value": 60.0,
+              "low": 20.0,
+              "high": 100.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of medium_component_conc",
+                "by": null
+              },
+              "recordIds": [
+                "standin-medium_component_conc-0",
+                "standin-medium_component_conc-1",
+                "standin-medium_component_conc-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-medium_component_conc-0",
+                  "paperId": "Q999",
+                  "value": 20.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-medium_component_conc-1",
+                  "paperId": "Q999",
+                  "value": 60.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-medium_component_conc-2",
+                  "paperId": "Q999",
+                  "value": 100.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "titre",
+              "label": "ethanol titre at harvest",
+              "unit": "g L-1",
+              "binding": "records",
+              "value": 60.0,
+              "low": 40.0,
+              "high": 90.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_titre",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_titre-0",
+                "standin-ethanol_titre-1",
+                "standin-ethanol_titre-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_titre-0",
+                  "paperId": "Q999",
+                  "value": 40.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_titre-1",
+                  "paperId": "Q999",
+                  "value": 60.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_titre-2",
+                  "paperId": "Q999",
+                  "value": 90.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "yield",
+              "label": "ethanol yield on glucose",
+              "unit": "g g-1",
+              "binding": "records",
+              "value": 0.45,
+              "low": 0.4,
+              "high": 0.48,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_yield_substrate",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_yield_substrate-0",
+                "standin-ethanol_yield_substrate-1",
+                "standin-ethanol_yield_substrate-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_yield_substrate-0",
+                  "paperId": "Q999",
+                  "value": 0.4,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_yield_substrate-1",
+                  "paperId": "Q999",
+                  "value": 0.45,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_yield_substrate-2",
+                  "paperId": "Q999",
+                  "value": 0.48,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "productivity",
+              "label": "ethanol volumetric productivity",
+              "unit": "g L-1 h-1",
+              "binding": "records",
+              "value": 1.8,
+              "low": 1.0,
+              "high": 2.5,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of ethanol_productivity",
+                "by": null
+              },
+              "recordIds": [
+                "standin-ethanol_productivity-0",
+                "standin-ethanol_productivity-1",
+                "standin-ethanol_productivity-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-ethanol_productivity-0",
+                  "paperId": "Q999",
+                  "value": 1.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_productivity-1",
+                  "paperId": "Q999",
+                  "value": 1.8,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-ethanol_productivity-2",
+                  "paperId": "Q999",
+                  "value": 2.5,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "plant_scale",
+              "label": "ethanol fermented in a year",
+              "unit": "t yr-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "glucose_price",
+              "label": "price of glucose",
+              "unit": "USD kg-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            }
+          ],
+          "waiting": [
+            "plant_scale",
+            "glucose_price"
+          ],
+          "leavesOut": [
+            "where the glucose comes from: it arrives as clean glucose, priced as such",
+            "cell mass and by-products: the glucose the yield does not turn into ethanol leaves unconverted in the stillage",
+            "the scrubber that recovers ethanol from the fermenter's gas",
+            "stillage handling and co-products",
+            "wastewater treatment and the boiler"
+          ],
+          "priceBasis": "USD per kg of fuel-grade ethanol, as the product leaves its tank"
+        }
+      },
+      "pha_sugar_v0": {
+        "status": 200,
+        "body": {
+          "id": "",
+          "name": "",
+          "product": "phb",
+          "flowsheet": "pha_sugar_v0",
+          "host": null,
+          "hosts": [
+            "c-necator-h16"
+          ],
+          "inputs": [
+            {
+              "key": "titre",
+              "label": "PHA titre at harvest",
+              "unit": "g L-1",
+              "binding": "records",
+              "value": 45.0,
+              "low": 20.0,
+              "high": 70.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of pha_titre",
+                "by": null
+              },
+              "recordIds": [
+                "standin-pha_titre-0",
+                "standin-pha_titre-1",
+                "standin-pha_titre-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-pha_titre-0",
+                  "paperId": "P999",
+                  "value": 20.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_titre-1",
+                  "paperId": "P999",
+                  "value": 45.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_titre-2",
+                  "paperId": "P999",
+                  "value": 70.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "yield",
+              "label": "PHA yield on sugar",
+              "unit": "g g-1",
+              "binding": "records",
+              "value": 0.3,
+              "low": 0.22,
+              "high": 0.36,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of pha_yield_substrate",
+                "by": null
+              },
+              "recordIds": [
+                "standin-pha_yield_substrate-0",
+                "standin-pha_yield_substrate-1",
+                "standin-pha_yield_substrate-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-pha_yield_substrate-0",
+                  "paperId": "P999",
+                  "value": 0.22,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_yield_substrate-1",
+                  "paperId": "P999",
+                  "value": 0.3,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_yield_substrate-2",
+                  "paperId": "P999",
+                  "value": 0.36,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "content",
+              "label": "PHA share of dry cell mass",
+              "unit": "g g-1",
+              "binding": "records",
+              "value": 0.7250000000000001,
+              "low": 0.65,
+              "high": 0.8,
+              "sampling": "uniform",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "2 records of pha_content_cdw",
+                "by": null
+              },
+              "recordIds": [
+                "standin-pha_content_cdw-0",
+                "standin-pha_content_cdw-1"
+              ],
+              "records": [
+                {
+                  "id": "standin-pha_content_cdw-0",
+                  "paperId": "P999",
+                  "value": 0.65,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_content_cdw-1",
+                  "paperId": "P999",
+                  "value": 0.8,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "productivity",
+              "label": "PHA volumetric productivity",
+              "unit": "g L-1 h-1",
+              "binding": "records",
+              "value": 1.4,
+              "low": 0.6,
+              "high": 2.0,
+              "sampling": "triangular",
+              "source": {
+                "kind": "record",
+                "id": null,
+                "note": "3 records of pha_productivity",
+                "by": null
+              },
+              "recordIds": [
+                "standin-pha_productivity-0",
+                "standin-pha_productivity-1",
+                "standin-pha_productivity-2"
+              ],
+              "records": [
+                {
+                  "id": "standin-pha_productivity-0",
+                  "paperId": "P999",
+                  "value": 0.6,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_productivity-1",
+                  "paperId": "P999",
+                  "value": 1.4,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                },
+                {
+                  "id": "standin-pha_productivity-2",
+                  "paperId": "P999",
+                  "value": 2.0,
+                  "organism": "STAND-IN organism",
+                  "carbonSource": "glucose",
+                  "provenance": "unverified"
+                }
+              ],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "recovery",
+              "label": "solids recovered at harvest",
+              "unit": "",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "sugarPrice",
+              "label": "price of fermentable sugar",
+              "unit": "USD kg-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            },
+            {
+              "key": "sugarFeed",
+              "label": "sugar fed",
+              "unit": "kg h-1",
+              "binding": "waiting",
+              "value": null,
+              "low": null,
+              "high": null,
+              "sampling": null,
+              "source": null,
+              "recordIds": [],
+              "records": [],
+              "leftOutNoCarbon": 0,
+              "leftOutOtherCarbon": 0,
+              "flags": []
+            }
+          ],
+          "waiting": [
+            "recovery",
+            "sugarPrice",
+            "sugarFeed"
+          ],
+          "leavesOut": [
+            "feedstock pretreatment and hydrolysis",
+            "polymer extraction and purification",
+            "wastewater treatment",
+            "co-products"
+          ],
+          "priceBasis": "USD per kg of PHA contained in dried cell mass"
+        }
+      },
+      "toy": {
+        "status": 422,
+        "body": {
+          "detail": "toy is a STAND-IN for tests and is not on the shelf; the shelf holds cornstover_benchmark, corn_drygrind, ethanol_glucose_v0, pha_sugar_v0"
+        }
+      }
+    }
+  }
+}

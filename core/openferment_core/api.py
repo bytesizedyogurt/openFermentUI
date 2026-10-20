@@ -54,6 +54,7 @@ from .models import (
     FetchResult,
     ForecastRequest,
     ProformaRunRequest,
+    ThermoPropsRequest,
     ForecastResult,
     GeneosModelInfo,
     GeneosResult,
@@ -346,12 +347,69 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@app.get("/api/fermos/fits")
+def fermos_fits(flowsheet: str) -> list[dict]:
+    """The kinetic fits and forecasts fermOS keeps, newest first, each with
+    what it can feed a shelf flowsheet's titre, yield and productivity and
+    why not (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+    a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
+    from . import proforma
+
+    try:
+        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _fits_param(raw: str | None) -> dict[str, str]:
+    """`?fits=` on GET /api/proforma/bind: a JSON object of input key to
+    artifact id, as ProformaRunRequest.fits carries it."""
+    if not raw:
+        return {}
+    try:
+        fits = json.loads(raw)
+    except (ValueError, RecursionError):
+        # OF-BLD-019 §7.R: JSON nested past Python's recursion limit is
+        # malformed like any other, refused in words, never a bare 500.
+        fits = None
+    if not isinstance(fits, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in fits.items()):
+        raise HTTPException(status_code=422, detail="fits is a JSON object of input key to the id of a kept fermOS fit")
+    return fits
+
+
+def _assumptions_param(raw: str | None) -> list:
+    """`?assumptions=` on GET /api/proforma/ceiling-check: a JSON list of
+    named persons' assumptions, as ProformaRunRequest.assumptions carries
+    them."""
+    from pydantic import TypeAdapter, ValidationError
+
+    from .models import InputAssumption
+
+    if not raw:
+        return []
+    try:
+        return TypeAdapter(list[InputAssumption]).validate_json(raw)
+    except (ValidationError, RecursionError):
+        raise HTTPException(status_code=422, detail="assumptions is a JSON list of assumptions, each with key, value, "
+                                                    "low, high, by and at, as a run takes them") from None
+
+
 @app.get("/api/proforma/status")
 def proforma_status() -> dict:
     """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
     from . import proforma
 
     return proforma.status()
+
+
+@app.get("/api/proforma/shelf")
+def proforma_shelf(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
+    simulator. A flowsheet of an archived program is left out unless
+    `?includeArchived=true` asks for it, as the artifact list does."""
+    from . import proforma
+
+    return [f.model_dump(mode="json") for f in proforma.shelf(include_archived=includeArchived)]
 
 
 @app.get("/api/proforma/benchmark")
@@ -377,18 +435,95 @@ def proforma_benchmark_run() -> dict:
     return {"artifact": art.model_dump(mode="json"), "simulator": proforma.status()}
 
 
-@app.get("/api/proforma/scenarios")
-def proforma_scenarios(host: str | None = None) -> list[dict]:
-    """The BioSTEAM scenario with its inputs bound to records (§8.3). A read:
-    it starts no simulator."""
+@app.get("/api/proforma/reference/{flowsheet_id}")
+def proforma_reference(flowsheet_id: str) -> dict:
+    """A reference biorefinery on the shelf (OF-BLD-019 §2.2): its entry, the
+    newest stored run or none, its package test's values, the simulator's
+    status. A read: it starts nothing. 404 for an id that is not a
+    reference biorefinery on the shelf."""
     from . import proforma
 
-    return [proforma.scenario(host=host).model_dump(mode="json")]
+    try:
+        return proforma.reference(flowsheet_id).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/api/proforma/reference/{flowsheet_id}")
+def proforma_reference_run(flowsheet_id: str) -> dict:
+    """Run a reference biorefinery whole on its package's defaults and keep
+    it as one `proforma.reference` artifact (a basis already run returns its
+    stored artifact)."""
+    from . import proforma
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        art = proforma.run_reference(flowsheet_id)
+        return proforma.reference(flowsheet_id, art).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run {flowsheet_id}: {e}") from e
+
+
+@app.get("/api/proforma/scenarios")
+def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The seed's BioSTEAM scenarios with their inputs bound to records
+    (§8.3; OF-BLD-019 §2.3): one per scenario whose program the switch
+    shows, so sc-yeast-1 with it off and sc-pha-1 too with it on. A read: it
+    starts no simulator."""
+    from . import proforma
+
+    return [s.model_dump(mode="json") for s in proforma.scenarios(include_archived=includeArchived, host=host)]
+
+
+@app.get("/api/proforma/bind")
+def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
+                  fits: str | None = None) -> dict:
+    """A shelf flowsheet's inputs bound, as a scenario a person made in the
+    browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+    lays on the fermOS fits a person chose (§5.1), a JSON object of input
+    key to artifact id. A reference biorefinery, the toy, an unknown id, a
+    flowsheet of a program the switch hides, or a fit that cannot feed its
+    input is a 422 in words. A read: it starts no simulator."""
+    from . import proforma
+
+    chosen = _fits_param(fits)
+    try:
+        return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
+                                       fits=chosen).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/api/proforma/ceiling-check")
+def proforma_ceiling_check(scenarioId: str, flowsheet: str | None = None, host: str | None = None,  # noqa: N803
+                           includeArchived: bool = False, fits: str | None = None,  # noqa: N803
+                           assumptions: str | None = None) -> dict:
+    """A scenario's fermenter yield read against the newest stored geneOS
+    ceiling of each shelf model of its organism, on its flowsheet's sugar
+    (OF-BLD-019 §5.2, D11): `CeilingCheck`. A seed scenario by its id, one
+    made in the browser by the flowsheet it names; `?fits=` and
+    `?assumptions=` (JSON) bind its yield as its page binds it. A yield above
+    a ceiling is flagged, never clamped. A read: it keeps nothing, starts no
+    worker and changes no binding or run. Refused in words (422) as the
+    binding is."""
+    from . import proforma
+
+    chosen = _fits_param(fits)
+    typed = _assumptions_param(assumptions)
+    try:
+        return proforma.ceiling_check(scenarioId, flowsheet, include_archived=includeArchived, host=host,
+                                      assumptions=typed, fits=chosen).model_dump(mode="json")
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @app.post("/api/proforma/run")
 def proforma_run(req: ProformaRunRequest) -> dict:
-    """Run the scenario: 422 listing every input waiting for a source."""
+    """Run a seed scenario by its id, or a scenario made in the browser by
+    the shelf flowsheet it names (OF-BLD-019 §2.3, d): 422 in words for any
+    other case, and listing every input waiting for a source."""
     from . import proforma
     from .workers import WorkerCrashed, WorkerError, WorkerTimeout
 
@@ -398,6 +533,72 @@ def proforma_run(req: ProformaRunRequest) -> dict:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
         raise HTTPException(status_code=503, detail=f"the Proforma simulator could not run the scenario: {e}") from e
+
+
+@app.get("/api/proforma/runs")
+def proforma_runs(scenarioId: str = "") -> dict:  # noqa: N803 (the wire name)
+    """A scenario's newest run on this service (OF-BLD-019 §3.R): the newest
+    stored `proforma.run` whose basis names the scenario (`latest_run`, the
+    one pureOS and selling_price read), or none. A read: it runs nothing and
+    starts no simulator. The scenario is named by id, so no program filter
+    applies (a link opens what it names)."""
+    from . import proforma
+
+    sid = scenarioId.strip()
+    if not sid:
+        raise HTTPException(status_code=422, detail="a read of a scenario's runs names the scenario it belongs to")
+    art = proforma.latest_run(sid)
+    return {"scenarioId": sid, "artifact": art.model_dump(mode="json") if art else None}
+
+
+# ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
+
+
+def _thermo_answer(fn, req: ThermoPropsRequest):
+    from . import artifacts, evidence_pool, thermo
+
+    try:
+        # A person names the run or the record by id, so archived programs'
+        # records resolve too; the page says which program a run is of. Only
+        # a record needs the pool.
+        kind, _ = thermo.question(req)
+        return fn(req, pool=evidence_pool.load(include_archived=True) if kind == thermo.BEER else None)
+    except thermo.ThermoNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except thermo.ThermoRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    except artifacts.ArtifactDamaged as e:  # the run's file or the answer's (§4.R): in words, as artifacts_read says it
+        raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+@app.post("/api/thermo/props", response_model=Artifact)
+def thermo_props(req: ThermoPropsRequest) -> Artifact:
+    """thermosteam's density, heat capacity, viscosity and bubble and dew
+    points for a run's stream, or a preset: one `thermo_props` artifact,
+    computed in the Proforma worker or returned as stored. 404 for a run,
+    stream or record not on file; 409 for a run or an answer whose file is
+    damaged on disk; 422 for a question that cannot be asked, a chemical the
+    library lacks among them, in words; 503 when the worker cannot answer."""
+    from . import thermo
+    from .workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    try:
+        return _thermo_answer(thermo.props, req)
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        raise HTTPException(status_code=503, detail=f"the Proforma simulator, where thermosteam runs, could not answer: {e}") from e
+
+
+@app.get("/api/thermo/props")
+def thermo_props_stored(artifactId: str | None = None, streamId: str | None = None,  # noqa: N803 (the wire names)
+                        preset: str | None = None, recordId: str | None = None) -> dict:
+    """The answer stored for the same question, as `{"artifact": …}`, or
+    `{"artifact": null}` when it has not been asked here: a read, which
+    starts no simulator. The same 404, 409 and 422 as the POST."""
+    from . import thermo
+
+    art = _thermo_answer(thermo.stored, ThermoPropsRequest(artifactId=artifactId, streamId=streamId, preset=preset,
+                                                           recordId=recordId))
+    return {"artifact": art.model_dump(mode="json") if art else None}
 
 
 def _warm_proforma() -> None:
@@ -757,7 +958,10 @@ def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N8
     """Every value this service computed and kept, newest first. A value
     computed from an archived program's records, models, products or strains
     is left out unless `?includeArchived=true` asks for it (OF-BLD-016 §2.R),
-    as the evidence pool leaves it out of Postdoc."""
+    as the evidence pool leaves it out of Postdoc; a Proforma run by its
+    scenario and flowsheet too, as every reader decides it (OF-BLD-019 §6.R)."""
+    from . import module_stores
+
     kept = artifacts.all_artifacts()
     if includeArchived:
         return kept
@@ -765,7 +969,7 @@ def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N8
         lookup = load_corpus().record
     except FileNotFoundError:
         lookup = None
-    return [a for a in kept if not programs.hides(programs.program_of_artifact(a, lookup))]
+    return [a for a in kept if not programs.hides(module_stores.artifact_program(a, lookup))]
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)
@@ -788,6 +992,41 @@ def artifacts_replay(artifact_id: str) -> ReplayResult:
         raise HTTPException(status_code=404, detail=f"no artifact {artifact_id!r}") from None
     except (artifacts.ToolNotRegistered, artifacts.ArtifactDamaged) as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
+
+
+# ── pureOS reads the train (OF-BLD-019 §4.1, D1) ────────────────────────
+
+
+def _record_lookup():
+    try:
+        return load_corpus().record
+    except FileNotFoundError:
+        return None
+
+
+@app.get("/api/pureos/trains")
+def pureos_trains(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The trains on file: the newest Proforma run of each scenario, read
+    unit by unit from its stream table, with its overall recovery. A train of
+    an archived program is left out unless `?includeArchived=true` asks for it.
+    A read: it starts no simulator."""
+    from . import pureos
+
+    return [pureos.summary(t).model_dump(mode="json")
+            for t in pureos.trains(include_archived=includeArchived, record_lookup=_record_lookup())]
+
+
+@app.get("/api/pureos/train/{key}")
+def pureos_train(key: str) -> dict:
+    """One train: the newest run of the scenario `key` names, or the run whose
+    artifact id it is. 404 says how a run gets there; a deep link opens
+    whatever program it belongs to, and the page names it."""
+    from . import pureos
+
+    try:
+        return pureos.train(key, record_lookup=_record_lookup()).model_dump(mode="json")
+    except pureos.TrainNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
 
 # ── Tools (OF-BLD-014 §3.4, E.6) ─────────────────────────────────────────
