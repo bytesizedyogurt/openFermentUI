@@ -8,7 +8,7 @@ session had to rediscover by reading the tree; the specs cite it as OF-BLD-012
 
 The branch is `claude/of-bld-015-postdoc`, from `main` at `6097df7` (OF-BLD-014 merged in
 pull request #8). Its documents are `docs/build/OF-BLD-015-phase7.md` (Part B, "Postdoc
-reaches everything") and `docs/build/DEMO-PHASE7.md` (the run sheet for showing it); Part C
+reaches everything"; its run sheet is folded into `docs/DEMO.md` by OF-BLD-016 §4.2); Part C
 ("Postdoc remembers", OF-BLD-017 Phase 5) is committed beside them when it starts. The closing
 truth pass deletes `docs/build/`.
 

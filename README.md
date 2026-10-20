@@ -52,7 +52,7 @@ Database entries for S288C and CEN.PK113-7D, and 18 open-access kinetics and phy
 all 22 fetched with full text. Extraction on Haiku anchored **163** values to sentences (all
 `unverified` until a person decides them in Guild). geneOS carries two reconstructions of
 *S. cerevisiae* S288C, Yeast9 and iMM904, each giving an ethanol ceiling on glucose; Proforma's
-stored BioSTEAM benchmark prices the Humbird design. `docs/DEMO-YEAST.md` is its run sheet.
+stored BioSTEAM benchmark prices the Humbird design. `docs/DEMO.md` is the run sheet for showing it.
 Home's **Programs** strip counts each program live.
 
 ## What is real, and what is modeled
