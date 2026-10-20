@@ -551,13 +551,16 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   locked runbook with no deposition behind it is an example; nothing under src/ is
                          #   imported from src/sim, and no string a user sees says demo, sample run,
                          #   stand-in, placeholder or scripted (three named exceptions); a BioSTEAM class names
-                         #   one unit-operation step
+                         #   one unit-operation step; no scenario takes a reserved id (scenario, reference), and
+                         #   a BioSTEAM seed scenario's description names no binding outcome
   pnpm check:biorepo     #   biorepo.json is sound and a fresh export reflects every decision in it
   pnpm test:export       #   the decision merge, exercised on core/tests/fixtures/export/; a bent one fails
   pnpm check:anchors     #   the anchoring floor — 93 of the 104 numeric curated records anchor on their own quote
-  pnpm check:store       #   the store's contracts (69 checks): the overlay is authoritative, a record remembers
+  pnpm check:store       #   the store's contracts (141 checks): the overlay is authoritative, a record remembers
                          #   its original, the program switch survives a reload, archived and example
-                         #   entities hide by default and the switch brings them back
+                         #   entities hide by default and the switch brings them back; scenarios made here,
+                         #   pins, assumptions and fermOS fits survive a reload and Clear drops them, New
+                         #   scenario is never disabled, and Proforma's pages read prices from the run
   pnpm check:guild       #   Guild's ladder on a ledger built in memory (no team in the store), the gate in both
                          #   modes, what runs, lessons, practice and checks write to the ledger, and who may see
                          #   a check, or a proposal to check someone (127 checks)
@@ -566,7 +569,8 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:capture     #   the free-text → measurement-schema matcher, regression-tested
   pnpm check:figures     #   the figure grammar: one mark per provenance, the non-evidence classes dashed, a table
                          #   row per mark, recharts only where it was; recovery by unit draws no bar where no
-                         #   product enters, and says so
+                         #   product enters, and says so; the cost waterfall closes on the run's own price,
+                         #   never a sum, and it and the tornado stand on the grammar
   pnpm build
   pnpm test:durable      #   the Durable tier survives a reload, finished lessons and series times included
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
@@ -630,7 +634,7 @@ The prototype holds itself to nine conditions (design §11, and OF-BLD-016's eig
 | 0 | PhycoExtract | Extraction quality is measurable | `/intake`, `/biorepo`, `/guild`, `/biorepo/witness` |
 | 1 | Corpus & Postdoc | Agentic RAG with visible retrieval | `/postdoc`, `/biorepo` |
 | 2 | Hosts & Protocols | Verified parameters become executable | `/geneos/hosts`, `/runbooks/protocols` |
-| 3 | Proforma | Parameters feed techno-economics | `/proforma` |
+| 3 | Proforma | Parameters feed techno-economics | `/proforma`, `/proforma/scenario`, `/proforma/reference`, `/biorepo/compare` |
 | — | pureOS | Recovery is read from the train a BioSTEAM flowsheet ran, never typed, and thermosteam answers for its streams | `/pureos`, `/pureos/train` |
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
@@ -807,6 +811,65 @@ a finite number and a negative seed are each refused in words (422), and an inpu
 records nor a named person's assumption refuses the run, naming it. Every run's basis names the
 scenario it belongs to, so a scenario's newest run is found by its id.
 
+### Proforma's screens (OF-BLD-019 Phase 3)
+
+Every screen reads the service and the runs it kept; none prices anything in the browser.
+
+- **The index** (`/proforma`) has three rows. **Reference runs**: the two reference biorefineries
+  on the shelf, each with the price of its newest stored run as the shelf names it, when it ran
+  (in UTC), its provenance, how many of its package test's values the run holds, a Run or Rerun
+  with the simulator's status line, and a link to its page. Every card reads
+  `GET /api/proforma/reference/{id}`; a benchmark kept before reference runs existed still
+  shows, price and settings only, with a line saying so. **Flowsheets**: every other flowsheet
+  the switch shows (glucose to ethanol with it off), each input and where it gets its value, and
+  **New scenario from this**. **Scenarios**: the scenarios of the programs the switch shows, as
+  cards with the price of the newest run (median, 5th–95th) or *Not run yet*, how the inputs
+  stand (bound to records, assumed, with a fermOS fit chosen, waiting), and a pin. An empty row
+  says why and what fills it, and no button on the index is disabled because a list is empty.
+- **New scenario** (the header, the empty state, a flowsheet's card, the palette's *New Proforma
+  scenario*) opens one chooser: a flowsheet from the shelf (not a reference: those run whole on
+  their package's defaults), a name, and the flowsheet's own program (an archived one only with
+  the switch on). It makes a BioSTEAM scenario, the only kind it makes, and opens its page.
+- **The scenario page** (`/proforma/scenario/:id`) is one page for a seed scenario and one made
+  here. The header names the flowsheet and its source, the program and the newest run's
+  provenance, with Pin, Compare and, once a run exists, pureOS → Train. **Inputs** gives each
+  input's dimension, unit, value and source: *N records, low–high* with the records under a
+  disclosure, an artifact (a fermOS fit) linked, *assumption by <name>* with its value, range and
+  what it rests on, a convention, or *waiting*, where **Keep assumption** takes a value, a range
+  and what it rests on under the reviewer name. **Run** shows the worker's status (cold,
+  starting, ready, failed) and waits while the simulator starts. Then every section of the newest
+  run, read from its one artifact: the price (median, 5th–95th, its basis and provenance, the
+  base case or why it could not run), the cost breakdown as a waterfall of the TEA's lines that
+  closes on the run's own price, the sensitivity tornado, the price distribution, the streams,
+  the equipment with installed and purchase cost per unit, the utilities, the diagram or the
+  units in run order with the run's line, the values read back after the run grouped by who set
+  them (the package, BioSTEAM or a convention; this case's records and assumptions; anything
+  else, credited to nobody), and the flowsheet's own questions for a process modeller. Each table
+  and figure exports a CSV of the run's own numbers. The newest run is the service's
+  (`GET /api/proforma/runs?scenarioId=`, the run pureOS and `selling_price` read too), else the
+  one this browser kept.
+- **A reference page** (`/proforma/reference/:id`, the corn plant and the corn stover benchmark)
+  shows the package and its version, the simulator's, the provenance the run computes, Run or
+  Rerun, the price the shelf names with the IRR (for the benchmark, 1.968 USD per gallon beside
+  it), and **Held to its package's own test**: each value the test asserts, this run's value, the
+  relative difference, the tolerance and within or outside, read from the run's checks. Then the
+  scenario page's sections over the one case, **What the TEA holds** (its installed equipment
+  cost need not equal the units' sum, and the card says why) and the package's citations. An id
+  that is not a reference says so in the service's words. `/proforma/benchmark` and
+  `/proforma/biosteam` land on the benchmark's page.
+- **Compare** (`/biorepo/compare`) sets pinned BioSTEAM scenarios side by side, each from its
+  newest run: the price with its basis, percentiles and provenance, every TEA line per unit of
+  the price's basis with its USD per year, and every input as the run's basis names it (records
+  with their count and lowest and highest value, an assumption and who made it, an artifact, a
+  model, a convention). Nothing is subtracted or summed; two flowsheets draw *Their bases differ*,
+  and each cell names its own input. A pinned scenario with no run says so.
+- **What this browser keeps, and what the service keeps.** The Durable tier keeps the scenarios
+  made here (whole, by a time-based id), the newest run id of a seed scenario, the pins, the
+  assumptions typed under a reviewer name and the fermOS fits chosen, by scenario and input;
+  *Clear this browser's data* drops them all. The service keeps the runs, each one artifact, and
+  holds no scenario made here: such a scenario runs by the flowsheet it names, and the run's
+  basis carries the scenario's id.
+
 ### pureOS reads the train, and thermosteam answers (OF-BLD-019 Phase 4)
 
 **pureOS → Train** (`/pureos/train/:scenarioId`, or a run's artifact id in
@@ -947,7 +1010,11 @@ surfaces, not a process simulator*: each is written once (CAPEX scaling exponent
 annualization, media/utility/labor line items, downstream yield effects) and evaluated over its
 sweep grid at load, and the client interpolates between grid points, so sliders are continuous and
 the cost waterfall always sums to the headline. They are casein examples, hidden by default, and
-subtitled *Cost model v0*.
+subtitled *Cost model v0*. They step aside and are not deleted (OF-BLD-019 D5): S1–S3 and
+`src/engine/grids.ts` stay for the archived examples, the scenario page's authored
+branch and the authored compare open them under their banner with the switch on, New scenario
+makes BioSTEAM scenarios alone, and Home's pinned card says *Cost model v0* for an authored
+surface alone.
 
 **BioSTEAM** runs for real in the Proforma worker (`workers/proforma_worker.py`,
 `flowsheets/`), over the shelf above: two published reference biorefineries run whole on their

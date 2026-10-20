@@ -699,7 +699,8 @@ Mini, which serves `main` (D8).
   feeds its "View as table" twin and the tests, and sits in `FigureFrame`
   (the question as title, units, CSV, sources, the basis of anything
   computed, and what would fill it when empty). `pnpm check:figures` holds
-  it; `recharts` stays in Compare and ProformaScenario alone. Settings →
+  it; `recharts` stays in Compare and ProformaScenario alone, for their
+  authored surfaces (OF-BLD-019 Phase 3, below). Settings →
   Figure grammar (`/settings/figures`) is the written definition, drawn over
   the newest kept `geneos.ceiling` and `geneos.frontier` artifacts from
   `/api/biorepo/artifacts`, else the legend alone with where to compute one.
@@ -924,6 +925,69 @@ Mini, which serves `main` (D8).
   (`AnaerobicBioreactor.V_max_default`), the TEA settings and the purity are
   read back, never typed. Each case empties the train's recycle first; a
   replay is held to the last digits (1e-9), not bitwise.
+
+## Proforma's screens (OF-BLD-019 Phase 3)
+
+- **Four places, two reserved segments.** `/proforma` is the index
+  (`Proforma.tsx`: Reference runs, Flowsheets, the scenarios the switch
+  shows); `/proforma/scenario/:id` the scenario page; `/proforma/reference/:id`
+  a reference biorefinery's page (`ProformaReference.tsx`, mounted with
+  `key={id}` so a run in flight lands on the page that asked); Compare stays
+  `/biorepo/compare`. `scenario` and `reference` are reserved under
+  `/proforma`: the old `/proforma/:id` pattern skips both, `/proforma/reference`
+  alone is the index, `/proforma/benchmark` and `/proforma/biosteam` redirect
+  to `/proforma/reference/cornstover_benchmark`, and `check:seed` refuses a
+  scenario with either id. Every reference card reads
+  `GET /api/proforma/reference/{id}`, the benchmark included; a
+  `proforma_benchmark` artifact is read only when that answer holds no run.
+- **New scenario makes a `biosteam` scenario and nothing else** (D5).
+  `NewScenarioDialog` offers the shelf's non-reference flowsheets, a name and
+  the flowsheet's own program (`programsFor`; an archived one only with the
+  switch on); the palette's *New Proforma scenario* opens it. `createScenario`
+  gives a time-based `sc-…` id (`timeId`: `nextId` restarts on a reload),
+  `modelId` = `flowsheetId`, no dims, point or assumptions. Nothing on the
+  index is disabled for an empty list; `check:store` reads the New scenario
+  buttons' tags and refuses `disabled` in any spelling.
+- **Durable (D6):** `createdScenarios` (the whole scenario, by id),
+  `scenarioRuns` (a seeded scenario's newest run id), `pinnedScenarios`
+  (seeded pins; a made scenario keeps its own `pinned`), `proformaAssumptions`
+  and `proformaFits`, through `snapshotOf` / `applyDurable`, all dropped by
+  *Clear this browser's data*; `check:store` round-trips each. The service
+  keeps the runs and no scenario made here: one runs by the flowsheet it
+  names, and its run's basis carries `scenario`.
+- **A page reads one run and computes nothing.** `BiosteamScenario`
+  (ProformaScenario.tsx) serves a seed BioSTEAM scenario and a made one alike;
+  every section under Run is `RunReport` and its kin, exported from
+  `ProformaBiosteam.tsx`, over a `RunView` (`runViewOfArtifact`,
+  `runViewOfResult`; `runViewOfReference` for a `proforma.reference` run, one
+  case). The newest run is the service's (`proformaNewestRun` →
+  `GET /api/proforma/runs?scenarioId=`, `proforma.latest_run`), else this
+  browser's (`newestRunId`); the service wins. The waterfall closes on the
+  run's `basePrice` (a reference's on the TEA's `productPrice`), never a
+  browser sum; a reference page reads its package test through
+  `referenceChecks` and types no package value, and shows the TEA's own
+  installed equipment cost; Compare subtracts and sums nothing. CSVs export
+  the run's own numbers; `readBackRows` credits each read-back value to who
+  set it; `QUESTIONS[flowsheet]` are a flowsheet's own; times print through
+  `stamp`, UTC named. `check:store` holds each by source.
+- **recharts stays in `ProformaScenario.tsx` and `Compare.tsx`**, for the
+  authored surfaces alone (S1–S3 and `grids.ts` open the archived casein
+  examples under their banner, D5). The BioSTEAM sections draw with the
+  grammar: `CostWaterfall.tsx` (a row per TEA line, no bar for a line with no
+  per-unit value, a credit runs back, closing on the run's price) and
+  `Tornado.tsx`, each with its own `toTable`, `ENCODING` and `FigureFrame`
+  (`check:figures` part 7). Home's pinned card says *Cost model v0* for an
+  authored surface alone.
+- **The double answers the run contract** from fixtures `demo.py
+  --prototype` writes with the stand-in evaluator: the shelf and
+  `scenarios` by the switch; `bind` from what the real code answered,
+  bindings and refusals, with `fits` from the recorded choices, any other a
+  422 in words; `run` a
+  seed by its id and a made scenario by its flowsheet, answered under the id
+  asked, refusing inputs that still wait; `runs` from what it answered
+  (`proformaRunsOnFile`, which a test may set or clear);
+  `reference/{id}` from `proforma-reference-<id>.json`, a 404 for any other
+  id.
 
 ## pureOS reads the train, thermosteam answers (OF-BLD-019 Phase 4)
 
