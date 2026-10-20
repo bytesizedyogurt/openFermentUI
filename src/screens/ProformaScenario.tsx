@@ -32,13 +32,16 @@ import {
 } from 'recharts';
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
 import { archivedProgramOf, useProgramLookup, useStore } from '@/store';
-import { href, navigate } from '@/router';
-import type { FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
+import { href, navigate, useRoute } from '@/router';
+import type { FermosFitInfo, FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
 import { durableAvailable } from '@/lib/durable';
 import {
+  FIT_TOOL_WORDS,
   ProformaDown,
   SIMULATOR_SAYS,
+  fermosFits,
+  fitsFrom,
   modellerQuestions,
   proformaArtifact,
   proformaBind,
@@ -760,11 +763,13 @@ function InputsTable({
   flowsheet,
   onAssume,
   onClear,
+  onClearFit,
 }: {
   inputs: ScenarioInput[];
   flowsheet: FlowsheetInfo | null;
   onAssume: (key: string, a: { value: number; low: number; high: number; note: string }) => void;
   onClear: (key: string) => void;
+  onClearFit: (key: string) => void;
 }) {
   const reviewer = useStore((s) => s.reviewer);
   const declared = new Map((flowsheet?.inputs ?? []).map((i) => [i.key, i]));
@@ -810,6 +815,11 @@ function InputsTable({
                     Withdraw this assumption
                   </button>
                 )}
+                {i.binding === 'artifact' && (
+                  <button className="text-caption text-ink-soft hover:text-accent underline" onClick={() => onClearFit(i.key)}>
+                    Stop using the fermOS fit here
+                  </button>
+                )}
                 {i.binding === 'waiting' &&
                   (reviewer.trim() ? (
                     <AssumptionForm input={i} onSave={(a) => onAssume(i.key, a)} />
@@ -832,25 +842,169 @@ function InputsTable({
 }
 
 /**
- * Use a fermOS fit (OF-BLD-019 §5.1, D10): a slot by structure. It draws
- * only when there is a fit to offer, and §5.1 brings the fits and what
- * using one does; until then nothing is offered and nothing shows.
+ * Use a fermOS fit (OF-BLD-019 §5.1, D10). A source, not a copy: the fits
+ * fermOS keeps (GET /api/fermos/fits) are listed with their provenance, the
+ * run each was fitted to and what each can feed this flowsheet's titre,
+ * yield and productivity, each value as the service computed it from the
+ * artifact, or why not, in its words. Choosing one keeps which artifact
+ * feeds which input (`proformaFits`, Durable, like assumptions), and the
+ * binding then names it as the inputs' source. A fit sent from fermOS →
+ * Forecast arrives as `?fit=` and is attached here, once, for the inputs it
+ * can feed. With no fit on file it says how one gets made.
  */
-function FermosFitSlot({ fits }: { fits: { id: string; label: string }[] }) {
-  if (!fits.length) return null;
+function FermosFitSlot({
+  flowsheetId,
+  chosen,
+  onChoose,
+  onStop,
+}: {
+  flowsheetId: string;
+  chosen: Record<string, string>;
+  onChoose: (fits: Record<string, string>) => void;
+  onStop: () => void;
+}) {
+  const route = useRoute();
+  const sent = route.query.get('fit');
+  const [fits, setFits] = useState<FermosFitInfo[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [arrived, setArrived] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setFits(null);
+    setProblem(null);
+    fermosFits(flowsheetId, ctrl.signal)
+      .then(setFits)
+      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, [flowsheetId]);
+
+  // A fit sent from fermOS → Forecast: attached once, for the inputs it can
+  // feed, then the address loses its ?fit= so a reload attaches nothing.
+  useEffect(() => {
+    if (!sent || !fits) return;
+    const found = fits.find((f) => f.artifactId === sent);
+    const feeds = found ? fitsFrom(found) : {};
+    if (Object.keys(feeds).length > 0) onChoose(feeds);
+    setArrived(
+      !found
+        ? `${sent} was sent from fermOS, but it is not a kinetic fit or forecast on file here.`
+        : Object.keys(feeds).length > 0
+          ? `${FIT_TOOL_WORDS[found.tool] ?? found.tool} ${sent}, sent from fermOS, now feeds ${Object.keys(feeds).join(', ')}.`
+          : `${FIT_TOOL_WORDS[found.tool] ?? found.tool} ${sent} was sent from fermOS, but it feeds nothing here: ${found.refused ?? found.feeds.map((f) => `${f.key}: ${f.refused}`).join('; ')}`,
+    );
+    navigate(route.path, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sent, fits]);
+
+  const using = new Set(Object.values(chosen));
+  const missing = [...using].filter((id) => fits && !fits.some((f) => f.artifactId === id));
   return (
-    <div className="mt-3" data-testid="fermos-fit-slot">
+    <div className="mt-4 border-t border-line/60 pt-3" data-testid="fermos-fit-slot">
       <h3 className="font-medium text-body">Use a fermOS fit</h3>
-      <ul className="text-caption">
-        {fits.map((f) => (
-          <li key={f.id}>
-            <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${f.id}`)}>
-              {f.id}
-            </a>{' '}
-            · {f.label}
-          </li>
-        ))}
-      </ul>
+      <p className="text-caption text-ink-soft mb-2">
+        A fit of a deposited run can give the fermenter its titre, its yield on sugar and its batch time. The service computes each
+        from the fit&rsquo;s forecast: titre from the final product, yield from product made over sugar used, and productivity as the
+        titre over the hour the median sugar runs out. The run then names the fit as the source of each.
+      </p>
+      {arrived && (
+        <p className="text-caption mb-2" data-testid="fermos-fit-arrived">
+          {arrived}
+        </p>
+      )}
+      {problem && <p className="text-caption text-signal-warn">The fits fermOS keeps could not be read: {problem}</p>}
+      {!problem && fits === null && <p className="text-caption text-ink-soft">Reading the fits fermOS keeps…</p>}
+      {fits !== null && fits.length === 0 && (
+        <p className="text-caption" data-testid="fermos-fit-none">
+          No fermOS fit is on file yet. One is made from a run: deposit its readings in{' '}
+          <a className="text-accent hover:underline" href={href('/runbooks/depositions')}>
+            Runbooks → Depositions
+          </a>{' '}
+          (the time of each sample, biomass at four or more times, product and sugar at the same times), then fit it in{' '}
+          <a className="text-accent hover:underline" href={href('/fermos')}>
+            fermOS
+          </a>
+          . A forecast on{' '}
+          <a className="text-accent hover:underline" href={href('/fermos/forecast')}>
+            fermOS → Forecast
+          </a>{' '}
+          run until the sugar is spent gives the batch time as well.
+        </p>
+      )}
+      {missing.length > 0 && (
+        <p className="text-caption text-signal-warn">
+          The fit this scenario uses, {missing.join(', ')}, is not on file here any more.{' '}
+          <button className="underline hover:text-accent" onClick={onStop}>
+            Stop using it
+          </button>
+        </p>
+      )}
+      {fits !== null && fits.length > 0 && (
+        <ul className="space-y-2">
+          {fits.map((f) => {
+            const feeds = fitsFrom(f);
+            const inUse = using.has(f.artifactId);
+            return (
+              <li key={f.artifactId} className="card p-3" data-testid="fermos-fit-option" data-artifact={f.artifactId} data-feeds={Object.keys(feeds).length}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{FIT_TOOL_WORDS[f.tool] ?? f.tool}</span>
+                  <a className="font-num text-caption hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${f.artifactId}`)}>
+                    {f.artifactId}
+                  </a>
+                  <ProvenanceBadge p={f.provenance} />
+                  <span className="text-caption text-ink-soft">
+                    run {f.depositionId ?? 'not named'}
+                    {f.productSeries && <> · product: {f.productSeries}</>}
+                    {f.substrateSeries && <> · sugar: {f.substrateSeries}</>}
+                  </span>
+                </div>
+                <ul className="text-caption mt-1">
+                  {f.feeds.map((x) => (
+                    <li key={x.key} data-testid="fermos-fit-feed" data-key={x.key}>
+                      <span className="font-medium">{x.key}</span>:{' '}
+                      {x.refused || x.value == null ? (
+                        <span className="text-ink-soft">{x.refused}</span>
+                      ) : (
+                        <>
+                          <span className="font-num">{fmt(x.value, 4)}</span> {x.unit} (
+                          <span className="font-num">
+                            {fmt(x.low ?? Number.NaN, 4)}–{fmt(x.high ?? Number.NaN, 4)}
+                          </span>
+                          )
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {f.batchTimeH != null && (
+                  <div className="text-caption text-ink-soft">
+                    Batch time <span className="font-num">{fmt(f.batchTimeH, 4)}</span> h, where the forecast&rsquo;s median sugar runs out.
+                  </div>
+                )}
+                {f.flags.map((w) => (
+                  <div key={w} className="text-caption text-signal-warn">
+                    {w}
+                  </div>
+                ))}
+                <div className="mt-2">
+                  {inUse ? (
+                    <span className="text-caption">
+                      In use for {Object.entries(chosen).filter(([, id]) => id === f.artifactId).map(([k]) => k).join(', ')}.{' '}
+                      <button className="underline hover:text-accent" onClick={onStop} data-testid="fermos-fit-stop">
+                        Stop using this fit
+                      </button>
+                    </span>
+                  ) : (
+                    <Button onClick={() => onChoose(feeds)} disabled={Object.keys(feeds).length === 0} data-testid="fermos-fit-use">
+                      Use this fit for {Object.keys(feeds).join(', ') || 'nothing it can feed'}
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -890,6 +1044,9 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]) ?? EMPTY;
   const setAssumption = useStore((s) => s.setProformaAssumption);
   const clearAssumption = useStore((s) => s.clearProformaAssumption);
+  const chosenFits = useStore((s) => s.proformaFits[scenario.id]) ?? EMPTY_FITS;
+  const setFits = useStore((s) => s.setProformaFits);
+  const clearFit = useStore((s) => s.clearProformaFit);
   const togglePin = useStore((s) => s.togglePin);
   const recordScenarioRun = useStore((s) => s.recordScenarioRun);
   const reviewer = useStore((s) => s.reviewer);
@@ -923,22 +1080,27 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     return () => ctrl.abort();
   }, []);
 
-  // The binding: a seed scenario by (b), one made here by its flowsheet (c).
+  // The binding: a seed scenario by (b), one made here by its flowsheet (c);
+  // with a fermOS fit chosen, either by (c) with the fits (OF-BLD-019 §5.1),
+  // which binds a seed scenario's flowsheet exactly as (b) does.
+  const fitsKey = JSON.stringify(Object.entries(chosenFits).sort());
   useEffect(() => {
     const ctrl = new AbortController();
     setInfo(null);
     setBindProblem(null);
+    const fits = Object.fromEntries(JSON.parse(fitsKey) as [string, string][]);
     const ask = { host, includeArchived };
-    const bound = madeHere
-      ? proformaBind(flowsheetId, ask, ctrl.signal)
-      : proformaScenarios(ask, ctrl.signal).then((all) => {
-          const found = all.find((x) => x.id === scenario.id);
-          if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
-          return found;
-        });
+    const bound =
+      madeHere || Object.keys(fits).length > 0
+        ? proformaBind(flowsheetId, { ...ask, fits }, ctrl.signal)
+        : proformaScenarios(ask, ctrl.signal).then((all) => {
+            const found = all.find((x) => x.id === scenario.id);
+            if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
+            return found;
+          });
     bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, includeArchived]);
+  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey]);
 
   // The newest run this browser saw, read back from its artifact (D6).
   const runId = scenario.lastRunId ?? null;
@@ -1010,7 +1172,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     setRunning(true);
     setRunProblem(null);
     const used = assumptions.filter((a) => bound.inputs.find((i) => i.key === a.key)?.binding === 'assumption');
-    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, assumptions: used, host })
+    const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
+    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, assumptions: used, host, fits })
       .then((r) => {
         setView(runViewOfResult(r));
         // The index and this page read the newest run from its artifact (D6).
@@ -1120,6 +1283,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               flowsheet={flowsheet}
               onAssume={(key, a) => setAssumption(scenario.id, { key, ...a, by: reviewer.trim(), at: today, note: a.note || null } satisfies InputAssumption)}
               onClear={(key) => clearAssumption(scenario.id, key)}
+              onClearFit={(key) => clearFit(scenario.id, key)}
             />
           ) : (
             flowsheet &&
@@ -1146,7 +1310,14 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
               </table>
             )
           )}
-          <FermosFitSlot fits={[]} />
+          {flowsheet && flowsheet.inputs.some((i) => FIT_INPUTS.includes(i.key)) && (
+            <FermosFitSlot
+              flowsheetId={flowsheetId}
+              chosen={chosenFits}
+              onChoose={(fits) => setFits(scenario.id, fits)}
+              onStop={() => clearFit(scenario.id)}
+            />
+          )}
           <div className="mt-3 text-caption text-ink-soft">
             <div>The price is {priceBasis}.</div>
             {(bound?.leavesOut ?? flowsheet?.leavesOut ?? []).length > 0 && (
@@ -1227,6 +1398,9 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
 }
 
 const EMPTY: InputAssumption[] = [];
+const EMPTY_FITS: Record<string, string> = {};
+/** The inputs a fermOS fit can feed (proforma.FIT_KEYS). */
+const FIT_INPUTS = ['titre', 'yield', 'productivity'];
 
 /** An authored surface (kept for the archived examples, D5), or a BioSTEAM scenario the service simulates. */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {

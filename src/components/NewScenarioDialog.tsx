@@ -11,14 +11,16 @@
 // value of its own.
 //
 // Proforma's index opens this, and so does the palette's "New Proforma
-// scenario" (through `ui.newScenarioOpen`).
+// scenario" (through `ui.newScenarioOpen`); fermOS → Forecast's "Send to
+// Proforma" opens it with the fit to attach (OF-BLD-019 §5.1), and the new
+// scenario's page attaches it.
 import { useEffect, useMemo, useState } from 'react';
 import type { FlowsheetInfo, ProgramId } from '@/data/types';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { activePrograms, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Modal } from './ui';
-import { ProformaDown, defaultProgram, proformaShelf } from '@/lib/proforma';
+import { ProformaDown, defaultProgram, proformaShelf, sendFitPath } from '@/lib/proforma';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
 export function NoFlowsheetLine({ showArchived }: { showArchived: boolean }) {
@@ -55,11 +57,14 @@ export function NewScenarioDialog({
   open,
   onClose,
   initialFlowsheet = null,
+  attachFit = null,
 }: {
   open: boolean;
   onClose: () => void;
   /** The flowsheet chosen when it opens ("New scenario from this"). */
   initialFlowsheet?: string | null;
+  /** A fermOS fit's artifact id the new scenario's page attaches when it opens (fermOS → Forecast, "Send to Proforma"). */
+  attachFit?: string | null;
 }) {
   const showArchived = useStore((s) => s.showArchived);
   const createScenario = useStore((s) => s.createScenario);
@@ -111,7 +116,7 @@ export function NewScenarioDialog({
     if (!flowsheet || !name.trim()) return;
     const id = createScenario(flowsheet.id, name, program);
     onClose();
-    navigate(`/proforma/scenario/${id}`);
+    navigate(attachFit ? sendFitPath(id, attachFit) : `/proforma/scenario/${id}`);
     toast({ text: `Scenario made on ${flowsheet.title}; it has not run yet`, kind: 'success' });
   };
 

@@ -945,6 +945,82 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §5.1 — a fermOS fit feeds the fermenter.
+  //
+  // With the switch off, sc-yeast-1's page offers "Use a fermOS fit": with no
+  // fit on file it says how one gets made (Runbooks → Depositions, fit it in
+  // fermOS); with the double's stand-in fit and forecast on file it lists
+  // both with what each can feed and why not, and choosing the forecast
+  // binds titre, yield and productivity to it, each shown as an artifact
+  // with its link, the binding asked of the service with the fits; the
+  // choice survives a reload, and stopping it puts the records back.
+  let fitFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-bind-fits.json'), 'utf8')).response;
+    const chosen = Object.values(fixture.fits)[0];
+    const slot = page.locator('[data-testid="fermos-fit-slot"]');
+    try {
+      doubleState.flags.fermosFitsOnFile = false;
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="fermos-fit-none"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const none = await slot.innerText({ timeout: 3000 }).catch(() => '');
+      if (!/No fermOS fit is on file yet/.test(none) || !/Runbooks → Depositions/.test(none) || !/fit it in\s+fermOS/.test(none))
+        problems.push(`with no fit on file the slot does not say how one gets made: ${JSON.stringify(none.slice(0, 200))}`);
+
+      doubleState.flags.fermosFitsOnFile = true;
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="fermos-fit-option"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="fermos-fit-option"]').count()) !== 2) problems.push('the slot does not list the fit and the forecast on file');
+      const fitOption = page.locator('[data-testid="fermos-fit-option"][data-feeds="2"]');
+      if (!/does not run out within/.test(await fitOption.innerText({ timeout: 3000 }).catch(() => ''))) problems.push('the fit that gives no batch time does not say why');
+      const option = page.locator(`[data-testid="fermos-fit-option"][data-artifact="${chosen}"]`);
+      await option.locator('[data-testid="fermos-fit-use"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="input-productivity"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const shown = async () => {
+        const lacks = [];
+        for (const key of ['titre', 'yield', 'productivity']) {
+          const cell = page.locator(`[data-testid="input-${key}"] [data-testid="source-artifact"]`);
+          if (!(await cell.count())) {
+            lacks.push(key);
+            continue;
+          }
+          const text = await cell.innerText({ timeout: 3000 }).catch(() => '');
+          const link = await cell.getAttribute('href', { timeout: 3000 }).catch(() => null);
+          if (!/artifact/.test(text) || link !== `#/biorepo/artifacts/${chosen}`) lacks.push(key);
+        }
+        return lacks;
+      };
+      const lacks = await shown();
+      if (lacks.length) problems.push(`choosing the forecast does not show these inputs as its artifact: ${lacks.join(', ')}`);
+      const asked = doubleState.proformaBinds.at(-1);
+      if (!asked || JSON.stringify(Object.entries(JSON.parse(asked.fits)).sort()) !== JSON.stringify(Object.entries(fixture.fits).sort()))
+        problems.push(`the binding was not asked of the service with the fits chosen: ${JSON.stringify(asked)}`);
+      if (/Waiting for a source: [^.]*productivity/i.test(await page.locator('[data-testid="proforma-waiting"]').innerText({ timeout: 3000 }).catch(() => '')))
+        problems.push('productivity still waits with the forecast chosen');
+      await page.waitForTimeout(700);
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="input-titre"] [data-testid="source-artifact"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await shown()).length) problems.push('the fit chosen does not survive a reload');
+      await page.locator('[data-testid="fermos-fit-stop"]').click({ timeout: 8000 });
+      await page.locator('[data-testid="input-titre"] [data-testid="source-records"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="source-artifact"]').count()) !== 0) problems.push('stopping the fit does not put the records back');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    } finally {
+      doubleState.flags.fermosFitsOnFile = false;
+    }
+    if (problems.length) {
+      fitFails++;
+      console.log(`✗ fermos fit   ${problems.join('; ')}`);
+    } else {
+      console.log('✓ fermos fit   sc-yeast-1 with no fit on file says how one gets made; with the fit and the forecast on file each says what it can feed and why not, choosing the forecast binds titre, yield and productivity to its artifact, asked of the service with the fits, kept across a reload, and stopping it puts the records back');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
   //    quotes are listed rather than dropped.
   //
@@ -1665,6 +1741,7 @@ async function main() {
   console.log(`${1 - scenarioPageFails}/1 Proforma scenario page — a seed and a made scenario run, every section read from the run`);
   console.log(`${1 - referenceFails}/1 Proforma reference pages — each held to its package's own test, every section read from its run`);
   console.log(`${1 - compareFails}/1 Compare — BioSTEAM scenarios side by side from their newest runs, pins kept`);
+  console.log(`${1 - fitFails}/1 fermOS fit — the slot says how a fit gets made, and a chosen forecast feeds titre, yield and productivity`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
@@ -1672,7 +1749,7 @@ async function main() {
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
 }
 
 main();

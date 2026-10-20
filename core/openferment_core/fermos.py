@@ -348,9 +348,8 @@ WHAT_IDENTIFIES = {
 }
 
 
-def check_forecastable(fit_: KineticFit) -> None:
-    if fit_.reason or not fit_.params:
-        raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+def unidentified(fit_: KineticFit) -> str | None:
+    """The first of μ and Xmax this fit does not identify, by name, or None."""
     names = [p.name for p in fit_.params]
     for name in ("mu", "Xmax"):
         p = param(fit_, name)
@@ -360,8 +359,17 @@ def check_forecastable(fit_: KineticFit) -> None:
         var = fit_.covariance[k][k] if p and k < len(fit_.covariance) and k < len(fit_.covariance[k]) else math.inf
         pinned = p is not None and p.low > 0 and p.value - 1.96 * math.sqrt(max(var, 0.0)) > 0
         if not pinned:
-            raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
-                             f"what would identify it is {WHAT_IDENTIFIES[name]}")
+            return name
+    return None
+
+
+def check_forecastable(fit_: KineticFit) -> None:
+    if fit_.reason or not fit_.params:
+        raise FitRefused(f"there is no kinetic fit to forecast from: {fit_.reason or 'no parameters'}")
+    name = unidentified(fit_)
+    if name:
+        raise FitRefused(f"{name} is not identified by this run (its interval reaches zero); "
+                         f"what would identify it is {WHAT_IDENTIFIES[name]}")
 
 
 def forecast(fit_: KineticFit, start: StartValues | None = None, duration_h: float | None = None,
@@ -529,3 +537,72 @@ def forecast_run(*, fit_artifact: str | None = None, fit_inline: KineticFit | No
         provenance=art.provenance, basis=artifacts.basis_of(art), figure="trajectory",
     )
     return ForecastResult(**out, artifactId=None if sample else art.id, evidence=ev, sample=sample, notes=list(FORECAST_NOTES))
+
+
+# ── what a fit feeds a flowsheet (OF-BLD-019 §5.1, D10) ────────────────
+#
+# A person sends a kept fit, or a kept forecast, to a Proforma scenario; the
+# binding (proforma.fit_info) reads what it gives from the forecast: titre
+# from the final product, yield from product made over sugar used (Yp/s),
+# and the batch time from the hour the median sugar runs out. A forecast is
+# read as it was kept; a kinetic fit is forecast here under the fitted run's
+# own starting values and length, seeded, exactly as `growth_forecast`
+# forecasts it, and that forecast is kept nowhere: the fit is the source the
+# scenario names. `batch_simulation` does not exist in this tree.
+
+FEEDABLE = (KINETIC, FORECAST)
+# How a refusal names a parameter.
+SYMBOL = {"mu": "μ", "Xmax": "Xmax"}
+
+
+def fit_of(art: Any) -> KineticFit:
+    """The kinetic fit a kept fermOS artifact rests on: a kinetic fit's own
+    output, or the fit a forecast's basis names. Refused in words when the
+    artifact is neither, or its fit is not on file."""
+    if art.tool == KINETIC:
+        return KineticFit.model_validate(art.output)
+    if art.tool == FORECAST:
+        try:
+            return _fit_from(art.inputs)
+        except (StopIteration, artifacts.ArtifactNotFound) as e:
+            raise FitRefused(f"the kinetic fit forecast {art.id} rests on is not on file") from e
+    raise FitRefused(f"{art.id} is a {art.tool}, not a kinetic fit or a forecast fermOS keeps")
+
+
+def fit_artifact_of(art: Any) -> str | None:
+    """The kept kinetic fit an artifact is or rests on, by id."""
+    if art.tool == KINETIC:
+        return art.id
+    i = next((x for x in art.inputs if x.name == "kinetic fit" and x.source.kind == "artifact"), None)
+    return i.source.id if i else None
+
+
+def deposition_of(art: Any) -> str | None:
+    """The run a fit was made on: its readings' deposition, through the fit a forecast rests on."""
+    found = next((x.source.id for x in art.inputs if x.source.kind == "deposition"), None)
+    if found or art.tool != FORECAST:
+        return found
+    fid = fit_artifact_of(art)
+    try:
+        return next((x.source.id for x in artifacts.get(fid).inputs if x.source.kind == "deposition"), None) if fid else None
+    except artifacts.ArtifactNotFound:
+        return None
+
+
+def forecast_for(art: Any) -> tuple[dict[str, Any], str]:
+    """The forecast an artifact feeds a flowsheet from, and how it was had, in
+    words. A kinetic fit whose μ or Xmax is not identified is refused naming
+    the parameter and what run would identify it."""
+    fit_ = fit_of(art)
+    if fit_.reason or not fit_.params:
+        raise FitRefused(f"it holds no kinetic fit: {fit_.reason or 'no parameters'}")
+    name = unidentified(fit_)
+    if name:
+        raise FitRefused(f"{SYMBOL[name]} ({name}) is not identified by the run it was fitted to (its interval "
+                         f"reaches zero); what would identify it is {WHAT_IDENTIFIES[name]}")
+    if art.tool == FORECAST:
+        return dict(art.output), f"forecast {art.id}, as kept"
+    return forecast(fit_, StartValues(), None, SEED), (
+        f"the forecast of fit {art.id} under its run's own starting values and length, seed {SEED}, "
+        f"{DRAWS} draws, kept nowhere")
+

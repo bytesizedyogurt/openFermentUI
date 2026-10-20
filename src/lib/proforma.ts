@@ -8,6 +8,7 @@ import type {
   BasisInput,
   ComputedBasis,
   CostLine,
+  FermosFitInfo,
   FlowsheetInfo,
   HistogramBin,
   InputAssumption,
@@ -181,6 +182,8 @@ export interface InputCounts {
   total: number;
   /** Bound to records by the service, or, unbound yet, inputs that bind to records. */
   records: number;
+  /** Computed from a fermOS fit a person chose (OF-BLD-019 §5.1). */
+  computed: number;
   assumed: number;
   conventions: number;
   waiting: number;
@@ -193,12 +196,14 @@ export function inputCounts(
   info: ProformaScenarioInfo | null,
   shelf: FlowsheetInfo[],
   assumptions: InputAssumption[],
+  fits: Record<string, string> = {},
 ): InputCounts | null {
   const typed = new Set(assumptions.map((a) => a.key));
   if (info) {
-    const c = { total: info.inputs.length, records: 0, assumed: 0, conventions: 0, waiting: 0, bound: true };
+    const c = { total: info.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: true };
     for (const i of info.inputs) {
-      if (i.binding === 'records') c.records++;
+      if (i.binding === 'artifact' || fits[i.key]) c.computed++;
+      else if (i.binding === 'records') c.records++;
       else if (i.binding === 'assumption' || typed.has(i.key)) c.assumed++;
       else c.waiting++;
     }
@@ -206,9 +211,10 @@ export function inputCounts(
   }
   const flowsheet = shelf.find((f) => f.id === (scenario.flowsheetId ?? scenario.modelId));
   if (!flowsheet) return null;
-  const c = { total: flowsheet.inputs.length, records: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
+  const c = { total: flowsheet.inputs.length, records: 0, computed: 0, assumed: 0, conventions: 0, waiting: 0, bound: false };
   for (const i of flowsheet.inputs) {
-    if (i.fields.length > 0) c.records++;
+    if (fits[i.key]) c.computed++;
+    else if (i.fields.length > 0) c.records++;
     else if (i.kind === 'convention') c.conventions++;
     else if (typed.has(i.key)) c.assumed++;
     else c.waiting++;
@@ -269,12 +275,15 @@ export const BENCHMARK_EXPECTED = { usdPerGal: 1.968, tolerance: 0.005, package:
 export interface BindAsk {
   host: string | null;
   includeArchived: boolean;
+  /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1); sent to (c) alone. */
+  fits?: Record<string, string>;
 }
 
 const bindQuery = (ask: BindAsk, extra: Record<string, string> = {}) => {
   const q = new URLSearchParams(extra);
   q.set('includeArchived', ask.includeArchived ? 'true' : 'false');
   if (ask.host) q.set('host', ask.host);
+  if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
   return q.toString();
 };
 
@@ -303,19 +312,23 @@ export interface RunAsk {
   flowsheet?: string | null;
   assumptions: InputAssumption[];
   host: string | null;
+  /** The fermOS fits a person chose, by input key (OF-BLD-019 §5.1). */
+  fits?: Record<string, string>;
 }
 
 /** (d) Run a scenario; the service keeps the run as one `proforma.run` artifact (D1). */
 export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
   // `flowsheet` joins ProformaRunRequest in the service with OF-BLD-019 §2.3;
   // a service that predates it ignores the field and refuses a scenario it
-  // does not hold, in words. It is sent only for a scenario made here.
-  const body: Omit<ProformaRunRequest, 'flowsheet'> & { flowsheet?: string } = {
+  // does not hold, in words. It is sent only for a scenario made here, and
+  // `fits` only when a person chose one (§5.1).
+  const body: ProformaRunRequest = {
     scenarioId: ask.scenarioId,
     assumptions: ask.assumptions,
     host: ask.host,
     seed: 0,
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
+    ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
   };
   return call<ProformaRunResult>('/api/proforma/run', {
     method: 'POST',
@@ -324,6 +337,34 @@ export const runProformaScenario = (ask: RunAsk, signal?: AbortSignal) => {
     signal,
   });
 };
+
+// ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
+//
+// The fits fermOS keeps, each with what it can feed a flowsheet's titre,
+// yield and productivity and why not, as the service computes them from the
+// artifact: the browser shows them and keeps which artifact a person chose
+// for which input (`proformaFits`, Durable), and computes no value.
+
+/** Every kinetic fit and forecast fermOS keeps, with what it can feed `flowsheet`: `GET /api/fermos/fits`. */
+export async function fermosFits(flowsheet: string, signal?: AbortSignal): Promise<FermosFitInfo[]> {
+  try {
+    return await call<FermosFitInfo[]>(`/api/fermos/fits?flowsheet=${encodeURIComponent(flowsheet)}`, { signal });
+  } catch (e) {
+    if (!noEndpoint(e)) throw e;
+    throw new RagRefused(404, 'This service has no fermOS fit list, so it cannot offer a fit to this scenario yet.');
+  }
+}
+
+/** The inputs a fit can feed, each to its artifact: what choosing it binds. */
+export const fitsFrom = (info: FermosFitInfo): Record<string, string> =>
+  info.refused ? {} : Object.fromEntries(info.feeds.filter((f) => !f.refused && f.value != null).map((f) => [f.key, info.artifactId]));
+
+/** What a fermOS artifact is, in words. */
+export const FIT_TOOL_WORDS: Record<string, string> = { kinetic_fit: 'kinetic fit', growth_forecast: 'forecast' };
+
+/** The scenario page a fit is sent to, with the fit to attach when it opens. */
+export const sendFitPath = (scenarioId: string, artifactId: string) =>
+  `/proforma/scenario/${encodeURIComponent(scenarioId)}?fit=${encodeURIComponent(artifactId)}`;
 
 // ── One run, as every reader reads it (D1) ──────────────────────────────
 

@@ -331,6 +331,17 @@ export interface OFState {
   proformaAssumptions: Record<string, InputAssumption[]>;
   setProformaAssumption: (scenarioId: string, a: InputAssumption) => void;
   clearProformaAssumption: (scenarioId: string, key: string) => void;
+  /**
+   * The fermOS fits a person chose for a scenario's inputs, by scenario id
+   * and then input key: the id of a kept kinetic fit or forecast
+   * (OF-BLD-019 §5.1, D10). Durable, like assumptions; the service computes
+   * every value from the artifact.
+   */
+  proformaFits: Record<string, Record<string, string>>;
+  /** Bind these inputs of a scenario to these fermOS artifacts (each key to its id). */
+  setProformaFits: (scenarioId: string, fits: Record<string, string>) => void;
+  /** Stop using a fermOS fit for one input of a scenario, or for every input when no key is named. */
+  clearProformaFit: (scenarioId: string, key?: string) => void;
   checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
@@ -796,6 +807,7 @@ const seedState = () => ({
   undoStack: [] as UndoFrame[],
   learnProgress: {} as Record<string, boolean>,
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
+  proformaFits: {} as Record<string, Record<string, string>>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
   checkpointAnswers: {} as Record<string, boolean>,
@@ -2340,6 +2352,17 @@ export const useStore = create<OFState>()((set, get) => ({
       },
     })),
 
+  // ── Proforma's fermOS fits (OF-BLD-019 §5.1, D10) ─────────────────────
+  // A person picks the fit; the browser keeps which artifact feeds which
+  // input and nothing else: every value is the service's, from the artifact.
+  setProformaFits: (scenarioId, fits) =>
+    set((s) => ({ proformaFits: { ...s.proformaFits, [scenarioId]: { ...(s.proformaFits[scenarioId] ?? {}), ...fits } } })),
+  clearProformaFit: (scenarioId, key) =>
+    set((s) => {
+      const kept = key ? Object.fromEntries(Object.entries(s.proformaFits[scenarioId] ?? {}).filter(([k]) => k !== key)) : {};
+      return { proformaFits: { ...s.proformaFits, [scenarioId]: kept } };
+    }),
+
   recordCheckpoint: (qid, correct) =>
     set((s) => ({ checkpointAnswers: { ...s.checkpointAnswers, [qid]: correct } })),
 
@@ -2518,6 +2541,9 @@ export const useStore = create<OFState>()((set, get) => ({
         learnProgress: { ...(snap.learnProgress ?? {}), ...s.learnProgress },
         // §8.4 — assumptions typed here; anything typed since load wins.
         proformaAssumptions: mergeAssumptions(snap.proformaAssumptions ?? {}, s.proformaAssumptions),
+        // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
+        // made since load wins over the snapshot's.
+        proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
         adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
         // Postdoc's Live conversations. A turn still running when the page
         // went away has no stream to finish it, and says so.
@@ -3399,6 +3425,7 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     },
     learnProgress: Object.fromEntries(Object.keys(s.learnProgress).filter((k) => s.learnProgress[k]).map((k) => [k, true as const])),
     proformaAssumptions: s.proformaAssumptions,
+    proformaFits: s.proformaFits,
     // Unlocked content as adopted; a lock rides in runbookLocks like any other.
     adoptedRunbooks: s.runbooks
       .filter((r) => s.adoptedRunbookIds.includes(r.id))
@@ -3450,6 +3477,7 @@ if (durableAvailable()) {
       s.guildActingId === prev.guildActingId &&
       s.learnProgress === prev.learnProgress &&
       s.proformaAssumptions === prev.proformaAssumptions &&
+      s.proformaFits === prev.proformaFits &&
       s.adoptedRunbookIds === prev.adoptedRunbookIds &&
       s.liveConversations === prev.liveConversations &&
       s.scenarios === prev.scenarios &&

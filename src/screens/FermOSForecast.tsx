@@ -5,14 +5,65 @@
 // fitted run's own starting values and length unless a person changes them;
 // a changed value is that person's assumption, and the forecast becomes
 // `demo`. The band leaves out run-to-run variation, and says so.
+//
+// Send to Proforma (OF-BLD-019 §5.1, D10): the fit in hand, or the forecast
+// just made from it, goes to a Proforma scenario of the active program, or
+// to a new one made in the New scenario chooser, whose page attaches it to
+// the inputs it can feed (titre, yield, productivity); the service computes
+// each value from the artifact there.
 import { useState } from 'react';
 import type { ForecastResult } from '@/data/types';
-import { useStore, reviewerName } from '@/store';
+import { useStore, reviewerName, useProgramFilter } from '@/store';
+import { navigate } from '@/router';
 import { Button, Callout } from '@/components/ui';
+import { NewScenarioDialog } from '@/components/NewScenarioDialog';
+import { FIT_TOOL_WORDS, sendFitPath } from '@/lib/proforma';
 import { EvidenceCard } from '@/components/EvidenceCard';
 import { TrajectoryBand } from '@/components/figures';
 import { fmt } from '@/engine/units';
 import { FermosDown, FermosRefused, fermosForecast, fitFigureSeries, fitSeriesOf } from '@/lib/fermos';
+
+/**
+ * Send a kept fit or forecast to Proforma: a scenario the program switch
+ * shows, or a new one; the scenario page attaches it to what it can feed.
+ */
+function SendToProforma({ artifactId, tool }: { artifactId: string; tool: string }) {
+  const scenarios = useStore((s) => s.scenarios);
+  const shows = useProgramFilter();
+  const [open, setOpen] = useState(false);
+  const [making, setMaking] = useState(false);
+  const offered = scenarios.filter((sc) => sc.kind === 'biosteam' && shows('scenario', sc.id));
+  return (
+    <div className="card p-3" data-testid="send-to-proforma">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setOpen(!open)} aria-expanded={open}>
+          Send to Proforma
+        </Button>
+        <span className="text-caption text-ink-soft">
+          The {FIT_TOOL_WORDS[tool] ?? tool} <span className="font-num">{artifactId}</span> can give a scenario&rsquo;s titre, yield and
+          batch time; the scenario&rsquo;s page says which it can feed and why not.
+        </span>
+      </div>
+      {open && (
+        <ul className="mt-2 space-y-1" data-testid="send-to-proforma-list">
+          {offered.map((sc) => (
+            <li key={sc.id}>
+              <button className="text-body text-accent hover:underline" onClick={() => navigate(sendFitPath(sc.id, artifactId))}>
+                {sc.name}
+              </button>{' '}
+              <span className="text-caption text-ink-soft font-num">{sc.flowsheetId ?? sc.modelId}</span>
+            </li>
+          ))}
+          {offered.length === 0 && <li className="text-caption text-ink-soft">No Proforma scenario of the active program is in this browser yet.</li>}
+          <li>
+            <Button onClick={() => setMaking(true)}>New scenario…</Button>
+          </li>
+        </ul>
+      )}
+      <NewScenarioDialog open={making} onClose={() => setMaking(false)} attachFit={artifactId} />
+    </div>
+  );
+}
 
 export default function FermOSForecast() {
   const fits = useStore((s) => s.fermosFits);
@@ -98,6 +149,11 @@ export default function FermOSForecast() {
         </p>
       )}
       {problem && <Callout kind="warn">{problem}</Callout>}
+      {result?.artifactId ? (
+        <SendToProforma artifactId={result.artifactId} tool="growth_forecast" />
+      ) : (
+        fit?.kineticArtifactId && <SendToProforma artifactId={fit.kineticArtifactId} tool="kinetic_fit" />
+      )}
       {result && fit && (
         <>
           <TrajectoryBand

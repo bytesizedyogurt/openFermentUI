@@ -9,6 +9,7 @@ starting rather than look stuck.
 from __future__ import annotations
 
 import os
+import re
 import threading
 from typing import Any, Literal
 
@@ -496,10 +497,12 @@ def scenario(host: str | None = None, assumptions: list | None = None, pool=None
 
 
 def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = FLOWSHEET,
-                 samples: int = SAMPLES, scenario_id: str | None = None) -> list:
+                 samples: int = SAMPLES, scenario_id: str | None = None, fitted: list | None = None) -> list:
     """The run's basis: the flowsheet, the scenario it belongs to, what it
     borrows from a package, the samples, and every record, assumption, the
-    cap and the conventions."""
+    cap and the conventions; an input a fermOS fit feeds names the fit's
+    artifact (OF-BLD-019 §5.1), and `fitted` adds what else the fit gave
+    (the batch time a productivity is the titre over)."""
     from .models import BasisInput, BasisSource
 
     info = _shelf.info(flowsheet, allow_toy=True)
@@ -534,6 +537,10 @@ def basis_inputs(inputs: list, cap: tuple[float, str] | None, flowsheet: str = F
         elif inp.binding == "assumption":
             for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
                 out.append(BasisInput(name=f"{inp.key}{part}", value=v, unit=inp.unit, source=inp.source))
+        elif inp.binding == "artifact":
+            for part, v in (("", inp.value), (" low", inp.low), (" high", inp.high)):
+                out.append(BasisInput(name=f"{inp.key} fit{part}", value=v, unit=inp.unit, source=inp.source))
+    out += fitted or []
     return out
 
 
@@ -544,9 +551,13 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
 
     vals: dict[str, list[float]] = {}
     assumed: dict[str, dict[str, float]] = {}
+    fitted: dict[str, dict[str, float]] = {}
     cap = next((float(i.value) for i in inputs if i.name == "yield cap"), None)
     for i in inputs:
-        if i.name.endswith(" record"):
+        named = _FIT_NAME.fullmatch(i.name)
+        if named and i.source.kind == "artifact":
+            fitted.setdefault(named[1], {})[named[2] or "value"] = float(i.value)
+        elif i.name.endswith(" record"):
             v = float(i.value)
             key = i.name.removesuffix(" record")
             vals.setdefault(key, []).append(min(v, cap) if key == "yield" and cap is not None else v)
@@ -569,6 +580,17 @@ def _specs(inputs: list) -> tuple[dict[str, dict], dict[str, float], dict[str, s
         base[key] = a["value"]
         specs[key] = ({"kind": "fixed", "value": a["value"]} if a["low"] == a["high"]
                       else {"kind": "uniform", "low": a["low"], "high": a["high"]})
+    for key, f in fitted.items():
+        # A fermOS fit's value: the forecast's median, drawn triangular over
+        # its 5th and 95th percentile (OF-BLD-019 §5.1).
+        kinds[key] = "artifact"
+        base[key] = f["value"]
+        if f["low"] == f["high"]:
+            specs[key] = {"kind": "fixed", "value": f["value"]}
+        elif f["low"] <= f["value"] <= f["high"]:
+            specs[key] = {"kind": "triangular", "low": f["low"], "mode": f["value"], "high": f["high"]}
+        else:
+            specs[key] = {"kind": "uniform", "low": min(f["low"], f["high"]), "high": max(f["low"], f["high"])}
     return specs, base, kinds
 
 
@@ -740,10 +762,14 @@ def run(req, pool=None):
     else:
         cap = None
         inputs = bind_inputs(flowsheet, pool.records, req.host, req.assumptions)
+    # OF-BLD-019 §5.1 (D10): the fermOS fits a person chose, each computed
+    # from its artifact; one that cannot feed its input is refused in words.
+    fitted = apply_fits(inputs, req.fits, flowsheet)
     waiting = [i.key for i in inputs if i.binding == "waiting"]
     if waiting:
         raise ScenarioRefused("these inputs wait for a source, a record or a named person's assumption: " + ", ".join(waiting))
-    art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId),
+    art = artifacts.compute(RUN, basis_inputs(inputs, cap, flowsheet, req.samples, scenario_id=req.scenarioId,
+                                              fitted=fitted),
                             records_by_id=pool.records_by_id, seed=req.seed)
     o = art.output
     q = o["quantiles"]
@@ -1043,22 +1069,27 @@ def _hosts(records: list[dict], flowsheet: str) -> list[str]:
 
 
 def bound(flowsheet: str, *, scenario_id: str = "", name: str = "", host: str | None = None,
-          assumptions: list | None = None, pool=None):
+          assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None):
     """A flowsheet's inputs bound, in the shape GET /api/proforma/scenarios
     serves: a seed scenario's with its id and name, a flowsheet's alone with
-    both empty (§2.3, c)."""
+    both empty (§2.3, c); with the fermOS fits a person chose laid on
+    (OF-BLD-019 §5.1)."""
     from . import evidence_pool
     from .models import ProformaScenarioInfo
 
     pool = pool or evidence_pool.load(include_archived=True)
     if flowsheet == FLOWSHEET:
-        return scenario(host, assumptions, pool).model_copy(update={"id": scenario_id, "name": name})
-    info = _shelf.info(flowsheet, allow_toy=True)
-    inputs = bind_inputs(flowsheet, pool.records, host, assumptions)
-    return ProformaScenarioInfo(
-        id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
-        hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[i.key for i in inputs if i.binding == "waiting"],
-        leavesOut=info.leavesOut, priceBasis=info.priceBasis or "")
+        out = scenario(host, assumptions, pool).model_copy(update={"id": scenario_id, "name": name})
+    else:
+        info = _shelf.info(flowsheet, allow_toy=True)
+        inputs = bind_inputs(flowsheet, pool.records, host, assumptions)
+        out = ProformaScenarioInfo(
+            id=scenario_id, name=name, product=PRODUCTS.get(flowsheet, flowsheet), flowsheet=flowsheet, host=host,
+            hosts=_hosts(pool.records, flowsheet), inputs=inputs, waiting=[], leavesOut=info.leavesOut,
+            priceBasis=info.priceBasis or "")
+    apply_fits(out.inputs, fits or {}, flowsheet)
+    out.waiting = [i.key for i in out.inputs if i.binding == "waiting"]
+    return out
 
 
 def _hidden(program: str | None, include_archived: bool) -> bool:
@@ -1087,11 +1118,13 @@ def scenarios(include_archived: bool = False, host: str | None = None, pool=None
 
 
 def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str | None = None,
-                   assumptions: list | None = None, pool=None):
+                   assumptions: list | None = None, pool=None, fits: dict[str, str] | None = None):
     """GET /api/proforma/bind (§2.3, c): a shelf flowsheet's inputs bound as a
-    scenario a person made here shows them, id and name empty. The toy, an
-    id the shelf does not hold, a reference biorefinery, and a flowsheet of
-    a program the switch hides (as the shelf hides it) are refused in words."""
+    scenario a person made here shows them, id and name empty, with the
+    fermOS fits a person chose (OF-BLD-019 §5.1). The toy, an id the shelf
+    does not hold, a reference biorefinery, a flowsheet of a program the
+    switch hides (as the shelf hides it), and a fit that cannot feed the
+    input it was chosen for are refused in words."""
     from . import programs
 
     info = runnable(flowsheet)
@@ -1100,4 +1133,209 @@ def bind_flowsheet(flowsheet: str, *, include_archived: bool = False, host: str 
         raise ScenarioRefused(
             f"{flowsheet} belongs to the archived program {held.name if held else info.program}; "
             "Settings → Programs → Show archived programs and examples binds it")
-    return bound(flowsheet, host=host, assumptions=assumptions, pool=pool)
+    return bound(flowsheet, host=host, assumptions=assumptions, pool=pool, fits=fits)
+
+
+# ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
+#
+# A source, not a copy. A person picks a kept kinetic fit or forecast for a
+# scenario's titre, yield and productivity (the request names the artifact
+# per input; a model never picks it), and the service computes each value
+# from it: titre from the forecast's final product, yield from product made
+# over sugar used (Yp/s), and productivity as that titre over the batch
+# time, the hour the forecast's median sugar runs out (fermos.forecast_for
+# says how the forecast was had). Each value is the forecast's median with
+# its 5th and 95th percentile, drawn triangular; the run's basis names the
+# artifact as an `artifact` source, so its provenance enters through
+# basis_provenance (a fit of a deposition rests on `measured` readings).
+# A fit that cannot give an input is refused in words naming the parameter:
+# μ or Xmax not identified, no Yp/s, no sugar series. A fit whose product
+# series names another product than the scenario's is refused whole.
+# `batch_simulation` does not exist in this tree; fermOS keeps
+# `kinetic_fit` and `growth_forecast` (fermos.FEEDABLE).
+
+FIT_KEYS = ("titre", "yield", "productivity")
+_FIT_NAME = re.compile(r"(\w+) fit(?: (low|high))?")
+# The words a series' label or measure id uses for what each shelf
+# flowsheet makes, to tell a fit of another product's series (PRODUCTS).
+PRODUCT_WORDS: dict[str, tuple[str, ...]] = {
+    "ethanol": ("ethanol", "etoh"),
+    "phb": ("phb", "pha", "polyhydroxybutyrate", "polymer"),
+}
+# The concentration a titre is reckoned in, to make a productivity per hour.
+_CONC, _PROD = "g L-1", "g L-1 h-1"
+
+
+def _names(series, product: str) -> bool:
+    if series is None:
+        return False
+    words = set(re.findall(r"[a-z0-9]+", f"{series.label} {series.measureId}".lower()))
+    return any(w in words for w in PRODUCT_WORDS.get(product, (product,)))
+
+
+def _converted(v: dict, frm: str, to: str) -> tuple[float, float, float]:
+    from . import units
+
+    return tuple(units.convert(float(v[k]), frm, to) for k in ("low", "median", "high"))  # type: ignore[return-value]
+
+
+def fit_info(art, flowsheet: str):
+    """What one kept fermOS artifact can feed a shelf flowsheet's titre,
+    yield and productivity, each with how it is computed or why not."""
+    from . import fermos, units
+    from .models import FermosFitInfo, FitFeed
+
+    info = runnable(flowsheet)
+    declared = {i.key: i for i in info.inputs if i.key in FIT_KEYS}
+    if not declared:
+        raise ScenarioRefused(f"{flowsheet} takes no titre, yield or productivity, so no fermOS fit feeds it")
+    product = PRODUCTS.get(flowsheet, flowsheet)
+    out = FermosFitInfo(artifactId=art.id, tool=art.tool, provenance=art.provenance, createdAt=art.createdAt,
+                        flowsheet=flowsheet, depositionId=fermos.deposition_of(art), fitArtifactId=fermos.fit_artifact_of(art))
+
+    def refuse_all(why: str):
+        out.refused = why
+        out.feeds = [FitFeed(key=k, unit=i.unit, derivation="", refused=why) for k, i in declared.items()]
+        return out
+
+    try:
+        fit_ = fermos.fit_of(art)
+    except fermos.FitRefused as e:
+        return refuse_all(str(e))
+    roles = fermos.series_by_role(fit_)
+    prod, sub = roles.get("product"), roles.get("substrate")
+    out.productSeries = prod.label if prod else None
+    out.substrateSeries = sub.label if sub else None
+    others = [p for p in PRODUCT_WORDS if p != product and _names(prod, p)]
+    if prod is not None and others and not _names(prod, product):
+        return refuse_all(f"its product series, {prod.label}, is {others[0]}, not {product}, the product of {flowsheet}")
+    if prod is not None and not _names(prod, product):
+        out.flags.append(f"its product series, {prod.label}, names no product: it is read as {product} because a person chose it")
+    try:
+        fc, how = fermos.forecast_for(art)
+    except fermos.FitRefused as e:
+        return refuse_all(str(e))
+
+    final = next((f for f in fc["finals"] if f["role"] == "product"), None)
+    end = fc["times"][-1] if fc["times"] else None
+    titre: tuple[float, float, float] | None = None
+    titre_why = None
+    if final is None:
+        titre_why = "the fit has no product series, so it gives no final product"
+    else:
+        try:
+            titre = _converted(final, final["unit"], _CONC)
+        except units.UnitError:
+            titre_why = f"the product series is in {final['unit']}, which is not a mass concentration"
+    runs = fc.get("substrateRunsOutH")
+    if sub is None:
+        batch_why = "no sugar series: the fit has no substrate series, so it gives no batch time"
+    elif runs is None:
+        batch_why = (f"the forecast's median sugar does not run out within its {end:.4g} h, so it gives no batch time; "
+                     "a forecast on fermOS → Forecast run until the sugar is spent does")
+    elif runs <= 0:
+        batch_why = "the forecast's median sugar is spent at its start, so it gives no batch time"
+    else:
+        batch_why = None
+        out.batchTimeH = float(runs)
+
+    feeds = []
+    for key, inp in declared.items():
+        feed = FitFeed(key=key, unit=inp.unit, derivation="")
+        try:
+            if key == "titre":
+                feed.derivation = f"the final product of {how}: its median, with the 5th and 95th percentile of its band for readings"
+                if titre is None:
+                    feed.refused = titre_why
+                else:
+                    feed.low, feed.value, feed.high = (units.convert(v, _CONC, inp.unit) for v in titre)
+            elif key == "yield":
+                feed.derivation = f"Yp/s, product made over sugar used, from {how}: its median, with the 5th and 95th percentile"
+                y = fc.get("yieldInterval")
+                if y is None:
+                    feed.refused = ("no Yp/s: the fit has no product series" if prod is None else
+                                    "no Yp/s, and no sugar series: the fit has no substrate series" if sub is None else
+                                    "no Yp/s: the product and sugar series are not in one mass unit")
+                elif units.family(prod.unit) != "massConc":
+                    feed.refused = f"no Yp/s: the product and sugar series are in {prod.unit}, not a mass concentration"
+                else:
+                    # Product over sugar in one mass concentration: grams per gram.
+                    feed.low, feed.value, feed.high = (units.convert(float(y[k]), "g g-1", inp.unit)
+                                                       for k in ("low", "median", "high"))
+            else:
+                feed.derivation = (f"titre over batch time: the final product of {how} over the hour its median sugar "
+                                   "runs out, the 5th and 95th percentile of the product over the same hour")
+                if titre is None:
+                    feed.refused = f"productivity is titre over batch time, and {titre_why}"
+                elif batch_why:
+                    feed.refused = f"productivity is titre over batch time, and {batch_why}"
+                else:
+                    feed.low, feed.value, feed.high = (units.convert(v / float(runs), _PROD, inp.unit) for v in titre)
+        except units.UnitError as e:
+            feed.low = feed.value = feed.high = None
+            feed.refused = f"its value does not convert to {inp.unit}: {e}"
+        feeds.append(feed)
+    out.feeds = feeds
+    return out
+
+
+def fermos_fits(flowsheet: str) -> list:
+    """GET /api/fermos/fits: every kinetic fit and forecast fermOS keeps,
+    newest first, each with what it can feed `flowsheet` and why not. A
+    read: it keeps nothing and starts no simulator."""
+    from . import artifacts, fermos
+
+    runnable(flowsheet)
+    return [fit_info(a, flowsheet) for a in artifacts.all_artifacts() if a.tool in fermos.FEEDABLE]
+
+
+def apply_fits(inputs: list, fits: dict[str, str], flowsheet: str) -> list:
+    """Bind each input a person chose a fermOS fit for to that artifact, in
+    place, and return what else the basis takes from it (the batch time a
+    productivity is the titre over). Refused in words: a key a fit cannot
+    feed, an artifact not on file, and a fit that cannot give the input,
+    naming the parameter."""
+    from . import artifacts
+    from .models import BasisInput, BasisSource
+
+    if not fits:
+        return []
+    unknown = sorted(k for k in fits if k not in FIT_KEYS)
+    if unknown:
+        raise ScenarioRefused(f"a fermOS fit feeds {', '.join(FIT_KEYS)} alone; {', '.join(unknown)} take records "
+                              "or a named person's assumption")
+    by = {i.key: i for i in inputs}
+    missing = sorted(k for k in fits if k not in by)
+    if missing:
+        raise ScenarioRefused(f"{flowsheet} takes no input {', '.join(missing)}")
+    infos: dict[str, Any] = {}
+    extra: list = []
+    for key in FIT_KEYS:
+        aid = fits.get(key)
+        if not aid:
+            continue
+        if aid not in infos:
+            try:
+                infos[aid] = fit_info(artifacts.get(aid), flowsheet)
+            except artifacts.ArtifactNotFound:
+                raise ScenarioRefused(f"there is no kept artifact {aid}: fermOS keeps a fit when it fits a deposited "
+                                      "run, and a forecast when one is made from it") from None
+            except artifacts.ArtifactDamaged as e:
+                raise ScenarioRefused(str(e)) from None
+        info = infos[aid]
+        feed = next(f for f in info.feeds if f.key == key)
+        if info.refused or feed.refused:
+            raise ScenarioRefused(f"{info.tool} {aid} cannot feed {key}: {info.refused or feed.refused}")
+        inp = by[key]
+        had = len(inp.records)
+        inp.binding = "artifact"
+        inp.value, inp.low, inp.high = feed.value, feed.low, feed.high
+        inp.sampling = "fixed" if feed.low == feed.high else "triangular"
+        inp.source = BasisSource(kind="artifact", id=aid, note=feed.derivation)
+        inp.records, inp.recordIds = [], []
+        inp.leftOutNoCarbon = inp.leftOutOtherCarbon = 0
+        inp.flags = ([f"chosen in place of the {had} record{'s' if had != 1 else ''} it bound"] if had else []) + list(info.flags)
+        if key == "productivity" and info.batchTimeH is not None:
+            extra.append(BasisInput(name="fit batch time", value=info.batchTimeH, unit="h", source=BasisSource(
+                kind="artifact", id=aid, note="the hour the forecast's median sugar runs out; productivity is the titre over it")))
+    return extra

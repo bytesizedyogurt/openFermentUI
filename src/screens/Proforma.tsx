@@ -270,6 +270,7 @@ function BiosteamCard({
   info: ProformaScenarioInfo | null;
 }) {
   const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]);
+  const fits = useStore((s) => s.proformaFits[scenario.id]);
   const [art, setArt] = useState<Artifact | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const runId = scenario.lastRunId ?? null;
@@ -287,7 +288,7 @@ function BiosteamCard({
 
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
   const flowsheet = shelf.find((f) => f.id === flowsheetId) ?? null;
-  const counts = inputCounts(scenario, info, shelf, assumptions ?? []);
+  const counts = inputCounts(scenario, info, shelf, assumptions ?? [], fits ?? {});
   const price = art ? runPrice(art, shelf) : null;
   return (
     <Card className="p-4 flex flex-col" data-testid="biosteam-card" data-scenario={scenario.id}>
@@ -333,6 +334,7 @@ function BiosteamCard({
       {counts && (
         <p className="text-caption text-ink-soft mb-3 font-num" data-testid="scenario-inputs">
           {counts.total} inputs: {counts.records} {counts.bound ? 'bound to records' : 'bind to records when it runs'}
+          {counts.computed > 0 && `, ${counts.computed} from a fermOS fit`}
           {counts.assumed > 0 && `, ${counts.assumed} assumed`}
           {counts.conventions > 0 && `, ${counts.conventions} by convention`}, {counts.waiting} waiting for an assumption
         </p>

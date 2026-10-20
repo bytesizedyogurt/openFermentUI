@@ -2742,8 +2742,13 @@ export interface ScenarioInput {
   key: string;
   label: string;
   unit: string;
-  /** 'records': bound records; 'assumption': a named person typed it; 'waiting': neither, so the run is refused. */
-  binding: 'records' | 'assumption' | 'waiting';
+  /**
+   * 'records': bound records; 'assumption': a named person typed it;
+   * 'artifact': a fermOS fit or forecast a person chose computes it, its
+   * source naming the artifact (OF-BLD-019 §5.1, D10); 'waiting': none of
+   * these, so the run is refused.
+   */
+  binding: 'records' | 'assumption' | 'artifact' | 'waiting';
   value: number | null;
   low: number | null;
   high: number | null;
@@ -2793,6 +2798,54 @@ export interface ProformaRunRequest {
    * this flowsheet, bound as `GET /api/proforma/bind` binds it.
    */
   flowsheet?: string | null;
+  /**
+   * The fermOS fits a person chose, by input key (titre, yield,
+   * productivity), each a kept `kinetic_fit` or `growth_forecast` artifact id
+   * (OF-BLD-019 §5.1, D10). The service computes each value from it.
+   */
+  fits?: Record<string, string>;
+}
+
+/**
+ * What one fermOS artifact gives one input of a flowsheet (OF-BLD-019 §5.1):
+ * the value in the input's unit with the 5th and 95th percentile of the
+ * forecast's band for readings, or why it gives nothing, naming the parameter.
+ */
+export interface FitFeed {
+  key: string;
+  unit: string;
+  value: number | null;
+  low: number | null;
+  high: number | null;
+  /** How the value is computed from the artifact, in words. */
+  derivation: string;
+  /** Why it gives nothing; null when it gives the value. */
+  refused: string | null;
+}
+
+/**
+ * A kinetic fit or forecast fermOS keeps, and what it can feed one shelf
+ * flowsheet (`GET /api/fermos/fits?flowsheet=`). A person picks it; a model
+ * never does.
+ */
+export interface FermosFitInfo {
+  artifactId: string;
+  /** 'kinetic_fit' or 'growth_forecast'. */
+  tool: string;
+  provenance: Provenance;
+  createdAt: string;
+  flowsheet: string;
+  /** The run the fit was made on, and the kinetic fit a forecast rests on. */
+  depositionId: string | null;
+  fitArtifactId: string | null;
+  productSeries: string | null;
+  substrateSeries: string | null;
+  /** The hour the forecast's median sugar runs out: the batch time a productivity is the titre over. */
+  batchTimeH: number | null;
+  feeds: FitFeed[];
+  flags: string[];
+  /** Why it feeds nothing at all, in words. */
+  refused: string | null;
 }
 
 export interface HistogramBin {

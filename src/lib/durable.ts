@@ -128,6 +128,12 @@ export interface DurableSnapshot {
    */
   proformaAssumptions?: Record<string, InputAssumption[]>;
   /**
+   * The fermOS fits a person chose for a scenario's inputs, by scenario id
+   * and input key: a kept kinetic fit's or forecast's artifact id
+   * (OF-BLD-019 §5.1). Optional for the same reason as `guild`.
+   */
+  proformaFits?: Record<string, Record<string, string>>;
+  /**
    * Runbooks adopted from a Postdoc draft (OF-BLD-014 §9.2), as adopted. A
    * lock on one is kept in `runbookLocks`, like a seeded runbook's.
    */

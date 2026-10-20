@@ -419,6 +419,7 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     # after a reload, Compare); it follows the PHA run, which tests take first.
     proforma_fixtures = prototype_proforma()
     run_artifacts = proforma_fixtures.pop(PROFORMA_RUN_ARTIFACTS)
+    bridge, bridge_artifacts = prototype_fermos_bridge()
     replay = artifacts.ReplayResult(
         artifactId=art.id, identical=True, storedHash=art.outputHash, replayedHash=art.outputHash, durationMs=0
     )
@@ -426,12 +427,13 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     written = []
     for name, value in (
         ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts),
-                            *run_artifacts]),
+                            *run_artifacts, *(a.model_dump(mode="json") for a in bridge_artifacts)]),
         ("ask-draft-stream.jsonl", draft_stream),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
         *prototype_fermos().items(),
+        *bridge.items(),
         *proforma_fixtures.items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
@@ -760,6 +762,66 @@ def prototype_fermos() -> dict[str, Any]:
     if fc.evidence is not None:
         fc.evidence.basis.at = AT
     return {"fermos-fit.json": fit.model_dump(mode="json"), "fermos-forecast.json": fc.model_dump(mode="json")}
+
+
+# OF-BLD-019 §5.1: a fermOS fit feeds the fermenter. The sample time course
+# above (INVENTED) relabelled as a STAND-IN ethanol run on a deposition no
+# browser holds, fitted and forecast through the real code in a scratch
+# store; the forecast runs STANDIN_FORECAST_H hours, a setting of this
+# fixture, so that its median sugar is spent. GET /api/fermos/fits for every
+# flowsheet with nothing on file and with the two on file (each answered or
+# refused in the service's words), and the yeast flowsheet bound with the
+# forecast for every input it feeds (GET /api/proforma/bind?fits=). The two
+# artifacts join artifacts.json so their links open.
+BRIDGE_DEPOSITION = "dep-standin-ethanol"
+STANDIN_FORECAST_H = 120.0
+BRIDGE_LABELS = {"biomass": "Dry cell weight (STAND-IN)", "product": "Ethanol (STAND-IN)",
+                 "substrate": "Glucose (STAND-IN)"}
+
+
+def prototype_fermos_bridge() -> tuple[dict[str, Any], list[Any]]:
+    import tempfile
+    from types import SimpleNamespace
+
+    from . import artifacts, fermos, proforma
+    from . import intake as _intake
+    from .flowsheets import shelf as _shelf
+    from .models import FermosSeries
+
+    rs = _standin_yeast_records()
+    pool = SimpleNamespace(records=rs, records_by_id={r["id"]: r for r in rs})
+
+    def listed() -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for fid in (*_shelf.SHELF, *_shelf.TEST_ONLY):
+            try:
+                # Newest first, as the service lists them; every one is dated AT.
+                infos = sorted(proforma.fermos_fits(fid), key=lambda i: i.artifactId, reverse=True)
+                out[fid] = {"status": 200, "body": [i.model_copy(update={"createdAt": AT}).model_dump(mode="json") for i in infos]}
+            except proforma.ScenarioRefused as e:
+                out[fid] = {"status": 422, "body": {"detail": str(e)}}
+        return out
+
+    saved = _intake.DATA_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            none = listed()
+            series = [FermosSeries.model_validate({**x, "measureId": f"standin-{x['role']}", "label": BRIDGE_LABELS[x["role"]]})
+                      for x in fermos_sample_series()]
+            fit = fermos.fit(BRIDGE_DEPOSITION, series)
+            fc = fermos.forecast_run(fit_artifact=fit.kineticArtifactId, duration_h=STANDIN_FORECAST_H)
+            on_file = listed()
+            info = proforma.fit_info(artifacts.get(fc.artifactId), proforma.ETHANOL)
+            fits = {f.key: fc.artifactId for f in info.feeds if not f.refused}
+            assert set(fits) == set(proforma.FIT_KEYS), "the stand-in forecast no longer feeds every input"
+            body = proforma.bind_flowsheet(proforma.ETHANOL, pool=pool, fits=fits).model_dump(mode="json")
+            kept = [artifacts.get(i).model_copy(update={"createdAt": AT, "durationMs": 0})
+                    for i in (fit.kineticArtifactId, fc.artifactId)]
+        finally:
+            _intake.DATA_DIR = saved
+    return ({"fermos-fits.json": {"none": none, "onFile": on_file},
+             "proforma-bind-fits.json": {"flowsheet": proforma.ETHANOL, "fits": fits, "body": body}}, kept)
 
 
 # §8.4: Proforma's BioSTEAM scenario for the smoke double. The binding and

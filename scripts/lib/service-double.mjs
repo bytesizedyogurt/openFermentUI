@@ -108,6 +108,15 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const geneosCalls = [];
   const fermosCalls = [];
   const proformaRuns = [];
+  /** The bindings the browser asked for with fermOS fits chosen (OF-BLD-019 §5.1): each query, as sent. */
+  const proformaBinds = [];
+  /**
+   * What the double has on file that a test may switch (OF-BLD-019 §5.1):
+   * `fermosFitsOnFile` serves GET /api/fermos/fits as a service with the
+   * fixture's fit and forecast on file, else as one with none, which is how a
+   * fresh install starts.
+   */
+  const flags = { fermosFitsOnFile: false };
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
   const proformaReferences = [];
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
@@ -277,6 +286,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(fixture));
     }
+    // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
+    // flowsheet, as the real code listed them over an empty store and over
+    // the stand-in fit and forecast (flags.fermosFitsOnFile picks which);
+    // a flowsheet the fixture does not hold is the service's 422.
+    if (url === '/api/fermos/fits' && req.method === 'GET') {
+      const flowsheet = new URL(req.url ?? '/', 'http://double').searchParams.get('flowsheet') ?? '';
+      const answers = (await prototype('fermos-fits.json'))[flags.fermosFitsOnFile ? 'onFile' : 'none'];
+      const answer = answers[flowsheet] ?? { status: 422, body: { detail: `there is no flowsheet ${flowsheet} on the shelf` } };
+      res.writeHead(answer.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(answer.body));
+    }
     // OF-BLD-014 §8.2 — a service whose simulator has yet to run: the
     // Benchmark card's empty state.
     if (url === '/api/proforma/status' && req.method === 'GET') {
@@ -379,6 +399,22 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     if (url === '/api/proforma/bind' && req.method === 'GET') {
       const q = new URL(req.url ?? '/', 'http://double').searchParams;
       const flowsheet = q.get('flowsheet') ?? '';
+      // OF-BLD-019 §5.1: with fermOS fits chosen, the binding the real code
+      // made with the stand-in forecast for every input it feeds; any other
+      // choice is a 422 in words.
+      if (q.get('fits')) {
+        proformaBinds.push(Object.fromEntries(q));
+        const fixture = await prototype('proforma-bind-fits.json');
+        let asked = null;
+        try {
+          asked = JSON.parse(q.get('fits'));
+        } catch {
+          /* answered below */
+        }
+        const same = asked && flowsheet === fixture.flowsheet && JSON.stringify(Object.entries(asked).sort()) === JSON.stringify(Object.entries(fixture.fits).sort());
+        res.writeHead(same ? 200 : 422, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(same ? fixture.body : { detail: `the double holds no binding of ${flowsheet} with these fits` }));
+      }
       const answers = (await prototype('proforma-bind.json'))[q.get('includeArchived') === 'true' ? 'on' : 'off'];
       const answer = answers[flowsheet] ?? {
         status: 422,
@@ -413,7 +449,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       // Inputs that still wait are refused as the service refuses them (§3.2).
       const seed = seeds.find((sc) => sc.id === asked.scenarioId);
       const bound = seed ?? seeds.find((sc) => sc.flowsheet === asked.flowsheet);
-      const typed = new Set((asked.assumptions ?? []).map((a) => a.key));
+      const typed = new Set([...(asked.assumptions ?? []).map((a) => a.key), ...Object.keys(asked.fits ?? {})]);
       const waiting = (bound?.inputs ?? []).filter((i) => i.binding === 'waiting' && !typed.has(i.key)).map((i) => i.key);
       if (waiting.length) return refuse(`these inputs wait for a source, a record or a named person's assumption: ${waiting.join(', ')}`);
       const run = await prototype(name);
@@ -511,5 +547,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaReferences, proposalActs, thermoCalls } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proposalActs, thermoCalls, flags } };
 }

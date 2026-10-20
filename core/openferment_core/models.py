@@ -1527,8 +1527,10 @@ class ScenarioInput(BaseModel):
     label: str
     unit: str
     # 'records': the median and range of bound records; 'assumption': a named
-    # person typed it; 'waiting': neither yet, so the scenario cannot run.
-    binding: Literal["records", "assumption", "waiting"]
+    # person typed it; 'artifact': a fermOS fit or forecast a person chose
+    # computes it (OF-BLD-019 §5.1, D10), its source naming the artifact;
+    # 'waiting': none of these yet, so the scenario cannot run.
+    binding: Literal["records", "assumption", "artifact", "waiting"]
     value: float | None = None
     low: float | None = None
     high: float | None = None
@@ -1585,6 +1587,12 @@ class ProformaRunRequest(BaseModel):
     # GET /api/proforma/bind binds it. A reference biorefinery, the toy or an
     # id the shelf does not hold is refused in words.
     flowsheet: str | None = None
+    # The fermOS fits a person chose, by input key: titre, yield and
+    # productivity, each the id of a kept `kinetic_fit` or `growth_forecast`
+    # artifact (OF-BLD-019 §5.1, D10). The service computes each value from
+    # the artifact; a model never picks one. A fit that cannot feed an input
+    # is refused in words naming the parameter.
+    fits: dict[str, str] = Field(default_factory=dict)
 
 
 class HistogramBin(BaseModel):
@@ -1638,6 +1646,53 @@ class ProformaRunResult(BaseModel):
     diagramNote: str | None = None
     unitOrder: list[str] = Field(default_factory=list)
     tableUnits: dict[str, str] = Field(default_factory=dict)
+
+
+# ── A fermOS fit feeds the fermenter (OF-BLD-019 §5.1, D10) ─────────────
+
+
+class FitFeed(BaseModel):
+    """What one fermOS artifact gives one input of a flowsheet: the value in
+    the input's unit, with the 5th and 95th percentile of the forecast's band
+    for readings, or why it gives nothing, in words naming the parameter."""
+
+    key: str
+    unit: str
+    value: float | None = None
+    low: float | None = None
+    high: float | None = None
+    # How the value is computed from the artifact, in words.
+    derivation: str
+    # Why it gives nothing; None when it gives the value.
+    refused: str | None = None
+
+
+class FermosFitInfo(BaseModel):
+    """A kinetic fit or a forecast fermOS keeps, and what it can feed one
+    shelf flowsheet (GET /api/fermos/fits). A person picks it; a model never
+    does."""
+
+    artifactId: str
+    # 'kinetic_fit' or 'growth_forecast'.
+    tool: str
+    provenance: Provenance
+    createdAt: str
+    flowsheet: str
+    # The run the fit was made on, and the kinetic fit a forecast rests on
+    # (a kinetic fit's own id for a fit).
+    depositionId: str | None = None
+    fitArtifactId: str | None = None
+    # The product and sugar series, by the labels the run gave them.
+    productSeries: str | None = None
+    substrateSeries: str | None = None
+    # The hour the forecast's median sugar runs out: the batch time a
+    # productivity is the titre over.
+    batchTimeH: float | None = None
+    feeds: list[FitFeed] = Field(default_factory=list)
+    # Words printed beside it, such as a product series that names no product.
+    flags: list[str] = Field(default_factory=list)
+    # Why it feeds nothing at all, in words.
+    refused: str | None = None
 
 
 # ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────

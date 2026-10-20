@@ -347,6 +347,34 @@ def fermos_forecast(req: ForecastRequest) -> ForecastResult:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@app.get("/api/fermos/fits")
+def fermos_fits(flowsheet: str) -> list[dict]:
+    """The kinetic fits and forecasts fermOS keeps, newest first, each with
+    what it can feed a shelf flowsheet's titre, yield and productivity and
+    why not (OF-BLD-019 §5.1, D10). A person picks one on the scenario page;
+    a read: it keeps nothing. A flowsheet a scenario cannot run is a 422."""
+    from . import proforma
+
+    try:
+        return [f.model_dump(mode="json") for f in proforma.fermos_fits(flowsheet)]
+    except proforma.ScenarioRefused as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _fits_param(raw: str | None) -> dict[str, str]:
+    """`?fits=` on GET /api/proforma/bind: a JSON object of input key to
+    artifact id, as ProformaRunRequest.fits carries it."""
+    if not raw:
+        return {}
+    try:
+        fits = json.loads(raw)
+    except ValueError:
+        fits = None
+    if not isinstance(fits, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in fits.items()):
+        raise HTTPException(status_code=422, detail="fits is a JSON object of input key to the id of a kept fermOS fit")
+    return fits
+
+
 @app.get("/api/proforma/status")
 def proforma_status() -> dict:
     """Where the BioSTEAM worker is (§8.1): cold, starting, ready or failed."""
@@ -431,15 +459,20 @@ def proforma_scenarios(host: str | None = None, includeArchived: bool = False) -
 
 
 @app.get("/api/proforma/bind")
-def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False) -> dict:  # noqa: N803
+def proforma_bind(flowsheet: str, host: str | None = None, includeArchived: bool = False,  # noqa: N803
+                  fits: str | None = None) -> dict:
     """A shelf flowsheet's inputs bound, as a scenario a person made in the
-    browser shows them (OF-BLD-019 §2.3, D6), id and name empty. A reference
-    biorefinery, the toy, an unknown id, or a flowsheet of a program the
-    switch hides is a 422 in words. A read: it starts no simulator."""
+    browser shows them (OF-BLD-019 §2.3, D6), id and name empty; `?fits=`
+    lays on the fermOS fits a person chose (§5.1), a JSON object of input
+    key to artifact id. A reference biorefinery, the toy, an unknown id, a
+    flowsheet of a program the switch hides, or a fit that cannot feed its
+    input is a 422 in words. A read: it starts no simulator."""
     from . import proforma
 
+    chosen = _fits_param(fits)
     try:
-        return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host).model_dump(mode="json")
+        return proforma.bind_flowsheet(flowsheet, include_archived=includeArchived, host=host,
+                                       fits=chosen).model_dump(mode="json")
     except proforma.ScenarioRefused as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

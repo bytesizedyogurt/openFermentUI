@@ -651,6 +651,43 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('Compare reads each BioSTEAM scenario from its newest run artifact, and makes no price of its own',
     /proformaArtifact\(/.test(compare) && /runViewOfArtifact\(/.test(compare) && /viewPrice\(/.test(compare) && !/basePrice\s*[-+]/.test(compare));
 }
+// OF-BLD-019 §5.1 (D10) — the fermOS fits a person chose for a scenario's
+// inputs are Durable, like its assumptions: which artifact feeds which input
+// survives a reload keyed by scenario and input, one input can stop using its
+// fit or all can, a choice made since load wins over the snapshot's, and
+// clearing this browser's data drops them. The page asks the service for the
+// fits and their values; Send to Proforma rides on fermOS → Forecast.
+{
+  const st = () => useStore.getState();
+  const fit = '1a2b3c4d5e6f7a8b';
+  const forecast = '8b7a6f5e4d3c2b1a';
+  st().setProformaFits('sc-yeast-1', { titre: forecast, yield: forecast, productivity: forecast });
+  st().setProformaFits('sc-yeast-1', { yield: fit });
+  check('choosing a fit binds the inputs it feeds, and a later choice replaces only its own inputs',
+    JSON.stringify(st().proformaFits['sc-yeast-1']) === JSON.stringify({ titre: forecast, yield: fit, productivity: forecast }), st().proformaFits);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps each scenario\u2019s fits by input', snap.proformaFits?.['sc-yeast-1']?.productivity === forecast, snap.proformaFits);
+  useStore.setState({ proformaFits: {} });
+  st().applyDurable(snap);
+  check('after a reload the fits are back under the scenario, input by input',
+    JSON.stringify(st().proformaFits['sc-yeast-1']) === JSON.stringify({ titre: forecast, yield: fit, productivity: forecast }), st().proformaFits);
+  st().setProformaFits('sc-yeast-1', { titre: fit });
+  st().applyDurable(snap);
+  check('a choice made since load wins over the snapshot\u2019s', st().proformaFits['sc-yeast-1']?.titre === fit, st().proformaFits);
+  st().clearProformaFit('sc-yeast-1', 'productivity');
+  check('one input can stop using its fit, and the others keep theirs',
+    !('productivity' in (st().proformaFits['sc-yeast-1'] ?? {})) && st().proformaFits['sc-yeast-1']?.yield === fit);
+  st().clearProformaFit('sc-yeast-1');
+  check('every input can stop using its fit at once', Object.keys(st().proformaFits['sc-yeast-1'] ?? {}).length === 0);
+  st().setProformaFits('sc-yeast-1', { titre: fit });
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data drops the fits chosen here', Object.keys(st().proformaFits).length === 0, st().proformaFits);
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  const forecastPage = readFileSync(new URL('../src/screens/FermOSForecast.tsx', import.meta.url), 'utf8');
+  check('the scenario page lists the fits the service keeps, and keeps the choice in the store',
+    /fermosFits\(/.test(page) && /setProformaFits|setFits\(scenario\.id/.test(page) && !/<FermosFitSlot fits=\{\[\]\}/.test(page));
+  check('fermOS \u2192 Forecast sends a fit to Proforma', /Send to Proforma/.test(forecastPage) && /sendFitPath/.test(forecastPage));
+}
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);
