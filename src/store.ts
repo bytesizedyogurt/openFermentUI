@@ -3527,17 +3527,56 @@ export function programOf(kind: ProgramEntityKind, id: string, s: ProgramLookup 
   }
 }
 
+const exampleLessonIndexes = new WeakMap<readonly LearnModule[], Map<string, boolean>>();
+function exampleLessonIndex(modules: readonly LearnModule[]) {
+  let m = exampleLessonIndexes.get(modules);
+  if (!m) {
+    m = new Map(modules.flatMap((mod) => mod.lessons.map((l) => [l.id, !!(l.example ?? mod.example)] as const)));
+    exampleLessonIndexes.set(modules, m);
+  }
+  return m;
+}
+
 /**
- * Whether an entity shows: it is general, its program is active, or the
- * person has turned archived programs on. The one selector every screen
- * calls (through `useProgramFilter` in a component).
+ * Whether an entity is an example (OF-BLD-016 §3.3, D3): a seed runbook,
+ * protocol, scenario, module or lesson that describes a run nobody made. An
+ * example is treated as archived — hidden by default, shown by the same
+ * switch, opened under ArchivedBanner by a link — and is never deleted. A
+ * lesson is an example when it or its module says so. A deposition is one
+ * only by its own flag: a run a person starts from an example runbook is a
+ * run someone made.
+ */
+export function isExample(kind: ProgramEntityKind, id: string, s: ProgramLookup = {}): boolean {
+  switch (kind) {
+    case 'runbook':
+      return !!indexById(s.runbooks ?? RUNBOOKS).get(id)?.example;
+    case 'protocol':
+      return !!indexById(s.protocols ?? PROTOCOLS).get(id)?.example;
+    case 'scenario':
+      return !!indexById(s.scenarios ?? SCENARIOS).get(id)?.example;
+    case 'module':
+      return !!indexById(s.modules ?? MODULES).get(id)?.example;
+    case 'lesson':
+      return exampleLessonIndex(s.modules ?? MODULES).get(id) ?? false;
+    case 'deposition':
+      return !!indexById(s.depositions ?? []).get(id)?.example;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether an entity shows: it is general or its program is active, and it is
+ * not an example — or the person has turned archived programs and examples
+ * on. The one selector every screen calls (through `useProgramFilter` in a
+ * component).
  */
 export function programVisible(
   kind: ProgramEntityKind,
   id: string,
   s: ProgramLookup & Pick<OFState, 'showArchived'>,
 ): boolean {
-  return s.showArchived || !isArchived(programOf(kind, id, s));
+  return s.showArchived || (!isArchived(programOf(kind, id, s)) && !isExample(kind, id, s));
 }
 
 /** The archived program an entity belongs to, or null — what ArchivedBanner names. */
@@ -3589,9 +3628,17 @@ export function useProgramScope(
     () => (kind && id ? archivedProgramOf(kind, id, lookup)?.id ?? null : null),
     [kind, id, lookup],
   );
+  // An example opened by link (§3.3) widens the same way: the other examples
+  // it names show beside it, unless their program is archived and not its own.
+  const ownExample = useMemo(() => (kind && id ? isExample(kind, id, lookup) : false), [kind, id, lookup]);
   return useCallback(
-    (k: ProgramEntityKind, x: string) => shows(k, x) || (own !== null && programOf(k, x, lookup) === own),
-    [shows, own, lookup],
+    (k: ProgramEntityKind, x: string) => {
+      if (shows(k, x)) return true;
+      const p = programOf(k, x, lookup);
+      if (own !== null && p === own) return true;
+      return ownExample && isExample(k, x, lookup) && (!isArchived(p) || p === own);
+    },
+    [shows, own, ownExample, lookup],
   );
 }
 

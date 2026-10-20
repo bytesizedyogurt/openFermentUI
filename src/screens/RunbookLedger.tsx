@@ -11,7 +11,7 @@
 // and with it on the page is exactly what it was.
 import { useMemo, useState } from 'react';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { programOf, useProgramFilter, useStore } from '@/store';
+import { isExample, programOf, useProgramFilter, useStore } from '@/store';
 import { href } from '@/router';
 import { Card, PageHeader, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -57,6 +57,12 @@ export default function RunbookLedger() {
     );
     return PROGRAMS.filter((p) => ids.has(p.id));
   }, [runbooks, shows]);
+  // Locked runbooks the filter hid because they are examples (OF-BLD-016
+  // §3.3, D3): predictions locked for a run nobody made.
+  const hiddenExamples = useMemo(
+    () => runbooks.filter((r) => r.lockedAt && r.predictions.length > 0 && !shows('runbook', r.id) && isExample('runbook', r.id, { runbooks })).length,
+    [runbooks, shows],
+  );
 
   return (
     <div data-testid="runbook-ledger">
@@ -100,6 +106,20 @@ export default function RunbookLedger() {
           );
         })}
         {groups.length === 0 && <p className="text-body text-ink-soft">No locked prediction matches this filter.</p>}
+        {groups.length === 0 && hiddenExamples > 0 && (
+          <p className="text-body text-ink-soft" data-testid="ledger-examples-hidden">
+            {hiddenExamples === 1 ? 'One locked runbook is an example' : `${hiddenExamples} locked runbooks are examples`}: their
+            predictions were locked for runs nobody made, so the ledger leaves them out. Next step: ask{' '}
+            <a className="text-accent underline underline-offset-2" href={href('/postdoc')}>
+              Postdoc
+            </a>{' '}
+            to draft a runbook, turn it into one, and lock its predictions; the ledger counts it from then.{' '}
+            <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+              Settings → Programs
+            </a>{' '}
+            shows the examples again.
+          </p>
+        )}
         {groups.length === 0 && hiddenPrograms.length > 0 && (
           <p className="text-body text-ink-soft" data-testid="hidden-by-archive">
             Locked predictions in {hiddenPrograms.map((p) => p.name).join(' and ')}{' '}

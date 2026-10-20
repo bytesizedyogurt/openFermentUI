@@ -106,6 +106,23 @@ def test_rows_carry_the_program_the_browser_gives_them(modules_json):
         assert all("program" in row for row in modules_json[module][key]), f"{module}.{key}"
 
 
+def test_examples_are_marked_in_the_projection_and_on_the_rows(modules_json):
+    # OF-BLD-016 §3.3 (D3): the seed runbooks, the casein protocols, sc-s1…s3
+    # and the lessons of m0–m5 describe runs nobody made; the generic
+    # protocols and the bench track do not. The browser hides an example with
+    # the archive; the service lists it, marked, so a read can say so.
+    rb = modules_json["runbooks"]
+    assert all(r["example"] is True for r in rb["runbooks"])
+    flagged = {p["id"] for p in rb["protocols"] if p["example"]}
+    assert {"PR-OD-01", "PR-CIP-01"}.isdisjoint(flagged) and "PR-TAP-01" in flagged
+    assert {s["id"] for s in modules_json["proforma"]["scenarios"] if s["example"]} == {"sc-s1", "sc-s2", "sc-s3"}
+    lessons = {l["id"]: l["example"] for l in modules_json["primer"]["lessons"]}
+    assert lessons["l1-1"] is True and lessons["l6-1"] is False
+    rows = {r.id: r for r in _stores(include_archived=True).rows("runbooks")}
+    assert rows["rb-taq-kigali"].detail.get("example") is True
+    assert "example" not in rows["PR-OD-01"].detail
+
+
 def test_archived_is_a_status_and_general_is_never_archived():
     assert programs.archived_ids() == frozenset({"casein", "pha"})
     assert [p.id for p in programs.active_programs()] == ["yeast"]

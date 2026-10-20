@@ -26,7 +26,7 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
-import { mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
+import { isExample, mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
 import { RECORDS } from '../src/data/records';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
@@ -428,6 +428,30 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('a general entity shows with the switch off', programVisible('strain', 's-cerevisiae', st()));
   check('an archived strain does not', !programVisible('strain', 'c-necator-h16', st()));
   check('a record shows as its paper does', programOf('record', RECORDS.find((r) => r.paperId.startsWith('H'))!.id, st()) === 'casein');
+}
+
+// OF-BLD-016 §3.3 (D3) — an example is treated as archived: a general seed
+// runbook that describes a run nobody made is hidden with the switch off and
+// shows with it on; a general protocol that teaches a method stays; a lesson
+// takes its module's flag; a copy of an example scenario stays an example;
+// and a deposition a person starts from an example runbook is not one.
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(false);
+  check('an example runbook is general, yet hidden with the switch off',
+    programOf('runbook', 'rb-taq-kigali', st()) === null && isExample('runbook', 'rb-taq-kigali', st()) && !programVisible('runbook', 'rb-taq-kigali', st()));
+  check('no seed runbook shows with the switch off', st().runbooks.every((r) => !programVisible('runbook', r.id, st())));
+  check('the generic protocols show with the switch off', programVisible('protocol', 'PR-OD-01', st()) && programVisible('protocol', 'PR-CIP-01', st()));
+  check('a lesson of an example module is an example', isExample('lesson', st().modules.find((m) => m.id === 'm0')!.lessons[0].id, st()));
+  check('the bench-track lessons show with the switch off', st().modules.find((m) => m.id === 'm6')!.lessons.every((l) => programVisible('lesson', l.id, st())));
+  st().setShowArchived(true);
+  check('the switch brings every example back', st().runbooks.every((r) => programVisible('runbook', r.id, st())));
+  st().setShowArchived(false);
+  const copyId = st().duplicateScenario('sc-s1');
+  check('a copy of an example scenario stays an example', isExample('scenario', copyId, st()) && !programVisible('scenario', copyId, st()), copyId);
+  check('a deposition is an example only by its own flag',
+    !isExample('deposition', 'dep-x', { ...st(), depositions: [{ id: 'dep-x', runbookId: 'rb-taq-kigali', protocolId: 'PR-OD-01' } as never] }));
+  st().clearBrowserData();
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

@@ -551,6 +551,13 @@ export interface Protocol {
    * is general and shows whatever programs are archived.
    */
   program?: ProgramId;
+  /**
+   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
+   * never deleted, and treated as archived: hidden from every list and count
+   * until Settings → Programs shows archived programs and examples, and
+   * opened under ArchivedBanner by a link. Never part of a lock digest.
+   */
+  example?: boolean;
 }
 
 export interface Deviation {
@@ -652,6 +659,13 @@ export interface Scenario {
    * is general and shows whatever programs are archived.
    */
   program?: ProgramId;
+  /**
+   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
+   * never deleted, and treated as archived: hidden from every list and count
+   * until Settings → Programs shows archived programs and examples, and
+   * opened under ArchivedBanner by a link. Never part of a lock digest.
+   */
+  example?: boolean;
 }
 
 export interface GridPointResult {
@@ -768,6 +782,13 @@ export interface Lesson {
    * its module's; a module with none is general.
    */
   program?: ProgramId;
+  /**
+   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
+   * never deleted, and treated as archived: hidden from every list and count
+   * until Settings → Programs shows archived programs and examples, and
+   * opened under ArchivedBanner by a link. Never part of a lock digest.
+   */
+  example?: boolean;
 }
 
 export type LessonBlock =
@@ -800,6 +821,13 @@ export interface LearnModule {
    * is general and shows whatever programs are archived.
    */
   program?: ProgramId;
+  /**
+   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
+   * never deleted, and treated as archived: hidden from every list and count
+   * until Settings → Programs shows archived programs and examples, and
+   * opened under ArchivedBanner by a link. Never part of a lock digest.
+   */
+  example?: boolean;
 }
 
 export interface ActivityEvent {
@@ -1229,6 +1257,12 @@ export interface Deposition {
   sampleTimes?: Record<string, number>;
   /** What each measure's series is, by measure id, as a person assigned it. */
   seriesRoles?: Record<string, SeriesRole>;
+  /**
+   * An example deposition (OF-BLD-016 §3.3, D3): a run nobody made, hidden
+   * like an archived program's. The seed holds none; a deposition a person
+   * starts here is never one, whatever the runbook it follows.
+   */
+  example?: boolean;
 }
 
 export type SeriesRole = 'biomass' | 'product' | 'substrate';
@@ -1325,6 +1359,13 @@ export interface Runbook {
    * of the strain, and is general when neither has one.
    */
   program?: ProgramId;
+  /**
+   * An example (OF-BLD-016 §3.3, D3): it describes a run nobody made. Kept,
+   * never deleted, and treated as archived: hidden from every list and count
+   * until Settings → Programs shows archived programs and examples, and
+   * opened under ArchivedBanner by a link. Never part of a lock digest.
+   */
+  example?: boolean;
 }
 
 // ── AnswerPlan (OF-BLD-007 §3) ─────────────────────────────────────────

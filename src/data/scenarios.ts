@@ -160,6 +160,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s1',
     program: 'casein',
+    example: true,
     modelId: 'S1',
     kind: 'authored',
     name: 'cw15 intracellular β-casein',
@@ -193,6 +194,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s2',
     program: 'casein',
+    example: true,
     modelId: 'S2',
     kind: 'authored',
     name: 'K. phaffii secreted comparator',
@@ -218,6 +220,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'sc-s3',
     program: 'casein',
+    example: true,
     modelId: 'S3',
     kind: 'authored',
     name: 'Conventional β-casein from milk',

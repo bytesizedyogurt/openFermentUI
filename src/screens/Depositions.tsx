@@ -82,8 +82,13 @@ export default function Depositions() {
           <EmptyState
             icon={<ClipboardList size={22} />}
             title="No depositions in this browser"
-            body="Depositions are written at the bench and kept in the durable tier, so they survive a reload — but they start empty. Open a runbook and stage a run against one of its protocols, and the record appears here."
-            action={<LinkButton to="/runbooks">Open the runbook board</LinkButton>}
+            body="Depositions are written at the bench and kept in the durable tier, so they survive a reload — but they start empty. Open a runbook and stage a run against one of its protocols, and the record appears here. The seed runbooks are examples of runs nobody made and are hidden with the archive, so the next step on a fresh board is to ask Postdoc to draft a runbook and turn it into one."
+            action={
+              <div className="flex flex-wrap gap-2 justify-center">
+                <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to="/runbooks">Open the runbook board</LinkButton>
+              </div>
+            }
           />
         </Card>
       ) : (

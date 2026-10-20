@@ -23,7 +23,7 @@ import { PAPERS } from '../src/data/papers';
 import { RECORDS } from '../src/data/records';
 import { ONTOLOGY, fieldName } from '../src/data/ontology';
 import { ALIASES, REFUSALS, SI_UNIT, U, toSI } from '../src/engine/units';
-import { programOf, provenanceOf } from '../src/store';
+import { isExample, programOf, provenanceOf } from '../src/store';
 import { PROGRAMS } from '../src/data/programs';
 import { SKILLS } from '../src/data/skills';
 import { MODULES } from '../src/data/learn';
@@ -343,6 +343,9 @@ const modulesProjection = {
       lockedAt: r.lockedAt,
       predictions: r.predictions.map((x) => x.label),
       program: programOf('runbook', r.id),
+      // OF-BLD-016 §3.3 (D3): a run nobody made. The browser hides it with
+      // the archive; the service lists it, marked, so a read can say so.
+      example: isExample('runbook', r.id),
     })),
     protocols: PROTOCOLS.map((p) => ({
       id: p.id,
@@ -353,6 +356,7 @@ const modulesProjection = {
       currentVersion: p.currentVersion,
       versions: p.versions.map((v) => v.version),
       program: programOf('protocol', p.id),
+      example: isExample('protocol', p.id),
     })),
   },
   geneos: {
@@ -363,11 +367,11 @@ const modulesProjection = {
     unitOperations: UNIT_OPERATIONS.map((u) => ({ id: u.id, label: u.label, stage: u.stage, note: u.note ?? null })),
   },
   proforma: {
-    scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId, program: programOf('scenario', x.id) })),
+    scenarios: SCENARIOS.map((x) => ({ id: x.id, name: x.name, kind: x.kind, product: x.product, modelId: x.modelId, program: programOf('scenario', x.id), example: isExample('scenario', x.id) })),
   },
   primer: {
     lessons: MODULES.flatMap((m) =>
-      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [], program: programOf('lesson', l.id) })),
+      m.lessons.map((l) => ({ id: l.id, title: l.title, moduleId: m.id, moduleTitle: m.title, blurb: m.blurb, skills: l.skills ?? [], program: programOf('lesson', l.id), example: isExample('lesson', l.id) })),
     ),
   },
 };

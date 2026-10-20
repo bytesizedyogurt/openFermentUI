@@ -20,7 +20,7 @@ import { useMemo } from 'react';
 import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { programOf, useProgramFilter, useStore } from '@/store';
+import { isExample, programOf, useProgramFilter, useStore } from '@/store';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/runbooks';
@@ -194,6 +194,12 @@ export default function Runbooks() {
     );
     return PROGRAMS.filter((p) => ids.has(p.id));
   }, [allRunbooks, shows]);
+  // The examples the filter hid (OF-BLD-016 §3.3, D3): seed runbooks that
+  // describe a run nobody made. Counted so an empty board says why it is empty.
+  const hiddenExamples = useMemo(
+    () => allRunbooks.filter((r) => !shows('runbook', r.id) && isExample('runbook', r.id, { runbooks: allRunbooks })).length,
+    [allRunbooks, shows],
+  );
   const route = useRoute();
 
   const handoffId = route.query.get('handoff');
@@ -304,25 +310,40 @@ export default function Runbooks() {
         ))}
       </div>
 
-      {runbooks.length === 0 && hiddenPrograms.length > 0 && (
-        <Card>
+      {runbooks.length === 0 && (hiddenPrograms.length > 0 || hiddenExamples > 0) && (
+        <Card data-testid="runbooks-empty">
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}
-            title="Every runbook here is in an archived program"
+            title="No runbook here describes a run someone made"
             body={
               <span data-testid="hidden-by-archive">
-                The runbooks in this session belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, through their own
-                program, their molecule or their host, and{' '}
-                {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the board
-                hides them. Settings → Programs shows archived programs again.
+                {hiddenExamples > 0 && (
+                  <>
+                    {hiddenExamples === 1 ? 'The one seed runbook is an example' : `The ${hiddenExamples} seed runbooks are examples`}: each
+                    describes a run nobody made, so the board hides {hiddenExamples === 1 ? 'it' : 'them'}.{' '}
+                  </>
+                )}
+                {hiddenPrograms.length > 0 && (
+                  <>
+                    Runbooks in {hiddenPrograms.map((p) => p.name).join(' and ')} are hidden too,{' '}
+                    {hiddenPrograms.length === 1 ? 'an archived program' : 'archived programs'}.{' '}
+                  </>
+                )}
+                Next step: ask Postdoc to draft a runbook from the evidence, then press Turn into a runbook; it lands
+                here. Settings → Programs shows archived programs and examples again.
               </span>
             }
-            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+            action={
+              <div className="flex flex-wrap gap-2 justify-center">
+                <LinkButton to="/postdoc">Draft a runbook in Postdoc</LinkButton>
+                <LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>
+              </div>
+            }
           />
         </Card>
       )}
 
-      {runbooks.length === 0 && hiddenPrograms.length === 0 && (
+      {runbooks.length === 0 && hiddenPrograms.length === 0 && hiddenExamples === 0 && (
         <Card>
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}

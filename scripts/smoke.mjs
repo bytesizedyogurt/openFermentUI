@@ -367,6 +367,10 @@ async function main() {
         .evaluateAll((els) => els.map((e) => `${e.getAttribute('data-program')}:${e.getAttribute('data-program-status')}`).join());
       if (status !== 'yeast:active,casein:archived,pha:archived') problems.push(`Settings → Programs lists ${status || 'nothing'}`);
       if (await page.locator('[data-testid="show-archived"]').isChecked()) problems.push('the archive switch is on in a fresh browser');
+      // OF-BLD-016 §3.3 — the one switch also shows the examples, and says so.
+      if (!/Show archived programs and examples/.test(await page.locator('[data-testid="settings-programs"]').innerText().catch(() => '')))
+        problems.push('the switch is not labelled as showing examples too');
+      if ((await page.locator('[data-testid="show-archived-examples"]').count()) !== 1) problems.push('Settings → Programs does not say the switch shows the examples');
 
       await goTo('/geneos/hosts', 'a[href="#/geneos/hosts/s-cerevisiae-s288c"]');
       if ((await page.locator('a[href="#/geneos/hosts/s-cerevisiae-s288c"]').count()) === 0) problems.push('the yeast host is not on the catalogue');
@@ -402,7 +406,28 @@ async function main() {
       await goTo('/biorepo/paper/Q1');
       if ((await page.locator('[data-archived-program]').count()) !== 0) problems.push('a yeast paper opens under an archive banner');
 
+      // OF-BLD-016 §3.3 — the seed runbooks are examples: the board, the
+      // ledger and Home say so and name the next step, and a deep link opens
+      // one under the same banner, which says it describes a run nobody made.
+      await goTo('/runbooks', '[data-testid="runbooks-empty"]');
+      const board = await page.locator('[data-testid="runbooks-empty"]').innerText().catch(() => '');
+      if (!/seed runbooks are examples/.test(board) || !/Next step/.test(board) || !/Postdoc/.test(board))
+        problems.push(`the empty runbook board does not say the seed runbooks are examples and name the next step: ${JSON.stringify(board.slice(0, 200))}`);
+      if ((await page.locator('a[href="#/runbooks/rb-taq-kigali"]').count()) !== 0) problems.push('the board lists an example runbook with the switch off');
+      await goTo('/runbooks/ledger', '[data-testid="ledger-examples-hidden"]');
+      const ledger = await page.locator('[data-testid="ledger-examples-hidden"]').innerText().catch(() => '');
+      if (!/locked runbooks are examples/.test(ledger) || !/Next step/.test(ledger)) problems.push('the empty ledger does not say its locked runbooks are examples and name the next step');
+      await goTo('/runbooks/depositions');
+      if (!/ask Postdoc to draft a runbook/.test(await page.locator('main').innerText().catch(() => ''))) problems.push('the empty deposition list does not name the next step');
+      await goTo('/', '[data-testid="home-predictions"]');
+      if ((await page.locator('[data-testid="home-predictions-examples"]').count()) !== 1) problems.push('Home\u2019s predictions card does not say the locked runbooks are examples');
+      await goTo('/runbooks/rb-taq-kigali', '[role="note"][data-example="true"]');
+      if (!/This runbook is an example/.test(await page.locator('main').innerText().catch(() => ''))) problems.push('a deep link to an example runbook does not open under the banner saying so');
+      if ((await page.locator('[role="note"][data-archived-program]').count()) !== 0) problems.push('an example runbook of no archived program names one');
+
       if (!(await setShowArchived(page, true))) problems.push('the archive switch did not turn on');
+      await goTo('/runbooks', 'a[href="#/runbooks/rb-taq-kigali"]');
+      if ((await page.locator('a[href="#/runbooks/rb-taq-kigali"]').count()) === 0) problems.push('turning the switch on did not bring the example runbooks back');
       await goTo('/geneos/hosts', 'a[href="#/geneos/hosts/cw15"]');
       if ((await page.locator('a[href="#/geneos/hosts/cw15"]').count()) === 0) problems.push('turning the switch on did not bring cw15 back to the catalogue');
       await goTo('/biorepo');
@@ -414,7 +439,7 @@ async function main() {
       programFails++;
       console.log(`✗ programs     ${problems.join('; ')}`);
     } else {
-      console.log('✓ programs     Settings lists yeast active, casein and PHA archived; with the switch off no casein or PHA host, paper or scenario is listed and each list says what it hides; H4 opens under the casein banner and Q1 under none; the switch brings cw15 back');
+      console.log('✓ programs     Settings lists yeast active, casein and PHA archived; with the switch off no casein or PHA host, paper or scenario is listed and each list says what it hides; the example runbooks leave the board, the ledger and Home, each naming the next step, and rb-taq-kigali opens under the example banner; H4 opens under the casein banner and Q1 under none; the switch brings cw15 and the runbooks back');
     }
     await page.close();
   }

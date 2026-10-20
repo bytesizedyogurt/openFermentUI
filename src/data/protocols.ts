@@ -34,6 +34,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-TAP-01',
     program: 'casein',
+    example: true,
     title: 'TAP medium preparation (1 L base)',
     category: 'media',
     organisms: ['cw15', 'uvm4'],
@@ -442,6 +443,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-SEED-01',
     program: 'casein',
+    example: true,
     title: 'cw15 seed train: plate to 50 mL to 400 mL',
     category: 'culture',
     organisms: ['cw15', 'uvm4'],
@@ -646,6 +648,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-TRANS-01',
     program: 'casein',
+    example: true,
     title: 'Nuclear transformation of cw15 by electroporation',
     category: 'culture',
     organisms: ['cw15', 'uvm4'],
@@ -1037,6 +1040,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-DISRUPT-01',
     program: 'casein',
+    example: true,
     title: 'Harvest and mild PEF disruption of cw15',
     category: 'harvest',
     organisms: ['cw15', 'uvm4'],
@@ -1259,6 +1263,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-BCN-01',
     program: 'casein',
+    example: true,
     title: 'Isoelectric precipitation of β-casein at pH 4.6',
     category: 'harvest',
     organisms: ['cw15', 'bovine'],
@@ -1471,6 +1476,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-PHOS-01',
     program: 'casein',
+    example: true,
     title: 'Phos-tag phosphorylation analysis of recombinant β-casein',
     category: 'analytics',
     organisms: ['cw15', 'gs115', 'bovine'],
@@ -1690,6 +1696,7 @@ export const PROTOCOLS: Protocol[] = [
   {
     id: 'PR-ACM-01',
     program: 'casein',
+    example: true,
     title: 'Artificial casein micelle assembly',
     category: 'harvest',
     organisms: ['bovine', 'cw15'],

@@ -20,7 +20,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
-import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, programOf, tickClass } from '../src/store';
+import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, isExample, programOf, tickClass, useStore } from '../src/store';
 import { PROGRAMS, THREAD_LETTERS, THREAD_LETTER_CLASS } from '../src/data/programs';
 import { provMeta } from '../src/components/Provenance';
 import { JURISDICTIONS } from '../src/engine/clearance';
@@ -1187,6 +1187,28 @@ for (const f of CLEARANCE_FINDINGS) {
       fail(`programs: record ${r.id} must take the program of the paper it cites (${r.paperId})`);
 }
 
+// ── examples (OF-BLD-016 §3.3, D3) ─────────────────────────────────────
+//
+// A locked prediction says "do this and you will get that". Unless a
+// deposition stands behind it, the runbook describes a run nobody made, and
+// it must say so: `example: true`, which the store treats as archived. The
+// seed's depositions are the fresh store's (none today), and a deposition
+// that is itself an example stands behind nothing. The two generic protocols
+// and the bench-track module teach a method with no run behind them, so they
+// stay unflagged and show by default.
+const seedDepositions = useStore.getState().depositions;
+{
+  for (const r of RUNBOOKS) {
+    const locked = r.lockedAt !== null && r.predictions.length > 0;
+    const behind = seedDepositions.some((d) => d.runbookId === r.id && !d.example);
+    if (locked && !behind && !r.example)
+      fail(`examples: runbook ${r.id} carries a locked prediction with no deposition behind it and is not marked \`example: true\` (OF-BLD-016 §3.3, D3)`);
+  }
+  for (const id of ['PR-OD-01', 'PR-CIP-01'])
+    if (isExample('protocol', id)) fail(`examples: ${id} teaches a general method with no run behind it and must not be an example (OF-BLD-016 §3.3)`);
+  if (isExample('module', 'm6')) fail('examples: m6 teaches methods from PR-OD-01 and PR-CIP-01 with no run behind them and must not be an example (OF-BLD-016 §3.3)');
+}
+
 // ── report ─────────────────────────────────────────────────────────────
 console.log('\nopenFerment seed check');
 console.log('──────────────────────');
@@ -1198,6 +1220,7 @@ console.log(`  records           ${RECORDS.length} (${RECORDS.filter((r) => r.pr
 console.log(`  non-primary       ${RECORDS.filter((r) => r.isPrimary === false).length} (citations of other records, excluded from aggregates)`);
 console.log(`  with method       ${RECORDS.filter((r) => r.method).length}, of which ${RECORDS.filter((r) => r.method === 'undetermined').length} undetermined`);
 console.log(`  gold set          ${goldIds.size} annotated (60 planned across 14 papers — pending tranche-1 ingest)`);
+console.log(`  examples          ${RUNBOOKS.filter((r) => r.example).length}/${RUNBOOKS.length} runbooks, ${PROTOCOLS.filter((p) => p.example).length}/${PROTOCOLS.length} protocols, ${SCENARIOS.filter((x) => x.example).length}/${SCENARIOS.length} scenarios, ${MODULES.filter((m) => m.example).length}/${MODULES.length} modules, ${seedDepositions.filter((d) => d.example).length}/${seedDepositions.length} depositions; every locked runbook with no deposition behind it is one`);
 console.log(`  programs          ${PROGRAMS.map((p) => `${p.name} (${p.letters.length === 1 ? p.letters[0] : `${p.letters[0]}–${p.letters[p.letters.length - 1]}`}, ${p.status})`).join(' · ')}; letters ${THREAD_LETTER_CLASS} held in code`);
 console.log(`  strains           ${STRAINS.length}`);
 console.log(`  molecules         ${PRODUCTS.length} across ${new Set(PRODUCTS.map((p) => p.category)).size} categories, ${new Set(PRODUCTS.map((p) => p.processCode)).size} process families (all modeled)`);

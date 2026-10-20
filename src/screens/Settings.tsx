@@ -501,7 +501,7 @@ function ProgramsSection() {
       </section>
 
       <section>
-        <SectionTitle>Archived programs</SectionTitle>
+        <SectionTitle>Archived programs and examples</SectionTitle>
         <Card className="p-3">
           <label className="flex items-start gap-2.5 cursor-pointer">
             <input
@@ -514,7 +514,7 @@ function ProgramsSection() {
               data-testid="show-archived"
             />
             <span>
-              <span className="block text-body font-medium">Show archived programs</span>
+              <span className="block text-body font-medium">Show archived programs and examples</span>
               <span className="block text-caption text-ink-soft mt-0.5 max-w-3xl">
                 When it is off,{' '}
                 {archived.length === 0 ? 'nothing is hidden, because no program is archived' : (
@@ -533,12 +533,16 @@ function ProgramsSection() {
                 . When it is on, everything shows as before. Nothing is deleted either way, and a
                 link to something archived still opens it, under a note that names its program.
               </span>
+              <span className="block text-caption text-ink-soft mt-1 max-w-3xl" data-testid="show-archived-examples">
+                The same switch shows the examples: the seed runbooks, protocols, scenarios and lessons that
+                describe a run nobody made. They are kept to show the shape of a run, never as a record of one.
+              </span>
             </span>
           </label>
           <div className="text-caption text-ink-soft mt-2 pt-2 border-t border-line" data-testid="show-archived-state">
             {showArchived
-              ? 'Archived programs are showing everywhere. The setting is kept in this browser across reloads.'
-              : 'Archived programs are hidden. The setting is kept in this browser across reloads.'}
+              ? 'Archived programs and examples are showing everywhere. The setting is kept in this browser across reloads.'
+              : 'Archived programs and examples are hidden. The setting is kept in this browser across reloads.'}
           </div>
         </Card>
       </section>

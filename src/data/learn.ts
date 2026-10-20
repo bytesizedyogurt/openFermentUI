@@ -22,6 +22,7 @@ export const MODULES: LearnModule[] = [
   {
     id: 'm0',
     program: 'casein',
+    example: true,
     index: 0,
     title: 'PhycoExtract: reading the literature like a machine',
     blurb:
@@ -478,6 +479,7 @@ Two limits: it costs one configuration per held-out paper, and it does not rescu
   {
     id: 'm1',
     program: 'casein',
+    example: true,
     index: 1,
     title: 'Host and chassis',
     blurb:
@@ -582,6 +584,7 @@ This is a research bet. The corpus supports calling it a defensible one. It does
   {
     id: 'm2',
     program: 'casein',
+    example: true,
     index: 2,
     title: 'Expression and localisation',
     blurb:
@@ -692,6 +695,7 @@ The corpus does not settle this. What it does is state the comparison honestly: 
   {
     id: 'm3',
     program: 'casein',
+    example: true,
     index: 3,
     title: 'The molecule and its modification',
     blurb:
@@ -818,6 +822,7 @@ The corpus also records evidence that phosphorylation is not universally require
   {
     id: 'm4',
     program: 'casein',
+    example: true,
     index: 4,
     title: 'Techno-economics',
     blurb:
@@ -943,6 +948,7 @@ Two things to keep in view. The reference point sits at 2 g/L — already optimi
   {
     id: 'm5',
     program: 'casein',
+    example: true,
     index: 5,
     title: 'Agentic literature methods',
     blurb:
@@ -1069,9 +1075,12 @@ Trust is earned by inspectability, not by tone, so the agent's plan, tool calls 
   },
   // ── OF-BLD-013 §3.1: the bench track ────────────────────────────────
   //
-  // PLACEHOLDER CONTENT. These lessons exist so a passed checkpoint has a
-  // skill to count toward while the skills content pass is still to come.
-  // They teach from the protocols themselves: the `skill-steps` embed reads
+  // These lessons exist so a passed checkpoint has a skill to count toward
+  // while the skills content pass is still to come. They teach a method with
+  // no run behind it, from the two general protocols (PR-OD-01, PR-CIP-01),
+  // so they are not examples (OF-BLD-016 §3.3, D3) and show by default; m0–m5
+  // are flagged `example` and hidden with the archive. They teach from the
+  // protocols themselves: the `skill-steps` embed reads
   // each step live, so every quantity a learner sees is the protocol's own,
   // and the prose, questions and explanations here carry no number at all
   // (check:seed holds a lesson that declares skills to that).

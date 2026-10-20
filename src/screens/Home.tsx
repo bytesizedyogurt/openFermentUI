@@ -27,7 +27,7 @@ import {
   Upload,
   type LucideIcon,
 } from 'lucide-react';
-import { useStore, provenanceOf, useProgramFilter, type ProgramEntityKind } from '@/store';
+import { useStore, provenanceOf, useProgramFilter, useProgramLookup, isExample, type ProgramEntityKind } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
@@ -242,6 +242,12 @@ function PredictionsCard() {
   // as the ledger page counts them.
   const shows = useProgramFilter();
   const c = ledgerCounts(runbooks, depositions, shows);
+  // The seed's locked runbooks are examples (OF-BLD-016 §3.3): say they are
+  // left out, so a row of zeros never reads as "nothing was ever locked".
+  const lookup = useProgramLookup();
+  const exampleLocks = runbooks.filter(
+    (r) => r.lockedAt && r.predictions.length > 0 && !shows('runbook', r.id) && isExample('runbook', r.id, lookup),
+  ).length;
   return (
     <Card className="p-4" data-testid="home-predictions">
       <div className="grid grid-cols-2 gap-y-1 text-body">
@@ -257,6 +263,12 @@ function PredictionsCard() {
           : `Hit rate ${Math.round(c.hitRate * 100)} % of ${c.tested} tested.`}{' '}
         <a className="text-accent hover:underline" href={href('/runbooks/ledger')}>Open the ledger</a>
       </p>
+      {c.locked === 0 && exampleLocks > 0 && (
+        <p className="text-caption text-ink-soft mt-1" data-testid="home-predictions-examples">
+          {exampleLocks === 1 ? 'One locked runbook is an example' : `${exampleLocks} locked runbooks are examples`} of runs
+          nobody made and are left out. Draft one in Postdoc and lock it to start the count.
+        </p>
+      )}
     </Card>
   );
 }

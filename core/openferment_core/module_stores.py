@@ -263,6 +263,13 @@ def _headline(output: Any) -> dict[str, Any]:
     return out
 
 
+def _example(row: dict[str, Any]) -> dict[str, Any]:
+    """`{"example": True}` for a seed row that describes a run nobody made
+    (OF-BLD-016 §3.3, D3), else nothing. The browser hides an example with the
+    archive; the service still lists it, marked, so a read can say it is one."""
+    return {"example": True} if row.get("example") else {}
+
+
 def _artifact_row(module: str, a: Any, provenance: str, program: str | None = None) -> Row:
     inputs = [f"{i.name}={i.value}" for i in a.inputs if isinstance(getattr(i, "value", None), str)][:MAX_ITEMS]
     return Row(module=module, kind="artifact", id=a.id, label=f"{a.tool} artifact", state="open", status="computed",
@@ -386,13 +393,15 @@ class Stores:
                       names=names,
                       words=" ".join([r["kind"], r.get("productId") or "", r.get("strainId") or ""] + r.get("predictions", [])),
                       detail={"kind": r["kind"], "productId": r.get("productId"), "strainId": r.get("strainId"),
-                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", [])},
+                              "lockedAt": r.get("lockedAt"), "predictions": r.get("predictions", []),
+                              **_example(r)},
                       program=r.get("program"))
         for x in p["protocols"]:
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
                       words=" ".join([x["category"], x.get("purpose") or ""] + x.get("organisms", [])),
                       detail={"category": x["category"], "organisms": x.get("organisms", []),
-                              "currentVersion": x["currentVersion"], "versions": x.get("versions", [])},
+                              "currentVersion": x["currentVersion"], "versions": x.get("versions", []),
+                              **_example(x)},
                       program=x.get("program"))
 
     def _geneos(self) -> Iterable[Row]:
@@ -427,7 +436,7 @@ class Stores:
         for s in self._get("projection")["proforma"]["scenarios"]:
             yield Row("proforma", "scenario", s["id"], s["name"], "open", s["kind"],
                       words=" ".join([s.get("product") or "", s.get("modelId") or ""]),
-                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId")},
+                      detail={"kind": s["kind"], "product": s.get("product"), "modelId": s.get("modelId"), **_example(s)},
                       program=s.get("program"))
         yield from self._artifacts("proforma")
 
@@ -469,7 +478,7 @@ class Stores:
         for lesson in self._get("projection")["primer"]["lessons"]:
             yield Row("primer", "lesson", lesson["id"], lesson["title"], "approved", "published",
                       words=" ".join([lesson["moduleTitle"], lesson.get("blurb") or ""] + lesson.get("skills", [])),
-                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", [])},
+                      detail={"module": lesson["moduleTitle"], "skills": lesson.get("skills", []), **_example(lesson)},
                       program=lesson.get("program"))
 
     def _intake(self) -> Iterable[Row]:
