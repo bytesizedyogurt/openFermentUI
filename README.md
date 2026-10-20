@@ -102,7 +102,7 @@ archived programs (above).
 | Fits and forecasts of runs | **Computed from depositions** (fermOS): a run's timed readings are fitted with a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance), each fit kept as an artifact with the deposition as its source, and a forecast is a band for readings drawn from one fit. On synthetic runs the fit returns its generating parameters within 0.1 % and the band holds a fresh reading in 33 to 35 of 40 runs. No run is deposited, so nothing real has been fitted: fermOS says *No run deposited yet* and names the readings to deposit and where |
 | Predictions and their score | **Locked, and scored by runs** — a prediction is a point, an interval or a bound, locked with what it rests on; Runbooks → Ledger draws each against what reconciled runs measured and counts locked, tested, held, missed and inconclusive runs. The seed's ten runbooks (eight of them locked) are examples, so by default the ledger counts zero and says why; no run has tested a prediction. Postdoc can draft a runbook whose numbers the service writes from artifacts and records |
 | Simulation economics, authored | **Modeled, and examples** — the three scenarios S1–S3 are illustrative casein cost surfaces written by hand, not validated, labelled *Cost model v0*, and hidden with the archive |
-| Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. No reference run and no scenario run is kept in this checkout |
+| Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it, as it cites the newest kept run of a seed BioSTEAM scenario the program switch shows; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. No reference run and no scenario run is kept in this checkout |
 | Downstream trains | **Read from a simulated run, never typed** — pureOS reads the train of the newest Proforma run of each scenario from the one artifact that run kept (OF-BLD-019 Phase 4): unit by unit in run order, the mass in and out, the product in and out, the product each unit passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery. Nothing is simulated again on read. A train exists once somebody runs a scenario: none is on file in this checkout, and pureOS says so and how to make one |
 | Physical properties | **Computed by thermosteam**, BioSTEAM's property engine, in the Proforma worker: density, heat capacity, viscosity, and bubble and dew points of a run's stream, or of a preset the service fills (the ethanol–water azeotrope, or water and ethanol at a titre record's value). Each answer is an artifact whose basis names the library and its version; a chemical the library lacks is refused in words. None is kept in this checkout |
 | Agent answer prose | **Real model calls in a bounded loop** — Postdoc on the configured model (`claude-haiku-5-5` in this build), restarted once on the fallback on a refusal or an outage, through `openferment-core`. Code sweeps the eleven modules first; the loop reads them, searches the records and passages (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, module rows, quoted sentences checked word for word against their passages, or computed values. There is no scripted mode: with the service down Postdoc says so, keeps the history, and offers nothing in its place. The eleven run-sheet questions, each asked twice on 2026-10-20, cost $0.1072 for the 22 and took 8–53 s each (`docs/DEMO.md`). The 13 authored flows are an evaluation set, graded against and never offered |
@@ -168,8 +168,9 @@ browser ──POST /api/ask/stream──▶ FastAPI
                                     │    question names; the map goes in round one and is the first trace line
                                     ├─ the loop: the model calls its tools — search_records, search_passages,
                                     │    convert_units, yield_ceiling, growth_forecast, selling_price,
-                                    │    draft_runbook, thermo_props, and a read and a write tool for every module —
-                                    │    each step streamed to the browser as it completes
+                                    │    draft_runbook, thermo_props, run_flowsheet, stream_table, and a read
+                                    │    and a write tool for every module — each step streamed to the browser
+                                    │    as it completes
                                     ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
                                     ├─ a refusal or outage: asked again once, on the fallback model
                                     ├─ validate_plan: no number, nothing cited that no tool returned,
@@ -279,9 +280,29 @@ nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
   record one: an assessor runs it at the bench.
 - **A plan's gaps and its decline are held to the number rule** like its claims: one holding
   a number is dropped and named, and the decline the code writes stands in.
+- **Postdoc runs a flowsheet and reads its streams** (OF-BLD-019 Phase 6). `run_flowsheet`
+  takes a seed BioSTEAM scenario's id and nothing else and runs it as the service binds it: a
+  free write through `proforma.run` (compute, no model money), at no gate, audited as the
+  model's. The service holds no person's assumption, so an input no record binds waits and the
+  tool says which; a scenario made with New scenario lives in the browser that made it and is
+  refused in words. `stream_table` reads a kept run's stream table (a scenario's or a reference
+  biorefinery's), its summary cut to what a model may read with the count left out said, the
+  whole table in `ToolResult.data`, which the endpoint and the MCP server return and no model
+  reads. `selling_price` reads the newest kept run of any seed BioSTEAM scenario the program
+  switch shows (`sc-yeast-1`; `sc-pha-1` too with it on), and with none kept names what waits
+  and how a run is made; it runs nothing. Each cites the run by its artifact id, and Postdoc's
+  prompt asks that a price, a cost or a recovery read from a run cite that run. With the switch
+  off, a run of an archived program is hidden from every registry tool that reads runs, from
+  pureOS's trains and from BioRepo → Artifacts by one rule, `module_stores.artifact_program`
+  (a run is its scenario's, its flowsheet's and its basis's program, an archived one winning);
+  the MCP server's `get_artifact` still reads any kept artifact by its id.
 
-`pnpm check:tools` holds the three rules in `verify`, reading `tools/writes.py` as parsed
-Python so a write function reached through an aliased import is still caught; `pnpm eval:o`
+`pnpm check:tools` holds its rules in `verify`: a read and a write tool for every module;
+`tools/writes.py`, read as parsed Python so a write function reached through an aliased import
+is still caught, calling only the module write functions it names; no other tool file reaching
+what keeps a Proforma run or writes an audit line, found by following every function of the
+service that does, through its imports (rule 2b); a person's name on every gated action; one
+gate table in two places; and every name in the closed registry written down. `pnpm eval:o`
 runs ten cross-module questions and scores whether the right modules were read (on Haiku,
 2026-10-20: searched 80 %, five cents). The footer is not scored: its key and the footer come
 from the same coverage call, so it could not miss.
@@ -509,7 +530,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   and checks.py: the ranking replayed from checks.ts, the queue's rules, a run, briefs;
                          #   Proforma's shelf, its one run artifact and its tables, a reference package's test
                          #   values parsed from the installed file, glucose to ethanol's binding over thread Q
-                         #   and every refusal of the run contract against a stand-in evaluator;
+                         #   and every refusal of the run contract against a stand-in evaluator; run_flowsheet
+                         #   and stream_table, selling_price reading the yeast scenario's run, one archive rule
+                         #   for every reader of a run, and check:tools' rule 2b planted in a copy of the package;
                          #   pureOS's trains read from a run's stream table, recovery by pass, and thermosteam's
                          #   questions, refusals and status codes against a stand-in worker
   pnpm test:sim          #   the real BioSTEAM worker answers: the corn plant run whole and read back, glucose to
@@ -518,9 +541,11 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   (pytest marker sim; 20 tests)
   pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
   pnpm check:tools       #   11 modules with a read and a write tool; writes.py calls only the 10 module write
-                         #   functions it names, followed through every import and alias; 12 gated actions
-                         #   need a person's name; the 7 gates in gates.py and docs/TOOLS.md alike; each of the
-                         #   32 names in WHITELIST registered and written down in docs/TOOLS.md
+                         #   functions it names, followed through every import and alias; no other tool file
+                         #   reaches any of the 24 functions it finds keeping a Proforma run or writing an
+                         #   audit line (rule 2b); 12 gated actions need a person's name; the 7 gates in
+                         #   gates.py and docs/TOOLS.md alike; each of the 32 names in WHITELIST registered
+                         #   and written down in docs/TOOLS.md
   pnpm check:seed        #   every seed invariant, incl. unit dimensional analysis; COMPONENTS.md matches;
                          #   every thread letter has one program and the [A-Q] class follows programs.ts; a
                          #   locked runbook with no deposition behind it is an example; nothing under src/ is

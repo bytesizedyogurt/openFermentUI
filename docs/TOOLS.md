@@ -5,12 +5,13 @@ Postdoc's loop, `GET /api/tools` and `POST /api/tools/{name}`, and the MCP
 server (`core/openferment_core/mcp_server.py`). A tool is in `WHITELIST` or
 it does not exist. Every input carries ids and words: a JSON number anywhere
 outside `k` and `limit` refuses the call, and every refusal is a result with
-`error` set. A summary over 9,000 characters is replaced by an error; a tool
-whose whole output is longer (`stream_table`) cuts its own summary, says how
-much it left out, and carries the whole in `ToolResult.data`, which the
-endpoint and the MCP server return and no model reads. The registry is closed
-at thirty-two names; `test_tools.NAMES` is the one literal list of them in the
-tests, and every other count there is derived from `WHITELIST`.
+`error` set. A summary over 9,000 characters is replaced by an error, and
+`data` is emptied with it; a tool whose whole output is longer
+(`stream_table`) cuts its own summary, says how much it left out, and carries
+the whole in `ToolResult.data`, which the endpoint and the MCP server return
+and no model reads. The registry is closed at thirty-two names;
+`test_tools.NAMES` is the one literal list of them in the tests, and every
+other count there is derived from `WHITELIST`.
 
 The names below are the registry's. The build document writes `dominion.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
@@ -206,7 +207,8 @@ take. With the switch off:
   `GET /api/biorepo/artifacts`, pureOS's trains, `stream_table` and
   `thermo_props` (the last two refuse it by id through
   `module_stores.hidden_run_refusal`), so a PHA run that bound no record is
-  PHA's everywhere.
+  PHA's everywhere. The MCP server's own `get_artifact` is outside the rule:
+  it reads any kept artifact by its id, whatever the switch says.
 - The coverage pass before round one fills `CoverageMap.archived` when the
   question names something archived; the trace reads *found in archived
   program PHA (hidden)*, no hidden row's ref reaches the model, and the
@@ -282,6 +284,10 @@ places.
 | `personnel` | mark a personnel check | `guild propose_check` | the server asks for the check in the person's name, by the Guild person the browser acts as (`checks.request`) |
 | `bench` | send a protocol to the bench | `runbooks deposit`, `runbooks run` | takes the person to the protocols to start the deposition |
 | `notebook` | write a note under a person's name | `home note` | the server keeps the note under the person's name (the notebook itself lands with OF-BLD-017 §5.3) |
+
+No gate covers a Proforma run (OF-BLD-019 §6.1): `run_flowsheet` and
+`proforma_write`'s `run` keep one `proforma.run` artifact in the open lane and
+spend no model money, so `gates.py` and this table are unchanged by them.
 
 A proposal is carried out or dismissed by a named person (the reviewer name
 in Settings; placeholders are refused), and each carries their name and the

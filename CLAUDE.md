@@ -483,7 +483,11 @@ Mini, which serves `main` (D8).
   server all go through `tools.run`. **Tool inputs carry ids and words:** a
   JSON number anywhere in an input outside top-level `k` and `limit` refuses
   the call, and every refusal is a `ToolResult` with `error` set. A summary
-  over 9,000 characters is replaced by an error. Built: `search_records`
+  over 9,000 characters is replaced by an error, and `ToolResult.data` is
+  emptied with it; a tool whose whole output is longer (`stream_table`) cuts
+  its own summary, says how much it left out, and carries the whole in
+  `data`, which the endpoint and the MCP server return and no model reads
+  (OF-BLD-019 §6.1). Built: `search_records`
   (over `evidence_pool`: seed and verified records plus the extractor's
   anchored candidates no decision rejected, as `unverified`) and
   `convert_units` (a record's own value through `units.py`, kept as an
@@ -671,7 +675,9 @@ Mini, which serves `main` (D8).
   when a module lacks a read or a write tool, when `writes.py` holds a file
   write or reaches a store function outside `ALLOWED_WRITES` (the file is
   parsed and every name followed through its import, aliases included; a
-  store module handed around bare or a dynamic import fails), when a gated action
+  store module handed around bare or a dynamic import fails), when any other
+  tool file reaches what keeps a Proforma run or writes an audit line (rule
+  2b, OF-BLD-019 §6.1 and §6.R; below), when a gated action
   completes without a named person, or when `gates.py` and `docs/TOOLS.md`
   name different gates. **Eval set O** (`evalo.py`, `pnpm eval:o`): ten
   cross-module questions keyed by the coverage code, scored on the modules
@@ -803,9 +809,17 @@ Mini, which serves `main` (D8).
   person's assumption, so an input no record binds waits and the tool returns
   the 422's words. It and `proforma_write`'s `run` are one function,
   `writes.run_scenario`, so `check:tools` reads the one call to `proforma.run`
-  in `writes.py`; its rule 2b fails when any other tool file reaches
-  `proforma.run` or `audit.append`. `stream_table` reads a `proforma.run` or
-  `proforma.reference` artifact's stream table through `proforma.tables_of`,
+  in `writes.py`; its rule 2b fails when any other tool file reaches what
+  keeps a Proforma run or writes an audit line. That is found, never listed
+  (§6.R): every function of the service that calls `artifacts.compute` for a
+  `proforma.run`, `proforma.reference` or `proforma_benchmark` artifact (or
+  for a tool the check cannot name) or `audit.append`, and every function
+  that reaches one, each name followed through its import as rule 2 follows
+  it; a tool file may also not call `artifacts.compute` for a run, hand a
+  store module around bare or import by name at run time.
+  `core/tests/test_check_tools.py` plants each way round in a copy of the
+  package. `stream_table` reads a `proforma.run` or `proforma.reference`
+  artifact's stream table through `proforma.tables_of`,
   cut to the cap (feeds and products first, the count left out said), the
   whole table in `ToolResult.data`, which no model reads. Both return the run
   as one `Evidence` whose id is the artifact's, so a claim cites the run as it
