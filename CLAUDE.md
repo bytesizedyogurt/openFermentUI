@@ -809,6 +809,51 @@ Mini, which serves `main` (D8).
   as one `Evidence` whose id is the artifact's, so a claim cites the run as it
   cites a ceiling, and `proforma_read` lists reference runs too.
 
+## pureOS reads the train, thermosteam answers (OF-BLD-019 Phase 4)
+
+- **A train is read from one run, never typed.** `pureos.py` reads a
+  `proforma.run` artifact through `proforma.tables_of` and nothing else (D1)
+  and simulates nothing; a `proforma.reference` run is not a train.
+  `GET /api/pureos/trains?includeArchived=` (`TrainSummary`, the newest run
+  of each scenario, newest first, an archived program's left out unless
+  asked) and `GET /api/pureos/train/{key}` (`Train`, by scenario id or run
+  artifact id; a 404 says how a run gets there) serve the browser;
+  `pureos_read`'s kinds `train` and `train-unit` read the same. A run
+  belongs to the scenario its basis input `scenario` names, else to the one
+  seed scenario whose `modelId` is its flowsheet, else it is known by its
+  artifact id. `train` is a reserved second segment under `/pureos`, and
+  `check:seed` fails on a BioSTEAM class that two vocabulary steps name.
+- **Recovery is by pass.** A unit's recovery is the product leaving by
+  outlets that lead on to the product stream over the product entering, never
+  outlets over inlets (one, by mass balance). What leads on is worked out
+  stream by stream through each sink unit's passes: a class in
+  `SEPARATE_PASSES` (`HXprocess` alone, read from BioSTEAM's source) sends
+  inlet i to outlet i, every other unit is one pass. Product a unit on the
+  path takes in and lets out by no outlet is lost there. The overall recovery
+  is the product stream's product over the sum of it and all lost on the path.
+- **A train's provenance is recomputed on read** (`_Marks`:
+  `basis_provenance` over the run's inputs as they stand now), so the
+  endpoints and `pureos_read` give one train one mark; never the stored one.
+- **thermosteam runs in the Proforma worker** (op `thermo_props`) and is
+  imported in `workers/proforma_worker.py` and `flowsheets/` alone
+  (`test_workers`); `thermo.py` talks to it through the JSON contract. A
+  question names a run's stream (artifact id and stream id) or a preset
+  (`ethanol-water-azeotrope`, `beer-at-titre-of` an `ethanol_titre` record)
+  and never a number; a T or P nobody gave is the library's default, said
+  so. The answer is one `thermo_props` artifact with thermosteam's version in
+  its basis. `POST /api/thermo/props` asks; `GET` returns the stored answer
+  or `{"artifact": null}`, starts no simulator, and recomputes the mark.
+  Both answer 404 for what is not on file, **409 for a run's or an answer's
+  file damaged on disk**, 422 for a refusal in words (a chemical the library
+  lacks, a stream in more than one phase); the POST 503 when the worker
+  cannot answer.
+- **`thermo_props` is the registry's thirtieth name, a loose read**: each
+  property its own `Evidence`, `<artifact id>:<property>`, cited like any
+  computed value; with the switch off a run of an archived program is
+  refused. `PropertiesPanel` (pureOS → Train, fermOS) aborts an ask its
+  question no longer names, is keyed by its subject, and keeps the ask
+  button after a 503.
+
 ## Runbooks keep score (OF-BLD-014 Phase 9)
 
 - **Three prediction kinds.** A `Prediction` with no `kind` is a point, held

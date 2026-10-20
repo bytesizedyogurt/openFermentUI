@@ -90,6 +90,23 @@ predicted in geneOS and consumed in pureOS, where it decides whether thermal
 clarification can replace most of the capture chromatography. Store it once in
 geneOS. Do not duplicate it.
 
+Two more seams carry data rather than a decision, and both are built
+(OF-BLD-019 Phase 4).
+
+**Proforma → pureOS is the run artifact.** A Proforma run keeps one
+`proforma.run` artifact holding BioSTEAM's stream and unit tables for its base
+case (OF-BLD-019 D1). pureOS reads the train from that artifact, unit by unit,
+and simulates nothing again: the flowsheet, its units and its mass balance are
+BioSTEAM's, run in Proforma's worker, and pureOS reads the recovery out of
+them.
+
+**pureOS → thermosteam goes through the Proforma worker.** A stream's physical
+properties (density, heat capacity, viscosity, bubble and dew points) are
+thermosteam's, BioSTEAM's property engine, asked in the Proforma worker where it
+is already loaded. The service names a run's stream or a preset, never a
+number, and keeps the answer as a `thermo_props` artifact; fermOS asks the same
+worker about water and ethanol at a measured titre.
+
 **fermOS cannot be seeded from literature.** Kinetic parameters are fitted to
 real runs in a specific vessel, so they come from Deposition. fermOS is the
 component that most needs the Assay loop and the one that cannot be built out of
@@ -180,7 +197,9 @@ The vessel: kinetics, oxygen and heat transport, operating mode and feeding, sca
 
 **Harvest, capture, recovery.** `/pureos` · chord `g u`
 
-Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 §4.1): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, the product in and out and the share it passes on toward the product stream, read by the service (`core/openferment_core/pureos.py`) from the run artifact's stream table and never typed; the front page lists the trains on file. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`). Choosing a train is not built, and the four subsystems below remain stubs.
+Everything after the fermenter: harvest, disruption, capture, polishing, recovery, formulation and storage. Holds the unit-operation vocabulary and `ProcessTrain`. Proforma prices a train; pureOS decides it. **pureOS reads the train a flowsheet ran** (OF-BLD-019 Phase 4): `/pureos/train/:scenarioId` (`src/screens/PureOSTrain.tsx`) shows the units of the newest Proforma run of a scenario in run order, each with its inlets and outlets, mass in and out, the product in and out, the product it passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery, read by the service (`core/openferment_core/pureos.py`, `GET /api/pureos/trains`, `GET /api/pureos/train/{key}`) from the run artifact's stream table and never typed; the front page lists the trains on file. Recovery is credited by pass: a unit whose passes BioSTEAM keeps apart (`SEPARATE_PASSES`, the process heat exchanger) is counted only on the pass that carries the product on, and product a unit on the path takes in and lets out by no outlet is lost there. A train's mark is its run's, worked out from the run's inputs as they stand when it is read. A vocabulary entry names the BioSTEAM classes that perform it, so a unit links to its step. A **Properties** card asks thermosteam, through the Proforma worker, about the broth, the product stream or any stream of the run (`core/openferment_core/thermo.py`, `src/components/PropertiesPanel.tsx`); fermOS carries the same card for a measured titre. `pureos_read` reads trains (kind `train`) and their units (kind `train-unit`), and `thermo_props` asks thermosteam. With the service down each says so. Choosing a train is not built, and the four subsystems below remain stubs.
+
+Views: [Train](#) `/pureos/train`
 
 | Subsystem | Key | State |
 |---|---|---|
@@ -332,9 +351,13 @@ question. They were living in the same place, and now they are not.
 **One boundary is still open: mass balance.** It is listed under Proforma today,
 and a mass balance is a statement about a process train rather than about money.
 The cleaner split would be *pureOS specifies the train and its recovery;
-Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). Nothing in the code
-forces the question yet, and it is recorded here rather than settled quietly,
-because whoever builds it first will settle it by accident otherwise.
+Proforma prices whatever pureOS specifies* (OF-BLD-011 §6). The code now
+answers it the other way, for the moment: the train is a flowsheet
+on Proforma's shelf, BioSTEAM closes its mass balance in the Proforma worker,
+and pureOS reads each unit's recovery out of the run artifact (OF-BLD-019
+Phase 4). pureOS specifies nothing yet. It is recorded here rather than settled
+quietly, because whoever builds train selection will otherwise settle it by
+accident.
 
 **Attribution survives the reorganisation.** `ComponentTag` names the component
 that did a piece of work, which is a different job from naming the surface you
