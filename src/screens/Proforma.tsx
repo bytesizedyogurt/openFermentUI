@@ -402,19 +402,20 @@ export default function Proforma() {
     return () => ctrl.abort();
   }, [showArchived]);
 
-  // The service binds the scenarios it holds (GET /api/proforma/scenarios);
-  // asked only when one of them is on the index.
+  // The service binds the seed scenarios the switch shows (GET
+  // /api/proforma/scenarios, OF-BLD-019 §3.2's contract (b)); asked only
+  // when one of them is on the index.
   const needsBinding = scenarios.some((sc) => sc.kind === 'biosteam' && !createdIds.includes(sc.id));
   useEffect(() => {
     if (!needsBinding) return;
     const ctrl = new AbortController();
-    proformaScenarios(null, ctrl.signal)
+    proformaScenarios({ host: null, includeArchived: showArchived }, ctrl.signal)
       .then(setBound)
       .catch(() => {
         /* the cards count from the shelf instead */
       });
     return () => ctrl.abort();
-  }, [needsBinding]);
+  }, [needsBinding, showArchived]);
 
   // The dialog belongs to this page: leaving the page closes it, so it does
   // not reopen on the next visit. (StrictMode's rehearsal unmount leaves the

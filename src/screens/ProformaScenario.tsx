@@ -2,6 +2,15 @@
 // assumption ticked, the waterfall always summing to the headline, and
 // simulation treated as work rather than magic.
 //
+// OF-BLD-019 §3.2 (D1, D5, D6): the BioSTEAM page is THE scenario page. A
+// seed BioSTEAM scenario and one a person made here with New scenario open
+// the same page (BiosteamScenario, below): header, inputs with their sources,
+// Run with the worker's status line, and every section of the newest run read
+// from its one artifact (ProformaBiosteam.tsx). The authored branch
+// (AuthoredScenario, the cost surfaces S1–S3 swept by src/engine/grids.ts)
+// steps aside but is not deleted: it opens the archived casein examples,
+// under their banner, and recharts stays allowed here for it alone.
+//
 // PROGRAMS (OF-BLD-016 §2.2). A scenario in an archived program has left
 // Proforma's index, but its link still opens it here, under the banner that
 // names the program and the switch, for an authored surface and a BioSTEAM
@@ -21,24 +30,40 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Table2, SlidersHorizontal } from 'lucide-react';
-import { useStore } from '@/store';
-import { navigate } from '@/router';
-import type { CostLine, FlowsheetInfo, Scenario } from '@/data/types';
+import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Play, Route, Table2, SlidersHorizontal } from 'lucide-react';
+import { archivedProgramOf, useProgramLookup, useStore } from '@/store';
+import { href, navigate } from '@/router';
+import type { FlowsheetInfo, InputAssumption, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
 import { PROGRAM_BY_ID } from '@/data/programs';
 import { durableAvailable } from '@/lib/durable';
-import { ProformaDown, proformaShelf } from '@/lib/proforma';
+import {
+  ProformaDown,
+  SIMULATOR_SAYS,
+  modellerQuestions,
+  proformaArtifact,
+  proformaBind,
+  proformaScenarios,
+  proformaShelf,
+  proformaStatus,
+  questionsText,
+  runProformaScenario,
+  runViewOfArtifact,
+  runViewOfResult,
+  type RunView,
+  type SimulatorStatus,
+} from '@/lib/proforma';
+import { trainPath } from '@/lib/pureos';
 import { inputSourceWords } from '@/components/NewScenarioDialog';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
-import { exportCSV } from '@/lib/csv';
+import { exportCSV, exportText } from '@/lib/csv';
 import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
-import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } from '@/components/ui';
+import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState } from '@/components/ui';
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 import { Tornado } from '@/components/figures';
 import { ArchivedBanner } from '@/components/ArchivedBanner';
-import ProformaBiosteam from './ProformaBiosteam';
+import { RunReport, SOURCE_WORDS, inputLabels } from './ProformaBiosteam';
 
 
 /** A "view as table" disclosure — the accessibility floor for every chart (§6.6). */
@@ -609,90 +634,601 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
   );
 }
 
-/**
- * A scenario a person made here with New scenario (OF-BLD-019 §3.1): it
- * opens, names its flowsheet and the inputs a run needs, and says it has not
- * run. The page that runs it is §3.2's; until then nothing here pretends to.
- */
-function MadeHereScenario({ scenario }: { scenario: Scenario }) {
-  const togglePin = useStore((s) => s.togglePin);
-  const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
+// ── The BioSTEAM scenario page (OF-BLD-014 §8.4; OF-BLD-019 §3.2) ───────
+//
+// ONE page for a seed BioSTEAM scenario and for one a person made here with
+// New scenario (D6). It reads, and never types:
+//
+//   the shelf       the flowsheet's title, source, program and each input's
+//                   dimension (GET /api/proforma/shelf, asked with archived
+//                   programs: the page was opened by id);
+//   the binding     a seed scenario from GET /api/proforma/scenarios, one
+//                   made here from GET /api/proforma/bind?flowsheet= (the
+//                   scenario run contract, src/lib/proforma.ts), each input
+//                   bound to records, an artifact, a named person's
+//                   assumption, or waiting; this browser's assumptions are
+//                   laid over the inputs that wait, as the service lays them
+//                   on the run;
+//   the run         POST /api/proforma/run, one `proforma.run` artifact
+//                   (D1); after a run the store keeps its id
+//                   (recordScenarioRun), and on load the page reads the newest
+//                   run back from GET /api/biorepo/artifacts/{id}. Every
+//                   section under the Run (ProformaBiosteam.tsx) reads that
+//                   one run.
+//
+// The program switch: the page asks for its own scenario's program even when
+// the switch hides it, because a link opens what it names, under
+// ArchivedBanner (useProgramScope's rule); anything of another archived
+// program stays out. A binding the service refuses is said in its words, and
+// the inputs the flowsheet takes are still listed from the shelf.
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    // Opened by id, so its flowsheet is looked up whatever the program switch says.
-    proformaShelf(true, ctrl.signal)
-      .then(setShelf)
-      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : String(e)));
-    return () => ctrl.abort();
-  }, []);
+const problemOf = (e: unknown) => (e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : e instanceof Error ? e.message : String(e));
 
-  const flowsheet = shelf?.find((f) => f.id === flowsheetId) ?? null;
+/** Where one input's value comes from, as the inputs table says it. */
+function SourceCell({ input }: { input: ScenarioInput }) {
+  const src = input.source;
+  if (input.binding === 'records') {
+    const n = input.records.length;
+    const range = input.low == null || input.high == null || input.low === input.high ? fmt(input.value ?? Number.NaN, 4) : `${fmt(input.low, 4)}–${fmt(input.high, 4)}`;
+    return (
+      <div data-testid="source-records">
+        <span className="chip">
+          {n} record{n === 1 ? '' : 's'}, <span className="font-num">{range}</span>
+          {input.unit && <span className="font-num">&nbsp;{input.unit}</span>}
+        </span>
+        <details className="mt-1">
+          <summary className="text-caption text-ink-soft cursor-pointer hover:text-accent">{src?.note ?? 'the records'}</summary>
+          <div className="flex flex-col gap-1 mt-1">
+            {input.records.map((r) => (
+              <span key={r.id} className="inline-flex flex-wrap items-center gap-1">
+                <CitationChip recordId={r.id} paperId={r.paperId} />
+                <span className="text-caption text-ink-soft">
+                  {r.organism ?? 'organism not stated'} · {r.carbonSource ?? 'carbon source not stated'} ·{' '}
+                  <span className="font-num">{fmt(r.value, 3)}</span>
+                </span>
+              </span>
+            ))}
+          </div>
+        </details>
+      </div>
+    );
+  }
+  if (src?.kind === 'artifact' && src.id) {
+    return (
+      <a className="chip font-num hover:text-accent" href={href(`/biorepo/artifacts/${src.id}`)} data-testid="source-artifact">
+        artifact {src.id}
+        {src.note ? ` · ${src.note}` : ''}
+      </a>
+    );
+  }
+  if (input.binding === 'assumption' && src) {
+    return (
+      <span className="chip" data-testid="assumption-chip">
+        assumption by {src.by ?? 'nobody named'} · <span className="font-num">{fmt(input.value ?? Number.NaN, 4)}</span>, low{' '}
+        <span className="font-num">{fmt(input.low ?? Number.NaN, 4)}</span>, high <span className="font-num">{fmt(input.high ?? Number.NaN, 4)}</span>
+        {src.note ? ` · ${src.note}` : ''}
+      </span>
+    );
+  }
+  if (src && input.binding !== 'waiting') {
+    return (
+      <span className="chip">
+        {SOURCE_WORDS[src.kind] ?? src.kind}
+        {src.note ? `: ${src.note}` : ''}
+      </span>
+    );
+  }
+  return <span className="chip text-signal-warn">waiting for a source</span>;
+}
+
+function AssumptionForm({ input, onSave }: { input: ScenarioInput; onSave: (a: { value: number; low: number; high: number; note: string }) => void }) {
+  const [value, setValue] = useState('');
+  const [low, setLow] = useState('');
+  const [high, setHigh] = useState('');
+  const [note, setNote] = useState('');
+  const v = Number(value);
+  const lo = Number(low);
+  const hi = Number(high);
+  const ok = value !== '' && low !== '' && high !== '' && [v, lo, hi].every(Number.isFinite) && lo <= v && v <= hi;
   return (
-    <div data-testid="proforma-made-here">
-      <PageHeader
-        eyebrow={`${flowsheetId} · BioSTEAM scenario`}
-        title={scenario.name}
-        subtitle={flowsheet ? `${flowsheet.title}, from ${flowsheet.source}` : `Flowsheet ${flowsheetId}`}
-        actions={
-          <Button onClick={() => togglePin(scenario.id)} title="Pin to compare">
-            {scenario.pinned ? <Pin size={14} /> : <PinOff size={14} />}
-            {scenario.pinned ? 'Pinned' : 'Pin'}
-          </Button>
-        }
-      />
-      <Card className="p-4 mb-4" data-testid="scenario-not-run">
-        <h2 className="font-serif text-section-title font-semibold mb-1">This scenario has not run yet</h2>
-        <p className="text-body text-ink-soft">
-          Made in this browser{scenario.createdAt ? ` on ${scenario.createdAt.slice(0, 10)}` : ''}
-          {scenario.program ? `, in ${PROGRAM_BY_ID[scenario.program]?.name ?? scenario.program}` : ''}. It holds no
-          input value of its own: a run binds its process inputs to records and takes every other input from a named
-          person&rsquo;s assumption. Running a scenario made here is not built on this page yet; the inputs below are
-          what a run will need.
-        </p>
-      </Card>
-      {problem && <Callout kind="warn">{problem}</Callout>}
-      {shelf && !flowsheet && (
-        <Callout kind="warn">The service&rsquo;s shelf holds no flowsheet {flowsheetId}, so this scenario cannot run on it.</Callout>
-      )}
-      {flowsheet && (
-        <Card className="p-4">
-          <h2 className="font-serif text-section-title font-semibold mb-1">Inputs, and where each will come from</h2>
-          <p className="text-caption text-ink-soft mb-2">{flowsheet.description}</p>
-          <table className="w-full text-body" data-testid="made-here-inputs">
-            <thead>
-              <tr className="text-caption text-ink-soft text-left">
-                <th className="py-1 pr-2 font-medium">Input</th>
-                <th className="py-1 pr-2 font-medium">Unit</th>
-                <th className="py-1 font-medium">Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {flowsheet.inputs.map((i) => (
-                <tr key={i.key} className="border-t border-line/60 align-top">
-                  <td className="py-1.5 pr-2">{i.name}</td>
-                  <td className="py-1.5 pr-2 font-num text-caption">{i.unit || 'share'}</td>
-                  <td className="py-1.5 text-caption">
-                    {inputSourceWords(i)}
-                    {i.note && <div className="text-ink-soft">{i.note}</div>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {flowsheet.priceBasis && <p className="text-caption text-ink-soft mt-2">The price will be {flowsheet.priceBasis}.</p>}
-          {flowsheet.leavesOut.length > 0 && (
-            <p className="text-caption text-ink-soft mt-1">What this flowsheet leaves out: {flowsheet.leavesOut.join('; ')}.</p>
-          )}
-        </Card>
-      )}
+    <div className="flex flex-wrap items-end gap-2 mt-1" data-testid={`assume-${input.key}`}>
+      {(
+        [
+          ['Value', value, setValue],
+          ['Low', low, setLow],
+          ['High', high, setHigh],
+        ] as const
+      ).map(([label, val, set]) => (
+        <label key={label} className="text-caption text-ink-soft">
+          <span className="block">{label}</span>
+          <input className="input w-[88px] font-num" inputMode="decimal" aria-label={`${input.label} ${label.toLowerCase()}`} value={val} onChange={(e) => set(e.target.value)} />
+        </label>
+      ))}
+      <label className="text-caption text-ink-soft flex-1 min-w-[140px]">
+        <span className="block">What it rests on</span>
+        <input className="input w-full" aria-label={`${input.label} basis`} value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      <Button disabled={!ok} onClick={() => onSave({ value: v, low: lo, high: hi, note })}>
+        Keep assumption
+      </Button>
     </div>
   );
 }
 
-/** An authored surface, or a BioSTEAM scenario the service simulates (§8.4). */
+function InputsTable({
+  inputs,
+  flowsheet,
+  onAssume,
+  onClear,
+}: {
+  inputs: ScenarioInput[];
+  flowsheet: FlowsheetInfo | null;
+  onAssume: (key: string, a: { value: number; low: number; high: number; note: string }) => void;
+  onClear: (key: string) => void;
+}) {
+  const reviewer = useStore((s) => s.reviewer);
+  const declared = new Map((flowsheet?.inputs ?? []).map((i) => [i.key, i]));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-body" data-testid="proforma-inputs">
+        <thead>
+          <tr className="text-caption text-ink-soft text-left">
+            <th className="py-1 pr-2 font-medium">Input</th>
+            <th className="py-1 pr-2 font-medium">Dimension</th>
+            <th className="py-1 pr-2 font-medium">Unit</th>
+            <th className="py-1 pr-2 font-medium">Value</th>
+            <th className="py-1 font-medium">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {inputs.map((i) => (
+            <tr key={i.key} className="border-t border-line/60 align-top" data-testid={`input-${i.key}`}>
+              <td className="py-1.5 pr-2">
+                <div className="font-medium">{i.label}</div>
+                {declared.get(i.key)?.note && <div className="text-caption text-ink-soft">{declared.get(i.key)?.note}</div>}
+              </td>
+              <td className="py-1.5 pr-2 text-caption">{declared.get(i.key)?.dimension ?? '—'}</td>
+              <td className="py-1.5 pr-2 font-num text-caption">{i.unit || 'share'}</td>
+              <td className="py-1.5 pr-2 font-num">
+                {i.value == null ? '—' : fmt(i.value, 4)}
+                {i.sampling && <div className="text-caption text-ink-soft">{i.sampling}</div>}
+              </td>
+              <td className="py-1.5">
+                <SourceCell input={i} />
+                {i.flags.map((f) => (
+                  <div key={f} className="text-caption text-signal-warn">
+                    {f}
+                  </div>
+                ))}
+                {(i.leftOutNoCarbon > 0 || i.leftOutOtherCarbon > 0) && (
+                  <div className="text-caption text-ink-soft">
+                    Left out: {i.leftOutNoCarbon} naming no carbon source, {i.leftOutOtherCarbon} on a feed other than a sugar or a hydrolysate.
+                  </div>
+                )}
+                {i.binding === 'assumption' && (
+                  <button className="text-caption text-ink-soft hover:text-accent underline" onClick={() => onClear(i.key)}>
+                    Withdraw this assumption
+                  </button>
+                )}
+                {i.binding === 'waiting' &&
+                  (reviewer.trim() ? (
+                    <AssumptionForm input={i} onSave={(a) => onAssume(i.key, a)} />
+                  ) : (
+                    <div className="text-caption text-ink-soft">
+                      An assumption carries a person's name: set yours in{' '}
+                      <a className="text-accent hover:underline" href={href('/settings/corpus')}>
+                        Settings
+                      </a>{' '}
+                      to type one.
+                    </div>
+                  ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Use a fermOS fit (OF-BLD-019 §5.1, D10): a slot by structure. It draws
+ * only when there is a fit to offer, and §5.1 brings the fits and what
+ * using one does; until then nothing is offered and nothing shows.
+ */
+function FermosFitSlot({ fits }: { fits: { id: string; label: string }[] }) {
+  if (!fits.length) return null;
+  return (
+    <div className="mt-3" data-testid="fermos-fit-slot">
+      <h3 className="font-medium text-body">Use a fermOS fit</h3>
+      <ul className="text-caption">
+        {fits.map((f) => (
+          <li key={f.id}>
+            <a className="font-num hover:text-accent" href={href(`/biorepo/artifacts/${f.id}`)}>
+              {f.id}
+            </a>{' '}
+            · {f.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The ceiling check (OF-BLD-019 §5.2, D11): a slot by structure. It draws
+ * only when a stored geneOS ceiling meets this scenario's yield, which §5.2
+ * reads; until then it holds nothing and shows nothing.
+ */
+function CeilingCheckSlot({ check }: { check: { flagged: boolean; words: string } | null }) {
+  if (!check) return null;
+  return (
+    <Card className={cx('p-4', check.flagged && 'border-signal-warn/50')} data-testid="ceiling-check">
+      <h2 className="font-serif text-section-title font-semibold mb-1">Ceiling check</h2>
+      <p className="text-body">{check.words}</p>
+    </Card>
+  );
+}
+
+/** The worker's status in words, with the seconds a run in hand has taken. */
+function StatusLine({ status, problem, running, elapsed }: { status: SimulatorStatus | null; problem: string | null; running: boolean; elapsed: number }) {
+  return (
+    <span className="text-caption text-ink-soft" data-testid="run-status" data-status={status?.status ?? 'unknown'}>
+      {status ? SIMULATOR_SAYS[status.status] : problem ? `The simulator's status could not be read: ${problem}` : "Asking the service for the simulator's status."}
+      {status?.error && ` ${status.error}`}
+      {running && (
+        <>
+          {' '}
+          Running for <span className="font-num">{elapsed}</span> s.
+        </>
+      )}
+    </span>
+  );
+}
+
+function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere: boolean }) {
+  const assumptions = useStore((s) => s.proformaAssumptions[scenario.id]) ?? EMPTY;
+  const setAssumption = useStore((s) => s.setProformaAssumption);
+  const clearAssumption = useStore((s) => s.clearProformaAssumption);
+  const togglePin = useStore((s) => s.togglePin);
+  const recordScenarioRun = useStore((s) => s.recordScenarioRun);
+  const reviewer = useStore((s) => s.reviewer);
+  const showArchived = useStore((s) => s.showArchived);
+  const lookup = useProgramLookup();
+  const ownArchived = archivedProgramOf('scenario', scenario.id, lookup) !== null;
+  const includeArchived = showArchived || ownArchived;
+  const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
+
+  const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
+  const [shelfProblem, setShelfProblem] = useState<string | null>(null);
+  const [host, setHost] = useState<string | null>(null);
+  const [info, setInfo] = useState<ProformaScenarioInfo | null>(null);
+  const [bindProblem, setBindProblem] = useState<string | null>(null);
+  const [status, setStatus] = useState<SimulatorStatus | null>(null);
+  const [statusProblem, setStatusProblem] = useState<string | null>(null);
+  const [view, setView] = useState<RunView | null>(null);
+  const [loadProblem, setLoadProblem] = useState<string | null>(null);
+  const [runProblem, setRunProblem] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    proformaShelf(true, ctrl.signal)
+      .then(setShelf)
+      .catch((e: unknown) => !ctrl.signal.aborted && setShelfProblem(problemOf(e)));
+    proformaStatus(ctrl.signal)
+      .then(setStatus)
+      .catch((e: unknown) => !ctrl.signal.aborted && setStatusProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, []);
+
+  // The binding: a seed scenario by (b), one made here by its flowsheet (c).
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setInfo(null);
+    setBindProblem(null);
+    const ask = { host, includeArchived };
+    const bound = madeHere
+      ? proformaBind(flowsheetId, ask, ctrl.signal)
+      : proformaScenarios(ask, ctrl.signal).then((all) => {
+          const found = all.find((x) => x.id === scenario.id);
+          if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
+          return found;
+        });
+    bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, [madeHere, flowsheetId, scenario.id, host, includeArchived]);
+
+  // The newest run this browser saw, read back from its artifact (D6).
+  const runId = scenario.lastRunId ?? null;
+  useEffect(() => {
+    setLoadProblem(null);
+    if (!runId) return;
+    const ctrl = new AbortController();
+    proformaArtifact(runId, ctrl.signal)
+      .then((art) => {
+        const v = runViewOfArtifact(art);
+        if (v) setView(v);
+        else setLoadProblem(`${runId} is not a scenario run: it was kept by ${art.tool}.`);
+      })
+      .catch((e: unknown) => !ctrl.signal.aborted && setLoadProblem(problemOf(e)));
+    return () => ctrl.abort();
+  }, [runId]);
+
+  // While a run is in hand: its seconds, and the worker's status every few.
+  useEffect(() => {
+    if (!running) return;
+    const t0 = Date.now();
+    setElapsed(0);
+    const tick = window.setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
+    const poll = window.setInterval(() => {
+      proformaStatus()
+        .then(setStatus)
+        .catch(() => {
+          /* the line keeps the last status it read */
+        });
+    }, 3000);
+    return () => {
+      window.clearInterval(tick);
+      window.clearInterval(poll);
+    };
+  }, [running]);
+
+  const flowsheet = shelf?.find((f) => f.id === flowsheetId) ?? null;
+
+  // What the service bound, with this browser's assumptions laid over the
+  // inputs that wait for one; the service applies the same rule on the run.
+  const bound = useMemo<ProformaScenarioInfo | null>(() => {
+    if (!info) return null;
+    const by = new Map(assumptions.map((a) => [a.key, a]));
+    const inputs = info.inputs.map((i): ScenarioInput => {
+      const a = by.get(i.key);
+      if (i.binding !== 'waiting' || !a) return i;
+      return {
+        ...i,
+        binding: 'assumption',
+        value: a.value,
+        low: a.low,
+        high: a.high,
+        sampling: a.low === a.high ? 'fixed' : 'uniform',
+        source: { kind: 'assumption', id: null, by: a.by, note: `typed on ${a.at}${a.note ? `: ${a.note}` : ''}` },
+      };
+    });
+    return { ...info, id: scenario.id, name: scenario.name, inputs, waiting: inputs.filter((i) => i.binding === 'waiting').map((i) => i.key) };
+  }, [info, assumptions, scenario.id, scenario.name]);
+
+  const priceBasis = bound?.priceBasis || flowsheet?.priceBasis || 'on the basis its flowsheet states';
+  const labels = inputLabels(bound?.inputs ?? null, flowsheet);
+  const unitLabels = inputLabels(bound?.inputs ?? null, flowsheet, true);
+  const programId = scenario.program ?? (flowsheet?.program as Scenario['program'] | null | undefined) ?? null;
+  const program = programId ? PROGRAM_BY_ID[programId] : null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const go = () => {
+    if (!bound) return;
+    setRunning(true);
+    setRunProblem(null);
+    const used = assumptions.filter((a) => bound.inputs.find((i) => i.key === a.key)?.binding === 'assumption');
+    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, assumptions: used, host })
+      .then((r) => {
+        setView(runViewOfResult(r));
+        // The index and this page read the newest run from its artifact (D6).
+        recordScenarioRun(scenario.id, r.artifactId);
+      })
+      .catch((e: unknown) => setRunProblem(problemOf(e)))
+      .finally(() => {
+        setRunning(false);
+        proformaStatus()
+          .then(setStatus)
+          .catch(() => {
+            /* the line keeps the last status it read */
+          });
+      });
+  };
+
+  const questions = bound ? modellerQuestions(bound.inputs, view) : [];
+
+  return (
+    <div data-testid="proforma-biosteam">
+      <PageHeader
+        eyebrow={`${flowsheetId} · BioSTEAM scenario`}
+        title={scenario.name}
+        subtitle={scenario.description || (flowsheet ? `${flowsheet.title}, from ${flowsheet.source}` : `Flowsheet ${flowsheetId}`)}
+        actions={
+          <>
+            <Button onClick={() => togglePin(scenario.id)} title="Pin to compare" data-testid="scenario-pin" aria-pressed={scenario.pinned}>
+              {scenario.pinned ? <Pin size={14} /> : <PinOff size={14} />}
+              {scenario.pinned ? 'Pinned' : 'Pin'}
+            </Button>
+            <a className="btn" href={href('/biorepo/compare')} data-testid="compare-link">
+              <GitCompare size={14} /> Compare
+            </a>
+            {view && (
+              <a className="btn" href={href(trainPath({ scenarioId: null, artifactId: view.artifactId }))} data-testid="train-link">
+                <Route size={14} /> pureOS train
+              </a>
+            )}
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2 mb-4 text-caption text-ink-soft" data-testid="scenario-meta">
+        <span>
+          Flowsheet: <span className="text-ink">{flowsheet ? flowsheet.title : flowsheetId}</span>
+          {flowsheet && <>, from {flowsheet.source}</>}
+        </span>
+        <span>· Program: <span className="text-ink">{program ? program.name : 'none (general)'}</span></span>
+        <span>· {madeHere ? `made in this browser${scenario.createdAt ? ` ${scenario.createdAt.slice(0, 10)}` : ''}` : 'shipped with openFerment'}</span>
+        {view ? <ProvenanceBadge p={view.provenance} /> : <span className="chip">not run yet</span>}
+      </div>
+
+      {(shelfProblem || (shelf && !flowsheet)) && (
+        <div className="mb-4">
+          {shelfProblem && <Callout kind="warn">The shelf could not be read: {shelfProblem}</Callout>}
+          {shelf && !flowsheet && (
+            <Callout kind="warn">The service&rsquo;s shelf holds no flowsheet {flowsheetId}, so this scenario cannot run on it.</Callout>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {!view && !runId && (
+          <Card className="p-4" data-testid="scenario-not-run">
+            <h2 className="font-serif text-section-title font-semibold mb-1">This scenario has not run yet</h2>
+            <p className="text-body text-ink-soft">
+              {madeHere
+                ? `Made in this browser${scenario.createdAt ? ` on ${scenario.createdAt.slice(0, 10)}` : ''}${program ? `, in ${program.name}` : ''}. `
+                : ''}
+              It holds no input value of its own: a run binds its process inputs to records and takes every other input from a named
+              person&rsquo;s assumption. Give every input that waits a source, then run it.
+            </p>
+          </Card>
+        )}
+
+        <Card className="p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-2">
+            <h2 className="font-serif text-section-title font-semibold">Inputs, and where each came from</h2>
+            {bound && bound.hosts.length > 0 && (
+              <label className="text-caption text-ink-soft">
+                <span className="block mb-0.5">Host</span>
+                <select className="input" aria-label="Host" value={host ?? ''} onChange={(e) => setHost(e.target.value || null)}>
+                  <option value="">Every organism the binding reads</option>
+                  {bound.hosts.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          {flowsheet && <p className="text-caption text-ink-soft mb-2">{flowsheet.description}</p>}
+          <p className="text-caption text-ink-soft mb-3">
+            Records of an input&rsquo;s field pass the same gate statistics pass. Three or more give their median and range, sampled
+            triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person&rsquo;s assumption, or a
+            convention the run states.
+          </p>
+          {bindProblem && (
+            <Callout kind="warn">
+              <span data-testid="bind-problem">The service could not bind this scenario&rsquo;s inputs: {bindProblem}</span>
+            </Callout>
+          )}
+          {bound ? (
+            <InputsTable
+              inputs={bound.inputs}
+              flowsheet={flowsheet}
+              onAssume={(key, a) => setAssumption(scenario.id, { key, ...a, by: reviewer.trim(), at: today, note: a.note || null } satisfies InputAssumption)}
+              onClear={(key) => clearAssumption(scenario.id, key)}
+            />
+          ) : (
+            flowsheet &&
+            bindProblem && (
+              <table className="w-full text-body mt-2" data-testid="shelf-inputs">
+                <thead>
+                  <tr className="text-caption text-ink-soft text-left">
+                    <th className="py-1 pr-2 font-medium">Input the flowsheet takes</th>
+                    <th className="py-1 pr-2 font-medium">Dimension</th>
+                    <th className="py-1 pr-2 font-medium">Unit</th>
+                    <th className="py-1 font-medium">Where it comes from</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flowsheet.inputs.map((i) => (
+                    <tr key={i.key} className="border-t border-line/60 align-top">
+                      <td className="py-1.5 pr-2">{i.name}</td>
+                      <td className="py-1.5 pr-2 text-caption">{i.dimension}</td>
+                      <td className="py-1.5 pr-2 font-num text-caption">{i.unit || 'share'}</td>
+                      <td className="py-1.5 text-caption">{inputSourceWords(i)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+          <FermosFitSlot fits={[]} />
+          <div className="mt-3 text-caption text-ink-soft">
+            <div>The price is {priceBasis}.</div>
+            {(bound?.leavesOut ?? flowsheet?.leavesOut ?? []).length > 0 && (
+              <div>What this flowsheet leaves out: {(bound?.leavesOut ?? flowsheet?.leavesOut ?? []).join('; ')}.</div>
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button variant="primary" onClick={go} disabled={running || !bound || bound.waiting.length > 0}>
+              <Play size={14} /> {running ? 'Simulating…' : view ? 'Run the scenario again' : 'Run the scenario'}
+            </Button>
+            <StatusLine status={status} problem={statusProblem} running={running} elapsed={elapsed} />
+          </div>
+          {bound && bound.waiting.length > 0 && (
+            <p className="text-caption text-signal-warn mt-2" data-testid="proforma-waiting">
+              Waiting for a source: {bound.waiting.map((k) => bound.inputs.find((i) => i.key === k)?.label ?? k).join(', ')}.
+            </p>
+          )}
+          {runProblem && (
+            <div className="mt-2">
+              <Callout kind="warn">
+                <span data-testid="run-problem">The run was refused: {runProblem}</span>
+              </Callout>
+            </div>
+          )}
+        </Card>
+
+        <CeilingCheckSlot check={null} />
+
+        {runId && loadProblem && !view && (
+          <Callout kind="warn">
+            Its newest run, {runId}, could not be read: {loadProblem}
+          </Callout>
+        )}
+
+        {view && (
+          <RunReport view={view} priceBasis={priceBasis} labels={labels} unitLabels={unitLabels} scenarioId={scenario.id} csvName={scenario.id} />
+        )}
+
+        {view && (
+          <p className="text-caption text-ink-soft">
+            pureOS reads this run&rsquo;s train, unit by unit:{' '}
+            <a className="text-accent hover:underline" href={href(trainPath({ scenarioId: null, artifactId: view.artifactId }))}>
+              pureOS → Train
+            </a>
+            .
+          </p>
+        )}
+
+        {bound && (
+          <Card className="p-4" data-testid="modeller-questions">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <h2 className="font-serif text-section-title font-semibold">Questions for a process modeller</h2>
+              <Button onClick={() => exportText(`${scenario.id}-questions.txt`, questionsText(bound, view))}>
+                <Download size={14} /> Export as text
+              </Button>
+            </div>
+            <p className="text-caption text-ink-soft mb-2">
+              The inputs that rest on an assumption, the strongest mover first once a run has ranked them, and what the flowsheet leaves out.
+            </p>
+            <ol className="list-decimal pl-5 space-y-1 text-body">
+              {questions.map((q) => (
+                <li key={q.key}>
+                  <span className="font-medium">{q.label}</span>
+                  {q.rho != null && <span className="font-num text-caption text-ink-soft"> (ρ {fmt(q.rho, 2)})</span>}: {q.question}
+                </li>
+              ))}
+            </ol>
+            <ul className="list-disc pl-5 mt-2 text-caption text-ink-soft">
+              {bound.leavesOut.map((l) => (
+                <li key={l}>left out: {l}</li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EMPTY: InputAssumption[] = [];
+
+/** An authored surface (kept for the archived examples, D5), or a BioSTEAM scenario the service simulates. */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
   const madeHere = useStore((s) => s.createdScenarioIds.includes(scenarioId));
@@ -706,11 +1242,7 @@ export default function ProformaScenario({ scenarioId }: { scenarioId: string })
     <>
       {scenario && <ArchivedBanner kind="scenario" id={scenario.id} />}
       {scenario?.kind === 'biosteam' ? (
-        madeHere ? (
-          <MadeHereScenario scenario={scenario} />
-        ) : (
-          <ProformaBiosteam scenario={scenario} />
-        )
+        <BiosteamScenario key={scenario.id} scenario={scenario} madeHere={madeHere} />
       ) : (
         <AuthoredScenario scenarioId={scenarioId} />
       )}

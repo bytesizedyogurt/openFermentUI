@@ -1,175 +1,259 @@
-// A BioSTEAM scenario (OF-BLD-014 §8.4): a price the service simulated, as a
-// distribution, with what moves it and where each input came from.
+// What one BioSTEAM run holds, drawn (OF-BLD-014 §8.4; OF-BLD-019 §3.2, D1).
 //
-// The service binds every input (`GET /api/proforma/scenarios`): to the
-// thread P records of its field, or to an assumption a named person typed
-// here. An assumption is kept in the Durable tier and posted with the run;
-// an input with neither holds the run, and the screen names it. A run is one
-// artifact (`POST /api/proforma/run`): 500 seeded samples, a grid the
-// sliders read with the interpolation the authored scenarios use, and the
-// settings the reference model supplied, read back and listed.
-import { useEffect, useMemo, useState } from 'react';
-import { Download, Play } from 'lucide-react';
-import type { InputAssumption, ProformaRunResult, ProformaScenarioInfo, Scenario, ScenarioInput } from '@/data/types';
-import { useStore } from '@/store';
+// A run is one `proforma.run` artifact: the price's samples and their
+// Spearman sensitivity, the base case, and the base case's tables as the
+// Proforma worker read them from BioSTEAM's own objects (the TEA breakdown,
+// every stream, every unit, the UnitGroup's utility duties, the diagram when
+// Graphviz is on the host). Every section below reads one field of that run
+// (`RunView`, src/lib/proforma.ts) and computes nothing of its own: no price,
+// cost, flow or duty on the page is typed or derived in the browser. Each
+// table exports as CSV, and each chart is drawn by the figure grammar
+// (CostWaterfall, Tornado, Distribution), never by recharts.
+//
+// The scenario page (ProformaScenario.tsx) composes these sections under its
+// inputs and its Run; a reference biorefinery's page can read the same
+// sections over its own artifact.
+import { useMemo, useState, type ReactNode } from 'react';
+import { Download } from 'lucide-react';
+import type { FlowsheetInfo, ScenarioInput } from '@/data/types';
 import { href } from '@/router';
 import { evaluateGrid, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
-import { exportText } from '@/lib/csv';
-import { Button, Callout, Card, PageHeader } from '@/components/ui';
-import { CitationChip } from '@/components/Chip';
-import { ProvenanceBadge } from '@/components/Provenance';
-import { Distribution, Tornado } from '@/components/figures';
+import { exportCSV } from '@/lib/csv';
+import { Card } from '@/components/ui';
+import { Tick } from '@/components/Provenance';
+import { CostWaterfall, Distribution, Tornado } from '@/components/figures';
 import {
   INFEASIBLE_WORDS,
-  ProformaDown,
+  NO_DIAGRAM,
   asResultGrid,
-  modellerQuestions,
-  proformaScenarios,
-  questionsText,
-  runProformaScenario,
+  baseCaseRefusal,
+  diagramSrc,
+  viewPrice,
+  type RunView,
 } from '@/lib/proforma';
 
-const SOURCE_WORDS: Record<string, string> = { record: 'records', assumption: 'assumption', model: 'reference model' };
+/** Where a sampled input came from, beside its tornado bar. */
+export const SOURCE_WORDS: Record<string, string> = {
+  record: 'records',
+  assumption: 'assumption',
+  model: 'reference model',
+  artifact: 'artifact',
+  convention: 'convention',
+};
 
-function SourceChip({ input }: { input: ScenarioInput }) {
-  if (input.binding === 'records') {
-    return (
-      <div className="space-y-1">
-        <div className="flex flex-wrap gap-1">
-          {input.records.map((r) => (
-            <span key={r.id} className="inline-flex items-center gap-1">
-              <CitationChip recordId={r.id} paperId={r.paperId} />
-              <span className="text-caption text-ink-soft">
-                {r.organism ?? 'organism not stated'} · {r.carbonSource} · <span className="font-num">{fmt(r.value, 3)}</span>
-              </span>
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (input.binding === 'assumption' && input.source) {
-    return (
-      <span className="chip" data-testid="assumption-chip">
-        assumed by {input.source.by} · {input.source.note}
-      </span>
-    );
-  }
-  return <span className="chip text-signal-warn">waiting for a source</span>;
+/** A number as a table cell: thousands grouped from a thousand up, else a few significant places. */
+export function cell(v: number | null | undefined, digits = 3): string {
+  if (v == null || !Number.isFinite(v)) return '—';
+  if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString('en-US');
+  return fmt(v, digits);
 }
 
-function AssumptionForm({ input, onSave }: { input: ScenarioInput; onSave: (a: { value: number; low: number; high: number; note: string }) => void }) {
-  const [value, setValue] = useState('');
-  const [low, setLow] = useState('');
-  const [high, setHigh] = useState('');
-  const [note, setNote] = useState('');
-  const v = Number(value);
-  const lo = Number(low);
-  const hi = Number(high);
-  const ok = value !== '' && low !== '' && high !== '' && [v, lo, hi].every(Number.isFinite) && lo <= v && v <= hi;
+/** A section's frame: its heading, one line on what it reads, and its CSV. */
+function Section({
+  title,
+  reads,
+  csv,
+  testid,
+  children,
+}: {
+  title: string;
+  reads: string;
+  csv?: { name: string; headers: string[]; rows: (string | number)[][] };
+  testid: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-end gap-2 mt-1" data-testid={`assume-${input.key}`}>
-      {(
-        [
-          ['Value', value, setValue],
-          ['Low', low, setLow],
-          ['High', high, setHigh],
-        ] as const
-      ).map(([label, val, set]) => (
-        <label key={label} className="text-caption text-ink-soft">
-          <span className="block">{label}</span>
-          <input className="input w-[88px] font-num" inputMode="decimal" aria-label={`${input.label} ${label.toLowerCase()}`} value={val} onChange={(e) => set(e.target.value)} />
-        </label>
-      ))}
-      <label className="text-caption text-ink-soft flex-1 min-w-[140px]">
-        <span className="block">What it rests on</span>
-        <input className="input w-full" aria-label={`${input.label} basis`} value={note} onChange={(e) => setNote(e.target.value)} />
-      </label>
-      <Button disabled={!ok} onClick={() => onSave({ value: v, low: lo, high: hi, note })}>
-        Keep assumption
-      </Button>
+    <Card className="p-4" data-testid={testid}>
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+        <h2 className="font-serif text-section-title font-semibold">{title}</h2>
+        {csv && (
+          <button className="chip" data-testid={`csv-${testid}`} onClick={() => exportCSV(`${csv.name}.csv`, csv.headers, csv.rows)}>
+            <Download size={12} aria-hidden /> CSV
+          </button>
+        )}
+      </div>
+      <p className="text-caption text-ink-soft mb-2">{reads}</p>
+      {children}
+    </Card>
+  );
+}
+
+function Table({ headers, rows, rowTestid }: { headers: string[]; rows: (string | number)[][]; rowTestid: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-caption">
+        <thead>
+          <tr className="border-b border-line text-ink-soft">
+            {headers.map((h, i) => (
+              <th key={h} className={i === 0 ? 'text-left py-1 pr-2 font-medium' : 'text-right py-1 px-1.5 font-medium'}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-line/50 align-top" data-testid={rowTestid}>
+              {r.map((c, j) => (
+                <td key={j} className={j === 0 ? 'py-1 pr-2 font-num' : 'py-1 px-1.5 text-right font-num'}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function InputsTable({ scenario, onAssume, onClear }: { scenario: ProformaScenarioInfo; onAssume: (key: string, a: { value: number; low: number; high: number; note: string }) => void; onClear: (key: string) => void }) {
-  const reviewer = useStore((s) => s.reviewer);
+/** A unit's name for a column header, from the run's own `tableUnits`. */
+const u = (view: RunView, key: string, fallback = '') => view.tables.tableUnits[key] ?? fallback;
+
+// ── Result ──────────────────────────────────────────────────────────────
+
+export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; priceBasis: string; scenarioId: string }) {
+  const price = viewPrice(view, priceBasis);
   return (
-    <table className="w-full text-body" data-testid="proforma-inputs">
-      <thead>
-        <tr className="text-caption text-ink-soft text-left">
-          <th className="py-1 pr-2 font-medium">Input</th>
-          <th className="py-1 pr-2 font-medium">Value</th>
-          <th className="py-1 pr-2 font-medium">Range</th>
-          <th className="py-1 font-medium">Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {scenario.inputs.map((i) => (
-          <tr key={i.key} className="border-t border-line/60 align-top" data-testid={`input-${i.key}`}>
-            <td className="py-1.5 pr-2">
-              <div className="font-medium">{i.label}</div>
-              <div className="text-caption text-ink-soft font-num">{i.unit || 'share'}</div>
-            </td>
-            <td className="py-1.5 pr-2 font-num">{i.value == null ? '—' : fmt(i.value, 4)}</td>
-            <td className="py-1.5 pr-2 font-num text-caption">
-              {i.low == null ? '—' : `${fmt(i.low, 4)} to ${fmt(i.high ?? i.low, 4)}`}
-              {i.sampling && <div className="text-ink-soft">{i.sampling}</div>}
-            </td>
-            <td className="py-1.5">
-              <SourceChip input={i} />
-              {i.flags.map((f) => (
-                <div key={f} className="text-caption text-signal-warn">
-                  {f}
-                </div>
-              ))}
-              {(i.leftOutNoCarbon > 0 || i.leftOutOtherCarbon > 0) && (
-                <div className="text-caption text-ink-soft">
-                  Left out: {i.leftOutNoCarbon} naming no carbon source, {i.leftOutOtherCarbon} on a feed other than a sugar or a hydrolysate.
-                </div>
-              )}
-              {i.binding === 'assumption' && (
-                <button className="text-caption text-ink-soft hover:text-accent underline" onClick={() => onClear(i.key)}>
-                  Withdraw this assumption
-                </button>
-              )}
-              {i.binding === 'waiting' &&
-                (reviewer.trim() ? (
-                  <AssumptionForm input={i} onSave={(a) => onAssume(i.key, a)} />
-                ) : (
-                  <div className="text-caption text-ink-soft">
-                    An assumption carries a person's name: set yours in{' '}
-                    <a className="text-accent hover:underline" href={href('/settings/corpus')}>
-                      Settings
-                    </a>{' '}
-                    to type one.
-                  </div>
-                ))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <Card className="p-4" data-testid="run-result">
+      <h2 className="font-serif text-section-title font-semibold mb-2">Result</h2>
+      {price ? (
+        <Tick p={view.provenance}>
+          <div className="text-caption uppercase tracking-wide text-ink-soft">Minimum selling price</div>
+          <div className="font-num text-display leading-none" data-testid="scenario-price">
+            {fmt(price.value, 4)}
+          </div>
+          <div className="text-caption text-ink-soft mt-1">
+            {price.basis}; {price.reads}
+            {price.low != null && price.high != null && (
+              <>
+                , <span className="font-num">{fmt(price.low, 4)}</span> to <span className="font-num">{fmt(price.high, 4)}</span> between the 5th and
+                95th percentiles
+              </>
+            )}
+            . Provenance {view.provenance}
+            {view.provenance === 'demo' ? ': it rests on at least one named person’s assumption.' : '.'}
+          </div>
+        </Tick>
+      ) : (
+        <p className="text-body">No sample of this run could be held by the flowsheet, so it has no price.</p>
+      )}
+      <p className="text-body mt-3" data-testid="base-case">
+        {view.basePrice != null ? (
+          <>
+            Base case, every input at its value: <span className="font-num">{fmt(view.basePrice, 4)}</span> {priceBasis}.
+          </>
+        ) : view.baseInfeasible ? (
+          <span className="text-signal-warn">The base case could not run: {baseCaseRefusal(view.baseInfeasible)}. The tables below are empty for it.</span>
+        ) : (
+          <span className="text-ink-soft">This run kept no base-case price.</span>
+        )}
+      </p>
+      <p className="text-caption text-ink-soft mt-2">
+        Run{' '}
+        <a className="font-num hover:text-accent underline underline-offset-2" href={href(`/biorepo/artifacts/${view.artifactId}`)}>
+          {view.artifactId}
+        </a>
+        {view.createdAt && (
+          <>
+            , computed <span className="font-num">{view.createdAt.replace('T', ' ').slice(0, 16)}</span>
+          </>
+        )}
+        {view.durationMs != null && (
+          <>
+            {' '}
+            in <span className="font-num">{fmt(view.durationMs / 1000, 1)}</span> s
+          </>
+        )}
+        {view.scenarioId && view.scenarioId !== scenarioId && <> · its basis names scenario {view.scenarioId}</>}
+        {view.tables.tablesSource && <> · tables from {view.tables.tablesSource}</>}.
+      </p>
+    </Card>
   );
 }
 
-function Sliders({ run, scenarioId }: { run: ProformaRunResult; scenarioId: string }) {
-  const grid = useMemo(() => asResultGrid(scenarioId, run.grid), [run, scenarioId]);
-  const [point, setPoint] = useState<Record<string, number>>(() =>
-    Object.fromEntries(run.grid.dims.map((d) => [d.key, d.values[Math.floor(d.values.length / 2)]])),
+// ── Cost breakdown ──────────────────────────────────────────────────────
+
+export function CostBreakdown({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
+  const tea = view.tables.tea;
+  return (
+    <div data-testid="cost-breakdown">
+      <CostWaterfall
+        title="What is the price made of?"
+        lines={tea?.lines ?? []}
+        total={view.basePrice != null ? { label: 'Base-case price', value: view.basePrice } : null}
+        unit={tea?.basis ? `USD per ${tea.basis}` : priceBasis}
+        annualUnit={u(view, 'annual', 'USD/yr')}
+        provenance={view.provenance}
+        basis={[view.basis]}
+        notes={
+          tea
+            ? [
+                `Read from BioSTEAM's ${tea.teaClass} object for the base case: sales ${cell(tea.sales)}, installed equipment ${cell(tea.installedEquipmentCost)}, fixed capital ${cell(tea.FCI)}, total capital ${cell(tea.TCI)} USD, over ${cell(tea.operatingHours)} operating hours a year.`,
+              ]
+            : undefined
+        }
+        csvName={`${csvName}-cost-breakdown`}
+      />
+    </div>
   );
+}
+
+// ── Sensitivity, the distribution, the sliders ──────────────────────────
+
+export function Sensitivity({ view, labels, csvName }: { view: RunView; labels: Record<string, string>; csvName: string }) {
+  return (
+    <div data-testid="sensitivity">
+      <Tornado
+        title="Which input moves the price most?"
+        drawn="The rank correlation of each sampled input with the price over the feasible samples, strongest first, each labelled with where the input came from."
+        series={['Spearman ρ']}
+        unit="rank correlation"
+        provenance={view.provenance}
+        rows={view.sensitivity.map((s) => ({ label: labels[s.key] ?? s.key, values: [s.rho], tag: SOURCE_WORDS[s.sourceKind] ?? s.sourceKind }))}
+        csvName={`${csvName}-tornado`}
+      />
+    </div>
+  );
+}
+
+export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
+  return (
+    <Distribution
+      title="What would this plant's product cost, across the inputs' ranges?"
+      quantity="Minimum selling price"
+      unit={priceBasis}
+      bins={view.histogram}
+      quantiles={view.quantiles}
+      provenance={view.provenance}
+      samples={view.samples}
+      infeasible={Object.entries(view.infeasible).map(([reason, count]) => ({ reason: INFEASIBLE_WORDS[reason] ?? reason, count }))}
+      basis={[view.basis]}
+      notes={['The inputs are sampled independently; a real vessel links them, so the infeasible share is part of the result.']}
+      csvName={`${csvName}-distribution`}
+    />
+  );
+}
+
+/** Three inputs moved over the run's grid, with the interpolation the authored scenarios use. */
+export function Sliders({ view, labels, priceBasis, scenarioId }: { view: RunView; labels: Record<string, string>; priceBasis: string; scenarioId: string }) {
+  const g = view.grid;
+  const grid = useMemo(() => (g ? asResultGrid(scenarioId, g) : null), [g, scenarioId]);
+  const [point, setPoint] = useState<Record<string, number>>(() =>
+    Object.fromEntries((g?.dims ?? []).map((d) => [d.key, d.values[Math.floor(d.values.length / 2)]])),
+  );
+  if (!g || !grid) return null;
   const r = evaluateGrid(grid, point);
-  const labels = Object.fromEntries(run.inputs.map((i) => [i.key, `${i.label} (${i.unit})`]));
   return (
     <Card className="p-4" data-testid="proforma-sliders">
       <h2 className="font-serif text-section-title font-semibold mb-1">Move three inputs over the run's grid</h2>
       <p className="text-caption text-ink-soft mb-3">
-        Interpolated between the {run.grid.msp.length} grid cases the service simulated; the other inputs stay at their base value.
-        {run.grid.infeasible > 0 && ` ${run.grid.infeasible} cases could not run, and a point near one shows no price.`}
+        Interpolated between the {g.msp.length} grid cases the service simulated; the other inputs stay at their base value.
+        {g.infeasible > 0 && ` ${g.infeasible} cases could not run, and a point near one shows no price.`}
       </p>
       <div className="space-y-3">
-        {run.grid.dims
+        {g.dims
           .filter((d) => d.values.length > 1)
           .map((d) => (
             <label key={d.key} className="block">
@@ -190,7 +274,7 @@ function Sliders({ run, scenarioId }: { run: ProformaRunResult; scenarioId: stri
           ))}
       </div>
       <div className="mt-3 font-num text-section-title" data-testid="slider-price">
-        {Number.isFinite(r.msp) ? `${fmt(r.msp, 3)} ${run.priceBasis}` : 'No price here: a neighbouring case could not run.'}
+        {Number.isFinite(r.msp) ? `${fmt(r.msp, 3)} ${priceBasis}` : 'No price here: a neighbouring case could not run.'}
       </div>
       {Number.isFinite(r.msp) && (
         <table className="w-full text-caption mt-2">
@@ -208,193 +292,216 @@ function Sliders({ run, scenarioId }: { run: ProformaRunResult; scenarioId: stri
   );
 }
 
-export default function ProformaBiosteam({ scenario: seed }: { scenario: Scenario }) {
-  const assumptions = useStore((s) => s.proformaAssumptions[seed.id]) ?? [];
-  const setAssumption = useStore((s) => s.setProformaAssumption);
-  const clearAssumption = useStore((s) => s.clearProformaAssumption);
-  const reviewer = useStore((s) => s.reviewer);
-  const recordScenarioRun = useStore((s) => s.recordScenarioRun);
-  const [host, setHost] = useState<string | null>(null);
-  const [info, setInfo] = useState<ProformaScenarioInfo | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [run, setRun] = useState<ProformaRunResult | null>(null);
-  const [running, setRunning] = useState(false);
+// ── Streams, equipment, utilities ───────────────────────────────────────
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    proformaScenarios(host, ctrl.signal)
-      .then((all) => setInfo(all.find((s) => s.id === seed.id) ?? null))
-      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}` : String(e)));
-    return () => ctrl.abort();
-  }, [host, seed.id]);
+export function streamsTable(view: RunView) {
+  const headers = [
+    'Stream',
+    'From',
+    'To',
+    'Phase',
+    `T (${u(view, 'T', 'K')})`,
+    `P (${u(view, 'P', 'Pa')})`,
+    `Mass flow (${u(view, 'massFlow', 'kg/hr')})`,
+    `By component (${u(view, 'massFlow', 'kg/hr')})`,
+    `Price (${u(view, 'price', 'USD/kg')})`,
+  ];
+  const rows = view.tables.streams.map((s) => [
+    s.id,
+    s.source ?? 'feed',
+    s.sink ?? 'out',
+    s.phase,
+    cell(s.T, 2),
+    cell(s.P),
+    cell(s.massFlow),
+    Object.entries(s.massFlows)
+      .map(([k, v]) => `${k} ${cell(v)}`)
+      .join('; '),
+    cell(s.price),
+  ]);
+  return { headers, rows };
+}
 
-  // What the service bound, with this browser's assumptions laid over the
-  // inputs that wait for one; the service applies the same rule on the run.
-  const scenario = useMemo<ProformaScenarioInfo | null>(() => {
-    if (!info) return null;
-    const by = new Map(assumptions.map((a) => [a.key, a]));
-    const inputs = info.inputs.map((i): ScenarioInput => {
-      const a = by.get(i.key);
-      if (i.binding !== 'waiting' || !a) return i;
-      return {
-        ...i,
-        binding: 'assumption',
-        value: a.value,
-        low: a.low,
-        high: a.high,
-        sampling: a.low === a.high ? 'fixed' : 'uniform',
-        source: { kind: 'assumption', id: null, by: a.by, note: `typed on ${a.at}${a.note ? `: ${a.note}` : ''}` },
-      };
-    });
-    return { ...info, inputs, waiting: inputs.filter((i) => i.binding === 'waiting').map((i) => i.key) };
-  }, [info, assumptions]);
-
-  const go = () => {
-    if (!scenario) return;
-    setRunning(true);
-    setProblem(null);
-    const used = assumptions.filter((a) => scenario.inputs.find((i) => i.key === a.key)?.binding === 'assumption');
-    runProformaScenario(seed.id, used, host)
-      .then((r) => {
-        setRun(r);
-        // Proforma's index reads the price of the newest run from this artifact (OF-BLD-019 D6).
-        recordScenarioRun(seed.id, r.artifactId);
-      })
-      .catch((e: unknown) => setProblem(e instanceof Error ? e.message : String(e)))
-      .finally(() => setRunning(false));
-  };
-
-  const questions = scenario ? modellerQuestions(scenario.inputs, run) : [];
-  const today = new Date().toISOString().slice(0, 10);
-
+export function StreamsTable({ view, csvName }: { view: RunView; csvName: string }) {
+  const t = streamsTable(view);
   return (
-    <div data-testid="proforma-biosteam">
-      <PageHeader eyebrow={`${seed.modelId} · BioSTEAM scenario`} title={seed.name} subtitle="BioSTEAM flowsheet, draft v0 — fermentation, harvest and drying only" />
+    <Section
+      title="Streams"
+      testid="streams-table"
+      reads="Every stream of the base case as BioSTEAM holds it after the run: the unit it leaves (feed, for one that enters the plant) and the one it enters (out, for one that leaves it), its phase, temperature, pressure and mass flow, by component."
+      csv={{ name: `${csvName}-streams`, ...t }}
+    >
+      {t.rows.length ? <Table {...t} rowTestid="stream-row" /> : <p className="text-body text-ink-soft">This run kept no stream table.</p>}
+    </Section>
+  );
+}
 
-      {problem && <Callout kind="warn">{problem}</Callout>}
+export function equipmentTable(view: RunView) {
+  const headers = [
+    'Unit',
+    'Class',
+    'Line',
+    `Installed cost (${u(view, 'cost', 'USD')})`,
+    `Purchase cost (${u(view, 'cost', 'USD')})`,
+    `Heating duty (${u(view, 'duty', 'kJ/hr')})`,
+    `Cooling duty (${u(view, 'duty', 'kJ/hr')})`,
+    `Power (${u(view, 'power', 'kW')})`,
+  ];
+  const rows = [...view.tables.units]
+    .sort((a, b) => a.order - b.order)
+    .map((x) => [x.id, x.unitClass, x.line ?? '', cell(x.installedCost), cell(x.purchaseCost), cell(x.heatingDuty), cell(x.coolingDuty), cell(x.power)]);
+  return { headers, rows };
+}
 
-      {scenario && (
-        <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-2">
-              <h2 className="font-serif text-section-title font-semibold">Inputs, and where each came from</h2>
-              <label className="text-caption text-ink-soft">
-                <span className="block mb-0.5">Host</span>
-                <select className="input" aria-label="Host" value={host ?? ''} onChange={(e) => setHost(e.target.value || null)}>
-                  <option value="">Every organism in thread P</option>
-                  {scenario.hosts.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="text-caption text-ink-soft mb-3">
-              Thread P records of a sugar or hydrolysate feed, through the same gate statistics pass. Three or more give their median and
-              range, sampled triangular; two a pair, sampled uniform; one is held fixed. Every other input is a named person's assumption.
-            </p>
-            <InputsTable
-              scenario={scenario}
-              onAssume={(key, a) => setAssumption(seed.id, { key, ...a, by: reviewer.trim(), at: today, note: a.note || null } satisfies InputAssumption)}
-              onClear={(key) => clearAssumption(seed.id, key)}
-            />
-            <div className="mt-3 text-caption text-ink-soft">
-              <div>The price is {scenario.priceBasis}.</div>
-              <div>What this flowsheet leaves out: {scenario.leavesOut.join('; ')}.</div>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={go} disabled={running || scenario.waiting.length > 0}>
-                <Play size={14} /> {running ? 'Simulating 500 samples…' : 'Run the scenario'}
-              </Button>
-              {scenario.waiting.length > 0 && (
-                <span className="text-caption text-signal-warn" data-testid="proforma-waiting">
-                  Waiting for a source: {scenario.waiting.map((k) => scenario.inputs.find((i) => i.key === k)?.label ?? k).join(', ')}.
-                </span>
-              )}
-            </div>
-          </Card>
+export function EquipmentTable({ view, csvName }: { view: RunView; csvName: string }) {
+  const t = equipmentTable(view);
+  return (
+    <Section
+      title="Equipment"
+      testid="equipment-table"
+      reads="Every unit operation in run order, with BioSTEAM's installed and purchase cost and its heat duties and power; a dash where the unit has none."
+      csv={{ name: `${csvName}-equipment`, ...t }}
+    >
+      {t.rows.length ? <Table {...t} rowTestid="unit-row" /> : <p className="text-body text-ink-soft">This run kept no unit table.</p>}
+    </Section>
+  );
+}
 
-          {run && (
-            <>
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ProvenanceBadge p={run.provenance} />
-                  <a className="font-num text-caption hover:text-accent" href={href(`/biorepo/artifacts/${run.artifactId}`)}>
-                    {run.artifactId}
-                  </a>
-                </div>
-                <Distribution
-                  title="What would this plant's PHA cost, across the inputs' ranges?"
-                  quantity="Minimum selling price"
-                  unit="USD kg-1 PHA in dried cell mass"
-                  bins={run.histogram}
-                  quantiles={run.quantiles}
-                  provenance={run.provenance}
-                  samples={run.samples}
-                  infeasible={Object.entries(run.infeasible).map(([reason, count]) => ({ reason: INFEASIBLE_WORDS[reason] ?? reason, count }))}
-                  basis={[run.evidence.basis]}
-                  notes={['Titre, yield, content and productivity are sampled independently; a real vessel links them, so the infeasible share is part of the result.']}
-                  csvName={`${seed.id}-distribution`}
-                />
-              </Card>
-              <Tornado
-                title="Which input moves the price most?"
-                drawn="The rank correlation of each sampled input with the price over the feasible samples, strongest first, each labelled with where the input came from."
-                series={['Spearman ρ']}
-                unit="rank correlation"
-                provenance={run.provenance}
-                rows={run.sensitivity.map((s) => ({
-                  label: run.inputs.find((i) => i.key === s.key)?.label ?? s.key,
-                  values: [s.rho],
-                  tag: SOURCE_WORDS[s.sourceKind] ?? s.sourceKind,
-                }))}
-                csvName={`${seed.id}-tornado`}
-              />
-              <Sliders run={run} scenarioId={seed.id} />
-              <Card className="p-4">
-                <h2 className="font-serif text-section-title font-semibold mb-1">What the reference model supplied</h2>
-                <p className="text-caption text-ink-soft mb-2">Read back from the units and the finance model after the base case ran; nobody typed these.</p>
-                <table className="w-full text-caption" data-testid="proforma-readback">
-                  <tbody>
-                    {Object.entries(run.readBack).map(([k, v]) => (
-                      <tr key={k} className="border-t border-line/50">
-                        <td className="py-0.5">{k}</td>
-                        <td className="py-0.5 text-right font-num">{fmt(v, 4)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            </>
-          )}
+export function utilitiesTable(view: RunView) {
+  const d = view.tables.utilities;
+  const headers = ['Duty', 'Total', 'Unit'];
+  const rows = d
+    ? [
+        ['Heating', cell(d.heating), d.heatingUnit],
+        ['Cooling', cell(d.cooling), d.coolingUnit],
+        ['Electricity consumed', cell(d.electricityConsumption), d.electricityConsumptionUnit],
+        ['Electricity produced', cell(d.electricityProduction), d.electricityProductionUnit],
+      ]
+    : [];
+  return { headers, rows };
+}
 
-          <Card className="p-4" data-testid="modeller-questions">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h2 className="font-serif text-section-title font-semibold">Questions for a process modeller</h2>
-              <Button onClick={() => exportText(`${seed.id}-questions.txt`, questionsText(scenario, run))}>
-                <Download size={14} /> Export as text
-              </Button>
-            </div>
-            <p className="text-caption text-ink-soft mb-2">
-              The inputs that rest on an assumption, the strongest mover first once a run has ranked them, and what the flowsheet leaves out.
-            </p>
-            <ol className="list-decimal pl-5 space-y-1 text-body">
-              {questions.map((q) => (
-                <li key={q.key}>
-                  <span className="font-medium">{q.label}</span>
-                  {q.rho != null && <span className="font-num text-caption text-ink-soft"> (ρ {fmt(q.rho, 2)})</span>}: {q.question}
+export function UtilitiesCard({ view, csvName }: { view: RunView; csvName: string }) {
+  const t = utilitiesTable(view);
+  const d = view.tables.utilities;
+  return (
+    <Section
+      title="Utilities"
+      testid="utilities"
+      reads={`The plant's heating, cooling and electricity, as BioSTEAM's UnitGroup totals them over ${d ? d.group : 'the units'}, each in the unit the UnitGroup states.`}
+      csv={{ name: `${csvName}-utilities`, ...t }}
+    >
+      {t.rows.length ? <Table {...t} rowTestid="utility-row" /> : <p className="text-body text-ink-soft">This run kept no utility duties.</p>}
+    </Section>
+  );
+}
+
+// ── Diagram ─────────────────────────────────────────────────────────────
+
+export function DiagramCard({ view, csvName }: { view: RunView; csvName: string }) {
+  const order = view.tables.unitOrder.length ? view.tables.unitOrder : [...view.tables.units].sort((a, b) => a.order - b.order).map((x) => x.id);
+  const classOf = new Map(view.tables.units.map((x) => [x.id, x.unitClass]));
+  return (
+    <Section
+      title="Diagram"
+      testid="diagram"
+      reads={view.tables.diagram ? 'The flowsheet as BioSTEAM draws it with Graphviz on the host that ran it.' : 'The units in the order the run simulated them.'}
+      csv={{ name: `${csvName}-unit-order`, headers: ['Order', 'Unit', 'Class'], rows: order.map((id, i) => [i + 1, id, classOf.get(id) ?? '']) }}
+    >
+      {view.tables.diagram ? (
+        <img src={diagramSrc(view.tables.diagram)} alt={`Flowsheet diagram of ${view.flowsheet ?? 'the run'}: ${order.join(', ')}`} className="max-w-full h-auto" data-testid="diagram-svg" />
+      ) : (
+        <>
+          <p className="text-caption text-signal-warn mb-2" data-testid="diagram-note">
+            {view.tables.diagramNote ?? NO_DIAGRAM}
+          </p>
+          {order.length > 0 ? (
+            <ol className="list-decimal pl-5 text-body" data-testid="diagram-units">
+              {order.map((id) => (
+                <li key={id} className="font-num">
+                  {id}
+                  {classOf.get(id) && <span className="text-ink-soft"> · {classOf.get(id)}</span>}
                 </li>
               ))}
             </ol>
-            <ul className="list-disc pl-5 mt-2 text-caption text-ink-soft">
-              {scenario.leavesOut.map((l) => (
-                <li key={l}>left out: {l}</li>
-              ))}
-            </ul>
-          </Card>
-        </div>
+          ) : (
+            <p className="text-body text-ink-soft">This run kept no unit order.</p>
+          )}
+        </>
       )}
+    </Section>
+  );
+}
+
+// ── What the reference model supplied ───────────────────────────────────
+
+export function ReadBack({ view }: { view: RunView }) {
+  const entries = Object.entries(view.readBack);
+  if (!entries.length) return null;
+  return (
+    <Card className="p-4">
+      <h2 className="font-serif text-section-title font-semibold mb-1">What the reference model supplied</h2>
+      <p className="text-caption text-ink-soft mb-2">Read back from the units and the finance model after the base case ran; nobody typed these.</p>
+      <table className="w-full text-caption" data-testid="proforma-readback">
+        <tbody>
+          {entries.map(([k, v]) => (
+            <tr key={k} className="border-t border-line/50">
+              <td className="py-0.5">{k}</td>
+              <td className="py-0.5 text-right font-num">{fmt(v, 4)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+/**
+ * The labels a run's sections print for its inputs: the scenario's own, else
+ * the shelf's; with their units for the sliders, without for the tornado.
+ */
+export function inputLabels(inputs: ScenarioInput[] | null, flowsheet: FlowsheetInfo | null, withUnit = false): Record<string, string> {
+  const out: Record<string, string> = {};
+  const say = (label: string, unit: string) => (withUnit && unit ? `${label} (${unit})` : label);
+  for (const i of flowsheet?.inputs ?? []) out[i.key] = say(i.name, i.unit);
+  for (const i of inputs ?? []) out[i.key] = say(i.label, i.unit);
+  return out;
+}
+
+/**
+ * Every section of one run, in the order a reader takes them: the result,
+ * the cost breakdown, the sensitivity, the distribution, the sliders when
+ * the run walked a grid, the streams, the equipment, the utilities, the
+ * diagram, and what the reference model supplied.
+ */
+export function RunReport({
+  view,
+  priceBasis,
+  labels,
+  unitLabels,
+  scenarioId,
+  csvName,
+}: {
+  view: RunView;
+  priceBasis: string;
+  /** Each input's label, and the same with its unit (inputLabels). */
+  labels: Record<string, string>;
+  unitLabels: Record<string, string>;
+  scenarioId: string;
+  csvName: string;
+}) {
+  return (
+    <div className="space-y-4" data-testid="run-report">
+      <RunResult view={view} priceBasis={priceBasis} scenarioId={scenarioId} />
+      <CostBreakdown view={view} priceBasis={priceBasis} csvName={csvName} />
+      <Sensitivity view={view} labels={labels} csvName={csvName} />
+      <PriceDistribution view={view} priceBasis={priceBasis} csvName={csvName} />
+      <Sliders key={view.artifactId} view={view} labels={unitLabels} priceBasis={priceBasis} scenarioId={scenarioId} />
+      <StreamsTable view={view} csvName={csvName} />
+      <EquipmentTable view={view} csvName={csvName} />
+      <UtilitiesCard view={view} csvName={csvName} />
+      <DiagramCard view={view} csvName={csvName} />
+      <ReadBack view={view} />
     </div>
   );
 }

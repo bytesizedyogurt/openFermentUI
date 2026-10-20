@@ -539,9 +539,9 @@ async function main() {
         problems.push('New scenario from this does not open on its flowsheet');
       if ((await page.locator('[data-testid="new-scenario-program"]').inputValue().catch(() => '')) !== 'pha') problems.push('a scenario on the PHA flowsheet does not start in PHA');
       const made = await make('pha_sugar_v0', 'PHA from the shelf');
-      // The inputs table draws once the shelf answers.
-      await page.locator('[data-testid="made-here-inputs"] tbody tr').first().waitFor({ timeout: 8000 }).catch(() => {});
-      if ((await page.locator('[data-testid="made-here-inputs"] tbody tr').count()) !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
+      // §3.2: the page lists the inputs the service bound for its flowsheet; wait for its rows.
+      await page.locator('[data-testid="proforma-inputs"] tbody tr').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="proforma-inputs"] tbody tr').count()) !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
       if (made) {
         await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
         const card = page.locator(`[data-testid="biosteam-card"][data-scenario="${made}"]`);
@@ -579,6 +579,159 @@ async function main() {
       console.log(`✗ proforma     ${problems.join('; ')}`);
     } else {
       console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; the palette opens the same chooser');
+    }
+    await page.close();
+  }
+
+  // ── OF-BLD-019 §3.2 — the scenario page runs the flowsheet and reads
+  //    every table from the run.
+  //
+  // With the switch on, sc-pha-1 (a seed scenario, run by its id) and a
+  // scenario made from the shelf's pha_sugar_v0 (run by its flowsheet, bound
+  // as GET /api/proforma/bind binds it) each take the three assumptions that
+  // wait, under the reviewer's name, and run against the double. After Run
+  // every section is on the page and each table is as long as the stored
+  // run's; after a reload the newest run reads back from its artifact, and
+  // the index reads the made scenario's price from it. With the switch off,
+  // a scenario made on a flowsheet the double cannot bind opens, says the
+  // service's words and that it has not run, offers no run, and nothing
+  // crashes; the made PHA scenario still opens its own program, under the
+  // banner, with its run.
+  let scenarioPageFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const run = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-run.json'), 'utf8')).response;
+    const count = (sel) => page.locator(sel).count();
+    const typeAssumptions = async () => {
+      for (const [key, vals] of [['recovery', ['0.95', '0.9', '0.98']], ['sugarPrice', ['0.4', '0.3', '0.5']], ['sugarFeed', ['10000', '10000', '10000']]]) {
+        const form = page.locator(`[data-testid="assume-${key}"]`);
+        await form.waitFor({ timeout: 8000 }).catch(() => {});
+        const boxes = form.locator('input');
+        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
+        await form.locator('button:has-text("Keep assumption")').click();
+        await page.waitForTimeout(150);
+      }
+    };
+    const sections = async (who) => {
+      await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const lacks = [];
+      if (!(await count('[data-testid="run-result"] [data-testid="scenario-price"]'))) lacks.push('the price');
+      if (!/Base case, every input at its value/.test(await page.locator('[data-testid="base-case"]').innerText().catch(() => ''))) lacks.push('the base case');
+      if ((await count('[data-testid="waterfall-row"]')) !== run.tea.lines.length || (await count('[data-testid="waterfall-total"]')) !== 1) lacks.push('the cost breakdown');
+      if ((await count('[data-testid="sensitivity"] [data-testid="tornado-row"]')) !== run.sensitivity.length) lacks.push('the sensitivity');
+      if ((await count('[data-testid="distribution-bin"]')) !== run.histogram.length) lacks.push('the distribution');
+      if ((await count('[data-testid="stream-row"]')) !== run.streams.length) lacks.push('the streams');
+      if ((await count('[data-testid="unit-row"]')) !== run.units.length) lacks.push('the equipment');
+      if ((await count('[data-testid="utility-row"]')) !== (run.utilities ? 4 : 0)) lacks.push('the utilities');
+      if (run.diagram ? (await count('[data-testid="diagram-svg"]')) !== 1 : (await count('[data-testid="diagram-units"] li')) !== run.unitOrder.length)
+        lacks.push('the diagram or its ordered units');
+      if (!run.diagram && !(await page.locator('[data-testid="diagram-note"]').innerText().catch(() => '')).includes(run.diagramNote)) lacks.push("the diagram's note");
+      for (const t of ['streams-table', 'equipment-table', 'utilities', 'diagram']) if (!(await count(`[data-testid="csv-${t}"]`))) lacks.push(`the CSV of ${t}`);
+      if (!(await count('[data-testid="scenario-pin"]')) || !(await count('[data-testid="compare-link"]'))) lacks.push('pin and Compare');
+      const train = await page.locator('[data-testid="train-link"]').getAttribute('href').catch(() => null);
+      if (train !== `#/pureos/train/${run.artifactId}`) lacks.push(`the link to pureOS's train (${train})`);
+      if (lacks.length) problems.push(`${who}: the page lacks ${lacks.join(', ')}`);
+    };
+    try {
+      if (!(await setShowArchived(page, true))) problems.push('the archive switch did not turn on');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+
+      // The seed scenario, by its id.
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await count('[data-testid="scenario-not-run"]'))) problems.push('sc-pha-1 does not say it has not run');
+      const meta = await page.locator('[data-testid="scenario-meta"]').innerText().catch(() => '');
+      if (!/Flowsheet: PHA from fermentable sugar, draft v0/.test(meta) || !/Program: PHA/.test(meta)) problems.push(`sc-pha-1's header does not name its flowsheet and program: ${JSON.stringify(meta)}`);
+      if (!/The simulator (has not started|is starting|is warm|failed)/.test(await page.locator('[data-testid="run-status"]').innerText().catch(() => '')))
+        problems.push('the Run has no status line');
+      await typeAssumptions();
+      await page.getByRole('button', { name: 'Run the scenario' }).click();
+      await sections('sc-pha-1');
+      const seedPost = doubleState.proformaRuns.at(-1);
+      if (seedPost?.scenarioId !== 'sc-pha-1' || 'flowsheet' in (seedPost ?? {})) problems.push(`sc-pha-1 was not run by its id alone: ${JSON.stringify(seedPost).slice(0, 120)}`);
+      await page.waitForTimeout(700);
+      await page.reload({ waitUntil: 'networkidle' });
+      await sections('sc-pha-1 after a reload');
+      if (!/computed \d{4}-\d\d-\d\d \d\d:\d\d in [\d.]+ s/.test(await page.locator('[data-testid="run-result"]').innerText().catch(() => '')))
+        problems.push('after a reload sc-pha-1 does not read its newest run back from the artifact');
+
+      // A scenario made from the shelf, run by its flowsheet.
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const pha = page.locator('[data-testid="flowsheet-card"][data-flowsheet="pha_sugar_v0"]');
+      await pha.waitFor({ timeout: 8000 }).catch(() => {});
+      await pha.getByRole('button', { name: 'New scenario from this' }).click();
+      await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="new-scenario-name"]').fill('Runs from the shelf');
+      await page.locator('[data-testid="new-scenario-create"]').click();
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const made = /#\/proforma\/scenario\/(sc-[^/?]+)$/.exec(page.url())?.[1] ?? null;
+      if (!made) throw new Error(`New scenario did not land on a scenario page (${page.url()})`);
+      if ((await count('[data-testid^="input-"]')) !== 7 || (await count('[data-testid="source-records"]')) !== 4)
+        problems.push('the made scenario does not list its seven inputs with four bound to records');
+      if (!(await count('[data-testid="scenario-not-run"]'))) problems.push('the made scenario does not say it has not run');
+      if (!(await page.getByRole('button', { name: 'Run the scenario' }).isDisabled())) problems.push('the made scenario is offered a run while inputs wait');
+      await typeAssumptions();
+      await page.getByRole('button', { name: 'Run the scenario' }).click();
+      await sections('a scenario made from pha_sugar_v0');
+      const madePost = doubleState.proformaRuns.at(-1);
+      if (madePost?.scenarioId !== made || madePost?.flowsheet !== 'pha_sugar_v0' || madePost?.assumptions?.length !== 3 || madePost.assumptions.some((a) => a.by !== REVIEWER))
+        problems.push(`the made scenario was not run by its flowsheet with three signed assumptions: ${JSON.stringify(madePost).slice(0, 160)}`);
+      await page.waitForTimeout(700);
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const card = page.locator(`[data-testid="biosteam-card"][data-scenario="${made}"]`);
+      await card.locator('[data-testid="scenario-price"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await card.locator('[data-testid="scenario-price"]').count())) problems.push('the index does not read the made scenario\u2019s price from its run');
+
+      // The switch off, and a scenario made on a flowsheet the double cannot bind.
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch did not turn off');
+      await page.evaluate(
+        async ({ from, to }) => {
+          const db = await new Promise((resolve, reject) => {
+            const r = indexedDB.open('openferment', 1);
+            r.onsuccess = () => resolve(r.result);
+            r.onerror = () => reject(r.error);
+          });
+          const snap = await new Promise((resolve) => {
+            const g = db.transaction('durable', 'readonly').objectStore('durable').get('snapshot');
+            g.onsuccess = () => resolve(g.result);
+          });
+          const sc = { ...snap.createdScenarios[from], ...to };
+          delete sc.program;
+          snap.createdScenarios = { ...snap.createdScenarios, [sc.id]: sc };
+          await new Promise((resolve) => {
+            const tx = db.transaction('durable', 'readwrite');
+            tx.objectStore('durable').put(snap, 'snapshot');
+            tx.oncomplete = resolve;
+          });
+          db.close();
+        },
+        { from: made, to: { id: 'sc-smoke-unbound', name: 'Made on a flowsheet this service lacks', flowsheetId: 'no_such_flowsheet', modelId: 'no_such_flowsheet', lastRunId: null } },
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-smoke-unbound`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="bind-problem"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const unbound = await page.locator('main').innerText().catch(() => '');
+      if (!/This scenario has not run yet/.test(unbound)) problems.push('a scenario the double cannot bind does not say it has not run');
+      if (!/no flowsheet no_such_flowsheet is on the shelf/.test(unbound)) problems.push('a scenario the double cannot bind does not say the service\u2019s words');
+      const unboundRun = await page.getByRole('button', { name: 'Run the scenario' }).isDisabled({ timeout: 5000 }).catch(() => null);
+      if (unboundRun !== true) problems.push(unboundRun === null ? 'a scenario the double cannot bind shows no Run' : 'a scenario with no binding is offered a run');
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/${made}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await count('[data-archived-program="pha"]'))) problems.push('the made PHA scenario does not open under its banner with the switch off');
+      if ((await count('[data-testid^="input-"]')) !== 7) problems.push('with the switch off the made PHA scenario does not bind its own program\u2019s inputs');
+      await sections('the made PHA scenario with the switch off');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      scenarioPageFails++;
+      console.log(`✗ scenario     ${problems.join('; ')}`);
+    } else {
+      console.log('✓ scenario     sc-pha-1 by its id and a scenario made from pha_sugar_v0 by its flowsheet each take three signed assumptions and run; the price, the base case, the cost breakdown, the sensitivity, the distribution, the streams, the equipment, the utilities and the ordered units are each as long as the stored run, each table with its CSV, with pin, Compare and pureOS\u2019s train; the newest run reads back from its artifact after a reload and gives the index its price; with the switch off a scenario the double cannot bind says the service\u2019s words and that it has not run, and the made PHA scenario opens its own program under the banner');
     }
     await page.close();
   }
@@ -1173,13 +1326,14 @@ async function main() {
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${1 - programFails}/1 programs — archived hidden by default, a deep link under its banner, the switch brings them back`);
   console.log(`${1 - proformaFails}/1 Proforma index — the shelf, the reference runs, New scenario makes one that opens and survives a reload`);
+  console.log(`${1 - scenarioPageFails}/1 Proforma scenario page — a seed and a made scenario run, every section read from the run`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
 }
 
 main();
