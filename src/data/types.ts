@@ -2762,6 +2762,8 @@ export interface ProformaRunRequest {
   assumptions: InputAssumption[];
   host: string | null;
   seed: number;
+  /** Latin hypercube samples to draw (OF-BLD-019 D7); the service defaults it and caps it. */
+  samples?: number;
 }
 
 export interface HistogramBin {
@@ -2802,4 +2804,147 @@ export interface ProformaRunResult {
   leavesOut: string[];
   priceBasis: string;
   evidence: Evidence;
+  // OF-BLD-019 §2.1 (D1): the base case's tables, read from the one run
+  // artifact; ProformaTables says what each holds.
+  flowsheet: string | null;
+  tablesSource: string | null;
+  tea: TeaBreakdown | null;
+  streams: StreamRow[];
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+  tableUnits: Record<string, string>;
+}
+
+// ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────
+// Mirrors of core/openferment_core/models.py; check:plan diffs the fields.
+// The shelf is data (flowsheets/shelf.py, D2), served at
+// GET /api/proforma/shelf. A run is one `proforma.run` artifact (D1) whose
+// output holds every table below, read by the worker from BioSTEAM's own
+// objects. Units are BioSTEAM's: T in K, P in Pa, flows in kg/hr, a unit's
+// duties in kJ/hr and power in kW, costs in USD, annual amounts in USD/yr
+// (`tableUnits`); UtilityDuties carries the unit the UnitGroup states.
+
+/** One input a shelf flowsheet takes: the ontology fields that bind it, or none for an assumption or a convention. */
+export interface FlowsheetInput {
+  key: string;
+  name: string;
+  /** The unit table's family where the unit has one (massConc, yield, volProd, costUSD), else massFlow or fraction. */
+  dimension: string;
+  unit: string;
+  fields: string[];
+  kind: 'process' | 'economic' | 'convention';
+  note: string;
+}
+
+export interface FlowsheetInfo {
+  id: string;
+  title: string;
+  description: string;
+  /** The package and version ('biorefineries 2.35.1, cornstover'), or 'this repository'. */
+  source: string;
+  /** A program id from programs.ts; null for a general flowsheet. */
+  program: string | null;
+  /** A published reference biorefinery, run whole on its package's defaults. */
+  reference: boolean;
+  inputs: FlowsheetInput[];
+  outputs: string[];
+  priceOutput: string | null;
+  priceBasis: string | null;
+  leavesOut: string[];
+  gridInputs: string[];
+}
+
+/** One stream of the base case: source and sink unit (null for a feed or a product). */
+export interface StreamRow {
+  id: string;
+  source: string | null;
+  sink: string | null;
+  phase: string;
+  T: number;
+  P: number;
+  massFlow: number;
+  massFlows: Record<string, number>;
+  price: number | null;
+}
+
+/** One unit operation, in run order. Duties and power are null where the unit has none. */
+export interface UnitRow {
+  id: string;
+  unitClass: string;
+  line: string | null;
+  order: number;
+  ins: string[];
+  outs: string[];
+  installedCost: number;
+  purchaseCost: number;
+  heatingDuty: number | null;
+  coolingDuty: number | null;
+  power: number | null;
+}
+
+/** BioSTEAM's UnitGroup totals, each with the unit the UnitGroup states. */
+export interface UtilityDuties {
+  group: string;
+  heating: number;
+  heatingUnit: string;
+  cooling: number;
+  coolingUnit: string;
+  electricityConsumption: number;
+  electricityConsumptionUnit: string;
+  electricityProduction: number;
+  electricityProductionUnit: string;
+}
+
+/** One line of the price, per year and per unit of the price's basis; the lines sum to the product's revenue. */
+export interface TeaLine {
+  key: 'feedstock' | 'otherMaterials' | 'utilities' | 'otherVariable' | 'fixedOperating' | 'capitalRecovery' | 'coproductCredits';
+  label: string;
+  usdPerYear: number;
+  perUnit: number | null;
+  reads: string;
+}
+
+/** The TEA object's own numbers for the base case, read through its attributes. */
+export interface TeaBreakdown {
+  teaClass: string;
+  product: string;
+  feedstock: string | null;
+  productPrice: number | null;
+  basisFlow: number | null;
+  basis: string | null;
+  operatingHours: number;
+  sales: number;
+  materialCost: number;
+  feedstockCost: number | null;
+  otherMaterialCost: number;
+  utilityCost: number;
+  purchaseCost: number;
+  installedEquipmentCost: number;
+  FCI: number;
+  TCI: number;
+  FOC: number;
+  laborCost: number | null;
+  capitalRecovery: number;
+  coproductCredits: number;
+  IRR: number | null;
+  incomeTax: number | null;
+  lines: TeaLine[];
+}
+
+/** What a reader takes from a `proforma.run` artifact (proforma.tables_of). */
+export interface ProformaTables {
+  flowsheet: string | null;
+  tablesSource: string | null;
+  tea: TeaBreakdown | null;
+  streams: StreamRow[];
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  /** SVG text when Graphviz's dot was on the path (D8); else null, with the words why and the units in run order. */
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+  tableUnits: Record<string, string>;
 }

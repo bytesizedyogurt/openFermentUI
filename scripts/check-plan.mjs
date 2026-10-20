@@ -184,6 +184,15 @@ const PAIRS = [
   ['InputSensitivity', 'InputSensitivity'],
   ['ProformaGrid', 'ProformaGrid'],
   ['ProformaRunResult', 'ProformaRunResult'],
+  // OF-BLD-019 §2.1 — the shelf of flowsheets and the run's tables.
+  ['FlowsheetInput', 'FlowsheetInput'],
+  ['FlowsheetInfo', 'FlowsheetInfo'],
+  ['StreamRow', 'StreamRow'],
+  ['UnitRow', 'UnitRow'],
+  ['UtilityDuties', 'UtilityDuties'],
+  ['TeaLine', 'TeaLine'],
+  ['TeaBreakdown', 'TeaBreakdown'],
+  ['ProformaTables', 'ProformaTables'],
   ['TraceStep', 'TraceStep'],
   // A follow-up carries its conversation's earlier turns in words.
   ['PriorTurn', 'PriorTurn'],

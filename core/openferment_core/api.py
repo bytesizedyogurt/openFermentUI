@@ -354,6 +354,16 @@ def proforma_status() -> dict:
     return proforma.status()
 
 
+@app.get("/api/proforma/shelf")
+def proforma_shelf(includeArchived: bool = False) -> list[dict]:  # noqa: N803 (the wire name)
+    """The shelf of flowsheets (OF-BLD-019 §2.1, D2): pure data, read with no
+    simulator. A flowsheet of an archived program is left out unless
+    `?includeArchived=true` asks for it, as the artifact list does."""
+    from . import proforma
+
+    return [f.model_dump(mode="json") for f in proforma.shelf(include_archived=includeArchived)]
+
+
 @app.get("/api/proforma/benchmark")
 def proforma_benchmark() -> dict:
     """The benchmark this installation reproduced (§8.2), or none yet. A read:

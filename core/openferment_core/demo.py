@@ -804,6 +804,18 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
 
     if op == "evaluate":
         return evaluate(args["values"])
+    if op == "run":
+        # OF-BLD-019 §2.1: the worker's whole run, composed of the three
+        # below, with tables a closed form makes and labels as the stand-in.
+        try:
+            base_out, base_infeasible = evaluate(args["base"]), None
+        except ValueError as e:
+            base_out, base_infeasible = None, f"ValueError: {e}"
+        grid = _standin_call("grid", {"axes": args["axes"], "base": args["base"]}) if args.get("axes") else None
+        mc = _standin_call("montecarlo", {"specs": args["specs"], "n": args["samples"], "seed": args["seed"],
+                                          "base": args["base"]})
+        return {"base": base_out, "baseInfeasible": base_infeasible,
+                "tables": _standin_tables(args["base"], base_out) if base_out else None, "grid": grid, "montecarlo": mc}
     if op == "grid":
         keys = list(args["axes"])
         cells = []
@@ -818,6 +830,78 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
         o, r = attempt(v)
         samples.append({"inputs": v, "outputs": o, "infeasible": r})
     return {"n": args["n"], "seed": args["seed"], "samples": samples}
+
+
+# The tables of a run (OF-BLD-019 §2.1) in the shape the worker writes, from
+# a closed form over the stand-in's inputs and cost lines: three units, six
+# streams, a TEA breakdown whose lines sum to the stand-in price. Every
+# number is invented and the tables say so in `tablesSource`.
+STANDIN_HOURS = 8000.0
+
+
+def _standin_tables(v: dict[str, float], out: dict[str, Any]) -> dict[str, Any]:
+    from .flowsheets.shelf import TABLE_UNITS
+
+    sugar, pha = v["sugarFeed"], v["sugarFeed"] * v["yield"]
+    water = pha / v["titre"] * 1000.0
+    cells = pha * (1 - v["content"]) / v["content"]
+    product = (pha + cells) * v["recovery"]
+    broth = sugar + water
+
+    def stream(sid, source, sink, flows, price=None):
+        return {"id": sid, "source": source, "sink": sink, "phase": "l", "T": 298.15, "P": 101325.0,
+                "massFlow": sum(flows.values()), "massFlows": flows, "price": price}
+
+    streams = [
+        stream("sugar", None, "R1", {"Glucose": sugar}, v["sugarPrice"]),
+        stream("process_water", None, "R1", {"Water": water}),
+        stream("broth", "R1", "C1", {"Water": water, "Glucose": sugar - pha - cells, "PHB": pha, "Cells": cells}),
+        stream("spent_medium", "C1", None, {"Water": water, "Glucose": sugar - pha - cells, "PHB": pha * (1 - v["recovery"]),
+                                            "Cells": cells * (1 - v["recovery"])}),
+        stream("wet_solids", "C1", "D1", {"PHB": pha * v["recovery"], "Cells": cells * v["recovery"]}),
+        stream("product", "D1", None, {"PHB": pha * v["recovery"], "Cells": cells * v["recovery"]}),
+    ]
+    lines_in = out["costLines"]
+    per = pha * v["recovery"] * STANDIN_HOURS
+    capital = lines_in["capex"] * per
+    units = []
+    for n, (uid, share, heat, cool, kw) in enumerate((("R1", 0.7, None, 9.0e6, 400.0), ("C1", 0.2, None, None, 90.0),
+                                                       ("D1", 0.1, 4.0e6, None, 170.0))):
+        installed = capital * 3.0 * share
+        units.append({"id": uid, "unitClass": "StandIn", "line": "STAND-IN unit", "order": n,
+                      "ins": [s["id"] for s in streams if s["sink"] == uid], "outs": [s["id"] for s in streams if s["source"] == uid],
+                      "installedCost": installed, "purchaseCost": installed / 2.0,
+                      "heatingDuty": heat, "coolingDuty": cool, "power": kw})
+    annual = {"feedstock": lines_in["media"] * per, "otherMaterials": 0.0,
+              "utilities": (lines_in["utilities"] + lines_in["downstream"]) * per,
+              "fixedOperating": (lines_in["labor"] + lines_in["other"]) * per, "capitalRecovery": capital}
+    words = {"feedstock": "Main feedstock", "otherMaterials": "Other materials", "utilities": "Utilities",
+             "fixedOperating": "Fixed operating, labour included", "capitalRecovery": "Capital recovery"}
+    sales = sum(annual.values())
+    installed_total = sum(u["installedCost"] for u in units)
+    tea = {
+        "teaClass": "StandIn", "product": "product", "feedstock": "sugar",
+        "productPrice": sales / (product * STANDIN_HOURS), "basisFlow": pha * v["recovery"],
+        "basis": "kg of PHA contained in dried cell mass", "operatingHours": STANDIN_HOURS, "sales": sales,
+        "materialCost": annual["feedstock"], "feedstockCost": annual["feedstock"], "otherMaterialCost": 0.0,
+        "utilityCost": annual["utilities"], "purchaseCost": installed_total / 2.0, "installedEquipmentCost": installed_total,
+        "FCI": installed_total, "TCI": installed_total, "FOC": annual["fixedOperating"], "laborCost": lines_in["labor"] * per,
+        "capitalRecovery": capital, "coproductCredits": 0.0, "IRR": None, "incomeTax": None,
+        "lines": [{"key": k, "label": words[k], "usdPerYear": a, "perUnit": a / per, "reads": PROFORMA_STANDIN}
+                  for k, a in annual.items()],
+    }
+    heating = sum(u["heatingDuty"] or 0.0 for u in units) / 1e6
+    cooling = sum(u["coolingDuty"] or 0.0 for u in units) / 1e6
+    power = sum(u["power"] or 0.0 for u in units) / 1e3
+    return {
+        "tablesSource": PROFORMA_STANDIN, "tea": tea, "streams": streams, "units": units,
+        "utilities": {"group": "STAND-IN units", "heating": heating, "heatingUnit": "GJ/hr", "cooling": cooling,
+                      "coolingUnit": "GJ/hr", "electricityConsumption": power, "electricityConsumptionUnit": "MW",
+                      "electricityProduction": 0.0, "electricityProductionUnit": "MW"},
+        "diagram": None,
+        "diagramNote": "STAND-IN: no flowsheet was simulated, so there is no diagram; the units are listed in order.",
+        "unitOrder": [u["id"] for u in units], "tableUnits": TABLE_UNITS,
+    }
 
 
 def prototype_proforma() -> dict[str, Any]:
@@ -843,7 +927,13 @@ def prototype_proforma() -> dict[str, Any]:
         finally:
             _intake.DATA_DIR, proforma.call, proforma.yield_cap = saved
     run.evidence.basis.at = AT
-    return {"proforma-scenarios.json": [info], "proforma-run.json": run.model_dump(mode="json")}
+    # OF-BLD-019 §2.1: the shelf, as GET /api/proforma/shelf serves it with
+    # the program switch off and, `?includeArchived=true`, on.
+    def shelf(include_archived: bool) -> list[dict[str, Any]]:
+        return [f.model_dump(mode="json") for f in proforma.shelf(include_archived=include_archived)]
+
+    return {"proforma-scenarios.json": [info], "proforma-run.json": run.model_dump(mode="json"),
+            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True)}
 
 
 def rebuild_fermos_sample(out: Path = FERMOS_SAMPLE) -> Path:

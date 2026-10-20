@@ -1571,6 +1571,10 @@ class ProformaRunRequest(BaseModel):
     assumptions: list[InputAssumption] = Field(default_factory=list)
     host: str | None = None
     seed: int = 0
+    # How many Latin hypercube samples the run draws (OF-BLD-019 D7). The
+    # default is proforma.SAMPLES, held equal by test_proforma, and
+    # proforma.run refuses more than proforma.MAX_SAMPLES, in words.
+    samples: int = 500
 
 
 class HistogramBin(BaseModel):
@@ -1611,6 +1615,189 @@ class ProformaRunResult(BaseModel):
     leavesOut: list[str]
     priceBasis: str
     evidence: Evidence
+    # OF-BLD-019 §2.1 (D1): the base case's tables, as the one run artifact
+    # holds them; `ProformaTables` says what each is. All defaulted, so a run
+    # stored before them still reads.
+    flowsheet: str | None = None
+    tablesSource: str | None = None
+    tea: TeaBreakdown | None = None
+    streams: list[StreamRow] = Field(default_factory=list)
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+
+
+# ── Proforma's shelf and the run's tables (OF-BLD-019 §2.1) ─────────────
+#
+# The shelf is data (flowsheets/shelf.py, D2). A run is one `proforma.run`
+# artifact (D1) holding the price, the sensitivity and, for its base case,
+# every table below, each read by the Proforma worker from BioSTEAM's own
+# objects; nothing recomputes them on read. Units are BioSTEAM's: a
+# stream's T in K and P in Pa, flows in kg/hr, a unit's duties in kJ/hr and
+# its power in kW, costs in USD, annual amounts in USD/yr; `tableUnits` in
+# the artifact names them, and UtilityDuties carries each unit as the
+# UnitGroup states it.
+
+
+class FlowsheetInput(BaseModel):
+    """One input a shelf flowsheet takes. It names the ontology fields whose
+    records bind it; with none, a named person's assumption or a stated
+    convention sets it. The file of the flowsheet holds no value for it."""
+
+    key: str
+    name: str
+    # The unit table's family where the unit has one (src/engine/units.ts:
+    # massConc, yield, volProd, costUSD), else a word: massFlow, fraction.
+    dimension: str
+    unit: str
+    fields: list[str] = Field(default_factory=list)
+    kind: Literal["process", "economic", "convention"]
+    note: str
+
+
+class FlowsheetInfo(BaseModel):
+    id: str
+    title: str
+    description: str
+    # The package and version it comes from ('biorefineries 2.35.1,
+    # cornstover'), or 'this repository'.
+    source: str
+    # A program id from src/data/programs.ts; None for a general flowsheet.
+    program: str | None = None
+    # A published reference biorefinery, run whole on its package's defaults.
+    reference: bool = False
+    inputs: list[FlowsheetInput] = Field(default_factory=list)
+    # The names its evaluation (or its whole run) reports.
+    outputs: list[str] = Field(default_factory=list)
+    # Which output is the price, and what it is a price of.
+    priceOutput: str | None = None
+    priceBasis: str | None = None
+    leavesOut: list[str] = Field(default_factory=list)
+    # The inputs a run's grid walks, for the sliders; none, no grid.
+    gridInputs: list[str] = Field(default_factory=list)
+
+
+class StreamRow(BaseModel):
+    """One stream of the base case, as BioSTEAM holds it after the run."""
+
+    id: str
+    # The unit it leaves and the unit it enters; None for a feed or a product.
+    source: str | None = None
+    sink: str | None = None
+    phase: str
+    T: float
+    P: float
+    massFlow: float
+    # Mass flow by component, the components that flow alone.
+    massFlows: dict[str, float] = Field(default_factory=dict)
+    # USD/kg, when the stream carries a price.
+    price: float | None = None
+
+
+class UnitRow(BaseModel):
+    """One unit operation, in run order."""
+
+    id: str
+    # The BioSTEAM class, and BioSTEAM's own name for its line.
+    unitClass: str
+    line: str | None = None
+    order: int
+    ins: list[str] = Field(default_factory=list)
+    outs: list[str] = Field(default_factory=list)
+    installedCost: float
+    purchaseCost: float
+    # None where the unit has no heat utility, or draws no power.
+    heatingDuty: float | None = None
+    coolingDuty: float | None = None
+    power: float | None = None
+
+
+class UtilityDuties(BaseModel):
+    """BioSTEAM's UnitGroup over the plant's units: each total with the unit
+    the UnitGroup states for it."""
+
+    group: str
+    heating: float
+    heatingUnit: str
+    cooling: float
+    coolingUnit: str
+    electricityConsumption: float
+    electricityConsumptionUnit: str
+    electricityProduction: float
+    electricityProductionUnit: str
+
+
+class TeaLine(BaseModel):
+    """One line of the price, per year and per unit of the price's basis.
+    The lines sum to the main product's revenue by construction."""
+
+    key: Literal["feedstock", "otherMaterials", "utilities", "otherVariable", "fixedOperating",
+                 "capitalRecovery", "coproductCredits"]
+    label: str
+    usdPerYear: float
+    perUnit: float | None = None
+    # Which attribute or method of the TEA object it is read from, in words.
+    reads: str
+
+
+class TeaBreakdown(BaseModel):
+    """The TEA object's own numbers for the base case, read through its
+    attributes and methods, never recomputed."""
+
+    teaClass: str
+    product: str
+    feedstock: str | None = None
+    # The product stream's price per kg as the run solved it (or as the
+    # package left it), and the flow in kg/hr the per-unit lines divide by.
+    productPrice: float | None = None
+    basisFlow: float | None = None
+    basis: str | None = None
+    operatingHours: float
+    sales: float
+    materialCost: float
+    feedstockCost: float | None = None
+    otherMaterialCost: float
+    utilityCost: float
+    purchaseCost: float
+    installedEquipmentCost: float
+    FCI: float
+    TCI: float
+    FOC: float
+    laborCost: float | None = None
+    # Sales less the annual operating cost: at a solved price, the return
+    # on and of the capital and the tax on it, as the cash-flow analysis
+    # requires.
+    capitalRecovery: float
+    coproductCredits: float
+    IRR: float | None = None
+    incomeTax: float | None = None
+    lines: list[TeaLine] = Field(default_factory=list)
+
+
+class ProformaTables(BaseModel):
+    """What a reader takes from a `proforma.run` artifact (proforma.tables_of):
+    the flowsheet, what made the tables, and the tables themselves."""
+
+    flowsheet: str | None = None
+    # 'BioSTEAM <version>, thermosteam <version>', or the stand-in's label.
+    tablesSource: str | None = None
+    tea: TeaBreakdown | None = None
+    streams: list[StreamRow] = Field(default_factory=list)
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    # SVG text when Graphviz's dot is on the path (D8); else None, the words
+    # why, and the units in run order.
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+    tableUnits: dict[str, str] = Field(default_factory=dict)
+
+
+# ProformaRunResult names the table models defined after it.
+ProformaRunResult.model_rebuild()
 
 
 # ── Runbook drafts (OF-BLD-014 §9.2) ────────────────────────────────────

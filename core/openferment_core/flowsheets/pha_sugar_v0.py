@@ -110,6 +110,7 @@ class Built:
         self.flowsheet = bst.main_flowsheet.get_flowsheet()
         self.system = bst.System.from_units("pha_sys", units=[self.M1, self.R1, self.C1, self.D1])
         self.tea = None
+        self.price: float | None = None
 
     def gap(self) -> float:
         flow_in = sum(s.F_mass for s in self.R1.ins)
@@ -204,7 +205,10 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
     # price would depend on what ran before. Start every case from zero, so
     # a case gives one price whatever came first and an artifact replays.
     tea._sales = 0.0
-    price = float(tea.solve_price(product)) * float(product.F_mass) / pha
+    # The product stream's price as the TEA solved it, kept for `parts`, so
+    # the run's cost breakdown is read at the same price.
+    b.price = float(tea.solve_price(product))
+    price = b.price * float(product.F_mass) / pha
     hours = float(tea.operating_hours)
     per_kg = 1.0 / (pha * hours)
     media = (b.feed.cost + b.ammonia.cost) * hours * per_kg
@@ -227,3 +231,14 @@ def evaluate(b: Built, values: dict[str, float]) -> dict[str, Any]:
         "readBack": read_back(b),
         "conversions": dict(zip(("polymer", "cells", "respiration"), conversions(b, {k: float(values[k]) for k in values}))),
     }
+
+
+def parts(b: Built) -> dict[str, Any]:
+    """What the worker reads the run's tables from after the base case
+    (OF-BLD-019 §2.1): the system, its TEA (the reference biorefinery's
+    finance model), the dried product, the sugar as the main feedstock, the
+    price the TEA solved for the product stream, and the PHA it contains as
+    the flow the price is per."""
+    product = b.D1.outs[0]
+    return {"system": b.system, "tea": b.tea, "product": product, "feedstock": b.feed, "price": b.price,
+            "basis_flow": float(product.imass["PHB"]), "basis": "kg of PHA contained in dried cell mass"}

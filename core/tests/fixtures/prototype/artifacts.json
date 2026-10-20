@@ -1783,9 +1783,9 @@
       "seed": 0
     },
     {
-      "id": "fc42ecde8271a703",
+      "id": "c88399e09c348cad",
       "tool": "proforma.run",
-      "toolVersion": "pha_sugar_v0 · biosteam 2.54.0 · biorefineries 2.35.1",
+      "toolVersion": "shelf run 1 · biosteam 2.54.0 · biorefineries 2.35.1",
       "inputs": [
         {
           "name": "flowsheet",
@@ -2053,6 +2053,7 @@
         }
       ],
       "output": {
+        "flowsheet": "pha_sugar_v0",
         "base": {
           "titre": 45.0,
           "yield": 0.3,
@@ -3146,9 +3147,243 @@
             ]
           },
           "infeasible": 0
+        },
+        "tablesSource": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM",
+        "tea": {
+          "teaClass": "StandIn",
+          "product": "product",
+          "feedstock": "sugar",
+          "productPrice": 1.4653176691729328,
+          "basisFlow": 2850.0,
+          "basis": "kg of PHA contained in dried cell mass",
+          "operatingHours": 8000.0,
+          "sales": 46081714.28571429,
+          "materialCost": 32000000.000000004,
+          "feedstockCost": 32000000.000000004,
+          "otherMaterialCost": 0.0,
+          "utilityCost": 5899047.619047619,
+          "purchaseCost": 4750000.0,
+          "installedEquipmentCost": 9500000.0,
+          "FCI": 9500000.0,
+          "TCI": 9500000.0,
+          "FOC": 5016000.0,
+          "laborCost": 2280000.0,
+          "capitalRecovery": 3166666.666666667,
+          "coproductCredits": 0.0,
+          "IRR": null,
+          "incomeTax": null,
+          "lines": [
+            {
+              "key": "feedstock",
+              "label": "Main feedstock",
+              "usdPerYear": 32000000.000000004,
+              "perUnit": 1.4035087719298247,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "otherMaterials",
+              "label": "Other materials",
+              "usdPerYear": 0.0,
+              "perUnit": 0.0,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "utilities",
+              "label": "Utilities",
+              "usdPerYear": 5899047.619047619,
+              "perUnit": 0.25873015873015875,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "fixedOperating",
+              "label": "Fixed operating, labour included",
+              "usdPerYear": 5016000.0,
+              "perUnit": 0.22,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            },
+            {
+              "key": "capitalRecovery",
+              "label": "Capital recovery",
+              "usdPerYear": 3166666.666666667,
+              "perUnit": 0.1388888888888889,
+              "reads": "STAND-IN for the browser tests: invented records and a closed-form evaluator in place of BioSTEAM"
+            }
+          ]
+        },
+        "streams": [
+          {
+            "id": "sugar",
+            "source": null,
+            "sink": "R1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 10000.0,
+            "massFlows": {
+              "Glucose": 10000.0
+            },
+            "price": 0.4
+          },
+          {
+            "id": "process_water",
+            "source": null,
+            "sink": "R1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 66666.66666666667,
+            "massFlows": {
+              "Water": 66666.66666666667
+            },
+            "price": null
+          },
+          {
+            "id": "broth",
+            "source": "R1",
+            "sink": "C1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 76666.66666666667,
+            "massFlows": {
+              "Water": 66666.66666666667,
+              "Glucose": 5862.068965517242,
+              "PHB": 3000.0,
+              "Cells": 1137.9310344827582
+            },
+            "price": null
+          },
+          {
+            "id": "spent_medium",
+            "source": "C1",
+            "sink": null,
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 72735.63218390805,
+            "massFlows": {
+              "Water": 66666.66666666667,
+              "Glucose": 5862.068965517242,
+              "PHB": 150.00000000000014,
+              "Cells": 56.89655172413796
+            },
+            "price": null
+          },
+          {
+            "id": "wet_solids",
+            "source": "C1",
+            "sink": "D1",
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 3931.0344827586205,
+            "massFlows": {
+              "PHB": 2850.0,
+              "Cells": 1081.0344827586202
+            },
+            "price": null
+          },
+          {
+            "id": "product",
+            "source": "D1",
+            "sink": null,
+            "phase": "l",
+            "T": 298.15,
+            "P": 101325.0,
+            "massFlow": 3931.0344827586205,
+            "massFlows": {
+              "PHB": 2850.0,
+              "Cells": 1081.0344827586202
+            },
+            "price": null
+          }
+        ],
+        "units": [
+          {
+            "id": "R1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 0,
+            "ins": [
+              "sugar",
+              "process_water"
+            ],
+            "outs": [
+              "broth"
+            ],
+            "installedCost": 6650000.0,
+            "purchaseCost": 3325000.0,
+            "heatingDuty": null,
+            "coolingDuty": 9000000.0,
+            "power": 400.0
+          },
+          {
+            "id": "C1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 1,
+            "ins": [
+              "broth"
+            ],
+            "outs": [
+              "spent_medium",
+              "wet_solids"
+            ],
+            "installedCost": 1900000.0,
+            "purchaseCost": 950000.0,
+            "heatingDuty": null,
+            "coolingDuty": null,
+            "power": 90.0
+          },
+          {
+            "id": "D1",
+            "unitClass": "StandIn",
+            "line": "STAND-IN unit",
+            "order": 2,
+            "ins": [
+              "wet_solids"
+            ],
+            "outs": [
+              "product"
+            ],
+            "installedCost": 950000.0,
+            "purchaseCost": 475000.0,
+            "heatingDuty": 4000000.0,
+            "coolingDuty": null,
+            "power": 170.0
+          }
+        ],
+        "utilities": {
+          "group": "STAND-IN units",
+          "heating": 4.0,
+          "heatingUnit": "GJ/hr",
+          "cooling": 9.0,
+          "coolingUnit": "GJ/hr",
+          "electricityConsumption": 0.66,
+          "electricityConsumptionUnit": "MW",
+          "electricityProduction": 0.0,
+          "electricityProductionUnit": "MW"
+        },
+        "diagram": null,
+        "diagramNote": "STAND-IN: no flowsheet was simulated, so there is no diagram; the units are listed in order.",
+        "unitOrder": [
+          "R1",
+          "C1",
+          "D1"
+        ],
+        "tableUnits": {
+          "T": "K",
+          "P": "Pa",
+          "massFlow": "kg/hr",
+          "price": "USD/kg",
+          "cost": "USD",
+          "duty": "kJ/hr",
+          "power": "kW",
+          "annual": "USD/yr",
+          "perUnit": "USD per unit of the price's basis"
         }
       },
-      "outputHash": "6000ecb2dc10b0117742274f44f1e8f46c146205310def2f4add1135dfebb002",
+      "outputHash": "d4e6cca0cde8742d7358af00ec83bc55dc3cbd3120c48b0acdb1d267c0c866c4",
       "provenance": "demo",
       "createdAt": "2026-09-15T09:00:00Z",
       "durationMs": 0,

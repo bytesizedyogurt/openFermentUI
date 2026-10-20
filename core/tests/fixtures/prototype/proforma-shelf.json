@@ -1,0 +1,25 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "id": "cornstover_benchmark",
+      "title": "Corn stover to ethanol, the NREL 2011 design",
+      "description": "The corn stover ethanol biorefinery the BioSTEAM authors built to the NREL design report (Humbird et al. 2011, NREL/TP-5100-47764): pretreatment, enzymatic hydrolysis, co-fermentation, distillation, wastewater treatment and a boiler, run whole on the package's own defaults. The benchmark: it shows this installation simulates and prices a published biorefinery as its authors do.",
+      "source": "biorefineries 2.35.1, cornstover",
+      "program": null,
+      "reference": true,
+      "inputs": [],
+      "outputs": [
+        "mespUsdPerGal",
+        "mespUsdPerKg",
+        "ethanolDensityKgPerGal",
+        "settings",
+        "references"
+      ],
+      "priceOutput": "mespUsdPerGal",
+      "priceBasis": "USD per gallon of ethanol, at the package's own ethanol density",
+      "leavesOut": [],
+      "gridInputs": []
+    }
+  ]
+}

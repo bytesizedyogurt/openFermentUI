@@ -15,7 +15,9 @@ check is one search. The key itself is never printed, in whole or in part.
 The last line is the lane (OF-BLD-014 A.4), what this machine can run:
 `full` with a key the Models API accepted and Europe PMC answering,
 `model-only` with that key alone, `none` otherwise. The `huggingface` row is optional: a
-blocked host is a warning, and it never changes the exit code.
+blocked host is a warning, and it never changes the exit code. Nor does the
+`graphviz` row (OF-BLD-019 D8): without `dot`, Proforma lists a flowsheet's
+units where its diagram would be.
 """
 from __future__ import annotations
 
@@ -182,6 +184,19 @@ def check_models() -> Check:
         else:
             said.append(f"{m.id} present, sha256 {m.fetched.sha256[:12]} matches")
     return Check("models", worst, "; ".join(said))
+
+
+def check_graphviz() -> Check:
+    """Whether Graphviz's `dot` is on the path (OF-BLD-019 D8). Optional, so
+    a warning at most: without it Proforma lists a flowsheet's units in run
+    order where the diagram would be, and nothing else changes."""
+    import shutil
+
+    dot = shutil.which("dot")
+    if dot:
+        return Check("graphviz", "ok", f"dot at {dot}; Proforma draws each run's flowsheet diagram")
+    return Check("graphviz", "warn", "Graphviz's dot is not on the path, so Proforma lists each flowsheet's units in "
+                 "run order instead of drawing it. Install: brew install graphviz")
 
 
 def check_artifacts() -> Check:
@@ -412,7 +427,7 @@ def run(no_network: bool = False, port: int | None = None, workers: bool = True)
     # §10.R: one damaged file must not stop the report; a row that cannot be
     # checked says why and the rest still run.
     for name, row in (("index", check_index), ("models", check_models), ("artifacts", check_artifacts),
-                      ("spend", check_spend), ("workers", lambda: check_workers(workers))):
+                      ("spend", check_spend), ("workers", lambda: check_workers(workers)), ("graphviz", check_graphviz)):
         try:
             checks.append(row())
         except Exception as e:  # any failure is the row's answer, in words

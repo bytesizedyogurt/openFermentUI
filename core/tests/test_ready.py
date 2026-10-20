@@ -193,6 +193,36 @@ def test_a_blocked_huggingface_leaves_the_exit_code_alone(monkeypatch, capsys):
     assert "! huggingface" in out and out.rstrip().endswith("lane: full")
 
 
+# ── Graphviz (OF-BLD-019 D8) ───────────────────────────────────────────
+
+
+def test_graphviz_is_ok_with_dot_on_the_path_and_a_warning_without(monkeypatch):
+    import shutil
+
+    monkeypatch.setattr(shutil, "which", lambda name: "/opt/homebrew/bin/dot" if name == "dot" else None)
+    row = ready.check_graphviz()
+    assert row.name == "graphviz" and row.mark == "ok" and "/opt/homebrew/bin/dot" in row.detail
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    row = ready.check_graphviz()
+    assert row.mark == "warn" and "brew install graphviz" in row.detail and "run order" in row.detail
+
+
+def test_a_missing_graphviz_leaves_the_exit_code_and_the_lane_alone(monkeypatch, capsys):
+    import shutil
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_KEY)
+    monkeypatch.setattr(ready, "load_dotenv", lambda *a, **k: None)
+    for name in ("check_model", "check_roles", "check_europe_pmc", "check_backup", "check_huggingface"):
+        row = name.removeprefix("check_").replace("_", "")
+        monkeypatch.setattr(ready, name, lambda *a, row=row, **k: ready.Check(row, "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_service", lambda *a, **k: ready.Check("service", "ok", "stand-in"))
+    monkeypatch.setattr(ready, "check_corpus", lambda: ready.Check("corpus", "ok", "stand-in"))
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    assert ready.main([]) == 0
+    out = capsys.readouterr().out
+    assert "! graphviz" in out and out.rstrip().endswith("lane: full")
+
+
 # ── the lane (OF-BLD-014 A.4) ──────────────────────────────────────────
 
 
@@ -361,7 +391,7 @@ def test_the_new_rows_are_listed_and_change_no_lane(monkeypatch):
     monkeypatch.setenv("OPENFERMENT_FIXTURES", "1")
     checks = ready.run(no_network=True, port=1)
     names = [c.name for c in checks]
-    for n in ("index", "models", "artifacts", "spend", "workers"):
+    for n in ("index", "models", "artifacts", "spend", "workers", "graphviz"):
         assert n in names
     assert ready.lane(checks) == "none"
 

@@ -1,0 +1,126 @@
+{
+  "_fixture": "TEST FIXTURE: made by `python -m openferment_core.demo --prototype` with a test tool.",
+  "response": [
+    {
+      "id": "cornstover_benchmark",
+      "title": "Corn stover to ethanol, the NREL 2011 design",
+      "description": "The corn stover ethanol biorefinery the BioSTEAM authors built to the NREL design report (Humbird et al. 2011, NREL/TP-5100-47764): pretreatment, enzymatic hydrolysis, co-fermentation, distillation, wastewater treatment and a boiler, run whole on the package's own defaults. The benchmark: it shows this installation simulates and prices a published biorefinery as its authors do.",
+      "source": "biorefineries 2.35.1, cornstover",
+      "program": null,
+      "reference": true,
+      "inputs": [],
+      "outputs": [
+        "mespUsdPerGal",
+        "mespUsdPerKg",
+        "ethanolDensityKgPerGal",
+        "settings",
+        "references"
+      ],
+      "priceOutput": "mespUsdPerGal",
+      "priceBasis": "USD per gallon of ethanol, at the package's own ethanol density",
+      "leavesOut": [],
+      "gridInputs": []
+    },
+    {
+      "id": "pha_sugar_v0",
+      "title": "PHA from fermentable sugar, draft v0",
+      "description": "Fermentable sugar and ammonia into an aerated batch fermenter, a solids centrifuge and a drum dryer, giving dried, PHA-rich cell mass. Chemicals and finance are the corn stover reference biorefinery's; equipment and thermodynamics are BioSTEAM's own.",
+      "source": "this repository",
+      "program": "pha",
+      "reference": false,
+      "inputs": [
+        {
+          "key": "titre",
+          "name": "PHA titre at harvest",
+          "dimension": "massConc",
+          "unit": "g L-1",
+          "fields": [
+            "pha_titre"
+          ],
+          "kind": "process",
+          "note": "sets the water that dilutes the sugar to the harvest broth"
+        },
+        {
+          "key": "yield",
+          "name": "PHA yield on sugar",
+          "dimension": "yield",
+          "unit": "g g-1",
+          "fields": [
+            "pha_yield_substrate"
+          ],
+          "kind": "process",
+          "note": "sets the polymer reaction's share of the sugar; clipped to the geneOS ceiling when one is stored"
+        },
+        {
+          "key": "content",
+          "name": "PHA share of dry cell mass",
+          "dimension": "fraction",
+          "unit": "g g-1",
+          "fields": [
+            "pha_content_cdw"
+          ],
+          "kind": "process",
+          "note": "sets the cell-mass reaction's share; records in percent of dry mass become a share"
+        },
+        {
+          "key": "productivity",
+          "name": "PHA volumetric productivity",
+          "dimension": "volProd",
+          "unit": "g L-1 h-1",
+          "fields": [
+            "pha_productivity"
+          ],
+          "kind": "process",
+          "note": "the batch time is the titre divided by it"
+        },
+        {
+          "key": "recovery",
+          "name": "solids recovered at harvest",
+          "dimension": "fraction",
+          "unit": "",
+          "fields": [],
+          "kind": "process",
+          "note": "a named person's assumption: the centrifuge's split of polymer and cells"
+        },
+        {
+          "key": "sugarPrice",
+          "name": "price of fermentable sugar",
+          "dimension": "costUSD",
+          "unit": "USD kg-1",
+          "fields": [],
+          "kind": "economic",
+          "note": "a named person's assumption; the sugar alone is priced, not its dilution water"
+        },
+        {
+          "key": "sugarFeed",
+          "name": "sugar fed",
+          "dimension": "massFlow",
+          "unit": "kg h-1",
+          "fields": [],
+          "kind": "process",
+          "note": "a named person's assumption; it sets the plant's size"
+        }
+      ],
+      "outputs": [
+        "pricePerKgPha",
+        "phaKgPerH",
+        "costLines",
+        "readBack",
+        "conversions"
+      ],
+      "priceOutput": "pricePerKgPha",
+      "priceBasis": "USD per kg of PHA contained in dried cell mass",
+      "leavesOut": [
+        "feedstock pretreatment and hydrolysis",
+        "polymer extraction and purification",
+        "wastewater treatment",
+        "co-products"
+      ],
+      "gridInputs": [
+        "titre",
+        "yield",
+        "sugarPrice"
+      ]
+    }
+  ]
+}

@@ -282,6 +282,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ artifact: null, simulator: { status: 'cold', error: null } }));
     }
+    // OF-BLD-019 §2.1 — the shelf of flowsheets, with the program switch off
+    // and, asked with ?includeArchived=true, on.
+    if (url.startsWith('/api/proforma/shelf') && req.method === 'GET') {
+      const on = new URL(url, 'http://double').searchParams.get('includeArchived') === 'true';
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(await prototype(on ? 'proforma-shelf-archived.json' : 'proforma-shelf.json')));
+    }
     // OF-BLD-014 §8.4 — the BioSTEAM scenario, bound over stand-in records,
     // and a run made through the real code with a stand-in evaluator.
     if (url.startsWith('/api/proforma/scenarios') && req.method === 'GET') {
