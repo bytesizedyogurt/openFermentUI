@@ -46,7 +46,9 @@ def _benchmark() -> ToolResult:
             "provenance": ev.provenance,
             "package": o.get("package"),
             "simulator": o.get("biosteam"),
-            "settings": o.get("settings"),
+            # The package's financial settings stay in the artifact; named here
+            # in words, so a claim names them and cites the evidence.
+            "settings": "the package's own: rate of return, income tax, operating days, and the start and end years, as stored with the artifact",
             "references": o.get("references"),
             "meaning": "the price at which the modelled corn stover ethanol plant breaks even, from the package's own settings; "
                        "a cellulosic design, not a batch fermentation of glucose",

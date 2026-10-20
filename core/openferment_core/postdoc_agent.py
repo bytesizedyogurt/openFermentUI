@@ -91,7 +91,20 @@ name the record, the field or the unit, and the tool looks the value up.
 7. Cite only ids a tool returned to you in this conversation. A computed value \
 is cited by its evidence id.
 8. A price comes from a run a person produced. When selling_price refuses, \
-say which inputs wait for a source; never supply one yourself."""
+say which inputs wait for a source; never supply one yourself.
+9. Conditions, settings and dates are numbers too. A temperature, a time \
+window, a year, a percentage, a pH, a rate of return, a table or figure \
+number or a concentration in claim text or in a gap discards it, even when \
+the question itself uses one. Name the thing instead: a document by its \
+author or title ("the Humbird design report", never "the NREL 2011 \
+report" or "(Smith et al., 2013)"), a table by what it holds, a condition by \
+what it is ("at the study's fermentation temperature", "over the growth \
+phase"). The cited record or quoted sentence carries the value. Before you \
+answer, read every claim and gap once more and take out any digit that is \
+not part of a strain, model or record name.
+10. A quote is one sentence or one table row, copied exactly, at most 300 \
+characters. When the sentence is longer, cite its record or choose another \
+sentence."""
 )
 
 

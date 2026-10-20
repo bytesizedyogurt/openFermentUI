@@ -170,6 +170,17 @@ def _blank_prose_counts(text: str) -> str:
     return _DETERMINER.sub(determiner, _STEP_LABEL.sub(label, text))
 
 
+# The names of kinetic models and their constants that carry a number word
+# (thread Q, 2026-10-20): "the half-saturation constant" is Ks's name, and
+# "first-order kinetics" names a model, neither a quantity. The list is closed
+# and each entry is a whole hyphenated term, so "half the titre", "first of
+# the strains" and "a half-saturating dose" still trip the rule.
+_NAMED_TERMS = re.compile(
+    r"(?<![A-Za-z-])(?:half-saturation|half-velocity|zero-order|first-order|second-order)(?![A-Za-z-])",
+    re.IGNORECASE,
+)
+
+
 def find_number(text: str) -> str | None:
     """The first number-like thing in the text, or None.
 
@@ -182,6 +193,7 @@ def find_number(text: str) -> str | None:
     # Chemistry names first: an identifier span can start inside one
     # ("HB-co-3HV" in P(3HB-co-3HV)) and strand its leading locant.
     masked = _CHEMISTRY.sub(lambda m: " " * len(m.group(0)), text)
+    masked = _NAMED_TERMS.sub(lambda m: " " * len(m.group(0)), masked)
     masked = _IDENTIFIER.sub(lambda m: " " * len(m.group(0)), masked)
     masked = _blank_prose_counts(masked)
     if m := _DIGIT.search(masked):
