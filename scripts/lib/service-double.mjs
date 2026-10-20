@@ -283,9 +283,11 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       return res.end(JSON.stringify({ artifact: null, simulator: { status: 'cold', error: null } }));
     }
     // OF-BLD-019 §2.1 — the shelf of flowsheets, with the program switch off
-    // and, asked with ?includeArchived=true, on.
+    // and, asked with ?includeArchived=true, on. `url` has lost its query
+    // string, so the switch is read from the request's own URL (§3.1: the
+    // index asks with the switch on and was served the switch-off shelf).
     if (url.startsWith('/api/proforma/shelf') && req.method === 'GET') {
-      const on = new URL(url, 'http://double').searchParams.get('includeArchived') === 'true';
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(await prototype(on ? 'proforma-shelf-archived.json' : 'proforma-shelf.json')));
     }

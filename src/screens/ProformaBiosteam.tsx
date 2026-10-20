@@ -213,6 +213,7 @@ export default function ProformaBiosteam({ scenario: seed }: { scenario: Scenari
   const setAssumption = useStore((s) => s.setProformaAssumption);
   const clearAssumption = useStore((s) => s.clearProformaAssumption);
   const reviewer = useStore((s) => s.reviewer);
+  const recordScenarioRun = useStore((s) => s.recordScenarioRun);
   const [host, setHost] = useState<string | null>(null);
   const [info, setInfo] = useState<ProformaScenarioInfo | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -254,7 +255,11 @@ export default function ProformaBiosteam({ scenario: seed }: { scenario: Scenari
     setProblem(null);
     const used = assumptions.filter((a) => scenario.inputs.find((i) => i.key === a.key)?.binding === 'assumption');
     runProformaScenario(seed.id, used, host)
-      .then(setRun)
+      .then((r) => {
+        setRun(r);
+        // Proforma's index reads the price of the newest run from this artifact (OF-BLD-019 D6).
+        recordScenarioRun(seed.id, r.artifactId);
+      })
       .catch((e: unknown) => setProblem(e instanceof Error ? e.message : String(e)))
       .finally(() => setRunning(false));
   };

@@ -666,6 +666,21 @@ export interface Scenario {
    * opened under ArchivedBanner by a link. Never part of a lock digest.
    */
   example?: boolean;
+  /**
+   * The shelf flowsheet a `biosteam` scenario runs (OF-BLD-019 D2): an id
+   * from `GET /api/proforma/shelf`, and nothing else about its structure.
+   * Absent on an authored surface. A scenario a person makes with New
+   * scenario always names one (§3.1).
+   */
+  flowsheetId?: string;
+  /**
+   * The id of the newest `proforma.run` artifact this browser saw for the
+   * scenario (OF-BLD-019 D6), or absent/null when it has not run here. The
+   * price on Proforma's index is read from that artifact, never kept here.
+   */
+  lastRunId?: string | null;
+  /** When a person made the scenario here (ISO time); absent on a seeded one. */
+  createdAt?: string;
 }
 
 export interface GridPointResult {

@@ -24,7 +24,11 @@ import {
 import { AlertTriangle, Copy, Download, GitCompare, Pin, PinOff, Table2, SlidersHorizontal } from 'lucide-react';
 import { useStore } from '@/store';
 import { navigate } from '@/router';
-import type { CostLine } from '@/data/types';
+import type { CostLine, FlowsheetInfo, Scenario } from '@/data/types';
+import { PROGRAM_BY_ID } from '@/data/programs';
+import { durableAvailable } from '@/lib/durable';
+import { ProformaDown, proformaShelf } from '@/lib/proforma';
+import { inputSourceWords } from '@/components/NewScenarioDialog';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
 import { exportCSV } from '@/lib/csv';
@@ -605,13 +609,111 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
   );
 }
 
+/**
+ * A scenario a person made here with New scenario (OF-BLD-019 §3.1): it
+ * opens, names its flowsheet and the inputs a run needs, and says it has not
+ * run. The page that runs it is §3.2's; until then nothing here pretends to.
+ */
+function MadeHereScenario({ scenario }: { scenario: Scenario }) {
+  const togglePin = useStore((s) => s.togglePin);
+  const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    // Opened by id, so its flowsheet is looked up whatever the program switch says.
+    proformaShelf(true, ctrl.signal)
+      .then(setShelf)
+      .catch((e: unknown) => !ctrl.signal.aborted && setProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : String(e)));
+    return () => ctrl.abort();
+  }, []);
+
+  const flowsheet = shelf?.find((f) => f.id === flowsheetId) ?? null;
+  return (
+    <div data-testid="proforma-made-here">
+      <PageHeader
+        eyebrow={`${flowsheetId} · BioSTEAM scenario`}
+        title={scenario.name}
+        subtitle={flowsheet ? `${flowsheet.title}, from ${flowsheet.source}` : `Flowsheet ${flowsheetId}`}
+        actions={
+          <Button onClick={() => togglePin(scenario.id)} title="Pin to compare">
+            {scenario.pinned ? <Pin size={14} /> : <PinOff size={14} />}
+            {scenario.pinned ? 'Pinned' : 'Pin'}
+          </Button>
+        }
+      />
+      <Card className="p-4 mb-4" data-testid="scenario-not-run">
+        <h2 className="font-serif text-section-title font-semibold mb-1">This scenario has not run yet</h2>
+        <p className="text-body text-ink-soft">
+          Made in this browser{scenario.createdAt ? ` on ${scenario.createdAt.slice(0, 10)}` : ''}
+          {scenario.program ? `, in ${PROGRAM_BY_ID[scenario.program]?.name ?? scenario.program}` : ''}. It holds no
+          input value of its own: a run binds its process inputs to records and takes every other input from a named
+          person&rsquo;s assumption. Running a scenario made here is not built on this page yet; the inputs below are
+          what a run will need.
+        </p>
+      </Card>
+      {problem && <Callout kind="warn">{problem}</Callout>}
+      {shelf && !flowsheet && (
+        <Callout kind="warn">The service&rsquo;s shelf holds no flowsheet {flowsheetId}, so this scenario cannot run on it.</Callout>
+      )}
+      {flowsheet && (
+        <Card className="p-4">
+          <h2 className="font-serif text-section-title font-semibold mb-1">Inputs, and where each will come from</h2>
+          <p className="text-caption text-ink-soft mb-2">{flowsheet.description}</p>
+          <table className="w-full text-body" data-testid="made-here-inputs">
+            <thead>
+              <tr className="text-caption text-ink-soft text-left">
+                <th className="py-1 pr-2 font-medium">Input</th>
+                <th className="py-1 pr-2 font-medium">Unit</th>
+                <th className="py-1 font-medium">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flowsheet.inputs.map((i) => (
+                <tr key={i.key} className="border-t border-line/60 align-top">
+                  <td className="py-1.5 pr-2">{i.name}</td>
+                  <td className="py-1.5 pr-2 font-num text-caption">{i.unit || 'share'}</td>
+                  <td className="py-1.5 text-caption">
+                    {inputSourceWords(i)}
+                    {i.note && <div className="text-ink-soft">{i.note}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {flowsheet.priceBasis && <p className="text-caption text-ink-soft mt-2">The price will be {flowsheet.priceBasis}.</p>}
+          {flowsheet.leavesOut.length > 0 && (
+            <p className="text-caption text-ink-soft mt-1">What this flowsheet leaves out: {flowsheet.leavesOut.join('; ')}.</p>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 /** An authored surface, or a BioSTEAM scenario the service simulates (§8.4). */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
+  const madeHere = useStore((s) => s.createdScenarioIds.includes(scenarioId));
+  const durableReady = useStore((s) => s.durableReady);
+  // A scenario made here lives in this browser's Durable tier, which is read
+  // just after the page loads: a deep link waits for it rather than say the
+  // scenario does not exist.
+  if (!scenario && !durableReady && durableAvailable())
+    return <p className="text-body text-ink-soft">Reading the scenarios kept in this browser…</p>;
   return (
     <>
       {scenario && <ArchivedBanner kind="scenario" id={scenario.id} />}
-      {scenario?.kind === 'biosteam' ? <ProformaBiosteam scenario={scenario} /> : <AuthoredScenario scenarioId={scenarioId} />}
+      {scenario?.kind === 'biosteam' ? (
+        madeHere ? (
+          <MadeHereScenario scenario={scenario} />
+        ) : (
+          <ProformaBiosteam scenario={scenario} />
+        )
+      ) : (
+        <AuthoredScenario scenarioId={scenarioId} />
+      )}
     </>
   );
 }

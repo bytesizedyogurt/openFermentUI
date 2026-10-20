@@ -319,6 +319,12 @@ export interface OFState {
   learnProgress: Record<string, boolean>;
   /** Runbooks adopted from a Postdoc draft, by id (OF-BLD-014 §9.2). Durable. */
   adoptedRunbookIds: string[];
+  /**
+   * Proforma scenarios a person made here from a shelf flowsheet, by id
+   * (OF-BLD-019 §3.1, D6). Durable: they live in `scenarios` beside the
+   * seeded ones and are saved whole, keyed by id.
+   */
+  createdScenarioIds: string[];
   /** A research runbook, unlocked, from a draft; returns its id. */
   adoptRunbookDraft: (draft: RunbookDraft) => string;
   /** Proforma's typed assumptions, by scenario id (§8.4). Durable. */
@@ -341,6 +347,8 @@ export interface OFState {
     railCollapsed: boolean;
     tourStop: number | null;
     helpOpen: boolean;
+    /** Proforma's New scenario dialog (OF-BLD-019 §3.1); the palette opens it too. */
+    newScenarioOpen: boolean;
   };
 
   // ── actions ──────────────────────────────────────────────────────────
@@ -428,6 +436,14 @@ export interface OFState {
   setScenarioPoint: (id: string, point: Record<string, number>) => void;
   togglePin: (id: string) => void;
   duplicateScenario: (id: string) => string;
+  /**
+   * A `biosteam` scenario on a shelf flowsheet (OF-BLD-019 §3.1): its name,
+   * its program (null for a general one), no inputs of its own, not run.
+   * Durable, under a time-based id; returns the id.
+   */
+  createScenario: (flowsheetId: string, name: string, program: ProgramId | null) => string;
+  /** The newest run artifact of a scenario, as a run on its page returned it (D6). */
+  recordScenarioRun: (id: string, artifactId: string) => void;
 
   // Postdoc's Live conversations — the only conversations there are
   /** A new Live conversation, first in the list; returns its id. */
@@ -781,6 +797,7 @@ const seedState = () => ({
   learnProgress: {} as Record<string, boolean>,
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
   adoptedRunbookIds: [] as string[],
+  createdScenarioIds: [] as string[],
   checkpointAnswers: {} as Record<string, boolean>,
   exports: [] as { name: string; at: string; rows: number }[],
 });
@@ -820,6 +837,7 @@ export const useStore = create<OFState>()((set, get) => ({
     railCollapsed: false,
     tourStop: null,
     helpOpen: false,
+    newScenarioOpen: false,
   },
 
   setUI: (patch) => set((s) => ({ ui: { ...s.ui, ...patch } })),
@@ -2207,6 +2225,10 @@ export const useStore = create<OFState>()((set, get) => ({
     const s = get();
     const src = s.scenarios.find((x) => x.id === id);
     if (!src) return id;
+    // A copy of a scenario on a shelf flowsheet is a scenario a person made:
+    // Durable, time-based id, not run (OF-BLD-019 D6).
+    if (src.kind === 'biosteam' && src.flowsheetId)
+      return get().createScenario(src.flowsheetId, `${src.name} (copy)`, src.program ?? null);
     const copy: Scenario = {
       ...structuredClone(src),
       id: nextId('sc'),
@@ -2216,6 +2238,38 @@ export const useStore = create<OFState>()((set, get) => ({
     set({ scenarios: [...s.scenarios, copy] });
     return copy.id;
   },
+
+  // OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario and
+  // nothing else. Its id is time-based, because nextId restarts on a reload
+  // and this outlives one (as adopted runbooks and Live conversations do).
+  // It holds no input value: the service binds records, and a named person
+  // types an assumption on its page, kept in proformaAssumptions under its id.
+  createScenario: (flowsheetId, name, program) => {
+    const id = timeId('sc');
+    const made: Scenario = {
+      id,
+      modelId: flowsheetId,
+      flowsheetId,
+      kind: 'biosteam',
+      name: name.trim() || flowsheetId,
+      description: '',
+      product: '',
+      dims: [],
+      point: {},
+      assumptions: [],
+      pinned: false,
+      ...(program ? { program } : {}),
+      lastRunId: null,
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({ scenarios: [...s.scenarios, made], createdScenarioIds: [...s.createdScenarioIds, id] }));
+    return id;
+  },
+
+  recordScenarioRun: (id, artifactId) =>
+    set((s) => ({
+      scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, lastRunId: artifactId } : sc)),
+    })),
 
   // ── Postdoc ──────────────────────────────────────────────────────────
   // Live conversations take time-based ids, because nextId restarts on a
@@ -2421,7 +2475,18 @@ export const useStore = create<OFState>()((set, get) => ({
         const l = snap.runbookLocks[r.id];
         return l ? { ...r, lockedAt: l.lockedAt, lockHash: l.lockHash } : r;
       });
+      // OF-BLD-019 D6 — scenarios made here come back after the seeded ones,
+      // unless this page already holds one by the id (made since load wins);
+      // a seeded scenario takes back the newest run it had here.
+      const madeHere = Object.values(snap.createdScenarios ?? {}).filter((sc) => !s.scenarios.some((x) => x.id === sc.id));
+      const runs = snap.scenarioRuns ?? {};
+      const scenarios = [
+        ...s.scenarios.map((sc) => (runs[sc.id] && !sc.lastRunId ? { ...sc, lastRunId: runs[sc.id] } : sc)),
+        ...madeHere,
+      ];
       return {
+        scenarios,
+        createdScenarioIds: [...new Set([...s.createdScenarioIds, ...madeHere.map((sc) => sc.id)])],
         records,
         runbooks: freezeLocked(runbooks),
         depositions: snap.depositions,
@@ -3180,7 +3245,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished and conversations kept here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations and Proforma scenarios kept here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3333,6 +3398,16 @@ export function snapshotOf(s: OFState): DurableSnapshot {
       .filter((r) => s.adoptedRunbookIds.includes(r.id))
       .map((r) => ({ ...structuredClone({ ...r, predictions: [...r.predictions], measurementSchema: [...r.measurementSchema] }), lockedAt: null, lockHash: null })),
     liveConversations: s.liveConversations,
+    // OF-BLD-019 D6 — scenarios made here, whole and keyed by id; the newest
+    // run of each seeded scenario that ran here.
+    createdScenarios: Object.fromEntries(
+      s.scenarios.filter((sc) => s.createdScenarioIds.includes(sc.id)).map((sc) => [sc.id, structuredClone(sc)]),
+    ),
+    scenarioRuns: Object.fromEntries(
+      s.scenarios
+        .filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.lastRunId)
+        .map((sc) => [sc.id, sc.lastRunId as string]),
+    ),
   };
 }
 
@@ -3368,7 +3443,9 @@ if (durableAvailable()) {
       s.learnProgress === prev.learnProgress &&
       s.proformaAssumptions === prev.proformaAssumptions &&
       s.adoptedRunbookIds === prev.adoptedRunbookIds &&
-      s.liveConversations === prev.liveConversations
+      s.liveConversations === prev.liveConversations &&
+      s.scenarios === prev.scenarios &&
+      s.createdScenarioIds === prev.createdScenarioIds
     )
       return;
     saveDurable(snapshotOf(s));

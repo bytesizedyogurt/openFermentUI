@@ -28,7 +28,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -138,6 +138,19 @@ export interface DurableSnapshot {
    * same reason as `guild`.
    */
   liveConversations?: LiveConversation[];
+  /**
+   * Proforma scenarios a person made here from a shelf flowsheet
+   * (OF-BLD-019 D6), keyed by id: each with its flowsheet id, name, program,
+   * pin and the id of its newest run artifact. Their typed assumptions ride
+   * in `proformaAssumptions` under the same id. Optional for the same reason
+   * as `guild`.
+   */
+  createdScenarios?: Record<string, Scenario>;
+  /**
+   * The newest run artifact of each SEEDED scenario that ran here, by
+   * scenario id (a created scenario carries its own `lastRunId`).
+   */
+  scenarioRuns?: Record<string, string>;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

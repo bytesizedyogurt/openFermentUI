@@ -14,7 +14,7 @@
  */
 import { chromium } from 'playwright';
 import { request as httpRequest } from 'node:http';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LOOPBACK } from './lib/serve-dist.mjs';
 import { createServiceDouble } from './lib/service-double.mjs';
@@ -446,6 +446,139 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §3.1 — Proforma's index shows the shelf and the reference
+  //    runs, and New scenario makes a scenario that opens on its page.
+  //
+  // The double's shelf is the one demo.py --prototype generates from
+  // flowsheets/shelf.py, with the switch off and on. Off, every reference on
+  // it has a card that says it has not run and offers a run beside the
+  // simulator's status line, the Flowsheets row and the chooser offer every
+  // other flowsheet on it (and say why when there is none), and New scenario
+  // is never disabled. Each flowsheet offered with the switch off makes a
+  // scenario that lands on its page. On, pha_sugar_v0 is offered: New
+  // scenario from it makes a PHA scenario that lands on its page, which says
+  // it has not run; the index lists it as not run, and it survives a reload,
+  // as does a deep link to it. The palette opens the same chooser.
+  let proformaFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const ids = (sel) => page.locator(sel).evaluateAll((els) => els.map((e) => e.getAttribute('data-flowsheet')).join());
+    const make = async (flowsheetId, name) => {
+      await page.locator(`[data-testid="new-scenario-flowsheet"][data-flowsheet="${flowsheetId}"] input`).check();
+      await page.locator('[data-testid="new-scenario-name"]').fill(name);
+      await page.locator('[data-testid="new-scenario-create"]').click();
+      await page.locator('[data-testid="scenario-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const made = /#\/proforma\/scenario\/(sc-[^/?]+)$/.exec(page.url())?.[1] ?? null;
+      const said = await page.locator('main').innerText().catch(() => '');
+      if (!made) problems.push(`New scenario on ${flowsheetId} did not land on a scenario page (${page.url()})`);
+      else if (!/This scenario has not run yet/.test(said) || !said.includes(name)) problems.push(`the page of the scenario made on ${flowsheetId} does not say it has not run`);
+      return made;
+    };
+    try {
+      const off = fixture('proforma-shelf.json');
+      const on = fixture('proforma-shelf-archived.json');
+      const startsOff = off.filter((f) => !f.reference).map((f) => f.id);
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="reference-status"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      const refs = await ids('[data-testid="reference-card"]');
+      if (refs !== off.filter((f) => f.reference).map((f) => f.id).join()) problems.push(`the Reference runs row lists ${refs || 'nothing'}`);
+      for (const f of off.filter((x) => x.reference)) {
+        const card = page.locator(`[data-testid="reference-card"][data-flowsheet="${f.id}"]`);
+        const text = await card.innerText().catch(() => '');
+        if (!text.includes(f.title) || !/Not run on this service yet|Ran \d{4}-/.test(text)) problems.push(`the reference card for ${f.id} does not name it and its newest run`);
+        if (!(await card.locator('[data-testid="reference-run"]').isEnabled().catch(() => false))) problems.push(`the reference card for ${f.id} offers no run`);
+        if (!/The simulator (has not started|is starting|is warm|failed)/.test(await card.locator('[data-testid="reference-status"]').innerText().catch(() => '')))
+          problems.push(`the reference card for ${f.id} has no status line`);
+      }
+      const rows = await ids('[data-testid="flowsheet-card"]');
+      if (rows !== startsOff.join()) problems.push(`the Flowsheets row lists ${rows || 'nothing'}, not ${startsOff.join() || 'nothing'}`);
+      if (startsOff.length === 0 && !/Glucose to ethanol, the yeast program\u2019s own flowsheet, is still to be added/.test(await page.locator('[data-testid="flowsheets"]').innerText().catch(() => '')))
+        problems.push('the empty Flowsheets row does not say why it is empty');
+      if (await page.locator('[data-testid="new-scenario"]').isDisabled()) problems.push('New scenario is disabled');
+      if (await page.locator('main button[disabled]').count()) problems.push(`${await page.locator('main button[disabled]').count()} button(s) on the index are disabled`);
+      if (!/Casein and PHA/.test(await page.locator('[data-testid="scenarios"] [data-testid="hidden-by-archive"]').innerText().catch(() => '')))
+        problems.push('the Scenarios row does not say whose scenarios it hides');
+      await page.locator('[data-testid="new-scenario"]').click();
+      await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      const offeredOff = await ids('[data-testid="new-scenario-flowsheet"]');
+      if (offeredOff !== startsOff.join()) problems.push(`the chooser offers ${offeredOff || 'nothing'} with the switch off, not ${startsOff.join() || 'nothing'}`);
+      if (startsOff.length === 0) {
+        if (!(await page.locator('[data-testid="new-scenario-dialog"] [data-testid="no-flowsheet"]').count())) problems.push('the empty chooser does not say why');
+        await page.getByRole('button', { name: 'Cancel' }).click();
+      } else {
+        for (const [i, id] of startsOff.entries()) {
+          if (i > 0) {
+            await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+            await page.locator('[data-testid="new-scenario"]').click();
+            await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+          }
+          await make(id, `From the shelf: ${id}`);
+        }
+      }
+
+      // The switch on: PHA's draft is on the shelf, and New scenario from it works end to end.
+      if (!(await setShowArchived(page, true))) problems.push('the archive switch did not turn on');
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const pha = page.locator('[data-testid="flowsheet-card"][data-flowsheet="pha_sugar_v0"]');
+      await pha.waitFor({ timeout: 8000 }).catch(() => {});
+      const rowsOn = await ids('[data-testid="flowsheet-card"]');
+      if (rowsOn !== on.filter((f) => !f.reference).map((f) => f.id).join()) problems.push(`with the switch on the Flowsheets row lists ${rowsOn || 'nothing'}`);
+      if ((await pha.locator('[data-testid="flowsheet-inputs"] li').count()) !== on.find((f) => f.id === 'pha_sugar_v0').inputs.length)
+        problems.push('the PHA flowsheet card does not list its inputs');
+      await pha.getByRole('button', { name: 'New scenario from this' }).click();
+      await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      if (!(await page.locator('[data-testid="new-scenario-flowsheet"][data-flowsheet="pha_sugar_v0"] input').isChecked().catch(() => false)))
+        problems.push('New scenario from this does not open on its flowsheet');
+      if ((await page.locator('[data-testid="new-scenario-program"]').inputValue().catch(() => '')) !== 'pha') problems.push('a scenario on the PHA flowsheet does not start in PHA');
+      const made = await make('pha_sugar_v0', 'PHA from the shelf');
+      if ((await page.locator('[data-testid="made-here-inputs"] tbody tr').count()) !== 7) problems.push('the made scenario\u2019s page does not list the seven inputs a run needs');
+      if (made) {
+        await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+        const card = page.locator(`[data-testid="biosteam-card"][data-scenario="${made}"]`);
+        await card.waitFor({ timeout: 8000 }).catch(() => {});
+        // A hash navigation remounts the index without a network-idle wait:
+        // the counts line draws once the shelf answers, so wait for it.
+        await card.locator('[data-testid="scenario-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+        const said = await card.innerText().catch(() => '');
+        if (!/Not run yet/.test(said) || !/7 inputs: 4 bind to records when it runs, 3 waiting for an assumption/.test(said))
+          problems.push(`the index does not list the made scenario as not run with its inputs: ${JSON.stringify(said.slice(0, 200))}`);
+        await page.waitForTimeout(700);
+        await page.reload({ waitUntil: 'networkidle' });
+        await card.waitFor({ timeout: 8000 }).catch(() => {});
+        if (!(await card.count())) problems.push('the made scenario did not survive a reload');
+        await page.goto(`http://localhost:${PORT}/#/settings`, { waitUntil: 'networkidle' });
+        await page.goto(`http://localhost:${PORT}/#/proforma/scenario/${made}`, { waitUntil: 'networkidle' });
+        await page.reload({ waitUntil: 'networkidle' });
+        await page.locator('[data-testid="scenario-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+        if (!(await page.locator('[data-testid="scenario-not-run"]').count())) problems.push('a deep link to the made scenario, after a reload, does not open it');
+      }
+      // The palette's New Proforma scenario opens the chooser on the index.
+      await page.goto(`http://localhost:${PORT}/#/biorepo`, { waitUntil: 'networkidle' });
+      await page.keyboard.press('Control+k');
+      await page.locator('input[aria-label="Command palette"]').fill('New Proforma scenario');
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Enter');
+      await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/#\/proforma$/.test(page.url()) || !(await page.locator('[data-testid="new-scenario-dialog"]').count()))
+        problems.push('the palette\u2019s New Proforma scenario does not open the chooser on Proforma');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      proformaFails++;
+      console.log(`✗ proforma     ${problems.join('; ')}`);
+    } else {
+      console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; the palette opens the same chooser');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
   //    quotes are listed rather than dropped.
   //
@@ -634,14 +767,18 @@ async function main() {
       if (doubleState.fermosCalls.some((c) => c.path === '/api/fermos/fit')) problems.push('fermOS asked for a fit with no run deposited');
       await page.goto(`http://localhost:${PORT}/#/fermos/forecast`, { waitUntil: 'networkidle' });
       if (!/No fit to forecast from yet/.test(await page.locator('body').innerText())) problems.push('fermOS → Forecast does not say there is no fit yet');
-      // OF-BLD-014 §8.2 — the Benchmark card, on a service whose simulator
-      // has yet to run: it says so, names the expected price and offers a run.
+      // OF-BLD-014 §8.2, OF-BLD-019 §3.1 — the benchmark's reference card, on
+      // a service whose simulator has yet to run: it says so, names the
+      // expected price and the package, and offers a run with the
+      // simulator's status line.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
-      await page.locator('[data-testid="benchmark-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
-      const bench = await page.locator('[data-testid="benchmark-card"]').innerText().catch(() => '');
+      const benchCard = page.locator('[data-testid="reference-card"][data-flowsheet="cornstover_benchmark"]');
+      await benchCard.locator('[data-testid="reference-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const bench = await benchCard.innerText().catch(() => '');
       if (!/Not run on this service yet/.test(bench) || !/biorefineries\.cornstover@2\.35\.1/.test(bench))
-        problems.push('the Benchmark card does not show its empty state with the package it will run');
-      if (!(await page.getByRole('button', { name: 'Run the benchmark' }).count())) problems.push('the Benchmark card offers no run');
+        problems.push('the benchmark\u2019s reference card does not show its empty state with the package it will run');
+      if (!(await benchCard.getByRole('button', { name: 'Run' }).count())) problems.push('the benchmark\u2019s reference card offers no run');
+      if (!/The simulator has not started on this service yet/.test(bench)) problems.push('the benchmark\u2019s reference card has no status line');
       // OF-BLD-016 §3.1 — Postdoc speaks only through the service. With
       // nothing answering (health and the ask both refused), the page says
       // so and how to start it, keeps the conversation asked above, and
@@ -1031,13 +1168,14 @@ async function main() {
   console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
   console.log(`${1 - programFails}/1 programs — archived hidden by default, a deep link under its banner, the switch brings them back`);
+  console.log(`${1 - proformaFails}/1 Proforma index — the shelf, the reference runs, New scenario makes one that opens and survives a reload`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || overlayFails || confineFails || guildFails || emptyFails || trainFails) process.exit(1);
 }
 
 main();

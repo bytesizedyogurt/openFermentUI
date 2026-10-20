@@ -563,5 +563,66 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check("fermOS filters its runs through shows('deposition')", /shows\('deposition', d\.id\)/.test(ferm));
 }
 
+// OF-BLD-019 §3.1 (D5, D6) — New scenario makes a `biosteam` scenario on a
+// shelf flowsheet, and it is Durable: it survives a reload keyed by id, with
+// its flowsheet, name, program, pin, the assumptions typed for it and the id
+// of its newest run; a seeded scenario's newest run survives beside it; a
+// copy is made the same way; clearing this browser's data drops it. The
+// index's button opens the chooser: it never copies the first scenario in a
+// list, and it is never disabled because the list is empty (B.1).
+{
+  const st = () => useStore.getState();
+  st().setShowArchived(false);
+  const id = st().createScenario('ethanol_glucose_v0', 'Glucose to ethanol, a first look', 'yeast');
+  const other = st().createScenario('ethanol_glucose_v0', 'A second one', 'yeast');
+  const made = st().scenarios.find((x) => x.id === id);
+  check('New scenario makes a biosteam scenario on its flowsheet, in its program, holding no input value and not run',
+    !!made && made.kind === 'biosteam' && made.flowsheetId === 'ethanol_glucose_v0' && made.program === 'yeast' &&
+      made.lastRunId === null && made.dims.length === 0 && Object.keys(made.point).length === 0 && made.assumptions.length === 0);
+  check('its id is time-based and its own', /^sc-[0-9a-z]+-\d+$/.test(id) && id !== other, [id, other]);
+  check('a scenario made in the active program shows with the switch off', programVisible('scenario', id, st()));
+  st().togglePin(id);
+  const typed = { key: 'glucose_price', value: 0.3, low: 0.2, high: 0.4, by: 'Sean Creighton', at: '2026-10-20', note: null };
+  st().setProformaAssumption(id, typed);
+  st().recordScenarioRun(id, 'a1b2c3d4e5f60718');
+  st().recordScenarioRun('sc-pha-1', '0f1e2d3c4b5a6978');
+  const snap = snapshotOf(st());
+  const kept = snap.createdScenarios?.[id];
+  check('the snapshot keeps a scenario made here by id, with its flowsheet, name, program, pin and newest run',
+    !!kept && kept.flowsheetId === 'ethanol_glucose_v0' && kept.name === 'Glucose to ethanol, a first look' &&
+      kept.program === 'yeast' && kept.pinned === true && kept.lastRunId === 'a1b2c3d4e5f60718');
+  check("a seeded scenario's newest run rides beside them, and the seed is not saved whole",
+    snap.scenarioRuns?.['sc-pha-1'] === '0f1e2d3c4b5a6978' && !snap.createdScenarios?.['sc-pha-1'] && !snap.createdScenarios?.['sc-s1'],
+    snap.scenarioRuns);
+  // A reload: a store that has lost both, and the assumptions typed for it.
+  useStore.setState((s) => ({
+    scenarios: s.scenarios.filter((x) => x.id !== id && x.id !== other).map((x) => (x.id === 'sc-pha-1' ? { ...x, lastRunId: null } : x)),
+    createdScenarioIds: [],
+    proformaAssumptions: {},
+  }));
+  st().applyDurable(snap);
+  const back = st().scenarios.find((x) => x.id === id);
+  check('after a reload the scenario made here is back, whole, and counted as made here',
+    !!back && back.flowsheetId === 'ethanol_glucose_v0' && back.pinned && back.lastRunId === 'a1b2c3d4e5f60718' &&
+      st().createdScenarioIds.includes(id) && st().createdScenarioIds.includes(other));
+  check('the assumption typed for it is back under its id', st().proformaAssumptions[id]?.[0]?.value === 0.3);
+  check('the seeded scenario has its newest run back', st().scenarios.find((x) => x.id === 'sc-pha-1')?.lastRunId === '0f1e2d3c4b5a6978');
+  st().applyDurable(snap);
+  check('a second hydrate does not make it twice', st().scenarios.filter((x) => x.id === id).length === 1 && st().createdScenarioIds.filter((x) => x === id).length === 1);
+  const copy = st().duplicateScenario(id);
+  const copied = st().scenarios.find((x) => x.id === copy);
+  check('a copy of it is made the same way: its own time-based id, Durable, the same flowsheet, not run',
+    copy !== id && st().createdScenarioIds.includes(copy) && copied?.flowsheetId === 'ethanol_glucose_v0' && copied?.lastRunId === null && copied?.program === 'yeast');
+  const pha = st().createScenario('pha_sugar_v0', 'PHA, made with the switch on', 'pha');
+  check('a scenario made in an archived program hides with the switch off and its link still names the program',
+    !programVisible('scenario', pha, st()) && programOf('scenario', pha, st()) === 'pha');
+  st().clearBrowserData();
+  check('Clearing this browser\u2019s data drops the scenarios made here, and their newest runs',
+    !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId));
+  const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
+  check('Proforma\u2019s New scenario opens the chooser: it copies no scenario and is not disabled for an empty list',
+    !/duplicateScenario/.test(index) && !/disabled=\{scenarios\.length === 0\}/.test(index) && /NewScenarioDialog/.test(index));
+}
+
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);
 process.exit(fails === 0 ? 0 : 1);
