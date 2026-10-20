@@ -35,11 +35,10 @@ const D9_RANGE_NOTE =
 
 /**
  * The same, for the kinetics family the yeast-ethanol program (thread Q)
- * adds, written in D9's form. One constant, so that recording Sean's answer
- * is a one-line edit.
+ * adds, written in D9's form.
  */
 const Y1_RANGE_NOTE =
-  'Validation range proposed on 2026-10-20 for the yeast-ethanol program (thread Q), awaiting acceptance by Sean Creighton. It rejects implausible extractions and states nothing about what has been achieved.';
+  'Validation range proposed on 2026-10-20 for the yeast-ethanol program (thread Q) and accepted by Sean Creighton on 2026-10-20. It rejects implausible extractions and states nothing about what has been achieved.';
 
 export const ONTOLOGY: ParameterDef[] = [
   // ── Family 1 — expression performance ───────────────────────────────
@@ -393,7 +392,7 @@ export const ONTOLOGY: ParameterDef[] = [
   // it fits them to, and the selling price a techno-economic analysis
   // computes. The extraction model reads each definition, so each names the
   // fields it must not be mistaken for and carries no number. Every range is
-  // a guard proposed for Sean Creighton's acceptance, not a value anybody
+  // a guard Sean Creighton accepted on 2026-10-20, not a value anybody
   // measured.
   {
     id: 'monod_ks',

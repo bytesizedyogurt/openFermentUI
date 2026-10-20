@@ -91,10 +91,13 @@ def test_the_rule_is_the_one_sean_set():
     assert not threadp.eligible(dict(hit, license="other"), THREAD_Q)
 
 
-def test_the_include_file_names_the_four_sources_sean_named():
-    assert threadp.read_includes(rule=THREAD_Q) == [
-        "osti:1013269", "osti:1129271", "sgd:S000203483", "sgd:S000203459",
-    ]
+def test_the_include_file_names_the_four_sources_sean_named_then_the_papers_he_approved():
+    ids = threadp.read_includes(rule=THREAD_Q)
+    assert ids[:4] == ["osti:1013269", "osti:1129271", "sgd:S000203483", "sgd:S000203459"]
+    # The papers Sean Creighton approved on 2026-10-20: PMCIDs, each once.
+    papers = ids[4:]
+    assert len(papers) == 18 and len(set(papers)) == 18
+    assert all(p.startswith("PMC") and p[3:].isdigit() for p in papers)
 
 
 def test_the_committed_seed_file_reads_as_apply_wrote_it():

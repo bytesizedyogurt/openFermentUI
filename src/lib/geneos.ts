@@ -4,7 +4,7 @@
 // service computes and keeps each as an artifact; with it down this says so,
 // and nothing stands in for a result (E.2). Shares lib/rag.ts's call, so the
 // two failures are the same two: down, or refused in words.
-import type { ExtractionRecord, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
+import type { ExtractionRecord, FieldId, GeneosModelInfo, GeneosResult, ParameterDef } from '@/data/types';
 import { ONTOLOGY_BY_ID } from '@/data/ontology';
 import { carbonSourceId } from '@/data/vocabulary';
 import { RagDown, RagRefused, call } from './rag';
@@ -31,10 +31,10 @@ export const SUBSTRATES = ['glucose', 'xylose', 'fructose'] as const;
 /**
  * Each product a ceiling is computed for, and the ontology field its reported
  * yields are recorded under: a PHB ceiling is held against PHA yields, an
- * ethanol ceiling against ethanol yields. Keyed loosely, so a field the
- * ontology does not have yet is a lookup that finds nothing.
+ * ethanol ceiling against ethanol yields. A product with no entry has no
+ * reported yields to draw.
  */
-export const YIELD_FIELD: Record<string, string> = {
+export const YIELD_FIELD: Record<string, FieldId> = {
   phb: 'pha_yield_substrate',
   ethanol: 'ethanol_yield_substrate',
 };

@@ -7,11 +7,34 @@
 # One with no open-access text is still catalogued, with openAccess: false.
 # Everything after a # is a comment. Sean edits this file; nothing else does.
 #
-# The four entries below are the sources Sean Creighton named in his
-# instruction of 2026-10-20. Papers from the search are approved in the
-# proposal file, not here.
+# The four sources first are the ones Sean Creighton named in his
+# instruction of 2026-10-20. The eighteen papers after them were listed for
+# him by a curation pass over Europe PMC's open-access, CC-licensed papers
+# that state S. cerevisiae kinetic parameters or wild-type batch physiology,
+# and Sean Creighton approved all eighteen, as listed, on 2026-10-20. Papers
+# the search rule finds are approved in the proposal file, not here.
 
 osti:1013269    # Humbird et al. 2011, NREL/TP-5100-47764
 osti:1129271    # Tao et al. 2014, NREL/TP-5100-61563
 sgd:S000203483  # S288C
 sgd:S000203459  # CEN.PK
+
+# Approved by Sean Creighton on 2026-10-20, as listed.
+PMC4842200     # Ji 2016 · baker's yeast AFY batch: μmax, Ks, Luedeking–Piret α/β, yields
+PMC7906595     # Zentou 2021 · glucose batch model: μmax, Ks, Yx/s, Yp/s
+PMC3639890     # Pagliardini 2013 · CEN.PK113-7D: μmax, yields, ethanol at which growth stops
+PMC5574463     # Papapetridis 2016 · IMX585 anaerobic batch: μ, yields
+PMC2887396     # Pagliardini 2010 · CEN.PK113-7D: μmax, yields, ethanol at which growth stops
+PMC5784725     # Papapetridis 2018 · reference strains, anaerobic batch
+PMC9600970     # Postma 2022 · CEN.PK113-7D aerobic batch
+PMC6723480     # Zentou 2019 · Monod and Andrews: μmax, Ks, Ki
+PMC6453773     # Moodley 2019 · BY4743 Monod (CC BY-NC-ND)
+PMC13382827    # Almeida 2026 · Andrews–Levenspiel: Pmax, substrate inhibition
+PMC10176687    # van Aalst 2023 · IME324 anaerobic batch
+PMC7440791     # Wiersma 2020 · IMX585 anaerobic
+PMC5349206     # Bisschops 2015 · CEN.PK113-7D μmax
+PMC12671053    # Sheikhi 2025 · CEN.PK113-7D ethanol tolerance
+PMC6053494     # Ganucci 2018 · ethanol's effect on μ
+PMC13038894    # Canseco Grellet 2026 · stress-tolerant strains
+PMC11278885    # Ginovart 2024 · high-glucose growth kinetics
+PMC9578259     # van Aalst 2022 · glucose and sorbitol
