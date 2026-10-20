@@ -414,19 +414,25 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     art = prototype_artifact()
     overlay = json.loads((FIXTURES / "overlay-smoke.json").read_text(encoding="utf-8"))
     draft_stream, draft_artifacts = prototype_draft_stream(overlay)
+    # OF-BLD-019 §3.3: the yeast scenario's run is kept beside the others, so
+    # the double reads it back by id as the service would (the scenario page
+    # after a reload, Compare); it follows the PHA run, which tests take first.
+    proforma_fixtures = prototype_proforma()
+    run_artifacts = proforma_fixtures.pop(PROFORMA_RUN_ARTIFACTS)
     replay = artifacts.ReplayResult(
         artifactId=art.id, identical=True, storedHash=art.outputHash, replayedHash=art.outputHash, durationMs=0
     )
     out.mkdir(parents=True, exist_ok=True)
     written = []
     for name, value in (
-        ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts)]),
+        ("artifacts.json", [art.model_dump(mode="json"), *(a.model_dump(mode="json") for a in draft_artifacts),
+                            *run_artifacts]),
         ("ask-draft-stream.jsonl", draft_stream),
         ("artifact-replay.json", replay.model_dump(mode="json")),
         *prototype_rag().items(),
         *prototype_geneos().items(),
         *prototype_fermos().items(),
-        *prototype_proforma().items(),
+        *proforma_fixtures.items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
         *prototype_proposals().items(),
@@ -1098,10 +1104,16 @@ def _standin_ethanol_tables(v: dict[str, float], out: dict[str, Any]) -> dict[st
     }
 
 
+# The key under which prototype_proforma hands rebuild_prototype the run
+# artifacts artifacts.json carries beside the others: not a file of its own.
+PROFORMA_RUN_ARTIFACTS = "(run artifacts for artifacts.json)"
+
+
 def prototype_proforma() -> dict[str, Any]:
     import tempfile
     from types import SimpleNamespace
 
+    from . import artifacts as _artifacts
     from . import intake as _intake
     from . import proforma
     from .flowsheets import shelf as _shelf
@@ -1121,6 +1133,7 @@ def prototype_proforma() -> dict[str, Any]:
             proforma.yield_cap = lambda: None
             run = proforma.run(ProformaRunRequest(scenarioId=proforma.SCENARIO_ID, assumptions=a), pool=pool)
             yeast = proforma.run(ProformaRunRequest(scenarioId=proforma.YEAST_SCENARIO_ID, assumptions=ay), pool=pool)
+            yeast_art = _artifacts.get(yeast.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
             # OF-BLD-019 §2.3 (b, c): the seed's scenarios bound with the
             # switch off and on, and every flowsheet a scenario made here
             # can name, bound (or refused, in the service's words) each way.
@@ -1163,7 +1176,8 @@ def prototype_proforma() -> dict[str, Any]:
     return {"proforma-scenarios.json": scenarios[False], "proforma-scenarios-archived.json": scenarios[True],
             "proforma-bind.json": bind, "proforma-run.json": run.model_dump(mode="json"),
             "proforma-run-yeast.json": yeast.model_dump(mode="json"),
-            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references}
+            "proforma-shelf.json": shelf(False), "proforma-shelf-archived.json": shelf(True), **references,
+            PROFORMA_RUN_ARTIFACTS: [yeast_art.model_dump(mode="json")]}
 
 
 # OF-BLD-019 §4.1: pureOS's trains for the double, read by the real code

@@ -11,8 +11,9 @@
 // (CostWaterfall, Tornado, Distribution), never by recharts.
 //
 // The scenario page (ProformaScenario.tsx) composes these sections under its
-// inputs and its Run; a reference biorefinery's page can read the same
-// sections over its own artifact.
+// inputs and its Run; a reference biorefinery's page (ProformaReference.tsx,
+// OF-BLD-019 §3.3) reads the same sections over its own `proforma.reference`
+// artifact through `runViewOfReference`, one case and no samples.
 import { useMemo, useState, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import type { FlowsheetInfo, ScenarioInput } from '@/data/types';
@@ -175,14 +176,25 @@ export function RunResult({ view, priceBasis, scenarioId }: { view: RunView; pri
 
 // ── Cost breakdown ──────────────────────────────────────────────────────
 
-export function CostBreakdown({ view, priceBasis, csvName }: { view: RunView; priceBasis: string; csvName: string }) {
+export function CostBreakdown({
+  view,
+  priceBasis,
+  csvName,
+  totalLabel = 'Base-case price',
+}: {
+  view: RunView;
+  priceBasis: string;
+  csvName: string;
+  /** What the closing bar is: the base case's price, or a reference run's TEA product price. */
+  totalLabel?: string;
+}) {
   const tea = view.tables.tea;
   return (
     <div data-testid="cost-breakdown">
       <CostWaterfall
         title="What is the price made of?"
         lines={tea?.lines ?? []}
-        total={view.basePrice != null ? { label: 'Base-case price', value: view.basePrice } : null}
+        total={view.basePrice != null ? { label: totalLabel, value: view.basePrice } : null}
         unit={tea?.basis ? `USD per ${tea.basis}` : priceBasis}
         annualUnit={u(view, 'annual', 'USD/yr')}
         provenance={view.provenance}

@@ -12,12 +12,14 @@ import type {
   HistogramBin,
   InputAssumption,
   InputSensitivity,
+  PackageRegression,
   ProformaGrid,
   ProformaRunRequest,
   ProformaRunResult,
   ProformaScenarioInfo,
   ProformaTables,
   Provenance,
+  RegressionCheck,
   ResultGrid,
   Scenario,
   ScenarioInput,
@@ -57,13 +59,24 @@ export const proformaShelf = (includeArchived: boolean, signal?: AbortSignal) =>
 
 // ── Reference runs (OF-BLD-019 §2.2, D3) ────────────────────────────────
 
-/** A reference biorefinery's newest stored run, or none, and the worker's status. */
+/**
+ * A reference biorefinery's newest stored run, or none, and the worker's
+ * status: `ProformaReference` as GET and POST /api/proforma/reference/{id}
+ * answer it, with the shelf's entry and the package test's values, which a
+ * service that predates that endpoint does not send.
+ */
 export interface ReferenceResponse {
+  flowsheet?: FlowsheetInfo | null;
   artifact: Artifact | null;
+  /** The package's own regression test, as the service read it from the installed file. */
+  regression?: PackageRegression | null;
   simulator: SimulatorStatus;
   /** What the service said when it answered that it holds no run, in its words. */
   note?: string | null;
 }
+
+/** Where a reference biorefinery's page lives (OF-BLD-019 §3.3; 'reference' is reserved under /proforma). */
+export const referencePath = (id: string) => `/proforma/reference/${encodeURIComponent(id)}`;
 
 /**
  * Whether the service has no such endpoint, rather than no such run: FastAPI's
@@ -75,35 +88,38 @@ const noEndpoint = (e: unknown) =>
   (e instanceof RagDown && /answered 40[45]\./.test(e.message));
 
 /**
- * The newest stored run of a reference flowsheet. The corn stover benchmark
- * reads at `/api/proforma/benchmark`, which every service answers in this
- * shape (OF-BLD-014 §8.2; OF-BLD-019 §2.2 keeps it as it was), so no browser
- * asks a service for an endpoint it may not have; every other reference reads
- * at `GET /api/proforma/reference/{id}`. A service that predates that
- * endpoint says so in the card's note, and a 404 in words is a reference not
- * run yet.
+ * The newest stored run of a reference flowsheet, its shelf entry and its
+ * package test's values, at `GET /api/proforma/reference/{id}` (OF-BLD-019
+ * §2.2), the corn stover benchmark included (§3.3): one artifact per
+ * reference run, `proforma.reference`, with its tables and its checks. A
+ * service that predates that endpoint says so in the note; for the benchmark
+ * it still answers at `/api/proforma/benchmark` (OF-BLD-014 §8.2), which
+ * keeps its price and no table. A 404 in words is the service saying the id
+ * is not a reference it holds.
  */
 export async function proformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  if (id === BENCHMARK_FLOWSHEET) return proformaBenchmark(signal);
   try {
     return await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { signal });
   } catch (e) {
     if (noEndpoint(e)) {
+      if (id === BENCHMARK_FLOWSHEET) {
+        const old = await proformaBenchmark(signal);
+        return { ...old, note: 'This service keeps the benchmark at its old address, with its price and no table: the reference endpoint is newer than it.' };
+      }
       return { artifact: null, simulator: await proformaStatus(signal), note: `This service has no reference endpoint, so it cannot run ${id} yet.` };
     }
-    // A 404 in words is the service saying it holds no run of this reference.
     if (e instanceof RagRefused && e.status === 404) return { artifact: null, simulator: await proformaStatus(signal), note: e.message };
     throw e;
   }
 }
 
-/** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`, the benchmark as above. */
+/** Run a reference flowsheet whole, on its package's defaults: `POST /api/proforma/reference/{id}`. */
 export async function runProformaReference(id: string, signal?: AbortSignal): Promise<ReferenceResponse> {
-  if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
   try {
     return await call<ReferenceResponse>(`/api/proforma/reference/${encodeURIComponent(id)}`, { method: 'POST', signal });
   } catch (e) {
     if (!noEndpoint(e)) throw e;
+    if (id === BENCHMARK_FLOWSHEET) return runProformaBenchmark(signal);
     throw new RagRefused(404, `This service cannot run ${id} yet: it has no reference endpoint.`);
   }
 }
@@ -133,10 +149,10 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 export function referencePrice(info: FlowsheetInfo | null, art: Artifact): PriceRead | null {
   const o = art.output as Record<string, unknown>;
   const named = info?.priceOutput ? num(o[info.priceOutput]) : null;
-  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'the price the package solves' };
+  if (named != null) return { value: named, basis: info?.priceBasis ?? info?.priceOutput ?? '', low: null, high: null, reads: 'the price the package\u2019s own run gives' };
   const tea = o.tea as { productPrice?: unknown } | null | undefined;
   const solved = num(tea?.productPrice) ?? num(o.basePrice);
-  return solved == null ? null : { value: solved, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the package solves' };
+  return solved == null ? null : { value: solved, basis: info?.priceBasis ?? 'USD per kg of product', low: null, high: null, reads: 'the price the package\u2019s own run gives' };
 }
 
 /**
@@ -405,6 +421,95 @@ export function runViewOfResult(r: ProformaRunResult): RunView {
     durationMs: null,
     provenance: r.provenance,
     basis: r.evidence.basis,
+  });
+}
+
+/** The tool every reference biorefinery's run is kept under (proforma.REFERENCE). */
+export const REFERENCE_TOOL = 'proforma.reference';
+
+/**
+ * A reference run in the shape a scenario run reads (OF-BLD-019 §3.3): the
+ * same tables under the same keys, and one case, so no samples, no
+ * sensitivity and no grid. Its base case is the run itself, and its price on
+ * the TEA's own basis is the product price the worker read from the TEA,
+ * which the cost breakdown closes on; nothing is computed here.
+ */
+export function runViewOfReference(art: Artifact): RunView | null {
+  if (art.tool !== REFERENCE_TOOL) return null;
+  const view = viewOf(art.output, {
+    artifactId: art.id,
+    createdAt: art.createdAt,
+    durationMs: art.durationMs,
+    provenance: art.provenance,
+    basis: { tool: art.tool, toolVersion: art.toolVersion, inputs: art.inputs, artifactId: art.id, at: art.createdAt, seed: art.seed },
+  });
+  return { ...view, basePrice: num(view.tables.tea?.productPrice) };
+}
+
+/** One of a reference run's checks against its package's own test, as the service wrote it (`output.checks`). */
+export const referenceChecks = (art: Artifact | null): RegressionCheck[] => arr<RegressionCheck>(art?.output?.checks);
+
+/** A basis input a reference run names, by name ('compatibility', 'simulator'), or null. */
+export const basisInput = (art: Artifact | null, name: string): BasisInput | null => art?.inputs.find((i) => i.name === name) ?? null;
+
+// ── The inputs a run was bound with, read from its basis (Compare) ──────
+
+/** One input of a run as its basis states it: the source, and its range when it has one. */
+export interface RunInput {
+  key: string;
+  label: string;
+  /** 'record', 'assumption', 'artifact', 'model', 'convention', or 'absent' when the basis names it nowhere. */
+  kind: string;
+  unit: string;
+  /** Records: how many, and the lowest and highest value the basis lists, in its unit. */
+  count: number;
+  low: number | null;
+  high: number | null;
+  /** An assumption's or an artifact's value; a record-bound input has none of its own here. */
+  value: number | string | null;
+  /** Who typed an assumption, or the artifact's id, or a source's note. */
+  by: string | null;
+  note: string | null;
+}
+
+/**
+ * Each input the run's flowsheet takes, as the run's basis names it (D1):
+ * `<key> record` once per record, `<key>`, `<key> low` and `<key> high` for an
+ * assumption, `<key>` alone for an artifact, a model or a convention. The
+ * range of a record-bound input is the lowest and highest record value the
+ * basis lists; every other number is the basis's own.
+ */
+export function runInputs(view: RunView, flowsheet: FlowsheetInfo | null, labels: Record<string, string> = {}): RunInput[] {
+  const keys = (flowsheet?.inputs ?? []).map((i) => i.key);
+  // A run whose flowsheet the shelf no longer holds still names its inputs.
+  for (const i of view.basis.inputs) {
+    const m = /^(.+?) (record|low|high)$/.exec(i.name);
+    const key = m ? m[1] : null;
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+  return keys.map((key) => {
+    const declared = flowsheet?.inputs.find((i) => i.key === key);
+    const label = labels[key] ?? declared?.name ?? key;
+    const records = view.basis.inputs.filter((i) => i.name === `${key} record` && i.source.kind === 'record');
+    const own = view.basis.inputs.find((i) => i.name === key);
+    const unit = records[0]?.unit ?? own?.unit ?? declared?.unit ?? '';
+    if (records.length) {
+      const vals = records.map((r) => num(r.value)).filter((v): v is number => v != null);
+      const scale = view.basis.inputs.find((i) => i.name === `${key} scale`);
+      return {
+        key, label, kind: 'record', unit, count: records.length,
+        low: vals.length ? Math.min(...vals) : null, high: vals.length ? Math.max(...vals) : null,
+        value: null, by: null, note: scale ? `scaled by the basis's convention ${String(scale.value)}${scale.source.note ? `, ${scale.source.note}` : ''}` : null,
+      };
+    }
+    if (!own) return { key, label, kind: 'absent', unit, count: 0, low: null, high: null, value: null, by: null, note: declared?.kind === 'convention' ? 'a convention the run states elsewhere in its basis' : null };
+    const part = (p: string) => num(view.basis.inputs.find((i) => i.name === `${key} ${p}`)?.value);
+    const value = typeof own.value === 'number' || typeof own.value === 'string' ? own.value : null;
+    return {
+      key, label, kind: own.source.kind, unit, count: 0,
+      low: own.source.kind === 'assumption' ? part('low') : null, high: own.source.kind === 'assumption' ? part('high') : null,
+      value, by: own.source.by ?? own.source.id ?? null, note: own.source.note ?? null,
+    };
   });
 }
 

@@ -63,6 +63,10 @@ const ROUTES = [
   ['/proforma/scenario/sc-s2', 'Proforma — scenario S2'],
   ['/proforma/scenario/sc-s3', 'Proforma — scenario S3 (the incumbent)'],
   ['/proforma/scenario/sc-pha-1', 'Proforma — BioSTEAM scenario (draft PHA flowsheet)'],
+  // OF-BLD-019 §3.3 — the yeast program's shipped scenario, and the two reference biorefineries' pages.
+  ['/proforma/scenario/sc-yeast-1', 'Proforma — BioSTEAM scenario (glucose to ethanol)'],
+  ['/proforma/reference/cornstover_benchmark', 'Proforma — reference (corn stover benchmark)'],
+  ['/proforma/reference/corn_drygrind', 'Proforma — reference (dry-grind corn ethanol)'],
   ['/runbooks', 'Runbooks'],
   ['/runbooks/rb-brazzein', 'Runbooks — complete'],
   ['/runbooks/rb-taq-kigali', 'Runbooks — running'],
@@ -134,6 +138,9 @@ const REDIRECTS = [
   ['/biorepo/ingest', '/intake/ingest'],
   ['/proforma/compare', '/biorepo/compare'],
   ['/proforma/sc-s2', '/proforma/scenario/sc-s2'],
+  // OF-BLD-019 §3.3 — the benchmark's old paths land on its reference page.
+  ['/proforma/benchmark', '/proforma/reference/cornstover_benchmark'],
+  ['/proforma/biosteam', '/proforma/reference/cornstover_benchmark'],
   // ── OF-BLD-006 legacy, re-aimed rather than chained ──────────────────
   ['/ask', '/postdoc'],
   ['/library', '/biorepo'],
@@ -736,6 +743,208 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-019 §3.3 — a reference biorefinery's page, for each reference
+  //    on the shelf.
+  //
+  // Over the double's fixtures (each a run made through the real code with
+  // the stand-in in place of BioSTEAM, and the package test's values parsed
+  // from the installed file): the header names the source, the program, the
+  // package test and the provenance; the price is the output the shelf
+  // names; "Held to its package's own test" has one row per regression value
+  // (eleven for corn), each with this run's measured value and whether it is
+  // within; every section of a scenario page is as long as the run's table;
+  // the TEA's installed equipment cost is the TEA's; the corn plant states its
+  // compatibility line in words; Run posts. The index's reference cards link
+  // to their pages.
+  let referenceFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    page.on('console', (m) => {
+      if (m.type() === 'error' && !IGNORE.some((re) => re.test(m.text()))) problems.push(`console: ${m.text().slice(0, 140)}`);
+    });
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const count = (sel) => page.locator(sel).count();
+    // As the page prints a regression value: thousands grouped, else five significant figures.
+    const sig = (v) => (v == null ? '—' : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : String(Number(v.toPrecision(5))));
+    try {
+      for (const id of ['cornstover_benchmark', 'corn_drygrind']) {
+        const ref = fixture(`proforma-reference-${id}.json`);
+        const o = ref.artifact.output;
+        const lacks = [];
+        await page.goto(`http://localhost:${PORT}/#/proforma/reference/${id}`, { waitUntil: 'networkidle' });
+        await page.locator('[data-testid="regression-row"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+        const meta = await page.locator('[data-testid="reference-meta"]').innerText().catch(() => '');
+        if (!meta.includes(ref.flowsheet.source) || !meta.includes(ref.flowsheet.packageTest) || !(await count('[data-testid="reference-provenance"]')))
+          lacks.push(`the header's source, package test and provenance (${JSON.stringify(meta.slice(0, 160))})`);
+        if (!/Program: (Yeast ethanol|none \(general\))/.test(meta)) lacks.push('the program');
+        if (!(await page.locator('h1').innerText().catch(() => '')).includes(ref.flowsheet.title)) lacks.push('its title');
+        const price = Number(await page.locator('[data-testid="reference-price"]').innerText().catch(() => 'NaN'));
+        if (!(Math.abs(price - o[ref.flowsheet.priceOutput]) < 1e-3)) lacks.push(`the price the shelf names (${ref.flowsheet.priceOutput}: ${price})`);
+        const checks = o.checks;
+        if ((await count('[data-testid="regression-row"]')) !== ref.regression.values.length || checks.length !== ref.regression.values.length)
+          lacks.push(`one row per package test value (${await count('[data-testid="regression-row"]')} of ${ref.regression.values.length})`);
+        if (id === 'corn_drygrind' && (await count('[data-testid="regression-row"]')) !== 11) lacks.push('the eleven values of test_corn');
+        const measured = await page.locator('[data-testid="regression-measured"]').allInnerTexts();
+        const within = await page.locator('[data-testid="regression-row"]').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-within')));
+        if (measured.join('|') !== checks.map((c) => sig(c.measured)).join('|')) lacks.push(`this run's measured values (${measured.join(', ')})`);
+        if (within.join('|') !== checks.map((c) => String(c.within)).join('|')) lacks.push('within or not, as the service decided');
+        if (!/within the package’s tolerance on this run/.test(await page.locator('[data-testid="regression-summary"]').innerText().catch(() => ''))) lacks.push('the count within');
+        if ((await count('[data-testid="waterfall-row"]')) !== o.tea.lines.length || (await count('[data-testid="waterfall-total"]')) !== 1) lacks.push('the cost breakdown');
+        if ((await count('[data-testid="stream-row"]')) !== o.streams.length) lacks.push('the streams');
+        if ((await count('[data-testid="unit-row"]')) !== o.units.length) lacks.push('the equipment');
+        if ((await count('[data-testid="utility-row"]')) !== (o.utilities ? 4 : 0)) lacks.push('the utilities');
+        if (o.diagram ? (await count('[data-testid="diagram-svg"]')) !== 1 : (await count('[data-testid="diagram-units"] li')) !== o.unitOrder.length)
+          lacks.push('the diagram or its ordered units');
+        for (const t of ['streams-table', 'equipment-table', 'utilities', 'diagram', 'regression']) if (!(await count(`[data-testid="csv-${t}"]`))) lacks.push(`the CSV of ${t}`);
+        const installed = await page.locator('[data-testid="tea-installed"]').innerText().catch(() => '');
+        if (!installed.includes(Math.round(o.tea.installedEquipmentCost).toLocaleString('en-US'))) lacks.push(`the TEA's own installed equipment cost (${JSON.stringify(installed)})`);
+        if (!/never a sum|need not equal/.test(await page.locator('[data-testid="tea-installed-note"]').innerText().catch(() => ''))) lacks.push('why the installed cost is the TEA’s');
+        const compat = ref.artifact.inputs.find((i) => i.name === 'compatibility');
+        const compatText = await page.locator('[data-testid="compatibility"]').innerText().catch(() => '');
+        if (compat ? !compatText.includes(compat.value) || !compatText.includes('No number of the package') : compatText) lacks.push('the compatibility line, where and only where the basis states one');
+        if (id === 'corn_drygrind' && !compat) lacks.push('the corn plant’s compatibility input in its fixture');
+        if (!/The simulator (has not started|is starting|is warm|failed)/.test(await page.locator('[data-testid="reference-status"]').innerText().catch(() => ''))) lacks.push('the status line');
+        const before = doubleState.proformaReferences.length;
+        await page.locator('[data-testid="reference-run"]').click();
+        await page.locator('[data-testid="reference-run"]:has-text("Rerun")').waitFor({ timeout: 8000 }).catch(() => {});
+        if (doubleState.proformaReferences.length !== before + 1 || doubleState.proformaReferences.at(-1) !== id) lacks.push('Run did not post');
+        if ((await count('[data-testid="regression-row"]')) !== ref.regression.values.length) lacks.push('the table after a run');
+        if (lacks.length) problems.push(`${id}: the page lacks ${lacks.join(', ')}`);
+      }
+      // The index's reference cards link to their pages.
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const link = page.locator('[data-testid="reference-card"][data-flowsheet="corn_drygrind"] [data-testid="reference-title"]');
+      await link.waitFor({ timeout: 8000 }).catch(() => {});
+      await link.click().catch(() => {});
+      await page.locator('[data-testid="proforma-reference"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/#\/proforma\/reference\/corn_drygrind$/.test(page.url())) problems.push(`the corn reference card does not open its page (${page.url()})`);
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      referenceFails++;
+      console.log(`✗ reference    ${problems.join('; ')}`);
+    } else {
+      console.log('✓ reference    both reference pages name their source, program, package test and provenance, read the price the shelf names, hold every value of the package’s own test beside this run’s (eleven for corn), draw the cost breakdown, the TEA’s own installed cost, streams, equipment, utilities and units as long as the run, say the corn plant’s compatibility change in words, and Run posts; the index’s cards open them');
+    }
+    await page.close();
+  }
+
+  // ── OF-BLD-019 §3.3 — Compare sets BioSTEAM scenarios side by side.
+  //
+  // With the switch off: sc-yeast-1 and a scenario made from the shelf's
+  // ethanol_glucose_v0 each take the two economic assumptions under the
+  // reviewer's name, run against the double and are pinned. Compare shows
+  // both, each read from its newest run artifact: the price, every TEA line
+  // and every input the flowsheet takes with its source; the same flowsheet
+  // draws no "bases differ" line. The pins survive a reload. With the switch
+  // on, pinning sc-pha-1 (not run here) adds a column that says it has not
+  // run and the line that their bases differ; pinning the casein example
+  // sc-s1 brings the authored compare back beside them.
+  let compareFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    page.on('console', (m) => {
+      if (m.type() === 'error' && !IGNORE.some((re) => re.test(m.text()))) problems.push(`console: ${m.text().slice(0, 140)}`);
+    });
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const count = (sel) => page.locator(sel).count();
+    const yeast = fixture('proforma-run-yeast.json');
+    const shelfEntry = fixture('proforma-shelf.json').find((f) => f.id === 'ethanol_glucose_v0');
+    const typeYeast = async () => {
+      for (const [key, vals] of [['plant_scale', ['100000', '100000', '100000']], ['glucose_price', ['0.4', '0.3', '0.5']]]) {
+        const form = page.locator(`[data-testid="assume-${key}"]`);
+        await form.waitFor({ timeout: 8000 }).catch(() => {});
+        const boxes = form.locator('input');
+        for (let i = 0; i < 3; i++) await boxes.nth(i).fill(vals[i]);
+        await form.locator('button:has-text("Keep assumption")').click();
+        await page.waitForTimeout(150);
+      }
+    };
+    const runAndPin = async (who) => {
+      await page.getByRole('button', { name: 'Run the scenario' }).click();
+      await page.locator('[data-testid="run-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await count('[data-testid="run-result"] [data-testid="scenario-price"]'))) problems.push(`${who} did not run`);
+      await page.locator('[data-testid="scenario-pin"]').click();
+      if ((await page.locator('[data-testid="scenario-pin"]').getAttribute('aria-pressed')) !== 'true') problems.push(`${who} did not pin`);
+    };
+    try {
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-yeast-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await typeYeast();
+      await runAndPin('sc-yeast-1');
+
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
+      const card = page.locator('[data-testid="flowsheet-card"][data-flowsheet="ethanol_glucose_v0"]');
+      await card.waitFor({ timeout: 8000 }).catch(() => {});
+      await card.getByRole('button', { name: 'New scenario from this' }).click();
+      await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="new-scenario-name"]').fill('Glucose to ethanol, compared');
+      await page.locator('[data-testid="new-scenario-create"]').click();
+      await page.locator('[data-testid="proforma-inputs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const made = /#\/proforma\/scenario\/(sc-[^/?]+)$/.exec(page.url())?.[1] ?? null;
+      if (!made) throw new Error(`New scenario did not land on a scenario page (${page.url()})`);
+      await typeYeast();
+      await runAndPin('the scenario made from ethanol_glucose_v0');
+      await page.waitForTimeout(700);
+
+      const compared = async (want) => {
+        await page.goto(`http://localhost:${PORT}/#/biorepo/compare`, { waitUntil: 'networkidle' });
+        await page.locator('[data-testid="compare-price"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+        const cols = await page.locator('[data-testid="compare-column"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-scenario')).join());
+        if (cols !== want.join()) problems.push(`Compare shows ${cols || 'nothing'}, not ${want.join()}`);
+      };
+      await compared(['sc-yeast-1', made]);
+      const prices = (await page.locator('[data-testid="compare-price"]').allInnerTexts()).map(Number);
+      if (prices.length !== 2 || prices.some((v) => !(Math.abs(v - yeast.quantiles.p50) < 1e-3))) problems.push(`Compare does not read each price from its run (${prices.join(', ')})`);
+      if (!/USD per kg of fuel-grade ethanol/.test(await page.locator('[data-testid="compare-price-row"]').innerText().catch(() => ''))) problems.push('the price is shown without its basis');
+      if ((await count('[data-testid="compare-line-row"]')) !== yeast.tea.lines.length) problems.push('Compare does not list every cost line of the TEA');
+      if ((await count('[data-testid="compare-input-row"]')) !== shelfEntry.inputs.length) problems.push(`Compare does not list every input the flowsheet takes (${await count('[data-testid="compare-input-row"]')})`);
+      const kinds = await page.locator('[data-testid="compare-input-row"][data-input="titre"] td[data-kind], [data-testid="compare-input-row"][data-input="glucose_price"] td[data-kind]').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind')).join());
+      if (kinds !== 'record,record,assumption,assumption') problems.push(`Compare does not name each input's source (${kinds})`);
+      // The double's run is the fixture's, so its basis names the fixture's person, not the reviewer: the column reads the run.
+      const assumed = await page.locator('[data-testid="compare-input-row"][data-input="glucose_price"]').innerText().catch(() => '');
+      const by = yeast.evidence.basis.inputs.find((i) => i.name === 'glucose_price')?.source.by;
+      if (!by || !assumed.includes(`assumption by ${by}`)) problems.push(`an assumption is not shown with who made it, as the run's basis names them (${JSON.stringify(assumed.slice(0, 120))})`);
+      if (await count('[data-testid="compare-bases-differ"]')) problems.push('two scenarios on one flowsheet are said to differ in basis');
+      if (await count('[data-testid="compare-not-run"]')) problems.push('a run scenario is said not to have run');
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator('[data-testid="compare-column"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await count('[data-testid="compare-column"]')) !== 2) problems.push('the pins did not survive a reload');
+
+      // The switch on: a PHA scenario not run here, and a casein example.
+      if (!(await setShowArchived(page, true))) problems.push('the archive switch did not turn on');
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-pha-1`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="scenario-pin"]').click();
+      await page.goto(`http://localhost:${PORT}/#/proforma/scenario/sc-s1`, { waitUntil: 'networkidle' });
+      await page.locator('button[title="Pin to compare (p)"]').click();
+      await page.waitForTimeout(400);
+      await compared(['sc-pha-1', 'sc-yeast-1', made]);
+      if ((await count('[data-testid="compare-not-run"]')) !== 1) problems.push('the PHA scenario with no run does not say so');
+      const differ = await page.locator('[data-testid="compare-bases-differ"]').innerText().catch(() => '');
+      if (!/bases differ/i.test(differ) || !/PHA/.test(differ) || !/ethanol/i.test(differ)) problems.push(`scenarios on two flowsheets are not said to differ in basis (${JSON.stringify(differ.slice(0, 120))})`);
+      if (!(await count('[data-testid="compare-authored"]'))) problems.push('the authored compare is gone for the archived example');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      compareFails++;
+      console.log(`✗ compare      ${problems.join('; ')}`);
+    } else {
+      console.log('✓ compare      sc-yeast-1 and a scenario made from ethanol_glucose_v0 run and pin, and Compare sets them side by side from their runs: the price with its basis, every TEA line, every input with its source; the pins survive a reload; a PHA scenario with no run says so under the line that their bases differ, and the authored compare stays for the casein example');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
   //    quotes are listed rather than dropped.
   //
@@ -930,14 +1139,30 @@ async function main() {
       if (doubleState.thermoCalls.some((c) => c.preset)) problems.push('fermOS asked thermosteam about a beer with no titre record picked');
       await page.goto(`http://localhost:${PORT}/#/fermos/forecast`, { waitUntil: 'networkidle' });
       if (!/No fit to forecast from yet/.test(await page.locator('body').innerText())) problems.push('fermOS → Forecast does not say there is no fit yet');
-      // OF-BLD-014 §8.2, OF-BLD-019 §3.1 — the benchmark's reference card, on
-      // a service whose simulator has yet to run: it says so, names the
-      // expected price and the package, and offers a run with the
-      // simulator's status line.
+      // OF-BLD-014 §8.2, OF-BLD-019 §3.1, §3.3 — the benchmark's reference
+      // card reads its newest reference run at
+      // /api/proforma/reference/cornstover_benchmark, as every reference does:
+      // with the double's run on file, its price, when it ran, the price the
+      // package gave when Proforma was first built and a Rerun; on a service
+      // whose simulator has yet to run (the same answer with no artifact), it
+      // says so, names the expected price and the package, and offers a run
+      // with the simulator's status line.
       await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
       const benchCard = page.locator('[data-testid="reference-card"][data-flowsheet="cornstover_benchmark"]');
+      await benchCard.locator('[data-testid="reference-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const ranBench = await benchCard.innerText().catch(() => '');
+      if (!/Ran\s+2026-09-15/.test(ranBench) || !/Expected 1\.968/.test(ranBench) || !(await benchCard.locator('[data-testid="reference-price"]').count()) ||
+        !(await benchCard.getByRole('button', { name: 'Rerun' }).count()))
+        problems.push('the benchmark\u2019s reference card does not read its newest reference run with the price its package gave');
+      const benchRef = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/proforma-reference-cornstover_benchmark.json'), 'utf8')).response;
+      await page.route('**/api/proforma/reference/cornstover_benchmark', (r) =>
+        r.request().method() === 'GET' ? r.fulfill({ json: { ...benchRef, artifact: null } }) : r.continue(),
+      );
+      await page.goto(`http://localhost:${PORT}/#/settings`, { waitUntil: 'networkidle' });
+      await page.goto(`http://localhost:${PORT}/#/proforma`, { waitUntil: 'networkidle' });
       await benchCard.locator('[data-testid="reference-not-run"]').waitFor({ timeout: 8000 }).catch(() => {});
       const bench = await benchCard.innerText().catch(() => '');
+      await page.unroute('**/api/proforma/reference/cornstover_benchmark');
       if (!/Not run on this service yet/.test(bench) || !/biorefineries\.cornstover@2\.35\.1/.test(bench))
         problems.push('the benchmark\u2019s reference card does not show its empty state with the package it will run');
       if (!(await benchCard.getByRole('button', { name: 'Run' }).count())) problems.push('the benchmark\u2019s reference card offers no run');
@@ -1438,6 +1663,8 @@ async function main() {
   console.log(`${1 - programFails}/1 programs — archived hidden by default, a deep link under its banner, the switch brings them back`);
   console.log(`${1 - proformaFails}/1 Proforma index — the shelf, the reference runs, New scenario makes one that opens and survives a reload`);
   console.log(`${1 - scenarioPageFails}/1 Proforma scenario page — a seed and a made scenario run, every section read from the run`);
+  console.log(`${1 - referenceFails}/1 Proforma reference pages — each held to its package's own test, every section read from its run`);
+  console.log(`${1 - compareFails}/1 Compare — BioSTEAM scenarios side by side from their newest runs, pins kept`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
@@ -1445,7 +1672,7 @@ async function main() {
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || referenceFails || compareFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails) process.exit(1);
 }
 
 main();

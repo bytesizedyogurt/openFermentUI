@@ -5,11 +5,13 @@
 //
 //   Reference runs  every reference biorefinery on the shelf, run whole on
 //                   its package's own defaults: the price of its newest
-//                   stored run, when it ran, its provenance (`model`), and a
-//                   Run or Rerun with the simulator's status line. The corn
-//                   stover benchmark (OF-BLD-014 §8.2) is the first: before
-//                   Proforma prices anything new, it reproduces a published
-//                   biorefinery.
+//                   stored run, when it ran, its provenance, a Run or Rerun
+//                   with the simulator's status line, and a link to its page
+//                   (/proforma/reference/:id, OF-BLD-019 §3.3), every one read
+//                   at /api/proforma/reference/:id, the benchmark included.
+//                   The corn stover benchmark (OF-BLD-014 §8.2) is the first:
+//                   before Proforma prices anything new, it reproduces a
+//                   published biorefinery.
 //   Flowsheets      every other flowsheet on the shelf, with the inputs it
 //                   takes and New scenario from this.
 //   Scenarios       the programs' scenarios: the price of the newest run
@@ -49,6 +51,7 @@ import {
   inputCounts,
   proformaArtifact,
   proformaReference,
+  referencePath,
   proformaScenarios,
   proformaShelf,
   referencePrice,
@@ -116,10 +119,18 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
         <span className="chip font-num">{info.id}</span>
         <span className="chip">reference</span>
       </div>
-      <h3 className="font-serif text-section-title font-semibold leading-snug">{info.title}</h3>
+      <a href={href(referencePath(info.id))} className="font-serif text-section-title font-semibold leading-snug hover:text-accent" data-testid="reference-title">
+        {info.title}
+      </a>
       <p className="text-caption text-ink-soft mb-2">
         From <span className="font-num">{info.source}</span>
         {info.program && <> · {programName(info.program)}</>}
+        {info.packageTest && (
+          <>
+            {' '}
+            · held to <span className="font-num">{info.packageTest.split('::').pop()}</span>
+          </>
+        )}
       </p>
       <p className="text-body text-ink-soft mb-3 flex-1">{info.description}</p>
       {problem && <p className="text-body text-signal-warn mb-2">{problem}</p>}
@@ -187,6 +198,9 @@ function ReferenceCard({ info }: { info: FlowsheetInfo }) {
         <Button onClick={run} disabled={busy} data-testid="reference-run">
           <Play size={13} /> {busy ? 'Running…' : art ? 'Rerun' : 'Run'}
         </Button>
+        <LinkButton to={referencePath(info.id)}>
+          <BookOpen size={13} /> Its page
+        </LinkButton>
         <span className="text-caption text-ink-soft" data-testid="reference-status">
           {state ? SIMULATOR_SAYS[state.simulator.status] : problem ? 'The simulator is the service’s.' : 'Asking the service…'}
           {state?.simulator.error && <> {state.simulator.error}</>}

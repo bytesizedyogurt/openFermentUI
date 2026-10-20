@@ -151,6 +151,12 @@ export interface DurableSnapshot {
    * scenario id (a created scenario carries its own `lastRunId`).
    */
   scenarioRuns?: Record<string, string>;
+  /**
+   * The SEEDED scenarios pinned to compare here (OF-BLD-019 §3.3, D6), by id;
+   * a created scenario carries its own `pinned`. Every seeded scenario ships
+   * unpinned, so an id absent here is unpinned.
+   */
+  pinnedScenarios?: string[];
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

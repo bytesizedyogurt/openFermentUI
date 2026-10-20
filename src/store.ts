@@ -2480,8 +2480,14 @@ export const useStore = create<OFState>()((set, get) => ({
       // a seeded scenario takes back the newest run it had here.
       const madeHere = Object.values(snap.createdScenarios ?? {}).filter((sc) => !s.scenarios.some((x) => x.id === sc.id));
       const runs = snap.scenarioRuns ?? {};
+      // §3.3 — a seeded scenario pinned here is pinned again (Compare's pins survive a reload).
+      const pins = new Set(snap.pinnedScenarios ?? []);
       const scenarios = [
-        ...s.scenarios.map((sc) => (runs[sc.id] && !sc.lastRunId ? { ...sc, lastRunId: runs[sc.id] } : sc)),
+        ...s.scenarios.map((sc) => {
+          const run = runs[sc.id] && !sc.lastRunId ? { lastRunId: runs[sc.id] } : {};
+          const pin = pins.has(sc.id) && !sc.pinned && !s.createdScenarioIds.includes(sc.id) ? { pinned: true } : {};
+          return 'lastRunId' in run || 'pinned' in pin ? { ...sc, ...run, ...pin } : sc;
+        }),
         ...madeHere,
       ];
       return {
@@ -3408,6 +3414,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
         .filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.lastRunId)
         .map((sc) => [sc.id, sc.lastRunId as string]),
     ),
+    // OF-BLD-019 §3.3 (D6) — the seeded scenarios pinned to compare here.
+    pinnedScenarios: s.scenarios.filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.pinned).map((sc) => sc.id),
   };
 }
 

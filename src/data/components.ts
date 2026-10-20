@@ -204,6 +204,7 @@ export const COMPONENTS: ComponentDef[] = [
       'src/screens/Proforma.tsx',
       'src/screens/ProformaScenario.tsx',
       'src/screens/ProformaBiosteam.tsx',
+      'src/screens/ProformaReference.tsx',
       'src/engine/grids.ts',
       'src/engine/interp.ts',
       'core/openferment_core/proforma.py',

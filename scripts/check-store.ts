@@ -586,6 +586,8 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   st().setProformaAssumption(id, typed);
   st().recordScenarioRun(id, 'a1b2c3d4e5f60718');
   st().recordScenarioRun('sc-pha-1', '0f1e2d3c4b5a6978');
+  // OF-BLD-019 §3.3 — a seeded scenario pinned to compare stays pinned.
+  st().togglePin('sc-yeast-1');
   const snap = snapshotOf(st());
   const kept = snap.createdScenarios?.[id];
   check('the snapshot keeps a scenario made here by id, with its flowsheet, name, program, pin and newest run',
@@ -594,9 +596,13 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check("a seeded scenario's newest run rides beside them, and the seed is not saved whole",
     snap.scenarioRuns?.['sc-pha-1'] === '0f1e2d3c4b5a6978' && !snap.createdScenarios?.['sc-pha-1'] && !snap.createdScenarios?.['sc-s1'],
     snap.scenarioRuns);
+  check('the snapshot names the seeded scenarios pinned here, and no other, and no scenario made here',
+    JSON.stringify(snap.pinnedScenarios) === JSON.stringify(['sc-yeast-1']), snap.pinnedScenarios);
   // A reload: a store that has lost both, and the assumptions typed for it.
   useStore.setState((s) => ({
-    scenarios: s.scenarios.filter((x) => x.id !== id && x.id !== other).map((x) => (x.id === 'sc-pha-1' ? { ...x, lastRunId: null } : x)),
+    scenarios: s.scenarios
+      .filter((x) => x.id !== id && x.id !== other)
+      .map((x) => (x.id === 'sc-pha-1' ? { ...x, lastRunId: null } : x.id === 'sc-yeast-1' ? { ...x, pinned: false } : x)),
     createdScenarioIds: [],
     proformaAssumptions: {},
   }));
@@ -607,6 +613,9 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
       st().createdScenarioIds.includes(id) && st().createdScenarioIds.includes(other));
   check('the assumption typed for it is back under its id', st().proformaAssumptions[id]?.[0]?.value === 0.3);
   check('the seeded scenario has its newest run back', st().scenarios.find((x) => x.id === 'sc-pha-1')?.lastRunId === '0f1e2d3c4b5a6978');
+  check('the seeded scenario pinned here is pinned again after a reload, and no other seeded one',
+    st().scenarios.find((x) => x.id === 'sc-yeast-1')?.pinned === true &&
+      st().scenarios.filter((x) => !st().createdScenarioIds.includes(x.id) && x.pinned).map((x) => x.id).join() === 'sc-yeast-1');
   st().applyDurable(snap);
   check('a second hydrate does not make it twice', st().scenarios.filter((x) => x.id === id).length === 1 && st().createdScenarioIds.filter((x) => x === id).length === 1);
   const copy = st().duplicateScenario(id);
@@ -617,11 +626,30 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('a scenario made in an archived program hides with the switch off and its link still names the program',
     !programVisible('scenario', pha, st()) && programOf('scenario', pha, st()) === 'pha');
   st().clearBrowserData();
-  check('Clearing this browser\u2019s data drops the scenarios made here, and their newest runs',
-    !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId));
+  check('Clearing this browser\u2019s data drops the scenarios made here, their newest runs and every pin',
+    !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId) &&
+      !st().scenarios.some((x) => x.pinned));
   const index = readFileSync(new URL('../src/screens/Proforma.tsx', import.meta.url), 'utf8');
   check('Proforma\u2019s New scenario opens the chooser: it copies no scenario and is not disabled for an empty list',
     !/duplicateScenario/.test(index) && !/disabled=\{scenarios\.length === 0\}/.test(index) && /NewScenarioDialog/.test(index));
+}
+
+// OF-BLD-019 §3.3 — a reference biorefinery's page reads its package test
+// from the run (`output.checks`, through referenceChecks) and the service
+// (`regression`), and types no value of it (a decimal outside a Tailwind
+// class name fails); it shows the TEA's installed
+// equipment cost, never a sum over the units' (the corn TEA prices
+// installation with a Lang factor, so the two differ).
+{
+  const ref = readFileSync(new URL('../src/screens/ProformaReference.tsx', import.meta.url), 'utf8');
+  const code = ref.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check('the reference page reads its package test from the run and the service, and types no decimal value of its own',
+    /referenceChecks\(/.test(code) && /regression/.test(code) && !/(?<![-\w.])\d+\.\d+\b/.test(code), code.match(/(?<![-\w.])\d+\.\d+\b/g));
+  check("the reference page shows the TEA's own installed equipment cost and sums no unit's",
+    /tea\.installedEquipmentCost/.test(code) && !/\.installedCost\b/.test(code) && !/\.reduce\(/.test(code));
+  const compare = readFileSync(new URL('../src/screens/Compare.tsx', import.meta.url), 'utf8');
+  check('Compare reads each BioSTEAM scenario from its newest run artifact, and makes no price of its own',
+    /proformaArtifact\(/.test(compare) && /runViewOfArtifact\(/.test(compare) && /viewPrice\(/.test(compare) && !/basePrice\s*[-+]/.test(compare));
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

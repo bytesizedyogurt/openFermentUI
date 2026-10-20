@@ -195,9 +195,13 @@ Everything after the fermenter: harvest, disruption, capture, polishing, recover
 
 Techno-economics over authored response surfaces. Prices a process; does not choose one.
 
+Views: [Corn ethanol reference](#) `/proforma/reference/corn_drygrind` · [Corn stover benchmark](#) `/proforma/reference/cornstover_benchmark`
+
+**A reference biorefinery has a page** (OF-BLD-019 §3.3): `/proforma/reference/:id` (`src/screens/ProformaReference.tsx`) shows a published biorefinery from the `biorefineries` package run whole on its own defaults, its price as the shelf names it, and each value of the package's own regression test beside what the run measured, read from the run's `proforma.reference` artifact, then the same tables a scenario page shows. BioRepo → Compare (`/biorepo/compare`) sets two or more pinned BioSTEAM scenarios side by side from each one's newest run.
+
 | Component | Implemented in |
 |---|---|
-| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` |
+| Proforma | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` |
 
 ### Runbooks
 
@@ -266,7 +270,7 @@ for the ones with a rail entry.
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
 | fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
-| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
+| Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |
 | Witness | Keeping it honest | `src/screens/Witness.tsx`, `src/engine/metrics.ts`, `core/openferment_core/witness.py`, `core/openferment_core/rageval.py`, `src/components/RetrievalScorecard.tsx` | a BioRepo tab, /biorepo/witness |

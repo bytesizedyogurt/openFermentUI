@@ -53,6 +53,7 @@ import Deposition from '@/screens/Deposition';
 import DepositionDetail from '@/screens/DepositionDetail';
 import Proforma from '@/screens/Proforma';
 import ProformaScenario from '@/screens/ProformaScenario';
+import ProformaReference from '@/screens/ProformaReference';
 import Compare from '@/screens/Compare';
 import Primer from '@/screens/Primer';
 import PrimerLesson from '@/screens/PrimerLesson';
@@ -192,6 +193,10 @@ function Screen() {
       return <PureOS />;
     case 'proforma':
       if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;
+      // OF-BLD-019 §3.3 — 'reference' is a reserved second segment: a
+      // reference biorefinery's page by its shelf id; with no id, the index,
+      // whose Reference runs row lists them.
+      if (b === 'reference') return c ? <ProformaReference flowsheetId={c} /> : <Proforma />;
       return <Proforma />;
     case 'runbooks':
       // 'protocols' and 'depositions' are reserved second segments. Runbook ids

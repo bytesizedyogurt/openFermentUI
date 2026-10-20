@@ -1111,6 +1111,9 @@ for (const f of CLEARANCE_FINDINGS) {
     ['/extract/validation', '/biorepo/witness'],
     ['/simulate/compare', '/biorepo/compare'],
     ['/proforma/compare', '/biorepo/compare'],
+    // OF-BLD-019 §3.3 — the benchmark's old paths land on its reference page.
+    ['/proforma/benchmark', '/proforma/reference/cornstover_benchmark'],
+    ['/proforma/biosteam', '/proforma/reference/cornstover_benchmark'],
     // Tail changes shape, not just prefix.
     ['/simulate/sc-s1', '/proforma/scenario/sc-s1'],
     ['/proforma/sc-s1', '/proforma/scenario/sc-s1'],
@@ -1122,6 +1125,10 @@ for (const f of CLEARANCE_FINDINGS) {
     ['/runbooks/protocols/PR-TAP-01', null],
     ['/biorepo/paper/H4', null],
     ['/proforma/scenario/sc-s1', null],
+    // 'reference' is reserved under /proforma: neither it nor a page under it
+    // is a scenario id for the old /proforma/:id pattern to move.
+    ['/proforma/reference', null],
+    ['/proforma/reference/corn_drygrind', null],
     ['/primer/l0-1', null],
     ['/geneos', null],
     ['/geneos/pathway', null],
@@ -1172,10 +1179,16 @@ for (const f of CLEARANCE_FINDINGS) {
 {
   const RESERVED: Record<string, string[]> = {
     biorepo: ['search', 'artifacts', 'paper', 'compare', 'witness'],
+    // OF-BLD-019 §3.3: /proforma/:id moves to /proforma/scenario/:id, so a
+    // scenario named for a view would land on that view instead.
+    proforma: ['scenario', 'reference'],
   };
   for (const p of PAPERS)
     if (RESERVED.biorepo.includes(p.id))
       fail(`paper ${p.id}: "${p.id}" is a BioRepo view (/biorepo/${p.id}), so no paper may take it as an id`);
+  for (const sc of SCENARIOS)
+    if (RESERVED.proforma.includes(sc.id))
+      fail(`scenario ${sc.id}: "${sc.id}" is a Proforma view (/proforma/${sc.id}), so no scenario may take it as an id`);
 }
 
 // ── a BioSTEAM class is one step (OF-BLD-019 §4.1) ─────────────────────
