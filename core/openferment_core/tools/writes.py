@@ -51,6 +51,8 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
         "draft": ("draft a runbook: use the draft_runbook tool, which writes the numbers from the evidence", ()),
         "lock": ("lock a runbook's predictions before a run (gated)", ()),
         "deposit": ("start a deposition of a protocol on the bench (gated)", ("protocolId",)),
+        "run": ("send a runbook's protocol to the bench (gated)", ("protocolId",)),
+        "publish": ("publish a runbook and its ledger to the commons (gated)", ()),
         "revise_protocol": ("draft a protocol revision", ("protocolId", "change")),
     },
     "geneos": {
@@ -75,8 +77,10 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     },
     "guild": {
         "propose_check": ("propose a competence check on a person's skills (gated: a person asks for it)", ("personId", "skillIds")),
+        "record_check": ("mark a check's outcome (gated: an assessor runs it)", ("checkId",)),
         "evidence": ("record evidence on the ledger (gated: a person signs it)", ("personId", "skillId", "kind")),
         "person": ("add or change a person on the ledger (gated)", ("personId", "name")),
+        "policy": ("change the lead's Guild policy (gated)", ("criticality", "mode")),
     },
     "primer": {
         "lesson": ("write or change a lesson", ("lessonId",)),
@@ -304,13 +308,17 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
 
     def run(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
         action = inp.action.strip()
-        if module in NO_WRITE:
-            return ToolResult(error=f"{name} refused: {NO_WRITE[module]}. Say so in gaps.")
         if action not in actions:
-            return ToolResult(error=f"{name} refused: {action!r} is not an action; the actions are {', '.join(actions)}.")
+            seed = f" {NO_WRITE[module]}." if module in NO_WRITE else ""
+            listed = f"the actions are {', '.join(actions)}" if actions else "it has no action"
+            return ToolResult(error=f"{name} refused: {action!r} is not an action; {listed}.{seed} Say so in gaps.")
+        # A gate is checked first: an action at one is a proposal whatever
+        # the module can or cannot write itself.
+        gate = gates.gated(module, action)
+        if module in NO_WRITE and gate is None:
+            return ToolResult(error=f"{name} refused: {NO_WRITE[module]}. Say so in gaps.")
         if (module, action) in NO_WRITE_ACTION:
             return ToolResult(error=f"{name} refused {action}: {NO_WRITE_ACTION[(module, action)]}. Say so in gaps.")
-        gate = gates.gated(module, action)
         if gate is not None and gate.id != "spend":
             what, _ = actions[action]
             title = f"{module_stores.LABEL[module]}: {what.split(' (')[0]}" + (f" — {inp.target}" if inp.target else "")
@@ -335,15 +343,17 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
 
 def _description(module: str) -> str:
     label = module_stores.LABEL[module]
-    if module in NO_WRITE:
+    lines = []
+    if module in NO_WRITE and not ACTIONS[module]:
         return (f"Write to {label}: nothing can be written here by a model. {NO_WRITE[module]}. Every call is refused in "
                 "words; report the refusal in gaps and name the person who could make the change.")
-    lines = []
     for action, (what, fields) in ACTIONS[module].items():
         g = gates.gated(module, action)
-        tail = f" [gated: {g.covers}; becomes a proposal a person carries out on Home]" if g and g.id != "spend" else ""
+        tail = (f" [gated: {g.covers}; becomes a proposal a person carries out on Home]" if g and g.id != "spend"
+                else " [at the budget, gated: becomes a spend proposal a person carries out on Home]" if g else "")
         lines.append(f"{action}: {what}" + (f" (fields: {', '.join(fields)})" if fields else "") + tail)
-    return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + ". "
+    seed = f" {NO_WRITE[module]}: every other call is refused in words." if module in NO_WRITE else ""
+    return (f"Write to {label}, through the module's own write function. Actions — " + "; ".join(lines) + f".{seed} "
             "Pass action, target (an id), fields (names to words) and note (why). What is written lands in the open lane "
             "marked as the model's, in the audit log, until a person promotes it; a refusal says why, and goes in gaps.")
 

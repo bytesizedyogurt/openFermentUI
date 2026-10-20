@@ -64,6 +64,12 @@ def test_a_module_with_no_write_function_refuses_in_words(pool, store, module): 
     r = write(module, ctx(pool), "anything")
     assert r.error and "no write function" in r.error and "gaps" in r.error
     assert audit.read() == [] and proposals.read().proposals == []
+    # A gated action on a seed module is still a proposal (Dominion: publish).
+    r = write(module, ctx(pool), "publish")
+    if module == "dominion":
+        assert r.error is None and r.summary["state"] == "proposed"
+    else:
+        assert "not an action" in r.error
 
 
 @pytest.mark.parametrize("module, action", [("runbooks", "revise_protocol"), ("fermos", "fit"), ("proforma", "bind"),
