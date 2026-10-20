@@ -1,9 +1,16 @@
 // Scenario index (OF-DES-001 §8.13), and the benchmark (OF-BLD-014 §8.2):
 // before Proforma prices anything new with BioSTEAM, it runs a published
 // biorefinery end to end and shows the price that run arrives at.
-import { useEffect, useState } from 'react';
+//
+// PROGRAMS (OF-BLD-016 §2.2). The scenario grid, the pinned count and the
+// scenario that "New scenario" copies all read through the store's program
+// filter: a scenario in an archived program leaves the index while the switch
+// is off, and its link still opens it under the banner. The benchmark is
+// general and always shows.
+import { useEffect, useMemo, useState } from 'react';
 import { LineChart, Pin, PinOff, Plus, GitCompare } from 'lucide-react';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { programOf, useProgramFilter, useStore } from '@/store';
 import { navigate } from '@/router';
 import { evaluateGrid } from '@/engine/grids';
 import { fmt } from '@/engine/units';
@@ -118,7 +125,17 @@ function BenchmarkCard() {
 }
 
 export default function Proforma() {
-  const scenarios = useStore((s) => s.scenarios);
+  const allScenarios = useStore((s) => s.scenarios);
+  const shows = useProgramFilter();
+  const scenarios = useMemo(() => allScenarios.filter((sc) => shows('scenario', sc.id)), [allScenarios, shows]);
+  const hiddenPrograms = useMemo(() => {
+    const ids = new Set(
+      allScenarios
+        .filter((sc) => !shows('scenario', sc.id))
+        .map((sc) => programOf('scenario', sc.id, { scenarios: allScenarios })),
+    );
+    return PROGRAMS.filter((p) => ids.has(p.id));
+  }, [allScenarios, shows]);
   const grids = useStore((s) => s.grids);
   const duplicateScenario = useStore((s) => s.duplicateScenario);
   const togglePin = useStore((s) => s.togglePin);
@@ -155,7 +172,20 @@ export default function Proforma() {
 
       <BenchmarkCard />
 
-      {scenarios.length === 0 ? (
+      {scenarios.length === 0 && hiddenPrograms.length > 0 ? (
+        <EmptyState
+          title="Every scenario here is in an archived program"
+          body={
+            <span data-testid="hidden-by-archive">
+              The scenarios on file belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, and{' '}
+              {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so this index
+              hides them. Settings → Programs shows archived programs again; a link to a scenario still opens it.
+            </span>
+          }
+          icon={<LineChart size={28} />}
+          action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+        />
+      ) : scenarios.length === 0 ? (
         <EmptyState
           title="No scenarios yet"
           body="A scenario pairs a cost model with a point in its sweep space."

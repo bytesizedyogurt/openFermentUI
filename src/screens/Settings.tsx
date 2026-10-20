@@ -10,6 +10,7 @@ import {
   Gauge,
   Info,
   KeyRound,
+  Layers,
   Moon,
   Palette,
   RotateCcw,
@@ -17,7 +18,17 @@ import {
   ShieldCheck,
   Sun,
 } from 'lucide-react';
-import { useStore, provenanceOf, guildView, actingIdOf, type Density, type Theme, type UnitMode } from '@/store';
+import {
+  useStore,
+  provenanceOf,
+  guildView,
+  actingIdOf,
+  useProgramFilter,
+  type Density,
+  type Theme,
+  type UnitMode,
+} from '@/store';
+import { PROGRAMS } from '@/data/programs';
 import { policyOf } from '@/engine/competence';
 import { Tick } from '@/components/Provenance';
 import {
@@ -65,6 +76,12 @@ const SECTIONS: SectionDef[] = [
     id: 'appearance',
     label: 'Appearance',
     blurb: 'Theme, density, motion and the rehearsal clock. Changes apply immediately.',
+  },
+  {
+    id: 'programs',
+    label: 'Programs',
+    blurb:
+      'The research programs the corpus serves, which are active and which archived, and the one switch that shows archived programs again.',
   },
   {
     id: 'units',
@@ -268,7 +285,10 @@ function AppearanceSection() {
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
   const simSpeed = useStore((s) => s.ui.simSpeed);
   const setUI = useStore((s) => s.setUI);
-  const records = useStore((s) => s.records);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The preview draws the first records whose program shows (OF-BLD-016 §2.2).
+  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
   const previewRecords = records.slice(0, 3);
 
   const [systemReduced] = useState(() =>
@@ -347,7 +367,9 @@ function AppearanceSection() {
                       className="px-1 text-caption text-ink-soft"
                       style={{ height: 'var(--row-h)' }}
                     >
-                      No records loaded in this session.
+                      {allRecords.length > records.length
+                        ? 'No values in the active programs yet. Values in archived programs are hidden; Settings → Programs shows them.'
+                        : 'No records loaded in this session.'}
                     </td>
                   </tr>
                 ) : (
@@ -427,6 +449,104 @@ function AppearanceSection() {
           numbers those steps produce. Whenever the speed is not 1×, the top bar shows a badge so a
           demo audience is never misled about how fast the real thing would be.
         </p>
+      </section>
+    </div>
+  );
+}
+
+// ── programs (OF-BLD-016 §2.1, §2.2, E.1′) ───────────────────────────────
+//
+// The programs are data (src/data/programs.ts); this section lists them and
+// holds the one switch. Off, the default, an archived program's papers,
+// values, strains, molecules, scenarios, protocols, runbooks, lessons and
+// suggested questions leave every list, count and prompt; on, everything
+// shows as it did before programs existed. Nothing is deleted either way
+// (D1), and a link to an archived entity opens it under a banner. The switch
+// is in the Durable tier, so it survives a reload and a reset.
+
+/** "threads A to O", "thread Q": a program's letters, written out. */
+function lettersLabel(letters: readonly string[]): string {
+  const l = [...letters].sort();
+  return l.length === 1 ? `thread ${l[0]}` : `threads ${l[0]} to ${l[l.length - 1]}`;
+}
+
+function ProgramsSection() {
+  const showArchived = useStore((s) => s.showArchived);
+  const setShowArchived = useStore((s) => s.setShowArchived);
+  const archived = PROGRAMS.filter((p) => p.status === 'archived');
+
+  return (
+    <div className="space-y-6" data-testid="settings-programs">
+      <section>
+        <SectionTitle>Programs</SectionTitle>
+        <ul className="space-y-2">
+          {PROGRAMS.map((p) => (
+            <li key={p.id}>
+              <Card className="p-3" data-program={p.id} data-program-status={p.status}>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="font-serif text-section-title font-semibold">{p.name}</span>
+                  <span className="text-caption uppercase tracking-wide text-ink-soft">
+                    {lettersLabel(p.letters)}
+                  </span>
+                  <span
+                    className={cx(
+                      'chip text-[11px] py-0',
+                      p.status === 'active'
+                        ? 'border-accent/40 text-accent'
+                        : 'border-line text-ink-soft',
+                    )}
+                  >
+                    {p.status === 'active' ? 'Active' : 'Archived'}
+                  </span>
+                </div>
+                <p className="text-body text-ink-soft mt-1 max-w-3xl">{p.summary}</p>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <SectionTitle>Archived programs</SectionTitle>
+        <Card className="p-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-checked={showArchived}
+              className="mt-1 shrink-0"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              data-testid="show-archived"
+            />
+            <span>
+              <span className="block text-body font-medium">Show archived programs</span>
+              <span className="block text-caption text-ink-soft mt-0.5 max-w-3xl">
+                When it is off,{' '}
+                {archived.length === 0 ? 'nothing is hidden, because no program is archived' : (
+                  <>
+                    the papers, values, strains, molecules, scenarios, protocols, runbooks, lessons
+                    and suggested questions of{' '}
+                    {archived.map((p, i) => (
+                      <span key={p.id}>
+                        {i > 0 && (i === archived.length - 1 ? ' and ' : ', ')}
+                        <span className="text-ink">{p.name}</span>
+                      </span>
+                    ))}{' '}
+                    leave every list, count and prompt
+                  </>
+                )}
+                . When it is on, everything shows as before. Nothing is deleted either way, and a
+                link to something archived still opens it, under a note that names its program.
+              </span>
+            </span>
+          </label>
+          <div className="text-caption text-ink-soft mt-2 pt-2 border-t border-line" data-testid="show-archived-state">
+            {showArchived
+              ? 'Archived programs are showing everywhere. The setting is kept in this browser across reloads.'
+              : 'Archived programs are hidden. The setting is kept in this browser across reloads.'}
+          </div>
+        </Card>
       </section>
     </div>
   );
@@ -679,8 +799,16 @@ function UnitsSection() {
 // ── corpus (owner) ─────────────────────────────────────────────────────
 
 function CorpusSection() {
-  const papers = useStore((s) => s.papers);
-  const records = useStore((s) => s.records);
+  const allPapers = useStore((s) => s.papers);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The ontology and gold-set counts are of the papers and values whose
+  // program shows (OF-BLD-016 §2.2). The reset dialog below counts the whole
+  // store, because a reset restores all of it, archived programs included.
+  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
+  const visibleRecords = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
+  const records = allRecords;
+  const archivedHidden = papers.length < allPapers.length || visibleRecords.length < allRecords.length;
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
   const resetDemo = useStore((s) => s.resetDemo);
@@ -689,7 +817,7 @@ function CorpusSection() {
   const reviewer = useStore((s) => s.reviewer);
   const setReviewerName = useStore((s) => s.setReviewerName);
 
-  const gold = useMemo(() => records.filter((r) => r.gold), [records]);
+  const gold = useMemo(() => visibleRecords.filter((r) => r.gold), [visibleRecords]);
   const goldPapers = useMemo(() => new Set(gold.map((r) => r.paperId)).size, [gold]);
   const goldByField = useMemo(() => {
     const m = new Map<FieldId, number>();
@@ -755,9 +883,19 @@ function CorpusSection() {
             </div>
             <div>
               <div className="text-caption uppercase tracking-wide text-ink-soft">Records</div>
-              <div className="font-num text-display leading-tight">{records.length}</div>
+              <div className="font-num text-display leading-tight">{visibleRecords.length}</div>
             </div>
           </div>
+          {archivedHidden && (
+            <p className="text-caption text-ink-soft mt-2" data-testid="corpus-archived-hidden">
+              Counted over the active programs. Papers and values in archived programs are kept and
+              hidden;{' '}
+              <a className="text-accent hover:underline" href="#/settings/programs">
+                Settings → Programs
+              </a>{' '}
+              shows them again.
+            </p>
+          )}
           <p className="text-body text-ink-soft mt-3 max-w-3xl">
             Every extracted value is typed to one of these fields, converted to the field's
             canonical unit, and range-checked at entry. Extending the ontology is a schema change,
@@ -804,7 +942,17 @@ function CorpusSection() {
           Gold set
         </SectionTitle>
         <Card className="p-3">
-          {gold.length === 0 ? (
+          {gold.length === 0 && archivedHidden && allRecords.some((r) => r.gold) ? (
+            <div className="text-body text-ink-soft">
+              No value in the active programs is flagged for the gold set yet. The gold set&rsquo;s
+              values sit in archived programs, which are hidden;{' '}
+              <a className="text-accent hover:underline" href="#/settings/programs">
+                Settings → Programs
+              </a>{' '}
+              shows them again. Flag a value with <span className="kbd">g</span> in the review queue
+              and it joins the baseline immediately.
+            </div>
+          ) : gold.length === 0 ? (
             <div className="text-body text-ink-soft">
               No records are flagged for the gold set, and none ship flagged: a gold annotation
               has to be made against the paper's own words, and no full text has been retrieved.
@@ -1211,8 +1359,14 @@ function fidelityKind(f: string): Fidelity {
 }
 
 function AboutSection() {
-  const papers = useStore((s) => s.papers);
-  const records = useStore((s) => s.records);
+  const allPapers = useStore((s) => s.papers);
+  const allRecords = useStore((s) => s.records);
+  const shows = useProgramFilter();
+  // The colophon counts what shows: with archived programs hidden it counts
+  // the active ones, and says so (OF-BLD-016 §2.2).
+  const papers = useMemo(() => allPapers.filter((p) => shows('paper', p.id)), [allPapers, shows]);
+  const records = useMemo(() => allRecords.filter((r) => shows('record', r.id)), [allRecords, shows]);
+  const archivedHidden = papers.length < allPapers.length || records.length < allRecords.length;
 
   const counts = useMemo(() => {
     const c: Record<Fidelity, number> = { Full: 0, Scripted: 0, Visual: 0 };
@@ -1252,6 +1406,15 @@ function AboutSection() {
     <div className="space-y-6">
       <section>
         <SectionTitle>Colophon</SectionTitle>
+        {archivedHidden && (
+          <p className="text-caption text-ink-soft mb-2" data-testid="about-archived-hidden">
+            The counts below are of the active programs. Archived programs are kept and hidden;{' '}
+            <a className="text-accent hover:underline" href="#/settings/programs">
+              Settings → Programs
+            </a>{' '}
+            shows them again.
+          </p>
+        )}
         <Callout kind="warn" title="Read this before you believe a number on this site">
           <ul className="space-y-1.5 mt-1">
             <li>
@@ -1476,6 +1639,7 @@ export default function Settings({ section }: { section: string }) {
                     )}
                   >
                     {s.id === 'appearance' && <Sun size={14} aria-hidden />}
+                    {s.id === 'programs' && <Layers size={14} aria-hidden />}
                     {s.id === 'units' && <Ruler size={14} aria-hidden />}
                     {s.id === 'corpus' && <Database size={14} aria-hidden />}
                     {s.id === 'guild' && <ShieldCheck size={14} aria-hidden />}
@@ -1497,6 +1661,7 @@ export default function Settings({ section }: { section: string }) {
 
         <div className="min-w-0">
           {active === 'appearance' && <AppearanceSection />}
+          {active === 'programs' && <ProgramsSection />}
           {active === 'units' && <UnitsSection />}
           {active === 'corpus' && <CorpusSection />}
           {active === 'guild' && <GuildPolicySection />}

@@ -24,11 +24,12 @@ import {
   AlertCircle,
   Square,
 } from 'lucide-react';
-import { useStore, provenanceOf, timeId } from '@/store';
-import { navigate, useRoute } from '@/router';
+import { useStore, provenanceOf, timeId, useProgramFilter, archivedProgramOf } from '@/store';
+import { href, navigate, useRoute } from '@/router';
 import type { ChatMessage, ChatRetrievalHit, ChatToolCall, LiveConversation, LiveTurn } from '@/data/types';
-import { SUGGESTED_PROMPTS } from '@/data/flows';
-import { LIVE_PROMPTS } from '@/data/livePrompts';
+import { SUGGESTED_PROMPTS, flowOfPrompt, flowShows, sessionShows, subjectsOfFlow, suggestedPrompts } from '@/data/flows';
+import { LIVE_PROMPT_LIST, livePrompts, type PromptSubject } from '@/data/livePrompts';
+import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { send, sendFlow } from '@/sim/chat';
 import { fieldName } from '@/data/ontology';
 import { convert, fmt, asNumber } from '@/engine/units';
@@ -49,6 +50,50 @@ const SLASH_HINTS = [
   { cmd: '/protocol <name>', does: 'look up a protocol' },
   { cmd: '/scope <paper>', does: 'restrict retrieval' },
 ];
+
+// ── programs (OF-BLD-016 §2.2) ─────────────────────────────────────────
+//
+// Every question this screen offers — the live five, the suggested prompts,
+// an answer's follow-ups — and every session, protocol and scenario it lists
+// passes through the program selector. What a conversation already holds is
+// history and stays as it was asked; what the screen offers next does not.
+
+/** The archived programs some hidden questions are about, by name, in the order they are met. */
+function hiddenProgramNames(about: PromptSubject[][]): string[] {
+  const names = new Set<string>();
+  for (const subjects of about)
+    for (const a of subjects) {
+      const p = archivedProgramOf(a.kind, a.id);
+      if (p) names.add(p.name);
+    }
+  return [...names];
+}
+
+/** "Casein", "Casein and PHA", "Casein, PHA and X". */
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The line a list of questions shows when the program filter emptied it:
+ * what is hidden, and where the switch is.
+ */
+function HiddenQuestionsNote({ about, className }: { about: PromptSubject[][]; className?: string }) {
+  const names = hiddenProgramNames(about);
+  return (
+    <p className={cx('text-caption text-ink-soft text-center', className)} data-testid="prompts-hidden">
+      {names.length === 0
+        ? 'The suggested questions here are about archived programs, which are hidden.'
+        : names.length === 1
+          ? `The suggested questions here are about ${names[0]}, an archived program, and are hidden.`
+          : `The suggested questions here are about ${joinNames(names)}, archived programs, and are hidden.`}{' '}
+      <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
+        Settings → Programs
+      </a>{' '}
+      shows them again.
+    </p>
+  );
+}
 
 /** A strip chart of the record values an answer cites (§8.2, message type 5). */
 function AnswerStrip({ md }: { md: string }) {
@@ -379,6 +424,9 @@ function LivePanel({
   onAsk: (q: string) => void;
 }) {
   const turns = conversation?.turns ?? [];
+  const shows = useProgramFilter();
+  const offered = livePrompts(shows);
+  const hiddenAbout = LIVE_PROMPT_LIST.filter((p) => !offered.includes(p.text)).map((p) => p.about);
   return (
     <div className="space-y-3 pt-1">
       {/* The service is up but cannot answer. A different problem from being
@@ -419,9 +467,9 @@ function LivePanel({
             body="Postdoc searches the records and the papers' own text with its tools, then writes claims that carry no numbers of their own: every value is rendered from the record it cites, and every quoted sentence was checked word for word against its paper. A question the corpus cannot support gets an explicit decline. Ask a follow-up and it reads this conversation first."
             icon={<Sparkles size={28} />}
           />
-          {LIVE_PROMPTS.length > 0 && (
+          {offered.length > 0 && (
             <div className="flex flex-wrap gap-2 justify-center mt-2">
-              {LIVE_PROMPTS.map((p) => (
+              {offered.map((p) => (
                 // A whole question, so it wraps rather than running off the column.
                 <button
                   key={p}
@@ -433,6 +481,7 @@ function LivePanel({
               ))}
             </div>
           )}
+          {offered.length === 0 && hiddenAbout.length > 0 && <HiddenQuestionsNote about={hiddenAbout} className="mt-2" />}
         </div>
       )}
     </div>
@@ -460,7 +509,24 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   const sessionsOpen = useStore((s) => s.ui.sessionsOpen);
   const setUI = useStore((s) => s.setUI);
   const toast = useStore((s) => s.toast);
+  const collections = useStore((s) => s.collections);
   const route = useRoute();
+  const shows = useProgramFilter();
+  const offeredPrompts = useMemo(() => suggestedPrompts(shows), [shows]);
+  const hiddenPromptAbout = useMemo(
+    () =>
+      SUGGESTED_PROMPTS.filter((p) => !offeredPrompts.includes(p)).map((p) => {
+        const flow = flowOfPrompt(p);
+        return flow ? subjectsOfFlow(flow) : [];
+      }),
+    [offeredPrompts],
+  );
+  // The sidebar lists the sessions whose program shows; a link to any other
+  // still opens it (`session` below reads every session).
+  const listedSessions = useMemo(
+    () => sessions.filter((s) => sessionShows(s, shows, collections)),
+    [sessions, shows, collections],
+  );
 
   const [activeId, setActiveId] = useState<string | null>(sessionId ?? null);
   const [input, setInput] = useState('');
@@ -521,6 +587,10 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   }, [sessionId]);
 
   const session = sessions.find((s) => s.id === activeId) ?? null;
+  // A link still opens a session the list hides; the pane says why it is not listed (§2.2).
+  const sessionArchived = !!session && !listedSessions.includes(session);
+  const sessionProgram =
+    sessionArchived && session?.scope?.kind === 'paper' ? archivedProgramOf('paper', session.scope.id) : null;
   // With nothing chosen, Live resumes the latest conversation; "New
   // conversation" shows an empty one until its first question.
   const conversation =
@@ -759,7 +829,16 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                 <MessageSquarePlus size={14} /> New session
               </Button>
               <div className="flex-1 overflow-y-auto space-y-1">
-                {sessions.map((s) => (
+                {listedSessions.length < sessions.length && (
+                  <p className="text-caption text-ink-soft px-2.5 py-2" data-testid="sessions-hidden">
+                    Sessions about archived programs are hidden.{' '}
+                    <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
+                      Settings → Programs
+                    </a>{' '}
+                    shows them again.
+                  </p>
+                )}
+                {listedSessions.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => {
@@ -821,6 +900,26 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
         </div>
 
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+          {!live && sessionArchived && (
+            <div
+              role="note"
+              data-archived-program={sessionProgram?.id ?? 'archived'}
+              className="rounded-card border border-line bg-ink-soft/[0.05] p-3 text-body"
+            >
+              <div className="font-medium mb-0.5">
+                {sessionProgram
+                  ? `This session is about ${sessionProgram.name}, an archived program`
+                  : 'This session is about an archived program'}
+              </div>
+              <p className="text-ink-soft">
+                It is not listed while archived programs are hidden; a link still opens it.{' '}
+                <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+                  Settings → Programs
+                </a>{' '}
+                shows archived programs again.
+              </p>
+            </div>
+          )}
           {live ? (
             <LivePanel conversation={conversation} health={health} onAsk={(q) => void run(q)} />
           ) : !session || session.messages.length === 0 ? (
@@ -831,12 +930,15 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                 icon={<Sparkles size={28} />}
               />
               <div className="flex flex-wrap gap-2 justify-center mt-2">
-                {SUGGESTED_PROMPTS.map((p) => (
+                {offeredPrompts.map((p) => (
                   <button key={p} className="chip hover:border-accent hover:bg-accent-wash" onClick={() => void run(p)}>
                     {p}
                   </button>
                 ))}
               </div>
+              {offeredPrompts.length === 0 && hiddenPromptAbout.length > 0 && (
+                <HiddenQuestionsNote about={hiddenPromptAbout} className="mt-2" />
+              )}
             </div>
           ) : (
             session.messages.map((m) => {
@@ -1013,9 +1115,10 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
                         </div>
                       )}
 
-                      {m.followups.length > 0 && (
+                      {m.followups.some((f) => !f.startsWith('flow:') || flowShows(f.slice(5).split('|')[0], shows)) && (
                         <div className="flex flex-wrap gap-2 mt-3">
-                          {m.followups.map((f) => {
+                          {/* A follow-up is offered only when the flow it opens shows (§2.2). */}
+                          {m.followups.filter((f) => !f.startsWith('flow:') || flowShows(f.slice(5).split('|')[0], shows)).map((f) => {
                             const isFlow = f.startsWith('flow:');
                             const [flowId, label] = isFlow ? f.slice(5).split('|') : ['', f];
                             return (
@@ -1147,7 +1250,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 
           {!live && session && session.messages.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {SUGGESTED_PROMPTS.slice(0, 3).map((p) => (
+              {offeredPrompts.slice(0, 3).map((p) => (
                 <button
                   key={p}
                   className="chip text-caption hover:border-accent hover:bg-accent-wash"
@@ -1258,9 +1361,14 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
 /** The cross-module handoff (§8.2): insert an answer's citations into a target. */
 function InsertInto({ md }: { md: string }) {
   const [open, setOpen] = useState(false);
-  const protocols = useStore((s) => s.protocols);
-  const scenarios = useStore((s) => s.scenarios);
+  const allProtocols = useStore((s) => s.protocols);
+  const allScenarios = useStore((s) => s.scenarios);
   const toast = useStore((s) => s.toast);
+  // The targets offered are the ones whose program shows (§2.2).
+  const shows = useProgramFilter();
+  const protocols = allProtocols.filter((p) => shows('protocol', p.id));
+  const scenarios = allScenarios.filter((s) => shows('scenario', s.id));
+  const hiddenTargets = protocols.length < allProtocols.length || scenarios.length < allScenarios.length;
 
   const ids = [...md.matchAll(/\[\[([A-Za-z0-9-]+)\]\]/g)].map((m) => m[1]);
   if (ids.length === 0) return null;
@@ -1310,6 +1418,15 @@ function InsertInto({ md }: { md: string }) {
               {s.name}
             </button>
           ))}
+          {hiddenTargets && (
+            <p className="text-caption text-ink-soft px-2 pt-2 mt-1 border-t border-line">
+              Protocols and scenarios of archived programs are hidden.{' '}
+              <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
+                Settings → Programs
+              </a>{' '}
+              shows them again.
+            </p>
+          )}
         </div>
       )}
     </div>

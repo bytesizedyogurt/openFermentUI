@@ -4,8 +4,14 @@
 // which Home's Predictions card reads too. A hit rate is shown only once
 // HIT_RATE_MIN_TESTED predictions have been tested; below that the screen
 // says there are too few, because a rate over two tests is a coin toss.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The rows and the counts read through the store's
+// program filter, passed to the ledger as its scope: a runbook or deposition
+// in an archived program is neither drawn nor counted while the switch is off,
+// and with it on the page is exactly what it was.
 import { useMemo, useState } from 'react';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { programOf, useProgramFilter, useStore } from '@/store';
 import { href } from '@/router';
 import { Card, PageHeader, cx } from '@/components/ui';
 import { OwnerTabs } from '@/components/OwnerTabs';
@@ -35,11 +41,22 @@ type Filter = 'all' | 'tested' | 'untested';
 export default function RunbookLedger() {
   const runbooks = useStore((s) => s.runbooks);
   const depositions = useStore((s) => s.depositions);
+  const shows = useProgramFilter();
   const [filter, setFilter] = useState<Filter>('all');
-  const rows = useMemo(() => ledgerRows(runbooks, depositions), [runbooks, depositions]);
-  const counts = useMemo(() => ledgerCounts(runbooks, depositions), [runbooks, depositions]);
+  const rows = useMemo(() => ledgerRows(runbooks, depositions, shows), [runbooks, depositions, shows]);
+  const counts = useMemo(() => ledgerCounts(runbooks, depositions, shows), [runbooks, depositions, shows]);
   const shown = rows.filter((r) => filter === 'all' || (filter === 'tested') === (r.held !== null));
   const groups = [...new Set(shown.map((r) => r.runbookId))];
+  // The archived programs holding a locked runbook the filter hid: what an
+  // empty ledger names, so it never reads as "nothing was ever locked".
+  const hiddenPrograms = useMemo(() => {
+    const ids = new Set(
+      runbooks
+        .filter((r) => r.lockedAt && r.predictions.length > 0 && !shows('runbook', r.id))
+        .map((r) => programOf('runbook', r.id, { runbooks })),
+    );
+    return PROGRAMS.filter((p) => ids.has(p.id));
+  }, [runbooks, shows]);
 
   return (
     <div data-testid="runbook-ledger">
@@ -83,6 +100,16 @@ export default function RunbookLedger() {
           );
         })}
         {groups.length === 0 && <p className="text-body text-ink-soft">No locked prediction matches this filter.</p>}
+        {groups.length === 0 && hiddenPrograms.length > 0 && (
+          <p className="text-body text-ink-soft" data-testid="hidden-by-archive">
+            Locked predictions in {hiddenPrograms.map((p) => p.name).join(' and ')}{' '}
+            {hiddenPrograms.length === 1 ? 'are hidden, because it is an archived program' : 'are hidden, because they are archived programs'}.{' '}
+            <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+              Settings → Programs
+            </a>{' '}
+            shows archived programs again.
+          </p>
+        )}
       </div>
     </div>
   );

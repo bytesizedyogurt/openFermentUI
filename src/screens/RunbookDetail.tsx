@@ -11,7 +11,14 @@
 // says exactly why and what would make the conversion possible, rather than
 // throwing. A stage that halts on a number with no source is the same shape of
 // event: not an error, a guardrail, with two honest ways forward.
-import { useEffect, useMemo, useState } from 'react';
+//
+// PROGRAMS (OF-BLD-016 §2.2). A runbook in an archived program has left the
+// board, but its link still opens it here, under the banner that names the
+// program and the switch. The protocol chooser, the depositions listed and
+// counted, the ledger figure and the host chip read through the program
+// filter, widened on an archived runbook to its own program (`useRunbookScope`),
+// so a link into the archive still shows that runbook's own runs.
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Boxes,
@@ -28,7 +35,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { Runbook } from '@/data/types';
-import { useStore } from '@/store';
+import { useProgramScope, useStore, type ProgramEntityKind } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE } from '@/data/runbooks';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
@@ -75,6 +83,17 @@ import { delayClass } from '@/sim/latency';
  */
 function looksLikeVocabularyId(value: string): boolean {
   return /^[a-z]+(-[a-z]+)+$/.test(value);
+}
+
+/**
+ * The program filter as this page applies it (`useProgramScope`): whatever
+ * `useProgramFilter` shows, and, when the runbook itself is in an archived
+ * program (a link into the archive), the rest of that program too. Anything
+ * of another archived program stays hidden. With the switch on, everything
+ * shows.
+ */
+function useRunbookScope(runbookId: string): (kind: ProgramEntityKind, id: string) => boolean {
+  return useProgramScope({ kind: 'runbook', id: runbookId });
 }
 
 // ── the state panel — what this runbook is waiting on ──────────────────
@@ -511,13 +530,15 @@ function EnumerationFunnel({ runbook }: { runbook: Runbook }) {
  * a run has nothing to be reconciled against. The protocol supplies the steps.
  */
 function StartDeposition({ runbook }: { runbook: Runbook }) {
-  const protocols = useStore((s) => s.protocols);
+  const allProtocols = useStore((s) => s.protocols);
   const depositions = useStore((s) => s.depositions);
   const openDeposition = useStore((s) => s.openDeposition);
+  const inScope = useRunbookScope(runbook.id);
   const [pick, setPick] = useState(false);
   const [scale, setScale] = useState(1);
 
-  const mine = depositions.filter((d) => d.runbookId === runbook.id);
+  const protocols = allProtocols.filter((p) => inScope('protocol', p.id));
+  const mine = depositions.filter((d) => d.runbookId === runbook.id && inScope('deposition', d.id));
   const blocked = runbook.lockedAt === null;
 
   return (
@@ -580,6 +601,12 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
           onChange={(e) => setScale(Math.max(0.1, Number(e.target.value) || 1))}
           aria-label="Scale multiplier"
         />
+        {protocols.length === 0 && allProtocols.length > 0 && (
+          <p className="text-body text-ink-soft mb-2" data-testid="hidden-by-archive">
+            Every protocol on file is in an archived program, so none is offered here. Settings → Programs shows
+            archived programs again.
+          </p>
+        )}
         <ul className="space-y-1.5 max-h-[320px] overflow-y-auto">
           {protocols.map((p) => (
             <li key={p.id}>
@@ -609,8 +636,9 @@ function StartDeposition({ runbook }: { runbook: Runbook }) {
 /** §9.3 — this runbook's predictions drawn against what its runs measured. */
 function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
   const depositions = useStore((s) => s.depositions);
+  const inScope = useRunbookScope(runbook.id);
   const tested = new Map(
-    ledgerRows([runbook], depositions).map((r) => [r.prediction.id, r]),
+    ledgerRows([runbook], depositions, inScope).map((r) => [r.prediction.id, r]),
   );
   return (
     <div className="mb-4">
@@ -633,6 +661,7 @@ function RunbookLedgerFigure({ runbook }: { runbook: Runbook }) {
 export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const runbooks = useStore((s) => s.runbooks);
   const products = useStore((s) => s.products);
+  const inScope = useRunbookScope(runbookId);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -650,7 +679,7 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
   const product = runbook?.productId
     ? products.find((p) => p.id === runbook.productId)
     : undefined;
-  const strain = runbook?.strainId ? STRAINS_BY_ID[runbook.strainId] : undefined;
+  const strain = runbook?.strainId && inScope('strain', runbook.strainId) ? STRAINS_BY_ID[runbook.strainId] : undefined;
 
   if (!runbook) {
     return (
@@ -708,6 +737,8 @@ export default function RunbookDetail({ runbookId }: { runbookId: string }) {
           </>
         }
       />
+
+      <ArchivedBanner kind="runbook" id={runbook.id} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="chip inline-flex items-center gap-1.5">

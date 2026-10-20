@@ -9,10 +9,19 @@
 // A runbook is not a job. The jobs tray shows the progress bar for whatever is
 // in flight; this board shows the records, including the ones that are not
 // running at all and will not be until somebody acts.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The board, its columns and every count above
+// them read through the store's program filter: a runbook belongs to its own
+// program, else the molecule's, else the host's, and one in an archived
+// program leaves the board while the switch is off. A handoff link from an
+// archived molecule still opens its panel, under the banner that names the
+// program.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { programOf, useProgramFilter, useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOK_STATUS_NOTE, RUNBOOK_STATUS_ORDER } from '@/data/runbooks';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
@@ -24,6 +33,7 @@ import {
   Card,
   EmptyState,
   Explain,
+  LinkButton,
   PageHeader,
   SectionTitle,
   Skeleton,
@@ -175,8 +185,17 @@ function HandoffPanel({ productId }: { productId: string }) {
 }
 
 export default function Runbooks() {
-  const runbooks = useStore((s) => s.runbooks);
-  const products = useStore((s) => s.products);
+  const allRunbooks = useStore((s) => s.runbooks);
+  const allProducts = useStore((s) => s.products);
+  const shows = useProgramFilter();
+  const runbooks = useMemo(() => allRunbooks.filter((r) => shows('runbook', r.id)), [allRunbooks, shows]);
+  const products = useMemo(() => allProducts.filter((p) => shows('product', p.id)), [allProducts, shows]);
+  const hiddenPrograms = useMemo(() => {
+    const ids = new Set(
+      allRunbooks.filter((r) => !shows('runbook', r.id)).map((r) => programOf('runbook', r.id, { runbooks: allRunbooks })),
+    );
+    return PROGRAMS.filter((p) => ids.has(p.id));
+  }, [allRunbooks, shows]);
   const route = useRoute();
   const [ready, setReady] = useState(false);
 
@@ -250,7 +269,12 @@ export default function Runbooks() {
       />
       <OwnerTabs tabs={RUNBOOK_TABS} />
 
-      {handoffId && <HandoffPanel productId={handoffId} />}
+      {handoffId && (
+        <>
+          <ArchivedBanner kind="product" id={handoffId} />
+          <HandoffPanel productId={handoffId} />
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-4 text-caption text-ink-soft">
         <span className="inline-flex items-center gap-1.5">
@@ -309,7 +333,25 @@ export default function Runbooks() {
         ))}
       </div>
 
-      {runbooks.length === 0 && (
+      {runbooks.length === 0 && hiddenPrograms.length > 0 && (
+        <Card>
+          <EmptyState
+            icon={<GitBranch size={22} aria-hidden />}
+            title="Every runbook here is in an archived program"
+            body={
+              <span data-testid="hidden-by-archive">
+                The runbooks in this session belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, through their own
+                program, their molecule or their host, and{' '}
+                {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the board
+                hides them. Settings → Programs shows archived programs again.
+              </span>
+            }
+            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+          />
+        </Card>
+      )}
+
+      {runbooks.length === 0 && hiddenPrograms.length === 0 && (
         <Card>
           <EmptyState
             icon={<GitBranch size={22} aria-hidden />}

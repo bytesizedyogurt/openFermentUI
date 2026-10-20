@@ -11,10 +11,21 @@
 // Every row is modeled: the provenance tick is dashed amber on all 117, and
 // the value-density band is an industry estimate that `aggregateExclusion()`
 // already holds out of every statistic. Nothing here is evidence.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The rows, every count above them, the runbook
+// column and the facets (built from the rows) pass the program selector, so
+// with archived programs hidden no casein or PHA molecule is listed or
+// counted. A `?host=` scope naming an archived host is a link into that host's
+// catalogue: it opens under ArchivedBanner with that program's molecules
+// (`useProgramScope`). When the filter empties the table, the table says what
+// is hidden and where the switch is.
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Boxes, Package, Thermometer, X } from 'lucide-react';
 import type { Product } from '@/data/types';
-import { useStore } from '@/store';
+import { useStore, type ProgramEntityKind, useProgramScope } from '@/store';
+import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
 import { href, navigate, useRoute } from '@/router';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import {
@@ -30,7 +41,7 @@ import { clearanceSeverity } from '@/engine/clearance';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ClearanceChip, CounselCallout } from '@/components/Clearance';
 import { ProvenanceLegend } from '@/components/Provenance';
-import { Card, Explain, PageHeader, Skeleton, cx } from '@/components/ui';
+import { Card, EmptyState, Explain, LinkButton, PageHeader, Skeleton, cx } from '@/components/ui';
 import { referenceFor } from '@/data/reference';
 import { delayClass } from '@/sim/latency';
 
@@ -126,8 +137,10 @@ function LimitationKinds() {
 }
 
 export default function Molecules({ embedded = false }: { embedded?: boolean } = {}) {
-  const products = useStore((s) => s.products);
-  const runbooks = useStore((s) => s.runbooks);
+  const allProducts = useStore((s) => s.products);
+  const allRunbooks = useStore((s) => s.runbooks);
+  const records = useStore((s) => s.records);
+  const depositions = useStore((s) => s.depositions);
   const density = useStore((s) => s.ui.density);
   const route = useRoute();
   const [ready, setReady] = useState(false);
@@ -150,6 +163,26 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
     }
     return out;
   }, [route.query]);
+
+  // OF-BLD-016 §2.2 — the catalogue the program switch lets show, widened to
+  // an archived host's own program when the URL scopes to that host.
+  const hostScope = scopes.find((s) => s.key === 'host')?.value ?? null;
+  const inView = useProgramScope(hostScope ? { kind: 'strain', id: hostScope } : null);
+  const products = useMemo(() => allProducts.filter((p) => inView('product', p.id)), [allProducts, inView]);
+  const runbooks = useMemo(() => allRunbooks.filter((r) => inView('runbook', r.id)), [allRunbooks, inView]);
+  const hidden = useMemo(() => allProducts.filter((p) => !inView('product', p.id)), [allProducts, inView]);
+  const hiddenInScope = useMemo(
+    () => hidden.filter((p) => scopes.every((s) => matchesScope(p, s.key, s.value))),
+    [hidden, scopes],
+  );
+  const hiddenPrograms = useMemo(
+    () =>
+      archivedProgramsOf(
+        hidden.map((p) => ['product', p.id] as [ProgramEntityKind, string]),
+        { records, runbooks: allRunbooks, depositions },
+      ),
+    [hidden, records, allRunbooks, depositions],
+  );
 
   const rows = useMemo(
     () => products.filter((p) => scopes.every((s) => matchesScope(p, s.key, s.value))),
@@ -450,6 +483,8 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
         </span>
       </div>
 
+      {hostScope && <ArchivedBanner kind="strain" id={hostScope} />}
+
       {scopes.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className="text-caption text-ink-soft">Scoped to</span>
@@ -494,22 +529,51 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
           patent status, and none of it is about any particular molecule. */}
       <LimitationKinds />
 
-      <DataTable<Product>
-        rows={rows}
-        columns={columns}
-        rowKey={(p) => p.id}
-        tickOf={(p) => p.provenance}
-        dense={density === 'dense'}
-        onOpen={(p) => navigate(`/dominion/molecules/${p.id}`)}
-        facets={facets}
-        searchOf={(p) =>
-          `${p.name} ${p.aliases.join(' ')} ${PRODUCT_CATEGORY_LABEL[p.category]} ${p.tags.join(' ')} ${p.processCode} ${p.note ?? ''}`
-        }
-        exportName="openferment-molecules"
-        exportNote="Every row is modeled and every value-density band is an industry estimate. The CSV carries the provenance disclosure header; nothing in it is evidence."
-        emptyTitle="No molecules match"
-        emptyBody="Nothing in the catalogue matches the current filters. Clearing the narrowing facet brings the rest back."
-      />
+      {rows.length === 0 && hiddenInScope.length > 0 ? (
+        // The program filter, not the scope, emptied the table: say so.
+        <Card>
+          <EmptyState
+            icon={<Boxes size={22} aria-hidden />}
+            title={scopes.length > 0 ? 'No molecule in an active program fits this scope' : 'No molecule in an active program'}
+            body={
+              <HiddenByArchive
+                subject={
+                  hiddenInScope.length === 1
+                    ? `The one molecule ${scopes.length > 0 ? 'this scope names' : 'in the catalogue'}`
+                    : `The ${hiddenInScope.length} molecules ${scopes.length > 0 ? 'this scope names' : 'in the catalogue'}`
+                }
+                plural={hiddenInScope.length !== 1}
+                programs={archivedProgramsOf(
+                  hiddenInScope.map((p) => ['product', p.id] as [ProgramEntityKind, string]),
+                  { records, runbooks: allRunbooks, depositions },
+                )}
+              />
+            }
+            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+          />
+        </Card>
+      ) : (
+        <DataTable<Product>
+          rows={rows}
+          columns={columns}
+          rowKey={(p) => p.id}
+          tickOf={(p) => p.provenance}
+          dense={density === 'dense'}
+          onOpen={(p) => navigate(`/dominion/molecules/${p.id}`)}
+          facets={facets}
+          searchOf={(p) =>
+            `${p.name} ${p.aliases.join(' ')} ${PRODUCT_CATEGORY_LABEL[p.category]} ${p.tags.join(' ')} ${p.processCode} ${p.note ?? ''}`
+          }
+          exportName="openferment-molecules"
+          exportNote="Every row is modeled and every value-density band is an industry estimate. The CSV carries the provenance disclosure header; nothing in it is evidence."
+          emptyTitle="No molecules match"
+          emptyBody={
+            hiddenPrograms.length > 0
+              ? `Nothing in the catalogue matches the current filters. Clearing the narrowing facet brings the rest back. Molecules of ${hiddenPrograms.map((p) => p.name).join(' and ')}, ${hiddenPrograms.length === 1 ? 'an archived program, are' : 'archived programs, are'} hidden; Settings → Programs shows them again.`
+              : 'Nothing in the catalogue matches the current filters. Clearing the narrowing facet brings the rest back.'
+          }
+        />
+      )}
 
       <p className="text-caption text-ink-soft mt-3 max-w-3xl">
         Facets with shallow depth are labelled black boxes, not failures. A unit operation appears

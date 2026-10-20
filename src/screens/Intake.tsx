@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClipboardCheck, Download, Gauge, Table2 } from 'lucide-react';
 import type { ExtractionRecord } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { useStore, provenanceOf } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { archivedProgramOf, useProgramFilter, useStore, provenanceOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
 import { unitFamily } from '@/engine/units';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
@@ -28,6 +29,7 @@ import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { INTAKE_TABS } from '@/data/tabs';
 import { SubsystemShelf } from '@/components/ReferenceView';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 
 // ── row model ──────────────────────────────────────────────────────────
 
@@ -125,6 +127,14 @@ function StatusCell({ r }: { r: ExtractionRecord }) {
   );
 }
 
+/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
+function archivedNames(paperIds: string[]): string {
+  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
+  return PROGRAMS.filter((p) => hit.has(p.id))
+    .map((p) => p.name)
+    .join(' and ');
+}
+
 // ── screen ─────────────────────────────────────────────────────────────
 
 export default function Intake() {
@@ -157,16 +167,30 @@ export default function Intake() {
 
   const scopedPaper = paperParam ? papers.find((p) => p.id === paperParam) : undefined;
 
+  // OF-BLD-016 §2.2: the table, its facets, its counts and the review session
+  // it starts hold only records whose program shows. A `?paper=` link names a
+  // paper, and opens its records whatever its program, under the banner that
+  // names the program and the switch; every record of a paper shares the
+  // paper's program, so the scope needs no second filter.
+  const shows = useProgramFilter();
+  const hiddenRecords = useMemo(
+    () => (paperParam ? [] : records.filter((r) => !shows('record', r.id))),
+    [records, shows, paperParam],
+  );
+  const hiddenPaperIds = useMemo(() => [...new Set(hiddenRecords.map((r) => r.paperId))], [hiddenRecords]);
+
   const allRows = useMemo<ExRow[]>(
     () =>
-      records.map((rec) => ({
+      records
+        .filter((rec) => (paperParam ? rec.paperId === paperParam : shows('record', rec.id)))
+        .map((rec) => ({
         rec,
         prov: provOf(rec),
         family: unitFamily(rec.unit) ?? 'unrecognised',
         band: bandOf(rec.confidence),
         updated: lastAudit(rec),
       })),
-    [records],
+    [records, shows, paperParam],
   );
 
   // ?paper=SP-004 narrows the whole table before the facets ever see it.
@@ -174,6 +198,19 @@ export default function Intake() {
     () => (paperParam ? allRows.filter((r) => r.rec.paperId === paperParam) : allRows),
     [allRows, paperParam],
   );
+
+  const hiddenLine =
+    hiddenRecords.length > 0 ? (
+      <>
+        <span className="font-num">{hiddenRecords.length}</span> record{hiddenRecords.length === 1 ? '' : 's'} on
+        papers in {archivedNames(hiddenPaperIds)} {hiddenRecords.length === 1 ? 'is' : 'are'} hidden, because
+        archived programs are.{' '}
+        <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+          Settings → Programs
+        </a>{' '}
+        shows them.
+      </>
+    ) : null;
 
   // Identity-stable so DataTable's effect never drives a render loop.
   const handleFiltered = useCallback((next: ExRow[]) => {
@@ -200,7 +237,9 @@ export default function Intake() {
       href: '#/guild',
       provenance: 'user',
     });
-    navigate('/guild');
+    // A paper the program filter hides was opened by a link; the queue keeps
+    // its records only while Guild is told which paper (OF-BLD-016 §2.2).
+    navigate(paperParam && !shows('paper', paperParam) ? `/guild?paper=${encodeURIComponent(paperParam)}` : '/guild');
   };
 
   const exportBoth = () => {
@@ -550,12 +589,21 @@ export default function Intake() {
           actions={headerActions}
         />
         <OwnerTabs tabs={INTAKE_TABS} />
+        {paperParam && <ArchivedBanner kind="paper" id={paperParam} />}
         <Card>
           <EmptyState
             icon={<Table2 size={22} />}
-            title={paperParam ? `No records for ${paperParam}` : 'No extraction records yet'}
-            body={
+            title={
               paperParam
+                ? `No records for ${paperParam}`
+                : hiddenLine
+                  ? 'Every record here is in an archived program'
+                  : 'No extraction records yet'
+            }
+            body={
+              !paperParam && hiddenLine ? (
+                <>{hiddenLine} Nothing was deleted.</>
+              ) : paperParam
                 ? scopedPaper
                   ? `${scopedPaper.title} is in the corpus but nothing has been extracted from it in this session. Run the extractor from the paper reader to stage candidate records.`
                   : `${paperParam} is not a paper in this session's corpus. Session state resets on refresh, so a link from an older session can point at nothing.`
@@ -569,12 +617,17 @@ export default function Intake() {
                     <LinkButton to={`/biorepo/paper/${scopedPaper.id}`}>Open the paper</LinkButton>
                   )}
                 </div>
+              ) : hiddenLine ? (
+                <LinkButton to={PROGRAMS_SETTINGS_PATH}>Show archived programs in Settings</LinkButton>
               ) : (
                 <LinkButton to="/intake/ingest">Open the ingest board</LinkButton>
               )
             }
           />
         </Card>
+        {/* The subsystems stand whatever the table holds: with every record
+            archived (OF-BLD-016 §2.2) the shelf still says what is built. */}
+        <SubsystemShelf owner="Intake" />
       </>
     );
   }
@@ -591,6 +644,7 @@ export default function Intake() {
         actions={headerActions}
       />
       <OwnerTabs tabs={INTAKE_TABS} />
+      {paperParam && <ArchivedBanner kind="paper" id={paperParam} />}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3 text-caption text-ink-soft">
         <span>
@@ -603,6 +657,7 @@ export default function Intake() {
           <span className="font-num text-gold">{goldCount}</span> in the gold set
         </span>
         <ProvenanceLegend />
+        {hiddenLine && <span data-testid="archived-hidden">{hiddenLine}</span>}
       </div>
 
       {scopedPaper && (

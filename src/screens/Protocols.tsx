@@ -2,6 +2,13 @@
 // protocols, with a table view for scanning. Filter state lives in this screen
 // rather than inside DataTable, so switching between card and table view
 // preserves exactly what the user has narrowed to.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The library reads through the store's program
+// filter: a protocol in an archived program leaves the cards, the table, the
+// facet counts, the text filter and the header's totals while the switch is
+// off, and a host in an archived program leaves the organism chips and the
+// Organism facet, so a general protocol written for casein hosts lists none of
+// them. With the switch on, every row and chip is back in its old order.
 import { useEffect, useMemo, useState } from 'react';
 import {
   Beaker,
@@ -27,7 +34,8 @@ import type {
   ProtocolVersion,
   Strain,
 } from '@/data/types';
-import { useStore, provenanceOf } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { programOf, useProgramFilter, useStore, provenanceOf } from '@/store';
 import { href, navigate } from '@/router';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Tick, ProvenanceLegend, type ProvKind } from '@/components/Provenance';
@@ -211,6 +219,8 @@ export function strainLabel(id: string, strains: Strain[]): { label: string; tit
 
 interface ProtoRow {
   protocol: Protocol;
+  /** The protocol's hosts that the program filter shows, in the protocol's order. */
+  organisms: string[];
   version: ProtocolVersion;
   caps: Capabilities;
   prov: ProvKind;
@@ -229,7 +239,7 @@ const EMPTY_SELECTION: Record<FacetKey, string[]> = { category: [], organism: []
 
 function valuesOf(row: ProtoRow, key: FacetKey): string[] {
   if (key === 'category') return [row.protocol.category];
-  if (key === 'organism') return row.protocol.organisms;
+  if (key === 'organism') return row.organisms;
   return capabilityKeys(row.caps);
 }
 
@@ -319,6 +329,21 @@ function CapabilityChips({ caps }: { caps: Capabilities }) {
   );
 }
 
+// ── Hosts hidden with their program ────────────────────────────────────
+
+/** What a protocol's host list says when every host it names is in an archived program. */
+export function HostsArchived() {
+  return (
+    <span
+      className="text-caption text-ink-soft"
+      data-testid="hidden-by-archive"
+      title="The hosts this protocol names belong to archived programs. Settings → Programs shows them again."
+    >
+      Hosts in archived programs
+    </span>
+  );
+}
+
 // ── Card ───────────────────────────────────────────────────────────────
 
 function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
@@ -360,7 +385,8 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
           {protocol.organisms.length === 0 && (
             <span className="text-caption text-ink-soft">Organism-independent</span>
           )}
-          {protocol.organisms.map((o) => {
+          {protocol.organisms.length > 0 && row.organisms.length === 0 && <HostsArchived />}
+          {row.organisms.map((o) => {
             const s = strainLabel(o, strains);
             return (
               <a
@@ -408,7 +434,15 @@ function ProtocolCard({ row, strains }: { row: ProtoRow; strains: Strain[] }) {
 // ── Screen ─────────────────────────────────────────────────────────────
 
 export default function Protocols() {
-  const protocols = useStore((s) => s.protocols);
+  const allProtocols = useStore((s) => s.protocols);
+  const shows = useProgramFilter();
+  const protocols = useMemo(() => allProtocols.filter((p) => shows('protocol', p.id)), [allProtocols, shows]);
+  const hiddenPrograms = useMemo(() => {
+    const ids = new Set(
+      allProtocols.filter((p) => !shows('protocol', p.id)).map((p) => programOf('protocol', p.id, { protocols: allProtocols })),
+    );
+    return PROGRAMS.filter((p) => ids.has(p.id));
+  }, [allProtocols, shows]);
   const records = useStore((s) => s.records);
   const strains = useStore((s) => s.strains);
   const runs = useStore((s) => s.runs);
@@ -439,19 +473,20 @@ export default function Protocols() {
         protocol.versions.find((v) => v.version === protocol.currentVersion) ?? protocol.versions[0];
       return {
         protocol,
+        organisms: protocol.organisms.filter((o) => shows('strain', o)),
         version,
         caps: capabilitiesOf(version),
         prov: protocolProvenance(version, records),
         runCount: runCounts.get(protocol.id) ?? 0,
       };
     });
-  }, [protocols, records, runs]);
+  }, [protocols, records, runs, shows]);
 
   const matchesQuery = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (row: ProtoRow) =>
       q === '' ||
-      `${row.protocol.id} ${row.protocol.title} ${row.protocol.purpose} ${row.protocol.organisms.join(' ')} ${CATEGORY_META[row.protocol.category].label}`
+      `${row.protocol.id} ${row.protocol.title} ${row.protocol.purpose} ${row.organisms.join(' ')} ${CATEGORY_META[row.protocol.category].label}`
         .toLowerCase()
         .includes(q);
   }, [query]);
@@ -605,9 +640,11 @@ export default function Protocols() {
       render: (r) =>
         r.protocol.organisms.length === 0 ? (
           <span className="text-ink-soft">—</span>
+        ) : r.organisms.length === 0 ? (
+          <HostsArchived />
         ) : (
           <span className="flex flex-nowrap gap-1 overflow-hidden">
-            {r.protocol.organisms.slice(0, 2).map((o) => {
+            {r.organisms.slice(0, 2).map((o) => {
               const s = strainLabel(o, strains);
               return (
                 <span key={o} className="chip text-caption text-ink-soft" title={s.title}>
@@ -615,14 +652,14 @@ export default function Protocols() {
                 </span>
               );
             })}
-            {r.protocol.organisms.length > 2 && (
+            {r.organisms.length > 2 && (
               <span className="text-caption text-ink-soft font-num">
-                +{r.protocol.organisms.length - 2}
+                +{r.organisms.length - 2}
               </span>
             )}
           </span>
         ),
-      value: (r) => r.protocol.organisms.join('; '),
+      value: (r) => r.organisms.join('; '),
     },
     {
       key: 'version',
@@ -740,6 +777,28 @@ export default function Protocols() {
         <div className="sr-only" aria-live="polite">
           Loading protocols
         </div>
+      </>
+    );
+  }
+
+  if (allRows.length === 0 && hiddenPrograms.length > 0) {
+    return (
+      <>
+        {header}
+        <Card>
+          <EmptyState
+            title="Every protocol here is in an archived program"
+            body={
+              <span data-testid="hidden-by-archive">
+                The protocols in this session belong to {hiddenPrograms.map((p) => p.name).join(' and ')}, and{' '}
+                {hiddenPrograms.length === 1 ? 'that program is archived' : 'those programs are archived'}, so the library
+                hides them. Settings → Programs shows archived programs again; a link to a protocol still opens it.
+              </span>
+            }
+            icon={<ClipboardList size={22} />}
+            action={<LinkButton to={PROGRAMS_SETTINGS_PATH}>Open Settings → Programs</LinkButton>}
+          />
+        </Card>
       </>
     );
   }

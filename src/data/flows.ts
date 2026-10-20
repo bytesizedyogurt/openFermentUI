@@ -23,7 +23,8 @@
 //
 // Answers name their evidential standing where it changes how the answer should
 // be read, rather than carrying an identical disclaimer everywhere.
-import type { ChatFlow } from './types';
+import type { ChatFlow, ChatSession } from './types';
+import { subjectsShow, type PromptSubject, type SubjectShows } from './livePrompts';
 
 export const FLOWS: ChatFlow[] = [
   // ── F1 — the cross-host prior-art table ─────────────────────────────
@@ -1070,3 +1071,81 @@ export const SUGGESTED_PROMPTS: string[] = [
   'Does phosphorylation actually matter for making cheese?',
   'What is the regulatory status of C. reinhardtii as food?',
 ];
+
+// ── by program (OF-BLD-016 §2.2, E.1′) ────────────────────────────────
+//
+// A flow belongs to whatever program the papers and records it stands on
+// belong to, so a suggested prompt and a follow-up are offered only when
+// every one of them shows through the program selector (`useProgramFilter`
+// in src/store.ts). Nothing here names a program: the subjects are read off
+// the flow itself — the papers its tool calls retrieved and the chips its
+// answer cites — and `programOf` places each one. A flow standing on nothing
+// is general and always shows.
+
+const promptKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+
+/** The flow a prompt is a trigger of, matched as check:seed matches them, or null. */
+export function flowOfPrompt(prompt: string): ChatFlow | null {
+  const b = promptKey(prompt);
+  return (
+    FLOWS.find((f) =>
+      f.triggers.some((t) => {
+        const a = promptKey(t);
+        return a.includes(b) || b.includes(a);
+      }),
+    ) ?? null
+  );
+}
+
+/** What a flow stands on: every paper its tool calls retrieved and every paper or record its answer cites. */
+export function subjectsOfFlow(flow: ChatFlow): PromptSubject[] {
+  const seen = new Set<string>();
+  const out: PromptSubject[] = [];
+  const add = (kind: PromptSubject['kind'], id: string) => {
+    if (seen.has(`${kind}:${id}`)) return;
+    seen.add(`${kind}:${id}`);
+    out.push({ kind, id });
+  };
+  for (const tc of flow.toolCalls) for (const hit of tc.retrieval ?? []) add('paper', hit.paperId);
+  for (const m of flow.answerMd.matchAll(/\[\[([A-Za-z0-9-]+)\]\]/g)) add(m[1].startsWith('r-') ? 'record' : 'paper', m[1]);
+  return out;
+}
+
+/** Whether a flow, by id, is offered: an unknown id stands on nothing and shows. */
+export function flowShows(flowId: string, shows: SubjectShows): boolean {
+  const flow = FLOWS.find((f) => f.id === flowId);
+  return flow ? subjectsShow(subjectsOfFlow(flow), shows) : true;
+}
+
+/** Whether a prompt is offered: the flow it triggers shows, or it triggers none. */
+export function promptShows(prompt: string, shows: SubjectShows): boolean {
+  const flow = flowOfPrompt(prompt);
+  return flow ? subjectsShow(subjectsOfFlow(flow), shows) : true;
+}
+
+/** The suggested prompts a screen offers, in their order. */
+export function suggestedPrompts(shows: SubjectShows): string[] {
+  return SUGGESTED_PROMPTS.filter((p) => promptShows(p, shows));
+}
+
+/**
+ * Whether a chat session is listed: the paper or collection it is scoped to,
+ * every paper its tool calls retrieved, and — when it is named for a
+ * suggested prompt — that prompt's flow, all show. A session about nothing
+ * in particular is general.
+ */
+export function sessionShows(
+  session: ChatSession,
+  shows: SubjectShows,
+  collections: readonly { id: string; paperIds: string[] }[],
+): boolean {
+  const scope = session.scope;
+  if (scope?.kind === 'paper' && !shows('paper', scope.id)) return false;
+  if (scope?.kind === 'collection') {
+    const c = collections.find((x) => x.id === scope.id);
+    if (c && !c.paperIds.every((id) => shows('paper', id))) return false;
+  }
+  for (const m of session.messages)
+    if (m.kind === 'tool') for (const h of m.call.retrieval ?? []) if (!shows('paper', h.paperId)) return false;
+  return !SUGGESTED_PROMPTS.includes(session.title) || promptShows(session.title, shows);
+}

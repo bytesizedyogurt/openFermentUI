@@ -103,6 +103,20 @@ await page.waitForTimeout(1400);
 const dens3 = await page.evaluate(() => document.documentElement.dataset.density);
 check('Ephemeral density RESET on reload', dens3 === dens1, `${dens3}`);
 
+// OF-BLD-016 §2.2 — rb-taq-kigali's run is staged on TAP medium (PR-TAP-01),
+// a casein protocol, and casein is archived: the start dialog offers it only
+// with the switch in Settings → Programs on, so it goes on first, as on the
+// golden path. The Durable tier keeps it across the reloads below.
+await go('/settings/programs');
+{
+  const sw = page.locator('[data-testid="show-archived"]');
+  await sw.waitFor({ timeout: 8000 }).catch(() => {});
+  if ((await sw.count()) && !(await sw.isChecked())) await sw.check().catch(() => {});
+  await page.waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 }).catch(() => {});
+  check('archived programs show once the switch is on', (await sw.count()) === 1 && (await sw.isChecked()));
+  await page.waitForTimeout(600);
+}
+
 // OF-BLD-014 §7.1 — readings' sample times and a series' role survive a reload.
 await go('/runbooks/rb-taq-kigali');
 await page.getByRole('button', { name: /Start a deposition/ }).click();

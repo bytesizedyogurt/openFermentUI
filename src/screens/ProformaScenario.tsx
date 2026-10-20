@@ -1,6 +1,11 @@
 // Scenario workspace (OF-DES-001 §8.13). Read it like an instrument: every
 // assumption ticked, the waterfall always summing to the headline, and
 // simulation treated as work rather than magic.
+//
+// PROGRAMS (OF-BLD-016 §2.2). A scenario in an archived program has left
+// Proforma's index, but its link still opens it here, under the banner that
+// names the program and the switch, for an authored surface and a BioSTEAM
+// scenario alike.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart,
@@ -29,6 +34,7 @@ import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } fro
 import { CitationChip } from '@/components/Chip';
 import { Tick, ProvenanceBadge } from '@/components/Provenance';
 import { Tornado } from '@/components/figures';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import ProformaBiosteam from './ProformaBiosteam';
 
 const CONVERGE_STAGES = ['Building flowsheet', 'Converging', 'Costing'];
@@ -653,5 +659,10 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
 /** An authored surface, or a BioSTEAM scenario the service simulates (§8.4). */
 export default function ProformaScenario({ scenarioId }: { scenarioId: string }) {
   const scenario = useStore((s) => s.scenarios.find((x) => x.id === scenarioId));
-  return scenario?.kind === 'biosteam' ? <ProformaBiosteam scenario={scenario} /> : <AuthoredScenario scenarioId={scenarioId} />;
+  return (
+    <>
+      {scenario && <ArchivedBanner kind="scenario" id={scenario.id} />}
+      {scenario?.kind === 'biosteam' ? <ProformaBiosteam scenario={scenario} /> : <AuthoredScenario scenarioId={scenarioId} />}
+    </>
+  );
 }

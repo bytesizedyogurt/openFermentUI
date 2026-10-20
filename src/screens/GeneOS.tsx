@@ -21,10 +21,16 @@
 // the gap between ceiling and achieved titre is exactly what reconciliation
 // measures. A reader who does not know where that line falls will look for
 // titre here and conclude the platform lost it.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The Hosts badge and count, and every molecule
+// count on the Pathway view, pass the program selector; a route that only
+// archived molecules declare leaves the Pathway list with them, while a route
+// nobody declares still reads "on none". With the switch on, all as before.
 import { useMemo } from 'react';
 import { STRAINS } from '@/data/strains';
 import { PATHWAYS } from '@/data/vocabulary';
 import { PRODUCTS } from '@/data/products';
+import { useProgramFilter } from '@/store';
 import { href, useRoute } from '@/router';
 import { Callout, Card, PageHeader, SectionTitle, cx } from '@/components/ui';
 import GeneOSModel from './GeneOSModel';
@@ -44,17 +50,23 @@ import Organisms from './Organisms';
  * that have no code, and they are named on the shelf below.
  */
 function PathwayView() {
-  const usage = useMemo(() => {
+  const shows = useProgramFilter();
+  const { usage, hiddenUsage } = useMemo(() => {
     const counts = new Map<string, number>();
+    const hidden = new Map<string, number>();
     for (const product of PRODUCTS) {
+      const into = shows('product', product.id) ? counts : hidden;
       for (const id of product.pathwayIds ?? []) {
-        counts.set(id, (counts.get(id) ?? 0) + 1);
+        into.set(id, (into.get(id) ?? 0) + 1);
       }
     }
-    return counts;
-  }, []);
+    return { usage: counts, hiddenUsage: hidden };
+  }, [shows]);
 
-  const unused = PATHWAYS.filter((p) => !usage.has(p.id)).length;
+  // A route only archived molecules declare belongs to them and is hidden
+  // with them; a route nobody declares stays, and reads "on none".
+  const routes = PATHWAYS.filter((p) => usage.has(p.id) || !hiddenUsage.has(p.id));
+  const unused = routes.filter((p) => !usage.has(p.id)).length;
 
   return (
     <>
@@ -69,7 +81,7 @@ function PathwayView() {
         <SectionTitle
           right={
             <span className="font-num text-caption text-ink-soft">
-              {PATHWAYS.length} routes
+              {routes.length} routes
               {unused > 0 ? ` · ${unused} on no molecule` : ''}
             </span>
           }
@@ -78,7 +90,7 @@ function PathwayView() {
         </SectionTitle>
         <Card className="px-4 py-1">
           <ul>
-            {PATHWAYS.map((pathway) => {
+            {routes.map((pathway) => {
               const used = usage.get(pathway.id) ?? 0;
               return (
                 <li key={pathway.id} className="py-2.5 border-b border-line/70 last:border-0">
@@ -143,13 +155,24 @@ function StoichiometryToDynamics() {
 
 export default function GeneOS() {
   const route = useRoute();
+  const shows = useProgramFilter();
+  // OF-BLD-016 §2.2 — the counts the program switch lets show.
+  const hosts = useMemo(() => STRAINS.filter((s) => shows('strain', s.id)).length, [shows]);
+  const routeCount = useMemo(() => {
+    const declared = new Map<string, boolean>();
+    for (const product of PRODUCTS) {
+      const shown = shows('product', product.id);
+      for (const id of product.pathwayIds ?? []) declared.set(id, (declared.get(id) ?? false) || shown);
+    }
+    return PATHWAYS.filter((p) => declared.get(p.id) !== false).length;
+  }, [shows]);
   const tabs: OwnerTab[] = useMemo(
     () => [
-      { label: 'Hosts', to: '/geneos/hosts', badge: STRAINS.length },
-      { label: 'Pathway', to: '/geneos/pathway', badge: PATHWAYS.length },
+      { label: 'Hosts', to: '/geneos/hosts', badge: hosts },
+      { label: 'Pathway', to: '/geneos/pathway', badge: routeCount },
       { label: 'Model', to: '/geneos/model' },
     ],
-    [],
+    [hosts, routeCount],
   );
   const active = activeTab(route.path, tabs);
   const onPathway = active === '/geneos/pathway';
@@ -194,8 +217,8 @@ export default function GeneOS() {
           component="geneOS"
           action={
             onPathway
-              ? `${PATHWAYS.length} routes, no pathway model`
-              : `${STRAINS.length} hosts, no chassis recommendation`
+              ? `${routeCount} routes, no pathway model`
+              : `${hosts} hosts, no chassis recommendation`
           }
         />
       </div>

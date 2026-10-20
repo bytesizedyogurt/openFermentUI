@@ -25,6 +25,16 @@ const go=async h=>{await p.goto('http://localhost:4324/#'+h,{waitUntil:'networki
 const res=[];
 const ck=(n,ok,d='')=>{res.push(ok);console.log((ok?'✓ ':'✗ ')+n+(d?' — '+d:''));};
 
+// OF-BLD-016 §2.2 — the scenarios and protocol below are casein, an archived
+// program: the switch in Settings → Programs goes on first, as on the golden
+// path, and every `go` after it keeps the store.
+await go('/settings/programs');
+const archiveSwitch = p.locator('[data-testid="show-archived"]');
+await archiveSwitch.waitFor({ timeout: 8000 }).catch(() => {});
+if ((await archiveSwitch.count()) && !(await archiveSwitch.isChecked())) await archiveSwitch.check().catch(() => {});
+await p.waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 }).catch(() => {});
+ck('Archived programs show once the switch is on', (await archiveSwitch.count())===1 && await archiveSwitch.isChecked());
+
 // Ingest: the scripted SP-020 parse failure and its recovery
 await go('/biorepo/ingest');
 const shelfBtns = p.locator('button[aria-label*="to the ingest pipeline"]');

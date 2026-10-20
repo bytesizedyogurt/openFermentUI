@@ -2,7 +2,7 @@
 // provenance-affecting changes fan out to derived views in one place.
 // No localStorage/sessionStorage anywhere — session-only by design (§9.5);
 // what must survive a reload goes to the Durable tier (src/lib/durable.ts).
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import type {
   InputAssumption,
@@ -3787,16 +3787,63 @@ export function archivedProgramOf(kind: ProgramEntityKind, id: string, s: Progra
  *   const papers = allPapers.filter((p) => shows('paper', p.id));
  *
  * It re-renders the component when the switch moves, a candidate arrives,
- * a runbook is adopted or a deposition starts.
+ * a runbook is adopted, a scenario is copied or a deposition starts. Every
+ * list `programOf` reads comes from the store, so a copy of an archived
+ * scenario (which keeps its `program`) stays with its program.
  */
 export function useProgramFilter(): (kind: ProgramEntityKind, id: string) => boolean {
   const showArchived = useStore((s) => s.showArchived);
-  const records = useStore((s) => s.records);
-  const runbooks = useStore((s) => s.runbooks);
-  const depositions = useStore((s) => s.depositions);
+  const lookup = useProgramLookup();
   return useCallback(
-    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { showArchived, records, runbooks, depositions }),
-    [showArchived, records, runbooks, depositions],
+    (kind: ProgramEntityKind, id: string) => programVisible(kind, id, { ...lookup, showArchived }),
+    [showArchived, lookup],
+  );
+}
+
+/**
+ * The program filter as a page that names one entity applies it.
+ *
+ * Every list on the page filters through `useProgramFilter`, with one
+ * widening: when the page's own entity belongs to an archived program (a deep
+ * link to cw15's strain page, a runbook or lesson opened from an old link),
+ * what belongs to that same program shows too, because the link opens what
+ * it names and the page sits under ArchivedBanner saying so. Anything of
+ * another archived program stays hidden. With no page entity, or a general
+ * or active one, this is `useProgramFilter` itself.
+ */
+export function useProgramScope(
+  page?: { kind: ProgramEntityKind; id: string | null | undefined } | null,
+): (kind: ProgramEntityKind, id: string) => boolean {
+  const shows = useProgramFilter();
+  const lookup = useProgramLookup();
+  const kind = page?.kind;
+  const id = page?.id;
+  const own = useMemo(
+    () => (kind && id ? archivedProgramOf(kind, id, lookup)?.id ?? null : null),
+    [kind, id, lookup],
+  );
+  return useCallback(
+    (k: ProgramEntityKind, x: string) => shows(k, x) || (own !== null && programOf(k, x, lookup) === own),
+    [shows, own, lookup],
+  );
+}
+
+/**
+ * The store's lists `programOf` reads, as one value that changes only when
+ * one of them does: what `useProgramFilter` and `ArchivedBanner` ask with.
+ */
+export function useProgramLookup(): ProgramLookup {
+  const records = useStore((s) => s.records);
+  const strains = useStore((s) => s.strains);
+  const products = useStore((s) => s.products);
+  const scenarios = useStore((s) => s.scenarios);
+  const protocols = useStore((s) => s.protocols);
+  const runbooks = useStore((s) => s.runbooks);
+  const modules = useStore((s) => s.modules);
+  const depositions = useStore((s) => s.depositions);
+  return useMemo(
+    () => ({ records, strains, products, scenarios, protocols, runbooks, modules, depositions }),
+    [records, strains, products, scenarios, protocols, runbooks, modules, depositions],
   );
 }
 

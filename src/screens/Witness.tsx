@@ -17,7 +17,8 @@ import {
 import type { Candidate, ExtractionRecord, ExtractorRun, FieldId, ReviewDecision, RunOutput } from '@/data/types';
 import { fieldName } from '@/data/ontology';
 import { isNewCandidate } from '@/lib/review';
-import { useStore } from '@/store';
+import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
+import { archivedProgramOf, useProgramFilter, useStore } from '@/store';
 import { computeRunMetrics, type FieldMetrics, type RunMetrics } from '@/engine/metrics';
 import { GOLD_SET_PLAN, GOLD_SET_DIFFICULTY_CASES } from '@/data/runOutputs';
 import { ONTOLOGY_GAPS } from '@/data/ontology';
@@ -231,23 +232,66 @@ function relativeGap(
 
 type SortKey = 'field' | 'nGold' | 'precision' | 'recall' | 'f1' | 'topFailure';
 
+/** The archived programs some hidden papers belong to, named in PROGRAMS order. */
+function archivedNames(paperIds: string[]): string {
+  const hit = new Set(paperIds.map((id) => archivedProgramOf('paper', id)?.id));
+  return PROGRAMS.filter((p) => hit.has(p.id))
+    .map((p) => p.name)
+    .join(' and ');
+}
+
+/** "… in Casein … Settings → Programs shows them." for a callout or an empty state. */
+function SettingsLink() {
+  return (
+    <a className="text-accent underline underline-offset-2" href={href(PROGRAMS_SETTINGS_PATH)}>
+      Settings → Programs
+    </a>
+  );
+}
+
 export default function Witness() {
-  const runOutputs = useStore((s) => s.runOutputs);
-  const records = useStore((s) => s.records);
-  const papers = useStore((s) => s.papers);
+  const runOutputsAll = useStore((s) => s.runOutputs);
+  const recordsAll = useStore((s) => s.records);
+  const papersAll = useStore((s) => s.papers);
+  // OF-BLD-016 §2.2: Witness scores what shows. With archived programs
+  // hidden (the default) a record, a paper, a run's scored value, a rejected
+  // candidate and a planned gold-set row from a casein or PHA paper leave
+  // every number and list here, and a callout says how many and where the
+  // switch is; with the switch on, every list below is the whole set as
+  // before. The retrieval scorecard is the service's report and is not
+  // filtered here.
+  const shows = useProgramFilter();
+  const records = useMemo(() => recordsAll.filter((r) => shows('record', r.id)), [recordsAll, shows]);
+  const papers = useMemo(() => papersAll.filter((p) => shows('paper', p.id)), [papersAll, shows]);
+  const runOutputs = useMemo<RunOutput[]>(
+    () =>
+      runOutputsAll.map((run) => ({
+        ...run,
+        results: run.results.filter((res) => shows('record', res.goldRecordId)),
+        falsePositives: run.falsePositives.filter((fp) => shows('paper', fp.paperId)),
+      })),
+    [runOutputsAll, shows],
+  );
   // §6.2 — candidates the seed has no record for: the corpus growing, unscored.
   const overlayCandidates = useStore((s) => s.overlay?.candidates ?? NO_CANDIDATES);
   const overlayRecords = useStore((s) => s.overlay?.records ?? NO_DECISIONS);
   // A candidate a reviewer has decided is a record or a false positive now,
   // not an unscored one (§7.3).
-  const unscored = useMemo(() => {
-    const local = new Map(records.map((r) => [r.id, r]));
+  const unscoredAll = useMemo(() => {
+    const local = new Map(recordsAll.map((r) => [r.id, r]));
     return overlayCandidates.filter((c) => {
-      if (overlayRecords[c.id] || !isNewCandidate(c, records)) return false;
+      if (overlayRecords[c.id] || !isNewCandidate(c, recordsAll)) return false;
       const mine = local.get(c.id);
       return !mine || (mine.status === 'unverified' && !mine.gold);
     });
-  }, [overlayCandidates, overlayRecords, records]);
+  }, [overlayCandidates, overlayRecords, recordsAll]);
+  const unscored = useMemo(() => unscoredAll.filter((c) => shows('paper', c.paperId)), [unscoredAll, shows]);
+  // What the program filter holds back, for the callout that says so.
+  const planRows = useMemo(() => GOLD_SET_PLAN.filter((p) => shows('paper', p.paperId)), [shows]);
+  const gapRows = useMemo(
+    () => ONTOLOGY_GAPS.filter((g) => g.entry.split(' · ').some((id) => shows('paper', id))),
+    [shows],
+  );
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
   const palette = useCategorical();
@@ -331,6 +375,22 @@ export default function Witness() {
   const run = orderedRuns[activeIdx];
   const metrics = allMetrics[activeIdx];
   const prevMetrics = activeIdx > 0 ? allMetrics[activeIdx - 1] : null;
+
+  // OF-BLD-016 §2.2 — what this run scored on papers the filter hides.
+  const hidden = useMemo(() => {
+    const whole = run ? runOutputsAll.find((r) => r.run === run.run) : undefined;
+    const results = whole ? whole.results.filter((res) => !shows('record', res.goldRecordId)) : [];
+    const fps = whole ? whole.falsePositives.filter((fp) => !shows('paper', fp.paperId)) : [];
+    const cands = unscoredAll.filter((c) => !shows('paper', c.paperId));
+    const byId = new Map(recordsAll.map((r) => [r.id, r]));
+    const paperIds = [
+      ...results.map((res) => byId.get(res.goldRecordId)?.paperId ?? ''),
+      ...fps.map((fp) => fp.paperId),
+      ...cands.map((c) => c.paperId),
+    ];
+    return { results: results.length, fps: fps.length, unscored: cands.length, names: archivedNames(paperIds) };
+  }, [run, runOutputsAll, unscoredAll, recordsAll, shows]);
+  const anyHidden = hidden.results + hidden.fps + hidden.unscored > 0;
 
   const mismatches = useMemo<MismatchRow[]>(() => {
     if (!run) return [];
@@ -508,7 +568,7 @@ export default function Witness() {
   // catalogued: the curator's notes stand in for source text, so there are no
   // source spans to annotate a gold set against and nothing to score.
   if (!run || !metrics) {
-    const plannedRecords = GOLD_SET_PLAN.reduce((n, p) => n + p.records, 0);
+    const plannedRecords = planRows.reduce((n, p) => n + p.records, 0);
     return (
       <>
         {header(<LinkButton to="/biorepo">Open BioRepo</LinkButton>)}
@@ -517,7 +577,8 @@ export default function Witness() {
           <Callout kind="info" title="No extractor has been run against this corpus yet">
             <p className="mb-2">
               Every one of the{' '}
-              <span className="font-num">{papers.length}</span> entries is{' '}
+              <span className="font-num">{papers.length}</span> entries
+              {papers.length < papersAll.length ? ' in the programs showing' : ''} is{' '}
               <strong>catalogued</strong>, not ingested: the curator&rsquo;s notes stand in for the
               source text. There are no parsed source spans to annotate a gold set against, and no
               extractor output to compare with one.
@@ -529,6 +590,23 @@ export default function Witness() {
             </p>
           </Callout>
 
+          {(planRows.length < GOLD_SET_PLAN.length || gapRows.length < ONTOLOGY_GAPS.length) && (
+            <Callout kind="info" title="What is planned here is in archived programs">
+              <span data-testid="archived-hidden">
+                {GOLD_SET_PLAN.length - planRows.length} of the {GOLD_SET_PLAN.length} papers planned for the
+                gold set, and {ONTOLOGY_GAPS.length - gapRows.length} of the {ONTOLOGY_GAPS.length} entries
+                holding values the ontology cannot, are in{' '}
+                {archivedNames(
+                  [...GOLD_SET_PLAN.map((p) => p.paperId), ...ONTOLOGY_GAPS.flatMap((g) => g.entry.split(' · '))].filter(
+                    (id) => !shows('paper', id),
+                  ),
+                )}
+                . Archived programs are hidden; <SettingsLink /> shows them.
+              </span>
+            </Callout>
+          )}
+
+          {planRows.length > 0 && (
           <Card className="p-4">
             <div className="flex items-baseline justify-between gap-3 mb-1">
               <h2 className="font-serif text-section-title font-semibold">Gold set — planned</h2>
@@ -537,9 +615,9 @@ export default function Witness() {
               </span>
             </div>
             <p className="text-body text-ink-soft mb-3">
-              {GOLD_SET_PLAN.length} papers, weighted toward fields with enough independent
+              {planRows.length} papers, weighted toward fields with enough independent
               measurements to make precision and recall mean something.{' '}
-              {GOLD_SET_PLAN.some((p) => p.blocked) && (
+              {planRows.some((p) => p.blocked) && (
                 <span className="text-signal-warn">
                   One row is blocked: the ontology has no field for what it asks for.
                 </span>
@@ -556,7 +634,7 @@ export default function Witness() {
                   </tr>
                 </thead>
                 <tbody>
-                  {GOLD_SET_PLAN.map((p) => (
+                  {planRows.map((p) => (
                     <tr key={p.paperId} className="border-b border-line/60 align-top">
                       <td className="py-1.5">
                         <CitationChip paperId={p.paperId} />
@@ -572,7 +650,10 @@ export default function Witness() {
               </table>
             </div>
           </Card>
+          )}
 
+          {/* The difficulty cases belong to the plan above: they name its papers. */}
+          {planRows.length > 0 && (
           <Card className="p-4">
             <h2 className="font-serif text-section-title font-semibold mb-2">
               Difficulty cases the gold set must include
@@ -589,7 +670,9 @@ export default function Witness() {
               ))}
             </ul>
           </Card>
+          )}
 
+          {gapRows.length > 0 && (
           <Card className="p-4">
             <h2 className="font-serif text-section-title font-semibold mb-1">
               Values the ontology cannot hold
@@ -600,7 +683,7 @@ export default function Witness() {
               quietly absorbs values it was not designed for produces confident nonsense.
             </p>
             <div className="space-y-2">
-              {ONTOLOGY_GAPS.map((g) => (
+              {gapRows.map((g) => (
                 <div key={g.entry} className="tick tick-industry-estimate">
                   <div className="flex items-baseline gap-2">
                     <span className="font-num text-caption text-ink-soft">{g.entry}</span>
@@ -611,6 +694,7 @@ export default function Witness() {
               ))}
             </div>
           </Card>
+          )}
 
           <Card className="p-4">
             <h2 className="font-serif text-section-title font-semibold mb-2">What unblocks this</h2>
@@ -742,6 +826,27 @@ export default function Witness() {
         </div>
       )}
 
+      {anyHidden && (
+        <div className="mb-4">
+          <Callout kind="info" title="Scored on the programs showing">
+            <span data-testid="archived-hidden">
+              {[
+                hidden.results > 0 &&
+                  `${hidden.results} of ${RUN_LABEL[run.run] ?? run.run}'s scored value${hidden.results === 1 ? '' : 's'}`,
+                hidden.fps > 0 && `${hidden.fps} rejected candidate${hidden.fps === 1 ? '' : 's'}`,
+                hidden.unscored > 0 && `${hidden.unscored} unscored candidate${hidden.unscored === 1 ? '' : 's'}`,
+              ]
+                .filter((x): x is string => Boolean(x))
+                .join(', ')
+                .replace(/, (?=[^,]*$)/, ' and ')}{' '}
+              {hidden.results + hidden.fps + hidden.unscored === 1 ? 'is' : 'are'} on papers in {hidden.names}, and
+              every number on this page leaves them out. Archived programs are hidden; <SettingsLink /> shows
+              them.
+            </span>
+          </Callout>
+        </div>
+      )}
+
       {partial && (
         <div className="mb-4">
           <Callout kind="warn" title="Partial results — read the headline with that in mind">
@@ -762,7 +867,10 @@ export default function Witness() {
 
       {metrics.goldSize === 0 && (
         <div className="mb-4">
-          <Callout kind="warn" title="No gold annotations in this session">
+          <Callout
+            kind="warn"
+            title={anyHidden ? 'No gold annotations in the programs showing' : 'No gold annotations in this session'}
+          >
             Precision and recall are undefined without a gold set. Flag records for gold in the
             review queue and this screen fills in.
           </Callout>
@@ -901,7 +1009,11 @@ export default function Witness() {
         {sortedFields.length === 0 ? (
           <EmptyState
             title="No fields scored"
-            body="This run produced no results that map onto a gold record in the current session."
+            body={
+              anyHidden
+                ? 'This run produced no results that map onto a gold record in the programs showing. The ones on papers in archived programs are hidden; Settings → Programs shows them.'
+                : 'This run produced no results that map onto a gold record in the current session.'
+            }
           />
         ) : (
           <table className="w-full border-collapse" style={{ fontSize: 'var(--table-fs)' }}>
@@ -1029,7 +1141,12 @@ export default function Witness() {
       </div>
 
       <Card className="overflow-x-auto">
-        {mismatches.length === 0 ? (
+        {mismatches.length === 0 && run.results.length === 0 && run.falsePositives.length === 0 && anyHidden ? (
+          <EmptyState
+            title="Nothing scored in the programs showing"
+            body="Every value this run was scored on, and every candidate a reviewer rejected, is on a paper in an archived program. Archived programs are hidden; Settings → Programs shows them."
+          />
+        ) : mismatches.length === 0 ? (
           <EmptyState
             title="No mismatches in this run"
             body="Every scored gold record matched and the run produced no spurious extractions. With a gold set this small that is a statement about the gold set, not about the extractor."

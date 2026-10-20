@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import type { ExtractionRecord, FieldId, Job, Paper } from '@/data/types';
 import { fieldName } from '@/data/ontology';
-import { useStore, provenanceOf, tickClass } from '@/store';
+import { useProgramFilter, useStore, provenanceOf, tickClass } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate } from '@/router';
 import { Quantity } from '@/components/QuantityField';
 import { ProvenanceLegend, provMeta, type ProvKind } from '@/components/Provenance';
@@ -121,7 +122,19 @@ export default function PaperReader({
 }) {
   const paper = useStore((s) => s.papers.find((p) => p.id === paperId));
   const records = useStore((s) => s.records);
-  const collections = useStore((s) => s.collections);
+  // OF-BLD-016 §2.2: a link opens any paper, and one in an archived program
+  // opens under the banner that names it; the collection chooser offers the
+  // collections BioRepo lists — empty ones, and those holding a paper that
+  // shows — and any that already hold this paper.
+  const shows = useProgramFilter();
+  const allCollections = useStore((s) => s.collections);
+  const collections = useMemo(
+    () =>
+      allCollections.filter(
+        (c) => c.paperIds.length === 0 || c.paperIds.includes(paperId) || c.paperIds.some((id) => shows('paper', id)),
+      ),
+    [allCollections, shows, paperId],
+  );
   const jobs = useStore((s) => s.jobs);
   const unitMode = useStore((s) => s.ui.unitMode);
   const reducedMotion = useStore((s) => s.ui.reducedMotion);
@@ -411,6 +424,7 @@ export default function PaperReader({
 
   const article = (
     <article className="flex-1 min-w-0 max-w-[760px]">
+      <ArchivedBanner kind="paper" id={paper.id} />
       <div className="mb-3 flex items-center gap-2 text-caption text-ink-soft">
         <a href={href('/biorepo')} className="inline-flex items-center gap-1 hover:text-accent">
           <ArrowLeft size={12} /> Library
@@ -820,7 +834,11 @@ export default function PaperReader({
                 Add <span className="font-num">{paper.id}</span> to:
               </div>
               {collections.length === 0 && (
-                <div className="text-body text-ink-soft">No collections exist in this session.</div>
+                <div className="text-body text-ink-soft">
+                  {allCollections.length > 0
+                    ? 'Every collection in this session holds only papers in archived programs, which are hidden. Settings → Programs shows them.'
+                    : 'No collections exist in this session.'}
+                </div>
               )}
               {collections.map((c) => {
                 const already = c.paperIds.includes(paper.id);
@@ -836,7 +854,7 @@ export default function PaperReader({
                   >
                     <span className="truncate">{c.name}</span>
                     <span className="font-num text-caption text-ink-soft shrink-0">
-                      {already ? 'already in' : c.paperIds.length}
+                      {already ? 'already in' : c.paperIds.filter((id) => shows('paper', id)).length}
                     </span>
                   </button>
                 );

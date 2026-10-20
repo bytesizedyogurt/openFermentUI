@@ -18,10 +18,12 @@ import {
   Search,
   Sparkles,
   CornerDownLeft,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
-import { useStore } from '@/store';
+import { useStore, useProgramFilter } from '@/store';
 import { navigate } from '@/router';
+import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import { RUNBOOK_STATUS_LABEL } from '@/data/runbooks';
 import { RAIL, SUB_VIEWS } from '@/data/nav';
@@ -55,6 +57,13 @@ function scoreItem(query: string, it: Item): number {
   return Math.max(direct, viaAlias);
 }
 
+/**
+ * A hidden item counts as a match for the "hidden in archived programs" line
+ * only when its label or an alias contains the query: the fuzzy subsequence
+ * score would find one in nearly any title and say so for every query.
+ */
+const HIDDEN_MATCH = 60;
+
 function score(query: string, label: string): number {
   if (!query) return 1;
   const q = query.toLowerCase();
@@ -79,6 +88,10 @@ export function CommandPalette() {
   const scenarios = useStore((s) => s.scenarios);
   const records = useStore((s) => s.records);
   const resetDemo = useStore((s) => s.resetDemo);
+  // Every entity the palette finds passes through the program selector
+  // (OF-BLD-016 §2.2): with archived programs hidden, the default, none of
+  // theirs is a result, and with the switch on the palette is as it was.
+  const shows = useProgramFilter();
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +103,11 @@ export function CommandPalette() {
     setSel(0);
   };
 
-  const items = useMemo<Item[]>(() => {
+  const { items, hidden } = useMemo<{ items: Item[]; hidden: Item[] }>(() => {
+    // An entity whose program is hidden goes to `hidden`, which is never a
+    // result: it only lets the palette say that a match was hidden, and where
+    // the switch is.
+    const hidden: Item[] = [];
     // Built from the vocabulary module rather than restated here, so a name
     // can only be changed in one place (§2.2 as revised).
     const nav: Item[] = [
@@ -115,11 +132,20 @@ export function CommandPalette() {
       { id: 'n-ing', group: 'Navigate', label: 'Intake — ingest board', hint: 'what is queued, fetched, failed', aliases: ['ingest', 'library ingest', 'fetch'], icon: Library, run: () => navigate('/intake/ingest') },
       { id: 'n-cmp', group: 'Navigate', label: 'Proforma — compare scenarios', aliases: ['compare', 'simulate compare'], icon: LineChart, run: () => navigate('/biorepo/compare') },
       { id: 'n-set', group: 'Navigate', label: 'Settings', icon: SettingsIcon, run: () => navigate('/settings/appearance') },
+      {
+        id: 'n-programs',
+        group: 'Navigate',
+        label: 'Settings — Programs',
+        hint: 'active and archived programs, and the switch',
+        aliases: ['programs', 'archived', 'archive', 'show archived'],
+        icon: Layers,
+        run: () => navigate(PROGRAMS_SETTINGS_PATH),
+      },
       { id: 'n-arch', group: 'Navigate', label: 'Architecture — the eighteen components', hint: 'what every name means', aliases: ['components', 'names', 'glossary', 'vocabulary', 'map'], icon: Boxes, run: () => navigate('/settings/architecture') },
       { id: 'n-abt', group: 'Navigate', label: 'About & colophon', icon: SettingsIcon, run: () => navigate('/settings/about') },
     ];
     for (const p of papers) {
-      nav.push({
+      (shows('paper', p.id) ? nav : hidden).push({
         id: `p-${p.id}`,
         group: 'Navigate',
         label: `${p.id} — ${p.title}`,
@@ -129,7 +155,7 @@ export function CommandPalette() {
       });
     }
     for (const s of strains) {
-      nav.push({
+      (shows('strain', s.id) ? nav : hidden).push({
         id: `s-${s.id}`,
         group: 'Navigate',
         label: `${s.binomial} ${s.designation}`,
@@ -139,7 +165,7 @@ export function CommandPalette() {
       });
     }
     for (const p of products) {
-      nav.push({
+      (shows('product', p.id) ? nav : hidden).push({
         id: `mo-${p.id}`,
         group: 'Navigate',
         label: p.name,
@@ -149,7 +175,7 @@ export function CommandPalette() {
       });
     }
     for (const r of runbooks) {
-      nav.push({
+      (shows('runbook', r.id) ? nav : hidden).push({
         id: `rb-${r.id}`,
         group: 'Navigate',
         label: r.title,
@@ -159,7 +185,7 @@ export function CommandPalette() {
       });
     }
     for (const p of protocols) {
-      nav.push({
+      (shows('protocol', p.id) ? nav : hidden).push({
         id: `pr-${p.id}`,
         group: 'Navigate',
         label: p.title,
@@ -169,7 +195,7 @@ export function CommandPalette() {
       });
     }
     for (const s of scenarios) {
-      nav.push({
+      (shows('scenario', s.id) ? nav : hidden).push({
         id: `sc-${s.id}`,
         group: 'Navigate',
         label: s.name,
@@ -184,7 +210,7 @@ export function CommandPalette() {
         id: 'a-review',
         group: 'Actions',
         label: 'Open Guild — start a review session',
-        hint: `${records.filter((r) => r.status === 'unverified').length} unverified`,
+        hint: `${records.filter((r) => r.status === 'unverified' && shows('record', r.id)).length} unverified`,
         run: () => navigate('/guild'),
       },
       {
@@ -242,15 +268,23 @@ export function CommandPalette() {
         id: 'a-blocked',
         group: 'Actions',
         label: 'Show molecules with blocking patent claims',
-        hint: `${products.filter((p) => p.clearanceState === 'blocked').length} blocked`,
+        hint: `${products.filter((p) => p.clearanceState === 'blocked' && shows('product', p.id)).length} blocked`,
         run: () => navigate('/dominion/molecules?clearance=blocked'),
       },
       { id: 'a-help', group: 'Actions', label: 'Keyboard shortcuts', run: () => useStore.getState().setUI({ helpOpen: true }) },
       { id: 'a-reset', group: 'Actions', label: 'Reset demo data', run: resetDemo },
     ];
 
-    return [...nav, ...actions];
-  }, [papers, strains, products, runbooks, protocols, scenarios, records, resetDemo]);
+    // An action that opens an entity is offered while that entity shows.
+    const opens: Record<string, [Parameters<typeof shows>[0], string]> = {
+      'a-newsc': ['scenario', 'sc-s1'],
+      'a-rb-example': ['runbook', 'rb-brazzein'],
+    };
+    const offered = actions.filter((a) => !opens[a.id] || shows(...opens[a.id]));
+    hidden.push(...actions.filter((a) => !offered.includes(a)));
+
+    return { items: [...nav, ...offered], hidden };
+  }, [papers, strains, products, runbooks, protocols, scenarios, records, resetDemo, shows]);
 
   const results = useMemo(() => {
     const scored = items
@@ -259,6 +293,19 @@ export function CommandPalette() {
       .sort((a, b) => b.s - a.s)
       .slice(0, 30)
       .map((x) => x.it);
+
+    // A query that names something in a hidden program says so, once, and
+    // offers the switch rather than the thing (§2.2).
+    if (query.trim() && hidden.some((it) => scoreItem(query, it) >= HIDDEN_MATCH)) {
+      scored.push({
+        id: 'hidden-archived',
+        group: 'Actions',
+        label: 'Matches in archived programs are hidden',
+        hint: 'Settings → Programs shows them',
+        icon: Layers,
+        run: () => navigate(PROGRAMS_SETTINGS_PATH),
+      });
+    }
 
     // Any unmatched string offers "Ask the agent" (§7.2)
     if (query.trim().length > 2) {
@@ -271,7 +318,7 @@ export function CommandPalette() {
       });
     }
     return scored;
-  }, [items, query]);
+  }, [items, hidden, query]);
 
   useEffect(() => setSel(0), [query]);
 

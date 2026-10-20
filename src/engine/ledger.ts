@@ -7,6 +7,12 @@
 // recorded inconclusive: an inconclusive run is counted as a run, never as a
 // test of anything. The latest such run decides held or missed, through
 // `holds` in reconcile.ts, the one place that decides it for every kind.
+//
+// PROGRAMS (OF-BLD-016 §2.2). Both functions take the store's program filter
+// as an optional last argument, `useProgramFilter()` in a component: a
+// runbook or a deposition it hides is left out before anything is counted,
+// so the ledger page and Home's Predictions card agree with the switch in
+// either position. Without it, everything counts, exactly as before.
 import type { Deposition, Prediction, Runbook } from '@/data/types';
 import { holds } from './reconcile';
 
@@ -33,7 +39,20 @@ export interface LedgerCounts {
   hitRate: number | null;
 }
 
-export function ledgerRows(runbooks: Runbook[], depositions: Deposition[]): LedgerRow[] {
+/**
+ * Which runbooks and depositions the ledger may read: the predicate
+ * `useProgramFilter()` returns. Written structurally, so the engine imports
+ * nothing from the store.
+ */
+export type LedgerScope = (kind: 'runbook' | 'deposition', id: string) => boolean;
+
+function inScope(runbooks: Runbook[], depositions: Deposition[], shows?: LedgerScope): [Runbook[], Deposition[]] {
+  if (!shows) return [runbooks, depositions];
+  return [runbooks.filter((r) => shows('runbook', r.id)), depositions.filter((d) => shows('deposition', d.id))];
+}
+
+export function ledgerRows(allRunbooks: Runbook[], allDepositions: Deposition[], shows?: LedgerScope): LedgerRow[] {
+  const [runbooks, depositions] = inScope(allRunbooks, allDepositions, shows);
   const rows: LedgerRow[] = [];
   for (const rb of runbooks) {
     if (!rb.lockedAt) continue;
@@ -59,7 +78,8 @@ export function ledgerRows(runbooks: Runbook[], depositions: Deposition[]): Ledg
   return rows;
 }
 
-export function ledgerCounts(runbooks: Runbook[], depositions: Deposition[]): LedgerCounts {
+export function ledgerCounts(allRunbooks: Runbook[], allDepositions: Deposition[], shows?: LedgerScope): LedgerCounts {
+  const [runbooks, depositions] = inScope(allRunbooks, allDepositions, shows);
   const rows = ledgerRows(runbooks, depositions);
   const tested = rows.filter((r) => r.held !== null);
   const held = tested.filter((r) => r.held).length;

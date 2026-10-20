@@ -10,6 +10,12 @@
 // there is no evidence here — the page wears the dashed amber demo tick and
 // the value figures wear the industry-estimate tick, both from the existing
 // provenance system.
+//
+// PROGRAMS (OF-BLD-016 §2.2). The molecule itself always opens, so a link to
+// an archived one still lands, under ArchivedBanner. Its linked runbooks and
+// its process-family neighbours pass the program selector through
+// `useProgramScope`: on a general molecule the archived programs' share is
+// hidden, and on an archived one its own program's shows with it.
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
@@ -22,7 +28,9 @@ import {
   Tag,
   Thermometer,
 } from 'lucide-react';
-import { useStore, PROVENANCE_LABEL } from '@/store';
+import { useStore, PROVENANCE_LABEL, type ProgramEntityKind, useProgramScope } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
+import { HiddenByArchive, archivedProgramsOf } from '@/components/HiddenByArchive';
 import { href, navigate } from '@/router';
 import { PRODUCT_CATEGORY_LABEL } from '@/data/products';
 import {
@@ -84,6 +92,9 @@ function StorageRow({ id, warmest }: { id: string; warmest: boolean }) {
 export default function MoleculeDetail({ productId }: { productId: string }) {
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
+  const records = useStore((s) => s.records);
+  const depositions = useStore((s) => s.depositions);
+  const inView = useProgramScope({ kind: 'product', id: productId });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -99,18 +110,41 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
 
   const product = products.find((p) => p.id === productId);
 
-  const linkedRunbooks = useMemo(
+  const allLinkedRunbooks = useMemo(
     () => runbooks.filter((r) => r.productId === productId),
     [runbooks, productId],
   );
+  const linkedRunbooks = useMemo(
+    () => allLinkedRunbooks.filter((r) => inView('runbook', r.id)),
+    [allLinkedRunbooks, inView],
+  );
 
-  const siblings = useMemo(
+  const allSiblings = useMemo(
     () =>
       product
         ? products.filter((p) => p.id !== product.id && p.processCode === product.processCode)
         : [],
     [products, product],
   );
+  const siblings = useMemo(() => allSiblings.filter((p) => inView('product', p.id)), [allSiblings, inView]);
+
+  // OF-BLD-016 §2.2 — what the program filter held back, for an emptied band to name.
+  const hiddenRunbooks = allLinkedRunbooks.filter((r) => !inView('runbook', r.id));
+  const hiddenSiblings = allSiblings.filter((p) => !inView('product', p.id));
+  const hiddenNote = (kind: ProgramEntityKind, ids: string[], subject: string) =>
+    ids.length === 0 ? null : (
+      <>
+        {' '}
+        <HiddenByArchive
+          subject={subject}
+          plural={ids.length !== 1}
+          programs={archivedProgramsOf(
+            ids.map((id) => [kind, id] as [ProgramEntityKind, string]),
+            { records, runbooks, depositions },
+          )}
+        />
+      </>
+    );
 
   if (!product) {
     return (
@@ -179,6 +213,8 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
           </>
         }
       />
+
+      <ArchivedBanner kind="product" id={product.id} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <ClearanceChip state={product.clearanceState} />
@@ -475,7 +511,19 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             {linkedRunbooks.length === 0 ? (
               <EmptyState
                 title="No runbook for this molecule"
-                body="Nothing has been synthesised against it yet. A runbook turns this page into a process you could build and defend, or into a prediction and the experiments that would test it."
+                body={
+                  hiddenRunbooks.length > 0 ? (
+                    hiddenNote(
+                      'runbook',
+                      hiddenRunbooks.map((r) => r.id),
+                      hiddenRunbooks.length === 1
+                        ? 'The one runbook for it'
+                        : `The ${hiddenRunbooks.length} runbooks for it`,
+                    )
+                  ) : (
+                    'Nothing has been synthesised against it yet. A runbook turns this page into a process you could build and defend, or into a prediction and the experiments that would test it.'
+                  )
+                }
                 action={<LinkButton to="/runbooks">Open the runbook board</LinkButton>}
               />
             ) : (
@@ -511,8 +559,18 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             </div>
             {siblings.length === 0 ? (
               <EmptyState
-                title="Nothing else uses this train"
-                body="This molecule is alone in its process family, which means its equipment earns its keep on one product or not at all."
+                title={hiddenSiblings.length > 0 ? 'Nothing else in an active program uses this train' : 'Nothing else uses this train'}
+                body={
+                  hiddenSiblings.length > 0
+                    ? hiddenNote(
+                        'product',
+                        hiddenSiblings.map((p) => p.id),
+                        hiddenSiblings.length === 1
+                          ? `The one other molecule in ${product.processCode}`
+                          : `The ${hiddenSiblings.length} other molecules in ${product.processCode}`,
+                      )
+                    : 'This molecule is alone in its process family, which means its equipment earns its keep on one product or not at all.'
+                }
               />
             ) : (
               <>

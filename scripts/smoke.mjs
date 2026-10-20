@@ -2,6 +2,14 @@
  * Route smoke test. Serves the production build, visits every route in the map,
  * and fails on console errors, uncaught exceptions, or an empty render.
  *
+ * Every route runs with archived programs HIDDEN, the default (OF-BLD-016
+ * §2.2): casein and PHA leave every list, and a deep link to one of their
+ * papers, strains or scenarios still opens, under the banner naming its
+ * program. The flows after the routes that exercise the B5 overlay, the
+ * review queue and the PHA model turn the switch on first (`setShowArchived`),
+ * because their fixtures sit on archived papers (OF-BLD-016 B.4, D1); the
+ * golden path walks with it on throughout.
+ *
  *   pnpm build && node scripts/smoke.mjs
  */
 import { chromium } from 'playwright';
@@ -87,6 +95,8 @@ const ROUTES = [
   ['/guild/people/p-nobody', 'Guild — person (absent here)'],
   // ── not rail entries, reachable from Home ────────────────────────────
   ['/settings/appearance', 'Settings — appearance'],
+  // OF-BLD-016 §2.2 — the programs, and the one switch that shows archived ones.
+  ['/settings/programs', 'Settings — programs and the archive switch'],
   ['/settings/units', 'Settings — units'],
   ['/settings/corpus', 'Settings — corpus'],
   ['/settings/figures', 'Settings — the figure grammar over its sample'],
@@ -140,6 +150,23 @@ const REDIRECTS = [
 ];
 
 const IGNORE = [/Download the React DevTools/i, /favicon/i];
+
+/**
+ * Move Settings → Programs' switch to `on` in this page's store, and wait out
+ * the Durable tier's debounce so a reload keeps it. Each `browser.newPage()`
+ * is a fresh context, so a page starts with archived programs hidden.
+ */
+async function setShowArchived(page, on) {
+  await page.goto(`http://localhost:${PORT}/#/settings/programs`, { waitUntil: 'networkidle' });
+  const sw = page.locator('[data-testid="show-archived"]');
+  await sw.waitFor({ timeout: 8000 });
+  if ((await sw.isChecked()) !== on) await (on ? sw.check() : sw.uncheck()).catch(() => {});
+  await page
+    .waitForFunction((want) => document.querySelector('[data-testid="show-archived"]')?.checked === want, on, { timeout: 4000 })
+    .catch(() => {});
+  await page.waitForTimeout(600);
+  return (await sw.isChecked()) === on;
+}
 
 async function main() {
   await new Promise((r) => server.listen(PORT, LOOPBACK, r));
@@ -312,6 +339,86 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-016 §2.2 — casein and PHA leave the default view, a link to
+  //    one of their papers opens under a banner, and the switch brings them
+  //    back.
+  //
+  // In a fresh browser the switch is off: Settings lists the three programs
+  // with their status, the strain catalogue holds no casein or PHA host,
+  // BioRepo says how many papers it hides and whose, Intake's table and
+  // Proforma's index are empty and say why, and geneOS → Model has nothing for an active program
+  // on the double's shelf. A deep link to H4 (casein) opens under the banner;
+  // Q1 (yeast) opens without one. Then the switch goes on, in the same page,
+  // and cw15 is back on the catalogue.
+  let programFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const goTo = async (route, ready) => {
+      await page.goto(`http://localhost:${PORT}/#${route}`, { waitUntil: 'networkidle' });
+      if (ready) await page.locator(ready).first().waitFor({ timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(500);
+    };
+    try {
+      await goTo('/settings/programs', '[data-testid="settings-programs"]');
+      const status = await page
+        .locator('[data-program-status]')
+        .evaluateAll((els) => els.map((e) => `${e.getAttribute('data-program')}:${e.getAttribute('data-program-status')}`).join());
+      if (status !== 'yeast:active,casein:archived,pha:archived') problems.push(`Settings → Programs lists ${status || 'nothing'}`);
+      if (await page.locator('[data-testid="show-archived"]').isChecked()) problems.push('the archive switch is on in a fresh browser');
+
+      await goTo('/geneos/hosts', 'a[href="#/geneos/hosts/s-cerevisiae-s288c"]');
+      if ((await page.locator('a[href="#/geneos/hosts/s-cerevisiae-s288c"]').count()) === 0) problems.push('the yeast host is not on the catalogue');
+      for (const id of ['cw15', 'c-necator-h16']) {
+        if ((await page.locator(`a[href="#/geneos/hosts/${id}"]`).count()) !== 0) problems.push(`the archived host ${id} is on the catalogue with the switch off`);
+      }
+
+      await goTo('/biorepo', '[data-testid="archived-hidden"]');
+      const hiddenLine = await page.locator('[data-testid="archived-hidden"]').first().innerText().catch(() => '');
+      if (!/papers in Casein and PHA are\s+hidden/.test(hiddenLine)) problems.push(`BioRepo does not say which papers it hides: ${JSON.stringify(hiddenLine)}`);
+      if ((await page.locator('a[href^="#/biorepo/paper/H4"]').count()) !== 0) problems.push('BioRepo lists the casein paper H4 with the switch off');
+
+      await goTo('/intake');
+      if (!/Every record here is in an archived program/.test(await page.locator('main').innerText().catch(() => '')))
+        problems.push('Intake does not say its records are all in archived programs');
+
+      await goTo('/proforma', '[data-testid="hidden-by-archive"]');
+      if (!/Casein and PHA/.test(await page.locator('[data-testid="hidden-by-archive"]').innerText().catch(() => '')))
+        problems.push('Proforma does not say its scenarios are in archived programs');
+      if ((await page.locator('a[href="#/proforma/scenario/sc-s1"]').count()) !== 0) problems.push('Proforma lists a casein scenario with the switch off');
+
+      await goTo('/', '[data-testid="home-programs-archived"]');
+      if (!/Casein[\s\S]*PHA/.test(await page.locator('[data-testid="home-programs-archived"]').innerText().catch(() => '')))
+        problems.push('Home does not name the archived programs in one line');
+
+      await goTo('/geneos/model');
+      if (!/No model on the shelf computes for an active program/.test(await page.locator('main').innerText().catch(() => '')))
+        problems.push('geneOS → Model does not say the shelf has nothing for an active program');
+
+      await goTo('/biorepo/paper/H4', '[role="note"][data-archived-program]');
+      if ((await page.locator('[role="note"][data-archived-program="casein"]').count()) !== 1) problems.push('a deep link to H4 does not open under the casein banner');
+      if (!/belongs to Casein, an archived program/.test(await page.locator('main').innerText().catch(() => ''))) problems.push('the banner does not name the program');
+      await goTo('/biorepo/paper/Q1');
+      if ((await page.locator('[data-archived-program]').count()) !== 0) problems.push('a yeast paper opens under an archive banner');
+
+      if (!(await setShowArchived(page, true))) problems.push('the archive switch did not turn on');
+      await goTo('/geneos/hosts', 'a[href="#/geneos/hosts/cw15"]');
+      if ((await page.locator('a[href="#/geneos/hosts/cw15"]').count()) === 0) problems.push('turning the switch on did not bring cw15 back to the catalogue');
+      await goTo('/biorepo');
+      if ((await page.locator('[data-testid="archived-hidden"]').count()) !== 0) problems.push('BioRepo still says papers are hidden with the switch on');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      programFails++;
+      console.log(`✗ programs     ${problems.join('; ')}`);
+    } else {
+      console.log('✓ programs     Settings lists yeast active, casein and PHA archived; with the switch off no casein or PHA host, paper or scenario is listed and each list says what it hides; H4 opens under the casein banner and Q1 under none; the switch brings cw15 back');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-012 §5.4 — the overlay reaches the reader, and unanchored
   //    quotes are listed rather than dropped.
   //
@@ -323,10 +430,14 @@ async function main() {
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     try {
+      // B5 and its candidate are casein (OF-BLD-016 B.4): this flow walks
+      // them with archived programs showing, as the golden path does.
+      const archivedOn = await setShowArchived(page, true);
       await page.goto(`http://localhost:${PORT}/#/biorepo/paper/B5`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(1200);
       const text = await page.locator('body').innerText();
       const problems = [];
+      if (!archivedOn) problems.push('the archive switch did not turn on');
       if (!/Full text from Europe PMC/.test(text)) problems.push('no full-text banner');
       if (!/The abstract comes first/.test(text)) problems.push('the overlay sections did not render');
       if (/Catalogued from OF-COR-001/.test(text)) problems.push('the curation-note banner is still showing');
@@ -530,10 +641,16 @@ async function main() {
       // `pnpm check:store`, which tests it without a clock.)
       // Opened on a deep link, `?record=r-B5-1`, which the queue focuses
       // ONCE when it seeds — see the unfiltered check below.
+      // A new context starts with archived programs hidden, and these are
+      // casein records: the switch goes on in Settings, and the reload makes
+      // the document fresh again, the switch restored from the Durable tier.
       const coldPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      if (!(await setShowArchived(coldPage, true))) problems.push('the archive switch did not turn on for the cold queue');
       await coldPage.goto(`http://localhost:${PORT}/#/guild?record=r-B5-1`, { waitUntil: 'networkidle' });
+      await coldPage.reload({ waitUntil: 'networkidle' });
       // networkidle already covers the double's 700 ms overlay; give the
       // store one tick to apply it.
+      await coldPage.waitForFunction(() => /\/ 83\b/.test(document.body.innerText), null, { timeout: 4000 }).catch(() => {});
       await coldPage.waitForTimeout(300);
       const cold = (await coldPage.locator('body').innerText()).replace(/\s+/g, ' ');
       if (!/\/ 83\b/.test(cold))
@@ -912,11 +1029,12 @@ async function main() {
   console.log(`\n${ROUTES.length - failures.length}/${ROUTES.length} routes clean`);
   console.log(`${SHELVES.length - shelfFails}/${SHELVES.length} reference shelves render beneath a "not built" statement`);
   console.log(`${SEEDED.length - seededFails}/${SEEDED.length} seeded subsystems carry reference without a "not built" claim`);
+  console.log(`${1 - programFails}/1 programs — archived hidden by default, a deep link under its banner, the switch brings them back`);
   console.log(`${REDIRECTS.length - redirectFails}/${REDIRECTS.length} redirects land on the new screen`);
   console.log(`${1 - overlayFails}/1 overlay applied — fetched text in the reader, unanchored quotes listed, run scored`);
   console.log(`${OUTSIDE.length - confineFails}/${OUTSIDE.length} requests outside dist/ refused`);
   console.log(`${1 - guildFails}/1 Guild ledger flow — sample, sign-off, a cosigned run, a lesson and the path, practice, a bench check, first person, reload`);
-  if (failures.length || redirectFails || shelfFails || seededFails || overlayFails || confineFails || guildFails) process.exit(1);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || overlayFails || confineFails || guildFails) process.exit(1);
 }
 
 main();

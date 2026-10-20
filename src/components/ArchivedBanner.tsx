@@ -10,7 +10,7 @@
 import { Archive } from 'lucide-react';
 import { href } from '@/router';
 import { PROGRAMS_SETTINGS_PATH } from '@/data/programs';
-import { archivedProgramOf, useStore, type ProgramEntityKind } from '@/store';
+import { archivedProgramOf, useProgramLookup, useStore, type ProgramEntityKind } from '@/store';
 import { cx } from './ui';
 
 const NOUN: Record<ProgramEntityKind, string> = {
@@ -36,10 +36,8 @@ export function ArchivedBanner({
   className?: string;
 }) {
   const showArchived = useStore((s) => s.showArchived);
-  const records = useStore((s) => s.records);
-  const runbooks = useStore((s) => s.runbooks);
-  const depositions = useStore((s) => s.depositions);
-  const program = archivedProgramOf(kind, id, { records, runbooks, depositions });
+  const lookup = useProgramLookup();
+  const program = archivedProgramOf(kind, id, lookup);
   if (!program) return null;
   return (
     <div

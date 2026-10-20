@@ -43,6 +43,23 @@ async function main() {
     await page.waitForTimeout(500);
   };
 
+  // OF-BLD-016 §2.2 — the walk below is the casein and PHA demo, and both
+  // programs are archived: the switch in Settings → Programs goes on first,
+  // and the walk passes unchanged with everything showing as before. (The
+  // smoke runs with it off.) Every `go` is a same-document navigation, so the
+  // store keeps the switch, as it keeps the sim speed below.
+  await go('/settings/programs');
+  const archiveSwitch = page.locator('[data-testid="show-archived"]');
+  await archiveSwitch.waitFor({ timeout: 8000 }).catch(() => {});
+  if ((await archiveSwitch.count()) && !(await archiveSwitch.isChecked())) await archiveSwitch.check().catch(() => {});
+  await page
+    .waitForFunction(() => document.querySelector('[data-testid="show-archived"]')?.checked === true, null, { timeout: 4000 })
+    .catch(() => {});
+  check(
+    'Archived programs show once the switch is on',
+    (await archiveSwitch.count()) === 1 && (await archiveSwitch.isChecked()),
+  );
+
   // Run at instant sim speed so scripted timings don't dominate the test.
   await go('/settings/appearance');
   const instant = page.locator('label', { hasText: /^Instant/ }).first();

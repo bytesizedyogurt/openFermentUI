@@ -1,6 +1,9 @@
 // Structured protocol editor (OF-DES-001 §5.3 `/runbooks/protocols/:id/edit`, fidelity
 // item 14). Edits, reorders, and quantity binding are real; a saved draft
 // becomes a live new version for the rest of the session.
+//
+// PROGRAMS (OF-BLD-016 §2.2): a protocol in an archived program opens here by
+// link like any other, under the banner that names the program.
 import { useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -14,6 +17,7 @@ import {
   Link2,
 } from 'lucide-react';
 import { useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { navigate } from '@/router';
 import type { Material, ProtocolVersion, ScalingClass, Step } from '@/data/types';
 import { renderStepText, scaleMaterial, batchLabel } from '@/engine/scale';
@@ -165,6 +169,8 @@ export default function ProtocolEditor({ protocolId }: { protocolId: string }) {
           </>
         }
       />
+
+      <ArchivedBanner kind="protocol" id={protocol.id} />
 
       {problems.length > 0 && (
         <div className="mb-4 space-y-2">
