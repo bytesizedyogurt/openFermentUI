@@ -2,7 +2,7 @@
 // protocols, with a table view for scanning. Filter state lives in this screen
 // rather than inside DataTable, so switching between card and table view
 // preserves exactly what the user has narrowed to.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Beaker,
   Calculator,
@@ -38,10 +38,8 @@ import {
   LinkButton,
   PageHeader,
   Popover,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -414,21 +412,9 @@ export default function Protocols() {
   const runs = useStore((s) => s.runs);
   const density = useStore((s) => s.ui.density);
 
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState<Record<FacetKey, string[]>>(EMPTY_SELECTION);
-
-  // Simulated first-paint latency (§13.5) so the loading state is a real state.
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const allRows = useMemo<ProtoRow[]>(() => {
     const runCounts = new Map<string, number>();
@@ -725,24 +711,6 @@ export default function Protocols() {
     <OwnerTabs tabs={RUNBOOK_TABS} />
     </>
   );
-
-  if (!ready) {
-    return (
-      <>
-        {header}
-        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={4} />
-            </Card>
-          ))}
-        </div>
-        <div className="sr-only" aria-live="polite">
-          Loading protocols
-        </div>
-      </>
-    );
-  }
 
   if (allRows.length === 0) {
     return (

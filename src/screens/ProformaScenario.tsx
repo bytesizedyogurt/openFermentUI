@@ -22,7 +22,6 @@ import { navigate } from '@/router';
 import type { CostLine } from '@/data/types';
 import { evaluateGrid, mspSweep, COST_LINES, COST_LINE_LABEL } from '@/engine/grids';
 import { fmt } from '@/engine/units';
-import { scaled } from '@/sim/latency';
 import { exportCSV } from '@/lib/csv';
 import { useChartTheme, useSeriesColor, tooltipStyle } from '@/lib/viz';
 import { PageHeader, Card, Button, Sheet, Callout, cx, EmptyState, Explain } from '@/components/ui';
@@ -31,7 +30,6 @@ import { Tick, ProvenanceBadge } from '@/components/Provenance';
 import { Tornado } from '@/components/figures';
 import ProformaBiosteam from './ProformaBiosteam';
 
-const CONVERGE_STAGES = ['Building flowsheet', 'Converging', 'Costing'];
 
 /** A "view as table" disclosure — the accessibility floor for every chart (§6.6). */
 function ChartTable({ headers, rows }: { headers: string[]; rows: (string | number)[][] }) {
@@ -77,11 +75,8 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
   const toast = useStore((s) => s.toast);
 
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
-  const [converging, setConverging] = useState<number | null>(null);
   const [activeDim, setActiveDim] = useState(0);
-  const lastPoint = useRef<Record<string, number> | null>(null);
   const lastConverged = useRef<Record<string, number> | null>(null);
-  const convergeTimer = useRef<number>();
 
   const grid = scenario ? grids[scenario.modelId] : undefined;
 
@@ -105,41 +100,6 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
     () => (grid && scenario && !nonConvergent ? evaluateGrid(grid, scenario.point) : null),
     [grid, scenario, nonConvergent],
   );
-
-  // Job feel: a move crossing more than one grid cell in any dimension enters a
-  // staged "converging" state. Small moves resolve instantly (§17.3).
-  useEffect(() => {
-    if (!scenario || !grid) return;
-    const prev = lastPoint.current;
-    lastPoint.current = { ...scenario.point };
-    if (!prev) return;
-
-    let crossed = 0;
-    for (const d of grid.dims) {
-      const cellOf = (v: number) => {
-        let i = 0;
-        while (i < d.values.length - 1 && v > d.values[i + 1]) i++;
-        return i;
-      };
-      crossed = Math.max(crossed, Math.abs(cellOf(scenario.point[d.key]) - cellOf(prev[d.key])));
-    }
-    if (crossed < 2) return;
-
-    window.clearTimeout(convergeTimer.current);
-    setConverging(0);
-    const stageMs = scaled(700 + crossed * 220);
-    let stage = 0;
-    const advance = () => {
-      stage += 1;
-      if (stage >= CONVERGE_STAGES.length) {
-        setConverging(null);
-        return;
-      }
-      setConverging(stage);
-      convergeTimer.current = window.setTimeout(advance, stageMs);
-    };
-    convergeTimer.current = window.setTimeout(advance, stageMs);
-  }, [scenario?.point, grid, scenario]);
 
   useEffect(() => {
     if (!nonConvergent && scenario) lastConverged.current = { ...scenario.point };
@@ -415,12 +375,7 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
                     <div className="text-caption uppercase tracking-wide text-ink-soft">
                       Minimum selling price
                     </div>
-                    <div
-                      className={cx(
-                        'font-num text-display leading-none transition-opacity',
-                        converging !== null && 'opacity-40',
-                      )}
-                    >
+                    <div className="font-num text-display leading-none">
                       ${result ? fmt(result.msp, 1) : '—'}
                       <span className="text-section-title text-ink-soft ml-1">/kg</span>
                     </div>
@@ -429,12 +384,6 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
                     </div>
                   </Tick>
 
-                  {converging !== null && (
-                    <div className="flex items-center gap-2 text-body text-signal-info">
-                      <span className="inline-block w-3 h-3 rounded-full border-2 border-signal-info border-t-transparent animate-spin" />
-                      {CONVERGE_STAGES[converging]}…
-                    </div>
-                  )}
                 </div>
 
                 {result?.clamped && (

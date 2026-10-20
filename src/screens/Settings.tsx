@@ -1136,32 +1136,15 @@ const FIDELITY_ROWS: { feature: string; fidelity: string; notes: string }[] = [
       'Multilinear interpolation across an authored cost-model sweep. The interpolation is real; the cost model is invented.',
   },
   {
-    feature: 'Simulation converging job feel',
-    fidelity: 'Scripted',
-    notes: 'Solver stages and their durations follow an authored timeline. Nothing is iterating.',
-  },
-  {
     feature: 'Scenario compare',
     fidelity: 'Full',
     notes: 'Deltas, shared assumptions and divergences are computed from the pinned scenarios.',
   },
   {
-    feature: 'Agent chat — scripted mode',
-    fidelity: 'Scripted',
-    notes:
-      'Plans, tool calls and answers come from authored flows matched to the question. The same question always gives the same answer.',
-  },
-  {
-    feature: 'Agent chat — live mode',
+    feature: 'Agent chat',
     fidelity: 'Real model call, through openferment-core',
     notes:
-      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down a question says so; nothing scripted answers in its place.',
-  },
-  {
-    feature: 'Retrieval inspector and tool traces',
-    fidelity: 'Scripted, mirroring the flow’s actual data',
-    notes:
-      'The passages shown are exactly the ones the flow cites, with scores from the local lexical scorer over the text actually in the build — the curator’s note for an entry the service has not fetched, the paper’s own words for one it has.',
+      'Postdoc, when the service is running, on the model its health check names (Claude Opus 5.5 with Sonnet 5.5 as fallback unless core/.env says otherwise): a bounded loop of tools, then a validated plan, and the browser renders every value from the cited record — the prose carries no numbers of its own. A follow-up sends the conversation\'s earlier questions and claims in words. With the service down Postdoc says so and how to start it, and keeps the conversations and the typed question; nothing answers in its place.',
   },
   {
     feature: 'Ingest pipeline',
@@ -1298,10 +1281,10 @@ function AboutSection() {
               plan against.
             </li>
             <li>
-              <span className="font-medium">Scripted answers are written, not generated.</span>{' '}
-              In scripted mode, plans, tool calls and answer prose come from authored flows matched
-              to the question, so the same question always returns the same answer. Live mode is a
-              real model call through openferment-core and is labelled as such.
+              <span className="font-medium">Postdoc answers only through the service.</span>{' '}
+              Every answer is a real model call through openferment-core, and every value in it is
+              rendered from the record it cites. With the service down Postdoc says so and how to
+              start it; nothing answers in its place.
             </li>
           </ul>
         </Callout>
@@ -1407,15 +1390,14 @@ function AboutSection() {
             named reviewer decides; Witness scores that run.
           </Row>
           <Row label="Agent">
-            Two modes, labelled. Scripted: plans, tool calls and answers are matched from authored
-            flows and no model is called. Live: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
-            Sonnet 5.5 as fallback by default), values rendered from the cited records.
+            One path: Postdoc through openferment-core, on the model the service reports (Opus 5.5 with
+            Sonnet 5.5 as fallback by default), values rendered from the cited records. With the
+            service down it says so, and nothing answers in its place.
           </Row>
           <Row label="Retrieval">
-            Local lexical scorer over the section text held in the build — the curator&rsquo;s note
-            for an entry the service has not fetched, the paper&rsquo;s own words for one it has. No
-            embedding model, no vector store; the &ldquo;Embed&rdquo; stage in ingest is a timed
-            animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
+            In the service: passages cut from the fetched papers, searched by the lane the service
+            names (BioRepo &rarr; Search, Witness &rarr; Retrieval). The browser holds no index; the
+            &ldquo;Embed&rdquo; stage in the offline ingest board is a timed animation. Fetch and Extract, when the service is up, are real: Europe PMC for the text,
             one structured response per paper for the candidates.
           </Row>
           <Row label="Storage">

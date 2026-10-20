@@ -11,7 +11,7 @@
 // Every row is modeled: the provenance tick is dashed amber on all 117, and
 // the value-density band is an industry estimate that `aggregateExclusion()`
 // already holds out of every statistic. Nothing here is evidence.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight, Boxes, Package, Thermometer, X } from 'lucide-react';
 import type { Product } from '@/data/types';
 import { useStore } from '@/store';
@@ -30,9 +30,8 @@ import { clearanceSeverity } from '@/engine/clearance';
 import { DataTable, type Column, type FacetDef } from '@/components/DataTable';
 import { ClearanceChip, CounselCallout } from '@/components/Clearance';
 import { ProvenanceLegend } from '@/components/Provenance';
-import { Card, Explain, PageHeader, Skeleton, cx } from '@/components/ui';
+import { Card, Explain, PageHeader, cx } from '@/components/ui';
 import { referenceFor } from '@/data/reference';
-import { delayClass } from '@/sim/latency';
 
 // ── scoping by query string ────────────────────────────────────────────
 
@@ -130,17 +129,6 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
   const runbooks = useStore((s) => s.runbooks);
   const density = useStore((s) => s.ui.density);
   const route = useRoute();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const scopes = useMemo(() => {
     const out: { key: ScopeKey; value: string }[] = [];
@@ -393,17 +381,6 @@ export default function Molecules({ embedded = false }: { embedded?: boolean } =
 
   const subtitle =
     'Every molecule this platform can describe, with the host it would be made in, the downstream train it needs, how it ships, and who already owns it. Modeled throughout — this is a map of the option space, not a set of measurements.';
-
-  if (!ready) {
-    return (
-      <>
-        {!embedded && <PageHeader eyebrow="Module 5 · Molecules" title="Molecules" subtitle={subtitle} />}
-        <Card>
-          <Skeleton rows={12} />
-        </Card>
-      </>
-    );
-  }
 
   return (
     <>

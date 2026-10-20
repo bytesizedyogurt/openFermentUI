@@ -4,7 +4,7 @@
 // actually stands behind each strain: cw15 is covered across every asset
 // class; the others are not, and the card says so rather than padding the
 // layout to look even.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, FlaskConical, LineChart, BookOpen, ShieldCheck } from 'lucide-react';
 import type { ExtractionRecord, Paper, Strain } from '@/data/types';
 import { useStore } from '@/store';
@@ -16,10 +16,8 @@ import {
   Explain,
   LinkButton,
   PageHeader,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 // ── coverage model ─────────────────────────────────────────────────────
 
@@ -240,18 +238,7 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
   const protocols = useStore((s) => s.protocols);
   const scenarios = useStore((s) => s.scenarios);
 
-  const [ready, setReady] = useState(false);
   const [sort, setSort] = useState<SortKey>('coverage');
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const paperById = useMemo(() => new Map(papers.map((p) => [p.id, p])), [papers]);
 
@@ -327,21 +314,6 @@ export default function Organisms({ embedded = false }: { embedded?: boolean } =
 
   const subtitle =
     'One page per organism, holding every parameter the corpus records for it. The coverage counts below describe this demonstration corpus — not the published literature.';
-
-  if (!ready) {
-    return (
-      <>
-        {!embedded && <PageHeader eyebrow="Module 1 · Organisms" title="Organisms" subtitle={subtitle} />}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={7} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
 
   if (strains.length === 0) {
     return (

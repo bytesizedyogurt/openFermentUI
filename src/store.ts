@@ -10,9 +10,7 @@ import type {
   Candidate,
   ReviewDecision,
   ActivityEvent,
-  ChatMessage,
   ClearanceStateId,
-  ChatSession,
   Collection,
   LiveConversation,
   LiveTurn,
@@ -62,7 +60,6 @@ import { RUNBOOKS } from '@/data/runbooks';
 import { PROTOCOLS } from '@/data/protocols';
 import { SCENARIOS, COST_MODELS } from '@/data/scenarios';
 import { MODULES } from '@/data/learn';
-import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '@/data/misc';
 import { buildGrid } from '@/engine/grids';
 import { toSI } from '@/engine/units';
 import { runbookLockHash } from '@/engine/lock';
@@ -301,7 +298,6 @@ export interface OFState {
   collections: Collection[];
   modules: LearnModule[];
   activity: ActivityEvent[];
-  sessions: ChatSession[];
   /**
    * Postdoc's Live conversations, newest first. Durable: a question asked
    * here is still on the page after a citation is followed and after a
@@ -339,12 +335,10 @@ export interface OFState {
     bannerDismissed: boolean;
     paletteOpen: boolean;
     jobsOpen: boolean;
-    inspectorOpen: boolean;
     sessionsOpen: boolean;
     railCollapsed: boolean;
     tourStop: number | null;
     helpOpen: boolean;
-    chatMode: 'scripted' | 'live';
   };
 
   // ── actions ──────────────────────────────────────────────────────────
@@ -433,8 +427,7 @@ export interface OFState {
   togglePin: (id: string) => void;
   duplicateScenario: (id: string) => string;
 
-  // chat
-  createSession: (title: string, scope?: ChatSession['scope']) => string;
+  // Postdoc's Live conversations — the only conversations there are
   /** A new Live conversation, first in the list; returns its id. */
   startLiveConversation: (title: string) => string;
   /** Add a turn to a Live conversation. */
@@ -443,9 +436,12 @@ export interface OFState {
   patchLiveTurn: (conversationId: string, turnId: string, patch: Partial<LiveTurn> & { step?: TraceStep }) => void;
   /** Remove a Live conversation. */
   dropLiveConversation: (conversationId: string) => void;
-  appendMessage: (sessionId: string, msg: ChatMessage) => void;
-  updateMessage: (sessionId: string, msgId: string, patch: Partial<ChatMessage>) => void;
-  pinEvidence: (sessionId: string, hits: ChatSession['pinned']) => void;
+  /**
+   * Take back a turn the service never received (it was not running), and
+   * the conversation with it when that turn was its only one. Nothing was
+   * asked, so nothing is kept as if it had been.
+   */
+  dropLiveTurn: (conversationId: string, turnId: string) => void;
 
   // learn
   completeLesson: (lessonId: string) => void;
@@ -778,10 +774,11 @@ const seedState = () => ({
   measuredEvidence: [] as MeasuredEvidence[],
   protocols: structuredClone(PROTOCOLS),
   scenarios: structuredClone(SCENARIOS),
-  collections: structuredClone(COLLECTIONS),
+  // Collections and activity start empty: what lands in them is what a
+  // person did in this browser, never an authored history (OF-BLD-016 §3.1).
+  collections: [] as Collection[],
   modules: structuredClone(MODULES),
-  activity: structuredClone(ACTIVITY),
-  sessions: structuredClone(SEED_SESSIONS),
+  activity: [] as ActivityEvent[],
   liveConversations: [] as LiveConversation[],
   runs: {} as Record<string, RunState>,
   activeRunId: null,
@@ -830,12 +827,10 @@ export const useStore = create<OFState>()((set, get) => ({
     bannerDismissed: false,
     paletteOpen: false,
     jobsOpen: false,
-    inspectorOpen: true,
     sessionsOpen: true,
     railCollapsed: false,
     tourStop: null,
     helpOpen: false,
-    chatMode: 'scripted',
   },
 
   setUI: (patch) => set((s) => ({ ui: { ...s.ui, ...patch } })),
@@ -2277,45 +2272,7 @@ export const useStore = create<OFState>()((set, get) => ({
     return copy.id;
   },
 
-  // ── chat ─────────────────────────────────────────────────────────────
-  createSession: (title, scope) => {
-    const id = nextId('sess');
-    const session: ChatSession = { id, title, startedAt: stamp(), scope, messages: [], pinned: [] };
-    set((s) => ({ sessions: [session, ...s.sessions] }));
-    return id;
-  },
-
-  appendMessage: (sessionId, msg) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) =>
-        x.id === sessionId ? { ...x, messages: [...x.messages, msg] } : x,
-      ),
-    })),
-
-  updateMessage: (sessionId, msgId, patch) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) =>
-        x.id === sessionId
-          ? {
-              ...x,
-              messages: x.messages.map((m) =>
-                m.id === msgId ? ({ ...m, ...patch } as ChatMessage) : m,
-              ),
-            }
-          : x,
-      ),
-    })),
-
-  pinEvidence: (sessionId, hits) =>
-    set((s) => ({
-      sessions: s.sessions.map((x) => {
-        if (x.id !== sessionId) return x;
-        const seen = new Set(x.pinned.map((p) => `${p.paperId}:${p.sectionId}`));
-        const add = hits.filter((h) => !seen.has(`${h.paperId}:${h.sectionId}`));
-        return { ...x, pinned: [...x.pinned, ...add] };
-      }),
-    })),
-
+  // ── Postdoc ──────────────────────────────────────────────────────────
   // Live conversations take time-based ids, because nextId restarts on a
   // reload and these outlive one (the same reason adopted runbooks do).
   startLiveConversation: (title) => {
@@ -2348,6 +2305,15 @@ export const useStore = create<OFState>()((set, get) => ({
 
   dropLiveConversation: (conversationId) =>
     set((s) => ({ liveConversations: s.liveConversations.filter((c) => c.id !== conversationId) })),
+
+  dropLiveTurn: (conversationId, turnId) =>
+    set((s) => ({
+      liveConversations: s.liveConversations.flatMap((c) => {
+        if (c.id !== conversationId) return [c];
+        const turns = c.turns.filter((t) => t.id !== turnId);
+        return turns.length ? [{ ...c, turns }] : [];
+      }),
+    })),
 
   // ── learn ────────────────────────────────────────────────────────────
   // Lesson progress is this browser's and Durable (OF-BLD-013 §3.2): the map

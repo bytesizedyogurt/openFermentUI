@@ -35,10 +35,8 @@ import {
   LinkButton,
   Popover,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { locateQuote } from '@/lib/review';
 import { fetchSourceName } from '@/lib/intake';
 
@@ -131,7 +129,6 @@ export default function PaperReader({
   const addCollectionPapers = useStore((s) => s.addCollectionPapers);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(spanId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(null);
@@ -142,17 +139,6 @@ export default function PaperReader({
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth';
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [paperId]);
 
   const recs = useMemo(() => records.filter((r) => r.paperId === paperId), [records, paperId]);
 
@@ -205,23 +191,23 @@ export default function PaperReader({
   }, [quote, sectionId, paper]);
 
   useEffect(() => {
-    if (!quoted || !ready) return;
+    if (!quoted) return;
     const t = window.setTimeout(() => quoteRef.current?.scrollIntoView({ behavior, block: 'center' }), 60);
     return () => window.clearTimeout(t);
-  }, [quoted, ready, behavior]);
+  }, [quoted, paperId, behavior]);
 
   // Deep link to a section: scroll to its heading, nothing selected.
   useEffect(() => {
-    if (!sectionId || spanId || quoted || !ready) return;
+    if (!sectionId || spanId || quoted) return;
     const t = window.setTimeout(() => {
       sectionRefs.current[sectionId]?.scrollIntoView({ behavior, block: 'start' });
     }, 60);
     return () => window.clearTimeout(t);
-  }, [sectionId, spanId, quoted, ready, behavior]);
+  }, [sectionId, spanId, quoted, paperId, behavior]);
 
   // Deep link: select, scroll into view, pulse once.
   useEffect(() => {
-    if (!spanId || !ready) return;
+    if (!spanId) return;
     setActiveId(spanId);
     const t1 = window.setTimeout(() => {
       spanRefs.current[spanId]?.scrollIntoView({ behavior, block: 'center' });
@@ -233,7 +219,7 @@ export default function PaperReader({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [spanId, ready, behavior]);
+  }, [spanId, paperId, behavior]);
 
   const topField = useMemo(() => {
     const counts = new Map<FieldId, number>();
@@ -543,12 +529,7 @@ export default function PaperReader({
         </div>
       )}
 
-      {!ready ? (
-        <Card className="mt-5">
-          <Skeleton rows={12} />
-        </Card>
-      ) : (
-        <>
+      <>
           {paper.textSource !== 'full-text' && (
             <section className="mt-6">
               <h2 className="font-serif text-section-title font-semibold mb-1">Abstract</h2>
@@ -606,8 +587,7 @@ export default function PaperReader({
               </section>
             ))
           )}
-        </>
-      )}
+      </>
     </article>
   );
 

@@ -9,7 +9,7 @@
 // A runbook is not a job. The jobs tray shows the progress bar for whatever is
 // in flight; this board shows the records, including the ones that are not
 // running at all and will not be until somebody acts.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight, Boxes, GitBranch, Sparkles } from 'lucide-react';
 import type { Runbook, RunbookStatus } from '@/data/types';
 import { useStore } from '@/store';
@@ -26,10 +26,8 @@ import {
   Explain,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { RUNBOOK_TABS } from '@/data/tabs';
 
@@ -178,17 +176,6 @@ export default function Runbooks() {
   const runbooks = useStore((s) => s.runbooks);
   const products = useStore((s) => s.products);
   const route = useRoute();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const handoffId = route.query.get('handoff');
 
@@ -219,22 +206,6 @@ export default function Runbooks() {
 
   const subtitle =
     'A runbook is a synthesised, followable answer to a question about making something. Industrial runbooks output a process you could build and defend; research runbooks output a prediction and the experiments that would test it. Same toolchain, different question.';
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Module 6 · Runbooks" title="Runbooks" subtitle={subtitle} />
-        <OwnerTabs tabs={RUNBOOK_TABS} />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <Skeleton rows={6} />
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  }
 
   return (
     <>

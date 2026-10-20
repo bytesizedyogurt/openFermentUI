@@ -406,7 +406,6 @@ export default function Home() {
   const scenarios = useStore((s) => s.scenarios);
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
-  const sessions = useStore((s) => s.sessions);
   const liveConversations = useStore((s) => s.liveConversations);
   const activity = useStore((s) => s.activity);
   const runs = useStore((s) => s.runs);
@@ -486,11 +485,9 @@ export default function Home() {
   );
 
   // ── band 2 state ─────────────────────────────────────────────────────
-  // The last conversation somebody actually had: a Live one first, else a
-  // scripted session with messages in it. The seeded sessions are empty, and
-  // an empty session is not work to resume.
+  // The last conversation somebody actually had with Postdoc. An empty one
+  // is not work to resume.
   const lastLive = liveConversations.find((c) => c.turns.length > 0) ?? null;
-  const lastSession = lastLive ? null : (sessions.find((x) => x.messages.length > 0) ?? null);
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
   const activeRun = activeRunId ? (runs[activeRunId] ?? null) : null;
   const activeProtocol = activeRun
@@ -508,7 +505,6 @@ export default function Home() {
 
   const hasWork =
     lastLive !== null ||
-    lastSession !== null ||
     reviewQueue.length > 0 ||
     activeRun !== null ||
     pinnedScenarios.length > 0 ||
@@ -772,23 +768,6 @@ export default function Home() {
                   }
                 />
               )}
-              {lastSession && (
-                <ResumeCard
-                  to={`/postdoc/${lastSession.id}`}
-                  kicker="Last conversation"
-                  title={lastSession.title}
-                  prov="user"
-                  meta={
-                    <>
-                      <span className="font-num">{lastSession.messages.length}</span>{' '}
-                      {lastSession.messages.length === 1 ? 'message' : 'messages'} ·{' '}
-                      <span className="font-num">{lastSession.startedAt}</span>
-                      {lastSession.scope && ` · scoped to ${lastSession.scope.label}`}
-                    </>
-                  }
-                />
-              )}
-
               {reviewQueue.length > 0 ? (
                 <ResumeCard
                   to="/guild"
@@ -1039,8 +1018,15 @@ export default function Home() {
         <Card className="overflow-hidden">
           {activity.length === 0 ? (
             <EmptyState
-              title="No activity yet"
-              body="Ingests, review decisions, runs and exports land here as you work. Nothing is recorded outside this browser session."
+              title="Nothing has happened in this browser yet"
+              body={
+                <>
+                  What a person does here is listed as it happens: a paper fetched, a record
+                  reviewed, a run deposited, a runbook adopted. To start, review the next record
+                  in <a href={href('/guild')} className="text-accent hover:underline">Guild</a> or
+                  fetch a paper in <a href={href('/intake/ingest')} className="text-accent hover:underline">Intake</a>.
+                </>
+              }
               icon={<Clock size={20} aria-hidden />}
             />
           ) : (

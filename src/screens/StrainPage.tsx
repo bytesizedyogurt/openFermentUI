@@ -5,7 +5,7 @@
 // Statistics are derived from the live store, so a record verified in the
 // review queue changes the median and turns its dot green without a reload.
 import { HostCeilingCard } from './GeneOSModel';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -43,11 +43,9 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 
 // ── model ──────────────────────────────────────────────────────────────
 
@@ -560,21 +558,9 @@ export default function StrainPage({ strainId }: { strainId: string }) {
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [view, setView] = useState<'plots' | 'table'>('plots');
   const [showRejected, setShowRejected] = useState(false);
   const [fieldQuery, setFieldQuery] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [strainId]);
 
   const strain = strains.find((s) => s.id === strainId);
 
@@ -1000,28 +986,6 @@ export default function StrainPage({ strainId }: { strainId: string }) {
             body="The organism index lists every strain this corpus covers. Open it to pick one."
             action={<LinkButton to="/geneos/hosts">Back to hosts</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="geneOS · Hosts"
-          title={
-            <span>
-              <span className="italic">{strain.binomial}</span>{' '}
-              <span className="font-num not-italic">{strain.designation}</span>
-            </span>
-          }
-        />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={10} />
         </Card>
       </>
     );

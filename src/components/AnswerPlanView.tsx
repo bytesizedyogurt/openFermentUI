@@ -401,7 +401,7 @@ function CoverageFooter({ coverage }: { coverage: CoverageMap }) {
   );
 }
 
-/** The service is not running. Says exactly what to type. */
+/** A question the service took and could not answer. Says exactly what to do. */
 export function PostdocDownNotice({ message, remedy }: { message: string; remedy: string }) {
   // A remedy writes a command between backticks; show it as one.
   const parts = remedy.split('`');
@@ -421,9 +421,8 @@ export function PostdocDownNotice({ message, remedy }: { message: string; remedy
       <p className="text-ink-soft mt-1.5 inline-flex items-start gap-1.5">
         <HelpCircle size={13} className="shrink-0 mt-0.5" aria-hidden />
         <span>
-          The scripted conversations are not used as a fallback. A convincing fake standing in
-          for a broken service is worse than a blank screen, because everything looks like it is
-          working.
+          Nothing answers in the service's place. A convincing fake standing in for a broken
+          service is worse than a blank screen, because everything looks like it is working.
         </span>
       </p>
     </Callout>

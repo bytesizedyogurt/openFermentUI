@@ -16,7 +16,8 @@ import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { lockIntact, runbookLockHash, shouldBeLocked } from '../src/engine/lock';
 import { PROVENANCE_LABEL, PROVENANCE_RANK, aggregateExclusion, tickClass } from '../src/store';
 import { provMeta } from '../src/components/Provenance';
@@ -36,7 +37,7 @@ import { SUBSYSTEMS } from '../src/data/subsystems';
 import { FLOWS, SUGGESTED_PROMPTS } from '../src/data/flows';
 import { STRAIN_ALIASES } from '../src/data/strains';
 import { MODULES } from '../src/data/learn';
-import { COLLECTIONS, ACTIVITY, SEED_SESSIONS } from '../src/data/misc';
+import { LIVE_PROMPTS, YEAST_PROMPT_COUNT } from '../src/data/livePrompts';
 import { ONTOLOGY_BY_ID } from '../src/data/ontology';
 import { toSI, normalizeUnit, convert, explainRefusal } from '../src/engine/units';
 import { buildGrid } from '../src/engine/grids';
@@ -128,13 +129,6 @@ for (const s of SCENARIOS) {
   }
 }
 
-for (const c of COLLECTIONS)
-  for (const pid of c.paperIds) if (!paperIds.has(pid)) fail(`${c.id}: paperId ${pid} unresolved`);
-
-for (const sess of SEED_SESSIONS)
-  if (sess.scope?.kind === 'paper' && !paperIds.has(sess.scope.id))
-    fail(`${sess.id}: scope paper ${sess.scope.id} unresolved`);
-
 // chips inside authored markdown
 const CHIP_RE = /\[\[([A-Za-z0-9\-]+)\]\]/g;
 const checkChips = (text: string, where: string) => {
@@ -165,15 +159,17 @@ for (const f of FLOWS) {
     }
   }
 }
-for (const prompt of SUGGESTED_PROMPTS) {
-  const hit = FLOWS.some((f) =>
-    f.triggers.some((t) => {
-      const a = t.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      const b = prompt.toLowerCase().replace(/[^a-z0-9 ]/g, '');
-      return a.includes(b) || b.includes(a) || a === b;
-    }),
-  );
-  if (!hit) warn(`suggested prompt has no exact trigger match: "${prompt}"`);
+// OF-BLD-016 D5 — Postdoc offers the questions tested against the live
+// service, and nothing else: the flows above are the eval set, never offered.
+// The yeast five lead, then Appendix 2's cross-module questions.
+if (SUGGESTED_PROMPTS.length !== LIVE_PROMPTS.length || SUGGESTED_PROMPTS.some((p, i) => p !== LIVE_PROMPTS[i]))
+  fail('SUGGESTED_PROMPTS is not livePrompts.ts: Postdoc offers the tested questions and nothing else (OF-BLD-016 D5)');
+if (new Set(LIVE_PROMPTS).size !== LIVE_PROMPTS.length) fail('livePrompts.ts offers the same question twice');
+if (LIVE_PROMPTS.length <= YEAST_PROMPT_COUNT)
+  fail(`livePrompts.ts holds ${LIVE_PROMPTS.length} questions; the yeast ${YEAST_PROMPT_COUNT} and the cross-module ones after them are expected`);
+for (const prompt of LIVE_PROMPTS) {
+  if (FLOWS.some((f) => f.triggers.some((t) => t.toLowerCase() === prompt.toLowerCase())))
+    fail(`livePrompts.ts offers a scripted flow's trigger: "${prompt}"`);
 }
 
 for (const mod of MODULES)
@@ -191,11 +187,25 @@ for (const mod of MODULES)
     }
   }
 
-for (const a of ACTIVITY) {
-  if (!a.href) continue;
-  const path = a.href.replace(/^#/, '');
-  const known = /^\/(|ask|library|extract|organisms|protocols|simulate|learn|settings)/.test(path);
-  if (!known) warn(`activity href does not look like a real route: ${a.href}`);
+// ── 2b. Postdoc speaks only through the service (OF-BLD-016 §3.1, D5) ──
+//
+// The scripted player and its invented delays (src/sim/) are gone. A file
+// that imported from them again would bring back an answer nobody asked the
+// service for, so the import itself fails the build, whatever it imports.
+{
+  const SIM_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](?:@\/sim|(?:\.\.?\/)+sim)(?:\/[^'"]*)?['"]/;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : /\.(ts|tsx|js|jsx|mjs)$/.test(name) ? [path] : [];
+    });
+  if (existsSync('src/sim')) fail('src/sim/ exists: the scripted chat player was deleted (OF-BLD-016 D5), and nothing replaces it');
+  for (const file of walk('src')) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      if (SIM_IMPORT.test(line)) fail(`${file}:${i + 1} imports from src/sim/ — Postdoc speaks only through the service (OF-BLD-016 §3.1)`);
+    });
+  }
 }
 
 // ── 3. record integrity for the real corpus ────────────────────────────
@@ -1064,7 +1074,8 @@ console.log(`  locked            ${RUNBOOKS.filter((r) => r.lockedAt).length}/${
 console.log(`  runbooks          ${RUNBOOKS.length} over ${new Set(RUNBOOKS.map((r) => r.status)).size} states (${RUNBOOKS.filter((r) => r.kind === 'industrial').length} industrial, ${RUNBOOKS.filter((r) => r.kind === 'research').length} research)`);
 console.log(`  protocols         ${PROTOCOLS.length} (${PROTOCOLS.reduce((n, p) => n + p.versions.length, 0)} versions, ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.length, 0), 0)} steps)`);
 console.log(`  scenarios         ${SCENARIOS.length} over ${COST_MODELS.length} cost models`);
-console.log(`  chat flows        ${FLOWS.length}`);
+console.log(`  eval flows        ${FLOWS.length} (graded against, never offered)`);
+console.log(`  postdoc prompts   ${LIVE_PROMPTS.length} (${YEAST_PROMPT_COUNT} yeast, ${LIVE_PROMPTS.length - YEAST_PROMPT_COUNT} across the modules)`);
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
 console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);

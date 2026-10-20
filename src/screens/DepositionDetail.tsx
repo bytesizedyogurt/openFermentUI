@@ -7,7 +7,7 @@
 // The page is organised around the one thing that makes the record worth
 // keeping — measured values sit above observations, because the measurements
 // are what can be reconciled and the observations are what nobody predicted.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, Eye, FlaskConical, GitBranch, Ruler, Scale as ScaleIcon } from 'lucide-react';
 import type { Deposition } from '@/data/types';
 import { useStore } from '@/store';
@@ -31,10 +31,8 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 const STATE_COPY: Record<Deposition['state'], { label: string; note: string; tone: string }> = {
   staged: {
@@ -210,18 +208,6 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
   const runbooks = useStore((s) => s.runbooks);
   const protocols = useStore((s) => s.protocols);
   const structure = useStore((s) => s.structureObservation);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [depositionId]);
 
   const deposition = depositions.find((d) => d.id === depositionId);
   // The operator as Guild's ledger names them (OF-BLD-013 §2).
@@ -252,17 +238,6 @@ export default function DepositionDetail({ depositionId }: { depositionId: strin
             body="A deposition is started from a runbook, which is what supplies the predictions it will be judged against."
             action={<LinkButton to="/runbooks">Open the runbook board</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Assay · Deposition" title={protocol?.title ?? deposition.id} />
-        <Card>
-          <Skeleton rows={8} />
         </Card>
       </>
     );

@@ -351,8 +351,7 @@ async function main() {
       // sentence; the fixture run is one match, one mismatch, one miss over
       // B5's three curated records, so the counts are fixed.
       await page.goto(`http://localhost:${PORT}/#/biorepo/witness`, { waitUntil: 'networkidle' });
-      // Witness renders a skeleton for a simulated 200–450 ms before its
-      // numbers; wait for the run's own label rather than a guessed sleep.
+      // Wait for the run's own label rather than a guessed sleep.
       await page.locator('text=claude-1').first().waitFor({ timeout: 8000 }).catch(() => {});
       await page.waitForTimeout(150);
       const witness = await page.locator('body').innerText();
@@ -411,12 +410,15 @@ async function main() {
       const card = (await page.locator('[data-testid="retrieval-scorecard"]').innerText().catch(() => '')) ?? '';
       if (!/in use: bm25/.test(card) || !/hybrid/.test(card)) problems.push('Witness does not show the retrieval scorecard');
 
-      // OF-BLD-014 §5.4 — Postdoc live: the steps draw as the double replays
-      // the stream the real loop recorded, the claim shows its record's value
+      // OF-BLD-014 §5.4 — Postdoc: the steps draw as the double replays the
+      // stream the real loop recorded, the claim shows its record's value
       // and its quoted sentence, the footer says why the loop stopped, and
-      // the quote opens the reader on the paper's words.
+      // the quote opens the reader on the paper's words. OF-BLD-016 §3.1:
+      // there is no mode to choose; the service is the only path.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
+      if (await page.getByRole('button', { name: 'Scripted' }).count()) problems.push('Postdoc still offers a scripted mode');
+      if ((await page.locator('[data-testid="suggested-prompt"]').count()) !== 11)
+        problems.push(`Postdoc's empty state does not offer the yeast five and the six cross-module questions (${await page.locator('[data-testid="suggested-prompt"]').count()} offered)`);
       await page.locator('textarea[aria-label="Ask a question"]').fill('What does the stand-in table report for placeholder A?');
       await page.locator('textarea[aria-label="Ask a question"]').press('Enter');
       await page.locator('[data-testid="trace-step"]').first().waitFor({ timeout: 8000 }).catch(() => {});
@@ -510,10 +512,33 @@ async function main() {
       if (!/Not run on this service yet/.test(bench) || !/biorefineries\.cornstover@2\.35\.1/.test(bench))
         problems.push('the Benchmark card does not show its empty state with the package it will run');
       if (!(await page.getByRole('button', { name: 'Run the benchmark' }).count())) problems.push('the Benchmark card offers no run');
+      // OF-BLD-016 §3.1 — Postdoc speaks only through the service. With
+      // nothing answering (health and the ask both refused), the page says
+      // so and how to start it, keeps the conversation asked above, and
+      // keeps a question typed meanwhile in the box: nothing answers in the
+      // service's place, and nothing typed is lost.
+      await page.route('**/api/health', (r) => r.abort());
+      await page.route('**/api/ask/stream', (r) => r.abort());
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
-      // Back to scripted, which the live panel leaves untouched.
-      await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Scripted' }).click();
+      await page.locator('[data-testid="postdoc-down"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const downNote = (await page.locator('[data-testid="postdoc-down"]').innerText().catch(() => '')) ?? '';
+      if (!/Postdoc needs the service/.test(downNote) || !/Start it with pnpm prototype:up/.test(downNote))
+        problems.push(`with the service down Postdoc does not say how to start it: ${JSON.stringify(downNote.slice(0, 120))}`);
+      const turnsBefore = await page.locator('[data-testid="live-turn"]').count();
+      const typedDown = 'What does the stand-in table report for placeholder B?';
+      await page.locator('textarea[aria-label="Ask a question"]').fill(typedDown);
+      await page.locator('textarea[aria-label="Ask a question"]').press('Enter');
+      await page
+        .waitForFunction((t) => document.querySelector('textarea[aria-label="Ask a question"]')?.value === t, typedDown, { timeout: 5000 })
+        .catch(() => {});
+      if ((await page.locator('textarea[aria-label="Ask a question"]').inputValue()) !== typedDown)
+        problems.push('a question asked with the service down did not stay in the box');
+      const turnsAfter = await page.locator('[data-testid="live-turn"]').count();
+      if (turnsBefore !== 1 || turnsAfter !== 1)
+        problems.push(`the conversation did not stay as it was with the service down (${turnsBefore} turns before, ${turnsAfter} after)`);
+      if (doubleState.asks.some((a) => a.question === typedDown)) problems.push('a question asked with the service down reached the double');
+      await page.unroute('**/api/health');
+      await page.unroute('**/api/ask/stream');
 
       // §7.3 — the review card. The new candidate is in the queue, labelled;
       // accepting it posts a decision to the service. The curated record on
@@ -625,7 +650,7 @@ async function main() {
         overlayFails++;
         console.log(`✗ overlay      ${problems.join('; ')}`);
       } else {
-        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc live draws its steps, quotes the table row and opens the reader on it; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported; fermOS fits and forecasts the sample run');
+        console.log('✓ overlay      B5 shows the fetched text; 3 unanchored quotes listed, each linked to review; Witness scores the run provisionally; Guild shows the extractor\'s span and posts the decision; Postdoc draws its steps, quotes the table row and opens the reader on it, and with the service down says how to start it and keeps the conversation and the typed question; the figure gallery draws its sample; geneOS draws a ceiling beside what was reported; fermOS fits and forecasts the sample run');
       }
     } catch (e) {
       overlayFails++;
@@ -712,7 +737,6 @@ async function main() {
       // opens an unlocked research runbook whose page draws its predictions
       // and the chain behind them, forecast then price, with the seam between.
       await page.goto(`http://localhost:${PORT}/#/postdoc`, { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Live (Postdoc service)' }).click();
       await page.locator('textarea[aria-label="Ask a question"]').fill('Draft a runbook for the stand-in run.');
       await page.locator('textarea[aria-label="Ask a question"]').press('Enter');
       await page.locator('[data-testid="runbook-draft"]').waitFor({ timeout: 10000 }).catch(() => {});

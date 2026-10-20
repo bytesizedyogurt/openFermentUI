@@ -1,6 +1,6 @@
 // Library — the faceted corpus table (OF-DES-001 §8.3). Every row is a paper
 // in the OF-COR-001 catalogue; the ingest queue lives on the Ingest screen.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   BookMarked,
@@ -24,11 +24,9 @@ import {
   LinkButton,
   PageHeader,
   Popover,
-  Skeleton,
   cx,
 } from '@/components/ui';
 import { exportCSV } from '@/lib/csv';
-import { delayClass } from '@/sim/latency';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { BIOREPO_TABS } from '@/data/tabs';
 import { SubsystemShelf } from '@/components/ReferenceView';
@@ -133,19 +131,7 @@ export default function BioRepo() {
   const logActivity = useStore((s) => s.logActivity);
   const toast = useStore((s) => s.toast);
 
-  const [ready, setReady] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
-
-  // Simulated first-paint latency (§13.5) so the loading state is real.
-  useEffect(() => {
-    let alive = true;
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const allRows = useMemo<LibRow[]>(() => {
     const byPaper = new Map<string, { total: number; gold: number; verified: number }>();
@@ -526,20 +512,6 @@ export default function BioRepo() {
     <OwnerTabs tabs={BIOREPO_TABS} />
     </>
   );
-
-  if (!ready) {
-    return (
-      <>
-        {header}
-        <Card>
-          <Skeleton rows={10} />
-        </Card>
-        <div className="sr-only" aria-live="polite">
-          Loading corpus table
-        </div>
-      </>
-    );
-  }
 
   if (allRows.length === 0) {
     return (

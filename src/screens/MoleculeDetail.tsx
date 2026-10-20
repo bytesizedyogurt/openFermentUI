@@ -10,7 +10,7 @@
 // there is no evidence here — the page wears the dashed amber demo tick and
 // the value figures wear the industry-estimate tick, both from the existing
 // provenance system.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ArrowRight,
   Boxes,
@@ -52,10 +52,8 @@ import {
   LinkButton,
   PageHeader,
   SectionTitle,
-  Skeleton,
   cx,
 } from '@/components/ui';
-import { delayClass } from '@/sim/latency';
 
 function StorageRow({ id, warmest }: { id: string; warmest: boolean }) {
   const f = STORAGE_FORMATS_BY_ID[id];
@@ -84,18 +82,6 @@ function StorageRow({ id, warmest }: { id: string; warmest: boolean }) {
 export default function MoleculeDetail({ productId }: { productId: string }) {
   const products = useStore((s) => s.products);
   const runbooks = useStore((s) => s.runbooks);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setReady(false);
-    delayClass('quick').then(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [productId]);
 
   const product = products.find((p) => p.id === productId);
 
@@ -127,20 +113,6 @@ export default function MoleculeDetail({ productId }: { productId: string }) {
             body="The molecule index lists every product this catalogue covers. Open it to pick one."
             action={<LinkButton to="/dominion/molecules">Back to molecules</LinkButton>}
           />
-        </Card>
-      </>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <>
-        <PageHeader eyebrow="Molecules" title={product.name} />
-        <Card className="p-4 mb-4">
-          <Skeleton rows={3} />
-        </Card>
-        <Card>
-          <Skeleton rows={8} />
         </Card>
       </>
     );
