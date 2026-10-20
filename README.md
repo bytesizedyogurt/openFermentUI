@@ -560,10 +560,10 @@ The prototype holds itself to nine conditions (design §11, and OF-BLD-016's eig
 3. **Traversable journeys.** Every cross-entity path — chip → reader → record → strain →
    protocol → scenario — is walkable in both directions.
 4. **Time as it is.** No screen waits on an invented delay; each draws when its data is
-   there. What remains of the simulated pacing is the browser's job queue (`startJob` /
-   `tickJobs` in `store.ts`, paced by `simSpeed`): Intake's real fetch and extract jobs report
-   the service's progress, while BioRepo's and the reader's extraction jobs and the runbook
-   jobs still advance through authored stages.
+   there. The browser's job queue (`startJob` / `tickJobs` in `store.ts`) carries Intake's
+   fetch, extract and ingest jobs, which report the service's progress; with the service down an
+   ingest stops at Fetch and says why. The extraction and research jobs that advanced through
+   authored stages, and the speed control that paced them, are gone (OF-BLD-016 §3.R).
 5. **Deterministic where it matters.** Simulation results and every computed value are
    reproducible run to run (a computed value is replayed from its inputs); only the model's
    words vary, and a validator holds them to the evidence.
@@ -670,8 +670,9 @@ The split is deliberate. `engine/` (units, scaling, diff, metrics, interpolation
 code already. `data/` seed modules keep the shapes the API will return, so they become fixtures
 and contract tests. `src/sim/`, the scripted chat player and its invented delays, is gone
 (OF-BLD-016 §3.1); its flows survive in `src/data/flows.ts` as the evaluation set. What is left of
-the simulation is the job pacing in `store.ts` (`startJob`/`tickJobs`, `simSpeed`), and
-`src/engine/retrieval.ts`, the browser's old retrieval, which nothing imports any more.
+the simulation is `src/engine/retrieval.ts`, the browser's old retrieval, which nothing imports
+any more; the job queue in `store.ts` (`startJob`/`tickJobs`) now carries only Intake's jobs, which
+report the service's progress (OF-BLD-016 §3.R).
 
 ### The evidence tick
 
