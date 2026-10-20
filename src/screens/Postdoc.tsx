@@ -422,7 +422,12 @@ function LivePanel({
           {LIVE_PROMPTS.length > 0 && (
             <div className="flex flex-wrap gap-2 justify-center mt-2">
               {LIVE_PROMPTS.map((p) => (
-                <button key={p} className="chip hover:border-accent hover:bg-accent-wash" onClick={() => onAsk(p)}>
+                // A whole question, so it wraps rather than running off the column.
+                <button
+                  key={p}
+                  className="chip hover:border-accent hover:bg-accent-wash whitespace-normal text-left max-w-full py-1"
+                  onClick={() => onAsk(p)}
+                >
                   {p}
                 </button>
               ))}
