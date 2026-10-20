@@ -2671,6 +2671,13 @@ export interface RagReport {
   /** The rule that chose it, in words. */
   rule: string;
   totalCostUsd: number;
+  /** The thread the questions were drawn from (OF-BLD-016 §4.1), or null for
+   *  every paper. Every search ran over the whole index either way. */
+  thread?: string | null;
+  /** The lane search runs on now (core/data/index/config.json), which a person
+   *  may hold apart from the rule's choice; the API fills it when it serves the
+   *  report (OF-BLD-016 §4.1). */
+  laneInUse?: string | null;
 }
 
 export interface RagSearchRequest {

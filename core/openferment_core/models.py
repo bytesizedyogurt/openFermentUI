@@ -1471,6 +1471,13 @@ class RagReport(BaseModel):
     # The rule that chose it, in words.
     rule: str
     totalCostUsd: float
+    # The thread the questions were drawn from (OF-BLD-016 §4.1), or None for
+    # every paper. Every search ran over the whole index either way.
+    thread: str | None = None
+    # The lane search runs on now (core/data/index/config.json), which a person
+    # may hold apart from the rule's choice; the API fills it when it serves the
+    # report, and the stored report leaves it None (OF-BLD-016 §4.1).
+    laneInUse: str | None = None
 
 
 class RagSearchRequest(BaseModel):

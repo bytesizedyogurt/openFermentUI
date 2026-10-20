@@ -886,7 +886,9 @@ def rag_report() -> RagReport:
     report = rageval.read_report()
     if report is None:
         raise HTTPException(status_code=404, detail="no retrieval scorecard yet: run pnpm rag:eval")
-    return report
+    # The rule's choice and the lane in use can differ: a person may hold the
+    # lane apart (OF-BLD-016 §4.1), and the screen names both.
+    return report.model_copy(update={"laneInUse": passages.chosen_lane()})
 
 
 # ── The built app (OF-BLD-012 §B.4) ──────────────────────────────────────

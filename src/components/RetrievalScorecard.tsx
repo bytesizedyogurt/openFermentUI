@@ -18,6 +18,9 @@ export function RetrievalScorecard() {
   const [report, setReport] = useState<RagReport | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [indexHash, setIndexHash] = useState<string | null>(null);
+  // The lane search runs on: the service names it beside the rule's choice
+  // (OF-BLD-016 §4.1); a report served without it is the lane it chose.
+  const inUse = report ? report.laneInUse ?? report.chosenLane : null;
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -46,7 +49,13 @@ export function RetrievalScorecard() {
         <>
           <p className="text-caption text-ink-soft mb-2">
             Scored {report.date.slice(0, 10)} over {report.passages.toLocaleString()} passages from{' '}
-            {report.papersIndexed} papers · in use: <strong>{report.chosenLane}</strong> ·{' '}
+            {report.papersIndexed} papers
+            {report.thread && <> · questions drawn from thread {report.thread}&rsquo;s papers alone</>} · in use:{' '}
+            <strong>{inUse}</strong>
+            {inUse !== report.chosenLane && (
+              <> (the rule chose <strong>{report.chosenLane}</strong>; search stays on {inUse} until a person adopts it)</>
+            )}{' '}
+            ·{' '}
             {report.sets.map((s) => `${s.name}: ${s.note}`).join(' · ')}
           </p>
           {indexHash && indexHash !== report.manifestHash && (
@@ -85,11 +94,12 @@ export function RetrievalScorecard() {
                     Object.entries(l.sets).map(([set, m], i) => (
                       <tr
                         key={`${l.lane}-${set}`}
-                        className={cx('border-b border-line last:border-0', l.lane === report.chosenLane && 'bg-accent-wash')}
+                        className={cx('border-b border-line last:border-0', l.lane === inUse && 'bg-accent-wash')}
                       >
                         <td className="px-3 py-2 font-mono">
                           {i === 0 ? l.lane : ''}
-                          {i === 0 && l.lane === report.chosenLane && <span className="chip ml-2">in use</span>}
+                          {i === 0 && l.lane === inUse && <span className="chip ml-2">in use</span>}
+                          {i === 0 && l.lane === report.chosenLane && l.lane !== inUse && <span className="chip ml-2">rule&rsquo;s choice</span>}
                           {i === 0 && (l.refused ?? 0) > 0 && (
                             <div className="text-caption text-ink-soft font-sans">{l.refused} unscored: the helper model declined them</div>
                           )}
