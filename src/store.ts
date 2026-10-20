@@ -1283,6 +1283,7 @@ export const useStore = create<OFState>()((set, get) => ({
             license: result.license?.href ?? result.license?.text ?? null,
             fetchedAt: result.fetchedAt,
             reason: null,
+            source: result.source,
           },
         },
         records: {},
@@ -2576,6 +2577,7 @@ export const useStore = create<OFState>()((set, get) => ({
           // SOMETHING, and the curator's words labelled as such beat nothing.
           sections: fetched ? o.sections : p.sections,
           license: fetched ? (o.license ?? undefined) : p.license,
+          fetchedFrom: fetched ? (o.source ?? 'europepmc') : p.fetchedFrom,
           ingestReason: o.reason ?? undefined,
         } as Paper;
       });

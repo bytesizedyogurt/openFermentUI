@@ -71,7 +71,7 @@ async function main() {
   await page.waitForTimeout(2500);
   const askText = await page.locator('body').innerText();
   check('Postdoc plays a flow and renders an answer', /500 mg\/L|15–18|1\.45/.test(askText));
-  const chips = page.locator('button', { hasText: /^\[[A-P]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
+  const chips = page.locator('button', { hasText: /^\[[A-Q]\d+[a-z]?\]$|^\[r-[A-Z0-9]+-\d+\]$/ });
   const chipCount = await chips.count();
   check('Answer carries working citation chips', chipCount > 0, `${chipCount} chips`);
 

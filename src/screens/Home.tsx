@@ -114,6 +114,16 @@ const PROGRAMS: { id: string; title: ReactNode; threads: string; letters: RegExp
     threads: 'thread P',
     letters: /^P$/,
   },
+  {
+    id: 'yeast-ethanol',
+    title: (
+      <>
+        Yeast ethanol: <i>S. cerevisiae</i> on glucose
+      </>
+    ),
+    threads: 'thread Q',
+    letters: /^Q$/,
+  },
 ];
 
 function ProgramTile({
@@ -652,9 +662,9 @@ export default function Home() {
             right={
               <Explain label="What is a program?">
                 A program is one research question and the papers gathered for it. Thread P's
-                papers are proposed by a fixed search rule and enter the corpus only when a
-                person approves them; none of its values is typed by hand. Every count here is
-                read from the corpus as it stands now.
+                and thread Q's papers are proposed by a fixed search rule and enter the corpus
+                only when a person approves them; none of their values is typed by hand. Every
+                count here is read from the corpus as it stands now.
               </Explain>
             }
           >

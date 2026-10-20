@@ -9,8 +9,28 @@
 // simulation for a real fetch — the ingest board keeps that path, labelled as
 // the offline one, and the choice between them is made in the store where the
 // reader can see which one ran.
-import type { DecisionCheck, ExtractResponse, FetchResult, IntakeStatus, Overlay, ReviewDecision } from '@/data/types';
+import type {
+  DecisionCheck,
+  ExtractResponse,
+  FetchResult,
+  FetchSource,
+  IntakeStatus,
+  Overlay,
+  ReviewDecision,
+} from '@/data/types';
 import { START_COMMAND, postdocHealth } from './postdoc';
+
+/** Who served a fetched text, in the words the reader is shown. */
+const SOURCE_NAMES: Record<FetchSource, string> = {
+  europepmc: 'Europe PMC',
+  osti: 'OSTI',
+  sgd: 'Saccharomyces Genome Database',
+};
+
+/** The name of a fetched text's source; absent is Europe PMC, the one source an older service knew. */
+export function fetchSourceName(source: FetchSource | undefined): string {
+  return SOURCE_NAMES[source ?? 'europepmc'];
+}
 
 export class IntakeDown extends Error {
   constructor(

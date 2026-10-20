@@ -25,6 +25,7 @@ LISTED = [
     "core/data/index/dense.json",
     "core/data/live",
     "core/data/thread-p-proposed.tsv",
+    "core/data/thread-q-proposed.tsv",
 ]
 
 needs_git = pytest.mark.skipif(
@@ -91,6 +92,7 @@ def fill(where: Path) -> None:
     put(where, "core/data/index/dense.json", '{"count": 0}\n')
     put(where, "core/data/live/2026-10-14.json", "{}\n")
     put(where, "core/data/thread-p-proposed.tsv", "verdict\tid\nPROPOSE\tPMC1\n")
+    put(where, "core/data/thread-q-proposed.tsv", "verdict\tid\nINCLUDE\t\n")
     # What never leaves the machine that made it.
     put(where, "core/data/fulltext/P1.json", '{"paperId": "P1", "sections": []}\n')
     put(where, "core/data/index/passages.jsonl", "{}\n")
@@ -109,7 +111,7 @@ def test_what_one_machine_pushes_another_pulls(machines):
     assert pulled.returncode == 0, pulled.stderr + pulled.stdout
     for rel in LISTED:
         assert files(second, rel) == files(first, rel), rel
-    assert "pulled 9 file(s)" in pulled.stdout
+    assert "pulled 10 file(s)" in pulled.stdout
 
 
 @needs_git

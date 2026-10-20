@@ -205,15 +205,20 @@ class FetchedSection(BaseModel):
 
 
 class FetchLicense(BaseModel):
-    """What the JATS <license> element said. Stored beside every fetched text,
-    because Europe PMC's open-access subset spans several licences and the
-    text is kept local partly on that account (§2.2)."""
+    """What the JATS <license> element said, or what an OSTI report or an SGD
+    strain entry states of itself. Stored beside every fetched text, because
+    Europe PMC's open-access subset spans several licences and the text is
+    kept local partly on that account (§2.2)."""
 
     href: str | None = None
     text: str | None = None
 
 
 FetchStatus = Literal["complete", "failed:fetch", "failed:parse"]
+# Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
+# Saccharomyces Genome Database strain entry (thread Q). A file cached before
+# the field existed was fetched from Europe PMC, and reads as such.
+FetchSource = Literal["europepmc", "osti", "sgd"]
 
 
 class FetchResult(BaseModel):
@@ -228,9 +233,11 @@ class FetchResult(BaseModel):
     fetchedAt: str
     license: FetchLicense | None = None
     sections: list[FetchedSection] = Field(default_factory=list)
-    # Size of the XML as received. A sanity figure for the batch table and the
-    # quickest tell that a "success" was actually an error page.
+    # Size of the document as received: the XML, the PDF or the JSON. A sanity
+    # figure for the batch table and the quickest tell that a "success" was
+    # actually an error page.
     bytes: int = 0
+    source: FetchSource = "europepmc"
 
 
 class IntakeStatus(BaseModel):
@@ -245,6 +252,7 @@ class IntakeStatus(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
+    source: FetchSource = "europepmc"
 
 
 class OverlayPaper(BaseModel):
@@ -260,6 +268,9 @@ class OverlayPaper(BaseModel):
     license: str | None = None
     fetchedAt: str | None = None
     reason: str | None = None
+    # Who served the text, so the reader names its source rather than
+    # assuming Europe PMC.
+    source: FetchSource = "europepmc"
 
 
 class Overlay(BaseModel):

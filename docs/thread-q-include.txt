@@ -1,0 +1,17 @@
+# Thread Q include list.
+#
+# One PMCID, DOI or PMID per line, or a source Europe PMC does not hold:
+# `osti:<id>`, a report on OSTI, or `sgd:<id>`, a strain entry in the
+# Saccharomyces Genome Database. `pnpm thread:propose:q` looks each one up at
+# its source and marks it INCLUDE, whatever the selection rule says about it.
+# One with no open-access text is still catalogued, with openAccess: false.
+# Everything after a # is a comment. Sean edits this file; nothing else does.
+#
+# The four entries below are the sources Sean Creighton named in his
+# instruction of 2026-10-20. Papers from the search are approved in the
+# proposal file, not here.
+
+osti:1013269    # Humbird et al. 2011, NREL/TP-5100-47764
+osti:1129271    # Tao et al. 2014, NREL/TP-5100-61563
+sgd:S000203483  # S288C
+sgd:S000203459  # CEN.PK

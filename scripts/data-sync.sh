@@ -32,6 +32,7 @@ PATHS=(
   core/data/index/dense.json
   core/data/live/
   core/data/thread-p-proposed.tsv
+  core/data/thread-q-proposed.tsv
 )
 
 say() { printf '── %s\n' "$*"; }

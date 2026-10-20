@@ -29,6 +29,7 @@ import type { Job, Paper } from '@/data/types';
 import { useStore } from '@/store';
 import { href } from '@/router';
 import { START_COMMAND } from '@/lib/postdoc';
+import { fetchSourceName } from '@/lib/intake';
 import { OwnerTabs } from '@/components/OwnerTabs';
 import { INTAKE_TABS } from '@/data/tabs';
 import {
@@ -450,7 +451,7 @@ export default function IntakeIngest() {
                         : row.state === 'stalled'
                           ? `Waiting at ${STAGE_LABELS[row.stageIndex]} — resume to run the remaining stages`
                           : row.real
-                            ? `${row.paper.sections.length} sections from Europe PMC${row.paper.license ? ` · ${row.paper.license}` : ''}`
+                            ? `${row.paper.sections.length} sections from ${fetchSourceName(row.paper.fetchedFrom)}${row.paper.license ? ` · ${row.paper.license}` : ''}`
                             : 'In corpus';
                 return (
                   <Card key={row.paper.id} className="p-3">

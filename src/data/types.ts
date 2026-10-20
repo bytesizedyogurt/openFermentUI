@@ -189,7 +189,9 @@ export type CorpusThread =
   | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H'
   | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O'
   /** PHA from waste cellulosic sugars, program two (OF-BLD-014 §2.2). */
-  | 'P';
+  | 'P'
+  /** Ethanol from glucose by wild-type Saccharomyces cerevisiae, program three. */
+  | 'Q';
 
 export type SourceType =
   | 'journal-article'
@@ -198,7 +200,9 @@ export type SourceType =
   | 'patent'
   | 'book'
   | 'industry-report'
-  | 'preprint';
+  | 'preprint'
+  /** An entry in a curated database, such as a strain page of the Saccharomyces Genome Database. */
+  | 'database-entry';
 
 export interface PaperSection {
   id: string;
@@ -230,6 +234,13 @@ export interface Paper {
   doi?: string;
   pmcid?: string;
   pmid?: string;
+  /**
+   * Where Intake fetches the text of a source Europe PMC does not hold: an
+   * OSTI report's purl, an SGD strain entry's address. Written by
+   * `pnpm thread:apply:q` from a person's include list; a strain entry has
+   * no other identifier.
+   */
+  sourceUrl?: string;
   /** Whether `sections` hold the paper's own text or the curator's notes. */
   textSource: 'full-text' | 'curation-note';
   /** Openly retrievable vs. needs institutional access (OF-COR-001 §19). */
@@ -244,6 +255,8 @@ export interface Paper {
   // ── set by the service overlay (OF-BLD-012 §2.1), never by the seed ──
   /** The licence the fetched full text carried, when `textSource` is 'full-text'. */
   license?: string;
+  /** Who served the fetched full text, when `textSource` is 'full-text'. */
+  fetchedFrom?: FetchSource;
   /** Why the last fetch halted, when `ingest` is a failure state. */
   ingestReason?: string;
 }
@@ -1411,13 +1424,23 @@ export interface LiveConversation {
 // `FetchedSection` is the same shape as `PaperSection` above and is compared
 // against it.
 
-/** What the JATS <license> element said, stored beside every fetched text. */
+/**
+ * What the JATS <license> element said, or what an OSTI report or an SGD
+ * strain entry states of itself, stored beside every fetched text.
+ */
 export interface FetchLicense {
   href: string | null;
   text: string | null;
 }
 
 export type FetchStatus = Extract<IngestStatus, 'complete' | 'failed:fetch' | 'failed:parse'>;
+
+/**
+ * Who served a fetched text: Europe PMC's JATS, an OSTI report's PDF, or a
+ * Saccharomyces Genome Database strain entry. Absent from what an older
+ * service sent, which was always Europe PMC.
+ */
+export type FetchSource = 'europepmc' | 'osti' | 'sgd';
 
 /**
  * What one fetch produced. A failure is a result with a reason rather than an
@@ -1431,8 +1454,9 @@ export interface FetchResult {
   fetchedAt: string;
   license: FetchLicense | null;
   sections: PaperSection[];
-  /** Size of the XML as received. */
+  /** Size of the document as received: the XML, the PDF or the JSON. */
   bytes: number;
+  source?: FetchSource;
 }
 
 /** One row of GET /api/intake/status. */
@@ -1446,6 +1470,7 @@ export interface IntakeStatus {
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
+  source?: FetchSource;
 }
 
 /**
@@ -1460,6 +1485,8 @@ export interface OverlayPaper {
   license: string | null;
   fetchedAt: string | null;
   reason: string | null;
+  /** Who served the text, so the reader names it rather than assuming Europe PMC. */
+  source?: FetchSource;
 }
 
 /**

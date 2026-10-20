@@ -26,12 +26,24 @@ Europe PMC is treated as a colleague's server. At most two requests a second,
 a User-Agent that names the project and — when `OPENFERMENT_CONTACT` is set in
 `core/.env` — somebody to write to, one retry on a 5xx, and nothing else.
 
+TWO SOURCES ARE NOT EUROPE PMC. Thread Q names reports on OSTI and strain
+entries in the Saccharomyces Genome Database, which carry a `sourceUrl` in
+the corpus, and a paper whose `sourceUrl` is on either host is fetched there
+instead. A report is a PDF, split by `split_pdf` into one section per page,
+its text exactly as the PDF library read it. A strain entry is SGD's JSON,
+split by `split_sgd` into its description, its genotype and the references it
+cites, its markup removed and nothing added. The same manners, the same
+caching of a miss, and the same refusal in fixture mode hold for both.
+
 Fixture mode (`OPENFERMENT_FIXTURES=1`) reads XML from `tests/fixtures/jats/`
-and refuses the network. It exists so the parser and the persistence can be
-tested offline, and so §8.1's demo can replay the loop with no connection.
+(and a report from `osti/<id>.pdf`, a strain entry from `sgd/<id>.json` beside
+it) and refuses the network. It exists so the parser and the persistence can
+be tested offline, and so §8.1's demo can replay the loop with no connection.
 """
 from __future__ import annotations
 
+import html
+import io
 import json
 import os
 import re
@@ -42,11 +54,12 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
 from . import atomic
-from .models import FetchedSection, FetchLicense, FetchResult, IntakeStatus, OverlayPaper
+from .models import FetchedSection, FetchLicense, FetchResult, FetchSource, IntakeStatus, OverlayPaper
 
 EUROPE_PMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 # Where the service keeps what it fetched, extracted and decided (§2.2), and
@@ -116,15 +129,25 @@ def _throttle() -> None:
         _last_request_at = time.monotonic()
 
 
-def _get(url: str, params: dict[str, str] | None = None) -> httpx.Response:
-    """One GET with the project's manners: throttle, User-Agent, one retry on 5xx."""
+def _get(
+    url: str,
+    params: dict[str, str] | None = None,
+    *,
+    headers: dict[str, str] | None = None,
+    follow_redirects: bool = False,
+) -> httpx.Response:
+    """One GET with the project's manners: throttle, User-Agent, one retry on
+    5xx. OSTI's purl answers with a redirect to the laboratory that holds the
+    file, so a caller may ask for redirects to be followed."""
     if fixtures_only():
         raise NetworkRefused(f"OPENFERMENT_FIXTURES is set; refusing to GET {url}")
-    headers = {"User-Agent": _user_agent()}
+    headers = {**(headers or {}), "User-Agent": _user_agent()}
     last: httpx.Response | None = None
     for attempt in (1, 2):
         _throttle()
-        response = httpx.get(url, params=params, headers=headers, timeout=TIMEOUT_S)
+        response = httpx.get(
+            url, params=params, headers=headers, timeout=TIMEOUT_S, follow_redirects=follow_redirects,
+        )
         if response.status_code < 500:
             return response
         last = response
@@ -743,6 +766,235 @@ def split_jats(xml: str, *, paper_id: str = "", pmcid: str | None = None) -> Fet
     )
 
 
+# ── sources outside Europe PMC (thread Q) ──────────────────────────────
+
+# Every page of the Saccharomyces Genome Database carries a rel="license" link
+# to CC BY 4.0 whose image's alt text is 'Creative Commons License'; that link
+# and those words are a strain entry's licence.
+SGD_LICENCE = FetchLicense(href="http://creativecommons.org/licenses/by/4.0/", text="Creative Commons License")
+NO_LICENCE = "The source states no licence."
+# An NREL report says how it may be had in a sentence of its own, on its cover
+# and often on every page after. The first of these found, in this order, is
+# its licence text.
+_AVAILABILITY = (
+    re.compile(r"This report is available at no cost\b.{0,300}?\.(?=\s|$)", re.S),
+    re.compile(r"Available electronically at \S+"),
+)
+_HTML_TAG = re.compile(r"</?[a-zA-Z][^<>]*>")
+
+
+class NotFetched(RuntimeError):
+    """The source answered, and what it answered is not the text: a page
+    served in place of a PDF. A miss, and cached as one."""
+
+
+def source_of(paper: dict[str, Any]) -> FetchSource:
+    """Where a paper's text is fetched: OSTI or the Saccharomyces Genome
+    Database when its `sourceUrl` is on one of their hosts, Europe PMC
+    otherwise."""
+    host = (urlsplit(str(paper.get("sourceUrl") or "").strip()).hostname or "").lower()
+    if host == "osti.gov" or host.endswith(".osti.gov"):
+        return "osti"
+    if host == "yeastgenome.org" or host.endswith(".yeastgenome.org"):
+        return "sgd"
+    return "europepmc"
+
+
+def _last_segment(url: str) -> str:
+    """The id at the end of a source address: an OSTI id, an SGD id."""
+    return urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1]
+
+
+def fetch_pdf(url: str) -> bytes:
+    """An OSTI report's PDF, as bytes, with the redirects from OSTI's purl to
+    the laboratory that holds the file followed. Raises on anything but a 200
+    that is a PDF: served as application/pdf, or starting as a PDF starts.
+
+    In fixture mode the file comes from tests/fixtures/osti/{id}.pdf and the
+    network is never touched.
+    """
+    if fixtures_only():
+        path = FIXTURE_ROOT / "osti" / f"{_last_segment(url)}.pdf"
+        if not path.exists():
+            raise NetworkRefused(f"fixture mode and no fixture at {path}")
+        return path.read_bytes()
+    response = _get(url, follow_redirects=True)
+    if response.status_code >= 500:
+        raise Transient(f"OSTI returned {response.status_code} for {url}")
+    if response.status_code != 200:
+        raise httpx.HTTPStatusError(
+            f"OSTI returned {response.status_code} for {url}", request=response.request, response=response,
+        )
+    kind = response.headers.get("content-type", "").split(";")[0].strip().lower()
+    if kind != "application/pdf" and not response.content.startswith(b"%PDF-"):
+        raise NotFetched(f"{url} answered {kind or 'with no content type'}, not a PDF")
+    return response.content
+
+
+def _report_licence(texts: list[str], source_url: str) -> FetchLicense:
+    """The report's own availability sentence, its words as extracted with
+    each run of white space read as one space, or `NO_LICENCE` when it holds
+    none. The href is the report's record on OSTI."""
+    osti_id = _last_segment(source_url)
+    href = f"https://www.osti.gov/biblio/{osti_id}" if osti_id.isdigit() else (source_url or None)
+    for pattern in _AVAILABILITY:
+        for text in texts:
+            found = pattern.search(text)
+            if found:
+                return FetchLicense(href=href, text=_WS.sub(" ", found.group(0)).strip())
+    return FetchLicense(href=href, text=NO_LICENCE)
+
+
+def split_pdf(data: bytes, *, paper_id: str = "", source_url: str = "") -> FetchResult:
+    """An OSTI report's PDF → a FetchResult, one section per page.
+
+    Page N is section `sN` under the heading 'Page N', its text exactly as
+    pypdf extracted it: no reflow, no dehyphenation, its line breaks kept. A
+    page with no text is left out and the numbering keeps to the pages, so
+    `s7` is page 7 whatever came before it. Never a `t` or `f` id: those name
+    tables and figures, and a page is neither.
+
+    The licence is the report's availability sentence (`_report_licence`).
+    A file that does not parse, or that has no text layer, is returned as
+    `failed:parse` with the reason, never raised.
+    """
+    # Imported here, so a service whose environment predates the dependency
+    # still starts and still fetches from Europe PMC.
+    from pypdf import PdfReader
+
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        texts = [page.extract_text() or "" for page in PdfReader(io.BytesIO(data)).pages]
+    except Exception as e:  # pypdf raises several kinds on a damaged file; each is a parse failure
+        return FetchResult(
+            paperId=paper_id, status="failed:parse", reason=f"the PDF did not parse: {e}",
+            fetchedAt=now, bytes=len(data), source="osti",
+        )
+    sections = [
+        FetchedSection(id=f"s{n}", heading=f"Page {n}", text=text)
+        for n, text in enumerate(texts, start=1)
+        if text.strip()
+    ]
+    if not sections:
+        return FetchResult(
+            paperId=paper_id, status="failed:parse",
+            reason=f"the PDF has no text layer on any of its {len(texts)} pages",
+            fetchedAt=now, bytes=len(data), source="osti",
+        )
+    return FetchResult(
+        paperId=paper_id, status="complete", fetchedAt=now, license=_report_licence(texts, source_url),
+        sections=sections, bytes=len(data), source="osti",
+    )
+
+
+def fetch_sgd(url: str) -> str:
+    """A strain entry of the Saccharomyces Genome Database, as the JSON its
+    backend serves. Raises on anything but a 200.
+
+    In fixture mode the entry comes from tests/fixtures/sgd/{id}.json and the
+    network is never touched.
+    """
+    if fixtures_only():
+        path = FIXTURE_ROOT / "sgd" / f"{_last_segment(url)}.json"
+        if not path.exists():
+            raise NetworkRefused(f"fixture mode and no fixture at {path}")
+        return path.read_text(encoding="utf-8")
+    response = _get(url, headers={"Accept": "application/json"})
+    if response.status_code >= 500:
+        raise Transient(f"the Saccharomyces Genome Database returned {response.status_code} for {url}")
+    if response.status_code != 200:
+        raise httpx.HTTPStatusError(
+            f"the Saccharomyces Genome Database returned {response.status_code} for {url}",
+            request=response.request, response=response,
+        )
+    return response.text
+
+
+def _html_words(value: object) -> str:
+    """SGD's markup as words: tags removed, entities read ('MAT&alpha;' is
+    MATα), white space collapsed. Nothing is added."""
+    if not isinstance(value, str):
+        return ""
+    return _WS.sub(" ", html.unescape(_HTML_TAG.sub("", value))).strip()
+
+
+def split_sgd(text: str, *, paper_id: str = "") -> FetchResult:
+    """An SGD strain entry's JSON → a FetchResult whose sections are the
+    database's own words.
+
+    'abstract' is the entry's description and then its paragraph, a line
+    each; then `s1`, `s2`, … are its genotype and the references its
+    paragraph cites, one citation a line, each when the entry has it. Markup
+    is removed (`_html_words`) and nothing SGD did not write is added: the
+    assembly's figures, the links and the contigs are left out, because none
+    of them is a sentence. The licence is `SGD_LICENCE`. JSON that does not
+    parse, or an entry that holds none of these, is returned as
+    `failed:parse` with the reason, never raised.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    size = len(text.encode("utf-8"))
+    try:
+        entry = json.loads(text)
+    except ValueError as e:
+        return FetchResult(
+            paperId=paper_id, status="failed:parse", reason=f"the SGD entry did not parse as JSON: {e}",
+            fetchedAt=now, bytes=size, source="sgd",
+        )
+    if not isinstance(entry, dict):
+        return FetchResult(
+            paperId=paper_id, status="failed:parse", reason="the SGD entry is not a JSON object",
+            fetchedAt=now, bytes=size, source="sgd",
+        )
+    paragraph = entry.get("paragraph") if isinstance(entry.get("paragraph"), dict) else {}
+    sections: list[FetchedSection] = []
+    abstract = "\n".join(p for p in (_html_words(entry.get("description")), _html_words(paragraph.get("text"))) if p)
+    if abstract:
+        sections.append(FetchedSection(id="abstract", heading="Description", text=abstract))
+    more: list[tuple[str, str]] = []
+    genotype = _html_words(entry.get("genotype"))
+    if genotype:
+        more.append(("Genotype", genotype))
+    cited = [_html_words(r.get("citation")) for r in paragraph.get("references") or [] if isinstance(r, dict)]
+    if any(cited):
+        more.append(("References", "\n".join(c for c in cited if c)))
+    for n, (heading, words) in enumerate(more, start=1):
+        sections.append(FetchedSection(id=f"s{n}", heading=heading, text=words))
+    if not sections:
+        return FetchResult(
+            paperId=paper_id, status="failed:parse",
+            reason="the SGD entry holds no description, paragraph, genotype or reference",
+            fetchedAt=now, bytes=size, source="sgd",
+        )
+    return FetchResult(
+        paperId=paper_id, status="complete", fetchedAt=now, license=SGD_LICENCE,
+        sections=sections, bytes=size, source="sgd",
+    )
+
+
+def _fetch_elsewhere(paper: dict[str, Any], source: FetchSource) -> FetchResult:
+    """A paper whose text is held outside Europe PMC, fetched at its
+    `sourceUrl` and split by its source's rule. Cached as `fetch_paper`
+    caches: a miss as a miss, an outage not at all."""
+    paper_id = str(paper["id"])
+    url = str(paper.get("sourceUrl") or "").strip()
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        if source == "osti":
+            result = split_pdf(fetch_pdf(url), paper_id=paper_id, source_url=url)
+        else:
+            result = split_sgd(fetch_sgd(url), paper_id=paper_id)
+    except (httpx.TransportError, Transient) as e:
+        return FetchResult(
+            paperId=paper_id, status="failed:fetch", fetchedAt=now, source=source,
+            reason=f"not cached — try again: {e}",
+        )
+    except (httpx.HTTPError, NetworkRefused, NotFetched) as e:
+        return _persist(FetchResult(
+            paperId=paper_id, status="failed:fetch", reason=str(e), fetchedAt=now, source=source,
+        ))
+    return _persist(result)
+
+
 # ── persistence ────────────────────────────────────────────────────────
 
 
@@ -771,12 +1023,18 @@ def fetch_paper(paper: dict[str, Any], *, force: bool = False) -> FetchResult:
     it. An OUTAGE is not — a timeout, a connection that dropped, a 5xx that
     survived the retry — because that is the network's condition and not the
     paper's, and a batch that cached it would show every paper a brief outage
-    touched as halted until somebody forced each one by hand."""
+    touched as halted until somebody forced each one by hand.
+
+    A paper whose `sourceUrl` is on OSTI or the Saccharomyces Genome
+    Database is fetched there, under the same rules (`_fetch_elsewhere`)."""
     paper_id = str(paper["id"])
     if not force:
         hit = cached(paper_id)
         if hit is not None:
             return hit
+    source = source_of(paper)
+    if source != "europepmc":
+        return _fetch_elsewhere(paper, source)
 
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -825,6 +1083,7 @@ def status_of(paper_id: str) -> IntakeStatus | None:
         license=(result.license.href or result.license.text) if result.license else None,
         fetchedAt=result.fetchedAt,
         reason=result.reason,
+        source=result.source,
     )
 
 
@@ -861,6 +1120,7 @@ def overlay_papers() -> dict[str, OverlayPaper]:
             license=(result.license.href or result.license.text) if result.license else None,
             fetchedAt=result.fetchedAt,
             reason=result.reason,
+            source=result.source,
         )
     return out
 
@@ -876,10 +1136,11 @@ def _papers() -> list[dict[str, Any]]:
 
 def fetch_all(papers: list[dict[str, Any]], *, force: bool = False) -> list[FetchResult]:
     """Every paper with a PMCID first, then the DOI-only and PMID-only ones
-    through `resolve_pmcid`. Papers with no identifier at all are skipped
-    without a request — there is nothing to ask."""
+    through `resolve_pmcid`, and those with a source address of their own
+    among them. Papers with no identifier and no address are skipped without
+    a request — there is nothing to ask."""
     ordered = sorted(
-        (p for p in papers if p.get("pmcid") or p.get("doi") or p.get("pmid")),
+        (p for p in papers if p.get("pmcid") or p.get("doi") or p.get("pmid") or p.get("sourceUrl")),
         key=lambda p: (0 if p.get("pmcid") else 1, str(p["id"])),
     )
     return [fetch_paper(p, force=force) for p in ordered]
@@ -890,8 +1151,9 @@ def _print_table(results: list[FetchResult]) -> None:
     for r in results:
         tables = sum(1 for s in r.sections if s.id.startswith("t"))
         lic = ((r.license.href or r.license.text or "") if r.license else "")[:44]
+        where = r.pmcid or (r.source if r.source != "europepmc" else "-")
         print(
-            f"{r.paperId:<6} {(r.pmcid or '-'):<13} {len(r.sections):>8} {tables:>6}  {lic:<44} "
+            f"{r.paperId:<6} {where:<13} {len(r.sections):>8} {tables:>6}  {lic:<44} "
             f"{r.bytes:>8}  {r.status}{' — ' + r.reason if r.reason else ''}"
         )
     ok = sum(1 for r in results if r.status == "complete")

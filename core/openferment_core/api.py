@@ -403,7 +403,9 @@ _warm_proforma()
 
 @app.post("/api/intake/{paper_id}/fetch", response_model=FetchResult)
 def intake_fetch(paper_id: str, force: bool = False) -> FetchResult:
-    """Fetch one paper's full text from Europe PMC, split it, cache it.
+    """Fetch one paper's full text from Europe PMC, or from OSTI or the
+    Saccharomyces Genome Database when its `sourceUrl` names one, split it,
+    cache it.
 
     A fetch that fails returns HTTP 200 with `status: failed:fetch` or
     `failed:parse` and a reason — the ingest board renders both, and a 5xx

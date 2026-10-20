@@ -119,6 +119,13 @@ const papers = PAPERS.map((p) => ({
   doi: p.doi ?? null,
   pmcid: p.pmcid ?? null,
   pmid: p.pmid ?? null,
+  /**
+   * Where Intake fetches the text of a source Europe PMC does not hold (an
+   * OSTI report, an SGD strain entry; thread Q), and what kind of source it
+   * is. Null when the paper has no address of its own.
+   */
+  sourceUrl: p.sourceUrl ?? null,
+  sourceType: p.sourceType,
   openAccess: p.openAccess,
   ingest: p.ingest,
   tranche: p.tranche,
@@ -279,7 +286,7 @@ const sections = papers.reduce((n, p) => n + p.sections.length, 0);
 
 console.log('\nopenFerment corpus export');
 console.log('─────────────────────────');
-console.log(`  papers      ${papers.length} (${sections} sections; ${papers.filter((p) => p.pmcid).length} with a PMCID, ${papers.filter((p) => !p.pmcid && p.doi).length} DOI-only, ${papers.filter((p) => !p.pmcid && !p.doi && p.pmid).length} PMID-only)`);
+console.log(`  papers      ${papers.length} (${sections} sections; ${papers.filter((p) => p.pmcid).length} with a PMCID, ${papers.filter((p) => !p.pmcid && p.doi).length} DOI-only, ${papers.filter((p) => !p.pmcid && !p.doi && p.pmid).length} PMID-only, ${papers.filter((p) => p.sourceUrl).length} with a source address of their own)`);
 const decisionList = Object.values(biorepo.decisions);
 console.log(`  records     ${records.length} (${seedRecords.length} seed, ${newRecords.length} accepted new records from biorepo.json)`);
 console.log(`  decisions   ${decisionList.length} (${decisionList.filter((d) => d.status === 'verified').length} verified, ${decisionList.filter((d) => d.status === 'rejected').length} rejected, ${decisionList.filter((d) => d.provenance === 'gold' || d.gold).length} gold)`);

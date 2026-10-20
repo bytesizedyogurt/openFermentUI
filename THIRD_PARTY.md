@@ -116,6 +116,7 @@ accepted licence strings, and every package a person accepted, are in
 | Pygments | 2.21.0 | BSD-2-Clause | tests, through pytest; the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | PyJWT | 2.15.1 | MIT | extra agent, through mcp | allowed |
 | pyparsing | 3.3.3 | MIT | the geneOS worker, through biorefineries, biosteam | allowed |
+| pypdf | 6.21.1 | BSD-3-Clause | service | allowed |
 | pytest | 9.1.1 | MIT | tests | allowed |
 | python-dateutil | 2.9.0.post0 | License :: OSI Approved :: BSD License | the geneOS worker, through biorefineries, biosteam, cobra | allowed |
 | python-dotenv | 1.2.3 | BSD-3-Clause | service | allowed |

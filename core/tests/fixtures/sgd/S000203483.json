@@ -1,0 +1,77 @@
+{
+ "_fixture": "Trimmed from https://www.yeastgenome.org/backend/strain/S000203483 as SGD served it on 2026-10-20 (Saccharomyces Genome Database, CC BY 4.0): three of its five links, one of its seventeen contigs, its one reference with two authors and one link. The shape and the words are SGD's; split_sgd reads no key it does not name.",
+ "display_name": "S288C",
+ "urls": [
+  {
+   "display_name": "ATCC:204508",
+   "category": "source",
+   "link": "https://www.atcc.org/products/204508"
+  },
+  {
+   "display_name": "Download Sequence",
+   "category": "download",
+   "link": "https://downloads.yeastgenome.org/sequence/S288C_reference/"
+  },
+  {
+   "display_name": "GCF_000146045.2",
+   "category": "genbank",
+   "link": "http://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000146045.2/"
+  }
+ ],
+ "status": "Reference",
+ "genotype": "<i>MAT&alpha; SUC2 gal2 mal2 mel flo1 flo8-1 hap1 ho bio1 bio6</i>",
+ "description": "Reference Genome",
+ "assembly_size": 12157105,
+ "genbank_id": "GCF_000146045.2",
+ "fold_coverage": null,
+ "scaffold_number": 17,
+ "longest_scaffold": 1531933,
+ "scaffold_n50": null,
+ "feature_count": null,
+ "paragraph": {
+  "text": "S288C is a widely used laboratory strain, designed by Robert Mortimer for biochemical studies, and specifically selected to be non-flocculent with a minimal set of nutritional requirements. S288C is the strain used in the systematic sequencing project, the reference sequence stored in SGD. S288C does not form pseudohyphae. In addition, since it has a mutated copy of <a href='/locus/S000004246'>HAP1</a>, it is not a good strain for mitochondrial studies. It has an allelic variant of <a href='/locus/S000005857'>MIP1</a> which increases petite frequency. S288C is <a href='/locus/S000004071'>gal2</a>- and does not use galactose anaerobically.",
+  "references": [
+   {
+    "id": 615227,
+    "display_name": "Mortimer RK and Johnston JR (1986)",
+    "citation": "Mortimer RK and Johnston JR (1986) Genealogy of principal strains of the yeast genetic stock center. Genetics 113(1):35-43",
+    "pubmed_id": 3519363,
+    "link": "/reference/S000050744",
+    "year": 1986,
+    "journal": {
+     "med_abbr": "Genetics"
+    },
+    "authors": [
+     {
+      "display_name": "Mortimer RK",
+      "link": "/author/Mortimer_RK"
+     },
+     {
+      "display_name": "Johnston JR",
+      "link": "/author/Johnston_JR"
+     }
+    ],
+    "urls": [
+     {
+      "display_name": "DOI full text",
+      "link": "http://dx.doi.org/10.1093/genetics/113.1.35"
+     }
+    ]
+   }
+  ]
+ },
+ "contigs": [
+  {
+   "display_name": "Chromosome X",
+   "format_name": "Chromosome_X",
+   "genbank_accession": "BK006943.2",
+   "link": "/contig/Chromosome_X",
+   "reference_alignment": null,
+   "centromere_end": 436425,
+   "centromere_start": 436307,
+   "length": 745751,
+   "id": 1381938,
+   "refseq_id": "NC_001142.9"
+  }
+ ]
+}
