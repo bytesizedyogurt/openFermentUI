@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MessageCircleQuestion, Send, Sparkles } from 'lucide-react';
 import type { PracticeScenario, PracticeSession, PracticeStepRef, PracticeValue } from '@/data/types';
-import { useStore } from '@/store';
+import { useProgramFilter, useStore } from '@/store';
 import { SKILLS, SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { PRIMER_TABS } from '@/data/tabs';
@@ -103,10 +103,14 @@ function PracticeList({ asked }: { asked: boolean }) {
   // Who the service knows this learner as.
   const named = learner?.id ?? null;
   // Every skill a protocol step needs: a scenario is drafted from those steps.
+  // An archived program's protocol offers nothing while the switch is off.
+  const shows = useProgramFilter();
   const tagged = useMemo(() => {
-    const needed = new Set(PROTOCOLS.flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))));
+    const needed = new Set(
+      PROTOCOLS.filter((p) => shows('protocol', p.id)).flatMap((p) => p.versions.flatMap((v) => v.steps.flatMap((st) => st.skills ?? []))),
+    );
     return SKILLS.filter((sk) => needed.has(sk.id));
-  }, []);
+  }, [shows]);
   const skills = useMemo(() => {
     const open = (id: string) => (learner ? statusOf(ctx.status, learner.id, id).effective < 3 : true);
     return [...tagged].sort(
@@ -121,7 +125,10 @@ function PracticeList({ asked }: { asked: boolean }) {
     setDrafting(skillId);
     setProblem(null);
     try {
-      const scenario = await draftScenario({ skillId, depositions: depositions.map((d) => forDrafting(d, runbooks)) });
+      const scenario = await draftScenario({
+        skillId,
+        depositions: depositions.filter((d) => shows('deposition', d.id)).map((d) => forDrafting(d, runbooks)),
+      }, useStore.getState().showArchived);
       merge({ scenario });
       navigate(`/primer/practice/${scenario.id}`);
     } catch (e) {

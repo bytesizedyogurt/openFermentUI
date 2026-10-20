@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, Download, UserPlus, X } from 'lucide-react';
 import type { Check as GuildCheck, DecisionCheck, Guild, GuildEvidence, GuildPerson, GuildRole, Skill } from '@/data/types';
-import { useStore, guildView, actingIdOf } from '@/store';
+import { useStore, guildView, actingIdOf, useProgramFilter } from '@/store';
 import { SKILLS, SKILL_BY_ID } from '@/data/skills';
 import { PROTOCOLS } from '@/data/protocols';
 import { GUILD_TABS } from '@/data/tabs';
@@ -317,9 +317,10 @@ const SIGN_HINT: Record<SignKind, string> = {
   witnessed: 'You watched them perform it against every criterion below.',
 };
 
-function stepsNeeding(skillId: string): { ref: string; stepId: string; text: string }[] {
+function stepsNeeding(skillId: string, shows: (kind: 'protocol', id: string) => boolean): { ref: string; stepId: string; text: string }[] {
   const out: { ref: string; stepId: string; text: string }[] = [];
   for (const p of PROTOCOLS) {
+    if (!shows('protocol', p.id)) continue;
     const v = p.versions.find((x) => x.version === p.currentVersion) ?? p.versions[0];
     for (const st of v.steps) if (st.skills?.includes(skillId)) out.push({ ref: p.id, stepId: st.id, text: st.text });
   }
@@ -339,7 +340,8 @@ function SheetBody({ personId, skillId, onClose }: { personId: string; skillId: 
   const person = ctx.personById.get(personId);
   const st = statusOf(ctx.status, personId, skillId);
   const entries = ctx.guild.evidence.filter((e) => e.personId === personId && e.skillId === skillId).slice().reverse();
-  const steps = useMemo(() => stepsNeeding(skillId), [skillId]);
+  const shows = useProgramFilter();
+  const steps = useMemo(() => stepsNeeding(skillId, shows), [skillId, shows]);
 
   const [kind, setKind] = useState<SignKind>(() =>
     !skill || !st.knowledgeComplete ? 'knowledge' : readyForCheck(st, skill) || st.level >= 3 ? 'witnessed' : 'supervised',

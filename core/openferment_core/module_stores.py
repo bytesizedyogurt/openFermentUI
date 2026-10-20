@@ -107,6 +107,12 @@ class Row:
     id_names: bool = True
     # The program the row belongs to, or None when it is general (§2.3).
     program: str | None = None
+    # The species the row is of, as "genus species" in lower case: a host's
+    # or a shelf model's by its label, a record's by its strain, a paper's or
+    # a record's by its program when every strain of the program is one
+    # species. A question naming the species, in full or abbreviated, names
+    # the row (OF-BLD-016 D10).
+    species: tuple[str, ...] = ()
 
     @property
     def ref(self) -> str:
@@ -382,6 +388,27 @@ class Stores:
                               "readAt": f.get("readAt"), "patents": f.get("patents") or []},
                       program=product_program.get(f["productId"]))
 
+    def _species(self) -> tuple[dict[str, str], dict[str, str]]:
+        """Each host's species by its label, and each program's species when
+        every host the program holds is the same one."""
+        if "_species" not in self._cache:
+            hosts = self._get("projection")["geneos"]["hosts"]
+            by_strain = {h["id"]: sp for h in hosts if (sp := species_of(h["name"]))}
+            by_program: dict[str, set[str]] = {}
+            for h in hosts:
+                if h.get("program"):
+                    by_program.setdefault(h["program"], set()).add(by_strain.get(h["id"], ""))
+            self._cache["_species"] = (by_strain, {pid: next(iter(sp)) for pid, sp in by_program.items()
+                                                   if len(sp) == 1 and "" not in sp})
+        return self._cache["_species"]
+
+    def _species_of(self, strain_ids: Iterable[str | None], program: str | None) -> tuple[str, ...]:
+        by_strain, by_program = self._species()
+        found = {by_strain[s] for s in strain_ids if s and s in by_strain}
+        if not found and program in by_program:
+            found = {by_program[str(program)]}
+        return tuple(sorted(found))
+
     def _runbooks(self) -> Iterable[Row]:
         p = self._get("projection")["runbooks"]
         for r in p["runbooks"]:
@@ -397,9 +424,14 @@ class Stores:
                               **_example(r)},
                       program=r.get("program"))
         for x in p["protocols"]:
+            # A general protocol names the strains it was written for; with
+            # the switch off an archived program's strain is not among them,
+            # so no default read hands a casein strain id on (§2.R).
+            organisms = [o for o in x.get("organisms", [])
+                         if not programs.hides(programs.program_of("strain", o), self.include_archived)]
             yield Row("runbooks", "protocol", x["id"], x["title"], "approved", f"version {x['currentVersion']} current",
-                      words=" ".join([x["category"], x.get("purpose") or ""] + x.get("organisms", [])),
-                      detail={"category": x["category"], "organisms": x.get("organisms", []),
+                      words=" ".join([x["category"], x.get("purpose") or ""] + organisms),
+                      detail={"category": x["category"], "organisms": organisms,
                               "currentVersion": x["currentVersion"], "versions": x.get("versions", []),
                               **_example(x)},
                       program=x.get("program"))
@@ -413,15 +445,21 @@ class Stores:
         for h in p["hosts"]:
             yield Row("geneos", "host", h["id"], h["name"], "open", "in the catalogue",
                       names=tuple(aliases.get(h["id"], ())), words=" ".join(h.get("badges") or []),
-                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []}, program=h.get("program"))
+                      detail={"bsl": h.get("bsl"), "badges": h.get("badges") or []}, program=h.get("program"),
+                      species=self._species_of([h["id"]], None))
         for x in p["pathways"]:
+            # A pathway belongs to the program of the products it makes, when
+            # one of them is a product a program holds ("PHB" → PHA, §2.R).
+            made = [programs.program_of("product", str(n).lower()) for n in x.get("products") or []]
             yield Row("geneos", "pathway", x["id"], x["label"], "open", "in the catalogue",
-                      words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []})
+                      words=" ".join(x.get("products") or []), detail={"products": x.get("products") or []},
+                      program=next((m for m in made if m), None))
         for m in self._get("shelf"):
             ok = m.unavailable is None
             yield Row("geneos", "model", m.id, m.name, "open" if ok else "fenced", "on the shelf" if ok else "not fetched",
                       words=m.host or "", detail={"host": m.host, "unavailable": m.unavailable},
-                      program=host_program.get(m.host or ""))
+                      program=host_program.get(m.host or ""),
+                      species=self._species_of([m.host], None) or tuple(x for x in [species_of(m.name)] if x))
         yield from self._artifacts("geneos")
 
     def _fermos(self) -> Iterable[Row]:
@@ -449,7 +487,8 @@ class Stores:
                       words=" ".join(str(r.get(k) or "") for k in ("field", "paperId", "strainId", "organism", "productId",
                                                                    "carbonSource")),
                       detail={"paperId": r.get("paperId"), "field": r.get("field"), "strainId": r.get("strainId")},
-                      program=programs.program_of_record(r))
+                      program=programs.program_of_record(r),
+                      species=self._species_of([r.get("strainId"), r.get("organism")], programs.program_of_record(r)))
         for a in self._get("artifacts"):
             yield _artifact_row("biorepo", a, self._artifact_mark(a), self._artifact_program(a))
         for run in self._get("witness"):
@@ -490,7 +529,8 @@ class Stores:
                       words=str(paper.get("year") or ""),
                       detail={"textSource": status.textSource if status is not None else paper.get("textSource"),
                               "reason": status.reason if status is not None else None}, id_names=False,
-                      program=programs.program_of_paper(paper["id"]))
+                      program=programs.program_of_paper(paper["id"]),
+                      species=self._species_of([], programs.program_of_paper(paper["id"])))
 
     def _home(self) -> Iterable[Row]:
         for r in self.pool().records:
@@ -581,9 +621,28 @@ def _names(row: Row) -> list[str]:
     return [n for n in out if len(n) >= MIN_NAME]
 
 
+_SPECIES = re.compile(r"^([A-Z][a-z]{2,}) ([a-z]{3,})\b")
+
+
+def species_of(label: str) -> str | None:
+    """"saccharomyces cerevisiae" from "Saccharomyces cerevisiae S288C": a
+    label that opens with a genus and an epithet. None for anything else
+    ("E. coli K-12 …" names no genus in full)."""
+    m = _SPECIES.match(label or "")
+    return f"{m.group(1).lower()} {m.group(2)}" if m else None
+
+
+def species_spellings(species: str) -> tuple[str, str]:
+    """A species in full and abbreviated, normalised: ("saccharomyces
+    cerevisiae", "s cerevisiae")."""
+    genus, epithet = species.split(" ", 1)
+    return species, f"{genus[0]} {epithet}"
+
+
 def named_rows(question: str, rows: Iterable[Row]) -> list[tuple[Row, str]]:
     """Rows whose label, id or a spelling stands in the question as whole
-    words, with the spelling that matched."""
+    words, with the spelling that matched; and rows of a species the question
+    names in full or abbreviated (OF-BLD-016 D10)."""
     q = f" {norm(question)} "
     out = []
     for row in rows:
@@ -591,6 +650,12 @@ def named_rows(question: str, rows: Iterable[Row]) -> list[tuple[Row, str]]:
             if f" {name} " in q:
                 out.append((row, name))
                 break
+        else:
+            for sp in row.species:
+                full, short = species_spellings(sp)
+                if f" {full} " in q or f" {short} " in q:
+                    out.append((row, full))
+                    break
     return out
 
 

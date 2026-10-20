@@ -25,6 +25,7 @@ import { STORAGE_FORMATS, UNIT_OPERATIONS, UNIT_OP_STAGE_ORDER } from '@/data/vo
 import { PRODUCTS } from '@/data/products';
 import type { UnitOperationStage } from '@/data/types';
 import { href } from '@/router';
+import { useProgramFilter } from '@/store';
 import { Callout, Card, PageHeader, SectionTitle, Stat, cx } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
 import { UnbuiltList } from '@/components/Unbuilt';
@@ -50,17 +51,21 @@ const PLANNED = [
 ];
 
 export default function PureOS() {
+  // The catalogue as it shows under the program switch (OF-BLD-016 §2), so
+  // these counts agree with Dominion's and Home's.
+  const shows = useProgramFilter();
+  const products = useMemo(() => PRODUCTS.filter((p) => shows('product', p.id)), [shows]);
   // Usage is counted from the catalogue rather than declared, so an operation
   // no molecule uses shows as zero instead of being quietly dropped.
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const product of PRODUCTS) {
+    for (const product of products) {
       for (const id of product.unitOperationIds ?? []) {
         counts.set(id, (counts.get(id) ?? 0) + 1);
       }
     }
     return counts;
-  }, []);
+  }, [products]);
 
   const byStage = useMemo(() => {
     const groups = new Map<UnitOperationStage, typeof UNIT_OPERATIONS>();
@@ -115,8 +120,8 @@ export default function PureOS() {
         <Stat label="Storage formats" value={String(STORAGE_FORMATS.length)} sub="how a product is kept" />
         <Stat
           label="Molecules with a train"
-          value={String(PRODUCTS.filter((p) => (p.unitOperationIds ?? []).length > 0).length)}
-          sub={`of ${PRODUCTS.length} in the catalogue`}
+          value={String(products.filter((p) => (p.unitOperationIds ?? []).length > 0).length)}
+          sub={`of ${products.length} in the catalogue`}
         />
         <Stat
           label="Operations unused"

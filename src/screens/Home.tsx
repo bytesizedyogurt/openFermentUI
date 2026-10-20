@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useStore, provenanceOf, useProgramFilter, useProgramLookup, isExample, type ProgramEntityKind } from '@/store';
 import { ProposalsCard } from '@/components/ProposalsCard';
+import { conversationShows } from '@/lib/programShows';
 import { href } from '@/router';
 import { RUNBOOK_STATUS_LABEL, RUNBOOKS } from '@/data/runbooks';
 import { ELEVEN } from '@/data/nav';
@@ -610,7 +611,8 @@ export default function Home() {
   // ── band 2 state ─────────────────────────────────────────────────────
   // The last conversation somebody actually had with Postdoc. An empty one
   // is not work to resume.
-  const lastLive = liveConversations.find((c) => c.turns.length > 0) ?? null;
+  // One that cites an archived program waits until the switch shows it.
+  const lastLive = liveConversations.find((c) => c.turns.length > 0 && conversationShows(c, shows)) ?? null;
   const pinnedScenarios = useMemo(() => scenarios.filter((x) => x.pinned), [scenarios]);
   // A run in progress shows while its protocol's program does (§2.2).
   const runInProgress = activeRunId ? (runs[activeRunId] ?? null) : null;

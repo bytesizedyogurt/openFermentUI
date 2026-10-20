@@ -7,10 +7,11 @@
 // arrive. There is no scripted player behind it and no mode to switch. With
 // the service down the screen says so and how to start it, the conversations
 // stay where they were, and a question typed meanwhile stays in the box.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquarePlus, PanelLeft, RefreshCw, Send, Sparkles, Square } from 'lucide-react';
 import { useStore, timeId, useProgramFilter, archivedProgramOf } from '@/store';
 import { href, navigate, useRoute } from '@/router';
+import { conversationShows } from '@/lib/programShows';
 import type { LiveConversation, LiveTurn } from '@/data/types';
 import { SUGGESTED_PROMPTS, suggestedPrompts } from '@/data/flows';
 import { LIVE_PROMPT_LIST, YEAST_PROMPT_COUNT, type PromptSubject } from '@/data/livePrompts';
@@ -278,7 +279,12 @@ function askedAt(): string {
 const NEW_CONVERSATION = 'new';
 
 export default function Postdoc({ sessionId, initialQuery }: { sessionId?: string; initialQuery?: string }) {
-  const liveConversations = useStore((s) => s.liveConversations);
+  const kept = useStore((s) => s.liveConversations);
+  // A conversation citing an archived program hides while archived programs
+  // are hidden; a link to it by id still opens it.
+  const showsProgram = useProgramFilter();
+  const liveConversations = useMemo(() => kept.filter((c) => conversationShows(c, showsProgram)), [kept, showsProgram]);
+  const hiddenConversations = kept.length - liveConversations.length;
   const sessionsOpen = useStore((s) => s.ui.sessionsOpen);
   const setUI = useStore((s) => s.setUI);
   const route = useRoute();
@@ -325,7 +331,7 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
   // With nothing chosen, the latest conversation is resumed; "New
   // conversation" shows an empty one until its first question.
   const conversation =
-    liveConversations.find((c) => c.id === activeId) ?? (activeId === null ? (liveConversations[0] ?? null) : null);
+    kept.find((c) => c.id === activeId) ?? (activeId === null ? (liveConversations[0] ?? null) : null);
   const running = !!conversation?.turns.some((t) => t.status === 'running' && inflight.has(t.id));
   const down = healthChecked && health === null && !reached;
 
@@ -455,6 +461,17 @@ export default function Postdoc({ sessionId, initialQuery }: { sessionId?: strin
             {liveConversations.length === 0 && (
               <p className="text-caption text-ink-soft px-2.5 py-2">
                 Conversations asked here are kept in this browser, across reloads.
+              </p>
+            )}
+            {hiddenConversations > 0 && (
+              <p className="text-caption text-ink-soft px-2.5 py-2" data-testid="live-conversations-hidden">
+                <span className="font-num">{hiddenConversations}</span>{' '}
+                {hiddenConversations === 1 ? 'conversation cites' : 'conversations cite'} archived programs and{' '}
+                {hiddenConversations === 1 ? 'is' : 'are'} hidden;{' '}
+                <a className="text-accent hover:underline" href={href(PROGRAMS_SETTINGS_PATH)}>
+                  Settings → Programs
+                </a>{' '}
+                shows them.
               </p>
             )}
             {liveConversations.map((c) => (

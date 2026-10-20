@@ -16,7 +16,8 @@
 import { useEffect, useState } from 'react';
 import { Inbox } from 'lucide-react';
 import type { Proposal } from '@/data/types';
-import { useStore, reviewerName } from '@/store';
+import { useStore, reviewerName, useProgramFilter } from '@/store';
+import { proposalShows } from '@/lib/programShows';
 import { navigate } from '@/router';
 import { carryOut, dismiss, listProposals, needsActing, shownProposals } from '@/lib/proposals';
 import { useGuild } from './GuildBits';
@@ -44,7 +45,9 @@ export function ProposalsCard() {
     return () => ctrl.abort();
   }, [serviceUp]);
 
-  const shown = shownProposals(items, guild.acting, guild.status);
+  // A proposal whose target is in an archived program hides with it.
+  const showsProgram = useProgramFilter();
+  const shown = shownProposals(items, guild.acting, guild.status).filter((p) => proposalShows(p, showsProgram));
   if (!serviceUp || shown.length === 0) return null;
 
   const run = async (p: Proposal, verb: 'carry-out' | 'dismiss') => {

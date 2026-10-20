@@ -10,6 +10,7 @@ gives them. No key, no network, no service.
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -359,3 +360,84 @@ def test_the_mcp_server_takes_the_switch_from_its_environment_and_never_from_a_c
     asyncio.run(mcp_server.build().call_tool("geneos_read", read))
     asyncio.run(mcp_server.build(include_archived=False).call_tool("geneos_read", read))
     assert seen == [True, False]
+
+
+# ── review23: the compute and draft tools, runbooks_read, artifacts, practice, a species (§2.R) ──
+
+_ARCHIVED_WORD = re.compile(r"\b(RehMBEL1391|phb|PHB|PHA|sc-pha-1|casein|cw15|uvm4|c-necator-h16|p-putida-kt2440)\b")
+
+
+def test_no_tool_description_or_schema_names_an_archived_program():
+    text = json.dumps([i.model_dump() for i in tools.infos()])
+    assert not _ARCHIVED_WORD.findall(text), sorted(set(_ARCHIVED_WORD.findall(text)))
+
+
+def test_with_the_switch_off_a_compute_or_draft_tool_refuses_an_archived_target(monkeypatch):
+    from openferment_core import geneos, proforma
+
+    monkeypatch.setattr(geneos, "ceiling", lambda *a, **k: (_ for _ in ()).throw(geneos.GeneosUnavailable("computed")))
+    monkeypatch.setattr(proforma, "latest_run", lambda *a, **k: pytest.fail("read an archived scenario's run"))
+    calls = (("yield_ceiling", {"modelId": "RehMBEL1391", "product": "ethanol", "substrate": "fructose"}),
+             ("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "glucose"}),
+             ("selling_price", {"scenarioId": "sc-pha-1"}),
+             ("draft_runbook", {"title": "t", "productId": "phb", "strainId": "s-cerevisiae-s288c", "items": [], "measures": []}),
+             ("draft_runbook", {"title": "t", "productId": "", "strainId": "cw15", "items": [], "measures": []}))
+    for name, raw in calls:
+        off = tools.run(name, raw, tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[])))
+        assert off.error and "archived (hidden)" in off.error and "Settings → Programs" in off.error, (name, off.error)
+    # With the switch on the tool goes on to its own work.
+    on = tools.run("yield_ceiling", calls[1][1], tools.ToolContext(include_archived=True))
+    assert on.error and "archived" not in on.error and "computed" in on.error
+
+
+def test_with_the_switch_off_runbooks_read_names_no_archived_strain():
+    casein = {"cw15", "uvm4", "creinhardtii-wt", "bovine", "c-necator-h16", "p-putida-kt2440"}
+    ctx = tools.ToolContext(pool_factory=lambda: SimpleNamespace(records=[], corpus=load_corpus()))
+    out = tools.run("runbooks_read", {"ids": [], "words": "", "kind": "protocol", "state": "", "limit": 50}, ctx)
+    assert not out.error and casein.isdisjoint(re.findall(r"[\w-]+", json.dumps(out.model_dump()))), out.summary
+    hit = tools.run("runbooks_read", {"ids": [], "words": "cw15", "kind": "protocol", "state": "", "limit": 50}, ctx)
+    assert "cw15" not in json.dumps(hit.model_dump())
+
+
+def test_the_artifacts_endpoint_leaves_archived_programs_out_unless_asked(monkeypatch):
+    from openferment_core import api, artifacts
+
+    def art(aid, *inputs):
+        return SimpleNamespace(id=aid, inputs=[SimpleNamespace(name=n, value=v, source=SimpleNamespace(kind=k, id=i))
+                                               for n, v, k, i in inputs])
+
+    kept = [art("pha", ("model", "m", "model", "RehMBEL1391")), art("casein", ("v", "1", "record", "r-B5-3")),
+            art("yeast", ("model", "m", "model", "Yeast9")), art("general", ("model", "m", "model", "biorefineries.cornstover"))]
+    monkeypatch.setattr(artifacts, "all_artifacts", lambda: kept)
+    assert [a.id for a in api.artifacts_list()] == ["yeast", "general"]
+    assert [a.id for a in api.artifacts_list(includeArchived=True)] == ["pha", "casein", "yeast", "general"]
+
+
+def test_with_the_switch_off_practice_drafts_from_no_archived_protocol():
+    from openferment_core import practice
+
+    for skill in ("SK-ASEP", "SK-OD", "SK-ENV", "SK-FACTOR", "SK-LOG"):
+        off = practice.sources_for(skill, [])
+        on = practice.sources_for(skill, [], include_archived=True)
+        assert not any("PR-SEED-01" in k for k in off), skill
+        assert set(off) <= set(on)
+    assert any("PR-SEED-01" in k for k in practice.sources_for("SK-ASEP", [], include_archived=True))
+
+
+def test_a_species_named_in_full_or_abbreviated_names_its_strains_and_its_papers():
+    for q in ("What does openFerment hold on ethanol fermentation by Saccharomyces cerevisiae, and in which modules?",
+              "What does openFerment hold on S. cerevisiae?"):
+        cov = module_stores.coverage(q, _stores(False))
+        found = {m.module: m.count for m in cov.modules if m.count}
+        assert {"geneos", "intake"} <= set(found), (q, found)
+        geneos_hits = {h.id for m in cov.modules if m.module == "geneos" for h in m.hits}
+        assert {"s-cerevisiae-s288c", "s-cerevisiae-cenpk113-7d"} <= geneos_hits, geneos_hits
+    # A species with no strain on the switch's side stays hidden, and is said so.
+    cov = module_stores.coverage("What is known about Cupriavidus necator?", _stores(False))
+    assert not any(m.count for m in cov.modules if m.module in ("geneos", "intake"))
+
+
+def test_with_the_switch_off_geneos_rows_hold_no_pha_pathway():
+    off = [r for r in _stores(False).rows("geneos") if r.kind == "pathway"]
+    on = [r for r in _stores(True).rows("geneos") if r.kind == "pathway"]
+    assert "phb-route" not in {r.id for r in off} and "phb-route" in {r.id for r in on}

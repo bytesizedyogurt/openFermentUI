@@ -25,7 +25,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import type { FermosFitResponse, FermosSeries, FitParam } from '@/data/types';
-import { useStore } from '@/store';
+import { useProgramFilter, useStore } from '@/store';
+import { ArchivedBanner } from '@/components/ArchivedBanner';
 import { href, navigate, useRoute } from '@/router';
 import { Callout, EmptyState, PageHeader } from '@/components/ui';
 import { ComponentTag } from '@/components/ComponentTag';
@@ -76,9 +77,15 @@ function Fits() {
   const runbooks = useStore((s) => s.runbooks);
   const keepFit = useStore((s) => s.keepFermosFit);
   const route = useRoute();
+  // The runs Runbooks → Depositions shows (OF-BLD-016 §2): a deposition of an
+  // archived program's runbook or protocol waits for the program switch.
+  const shows = useProgramFilter();
   const qualifying = useMemo(
-    () => depositions.filter((d) => qualifies(d, runbooks.find((r) => r.id === d.runbookId))),
-    [depositions, runbooks],
+    () =>
+      depositions.filter(
+        (d) => shows('deposition', d.id) && qualifies(d, runbooks.find((r) => r.id === d.runbookId)),
+      ),
+    [depositions, runbooks, shows],
   );
   const options = qualifying.map((d) => d.id);
   const chosen = route.query.get('run') ?? options[0] ?? null;
@@ -136,6 +143,7 @@ function Fits() {
         )}
         {busy && <span className="text-caption text-ink-soft">Fitting…</span>}
       </div>
+      {chosen && !options.includes(chosen) && <ArchivedBanner kind="deposition" id={chosen} />}
 
       {options.length === 0 && (
         <div data-testid="fermos-empty">

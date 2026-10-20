@@ -34,6 +34,7 @@ function archivedNames(paperIds: string[]): string {
 export default function BioRepoSearch() {
   const papers = useStore((s) => s.papers);
   const shows = useProgramFilter();
+  const showArchived = useStore((s) => s.showArchived);
   const [status, setStatus] = useState<RagStatus | null>(null);
   const [down, setDown] = useState<RagDown | null>(null);
   const [question, setQuestion] = useState('');
@@ -127,7 +128,11 @@ export default function BioRepoSearch() {
             </Button>
           </form>
           <p className="text-caption text-ink-soft mb-4">
-            {status.passages.toLocaleString()} passages from {status.papersIndexed} papers.{' '}
+            {/* The service counts its whole index, which holds every program's
+                passages; with archived programs hidden a search returns only
+                passages from papers that show (OF-BLD-016 §2.3). */}
+            The index holds {status.passages.toLocaleString()} passages from {status.papersIndexed} papers, every
+            program&rsquo;s{showArchived ? '' : '; a search returns passages only from the papers that show'}.{' '}
             {status.lanes
               .filter((l) => !l.available)
               .map((l) => `${l.name}: ${l.why}`)

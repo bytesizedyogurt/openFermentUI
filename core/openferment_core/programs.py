@@ -180,6 +180,44 @@ def program_of_artifact(artifact: Any, record_lookup: Any = None) -> str | None:
     return next((p for p in found if is_archived(p)), found[0] if found else None)
 
 
+SWITCH = "Settings → Programs has the switch that shows archived programs; turn it on to include them."
+
+
+def archived_target(targets: Any, include_archived: bool = False) -> Program | None:
+    """The archived program a tool's target belongs to, or None when every
+    target shows: `targets` is (kind, id) pairs, kind one of `Kind` or
+    `model` (a geneOS shelf model, by its host). Empty ids are skipped."""
+    if include_archived:
+        return None
+    for kind, entity_id in targets:
+        if not entity_id:
+            continue
+        pid = program_of_model(entity_id) if kind == "model" else program_of(kind, entity_id)
+        if is_archived(pid):
+            return program_by_id(pid)
+    return None
+
+
+def archived_refusal(tool: str, targets: Any, include_archived: bool = False) -> str | None:
+    """A compute or draft tool's refusal of an archived target with the
+    switch off (OF-BLD-016 §2.R): the program, the words the coverage line
+    uses, and the switch. None when the call may go on."""
+    p = archived_target(targets, include_archived)
+    if p is None:
+        return None
+    return f"{tool} refused: what it names belongs to {p.name}, archived (hidden). {SWITCH}"
+
+
+def offered(kind: Kind, ids: Any) -> list[str]:
+    """The ids a tool's description may name: those no archived program
+    holds. With the projection missing nothing is named, so no description
+    names an archived program by accident."""
+    try:
+        return [i for i in ids if not is_archived(program_of_model(i) if kind == "model" else program_of(kind, i))]
+    except FileNotFoundError:
+        return []
+
+
 def clear_cache() -> None:
     """Forget what was read, after `pnpm export:corpus` rewrote the projections."""
     _programs.cache_clear()

@@ -306,9 +306,22 @@ export default function IntakeIngest() {
           <>
             A paper enters the corpus here or not at all. Fetch asks Europe PMC for the open-access
             full text and splits it into sections, so a record&rsquo;s quote can anchor to the
-            paper&rsquo;s own words rather than to a curation note. Twenty-seven of the 132 entries
-            carry a PMCID and are fetchable; the DOI-only ones are looked up once; the rest need
-            manual retrieval.
+            paper&rsquo;s own words rather than to a curation note.{' '}
+            {(() => {
+              // Counted from the entries that show under the program switch.
+              const showing = papers.filter((p) => shows('paper', p.id));
+              const pmcid = showing.filter((p) => p.pmcid).length;
+              const doiOnly = showing.filter((p) => !p.pmcid && p.doi).length;
+              return (
+                <>
+                  Of the <span className="font-num">{showing.length}</span> entries showing,{' '}
+                  <span className="font-num">{pmcid}</span> carry a PMCID and are fetchable,{' '}
+                  <span className="font-num">{doiOnly}</span> carry a DOI alone and are looked up once,
+                  and <span className="font-num">{showing.length - pmcid - doiOnly}</span> carry
+                  neither.
+                </>
+              );
+            })()}
           </>
         }
         actions={<LinkButton to="/biorepo">Back to BioRepo</LinkButton>}

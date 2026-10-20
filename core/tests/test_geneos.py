@@ -357,10 +357,12 @@ def test_the_endpoints(store):
 def test_yield_ceiling_takes_ids_and_words_and_returns_one_evidence(store):
     from openferment_core import tools
 
-    r = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "glucose"})
+    # PHB is PHA's, an archived program: the switch is on here (OF-BLD-016 §2.R).
+    on = tools.ToolContext(include_archived=True)
+    r = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "glucose"}, on)
     assert r.error is None and len(r.evidence) == 1 and r.evidence[0].figure == "ceiling"
     assert r.summary["evidenceId"] == r.evidence[0].id and r.summary["model"]["scope"] == "central carbon"
-    finding = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"})
+    finding = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": "xylose"}, on)
     assert finding.evidence == [] and "no uptake reaction" in finding.summary["finding"]
     assert "a number was typed" in (tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "phb", "substrate": 10}).error or "")
 
@@ -370,8 +372,9 @@ def test_yield_ceiling_takes_ethanol_and_names_each_models_products(store):
 
     schema = tools.REGISTRY["yield_ceiling"].info().inputSchema["properties"]
     assert "Yeast9 (ethanol)" in schema["modelId"]["description"] and "iMM904 (ethanol)" in schema["modelId"]["description"]
-    assert "RehMBEL1391 (phb)" in schema["modelId"]["description"]
-    assert schema["product"]["description"] == "The product: phb, ethanol."
+    # The schema names no archived program's model or product (OF-BLD-016 §2.R).
+    assert "RehMBEL1391" not in schema["modelId"]["description"] and "phb" not in schema["modelId"]["description"]
+    assert schema["product"]["description"] == "The product: ethanol."
     # The core model carries E. coli's own ethanol route; the redox balance of
     # glucose to ethanol allows two per glucose.
     r = tools.run("yield_ceiling", {"modelId": "e_coli_core", "product": "ethanol", "substrate": "glucose"})

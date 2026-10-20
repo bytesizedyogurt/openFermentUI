@@ -26,11 +26,14 @@
  * in `applyOverlay` fails the build instead of being found by a reviewer
  * wondering why a record they rejected came back.
  */
+import { readFileSync } from 'node:fs';
 import { isExample, mergeAssumptions, programOf, programVisible, snapshotOf, useStore } from '../src/store';
 import { RECORDS } from '../src/data/records';
+import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Candidate, Overlay } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, Overlay } from '../src/data/types';
+import { visibleArtifacts } from '../src/lib/artifacts';
 
 let fails = 0;
 const check = (label: string, ok: boolean, extra: unknown = '') => {
@@ -452,6 +455,63 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   check('a deposition is an example only by its own flag',
     !isExample('deposition', 'dep-x', { ...st(), depositions: [{ id: 'dep-x', runbookId: 'rb-taq-kigali', protocolId: 'PR-OD-01' } as never] }));
   st().clearBrowserData();
+}
+
+// OF-BLD-016 §2.R — a computed artifact follows what its basis names: a
+// record (by its paper, a candidate's id included), a product or a strain.
+// BioRepo → Artifacts and Settings → Figure grammar list through it, so a
+// PHB ceiling or a thread P conversion hides with the switch off.
+{
+  const st = () => useStore.getState();
+  const src = (kind: BasisSource['kind'], id: string | null = null): BasisSource => ({ kind, id, note: null, by: null });
+  const art = (id: string, inputs: Artifact['inputs']): Artifact => ({
+    id, tool: 't', toolVersion: 'v', inputs, output: {}, outputHash: '', provenance: 'computed', createdAt: '', durationMs: 0, seed: null,
+  });
+  const list = [
+    art('phb-ceiling', [{ name: 'model', value: 'E. coli core', unit: '', source: src('model', 'e_coli_core') }, { name: 'product', value: 'phb', unit: '', source: src('convention') }]),
+    art('p-conversion', [{ name: 'record value', value: 'x', unit: '', source: src('record', 'cl1-P6-ef418c6a') }]),
+    art('b5-conversion', [{ name: 'record value', value: 'x', unit: '', source: src('record', 'r-B5-3') }]),
+    art('ethanol-ceiling', [{ name: 'model', value: 'iMM904', unit: '', source: src('model', 'iMM904') }, { name: 'product', value: 'ethanol', unit: '', source: src('convention') }]),
+    art('benchmark', [{ name: 'model', value: 'cornstover', unit: '', source: src('model', 'biorefineries.cornstover@2.35.1') }]),
+  ];
+  st().setShowArchived(false);
+  const shown = visibleArtifacts(list, st()).map((a) => a.id).join();
+  check('with the switch off, artifacts computed from casein or PHA inputs are not listed', shown === 'ethanol-ceiling,benchmark', shown);
+  st().setShowArchived(true);
+  check('with the switch on, every artifact is listed', visibleArtifacts(list, st()).length === list.length);
+  st().setShowArchived(false);
+}
+
+// OF-BLD-016 §2.R — Intake → Ingest's header counts what shows; it never
+// states the casein catalogue's counts in writing.
+{
+  const ingest = readFileSync(new URL('../src/screens/IntakeIngest.tsx', import.meta.url), 'utf8');
+  check('Intake → Ingest states no written count of the catalogue', !/Twenty-seven|of the 132 entries/.test(ingest));
+}
+
+// OF-BLD-016 §2.R — BioRepo → Search's status line counts the whole index,
+// which holds every program's passages; with archived programs hidden it
+// says so, since a search returns only what shows.
+{
+  const search = readFileSync(new URL('../src/screens/BioRepoSearch.tsx', import.meta.url), 'utf8');
+  check('BioRepo → Search does not present the whole index as what a search reaches',
+    !/\{status\.passages\.toLocaleString\(\)\} passages from \{status\.papersIndexed\} papers\.\{' '\}/.test(search) && /every program/.test(search));
+}
+
+// OF-BLD-016 §2.R — pureOS counts the molecules that show, as Dominion and
+// Home do: it never counts the seed's product list straight.
+{
+  const pure = readFileSync(new URL('../src/screens/PureOS.tsx', import.meta.url), 'utf8');
+  check('pureOS counts products through the program filter', !/PRODUCTS\.length|of PRODUCTS\)|PRODUCTS\.filter\(\(p\) => \(p\.unitOperationIds/.test(pure) && /shows\('product'/.test(pure));
+  const shownProducts = PRODUCTS.filter((p) => programVisible('product', p.id, { ...useStore.getState(), showArchived: false })).length;
+  check('with the switch off, fewer products show than the catalogue holds', shownProducts < PRODUCTS.length, [shownProducts, PRODUCTS.length]);
+}
+
+// OF-BLD-016 §2.R — fermOS offers the runs Runbooks → Depositions shows: a
+// deposition of an archived protocol is not in its chooser.
+{
+  const ferm = readFileSync(new URL('../src/screens/FermOS.tsx', import.meta.url), 'utf8');
+  check("fermOS filters its runs through shows('deposition')", /shows\('deposition', d\.id\)/.test(ferm));
 }
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

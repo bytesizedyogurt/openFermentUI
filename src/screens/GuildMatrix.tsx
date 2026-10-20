@@ -13,6 +13,7 @@ import { AddPersonForm, GuildHeader, SignoffSheet, useGuild } from '@/components
 import { LevelGlyph, LevelLegend, levelLabel } from '@/components/LevelGlyph';
 import { statusOf, verdictFor } from '@/engine/competence';
 import { href } from '@/router';
+import { useProgramFilter } from '@/store';
 
 const VERDICT = {
   alone: { dot: 'bg-accent', text: 'Runs it alone' },
@@ -29,9 +30,11 @@ const stepsOf = (p: Protocol) => (p.versions.find((v) => v.version === p.current
 
 export default function GuildMatrix() {
   const ctx = useGuild();
-  const [protocolId, setProtocolId] = useState<string>(TAGGED[0]?.id ?? 'all');
+  const shows = useProgramFilter();
+  const tagged = TAGGED.filter((p) => shows('protocol', p.id));
+  const [protocolId, setProtocolId] = useState<string>(tagged[0]?.id ?? 'all');
   const [pair, setPair] = useState<{ p: string; s: string } | null>(null);
-  const protocol = TAGGED.find((p) => p.id === protocolId) ?? null;
+  const protocol = tagged.find((p) => p.id === protocolId) ?? null;
 
   const columns = useMemo(() => {
     const needed = protocol ? new Set(stepsOf(protocol).flatMap((s) => s.skills ?? [])) : null;
@@ -85,10 +88,10 @@ export default function GuildMatrix() {
               <select
                 id="matrix-protocol"
                 className="input pr-8 appearance-none max-w-full"
-                value={protocolId}
+                value={protocol?.id ?? 'all'}
                 onChange={(e) => setProtocolId(e.target.value)}
               >
-                {TAGGED.map((p) => (
+                {tagged.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.id} · {p.title}
                   </option>

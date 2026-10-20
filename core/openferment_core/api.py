@@ -693,9 +693,11 @@ def practice_read() -> Practice:
 
 
 @app.post("/api/practice/draft", response_model=PracticeScenario)
-def practice_draft(request: PracticeDraftRequest) -> PracticeScenario:
+def practice_draft(request: PracticeDraftRequest, includeArchived: bool = False) -> PracticeScenario:  # noqa: N803 (the wire name)
+    """A scenario for one skill. An archived program's protocols are no source
+    unless `?includeArchived=true` asks for them (OF-BLD-016 §2.R)."""
     try:
-        return practice.draft(request)
+        return practice.draft(request, include_archived=includeArchived)
     except practice.PracticeRefused as e:
         log.warning("practice refused a draft for %s — %s: %s ($%.4f spent)", request.skillId, e.rule, e.detail, e.usage.costUsd)
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -751,9 +753,19 @@ def witness_runs() -> list[ExtractRun]:
 
 
 @app.get("/api/biorepo/artifacts", response_model=list[Artifact])
-def artifacts_list() -> list[Artifact]:
-    """Every value this service computed and kept, newest first."""
-    return artifacts.all_artifacts()
+def artifacts_list(includeArchived: bool = False) -> list[Artifact]:  # noqa: N803 (the wire name)
+    """Every value this service computed and kept, newest first. A value
+    computed from an archived program's records, models, products or strains
+    is left out unless `?includeArchived=true` asks for it (OF-BLD-016 §2.R),
+    as the evidence pool leaves it out of Postdoc."""
+    kept = artifacts.all_artifacts()
+    if includeArchived:
+        return kept
+    try:
+        lookup = load_corpus().record
+    except FileNotFoundError:
+        lookup = None
+    return [a for a in kept if not programs.hides(programs.program_of_artifact(a, lookup))]
 
 
 @app.get("/api/biorepo/artifacts/{artifact_id}", response_model=Artifact)

@@ -36,6 +36,7 @@ import {
 } from '@/lib/review';
 import { useRoute, href } from '@/router';
 import { checkDecision } from '@/lib/intake';
+import { rejoinQueue } from '@/lib/programShows';
 import { fmt, toSI } from '@/engine/units';
 import { CitationChip } from '@/components/Chip';
 import { ProvenanceBadge, Tick, type ProvKind } from '@/components/Provenance';
@@ -316,7 +317,9 @@ export default function Guild() {
   // front before this looks. A record the program filter hides leaves the
   // queue, and the card under review is followed the way the overlay follows
   // it (store.ts): the same record if it stays, else the next one that does.
-  // Records the switch brings back, still undecided, join after everything
+  // Records the switch brings back, still undecided, take their seed places
+  // while no card of the session has been passed (the order a session begun
+  // with the switch on would have), and after that join after everything
   // already queued, as new candidates do (an empty queue seeds afresh above,
   // in the seed's order). Nothing is decided or reset: the session's counters
   // and the records themselves are untouched.
@@ -345,10 +348,13 @@ export default function Guild() {
       )
       .map((r) => r.id);
     if (kept.length === s.reviewQueue.length && joining.length === 0) return;
-    const reviewQueue = [...kept, ...joining];
+    // Before any card is passed, returning records take their seed places.
+    const untouched = s.reviewIndex === 0;
+    const reviewQueue = rejoinQueue(kept, joining, s.records.map((r) => r.id), untouched);
     const under = s.reviewQueue[s.reviewIndex];
-    const reviewIndex =
-      under !== undefined && stays(under)
+    const reviewIndex = untouched
+      ? 0
+      : under !== undefined && stays(under)
         ? reviewQueue.indexOf(under)
         : Math.min(s.reviewQueue.slice(0, s.reviewIndex).filter(stays).length, reviewQueue.length);
     useStore.setState({ reviewQueue, reviewIndex });

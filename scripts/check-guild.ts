@@ -48,7 +48,7 @@ import {
   statusOf,
   verdictFor,
 } from '../src/engine/competence';
-import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, Proposal } from '../src/data/types';
+import type { Check, CheckResult, Checks, Guild, GuildEvidence, GuildPerson, LiveConversation, Proposal } from '../src/data/types';
 import { mayQueue, proposeChecks, shownTo } from '../src/engine/checks';
 import { needsActing, shownProposals } from '../src/lib/proposals';
 
@@ -639,6 +639,57 @@ async function main() {
     check('a check proposal shows to the lead', seen(who('p-sean', 'lead')) === 'pr-g,pr-l');
     check('a check proposal never shows to the person it names', seen(who('p-alex', 'lead')) === 'pr-l');
     check('carrying out a check proposal needs who is acting, and a lock does not', needsActing(checkP) && !needsActing(lockP));
+  }
+
+  // OF-BLD-016 review 23: every Guild and Primer screen that reads protocol
+  // steps reads them through the program filter, so an archived program's
+  // protocol (PR-SEED-01, casein) never shows on a default view.
+  {
+    const { readFileSync } = await import('node:fs');
+    for (const f of ['src/screens/GuildSkills.tsx', 'src/screens/GuildMatrix.tsx', 'src/components/GuildBits.tsx', 'src/screens/PrimerPractice.tsx']) {
+      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+      const reads = /\bPROTOCOLS\b/.test(src.replace(/^import .*$/gm, ''));
+      check(`${f} reads protocols through the program filter`, !reads || /useProgramFilter\(\)/.test(src) && /shows\('protocol'/.test(src));
+    }
+    // The service drafts from no archived protocol unless the switch is sent.
+    const practice = readFileSync(new URL('../src/screens/PrimerPractice.tsx', import.meta.url), 'utf8');
+    const client = readFileSync(new URL('../src/lib/practice.ts', import.meta.url), 'utf8');
+    check('Practice sends the switch with a draft', /draftScenario\([\s\S]*?showArchived\s*\)/.test(practice) && /\?includeArchived=true/.test(client));
+  }
+
+  // OF-BLD-016 review 23: a Live conversation or a proposal that names an
+  // archived program's record hides by default, on Home and in Postdoc.
+  {
+    const { readFileSync } = await import('node:fs');
+    const { conversationShows, proposalShows } = await import('../src/lib/programShows');
+    const { programVisible } = await import('../src/store');
+    const off = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: false });
+    const on = (kind: Parameters<typeof programVisible>[0], id: string) => programVisible(kind, id, { showArchived: true });
+    const turn = (recordIds: string[]) => ({
+      id: 't', question: 'q', askedAt: '', steps: [], error: null, status: 'answered',
+      plan: { question: 'q', claims: [{ id: 'c', text: 't', recordIds, paperIds: [], support: 'supported', provenance: 'curated' }],
+        gaps: [], declined: null, rejected: 0, rejectionReasons: [] },
+    });
+    const conv = (recordIds: string[]) => ({ id: 'lc', title: 'q', startedAt: '', turns: [turn(recordIds)] }) as unknown as LiveConversation;
+    check('a conversation citing a casein record hides with the switch off', !conversationShows(conv(['r-M5-1']), off));
+    check('the same conversation shows with the switch on', conversationShows(conv(['r-M5-1']), on));
+    check('a conversation citing nothing archived shows', conversationShows(conv([]), off));
+    const prop = (target: string | null) => ({ id: 'p', target, fields: {} }) as unknown as Proposal;
+    check('a proposal targeting a casein record hides with the switch off', !proposalShows(prop('r-M5-1'), off) && proposalShows(prop('r-M5-1'), on));
+    check('a proposal with no target shows', proposalShows(prop(null), off));
+    for (const f of ['src/screens/Postdoc.tsx', 'src/screens/Home.tsx', 'src/components/ProposalsCard.tsx']) {
+      const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+      check(`${f} filters what it lists through the program filter`, /conversationShows\(|proposalShows\(/.test(src));
+    }
+  }
+
+  // OF-BLD-016 review 23: records the switch brings back before any card of
+  // the session is decided take their seed places, as a fresh session would.
+  {
+    const { rejoinQueue } = await import('../src/lib/programShows');
+    const order = ['r-a', 'r-b', 'r-c', 'r-d'];
+    check('an untouched queue takes back the seed order', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, true).join() === order.join());
+    check('a queue already worked keeps its order and appends', rejoinQueue(['r-b', 'r-d'], ['r-a', 'r-c'], order, false).join() === 'r-b,r-d,r-a,r-c');
   }
 
   console.log(fails ? `\n✗ ${fails} Guild check(s) failed` : '\n✓ Guild levels are computed the way the ladder says.');
