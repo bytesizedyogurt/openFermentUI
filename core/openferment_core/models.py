@@ -2441,8 +2441,13 @@ class VesselRequest(BaseModel):
     # proforma.fit_info for titre, yield and batch time: anaerobic only.
     fit: str | None = None
     # The aerated design; None is BioSTEAM's own default. An anaerobic
-    # design takes none.
+    # design takes none. A person's override of `design` in the panel says
+    # the same in BioSTEAM's words, and the two must agree (§4.2).
     vesselType: Literal["stirred-tank", "bubble-column"] | None = None
+    # A kLa correlation by the name BioSTEAM registers it ('Riet', 'Dewes'),
+    # one its class runs for the design; a convention of this request, as
+    # fermos_vessel names it (OF-BLD-020 §4.2, D13). None is the class's own.
+    klaMethod: str | None = None
     # A person's changes, each a named assumption (D3), scope
     # `fermos:vessel:<simulation or fit id>`.
     overrides: list[Override] = Field(default_factory=list)
@@ -2559,6 +2564,10 @@ class VesselDesign(BaseModel):
     reaction: dict[str, Any]
     flags: list[str] = Field(default_factory=list)
     versions: dict[str, str]
+    # The design as one citable value with its basis (OF-BLD-020 §4.2): its
+    # id is the artifact's, as fermos_vessel returns it to Postdoc; the
+    # screen reads the basis from it.
+    evidence: Evidence
 
 
 class VesselSummary(BaseModel):

@@ -145,7 +145,14 @@ draft is the answer the person asked for, and nothing else stands in for it.
 14. Each module also has a write tool (geneos_write, intake_write and the \
 rest). What it writes lands marked as yours for a person to promote; an \
 action at a gate comes back `state: proposed` and waits for a person on Home. \
-Say in gaps what you wrote or proposed, and what a tool refused to write."""
+Say in gaps what you wrote or proposed, and what a tool refused to write.
+15. A vessel is BioSTEAM's design for a kept simulation: fermos_vessel takes \
+the simulation's artifact id, a vessel type and a kLa correlation by name. A \
+vessel's numbers (vessels, volumes, times, powers, kLa, the oxygen balance, \
+heat, cost) are read from its artifact and cited by its evidence id, which is \
+the artifact id; never state them yourself. When fermos_vessel refuses because \
+the plant scale waits, say in gaps that a named person types it in fermOS → \
+Vessel; never supply one."""
 )
 
 
@@ -275,6 +282,9 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
         return f"Converted {inp.get('recordId')} to {inp.get('toUnit')}"
     if name == "run_flowsheet":
         return f"Ran the flowsheet of {inp.get('scenarioId')} · kept run {result.summary.get('artifactId')}"
+    if name == "fermos_vessel":
+        what = inp.get("simulationArtifact") or inp.get("fitArtifact")
+        return f"Designed the vessel for {what} · kept design {result.summary.get('artifactId')}"
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"

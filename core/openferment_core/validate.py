@@ -302,7 +302,10 @@ MAX_QUOTE_CHARS = 300
 class SeenSet:
     """What this run's tool calls returned. A claim may cite only these: a
     record, passage or computed value the model never retrieved is one it
-    cannot have read."""
+    cannot have read. A vessel design (OF-BLD-020 §4.2) is learned as the
+    evidence fermos_vessel returns, by its `fermos.vessel` artifact id, and as
+    the `fermos/vessel/<id>` row fermos_read returns; a refused call teaches
+    it nothing, so a design nobody returned in this run is not citable."""
 
     records: set[str] = field(default_factory=set)
     passages: dict[str, Any] = field(default_factory=dict)

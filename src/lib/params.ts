@@ -2,7 +2,7 @@
 //
 // Two calls, both binding only (no worker starts, nothing is kept):
 //
-//   GET  /api/params/{scope}?flowsheet=&host=&fits=   a scope's specs and
+//   GET  /api/params/{scope}?flowsheet=&host=&fits=&vesselType=   a scope's specs and
 //        each value as the service binds it now, with its source
 //        (`ParamScope`);
 //   POST /api/params/{scope}/resolve   a person's overrides laid on, each an
@@ -20,11 +20,12 @@ import { RagDown, RagRefused, call } from './rag';
 
 export { RagDown as ParamsDown, RagRefused as ParamsRefused };
 
-/** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does. */
+/** What a scope is asked with besides its name: a Proforma scenario made here names its flowsheet; host and fits bind as Proforma's binding does; a vessel scope names the vessel type its design is (OF-BLD-020 §4.2). */
 export interface ParamAsk {
   flowsheet?: string | null;
   host?: string | null;
   fits?: Record<string, string>;
+  vesselType?: 'stirred-tank' | 'bubble-column' | null;
 }
 
 /** A scope's path: each id between the colons encoded, the colons kept (`params.parse_scope`'s forms). */
@@ -35,6 +36,7 @@ const askQuery = (ask: ParamAsk) => {
   if (ask.flowsheet) q.set('flowsheet', ask.flowsheet);
   if (ask.host) q.set('host', ask.host);
   if (ask.fits && Object.keys(ask.fits).length > 0) q.set('fits', JSON.stringify(ask.fits));
+  if (ask.vesselType) q.set('vesselType', ask.vesselType);
   const s = q.toString();
   return s ? `?${s}` : '';
 };
@@ -50,6 +52,7 @@ export function resolveRequest(overrides: Override[], ask: ParamAsk = {}): Param
     ...(ask.flowsheet ? { flowsheet: ask.flowsheet } : {}),
     ...(ask.host ? { host: ask.host } : {}),
     ...(ask.fits && Object.keys(ask.fits).length > 0 ? { fits: ask.fits } : {}),
+    ...(ask.vesselType ? { vesselType: ask.vesselType } : {}),
   };
 }
 

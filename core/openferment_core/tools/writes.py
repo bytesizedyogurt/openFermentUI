@@ -29,6 +29,9 @@ ONE RUN, TWO NAMES (OF-BLD-019 §6.1). `proforma_write`'s `run` and the
 registry's `run_flowsheet` (tools/proforma.py) both run a scenario through
 `run_scenario` below, so the one call to `proforma.run` stays in this file,
 where `check:tools` reads it, and both are refused, run and audited alike.
+So with a vessel (OF-BLD-020 §4.2): `fermos_write`'s `design_vessel` and the
+registry's `fermos_vessel` (tools/fermos.py) both design through
+`design_vessel` below, the one call to `vessel.design`.
 
 Inputs carry ids and words, as every tool's do: `action`, `target` (an id or
 ref), `fields` (names to words, what the action needs), `note` (the model's
@@ -70,6 +73,9 @@ ACTIONS: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {
     "fermos": {
         "forecast": ("forecast a run from a kept kinetic fit and keep it", ("fitArtifactId",)),
         "fit": ("fit a deposited run's series", ("depositionId",)),
+        "design_vessel": ("design on BioSTEAM the vessel a kept simulation (or, anaerobic, a kept kinetic fit) needs and "
+                          "keep it, as fermos_vessel does; refused in words while its plant scale waits for a person",
+                          ("simulationArtifact", "fitArtifact", "vesselType", "klaMethod")),
     },
     "pureos": {},
     "proforma": {
@@ -237,6 +243,90 @@ def _fermos_forecast(inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
                                "provenance": r.evidence.provenance,
                                "meaning": "kept as an artifact in the open lane, marked as the model's; cite the evidence id"},
                       evidence=[r.evidence])
+
+
+VESSEL_WAITS = ("A named person types the plant scale (or one vessel's batch volume) in fermOS → Vessel, under their "
+                "reviewer name; a model never supplies one. Say in gaps that the design waits for it.")
+
+
+def design_vessel(tool: str, simulation: str, fit: str, vessel_type: str, kla_method: str, note: str,
+                  ctx: ToolContext) -> ToolResult:
+    """Design the vessel a kept simulation (or, anaerobic, a kept fit) needs
+    on BioSTEAM, keep it as one `fermos.vessel` artifact, and mark it as the
+    model's (OF-BLD-020 §4.2, D13). `fermos_vessel` and `fermos_write`'s
+    `design_vessel` both run here, so the one call to `vessel.design` stays
+    in this file. Ids and words in: the artifact, the vessel type, the kLa
+    correlation by BioSTEAM's name. The service holds no person's plant scale
+    or batch volume (they are typed in the panel, in a browser), so none is
+    passed, and the design is refused in vessel.design's own words until a
+    person's design is asked for on the screen."""
+    from .. import artifacts, vessel
+    from ..models import VesselRequest
+    from ..workers import WorkerCrashed, WorkerError, WorkerTimeout
+
+    sim, fitted = (simulation or "").strip(), (fit or "").strip()
+    if bool(sim) == bool(fitted):
+        return ToolResult(error=f"{tool} refused: name one kept simulation (simulationArtifact) or one kept kinetic fit "
+                                "(fitArtifact) by its artifact id, not both; fermos_read lists them")
+    kind = (vessel_type or "").strip() or None
+    if kind is not None and kind not in vessel.VESSEL_TYPES:
+        return ToolResult(error=f"{tool} refused: a vessel type is {' or '.join(vessel.VESSEL_TYPES)}; {kind!r} is neither")
+    try:
+        d = vessel.design(VesselRequest(simulation=sim or None, fit=fitted or None, vesselType=kind,
+                                        klaMethod=(kla_method or "").strip() or None,
+                                        includeArchived=ctx.include_archived))
+    except vessel.VesselRefused as e:
+        waits = f" {VESSEL_WAITS}" if "plant_scale" in str(e) else ""
+        return ToolResult(error=f"{tool} refused: {e}.{waits}")
+    except (vessel.VesselNotFound, artifacts.ArtifactDamaged) as e:
+        return ToolResult(error=f"{tool} refused: {e}")
+    except (WorkerError, WorkerCrashed, WorkerTimeout) as e:
+        return ToolResult(error=f"{tool} could not design the vessel: {e}")
+    ev = d.evidence
+    _audit(ctx, "fermos", "design_vessel", "open", sim or fitted, {"artifactId": d.artifactId, "evidenceId": ev.id,
+                                                                   "tool": tool, "note": note})
+    return ToolResult(summary={"state": "open", **_vessel_summary(d), "evidenceId": ev.id,
+                               "meaning": "the vessel is designed on BioSTEAM and kept as one artifact in the open lane, "
+                                          "marked as the model's in the audit log; cite its numbers by the evidence id, "
+                                          "which is its artifact id; never state them yourself"},
+                      evidence=[ev])
+
+
+# The design table's rows a summary carries, by the label the worker reads
+# them under; the whole table is in the artifact (get_artifact).
+VESSEL_ROWS = ("Vessels", "Volume of each vessel", "Working volume of each vessel", "Batch time (reacting)",
+               "Cycle time", "Dead time", "Agitator power, each vessel", "Compressor power", "kLa achieved",
+               "Superficial gas velocity", "Aeration, vvm", "Reactor duty", "Cooling duty, every heat utility",
+               "Electricity, the whole unit")
+
+
+def _vessel_summary(d: Any) -> dict[str, Any]:
+    """What a model reads of a design, copied from it: the rows a reader
+    asks for first, the oxygen balance in brief, heat, cost with its index,
+    who assumed what, and the flags. Nothing is computed here."""
+    ox = d.oxygen
+    return {
+        "artifactId": d.artifactId, "provenance": d.provenance, "source": d.source, "sourceTool": d.sourceTool,
+        "unitClass": d.unitClass, "vesselType": d.vesselType, "aerobic": d.aerobic,
+        "design": [{"label": r.label, "value": r.value, "unit": r.unit} for r in d.design if r.label in VESSEL_ROWS],
+        "oxygen": None if ox is None else {
+            "method": ox.method, "kLa": ox.kLa, "kLaNeededAtPeak": ox.kLaNeededAtPeak, "kLaUnit": ox.kLaUnit,
+            "otr": ox.otr, "unit": ox.unit, "short": ox.short, "oxygenBasis": ox.oxygenBasis, "aerated": ox.aerated},
+        "oxygenNote": d.oxygenNote,
+        "heat": {"bst": d.heat.bst, "convention": d.heat.convention, "unit": d.heat.unit},
+        "cost": {"purchase": d.cost.purchase, "installed": d.cost.installed, "unit": "USD",
+                 "costIndex": d.cost.costIndex, "costIndexYear": d.cost.costIndexYear},
+        "assumedBy": sorted({p.overriddenBy for p in d.parameters if p.overriddenBy}),
+        "flags": d.flags,
+    }
+
+
+def _fermos(action: str, inp: ModuleWriteInput, ctx: ToolContext) -> ToolResult:
+    if action == "design_vessel":
+        f = inp.fields
+        return design_vessel("fermos_write", f.get("simulationArtifact", ""), f.get("fitArtifact", ""),
+                             f.get("vesselType", ""), f.get("klaMethod", ""), inp.note, ctx)
+    return _fermos_forecast(inp, ctx)
 
 
 RUN_WAITS = ("A named person types each waiting input in Proforma, on the scenario's page, under their reviewer "
@@ -426,7 +516,7 @@ def _runner(module: str) -> Callable[[ModuleWriteInput, ToolContext], ToolResult
         if module == "geneos":
             return _geneos(action, inp, ctx)
         if module == "fermos":
-            return _fermos_forecast(inp, ctx)
+            return _fermos(action, inp, ctx)
         if module == "proforma":
             return _proforma_run(inp, ctx)
         if module == "biorepo":

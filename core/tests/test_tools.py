@@ -193,7 +193,7 @@ READS = [f"{m}_read" for m in MODULES] + [f"{m}_write" for m in MODULES]
 # The one literal list of the registry's names the tests hold it to; every
 # other test derives its count from tools.WHITELIST (OF-BLD-019 §6.1).
 NAMES = (["search_records", "convert_units", "search_passages", "yield_ceiling", "growth_forecast", "selling_price",
-          "draft_runbook"] + READS + ["thermo_props", "run_flowsheet", "stream_table"])
+          "draft_runbook"] + READS + ["thermo_props", "run_flowsheet", "stream_table", "fermos_vessel"])
 
 
 def test_only_the_whitelisted_names_may_register():

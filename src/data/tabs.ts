@@ -57,8 +57,10 @@ export const GUILD_TABS: OwnerTab[] = [
 ];
 
 // OF-BLD-014 §7.4 — fermOS's first tab set: fits of deposited runs, and
-// forecasts from those fits.
+// forecasts from those fits. OF-BLD-020 §4.2 — the vessel BioSTEAM designs
+// for a kept simulation.
 export const FERMOS_TABS: OwnerTab[] = [
   { label: 'Fits', to: '/fermos' },
+  { label: 'Vessel', to: '/fermos/vessel' },
   { label: 'Forecast', to: '/fermos/forecast' },
 ];

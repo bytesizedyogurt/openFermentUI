@@ -23,6 +23,13 @@
  *    provenance. CostWaterfall and Tornado each stand on the grammar (their
  *    own toTable, ENCODING, FigureFrame, no recharts), are exported from the
  *    figures index, and the BioSTEAM scenario's sections draw with them.
+ * 9. OF-BLD-020 §4.2 (D14): OxygenBalance draws one row per hour of the
+ *    simulated uptake, the vessel's transfer the one value the design gives
+ *    on every row, the short hours exactly the service's intervals, every row
+ *    the design's provenance; it finds no short hour of its own (no
+ *    comparison of the uptake with the transfer in its source); it says what
+ *    would fill it when there is no uptake to draw; it stands on the grammar,
+ *    is exported from the index, and fermOS → Vessel draws with it.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -37,6 +44,8 @@ import { toTable as tornadoTable } from '../src/components/figures/Tornado';
 import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger';
 import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
 import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
+import { emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
+import { fmt } from '../src/engine/units';
 import type { TrainUnit } from '../src/data/types';
 import { gatherLinks } from '../src/components/Dossier';
 import { ArtifactsDown, ArtifactRefused } from '../src/lib/artifacts';
@@ -242,6 +251,32 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   const page = readFileSync('src/screens/ProformaBiosteam.tsx', 'utf8');
   if (!/<CostWaterfall\b/.test(page) || !/<Tornado\b/.test(page)) problems.push("the BioSTEAM scenario's sections do not draw the cost breakdown and the sensitivity through the grammar");
   ok.push(`tables: cost breakdown ${rows.length}, one row per line and the run's price; CostWaterfall and Tornado stand on toTable, ENCODING and FigureFrame`);
+}
+
+// 9 — OF-BLD-020 §4.2: the oxygen balance, on the grammar.
+{
+  const t = [0, 1, 2, 3, 4];
+  const our = [0.5, 1.5, 2.5, 1.5, 0.5];
+  const props = { title: 't', t, our, otr: 2, unit: 'mmol L⁻¹ h⁻¹', short: [[1.5, 2.5]], provenance: 'demo' as const };
+  const rows = oxygenTable(props).rows;
+  if (rows.length !== t.length) problems.push(`OxygenBalance's table has ${rows.length} rows for ${t.length} hours of uptake`);
+  if (rows.some((r) => r[5] !== 'demo')) problems.push("an OxygenBalance row loses the design's provenance");
+  if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('an OxygenBalance cell holds NaN or Infinity');
+  if (rows.some((r) => r[2] !== fmt(2))) problems.push("OxygenBalance's transfer is not the design's one value on every row");
+  if (rows.map((r) => r[4]).join() !== 'no,no,yes,no,no') problems.push(`OxygenBalance's short hours are not the service's intervals (${rows.map((r) => r[4]).join()})`);
+  // The service said nothing is short: the figure finds no short hour of its own, though the uptake rises above the rule.
+  if (oxygenTable({ ...props, short: [] }).rows.some((r) => r[4] === 'yes')) problems.push('OxygenBalance marks a short hour the service did not name');
+  if (!oxygenEmpty({ ...props, t: [0], our: [1] }) || !oxygenEmpty({ ...props, our: [1, 2] }) || oxygenEmpty(props) !== null)
+    problems.push('OxygenBalance draws an uptake it does not have, or calls a whole one empty');
+  const src = readFileSync('src/components/figures/OxygenBalance.tsx', 'utf8');
+  if (!/export function toTable\(/.test(src)) problems.push('OxygenBalance exports no toTable');
+  if (!/from '\.\/FigureFrame'/.test(src) || !/<FigureFrame\b/.test(src)) problems.push('OxygenBalance is not framed by FigureFrame');
+  if (!/from '\.\/encoding'/.test(src) || !/\bENCODING\[/.test(src)) problems.push('OxygenBalance does not take its marks from ENCODING');
+  if (/['"]recharts/.test(src)) problems.push('OxygenBalance draws with recharts');
+  if (/our\[[^\]]*\]\s*[<>]=?\s*props\.otr|props\.otr\s*[<>]=?\s*props\.our|\.otr\s*[<>]/.test(src)) problems.push('OxygenBalance compares the uptake with the transfer itself: the short hours are the service\'s');
+  if (!/export \{ OxygenBalance,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export OxygenBalance');
+  if (!/<OxygenBalance\b/.test(readFileSync('src/screens/FermOSVessel.tsx', 'utf8'))) problems.push('fermOS → Vessel does not draw the oxygen balance through the grammar');
+  ok.push(`tables: oxygen balance ${rows.length}, one row per hour of uptake, the transfer the design's value, the short hours the service's; OxygenBalance stands on toTable, ENCODING and FigureFrame`);
 }
 
 if (problems.length) {

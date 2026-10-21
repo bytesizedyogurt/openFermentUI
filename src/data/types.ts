@@ -3445,8 +3445,10 @@ export interface VesselRequest {
   simulation?: string | null;
   /** A `kinetic_fit` or `growth_forecast` artifact id: anaerobic only. */
   fit?: string | null;
-  /** The aerated design; null is BioSTEAM's own default. */
+  /** The aerated design; null is BioSTEAM's own default. A person's override of `design` says the same, and the two must agree. */
   vesselType?: 'stirred-tank' | 'bubble-column' | null;
+  /** A kLa correlation by BioSTEAM's registered name, one its class runs for the design (fermos_vessel's klaMethod); null is the class's own. */
+  klaMethod?: string | null;
   /** A person's changes, each a named assumption, scope `fermos:vessel:<id>`. */
   overrides: Override[];
   includeArchived?: boolean;
@@ -3534,6 +3536,8 @@ export interface VesselDesign {
   reaction: Record<string, unknown>;
   flags: string[];
   versions: Record<string, string>;
+  /** The design as one citable value with its basis: its id is the artifact's, as fermos_vessel returns it. */
+  evidence: Evidence;
 }
 
 /** GET /api/fermos/vessels: one kept `fermos.vessel` artifact. */

@@ -43,6 +43,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Iterator
 
 CORE = Path(__file__).parent.parent
@@ -408,7 +409,10 @@ def prototype_proposals() -> dict[str, Any]:
     return {"proposals.json": [made.model_dump(mode="json")]}
 
 
-def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
+def rebuild_prototype(out: Path = PROTOTYPE, *, real_worker: bool | None = None) -> list[Path]:
+    """Every prototype fixture. `real_worker` decides whether the vessel
+    fixture's designs come from BioSTEAM (None: when the sim extra is
+    installed); test:core passes False, so it never starts the worker."""
     from . import proforma
 
     # OF-BLD-019 §2.R: a run's basis says whether its diagram is drawn, from
@@ -417,12 +421,12 @@ def rebuild_prototype(out: Path = PROTOTYPE) -> list[Path]:
     drawn_here = proforma.drawn_here
     proforma.drawn_here = lambda: False
     try:
-        return _rebuild_prototype(out)
+        return _rebuild_prototype(out, real_worker)
     finally:
         proforma.drawn_here = drawn_here
 
 
-def _rebuild_prototype(out: Path) -> list[Path]:
+def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]:
     from . import artifacts
 
     art = prototype_artifact()
@@ -453,6 +457,7 @@ def _rebuild_prototype(out: Path) -> list[Path]:
         *prototype_pureos().items(),
         *prototype_thermo().items(),
         *prototype_proposals().items(),
+        *prototype_vessel(real_worker).items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -1648,6 +1653,170 @@ def rebuild_figure_samples(out: Path = FIGURE_SAMPLES) -> Path:
     out.write_text(json.dumps(figure_samples(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"wrote {out}")
     return out
+
+
+# OF-BLD-020 §4.2: fermOS → Vessel against the double. Two batch_v1 runs
+# made by the real fermos.simulate (scipy, no BioSTEAM) on STAND-IN overrides
+# named as such, aerobic (Yx/o set) and anaerobic; the vessel scope each
+# serves and the designs the browser tests ask for, made by the real Proforma
+# worker on BioSTEAM when the sim extra is installed, else by a STAND-IN
+# worker, the fixture saying which (`worker.kind`). A design from BioSTEAM
+# moves in its last digits from one process to the next (§4.1, measured), so
+# test_demo holds this file to the code by its requests and its simulations,
+# and test:sim holds its numbers to the worker within VESSEL_FIXTURE_RTOL.
+VESSEL_STANDIN = "STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result"
+VESSEL_BY = "openFerment test fixture"
+VESSEL_AT = "2026-10-21"
+VESSEL_SIM = {"mu_max": 0.3, "ks": 0.5, "yxs": 0.1, "alpha": 2.0, "yps": 0.45, "p_max": 95.0, "x0": 0.5,
+              "s0": 100.0, "p0": 0.0}
+VESSEL_AEROBIC = {"yxo": 1.0}
+VESSEL_PLANT_SCALE = 50000.0
+VESSEL_FIXTURE_RTOL = 1e-6
+
+
+def _biosteam_here() -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec("biosteam") is not None
+
+
+def _standin_vessel_call(op: str, args: dict[str, Any]) -> Any:
+    """The Proforma worker's `vessel_specs` and `vessel_design` in the JSON
+    contract's shape, with STAND-IN defaults and an invented design, for a
+    machine without the sim extra. Nothing here is BioSTEAM's."""
+    from . import vessel
+
+    if op == "vessel_specs":
+        kind = args["kind"]
+        words = {"vessel_type": "Vertical", "vessel_material": "Stainless steel 316",
+                 "heat_exchanger_configuration": "recirculation loop", "design": "Stirred tank"}
+        keys = [d.key for d in vessel._decls(kind)] + ["batch", "Nmin", "Nmax", "reactions"]
+        out: dict[str, Any] = {
+            "kind": kind, "unitClass": "AeratedBioreactor" if kind == vessel.AEROBIC else "NRELAnaerobicBatchBioreactor",
+            "parameters": {k: {"default": None if k in ("N", "loading_time", "Q_O2_consumption") else words.get(k, 0.5),
+                               "from": VESSEL_STANDIN} for k in keys},
+            "biosteam": "stand-in", "thermosteam": "stand-in", "biorefineries": "stand-in", "chemicals": VESSEL_STANDIN,
+            "operatingHours": 1000.0, "operatingHoursFrom": VESSEL_STANDIN, "costIndex": 500.0, "costIndexYear": None}
+        if kind == vessel.AEROBIC:
+            out["designs"] = {
+                "Stirred tank": {"method": "Riet", "optimize_power": True, "kW_per_m3": 0.5, "runs": ["Riet"],
+                                 "solvesPower": ["Riet"], "registered": ["Riet"]},
+                "Bubble column": {"method": "Dewes", "optimize_power": False, "kW_per_m3": 0.5, "runs": ["Dewes"],
+                                  "solvesPower": [], "registered": ["Dewes"]},
+            }
+            out["defaultDesign"] = "Stirred tank"
+            out["choices"] = {"vessel_material": ["Carbon steel", "Stainless steel 316"],
+                              "vessel_type": ["Horizontal", "Vertical"],
+                              "heat_exchanger_configuration": ["jacketed", "recirculation loop"]}
+            out["heatPerO2"], out["heatPerO2From"] = -1.0, VESSEL_STANDIN
+        return out
+    if op == "vessel_design":
+        aerobic = args["kind"] == vessel.AEROBIC
+        ox = None
+        if aerobic:
+            ys = list(args["our"]["value"])
+            ox = {"t": list(args["our"]["t"]), "our": ys, "unit": "mmol L⁻¹ h⁻¹", "otr": max(ys), "short": [],
+                  "kLa": 1.0, "kLaNeededAtPeak": 1.0, "kLaUnit": "h⁻¹",
+                  "method": (args["params"].get("method") or ("Dewes" if args["design"] == "Bubble column" else "Riet")),
+                  "aerated": True, "oxygenBasis": args["oxygenBasis"], "targetUptake": max(ys), "sized": max(ys),
+                  "balancedUptake": max(ys), "scale": 1.0, "cStar": 1.0, "cL": 0.5, "drivingForce": 0.5,
+                  "reactionO2KmolPerH": 1.0}
+        row = lambda label, value, unit: {"label": label, "value": value, "unit": unit, "readFrom": VESSEL_STANDIN}  # noqa: E731
+        return {"unitClass": "AeratedBioreactor" if aerobic else "NRELAnaerobicBatchBioreactor", "unitId": "R1",
+                "aerobic": aerobic, "design": [row("Vessels", 2.0, ""), row("Volume of each vessel", 10.0, "m3"),
+                                               row("Batch time (reacting)", args["tau"], "hr")],
+                "designResults": {"Number of reactors": 2.0, "Reactor volume": 10.0}, "auxiliaries": {},
+                "used": {}, "coolingAgents": [], "cost": {
+                    "purchase": 1.0, "installed": 2.0, "byItem": {"Vessel": {"purchase": 1.0, "installed": 2.0}},
+                    "utility": 1.0, "costIndex": 500.0, "costIndexYear": None, "note": VESSEL_STANDIN},
+                "versions": {"biosteam": "stand-in"}, "chemicals": VESSEL_STANDIN, "dutyRead": -1.0,
+                "scale": {"how": VESSEL_STANDIN}, "reaction": {"equation": VESSEL_STANDIN, "notes": []}, "oxygen": ox,
+                "warnings": [], "utilitySettings": {},
+                "heat": {"bst": -1.0, "convention": -1.0 if aerobic else None, "conventionNote": VESSEL_STANDIN}}
+    raise ValueError(f"the stand-in vessel worker has no op {op}")
+
+
+# The designs the browser tests ask for: (which simulation, vessel type,
+# the overrides beyond the plant scale), each with the plant scale typed.
+VESSEL_ASKS = (
+    ("aerobic", None, ()),
+    ("aerobic", "bubble-column", (("design", "Bubble column"),)),
+    ("anaerobic", None, ()),
+)
+
+
+# The pool a fixture's simulation binds from: no records at all (see
+# prototype_vessel).
+_NO_RECORDS = SimpleNamespace(records=[], records_by_id={}, hidden={})
+
+
+def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
+    from . import fermos, proforma, vessel
+    from . import intake as _intake
+    from .models import Override, SimulationRequest, VesselRequest
+
+    real = _biosteam_here() if real_worker is None else real_worker
+    family = "fermos:family:batch_v1"
+
+    def simulate(extra: dict[str, float]) -> Any:
+        values = {**VESSEL_SIM, **extra}
+        # An empty evidence pool: the fixture's simulation binds the named
+        # stand-ins and the conventions alone, never this machine's thread Q
+        # candidates, so the fixture is the same wherever it is rebuilt.
+        return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+            Override(scope=family, key=k, value=v, by=VESSEL_BY, at=VESSEL_AT, note=VESSEL_STANDIN)
+            for k, v in values.items()]), by_pool=_NO_RECORDS)
+
+    def typed(aid: str, key: str, value: Any) -> Override:
+        return Override(scope=f"fermos:vessel:{aid}", key=key, value=value, by=VESSEL_BY, at=VESSEL_AT,
+                        note=VESSEL_STANDIN if key == "plant_scale" else None)
+
+    def stamped(body: dict[str, Any]) -> dict[str, Any]:
+        out = {**body, "createdAt": AT}
+        out["evidence"] = {**body["evidence"], "basis": {**body["evidence"]["basis"], "at": AT}}
+        return out
+
+    saved = (_intake.DATA_DIR, proforma.call, dict(vessel._SPECS))
+    with _scratch() as scratch:
+        try:
+            _intake.DATA_DIR = scratch
+            vessel._SPECS.clear()
+            if not real:
+                proforma.call = _standin_vessel_call
+            sims = {"aerobic": simulate(VESSEL_AEROBIC), "anaerobic": simulate({})}
+            ids = {k: v.artifactId for k, v in sims.items()}
+            listed = {s.artifactId: s for s in fermos.simulations()}
+            simulations = [listed[ids[k]].model_copy(update={"createdAt": AT}).model_dump(mode="json")
+                           for k in ("aerobic", "anaerobic")]
+            scopes = []
+            for which, kind in (("aerobic", None), ("aerobic", "bubble-column"), ("anaerobic", None)):
+                body = vessel.scope(ids[which], kind).model_dump(mode="json")
+                scopes.append({"simulation": ids[which], "vesselType": kind, "status": 200, "body": body})
+            designs = []
+            refused = VesselRequest(simulation=ids["aerobic"])
+            try:
+                vessel.design(refused)
+            except vessel.VesselRefused as e:
+                designs.append({"request": refused.model_dump(mode="json"), "status": 422, "body": {"detail": str(e)}})
+            for which, kind, more in VESSEL_ASKS:
+                aid = ids[which]
+                req = VesselRequest(simulation=aid, vesselType=kind, overrides=[
+                    *(typed(aid, k, v) for k, v in more), typed(aid, "plant_scale", VESSEL_PLANT_SCALE)])
+                body = stamped(vessel.design(req).model_dump(mode="json"))
+                designs.append({"request": req.model_dump(mode="json"), "status": 200, "body": body})
+            ws = vessel.worker_specs(vessel.AEROBIC)
+        finally:
+            _intake.DATA_DIR, proforma.call = saved[0], saved[1]
+            vessel._SPECS.clear()
+            vessel._SPECS.update(saved[2])
+    worker = {"kind": "biosteam" if real else "stand-in",
+              "note": ("designed by the real Proforma worker on BioSTEAM, from STAND-IN simulations and a STAND-IN plant "
+                       "scale" if real else VESSEL_STANDIN + "; the worker is a stand-in too, as the sim extra is not "
+                                                             "installed here"),
+              "versions": {k: ws[k] for k in ("biosteam", "thermosteam", "biorefineries")}}
+    return {"fermos-vessel.json": {"worker": worker, "aerobic": ids["aerobic"], "anaerobic": ids["anaerobic"],
+                                   "plantScale": VESSEL_PLANT_SCALE, "by": VESSEL_BY, "simulations": simulations,
+                                   "scopes": scopes, "designs": designs}}
 
 
 # §8.1: the fixtures that need BioSTEAM, which are the toy flowsheet's: one

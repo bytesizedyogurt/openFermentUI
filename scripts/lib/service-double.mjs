@@ -156,6 +156,14 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    */
   const paramScopes = [];
   const paramResolves = [];
+  /**
+   * fermOS → Vessel (OF-BLD-020 §4.2): each design the browser posted
+   * (POST /api/fermos/vessel), as sent. The answers are fermos-vessel.json's,
+   * which demo.py --prototype made from two simulations of the real
+   * fermos.simulate and, with the sim extra installed, designs by the real
+   * Proforma worker on BioSTEAM (its `worker.kind` says which).
+   */
+  const vesselPosts = [];
 
   const server = createServer(async (req, res) => {
     try {
@@ -429,6 +437,103 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       if (entry.status === 200) thermoKept.set(keyOf(asked), entry.body);
       res.writeHead(entry.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(entry.body));
+    }
+    // OF-BLD-020 §4.2 — fermOS → Vessel. The kept simulations; the vessel
+    // scope of each as the real code served it (by its vesselType); a
+    // resolve that lays each override on as the service does, an assumption
+    // by the person it names; and a design answered by its request: the
+    // recorded body for the same source, vessel type and overrides (by key
+    // and value), with the person's name laid on as the service lays it on;
+    // a request with no scale the real code's refusal; any other a 422 in
+    // words. A scope or source the fixture lacks is the service's 404.
+    {
+      const vesselFixture = () => prototype('fermos-vessel.json');
+      const sendJson = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      if (url === '/api/fermos/simulations' && req.method === 'GET') return sendJson(200, (await vesselFixture()).simulations);
+      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, []);
+      const vm = /^\/api\/params\/fermos:vessel:([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
+      if (vm) {
+        const id = vm[1];
+        const resolving = Boolean(vm[2]);
+        if (resolving !== (req.method === 'POST')) return sendJson(405, { detail: 'Method Not Allowed' });
+        let ask;
+        if (resolving) {
+          let raw = '';
+          for await (const chunk of req) raw += chunk;
+          ask = JSON.parse(raw || '{}');
+          paramResolves.push({ scope: `fermos:vessel:${id}`, ...ask });
+        } else {
+          const q = new URL(req.url ?? '/', 'http://double').searchParams;
+          ask = { vesselType: q.get('vesselType') };
+          paramScopes.push({ scope: `fermos:vessel:${id}`, ...Object.fromEntries(q) });
+        }
+        const fx = await vesselFixture();
+        const entry = fx.scopes.find((sc) => sc.simulation === id && (sc.vesselType ?? null) === (ask.vesselType ?? null));
+        if (!entry) {
+          const known = fx.scopes.some((sc) => sc.simulation === id);
+          return known
+            ? sendJson(422, { detail: `the double holds no ${ask.vesselType} scope of ${id}` })
+            : sendJson(404, { detail: `no artifact '${id}' is on file here: a vessel is designed for a fermOS simulation (fermOS → Simulate keeps one) or, anaerobic, a kinetic fit or forecast` });
+        }
+        const served = entry.body;
+        if (!resolving) return sendJson(200, served);
+        const overrides = ask.overrides ?? [];
+        const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+        const scope = served.scope;
+        const stray = [...new Set(overrides.map((o) => o.scope).filter((sc) => sc !== scope))].sort();
+        if (stray.length) return sendJson(422, { detail: `an override names the scope it changes, and these were sent to ${scope}: ${stray.join(', ')}` });
+        for (const o of overrides) {
+          if (!specs.has(o.key)) return sendJson(422, { detail: `there is no parameter ${o.key} here; the parameters are ${[...specs.keys()].join(', ')}` });
+          if (!String(o.by ?? '').trim()) return sendJson(422, { detail: `the override of ${o.key} needs a person's name: a decision needs a reviewer name` });
+        }
+        const byKey = new Map(overrides.map((o) => [o.key, o]));
+        const values = served.values.map((v) => {
+          const o = byKey.get(v.key);
+          if (!o) return v;
+          const who = String(o.by).trim();
+          return {
+            key: v.key, value: o.value, low: o.low ?? null, high: o.high ?? null,
+            source: { kind: 'assumption', id: null, note: `typed on ${o.at}${o.note ? `: ${o.note}` : ''}`, by: who },
+            origin: 'assumption', identified: null, overriddenBy: who, libraryDefault: v.libraryDefault ?? null,
+            recordIds: [], detail: `typed by ${who} on ${o.at}${o.note ? `: ${o.note}` : ''}`, outOfBounds: null,
+          };
+        });
+        return sendJson(200, {
+          scope, values, waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key),
+          basisInputs: values.filter((v) => v.overriddenBy).map((v) => ({ name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source })),
+          warnings: [], notes: served.notes,
+        });
+      }
+      if (url === '/api/fermos/vessel' && req.method === 'POST') {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        const asked = JSON.parse(raw || '{}');
+        vesselPosts.push(asked);
+        const fx = await vesselFixture();
+        const keyed = (os) => JSON.stringify((os ?? []).map((o) => [o.key, o.value]).sort());
+        const source = asked.simulation ?? asked.fit ?? null;
+        const typed = new Map((asked.overrides ?? []).map((o) => [o.key, o]));
+        const scaled = typed.has('plant_scale') || typed.has('batch_volume');
+        const recorded = fx.designs.find((d) => d.status === 200 && (d.request.simulation ?? d.request.fit) === source &&
+          (d.request.vesselType ?? null) === (asked.vesselType ?? null) && keyed(d.request.overrides) === keyed(asked.overrides));
+        if (recorded) {
+          // The person's name laid on as the service lays it on: on each value they typed, and on its basis input.
+          const named = (src, key) => (typed.has(key) && src?.kind === 'assumption' ? { ...src, by: String(typed.get(key).by).trim() } : src);
+          const body = recorded.body;
+          return sendJson(200, {
+            ...body,
+            parameters: body.parameters.map((v) => (typed.has(v.key) ? { ...v, overriddenBy: String(typed.get(v.key).by).trim(), source: named(v.source, v.key) } : v)),
+            evidence: { ...body.evidence, basis: { ...body.evidence.basis, inputs: body.evidence.basis.inputs.map((i) => ({ ...i, source: named(i.source, i.name) })) } },
+          });
+        }
+        if (!fx.scopes.some((sc) => sc.simulation === source)) return sendJson(422, { detail: `no artifact '${source}' is on file here` });
+        const refusal = fx.designs.find((d) => d.status === 422);
+        if (!scaled && refusal) return sendJson(422, refusal.body);
+        return sendJson(422, { detail: 'the double holds no design for this request: it holds the designs the browser tests ask for' });
+      }
     }
     // OF-BLD-020 §2.2 — the parameter panel. GET /api/params/{scope}: a seed
     // scenario's scope, or a scenario made here by the flowsheet it names
@@ -761,5 +866,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, flags } };
 }

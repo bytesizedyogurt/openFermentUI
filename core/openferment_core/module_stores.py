@@ -331,6 +331,25 @@ def _artifact_row(module: str, a: Any, provenance: str, program: str | None = No
                        "cite": "cite the value through get_artifact or the tool that computes it; this row names it"})
 
 
+VESSEL_TOOL = "fermos.vessel"
+
+
+def _vessel_row(a: Any, provenance: str, program: str | None = None) -> Row:
+    from . import vessel
+
+    v = vessel.summary(a)
+    kind = f", {v.vesselType.replace('-', ' ')}" if v.vesselType else ""
+    return Row(module="fermos", kind="vessel", id=a.id, label=f"Vessel design: BioSTEAM's {v.unitClass}{kind}, for "
+               f"{v.sourceTool} {v.source}", state="open", status="computed", provenance=provenance,
+               words=" ".join(["vessel", "fermenter", "bioreactor", v.unitClass, v.vesselType or "", v.source]),
+               program=program, alt_ids=(v.source,) if v.source else (),
+               detail={"tool": a.tool, "createdAt": a.createdAt, "unitClass": v.unitClass, "vesselType": v.vesselType,
+                       "source": v.source, "sourceTool": v.sourceTool, "vessels": v.vessels, "volume": v.volume,
+                       "volumeUnit": "m3", "installed": v.installed, "installedUnit": "USD",
+                       "cite": "cite a design's numbers by its artifact id, as fermos_vessel returns it, or by this "
+                               "row's ref; get_artifact reads the whole design table"})
+
+
 class Stores:
     """Every module's rows, loaded on first use and kept for one question.
 
@@ -521,6 +540,11 @@ class Stores:
 
     def _fermos(self) -> Iterable[Row]:
         yield from self._artifacts("fermos")
+        # OF-BLD-020 §4.2 — a kept vessel design, kind `vessel`: what BioSTEAM
+        # sized for which simulation, read from the artifact (vessel.summary).
+        for a in self._get("artifacts"):
+            if a.tool == VESSEL_TOOL:
+                yield _vessel_row(a, self._artifact_mark(a), self._artifact_program(a))
 
     def _pureos(self) -> Iterable[Row]:
         ops = self._get("projection")["pureos"]["unitOperations"]
@@ -659,7 +683,7 @@ KINDS = {
     "dominion": ("molecule", "finding"),
     "runbooks": ("runbook", "protocol"),
     "geneos": ("host", "pathway", "model", "artifact"),
-    "fermos": ("artifact",),
+    "fermos": ("artifact", "vessel"),
     "pureos": ("unit-operation", "train", "train-unit"),
     "proforma": ("scenario", "artifact"),
     "biorepo": ("record", "candidate", "artifact", "witness-run"),

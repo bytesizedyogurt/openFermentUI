@@ -55,6 +55,8 @@ const ROUTES = [
   ['/geneos/model', 'geneOS — Model: the ceiling beside what was reported'],
   ['/fermos', 'fermOS — Fits'],
   ['/fermos/forecast', 'fermOS — Forecast'],
+  // OF-BLD-020 §4.2 — the vessel BioSTEAM designs for a kept simulation.
+  ['/fermos/vessel', 'fermOS — Vessel'],
   ['/pureos', 'pureOS'],
   // OF-BLD-019 §4.1 — the train of the run Proforma priced, by scenario; PHA's, so under its banner.
   ['/pureos/train/sc-pha-1', 'pureOS — train of a run, unit by unit'],
@@ -300,7 +302,9 @@ async function main() {
   const SHELVES = [
     ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
     ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
-    ['/fermos', 'fermOS subsystems', 'Oxygen transfer'],
+    // OF-BLD-020 §4.2 — transport is live, so its table moved to the Vessel
+    // view (SEEDED below); control is still a stub on the shelf.
+    ['/fermos', 'fermOS subsystems', 'Measured online'],
     ['/dominion', 'Dominion subsystems', 'Limitation kinds'],
     ['/intake', 'Intake subsystems', 'Parse status ladder'],
     ['/biorepo', 'BioRepo subsystems', 'Provenance levels'],
@@ -346,6 +350,9 @@ async function main() {
     ['/geneos/pathway', 'Precursor pathways', 'Pathway has no implementation'],
     // §8.4 — Uncertainty is live: its reference stays on Proforma, off any shelf.
     ['/proforma', 'Uncertain inputs', 'Uncertainty has no implementation'],
+    // OF-BLD-020 §4.2 — transport and scale are live: their reference stays on fermOS → Vessel, off the shelf.
+    ['/fermos/vessel', 'Oxygen transfer', 'Transport has no implementation'],
+    ['/fermos/vessel', 'Scale-up criteria', 'Scale has no implementation'],
   ];
   let seededFails = 0;
   for (const [route, table, mustNotSay] of SEEDED) {
@@ -2205,6 +2212,129 @@ async function main() {
   }
   // ── end §4.R
 
+  // ── OF-BLD-020 §4.2 — fermOS → Vessel against the double.
+  //
+  // The chooser lists the kept simulations; the aerobic one's scope is the
+  // parameter panel in Appendix 2 §C's six groups, each value with its
+  // source (the harvest hour and the oxygen uptake the simulation's), and
+  // the scale waits: Design says the service's words for it. A plant scale
+  // typed under the reviewer name is that person's assumption; Design posts
+  // the scope's overrides, signed, and shows the design table with where
+  // BioSTEAM put each row, the oxygen balance through the grammar, the heat
+  // line with its convention labelled, the cost line with BioSTEAM's cost
+  // index and the basis naming the person. Price this in Proforma says what
+  // Phase 6 adds and makes nothing. A bubble column chosen in the panel's
+  // vessel type refetches the scope (Dewes) and designs it; the anaerobic
+  // simulation designs the NREL fermenter, with no compressor and no
+  // oxygen balance, said so.
+  let vesselFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fx = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/fermos-vessel.json'), 'utf8')).response;
+    const row = (key) => page.locator(`[data-testid="param-row"][data-key="${key}"]`);
+    const recorded = (sim, vesselType) =>
+      fx.designs.find((d) => d.status === 200 && d.request.simulation === sim && (d.request.vesselType ?? null) === vesselType)?.body;
+    const design = async () => {
+      const before = doubleState.vesselPosts.length;
+      await page.locator('[data-testid="vessel-design"]').click();
+      for (let i = 0; i < 40 && doubleState.vesselPosts.length === before; i++) await page.waitForTimeout(100);
+      await page.waitForTimeout(400);
+      return doubleState.vesselPosts.at(-1);
+    };
+    try {
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/vessel`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="vessel-source"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const options = await page.locator('[data-testid="vessel-source"] option').evaluateAll((els) => els.map((e) => e.value));
+      if (!options.includes(`simulation:${fx.aerobic}`) || !options.includes(`simulation:${fx.anaerobic}`))
+        problems.push(`the chooser does not list the kept simulations (${options.join(', ')})`);
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.aerobic}`);
+      await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
+      const groups = await page.locator('[data-testid="param-group"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')).join());
+      if (groups !== 'Scale,Vessel,Schedule,Aeration,Agitation,Heat') problems.push(`the vessel panel's groups are ${groups}`);
+      const served = fx.scopes.find((sc) => sc.simulation === fx.aerobic && sc.vesselType === null).body;
+      const rows = await page.locator('[data-testid="param-row"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-origin')}`).join());
+      const want = served.values.map((v) => `${v.key}:${v.origin}`).join();
+      if (rows !== want) problems.push(`the vessel panel does not show each parameter with the source the service served (${rows}; the service: ${want})`);
+      for (const key of ['tau', 'our_peak']) if ((await chipOf(page, key)).origin !== 'simulation') problems.push(`${key} is not shown as the simulation's`);
+      if ((await chipOf(page, 'plant_scale')).origin !== 'waiting') problems.push('the plant scale does not wait');
+      if ((await page.locator('[data-testid="vessel-scale"]').getAttribute('data-scale')) !== 'none') problems.push('Design does not say a scale is needed');
+      // Design with no scale: the service's words.
+      await design();
+      const refusedWords = fx.designs.find((d) => d.status === 422).body.detail;
+      if ((await page.locator('[data-testid="vessel-refused"]').innerText().catch(() => '')) !== refusedWords) problems.push("Design with no scale does not say the service's words");
+
+      // A plant scale typed under the reviewer name.
+      await typeParam(page, 'plant_scale', fx.plantScale);
+      await row('plant_scale').locator('[data-testid="param-chip"][data-origin="assumption"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const typed = await chipOf(page, 'plant_scale');
+      if (typed.origin !== 'assumption' || !typed.text.includes(`assumption by ${REVIEWER}`)) problems.push(`the plant scale's chip does not say assumption by ${REVIEWER} (${JSON.stringify(typed)})`);
+      if ((await page.locator('[data-testid="vessel-scale"]').getAttribute('data-scale')) !== 'one') problems.push('Design does not see the scale typed');
+      const posted = await design();
+      await page.locator('[data-testid="vessel-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const scaleSent = (posted?.overrides ?? []).find((o) => o.key === 'plant_scale');
+      if (posted?.simulation !== fx.aerobic || scaleSent?.value !== fx.plantScale || scaleSent?.by !== REVIEWER || scaleSent?.scope !== `fermos:vessel:${fx.aerobic}` || posted.vesselType)
+        problems.push(`Design did not post the scope's override, signed: ${JSON.stringify(posted).slice(0, 200)}`);
+      const stirred = recorded(fx.aerobic, null);
+      const labels = await page.locator('[data-testid="vessel-design-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-label')));
+      if (labels.join('|') !== stirred.design.map((r) => r.label).join('|')) problems.push(`the design table is not the design's rows (${labels.length} of ${stirred.design.length})`);
+      const vessels = await page.locator('[data-testid="vessel-design-row"][data-label="Vessels"] td').nth(1).innerText().catch(() => '');
+      if (!vessels || vessels === '—') problems.push('the design table does not show the number of vessels');
+      if (!(await page.locator('[data-testid="oxygen-balance"]').count()) || !(await page.locator('[data-testid="oxygen-otr"]').count()) || !(await page.locator('[data-testid="oxygen-our"]').count()))
+        problems.push('the oxygen balance is not drawn, its transfer as a rule and its uptake as a curve');
+      const heat = await page.locator('[data-testid="vessel-heat"]').innerText().catch(() => '');
+      if (!/BioSTEAM.s duty/.test(heat) || !/a convention/.test(heat)) problems.push(`the heat line does not set BioSTEAM's duty beside the convention, labelled (${heat.slice(0, 120)})`);
+      const cost = await page.locator('[data-testid="vessel-cost"]').innerText().catch(() => '');
+      if (!/plant cost index/.test(cost)) problems.push("the cost line does not name BioSTEAM's cost index");
+      await page.locator('[data-testid="vessel-basis"] summary').click();
+      const basis = await page.locator('[data-testid="vessel-basis"]').innerText().catch(() => '');
+      if (!basis.includes(`plant_scale: ${fx.plantScale}`) || !basis.includes(`assumption by ${REVIEWER}`)) problems.push("the design's basis does not name the person's plant scale");
+      // Price this in Proforma: words, and nothing made.
+      await page.locator('[data-testid="vessel-price"]').click();
+      const words = await page.locator('[data-testid="vessel-price-words"]').innerText().catch(() => '');
+      if (!/custom_train_v1/.test(words) || !/no scenario is created/.test(words)) problems.push(`Price this in Proforma does not say what Phase 6 adds (${words.slice(0, 120)})`);
+      if (!page.url().includes('/fermos/vessel')) problems.push('Price this in Proforma left the page');
+
+      // A bubble column, chosen as the panel's vessel type.
+      await row('design').locator('[data-testid="param-choice"]').selectOption('Bubble column');
+      await page.waitForFunction(() => document.querySelector('[data-testid="param-row"][data-key="method"] [data-testid="param-value"]')?.textContent?.includes('Dewes'), null, { timeout: 8000 }).catch(() => {});
+      if (!doubleState.paramScopes.some((q) => q.scope === `fermos:vessel:${fx.aerobic}` && q.vesselType === 'bubble-column')) problems.push("choosing a bubble column does not ask for the bubble column's scope");
+      if (!(await row('method').locator('[data-testid="param-value"]').innerText().catch(() => '')).includes('Dewes')) problems.push("the bubble column's kLa correlation is not Dewes");
+      const bubblePost = await design();
+      await page.waitForFunction(() => /bubble column/.test(document.querySelector('[data-testid="vessel-result"]')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
+      if (bubblePost?.vesselType !== 'bubble-column' || !(bubblePost.overrides ?? []).some((o) => o.key === 'design' && o.value === 'Bubble column' && o.by === REVIEWER))
+        problems.push(`the bubble column was not posted as the person's choice: ${JSON.stringify(bubblePost).slice(0, 200)}`);
+      if (!/bubble column/.test(await page.locator('[data-testid="vessel-result"]').innerText().catch(() => ''))) problems.push('the bubble column is not designed');
+
+      // The anaerobic simulation: the NREL fermenter, no compressor, no oxygen balance.
+      await page.locator('[data-testid="vessel-source"]').selectOption(`simulation:${fx.anaerobic}`);
+      await row('plant_scale').waitFor({ timeout: 8000 }).catch(() => {});
+      if (await row('batch_volume').count()) problems.push('an anaerobic vessel offers a batch volume');
+      await typeParam(page, 'plant_scale', fx.plantScale);
+      await page.waitForTimeout(500);
+      await design();
+      await page.locator('[data-testid="vessel-anaerobic"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const result = await page.locator('[data-testid="vessel-result"]').innerText().catch(() => '');
+      if (!result.includes('Anaerobic: no compressor, no oxygen balance') || (await page.locator('[data-testid="oxygen-balance"]').count()))
+        problems.push('the anaerobic design does not say it has no compressor and no oxygen balance');
+      if ((await page.locator('[data-testid="vessel-result"]').getAttribute('data-unit-class')) !== 'NRELAnaerobicBatchBioreactor') problems.push('the anaerobic simulation is not designed as the NREL fermenter');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      vesselFails++;
+      console.log(`✗ vessel       ${problems.join('; ')}`);
+    } else {
+      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with its convention, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a bubble column chosen in the panel designs by Dewes; the anaerobic batch is the NREL fermenter with no compressor`);
+    }
+    await page.close();
+  }
+  // ── end §4.2
+
   await browser.close();
   server.close();
 
@@ -2226,7 +2356,8 @@ async function main() {
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails) process.exit(1);
+  console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails) process.exit(1);
 }
 
 main();

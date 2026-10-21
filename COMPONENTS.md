@@ -217,19 +217,19 @@ Views: [Hosts](#) `/geneos/hosts` · [Pathway](#) `/geneos/pathway`
 
 **Reactor, kinetics, scale.** `/fermos` · chord `g f`
 
-The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). Transport, operating mode, scale-up and control are not built.
+The vessel: kinetics, oxygen and heat transport, operating mode and feeding, scale-up, instrumentation and control. Dynamics — what a real reactor achieves over time. **Kinetics is built, from depositions alone**: a run's readings become time series, the service fits a growth rate and a kinetic model (logistic growth, Luedeking–Piret production, the substrate balance) and keeps each fit as an artifact, and a forecast is a band drawn from one fit. No parameter from a paper enters it. A fit or forecast can feed a Proforma scenario's titre, yield and productivity when a person chooses it (fermOS → Proforma, above). **The vessel is BioSTEAM's** (OF-BLD-020 §4.2): fermOS → Vessel (`/fermos/vessel`, `src/screens/FermOSVessel.tsx`) designs the vessel a kept simulation needs in the Proforma worker (`core/openferment_core/vessel.py`, `POST /api/fermos/vessel`), an AeratedBioreactor (stirred tank or bubble column) or the NREL batch fermenter, every design parameter in the parameter panel with its source and a plant scale a named person's assumption, and draws the oxygen balance (`OxygenBalance`): what the culture takes up against what the vessel transfers. Postdoc asks for one with `fermos_vessel`. Operating mode and control are not built.
 
 | Subsystem | Key | State |
 |---|---|---|
 | Kinetics | `fermos.kinetics` | live |
-| Transport | `fermos.transport` | stub |
+| Transport | `fermos.transport` | live |
 | Operating mode | `fermos.mode` | stub |
-| Scale | `fermos.scale` | stub |
+| Scale | `fermos.scale` | live |
 | Control | `fermos.control` | stub |
 
 | Component | Implemented in |
 |---|---|
-| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` |
+| fermOS | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` |
 
 ### pureOS
 
@@ -330,7 +330,7 @@ for the ones with a rail entry.
 | Intake | Evidence in | `src/screens/IntakeIngest.tsx`, `src/screens/Intake.tsx`, `core/openferment_core/intake.py`, `core/openferment_core/extract.py` | the rail, /intake |
 | BioRepo | Evidence in | `src/data/`, `src/engine/retrieval.ts`, `src/screens/BioRepo.tsx`, `core/openferment_core/biorepo.py`, `src/screens/BioRepoArtifacts.tsx`, `core/openferment_core/artifacts.py`, `src/screens/BioRepoSearch.tsx`, `core/openferment_core/passages.py`, `core/openferment_core/retrieve.py`, `src/components/figures/` | the rail, /biorepo |
 | geneOS | Computing | `src/screens/GeneOS.tsx`, `src/screens/Organisms.tsx`, `src/screens/StrainPage.tsx`, `src/engine/geneos/enumeration.ts`, `src/screens/GeneOSModel.tsx`, `core/openferment_core/geneos.py`, `core/openferment_core/workers/geneos_worker.py` | the rail, /geneos |
-| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py` | the rail, /fermos |
+| fermOS | Computing | `src/screens/FermOS.tsx`, `src/screens/FermOSForecast.tsx`, `src/engine/series.ts`, `core/openferment_core/fermos.py`, `src/screens/FermOSVessel.tsx`, `core/openferment_core/vessel.py` | the rail, /fermos |
 | Proforma | Computing | `src/screens/Proforma.tsx`, `src/screens/ProformaScenario.tsx`, `src/screens/ProformaBiosteam.tsx`, `src/screens/ProformaReference.tsx`, `src/engine/grids.ts`, `src/engine/interp.ts`, `core/openferment_core/proforma.py`, `core/openferment_core/flowsheets/` | the rail, /proforma |
 | Primer | Keeping it honest | `src/screens/Primer.tsx`, `src/screens/PrimerLesson.tsx`, `src/screens/PrimerPath.tsx`, `src/screens/PrimerPractice.tsx`, `core/openferment_core/practice.py` | the rail, /primer |
 | Audit | Keeping it honest | `src/components/Provenance.tsx`, `aggregateExclusion() in src/store.ts`, `core/openferment_core/basis.py` | provenance ticks and their labels |

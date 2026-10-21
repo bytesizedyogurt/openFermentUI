@@ -11,8 +11,9 @@ read tool per module (OF-BLD-015 §7.2), written `<module>_read` because the
 Messages API refuses a dot in a tool name, and its write pair (§7.3); then
 `thermo_props` (OF-BLD-019 §4.2), a read offered loose; then Proforma's two
 (OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
-`stream_table`, a read of a kept run's streams. Thirty-two names. A tool
-outside it is a new document. `test_tools.NAMES` is the one literal list the
+`stream_table`, a read of a kept run's streams; then fermOS's vessel
+(OF-BLD-020 §4.2): `fermos_vessel`, a free write through `fermos_write`'s
+`design_vessel`. A tool outside it is a new document. `test_tools.NAMES` is the one literal list the
 tests hold the registry to; every other count is derived from `WHITELIST`.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
@@ -83,6 +84,9 @@ WHITELIST = (
     # loose (the module tools' grammar, §7.2).
     "run_flowsheet",
     "stream_table",
+    # OF-BLD-020 §4.2 — the vessel a kept simulation needs, designed on
+    # BioSTEAM: a free write through fermos_write's design_vessel, loose.
+    "fermos_vessel",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})

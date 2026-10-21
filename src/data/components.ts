@@ -182,19 +182,23 @@ export const COMPONENTS: ComponentDef[] = [
   {
     // OF-BLD-011 §3 — the reactor. The catalogue it used to hold went to
     // geneOS. OF-BLD-014 Phase 7 built its kinetics from depositions;
-    // transport, operating mode, scale and control are not built.
+    // OF-BLD-020 §4.2 its transport and scale (the vessel on BioSTEAM);
+    // operating mode and control are not built.
     name: 'fermOS',
     owner: 'fermOS',
     layer: 'Computing',
-    // OF-BLD-014 Phase 7 — fits and forecasts from depositions.
+    // OF-BLD-014 Phase 7 — fits and forecasts from depositions; OF-BLD-020
+    // §4.2 — the vessel BioSTEAM designs for a kept simulation.
     livesIn: [
       'src/screens/FermOS.tsx',
       'src/screens/FermOSForecast.tsx',
       'src/engine/series.ts',
       'core/openferment_core/fermos.py',
+      'src/screens/FermOSVessel.tsx',
+      'core/openferment_core/vessel.py',
     ],
     surfacedAs: 'the rail, /fermos',
-    role: 'The reactor — kinetics, transport, operating mode, scale, control. None of it built',
+    role: 'The reactor — kinetics, transport, operating mode, scale, control. Kinetics, transport and scale built',
   },
   {
     name: 'Proforma',

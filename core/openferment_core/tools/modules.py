@@ -46,7 +46,8 @@ WHAT = {
                 "with the headline clearance and its basis",
     "runbooks": "the runbooks (their status, lock and what they predict) and the protocols (their versions)",
     "geneos": "the hosts, the pathways, the genome-scale models on the shelf and the ceilings computed on them",
-    "fermos": "the growth fits and forecasts computed from deposited runs",
+    "fermos": "the growth fits and forecasts computed from deposited runs, and the vessels BioSTEAM designed for kept "
+              "simulations (kind vessel, read by the design's artifact id or the simulation's)",
     "pureos": "the downstream unit operations, by stage (each with the BioSTEAM classes it is), and the trains Proforma's "
               "runs simulated (kind train, one a scenario: read by the scenario id or the run's artifact id); kind "
               "train-unit is one unit of a train, in run order, with the product in and out and the recovery read "

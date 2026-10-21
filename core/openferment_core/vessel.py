@@ -51,6 +51,18 @@ any assumption, which a plant scale or batch volume always is.
     GET  /api/fermos/vessel/specs?simulation=&vesselType=   the ParamScope
     POST /api/fermos/vessel                                 VesselDesign
     GET  /api/fermos/vessels                                kept designs, newest first
+
+OF-BLD-020 §4.2 ADDED. The vessel type is the panel's choice parameter
+`design` (BioSTEAM's own name; Stirred tank or Bubble column): a person's
+override of it is an assumption by them and chooses the vessel type as the
+request's `vesselType` does, and the two must agree (`_chosen_type`). A
+request may name a kLa correlation (`klaMethod`, fermos_vessel's), held to the
+ones the class runs for the design and kept as a convention of that request
+(`_kla_method`). A design carries its `Evidence` (id the artifact's), which
+fermos_vessel returns and the screen reads the basis from. And the real
+simulation is read as §3.1 keeps it: `end` is the run's last hour, so a run
+that goes on past the hour its sugar runs out is read at `harvestH`
+(`fermos.harvest`), its oxygen uptake up to that hour (`_past_harvest`).
 """
 from __future__ import annotations
 
@@ -63,6 +75,8 @@ from .models import (
     Artifact,
     BasisInput,
     BasisSource,
+    Evidence,
+    Override,
     ParameterSpec,
     ParameterValue,
     ParamResolveRequest,
@@ -91,6 +105,11 @@ OUR_UNITS = ("g O2 L⁻¹ h⁻¹", "g O₂ L⁻¹ h⁻¹", "g O2 L-1 h-1", "g O�
 OUR_UNIT = "g O₂ L⁻¹ h⁻¹"
 # The reaction's oxygen counts as unscaled within the float's own rounding.
 UNSCALED = 1e-12
+# A simulation's last hour counts as its harvest hour within the float's own
+# rounding; past it, the run went on after the sugar ran out (§4.2).
+HARVEST_EPS = 1e-9
+# BioSTEAM's word for each vessel type, and the request's word for each.
+TYPE_OF_DESIGN = {v: k for k, v in VESSEL_TYPES.items()}
 
 
 class VesselRefused(ValueError):
@@ -161,7 +180,6 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
     end = o.get("end") or {}
     x0, s0 = _number(start.get("x0"), "the cells at the start (x0)"), _number(start.get("s0"), "the glucose at the start (s0)")
     p0 = float(start.get("p0") or 0.0)
-    X, S, P = (_number(end.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
     harvest = _number(o.get("harvestH", end.get("t")), "the hour of harvest (harvestH)")
     our = o.get("our") or {}
     t, value = list(our.get("t") or []), list(our.get("value") or [])
@@ -170,13 +188,40 @@ def simulation_inputs(art: Artifact) -> dict[str, Any]:
         raise VesselRefused(f"simulation {art.id} keeps its oxygen uptake in {unit}; the vessel reads {OUR_UNIT}")
     if len(t) != len(value):
         raise VesselRefused(f"simulation {art.id}'s oxygen uptake has {len(value)} values at {len(t)} hours")
+    end_t = end.get("t")
+    notes: list[str] = []
+    if _past_harvest(end_t, harvest):
+        # §3.1's `end` is the run's last hour; a run set to go on past the
+        # hour its sugar runs out is harvested at that hour (`harvestH`), so
+        # the broth is read there, integrated again from the artifact's own
+        # basis (fermos.harvest), and the uptake is the batch's up to it
+        # (OF-BLD-020 §4.2, reconciled with the real simulation).
+        from . import fermos
+
+        state = fermos.harvest(art)["state"]
+        X, S, P = (_number(state.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
+        keep = [i for i, h in enumerate(t) if float(h) <= harvest * (1 + HARVEST_EPS)]
+        t, value = [t[i] for i in keep], [value[i] for i in keep]
+        notes.append(f"the simulation runs on to {float(end_t):.4g} h; the vessel reads its broth at harvest, "
+                     f"{harvest:.4g} h, the hour its sugar runs out, and its oxygen uptake up to that hour")
+    else:
+        X, S, P = (_number(end.get(k), f"{k} at harvest") for k in ("X", "S", "P"))
     return {
         "id": art.id, "tool": art.tool, "family": family, "aerobic": bool(o.get("aerobic")),
         "start": {"x0": x0, "s0": s0, "p0": p0}, "end": {"X": X, "S": S, "P": P},
         "used": s0 - S, "made": {"cells": X - x0, "ethanol": P - p0},
         "harvestH": harvest, "finalTitre": float(o.get("finalTitre", P)),
         "our": {"t": [float(x) for x in t], "value": [float(x) for x in value]},
+        "readNotes": notes,
     }
+
+
+def _past_harvest(end_t: Any, harvest: float) -> bool:
+    """Whether the run's last hour lies past its harvest hour, beyond the
+    float's own rounding (`HARVEST_EPS`)."""
+    if isinstance(end_t, bool) or not isinstance(end_t, (int, float)) or not math.isfinite(float(end_t)):
+        return False
+    return float(end_t) > harvest * (1 + HARVEST_EPS) + HARVEST_EPS
 
 
 def fit_inputs(art: Artifact) -> dict[str, Any]:
@@ -302,6 +347,12 @@ DECLARED: tuple[Decl, ...] = (
          kinds=AER, note="One of plant_scale and batch_volume is needed. One vessel needs a loading time: BioSTEAM "
                          "sizes a single vessel's schedule with it."),
     # Vessel
+    Decl("design", "Vessel type", "", "whether the aerated vessel is a stirred tank, whose agitator BioSTEAM sizes and "
+         "costs, or a bubble column, with none; it chooses the kLa correlation BioSTEAM computes with", "choice", "",
+         "Vessel", ["assumption", "convention", "library-default"], (None, None, _WORDS), kinds=AER, choice=True,
+         note="BioSTEAM's own name for it is design. A person's choice here is a named assumption; a request that "
+              "names the vessel type (fermos_vessel's vesselType) is a convention of that request, and the two must "
+              "agree. Changing it changes the kLa correlations offered and whether an agitator is costed."),
     Decl("V_max", "Largest vessel", "Vmax", "the largest single vessel BioSTEAM may use; it adds vessels rather than "
          "exceed it", "volume", "m³", "Vessel", DEFAULT, (0, None, _POSITIVE.format(what="a vessel's volume")),
          note="Give N or V_max, not both. The NREL vessel has no default of its own: BioSTEAM's anaerobic bioreactor's, "
@@ -342,7 +393,8 @@ DECLARED: tuple[Decl, ...] = (
          "oxygenUptake", "g O₂ L⁻¹ h⁻¹", "Aeration", ["simulation", "assumption"],
          (0, None, "a physical limit: no negative uptake"), kinds=AER),
     Decl("method", "kLa correlation", "kLa", "the correlation BioSTEAM computes the oxygen transfer coefficient with",
-         "choice", "", "Aeration", DEFAULT, (None, None, _WORDS), kinds=AER, choice=True),
+         "choice", "", "Aeration", ["assumption", "convention", "library-default"], (None, None, _WORDS), kinds=AER,
+         choice=True),
     Decl("theta_O2", "Dissolved oxygen setpoint", "θ", "the dissolved oxygen held in the broth, as a share of "
          "saturation", "fraction", "", "Aeration", DEFAULT, (0, 1, _SHARE), kinds=AER),
     Decl("compressor_isentropic_efficiency", "Compressor efficiency", "η", "the air compressor's isentropic "
@@ -384,13 +436,14 @@ NOT_OFFERED = {
     "tau_phases": "BioSTEAM's own: the phases a residence time counts",
     "reactions": "built from what the simulation made",
     "kLa_kwargs": "BioSTEAM's correlation coefficients, its own",
-    "design": "chosen as the vessel type beside the panel",
     "Nmin": "stored by the NREL vessel and never used (measured: a large flow gave more vessels)",
     "Nmax": "stored by the NREL vessel and never used (measured: a large flow gave more vessels)",
 }
 GROUPS = ("Scale", "Vessel", "Schedule", "Aeration", "Agitation", "Heat")
+# What the worker takes as a unit parameter; the vessel type travels as the
+# design the request names, the rest are read before the worker runs.
 DESIGN_KEYS = tuple(d.key for d in DECLARED if d.key not in (
-    "plant_scale", "batch_volume", "tau", "oxygen_basis", "our_peak", "our_mean"))
+    "plant_scale", "batch_volume", "tau", "oxygen_basis", "our_peak", "our_mean", "design"))
 
 
 def _decls(kind: str) -> list[Decl]:
@@ -439,6 +492,8 @@ def _choices(d: Decl, ws: dict[str, Any], design: str | None) -> list[str] | Non
         return None
     if d.key == "oxygen_basis":
         return list(OXYGEN_BASES)
+    if d.key == "design":
+        return list(ws["designs"])
     if d.key == "method":
         return list(ws["designs"][design]["runs"])
     if d.key == "optimize_power":
@@ -455,12 +510,56 @@ def _method_note(ws: dict[str, Any], design: str) -> str:
                "BioSTEAM, so they are not offered" if idle else ""))
 
 
-def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True) -> tuple[params.Provided, dict]:
-    """The scope's specs and the candidates for each, and what was read."""
+def _chosen_type(vessel_type: str | None, overrides: Iterable[Override]) -> tuple[str | None, str]:
+    """The vessel type a design asks for, and who asked: a person's
+    override of `design` in the panel ("override"), the request's
+    `vesselType` ("request"), or neither ("default"). The two must agree."""
+    chosen = next((o for o in overrides if o.key == "design"), None)
+    if chosen is None:
+        return vessel_type, ("request" if vessel_type else "default")
+    word = TYPE_OF_DESIGN.get(chosen.value) if isinstance(chosen.value, str) else None
+    if word is None:
+        raise VesselRefused(f"design is one of {', '.join(VESSEL_TYPES.values())}; {chosen.value!r} is not")
+    if vessel_type and vessel_type != word:
+        raise VesselRefused(f"the vessel type asked for ({vessel_type}) and the one {chosen.by or 'a person'} chose in the "
+                            f"panel ({chosen.value}) differ: send one, or the two alike")
+    return word, "override"
+
+
+def _kla_method(kind: str, design: str | None, ws: dict[str, Any], kla_method: str | None,
+                overrides: Iterable[Override]) -> str | None:
+    """The kLa correlation a request names (fermos_vessel's klaMethod), held
+    to the ones BioSTEAM's class runs for the design; refused in words."""
+    if not kla_method:
+        return None
+    if kind != AEROBIC or design is None:
+        raise VesselRefused("an anaerobic vessel takes no air, so it has no kLa correlation to name")
+    each = ws["designs"][design]
+    if kla_method not in each["runs"]:
+        idle = [m for m in each["registered"] if m not in each["runs"]]
+        raise VesselRefused(f"BioSTEAM {ws['biosteam']} runs {', '.join(each['runs'])} for a {design.lower()}; "
+                            f"{kla_method!r} is not one" + (f" ({', '.join(idle)} are registered and not implemented "
+                                                            "by its class)" if idle else ""))
+    typed = next((o for o in overrides if o.key == "method"), None)
+    if typed is not None and typed.value != kla_method:
+        raise VesselRefused(f"the kLa correlation asked for ({kla_method}) and the one {typed.by or 'a person'} chose "
+                            f"in the panel ({typed.value}) differ: send one, or the two alike")
+    return kla_method
+
+
+def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True, overrides: Iterable[Override] = (),
+             kla_method: str | None = None) -> tuple[params.Provided, dict]:
+    """The scope's specs and the candidates for each, and what was read.
+    The vessel type is the request's `vesselType` or a person's override
+    of `design` (they must agree); `kla_method` is a request's named kLa
+    correlation, a convention of that request."""
+    overrides = list(overrides)
     art, src = _source_of(aid, include_archived)
     kind = AEROBIC if src["aerobic"] else ANAEROBIC
     ws = worker_specs(kind)
+    vessel_type, design_from = _chosen_type(vessel_type, overrides)
     design = _design_of(kind, vessel_type, ws)
+    named_method = _kla_method(kind, design, ws, kla_method, overrides)
     defaults = ws["parameters"]
     specs: list[ParameterSpec] = []
     sources: dict[str, dict[str, ParameterValue | None]] = {}
@@ -480,6 +579,17 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
                         "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)")
                 cands["simulation"] = ParameterValue(key=d.key, value=v, origin="simulation", detail=what,
                                                      source=BasisSource(kind="artifact", id=art.id, note=what))
+        elif d.key == "design":
+            got = defaults.get("design") or {}
+            where = got.get("from") or f"{ws['unitClass']}'s own default design"
+            cands["library-default"] = ParameterValue(key=d.key, value=ws["defaultDesign"], origin="library-default",
+                                                      libraryDefault=ws["defaultDesign"],
+                                                      source=_model_source(ws, d.key, where),
+                                                      detail=f"{ws['unitClass']}'s default design, from {where}")
+            if design_from == "request":
+                what = "the vessel type the request chose (vesselType)"
+                cands["convention"] = ParameterValue(key=d.key, value=design, origin="convention", detail=what,
+                                                     source=BasisSource(kind="convention", note=what))
         elif d.key == "kW_per_m3" and design == "Bubble column":
             rule, convention = ["assumption", "convention"], 0.0
             note = ("A bubble column has no agitator: BioSTEAM costs one unless the power per volume is zero, so zero is "
@@ -493,6 +603,10 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
                                                       detail=f"BioSTEAM's default for a {design.lower()}")
             if d.key == "method":
                 note = _method_note(ws, design)
+                if named_method:
+                    what = "the kLa correlation the request named (klaMethod)"
+                    cands["convention"] = ParameterValue(key=d.key, value=named_method, origin="convention",
+                                                         detail=what, source=BasisSource(kind="convention", note=what))
         elif "library-default" in d.rule:
             got = defaults.get(d.key)
             if got is None:
@@ -519,14 +633,15 @@ def provided(aid: str, vessel_type: str | None, *, include_archived: bool = True
         notes.append("The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design.")
     if art.tool != SIMULATION:
         notes += src.get("fitNotes", [])
+    notes += src.get("readNotes", [])
     return params.Provided(title=title, specs=specs, sources=sources, notes=notes), {
-        "artifact": art, "source": src, "kind": kind, "design": design, "worker": ws}
+        "artifact": art, "source": src, "kind": kind, "design": design, "worker": ws, "designFrom": design_from}
 
 
 def _provider(ids: tuple[str, ...], req: ParamResolveRequest) -> params.Provided:
     (aid,) = ids
     try:
-        got, _ = provided(aid, req.vesselType)
+        got, _ = provided(aid, req.vesselType, overrides=req.overrides)
     except VesselNotFound as e:
         raise params.ScopeUnknown(str(e)) from None
     except VesselRefused as e:
@@ -559,7 +674,8 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
     if len(named) != 1:
         raise VesselRefused("a vessel is designed for one simulation or one fit: name exactly one")
     aid = named[0]
-    got, read = provided(aid, req.vesselType, include_archived=req.includeArchived)
+    got, read = provided(aid, req.vesselType, include_archived=req.includeArchived, overrides=req.overrides,
+                         kla_method=req.klaMethod)
     art, kind = read["artifact"], read["kind"]
     if req.fit and art.tool == SIMULATION:
         raise VesselRefused(f"artifact {aid} is a simulation: name it as the simulation, not the fit")
@@ -602,9 +718,11 @@ def basis_inputs(req: VesselRequest) -> tuple[list[BasisInput], list[ParameterSp
             kind="convention", note="the BioSTEAM unit id the design is built under")),
     ]
     if read["design"] is not None:
+        how = {"request": "the vessel type the request chose",
+               "override": "the vessel type a person chose in the panel, named as design",
+               "default": f"BioSTEAM's own default design for {ws['unitClass']}"}[read["designFrom"]]
         inputs.append(BasisInput(name="vessel type", value=read["design"], unit="", source=BasisSource(
-            kind="convention", note=("the vessel type the request chose" if req.vesselType else
-                                     f"BioSTEAM's own default design for {ws['unitClass']}"))))
+            kind="convention", note=how)))
     if "plant_scale" in has:
         inputs.append(BasisInput(name="operating hours", value=ws["operatingHours"], unit="h yr⁻¹", source=BasisSource(
             kind="model", id=f"biorefineries@{ws['biorefineries']}", note=ws["operatingHoursFrom"])))
@@ -669,7 +787,8 @@ def _compute(inputs: list[BasisInput], seed: int | None) -> dict[str, Any]:
         if text.startswith("Refused: "):
             raise VesselRefused(text.removeprefix("Refused: ")) from None
         raise
-    flags = list(said["reaction"].get("notes") or []) + list(src.get("fitNotes") or [])
+    flags = (list(said["reaction"].get("notes") or []) + list(src.get("fitNotes") or [])
+             + list(src.get("readNotes") or []))
     ox = said.get("oxygen")
     if ox is not None:
         if not ox["aerated"]:
@@ -755,7 +874,7 @@ def output_of(art: Artifact) -> VesselDesign:
     o = art.output
     fields = {k: o[k] for k in VesselDesign.model_fields if k in o}
     return VesselDesign.model_validate({**fields, "artifactId": art.id, "provenance": art.provenance,
-                                        "createdAt": art.createdAt})
+                                        "createdAt": art.createdAt, "evidence": evidence(art)})
 
 
 def design(req: VesselRequest) -> VesselDesign:
@@ -767,20 +886,39 @@ def design(req: VesselRequest) -> VesselDesign:
     return output_of(art)
 
 
+def summary(a: Artifact) -> VesselSummary:
+    """One kept design in a line: what `GET /api/fermos/vessels` lists and
+    `fermos_read`'s `vessel` rows carry. Read, never computed."""
+    o = a.output or {}
+    dr = o.get("designResults") or {}
+    return VesselSummary(
+        artifactId=a.id, provenance=a.provenance, createdAt=a.createdAt, source=str(o.get("source") or ""),
+        sourceTool=str(o.get("sourceTool") or ""), unitClass=str(o.get("unitClass") or ""),
+        vesselType=o.get("vesselType"), vessels=dr.get("Number of reactors"), volume=dr.get("Reactor volume"),
+        installed=(o.get("cost") or {}).get("installed"))
+
+
 def designs() -> list[VesselSummary]:
     """GET /api/fermos/vessels: every kept vessel design, newest first; a
     read, which starts no simulator."""
     from . import artifacts
 
-    out = []
-    for a in artifacts.all_artifacts():
-        if a.tool != TOOL:
-            continue
-        o = a.output or {}
-        dr = o.get("designResults") or {}
-        out.append(VesselSummary(
-            artifactId=a.id, provenance=a.provenance, createdAt=a.createdAt, source=str(o.get("source") or ""),
-            sourceTool=str(o.get("sourceTool") or ""), unitClass=str(o.get("unitClass") or ""),
-            vesselType=o.get("vesselType"), vessels=dr.get("Number of reactors"), volume=dr.get("Reactor volume"),
-            installed=(o.get("cost") or {}).get("installed")))
-    return out
+    return [summary(a) for a in artifacts.all_artifacts() if a.tool == TOOL]
+
+
+# ── what a design cites (OF-BLD-020 §4.2, D13) ─────────────────────────
+
+
+def evidence(art: Artifact) -> Evidence:
+    """A kept design as one citable value: its id is the artifact's, its
+    value the number of vessels BioSTEAM sized, its basis the design's."""
+    from . import artifacts
+
+    o = art.output or {}
+    n = next((r.get("value") for r in o.get("design") or [] if r.get("label") == "Vessels"), None)
+    kind = f", {o['vesselType'].replace('-', ' ')}" if o.get("vesselType") else ""
+    return Evidence(
+        id=art.id, label=f"Vessel design for {o.get('sourceTool')} {o.get('source')}: BioSTEAM's {o.get('unitClass')}"
+                         f"{kind}, the number of vessels it sized (every other number is in the artifact)",
+        value=float(n) if isinstance(n, (int, float)) and not isinstance(n, bool) else str(n), unit="vessels",
+        provenance=art.provenance, basis=artifacts.basis_of(art), figure="oxygen-balance" if o.get("oxygen") else None)

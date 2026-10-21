@@ -8,8 +8,10 @@
 // growth, Luedeking–Piret production, the substrate balance — and keeps each
 // fit as an artifact with the deposition as its source (§7.2); a forecast is a
 // band drawn from one fit's covariance (§7.3). Fits is the default view;
-// Forecast is the second. Transport, operating mode, scale and control remain
-// unbuilt, and the shelf below says so.
+// Forecast is the last. OF-BLD-020 §4.2 adds Vessel (FermOSVessel.tsx): the
+// vessel BioSTEAM sizes for a kept simulation, with the oxygen balance, so
+// transport and scale are live; operating mode and control remain unbuilt,
+// and the shelf below says so.
 //
 // AND IT IS NOT SEEDED FROM LITERATURE (§3, D6). Kinetic parameters are fitted
 // to real runs in a specific vessel; mu_max copied out of a paper about a
@@ -49,6 +51,7 @@ import { stubsFor } from '@/data/subsystems';
 import { fmt } from '@/engine/units';
 import { FermosDown, FermosRefused, fermosFit, fitFigureSeries, fitSeriesOf, qualifies } from '@/lib/fermos';
 import FermOSForecast from './FermOSForecast';
+import FermOSVessel from './FermOSVessel';
 
 function ParamTable({ params }: { params: FitParam[] }) {
   return (
@@ -295,6 +298,9 @@ function BrothProperties() {
 export default function FermOS() {
   const route = useRoute();
   const onForecast = route.path.startsWith('/fermos/forecast');
+  // OF-BLD-020 §4.2 — 'vessel' is a second segment of its own: the vessel
+  // BioSTEAM designs for a kept simulation.
+  const onVessel = route.path.startsWith('/fermos/vessel');
   const stubs = stubsFor('fermOS');
 
   return (
@@ -302,11 +308,11 @@ export default function FermOS() {
       <PageHeader
         eyebrow="Reactor, kinetics, scale"
         title="fermOS"
-        subtitle="The vessel. What a real reactor achieves over time: fitted to the runs deposited here and forecast from those fits. Transport, operating mode, scale-up and control are not built."
+        subtitle="The vessel. What a real reactor achieves over time: fitted to the runs deposited here and forecast from those fits, and the vessel BioSTEAM sizes for a kept simulation, with its oxygen balance. Operating mode and control are not built."
       />
       <OwnerTabs tabs={FERMOS_TABS} />
 
-      {onForecast ? <FermOSForecast /> : <Fits />}
+      {onVessel ? <FermOSVessel /> : onForecast ? <FermOSForecast /> : <Fits />}
 
       <BrothProperties />
 
@@ -350,7 +356,7 @@ export default function FermOS() {
       <SubsystemShelf owner="fermOS" />
 
       <div className="mt-5">
-        <ComponentTag component="fermOS" action={`kinetics live; ${stubs.length} subsystems named and not built`} />
+        <ComponentTag component="fermOS" action={`kinetics, transport and scale live; ${stubs.length} subsystems named and not built`} />
       </div>
     </>
   );

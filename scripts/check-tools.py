@@ -33,8 +33,9 @@ Fails when:
 5. the registry is not the closed list: a name in `WHITELIST` with no tool
    registered under it, or one `docs/TOOLS.md` never names in backticks
    (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, and §6.1
-   `run_flowsheet` and `stream_table`, by the build document's authority; a
-   name added to the code alone is a tool nobody wrote down).
+   `run_flowsheet` and `stream_table`, and OF-BLD-020 §4.2 `fermos_vessel`,
+   by the build documents' authority; a name added to the code alone is a
+   tool nobody wrote down).
 
 Runs on a throwaway data directory with no key and no network, in a few
 seconds. Negative-tested on 2026-10-20: a module added with no tools,
@@ -86,6 +87,9 @@ except Exception as e:  # a module with no tool, or a tool outside WHITELIST, fa
 ALLOWED_WRITES = (
     "geneos.ceiling", "geneos.frontier", "geneos.mix",
     "fermos.forecast_run",
+    # fermos_write's design_vessel and the registry's fermos_vessel alike, both
+    # through writes.design_vessel (OF-BLD-020 §4.2).
+    "vessel.design",
     # proforma_write's run and the registry's run_flowsheet alike, both through
     # writes.run_scenario (OF-BLD-019 §6.1; rule 2b).
     "proforma.run",
@@ -97,8 +101,8 @@ ALLOWED_WRITES = (
 )
 # The modules that keep a store: anything of theirs a write tool names is a
 # write function in ALLOWED_WRITES, an exception, or a constant.
-STORES = ("geneos", "fermos", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild", "biorepo",
-          "artifacts", "atomic")
+STORES = ("geneos", "fermos", "vessel", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild",
+          "biorepo", "artifacts", "atomic")
 # What a write tool may never do itself.
 FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(")
 

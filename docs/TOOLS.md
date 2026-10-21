@@ -9,7 +9,7 @@ outside `k` and `limit` refuses the call, and every refusal is a result with
 `data` is emptied with it; a tool whose whole output is longer
 (`stream_table`) cuts its own summary, says how much it left out, and carries
 the whole in `ToolResult.data`, which the endpoint and the MCP server return
-and no model reads. The registry is closed at thirty-two names;
+and no model reads. The registry is closed at thirty-three names;
 `test_tools.NAMES` is the one literal list of them in the tests, and every
 other count there is derived from `WHITELIST`.
 
@@ -82,6 +82,32 @@ enters `SeenSet` and a claim citing it is kept, and a claim citing a run no
 tool returned in this conversation is dropped. Postdoc's prompt (rule 8)
 says a price, a cost or a recovery read from a run cites that run's evidence
 id.
+
+## fermOS's vessel (OF-BLD-020 §4.2)
+
+| Tool | In | Out |
+|---|---|---|
+| `fermos_vessel` | a kept simulation's artifact id (`simulationArtifact`) or, for an anaerobic vessel, a kept kinetic fit's or forecast's (`fitArtifact`); `vesselType` (`stirred-tank` or `bubble-column`, or empty for BioSTEAM's own); `klaMethod` (a kLa correlation by the name BioSTEAM registers it and its class runs for the design, `Riet` or `Dewes`, or empty) | designs the vessel on BioSTEAM through `vessel.design` (the Proforma worker), keeps one `fermos.vessel` artifact and returns it as one evidence id (the artifact id): the vessels, volumes, times, powers, kLa, the oxygen balance in brief, heat and cost with BioSTEAM's cost index, who assumed what, and the flags; or refuses in `vessel.design`'s own words |
+
+Offered loose, as the module tools are; every field is a string, an empty
+one meaning "none", and E.4‴ holds the schema to no numeric field. It is a
+free write at no gate, audited like every module write (`agent: model`,
+`module: fermos`, `action: design_vessel`, the tool's name in `detail`), and
+it is `tools/writes.py`'s `design_vessel`, the function `fermos_write`'s
+`design_vessel` action calls, so the one call to `vessel.design` stays where
+`check:tools` reads it (`vessel.design` is in `ALLOWED_WRITES`, and `vessel`
+among the stores rule 2 polices). A design needs a plant scale or one
+vessel's batch volume, a named person's assumption typed in fermOS → Vessel;
+the service holds none, so without one the tool returns the refusal's words
+and Postdoc says in gaps that the design waits for a person. The vessel type
+and the kLa correlation a call names are conventions of that request, named
+in the basis; a person's choice of either in the panel is an assumption by
+them, and the two must agree. A design is cited like any computed value: its
+`Evidence` id is the artifact's, so `SeenSet` keeps it, and a claim citing a
+design no tool returned in this conversation is dropped. `fermos_read`'s kind
+`vessel` lists the kept designs (`fermos/vessel/<artifact id>`, read by the
+design's id or the simulation's). Postdoc's prompt (rule 15) says a vessel's
+numbers are read from its artifact, never stated.
 
 ## The read tools (OF-BLD-015 §7.2)
 
@@ -252,6 +278,7 @@ audited as `finding`.
 | `geneos_write` | `ceiling`, `frontier`, `mix` | computes and keeps an artifact; returns an evidence id | `geneos.ceiling` and kin |
 | `fermos_write` | `forecast` | forecasts from a kept fit and keeps it | `fermos.forecast_run` |
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
+| `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while the plant scale waits for a person | `vessel.design` |
 | `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
 | `proforma_write` | `bind` | refused: an assumption is a named person's, in the Durable tier | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
@@ -329,6 +356,6 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
 Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-four in all. `test_mcp` counts them from `WHITELIST`, and holds
+thirty-five in all. `test_mcp` counts them from `WHITELIST`, and holds
 `run_flowsheet` and `stream_table` to the registry's own descriptions and
 schemas.

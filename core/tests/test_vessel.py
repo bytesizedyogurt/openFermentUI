@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, intake, params, proforma, vessel
-from openferment_core.models import Artifact, BasisInput, BasisSource, Override, VesselRequest
+from openferment_core.models import Artifact, BasisInput, BasisSource, Override, ParamResolveRequest, VesselRequest
 
 STANDIN = "STAND-IN for this test: invented numbers in §3.1's shape"
 AEROBIC_ID = "a0a0a0a0a0a0a0a1"
@@ -299,6 +299,106 @@ def test_a_fit_designs_the_anaerobic_vessel_from_its_titre_yield_and_batch_time(
         vessel.design(VesselRequest(fit=fit_id, vesselType="stirred-tank"))
 
 
+# ── the vessel type in the panel, a correlation by name (§4.2) ─────────
+
+
+def test_the_vessel_type_is_a_panel_choice_and_a_persons_choice_is_named(store, worker):
+    scope = f"fermos:vessel:{AEROBIC_ID}"
+    s = vessel.scope(AEROBIC_ID)
+    spec = {sp.key: sp for sp in s.specs}["design"]
+    v = by_key(s.values)["design"]
+    assert spec.group == "Vessel" and spec.choices == ["Stirred tank", "Bubble column"] and spec.boundsReason
+    assert v.value == "Stirred tank" and v.origin == "library-default" and v.libraryDefault == "Stirred tank"
+    # A person's choice of a bubble column is an assumption by them, and the scope is the bubble column's.
+    chosen = [override(AEROBIC_ID, "design", "Bubble column")]
+    r = params.resolve_scope(scope, ParamResolveRequest(overrides=chosen, vesselType="bubble-column"))
+    got = by_key(r.values)
+    assert got["design"].origin == "assumption" and got["design"].overriddenBy == BY
+    assert got["method"].value == "Dewes" and got["kW_per_m3"].origin == "convention"
+    assert [b.name for b in r.basisInputs] == ["design"]
+    # The same choice with no vesselType reads the same; a request that disagrees is refused in words.
+    assert by_key(params.resolve_scope(scope, ParamResolveRequest(overrides=chosen)).values)["method"].value == "Dewes"
+    with pytest.raises(params.ParamRefused, match="differ"):
+        params.resolve_scope(scope, ParamResolveRequest(overrides=chosen, vesselType="stirred-tank"))
+    # A request naming the type without a person's choice is a convention of that request.
+    asked = by_key(vessel.scope(AEROBIC_ID, "bubble-column").values)["design"]
+    assert asked.origin == "convention" and asked.value == "Bubble column" and "vesselType" in asked.detail
+    # Designed: the worker builds the bubble column, and the basis names who chose it.
+    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, overrides=[*chosen, override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    [(_, sent)] = [c for c in worker.calls if c[0] == "vessel_design"]
+    assert sent["design"] == "Bubble column" and "design" not in sent["params"] and d.vesselType == "bubble-column"
+    named = {i.name: i for i in artifacts.get(d.artifactId).inputs}
+    assert named["design"].source.by == BY and "a person chose in the panel" in named["vessel type"].source.note
+    assert by_key(d.parameters)["design"].overriddenBy == BY
+    # An anaerobic vessel takes no vessel type, from the panel or the request.
+    with pytest.raises(vessel.VesselRefused, match="NREL batch fermenter"):
+        vessel.design(VesselRequest(simulation=ANAEROBIC_ID, overrides=[override(ANAEROBIC_ID, "design", "Bubble column"),
+                                                                          override(ANAEROBIC_ID, "plant_scale", 1000.0)]))
+
+
+def test_a_kla_correlation_named_by_the_request_is_its_convention(store, worker):
+    d = vessel.design(VesselRequest(simulation=AEROBIC_ID, klaMethod="Riet",
+                                    overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    m = by_key(d.parameters)["method"]
+    assert m.value == "Riet" and m.origin == "convention" and m.source.kind == "convention"
+    [(_, sent)] = [c for c in worker.calls if c[0] == "vessel_design"]
+    assert sent["params"]["method"] == "Riet"
+    with pytest.raises(vessel.VesselRefused, match="'Galaction' is not one"):
+        vessel.design(VesselRequest(simulation=AEROBIC_ID, klaMethod="Galaction",
+                                    overrides=[override(AEROBIC_ID, "plant_scale", 1000.0)]))
+    # A person's choice in the panel and the request's must agree.
+    with pytest.raises(vessel.VesselRefused, match="differ"):
+        vessel.design(VesselRequest(simulation=AEROBIC_ID, vesselType="bubble-column", klaMethod="Dewes", overrides=[
+            override(AEROBIC_ID, "plant_scale", 1000.0), override(AEROBIC_ID, "method", "Shah")]))
+
+
+# ── §3.1's real simulation, read and designed (§4.2) ───────────────────
+
+# STAND-IN parameters for fermos.simulate, named as such on every override:
+# chosen to exercise the code (a short batch on glucose), none a result.
+SIM_STANDIN = {"mu_max": 0.3, "ks": 0.5, "yxs": 0.1, "alpha": 2.0, "yps": 0.45, "p_max": 95.0, "x0": 0.5,
+               "s0": 100.0, "p0": 0.0}
+
+
+def real_simulation(aerobic: bool, **more):
+    """A batch_v1 run through the real fermos.simulate (scipy, no BioSTEAM),
+    on STAND-IN overrides: aerobic with Yx/o set, anaerobic without."""
+    from openferment_core import fermos
+    from openferment_core.models import SimulationRequest
+
+    values = {**SIM_STANDIN, **({"yxo": 1.0} if aerobic else {}), **more}
+    scope = "fermos:family:batch_v1"
+    return fermos.simulate(SimulationRequest(family="batch_v1", product="ethanol", sugar="glucose", overrides=[
+        Override(scope=scope, key=k, value=v, by=BY, at=AT, note=STANDIN) for k, v in values.items()]))
+
+
+def test_a_real_simulation_is_read_as_kept(store):
+    for aerobic in (True, False):
+        sim = real_simulation(aerobic)
+        src = vessel.simulation_inputs(artifacts.get(sim.artifactId))
+        assert src["aerobic"] is aerobic and src["family"] == "batch_v1"
+        assert src["start"] == {"x0": SIM_STANDIN["x0"], "s0": SIM_STANDIN["s0"], "p0": SIM_STANDIN["p0"]}
+        assert src["end"] == {k: sim.end[k] for k in ("X", "S", "P")} and src["harvestH"] == sim.harvestH
+        assert src["finalTitre"] == sim.finalTitre and src["used"] == pytest.approx(SIM_STANDIN["s0"] - sim.end["S"])
+        assert src["our"]["t"] == sim.our.t and src["readNotes"] == []
+        peak, _ = vessel.oxygen_uptake(src)
+        assert (peak == pytest.approx(max(sim.our.value)) and peak > 0) if aerobic else peak == 0
+
+
+def test_a_run_past_its_harvest_is_read_at_harvest_with_the_uptake_up_to_it(store, worker):
+    from openferment_core import fermos
+
+    sim = real_simulation(True, kd=0.02, t_end=20.0)
+    art = artifacts.get(sim.artifactId)
+    assert sim.end["t"] > sim.harvestH  # the run goes on after the sugar runs out
+    src = vessel.simulation_inputs(art)
+    at = fermos.harvest(art)["state"]
+    assert src["end"] == {k: at[k] for k in ("X", "S", "P")} and src["end"]["X"] != sim.end["X"]
+    assert max(src["our"]["t"]) <= sim.harvestH and len(src["our"]["t"]) < len(sim.our.t)
+    assert "reads its broth at harvest" in src["readNotes"][0]
+    assert any("reads its broth at harvest" in n for n in vessel.scope(sim.artifactId).notes)
+
+
 # ── the endpoints ──────────────────────────────────────────────────────
 
 
@@ -435,6 +535,22 @@ def test_the_real_scope_reads_the_class_defaults_from_biosteam(real):
                                                            "our_mean"}
         assert declared <= set(ws["parameters"]), declared - set(ws["parameters"])
         assert set(ws["parameters"]) - declared - {"method"} <= set(vessel.NOT_OFFERED) | {"tau"}
+
+
+@pytest.mark.sim
+def test_a_vessel_is_designed_for_each_real_simulation(real):
+    """§3.1's real simulation, aerobic and anaerobic, designed on BioSTEAM."""
+    aer, ana = real_simulation(True), real_simulation(False)
+    d = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[override(aer.artifactId, "plant_scale", 2000.0)]))
+    assert d.unitClass == "AeratedBioreactor" and d.oxygen.method == "Riet" and d.oxygen.kLa > 0
+    assert _row(d, "Vessels") >= 1 and _row(d, "Batch time (reacting)") == pytest.approx(aer.harvestH)
+    assert d.oxygen.otr == pytest.approx(max(d.oxygen.our), rel=1e-6) and d.oxygen.short == []
+    bubble = vessel.design(VesselRequest(simulation=aer.artifactId, overrides=[
+        override(aer.artifactId, "plant_scale", 2000.0), override(aer.artifactId, "design", "Bubble column")]))
+    assert bubble.vesselType == "bubble-column" and bubble.oxygen.method == "Dewes" and bubble.oxygen.kLa > 0
+    n = vessel.design(VesselRequest(simulation=ana.artifactId, overrides=[override(ana.artifactId, "plant_scale", 50000.0)]))
+    assert n.unitClass == "NRELAnaerobicBatchBioreactor" and n.oxygen is None and _row(n, "Vessels") >= 2
+    assert not any("Compressor" in k for k in n.cost.byItem) and n.evidence.id == n.artifactId
 
 
 ETHANOL_STANDIN = {"feed_glucose_conc": 100.0, "titre": 45.0, "yield": 0.45, "productivity": 2.0,

@@ -5,7 +5,7 @@
 // fit inline. The fitted curve drawn through the points is the closed form
 // the service fitted, evaluated here on its parameters; it computes nothing
 // the fit did not already hold. Shares lib/rag.ts's call and its failures.
-import type { Deposition, FermosFitResponse, FermosSeries, ForecastResult, KineticFit, Runbook, StartValues } from '@/data/types';
+import type { Deposition, FermosFitResponse, FermosSeries, ForecastResult, KineticFit, Override, Runbook, SimulationSummary, StartValues, VesselDesign, VesselRequest } from '@/data/types';
 import { seriesOf } from '@/engine/series';
 import type { TrajectorySeries } from '@/components/figures';
 import { RagDown, RagRefused, call } from './rag';
@@ -95,3 +95,52 @@ export function fitFigureSeries(series: FermosSeries[], fit: KineticFit | null):
     });
 }
 
+
+// ── fermOS → Vessel (OF-BLD-020 §4.2, D7) ──────────────────────────────
+//
+// The vessel a kept simulation (or, anaerobic, a kept fit) needs, designed by
+// BioSTEAM in the service's Proforma worker. The browser asks and shows: the
+// scope's parameters come from `GET /api/params/fermos:vessel:<id>` through
+// the panel, a person's changes are the scope's overrides (Durable), and
+// `POST /api/fermos/vessel` designs. Nothing here computes a value.
+
+/** The kept simulations, newest first (`GET /api/fermos/simulations`); an archived program's left out unless the switch shows it. */
+export const fermosSimulations = (includeArchived: boolean, signal?: AbortSignal) =>
+  call<SimulationSummary[]>(`/api/fermos/simulations${includeArchived ? '?includeArchived=true' : ''}`, { signal });
+
+/** The flowsheet a fit is read through for a vessel: its titre, yield and batch time, as the ethanol flowsheet reads them (vessel.FIT_FLOWSHEET). */
+export const VESSEL_FIT_FLOWSHEET = 'ethanol_glucose_v0';
+
+/** The vessel scope of a simulation or a fit: `fermos:vessel:<artifact id>`. */
+export const vesselScope = (sourceId: string) => `fermos:vessel:${sourceId}`;
+
+export type VesselType = 'stirred-tank' | 'bubble-column';
+
+/** BioSTEAM's word for each vessel type (the `design` parameter's choices), to the request's. */
+export const VESSEL_TYPE_OF_DESIGN: Record<string, VesselType> = { 'Stirred tank': 'stirred-tank', 'Bubble column': 'bubble-column' };
+
+/** The vessel type a person chose in the panel (their override of `design`), or null for BioSTEAM's own. */
+export function vesselTypeOf(overrides: Override[]): VesselType | null {
+  const chosen = overrides.find((o) => o.key === 'design');
+  return chosen && typeof chosen.value === 'string' ? VESSEL_TYPE_OF_DESIGN[chosen.value] ?? null : null;
+}
+
+/** The design request: the source, the vessel type the person chose, and every override of the scope as typed. */
+export function vesselRequest(source: { simulation?: string | null; fit?: string | null }, overrides: Override[], includeArchived: boolean): VesselRequest {
+  return {
+    simulation: source.simulation ?? null,
+    fit: source.fit ?? null,
+    vesselType: vesselTypeOf(overrides),
+    overrides,
+    includeArchived,
+  };
+}
+
+/** Design the vessel (`POST /api/fermos/vessel`): one `fermos.vessel` artifact, or the service's refusal in its words. */
+export const designVessel = (req: VesselRequest, signal?: AbortSignal) => post<VesselDesign>('/api/fermos/vessel', req, signal);
+
+/** Whether a design request names a scale: one of plant scale and batch volume, as the service needs (said above Design). */
+export function scaleOf(overrides: Override[]): 'none' | 'one' | 'both' {
+  const n = overrides.filter((o) => (o.key === 'plant_scale' || o.key === 'batch_volume') && typeof o.value === 'number').length;
+  return n === 0 ? 'none' : n === 1 ? 'one' : 'both';
+}
