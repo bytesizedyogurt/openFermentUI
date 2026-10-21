@@ -1,0 +1,21 @@
+{
+  "rows": [
+    {
+      "n": 1,
+      "question": "Design a fermenter for that simulated batch and tell me how many vessels and what working volume it needs.",
+      "kept": 0,
+      "dropped": 0,
+      "toolCalls": 4,
+      "rounds": 4,
+      "seconds": 16.6,
+      "costUsd": 0.004594,
+      "stopped": "done",
+      "declined": "The corpus does not contain evidence that bears on this question, so there is nothing to answer from.",
+      "models": [
+        "claude-haiku-5-5"
+      ],
+      "keptWithRecordOrQuote": 0
+    }
+  ],
+  "costUsd": 0.004594
+}
