@@ -54,9 +54,48 @@ PLANTED = {
     "plant_sysmodules.py": 'import sys\n\n\ndef f(req):\n    return sys.modules["openferment_core.fermos"].simulate(req)\n',
     "plant_vars.py": 'from .. import api\n\n\ndef f():\n    return vars(api)["artifacts"].compute("fermos.simulation", [])\n',
     "plant_globals.py": 'from .. import fermos\n\n\ndef f(req):\n    return globals()["fermos"].__dict__["simulate"](req)\n',
+    # OF-BLD-020 §5.4: the store of the trains a model built, and a train's run.
+    # The one write to the store, past writes.py's train functions.
+    "plant_keep_train.py": 'from ..pureos.kept import keep_train\n\n\ndef f(spec):\n    return keep_train(None, lambda _: spec, "m")\n',
+    # The same, the store module aliased.
+    "plant_kept_alias.py": 'from ..pureos import kept as k\n\n\ndef f(spec):\n    return k.keep_train(None, lambda _: spec, "m")\n',
+    # The store's private writer, which keep_train calls.
+    "plant_kept_persist.py": "from ..pureos import kept\n\n\ndef f(store):\n    return kept._persist(store)\n",
+    # A train's run, through the package's re-export.
+    "plant_run_train.py": "from .. import pureos\n\n\ndef f(spec):\n    return pureos.run_train(spec)\n",
+    # A function outside tools/ that keeps a model's train.
+    "plant_train_wrapper.py": "from .. import plant_train_keeper\n\n\ndef f(spec):\n    return plant_train_keeper.keep(spec)\n",
+    # A second writer of the same store, found by the file it names.
+    "plant_store_wrapper.py": "from .. import plant_store\n\n\ndef f(text):\n    return plant_store.save(text)\n",
+    # OF-BLD-020 §5.R (finding 18): a tool file that writes the kept-train
+    # store itself, past keep_train's locks and the audit log. Through atomic,
+    # by the store's own path function.
+    "plant_kept_direct.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
+                             "    atomic.write_text(kept.path(), t)\n"),
+    # The same, by the store's file name joined to the data directory.
+    "plant_kept_file.py": ("from .. import atomic\nfrom ..pureos import kept\n\n\ndef f(t):\n"
+                           "    atomic.write_text(kept.intake.DATA_DIR / kept.FILE, t)\n"),
+    # A tool file naming the store's file itself, its own function writing it.
+    "plant_kept_own.py": ('from .. import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\n'
+                          "def _keep(text):\n    atomic.write_bytes(intake.DATA_DIR / FILE, text)\n\n\n"
+                          "def build(text):\n    return _keep(text)\n"),
+    # Past atomic altogether: the path's own write, and a file opened to write.
+    "plant_kept_path.py": "from ..pureos import kept\n\n\ndef f(t):\n    kept.path().write_text(t)\n",
+    "plant_kept_open.py": ('from ..pureos import kept\n\n\ndef f(t):\n    with open(kept.path(), "w") as fh:\n'
+                          "        fh.write(t)\n"),
+    # A helper outside tools/ that writes the store by its path function, not
+    # its file's name, reached from a tool file.
+    "plant_kept_helper_wrapper.py": "from .. import plant_kept_helper\n\n\ndef f(t):\n    return plant_kept_helper.save(t)\n",
 }
 # The function the last planted tool file reaches, outside tools/.
 KEEPER = "from . import proforma\n\n\ndef keep(req):\n    return proforma.run(req)\n"
+# OF-BLD-020 §5.4: what the train wrappers reach, outside tools/.
+TRAIN_KEEPER = 'from .pureos import kept\n\n\ndef keep(spec):\n    return kept.keep_train(None, lambda _: spec, "m")\n'
+STORE = ('from . import atomic, intake\n\nFILE = "pureos-trains.json"\n\n\ndef save(text):\n'
+         '    atomic.write_text(intake.DATA_DIR / FILE, text)\n')
+# OF-BLD-020 §5.R (finding 18): what the last planted tool file reaches, a
+# module that names no store file and writes the store through its path.
+KEPT_HELPER = "from . import atomic\nfrom .pureos import kept\n\n\ndef save(text):\n    atomic.write_text(kept.path(), text)\n"
 
 
 def _copy(tmp_path: Path) -> Path:
@@ -82,6 +121,9 @@ def test_rule_2b_names_every_way_a_tool_file_keeps_a_run_or_writes_an_audit_line
     for name, text in PLANTED.items():
         (package / "tools" / name).write_text(text, encoding="utf-8")
     (package / "plant_keeper.py").write_text(KEEPER, encoding="utf-8")
+    (package / "plant_train_keeper.py").write_text(TRAIN_KEEPER, encoding="utf-8")
+    (package / "plant_store.py").write_text(STORE, encoding="utf-8")
+    (package / "plant_kept_helper.py").write_text(KEPT_HELPER, encoding="utf-8")
     out = _check(root)
     assert out.returncode == 1, out.stdout + out.stderr
     errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
@@ -90,6 +132,11 @@ def test_rule_2b_names_every_way_a_tool_file_keeps_a_run_or_writes_an_audit_line
     # Nothing but the planted files is named: the copy itself passes every rule.
     assert all(any(e.startswith(f"tools/{name} ") for name in PLANTED) for e in errors), out.stdout
     assert any("plant_keeper.keep" in e for e in errors if e.startswith("tools/plant_wrapper.py ")), out.stdout
+    assert any("plant_train_keeper.keep" in e for e in errors if e.startswith("tools/plant_train_wrapper.py ")), out.stdout
+    assert any("plant_store.save" in e for e in errors if e.startswith("tools/plant_store_wrapper.py ")), out.stdout
+    assert any("pureos.kept._persist" in e for e in errors if e.startswith("tools/plant_kept_persist.py ")), out.stdout
+    assert any("plant_kept_helper.save" in e for e in errors if e.startswith("tools/plant_kept_helper_wrapper.py ")), \
+        out.stdout
 
 
 def test_the_copy_the_negative_test_plants_in_passes_as_the_tree_does(tmp_path):
@@ -119,3 +166,20 @@ def test_rule_6_names_a_numeric_field_in_a_fermos_tools_input_and_lets_the_top_l
     assert where == ["byKey.additionalProperties.items", "hours", "limit.additionalProperties"], out.stdout
     assert all(e.startswith("fermos_simulate's input schema holds a numeric field at ") and "(E.4‴)" in e
                for e in errors), out.stdout
+
+
+
+# Rule 2 (OF-BLD-020 §5.4): writes.py names of the kept-train store its one
+# write function and nothing else callable; a read planted there is named.
+PLANTED_READ = "\n\ndef _planted_read():\n    from ..pureos import kept\n\n    return kept.read()\n"
+
+
+def test_rule_2_names_writes_py_reaching_the_kept_train_store_past_its_write_function(tmp_path):
+    root = _copy(tmp_path)
+    source = root / "core" / "openferment_core" / "tools" / "writes.py"
+    source.write_text(source.read_text(encoding="utf-8") + PLANTED_READ, encoding="utf-8")
+    out = _check(root)
+    assert out.returncode == 1, out.stdout + out.stderr
+    errors = [line.strip()[2:] for line in out.stdout.splitlines() if line.strip().startswith("- ")]
+    assert len(errors) == 1 and errors[0].startswith("tools/writes.py line ") and \
+        "reaches pureos.kept.read (as kept.read), which is not one of the module write functions" in errors[0], out.stdout

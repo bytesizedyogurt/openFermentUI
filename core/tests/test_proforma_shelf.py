@@ -50,8 +50,11 @@ def test_the_shelf_and_the_service_read_it_without_biosteam():
 
 
 def test_the_shelf_holds_the_flowsheets_that_exist_and_never_the_toy():
-    assert set(shelf.SHELF) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0"}
-    assert set(KNOWN) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0", "toy"}
+    # OF-BLD-020 §6.1: a vessel and a train, priced (test_custom_train holds it).
+    assert set(shelf.SHELF) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
+                                "custom_train_v1"}
+    assert set(KNOWN) == {"cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
+                          "custom_train_v1", "toy"}
     for fid in KNOWN:
         assert (CORE / "openferment_core" / "flowsheets" / f"{fid}.py").is_file(), f"{fid} has no module"
     cs, pha = shelf.SHELF["cornstover_benchmark"], shelf.SHELF["pha_sugar_v0"]
@@ -92,9 +95,11 @@ def test_the_shelf_endpoint_leaves_an_archived_program_out_unless_asked():
     c = TestClient(api.app, base_url="http://127.0.0.1")
     off = [f["id"] for f in c.get("/api/proforma/shelf").json()]
     on = c.get("/api/proforma/shelf?includeArchived=true").json()
-    # PHA is archived (OF-BLD-016); the corn plant (§2.2) and glucose to ethanol (§2.3) are the yeast program's.
-    assert off == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0"]
-    assert [f["id"] for f in on] == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0"]
+    # PHA is archived (OF-BLD-016); the corn plant (§2.2), glucose to ethanol (§2.3) and a vessel and a train
+    # (OF-BLD-020 §6.1) are the yeast program's.
+    assert off == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "custom_train_v1"]
+    assert [f["id"] for f in on] == ["cornstover_benchmark", "corn_drygrind", "ethanol_glucose_v0", "pha_sugar_v0",
+                                     "custom_train_v1"]
     assert all("toy" != f["id"] for f in on)
     pha = next(f for f in on if f["id"] == "pha_sugar_v0")
     assert set(pha) >= {"id", "title", "description", "source", "program", "reference", "inputs", "outputs",

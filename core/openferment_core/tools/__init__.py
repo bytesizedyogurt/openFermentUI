@@ -13,10 +13,13 @@ Messages API refuses a dot in a tool name, and its write pair (§7.3); then
 (OF-BLD-019 §6.1): `run_flowsheet`, a free write through `proforma.run`, and
 `stream_table`, a read of a kept run's streams; then fermOS's two (OF-BLD-020):
 `fermos_simulate` (§3.4), a free write through `fermos.simulate`, and
-`fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`.
-Thirty-four names. A tool outside it is a new document. `test_tools.NAMES` is
-the one literal list the tests hold the registry to; every other count is
-derived from `WHITELIST`.
+`fermos_vessel` (§4.2), a free write through `fermos_write`'s `design_vessel`;
+then pureOS's `pureos_build` (OF-BLD-020 §5.4), a free write through
+`pureos_write`'s train actions that builds and runs a train from unit type
+names and record ids; then `pureos_propose` (§7.2), a read: a train proposed
+by written rules, each naming the property it read. Thirty-six names. A tool
+outside it is a new document. `test_tools.NAMES` is the one literal list the
+tests hold the registry to; every other count is derived from `WHITELIST`.
 
 TOOL INPUTS CARRY IDS AND WORDS. A model names a record, an artifact, a model
 file, a field or a scenario, and the service looks the quantity up. A JSON
@@ -92,6 +95,12 @@ WHITELIST = (
     # OF-BLD-020 §4.2 — the vessel a kept simulation needs, designed on
     # BioSTEAM: a free write through fermos_write's design_vessel, loose.
     "fermos_vessel",
+    # OF-BLD-020 §5.4 — a train built and run from unit type names and record
+    # ids: a free write through pureos_write's train actions, loose.
+    "pureos_build",
+    # OF-BLD-020 §7.2 — a train proposed by written rules that each name the
+    # property they read: a read, loose, ids and words in.
+    "pureos_propose",
 )
 # The only fields a number may stand in: how many results to return.
 COUNT_FIELDS = frozenset({"k", "limit"})
@@ -247,6 +256,7 @@ from . import modules as _modules  # noqa: E402,F401
 from . import writes as _writes  # noqa: E402,F401
 from . import passages as _passages  # noqa: E402,F401
 from . import proforma as _proforma  # noqa: E402,F401
+from . import pureos as _pureos  # noqa: E402,F401
 from . import records as _records  # noqa: E402,F401
 from . import runbook as _runbook  # noqa: E402,F401
 from . import thermo as _thermo  # noqa: E402,F401

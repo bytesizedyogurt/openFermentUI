@@ -206,6 +206,14 @@ class Sources:
     strain_aliases: Callable[[], dict[str, str]]
     witness: Callable[[], list[Any]] = list
     proposals: Callable[[], list[Any]] = list
+    # The trains a model built (OF-BLD-020 §5.4, pureos.kept), every program's.
+    kept_trains: Callable[[], list[Any]] = list
+
+
+def _kept_trains() -> list[Any]:
+    from .pureos import kept
+
+    return list(kept.read().trains)
 
 
 def _projection() -> dict[str, Any]:
@@ -234,6 +242,7 @@ def default_sources(pool_factory: Callable[[], Any] | None = None, include_archi
         strain_aliases=_strain_aliases,
         witness=witness.runs,
         proposals=proposals.open_ones,
+        kept_trains=_kept_trains,
     )
 
 
@@ -312,6 +321,8 @@ def artifact_program(a: Any, record_lookup: Any = None, scenarios: Iterable[dict
     tool = getattr(a, "tool", None)
     if tool in FERMOS_RUNS:
         return _fermos_program(a, record_lookup, frozenset())
+    if tool == "pureos.train_run":  # OF-BLD-020 §5.2: the train's, its inlet's, its records'
+        return pureos.program_of_run(a, record_lookup)
     if tool not in RUN_TOOLS:
         return programs.program_of_artifact(a, record_lookup)
     scenarios = list(pureos.seed_scenarios() if scenarios is None else scenarios)
@@ -368,6 +379,9 @@ def _artifact_row(module: str, a: Any, provenance: str, program: str | None = No
 
 
 VESSEL_TOOL = "fermos.vessel"
+# A pureOS train run (OF-BLD-020 §5.2): pureOS reads it as its own kind,
+# `train-run` (§5.4).
+TRAIN_RUN = "pureos.train_run"
 
 
 def _vessel_row(a: Any, provenance: str, program: str | None = None) -> Row:
@@ -407,6 +421,18 @@ class Stores:
         if name not in self._cache:
             self._cache[name] = getattr(self.sources, name)()
         return self._cache[name]
+
+    def forget(self, *sources: str) -> None:
+        """Read the named sources afresh on next use, and every module's rows
+        with them (OF-BLD-020 §5.R, finding 21): a write in the middle of a
+        question (a model's train changed, a run kept) changes what a later
+        read of the same question must see. The other sources stay as read."""
+        for name in sources:
+            self._cache.pop(name, None)
+        self._all.clear()
+        self._rows.clear()
+        self._hidden.clear()
+        self._errors.clear()
 
     def pool(self) -> Any:
         return self._get("pool")
@@ -624,6 +650,65 @@ class Stores:
                       words=" ".join([u["stage"], u.get("note") or "", *classes]),
                       detail={"stage": u["stage"], "note": u.get("note"), "biosteamClasses": classes})
         yield from self._trains({c: u["id"] for u in ops for c in u.get("biosteamClasses") or []})
+        yield from self._kept_trains()
+        yield from self._train_runs()
+
+    def _kept_trains(self) -> Iterable[Row]:
+        """One row a train a model built (OF-BLD-020 §5.4), kind `train`,
+        `pureos/train/<train id>`: the train as data in words and ids, who made
+        it and when, and the ids of its runs, newest first; found by the
+        train's id or a run's. It carries no mark: a train is data, and its
+        runs carry theirs (kind `train-run`)."""
+        runs: dict[str, list[Any]] = {}
+        for a in self._get("artifacts"):
+            if a.tool == TRAIN_RUN:
+                tid = (a.output.get("train") or {}).get("id") if isinstance(a.output, dict) else None
+                if tid:
+                    runs.setdefault(str(tid), []).append(a)
+        for k in self._get("kept_trains"):
+            s = k.spec
+            mine = sorted(runs.get(s.id, []), key=lambda a: a.createdAt, reverse=True)
+            yield Row("pureos", "train", s.id, f"{s.name} ({s.id})", "open", "built by a model", names=(s.name,),
+                      words=" ".join(["train built model", s.product, s.program, *(u.type for u in s.units)]),
+                      alt_ids=tuple(a.id for a in mine), program=s.program,
+                      detail={"trainId": s.id, "name": s.name, "program": s.program, "product": s.product,
+                              "inlet": {"kind": s.inlet.kind, "ref": s.inlet.ref, "streamId": s.inlet.streamId,
+                                        "vessel": s.inlet.vessel},
+                              "units": [u.id for u in s.units], "unitTypes": [u.type for u in s.units],
+                              "recordsNamed": {u.id: sorted(u.records) for u in s.units if u.records},
+                              "madeBy": k.madeBy, "agent": k.agent, "at": k.at, "updatedAt": k.updatedAt,
+                              "runs": [a.id for a in mine],
+                              "cite": "cite the train by its ref; a run's numbers are cited by its evidence id, which "
+                                      "pureos_build returns, or its train-run row's ref"})
+
+    def _train_runs(self) -> Iterable[Row]:
+        """One row a kept train run (OF-BLD-020 §5.4), kind `train-run`,
+        `pureos/train-run/<artifact id>`: labelled with its train's name and
+        product, its mark worked out from its inputs as they stand when read
+        (`_artifact_mark`), and a detail of words, ids and flags alone; its
+        numbers stay in the artifact. Found by its own id or its train's."""
+        for a in self._get("artifacts"):
+            if a.tool != TRAIN_RUN:
+                continue
+            o = a.output if isinstance(a.output, dict) else {}
+            spec = o.get("train") if isinstance(o.get("train"), dict) else {}
+            tid, tname = spec.get("id"), spec.get("name")
+            product = o.get("productId") or spec.get("product")
+            units = [u for u in spec.get("units") or [] if isinstance(u, dict)]
+            inlet = spec.get("inlet") if isinstance(spec.get("inlet"), dict) else {}
+            yield Row("pureos", "train-run", a.id, f"Run of train {tname or tid or a.id} ({product})", "open",
+                      "computed", provenance=self._artifact_mark(a), id_names=False,
+                      alt_ids=(str(tid),) if tid else (),
+                      words=" ".join(str(x) for x in ("train run recovery purity", product, o.get("product"), tid,
+                                                      *(u.get("type") for u in units)) if x),
+                      program=self._artifact_program(a),
+                      detail={"artifactId": a.id, "tool": a.tool, "createdAt": a.createdAt, "trainId": tid,
+                              "trainName": tname, "product": product, "productChemical": o.get("product"),
+                              "productStream": o.get("productStream"), "units": [u.get("id") for u in units],
+                              "unitTypes": [u.get("type") for u in units], "inletKind": inlet.get("kind"),
+                              "inletRef": inlet.get("ref"), "flagged": bool(o.get("flags")),
+                              "cite": "cite the run by this row's ref; its numbers are in the artifact, and "
+                                      "pureos_build returns a run's evidence id"})
 
     def _trains(self, operation: dict[str, str]) -> Iterable[Row]:
         """The train of each scenario's newest Proforma run (OF-BLD-019 §4.1),
@@ -754,7 +839,7 @@ KINDS = {
     "runbooks": ("runbook", "protocol"),
     "geneos": ("host", "pathway", "model", "artifact"),
     "fermos": ("artifact", "simulation", "vessel"),
-    "pureos": ("unit-operation", "train", "train-unit"),
+    "pureos": ("unit-operation", "train", "train-unit", "train-run"),
     "proforma": ("scenario", "artifact"),
     "biorepo": ("record", "candidate", "artifact", "witness-run"),
     "guild": ("person", "check"),

@@ -14,8 +14,8 @@
 //   Durable    depositions, review decisions, runbook locks, this browser's
 //              copy of Guild's ledger, the lessons finished here,
 //              Postdoc's Live conversations, whether archived programs
-//              show, and the parameter overrides typed here — must
-//              survive.
+//              show, the parameter overrides typed here and pureOS's
+//              trains built here — must survive.
 //   Ephemeral  open panels, density, theme, sim speed — must NOT survive. A
 //              theme that follows you across sessions is a preference; a
 //              collapsed panel that does is a bug.
@@ -29,7 +29,7 @@
 // all of these end with the app running normally on in-memory state. Losing
 // persistence is bad; refusing to open the screen because persistence is
 // unavailable would be worse.
-import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Override, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario } from '@/data/types';
+import type { Deposition, Guild, GuildWithdrawal, InputAssumption, LiveConversation, MeasuredEvidence, Override, Runbook, Provenance, RecordStatus, ReviewDecision, Scenario, TrainSpec } from '@/data/types';
 
 const DB_NAME = 'openferment';
 const DB_VERSION = 1;
@@ -175,6 +175,24 @@ export interface DurableSnapshot {
    * unpinned, so an id absent here is unpinned.
    */
   pinnedScenarios?: string[];
+  /**
+   * pureOS's trains built here (OF-BLD-020 §5.3, D9), by train id: each
+   * saved whole as data, with when and by whom. The values typed into a
+   * train's panels ride in `parameterOverrides` under its scopes
+   * (`pureos:unit:<train id>:<unit id | inlet>`), and the saved train carries
+   * them as they stood at the save. Optional for the same reason as `guild`.
+   */
+  trainsMade?: Record<string, TrainMade>;
+}
+
+/** A train built in pureOS's Builder and saved in this browser (OF-BLD-020 §5.3). */
+export interface TrainMade {
+  /** The train as data, every value typed into its panels laid in as each place's params. */
+  train: TrainSpec;
+  /** When it was saved, ISO, UTC. */
+  savedAt: string;
+  /** The reviewer name it was saved under. */
+  by: string;
 }
 
 export const EMPTY_SNAPSHOT: DurableSnapshot = {

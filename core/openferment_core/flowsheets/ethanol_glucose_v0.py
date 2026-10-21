@@ -105,6 +105,17 @@ class Fermenter(bst.BatchBioreactor):
         vent.receive_vent(effluent)
 
 
+def create_chemicals() -> Any:
+    """The yeast program's chemicals, as this flowsheet builds on them: the
+    dry-grind corn plant's (`biorefineries.corn.create_chemicals`), whose cells
+    are thermosteam's `Yeast`. pureOS's unit catalogue builds every unit type
+    on this set in the worker (OF-BLD-020 §5.1), and the vessel's chemicals are
+    the same. No number here: the package's own set."""
+    from biorefineries import corn
+
+    return corn.create_chemicals()
+
+
 class Built:
     """The system and its TEA, built once. Each case sets its inputs on these
     objects and re-simulates (Appendix 3, trap 3)."""
@@ -117,7 +128,7 @@ class Built:
         # A fresh flowsheet each build, so nothing of an earlier build under
         # the same name is found by ID and reused.
         bst.main_flowsheet.set_flowsheet(bst.Flowsheet(NAME))
-        self.chemicals = corn.create_chemicals()
+        self.chemicals = create_chemicals()
         bst.settings.set_thermo(self.chemicals)
         self.thermo = bst.settings.thermo
 

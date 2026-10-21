@@ -16,7 +16,7 @@ import { RUNBOOKS } from '../src/data/runbooks';
 import { CLEARANCE_FINDINGS } from '../src/data/clearanceFindings';
 import { COMPONENTS, FULL_NAME, LAYERS, UNNAMED, isBuilt } from '../src/data/components';
 import { ALL_SURFACES, ELEVEN, RAIL, REDIRECTS, SUB_VIEWS, redirectFor } from '../src/data/nav';
-import { FERMOS_TABS } from '../src/data/tabs';
+import { FERMOS_TABS, PUREOS_TABS } from '../src/data/tabs';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -1195,6 +1195,12 @@ for (const f of CLEARANCE_FINDINGS) {
     // the guard is that every fermOS tab is one of these, and each is a tab:
     // a view added without reserving its segment fails here.
     fermos: ['simulate', 'vessel', 'forecast'],
+    // OF-BLD-020 §5.3: pureOS's views. /pureos/train/:key (OF-BLD-019 §4.1)
+    // and /pureos/build/:trainId (the Builder, `new` for a fresh train) are
+    // matched before anything else under /pureos, so each is a tab and a
+    // palette view; a train's id is minted by the Builder (`tr-…`), never one
+    // of these words.
+    pureos: ['build', 'train'],
   };
   for (const p of PAPERS)
     if (RESERVED.biorepo.includes(p.id))
@@ -1210,6 +1216,14 @@ for (const f of CLEARANCE_FINDINGS) {
   for (const v of RESERVED.fermos)
     if (!SUB_VIEWS.some((sv) => sv.to === `/fermos/${v}` && sv.owner === 'fermOS'))
       fail(`fermOS's view /fermos/${v} is not named in nav.ts's SUB_VIEWS, so the palette cannot reach it`);
+  const pureosViews = PUREOS_TABS.map((t) => t.to.split('/').filter(Boolean)[1]).filter(Boolean);
+  for (const v of pureosViews)
+    if (!RESERVED.pureos.includes(v)) fail(`pureOS's tab /pureos/${v} is not a reserved segment under /pureos: add it to RESERVED.pureos`);
+  for (const v of RESERVED.pureos) {
+    if (!pureosViews.includes(v)) fail(`"${v}" is reserved under /pureos but no pureOS tab shows it`);
+    if (!SUB_VIEWS.some((sv) => sv.to === `/pureos/${v}` && sv.owner === 'pureOS'))
+      fail(`pureOS's view /pureos/${v} is not named in nav.ts's SUB_VIEWS, so the palette cannot reach it`);
+  }
 }
 
 // ── a BioSTEAM class is one step (OF-BLD-019 §4.1) ─────────────────────
@@ -1229,6 +1243,63 @@ for (const f of CLEARANCE_FINDINGS) {
       claimed.set(cls, op.id);
     }
   }
+}
+
+// ── the unit catalogue speaks the vocabulary (OF-BLD-020 §5.1) ─────────
+//
+// pureOS's unit catalogue (core/openferment_core/pureos/catalogue.py) is a
+// list of unit types a train is built from, and each one's id is a
+// vocabulary step: the Builder's palette, a train's unit and pureOS's front
+// page name one thing. The catalogue is read as `python -m
+// openferment_core.pureos.catalogue --ids` prints it (its data alone, no
+// BioSTEAM, as params --check reads its specs): every catalogue id is a step,
+// a BioSTEAM class the catalogue offers is named by its own entry's step, every
+// step naming a class the catalogue offers is in the catalogue, the steps an
+// entry stands for (cell disruption's two, chromatography's modes) exist, and
+// a class the catalogue left out (it did not converge on its own defaults)
+// names a step that is not in it.
+let catalogueLine = '';
+{
+  const run = spawnSync('uv', ['run', 'python', '-m', 'openferment_core.pureos.catalogue', '--ids'], {
+    cwd: 'core',
+    encoding: 'utf-8',
+    maxBuffer: 8 * 1024 * 1024,
+    shell: process.platform === 'win32',
+  });
+  type Row = { id: string; biosteamClass?: string | null; inhouseClass?: string | null; maps?: string[]; leftOut?: string };
+  let rows: Row[] = [];
+  try {
+    rows = JSON.parse((run.stdout ?? '').trim().split('\n').pop() ?? '[]');
+  } catch {
+    fail(`unit catalogue: pureos.catalogue --ids did not print the catalogue:\n${`${run.stdout ?? ''}${run.stderr ?? ''}`.trim()}`);
+  }
+  const steps = new Map(UNIT_OPERATIONS.map((op) => [op.id, op]));
+  const entries = rows.filter((r) => !r.leftOut);
+  const left = rows.filter((r) => r.leftOut);
+  const ids = new Set(entries.map((r) => r.id));
+  const offered = new Set(entries.map((r) => r.biosteamClass).filter((c): c is string => !!c));
+  if (run.status !== 0 || entries.length === 0) fail('unit catalogue: pureos.catalogue --ids printed no unit type');
+  for (const r of entries) {
+    const step = steps.get(r.id);
+    if (!step) {
+      fail(`unit catalogue: ${r.id} is not a unit operation in src/data/vocabulary.ts; a catalogue id is a vocabulary id`);
+      continue;
+    }
+    if (r.biosteamClass && !(step.biosteamClasses ?? []).includes(r.biosteamClass))
+      fail(`unit catalogue: ${r.id} is BioSTEAM's ${r.biosteamClass}, and the vocabulary's ${r.id} does not name that class`);
+    if (!r.biosteamClass && !r.inhouseClass) fail(`unit catalogue: ${r.id} names no class`);
+    for (const m of r.maps ?? [])
+      if (!steps.has(m)) fail(`unit catalogue: ${r.id} stands for "${m}", which is not a unit operation`);
+  }
+  for (const op of UNIT_OPERATIONS)
+    for (const cls of op.biosteamClasses ?? [])
+      if (offered.has(cls) && !ids.has(op.id))
+        fail(`unit catalogue: the vocabulary's ${op.id} names ${cls}, which the catalogue offers, and ${op.id} is not in the catalogue`);
+  for (const r of left) {
+    if (!steps.has(r.id)) fail(`unit catalogue: the class ${r.leftOut} it left out names "${r.id}", which is not a unit operation`);
+    if (ids.has(r.id)) fail(`unit catalogue: ${r.id} is both in the catalogue and left out of it`);
+  }
+  catalogueLine = `catalogue         ${entries.length} unit types, each a vocabulary step, ${offered.size} BioSTEAM classes named by their own step; ${left.length} left out (${left.map((r) => r.id).join(', ') || 'none'})`;
 }
 
 // ── programs (OF-BLD-016 §2.1, E.1′, D7) ───────────────────────────────
@@ -1502,6 +1573,7 @@ console.log(`  postdoc prompts   ${LIVE_PROMPTS.length} (${YEAST_PROMPT_COUNT} y
 console.log(`  learn modules     ${MODULES.length} (${MODULES.reduce((n, m) => n + m.lessons.length, 0)} lessons, ${MODULES.reduce((n, m) => n + m.lessons.reduce((k, l) => k + l.checkpoint.length, 0), 0)} checkpoint questions)`);
 console.log(`  skills            ${SKILLS.length} in ${FAMILIES.length} families, tagged on ${PROTOCOLS.reduce((n, p) => n + p.versions.reduce((m, v) => m + v.steps.filter((st) => (st.skills ?? []).length > 0).length, 0), 0)} protocol steps across ${PROTOCOLS.filter((p) => p.versions.some((v) => v.steps.some((st) => (st.skills ?? []).length > 0))).length} protocols`);
 console.log(`  ${parametersLine || 'parameters        not read'}`);
+console.log(`  ${catalogueLine || 'catalogue         not read'}`);
 console.log(`  ${numericLine}`);
 console.log(`  bench lessons     ${MODULES.reduce((n, m) => n + m.lessons.filter((l) => (l.skills ?? []).length > 0).length, 0)} counting toward ${new Set(MODULES.flatMap((m) => m.lessons.flatMap((l) => l.skills ?? []))).size} skills`);
 

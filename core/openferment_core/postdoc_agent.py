@@ -25,8 +25,14 @@ time. Whichever is spent first names the plan's `stopped`.
 A REFUSAL OR AN OUTAGE mid-loop restarts the question once on the next model
 in the answer chain, with a fresh conversation; tool results come from the
 per-question cache, so nothing is computed twice, and a `restart` step enters
-the trace. A spent daily budget is not an outage another model can fix, and
-ends the question.
+the trace. A tool whose result depends on what the run changed since (a draft
+checked against what was seen; a train a model builds step by step, whose run
+must be of the train as it now stands, OF-BLD-020 §5.4) is never served from
+the cache (`UNCACHED`). A write that changes rows a later read must see (a
+model's train, its run: `CHANGES_ROWS`, OF-BLD-020 §5.R) makes the reads of
+the same question read those sources afresh and forgets the module reads
+cached before it. A spent daily budget is not an outage another model can fix,
+and ends the question.
 
 Every claim the model writes is held to `validate_plan`: no number in its
 text, nothing cited that no tool returned in this run, every quote verbatim
@@ -72,6 +78,23 @@ MAX_SECONDS = 180.0
 # to a length, so a long conversation costs what a short one does.
 MAX_HISTORY_TURNS = 4
 MAX_TURN_CHARS = 2000
+# Tools whose result depends on what the run changed since an earlier call
+# with the same input, so never served from the per-question cache: a draft
+# (checked against what this conversation has seen, §9.2), and a train a model
+# builds a step at a time (OF-BLD-020 §5.4: its run must be of the train as it
+# stands now, and adding the same unit twice adds two).
+UNCACHED = frozenset({"draft_runbook", "pureos_build", "pureos_write"})
+# Writes that change what a later read of the same question must see
+# (OF-BLD-020 §5.R, finding 21), and the store sources each changes: a train a
+# model built is kept beside the artifacts, and a run of it is one. The rows a
+# question reads are read once (`ToolContext.stores`, the sweep before round
+# one) and each read is cached by its input; after one of these writes goes
+# through, those sources are read afresh and every module read cached so far
+# is forgotten, so a read of the train or its run finds it as it stands.
+CHANGES_ROWS: dict[str, tuple[str, ...]] = {
+    "pureos_build": ("kept_trains", "artifacts"),
+    "pureos_write": ("kept_trains", "artifacts"),
+}
 
 FOLLOW_UP = (
     "This question follows the earlier turns above. They say what the conversation is about; "
@@ -162,7 +185,16 @@ heat, cost) are read from its artifact and cited by the evidence id \
 fermos_vessel returns, which is the artifact id, or a vessel row fermos_read \
 returned by its ref in moduleRefs; never state them yourself. When \
 fermos_vessel refuses because the plant scale waits, say in gaps that a named \
-person types it in fermOS → Vessel; never supply one."""
+person types it in fermOS → Vessel; never supply one.
+17. A train is built with pureos_build, one action a call: new (the product's id \
+and the artifact its inlet is read from), add_unit (a catalogue unit type, after \
+a unit), remove_unit, set_from_record (record ids for a unit's parameter), then \
+run. A train's numbers (a unit's recovery, the overall recovery, the product's \
+share of a stream, a flow, a cost) are read from its run's artifact and never \
+stated by you: cite the run by the evidence id pureos_build's run returns, which \
+is its artifact id, or a train-run row pureos_read returned by its ref in \
+moduleRefs. When the run refuses because values wait, say in gaps which wait; \
+never supply one: a value is a named person's, typed in pureOS → Builder."""
 )
 
 
@@ -302,6 +334,17 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     if name == "fermos_vessel":
         what = inp.get("simulationArtifact") or inp.get("fitArtifact")
         return f"Designed the vessel for {what} · kept design {result.summary.get('artifactId')}"
+    if name == "pureos_build":
+        action, train = str(inp.get("action") or ""), result.summary.get("trainId")
+        if action == "run":
+            return f"Ran train {train} · kept run {result.summary.get('artifactId')}"
+        if action == "add_unit":
+            return f"Added {inp.get('unitType')} to train {train} as {result.summary.get('added')}"
+        if action == "remove_unit":
+            return f"Took {inp.get('unitId')} out of train {train}"
+        if action == "set_from_record":
+            return f"Bound records on {inp.get('unitId')} of train {train}"
+        return f"Built a train for {result.summary.get('product')} · kept train {train}"
     if name == "stream_table":
         cut = f", {result.summary.get('leftOut')} left out" if result.summary.get("leftOut") else ""
         return f"Read the stream table of run {inp.get('artifactId')} · {_count(int(result.summary.get('shown', 0)), 'stream')}{cut}"
@@ -322,6 +365,16 @@ def _summary_line(name: str, inp: dict[str, Any], result: ToolResult) -> str:
     return f"Ran {name}"
 
 
+def _forget_reads(run: _Run, sources: tuple[str, ...]) -> None:
+    """After a write that changes rows (CHANGES_ROWS): the sources it changed
+    are read afresh, and no module read cached before it is served again."""
+    forget = getattr(run.ctx.stores, "forget", None)
+    if callable(forget):
+        forget(*sources)
+    for key in [k for k in run.cache if json.loads(k)["tool"].endswith("_read")]:
+        del run.cache[key]
+
+
 def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     """Run one call (or return its cached result) and give back the
     tool_result block the model reads."""
@@ -329,8 +382,10 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
     started = run.clock()
     run.ctx.seen = run.seen
     # A draft is checked against what this conversation has seen, so it is
-    # never served from the cache across a restart (§9.2).
-    if key in run.cache and call.name != "draft_runbook":
+    # never served from the cache across a restart (§9.2); a train a model
+    # builds changes between calls, so its steps and its run are never served
+    # from it either (OF-BLD-020 §5.4).
+    if key in run.cache and call.name not in UNCACHED:
         result = run.cache[key]
     else:
         result = tools.run(call.name, call.input, run.ctx)
@@ -338,6 +393,8 @@ def _run_tool(run: _Run, call: llm.ToolCall) -> dict[str, Any]:
         # A search lane that calls a model spends on this question (§5.R);
         # a cached result was paid for once.
         run.spent = llm.add(run.spent, result.usage)
+        if result.error is None and call.name in CHANGES_ROWS:
+            _forget_reads(run, CHANGES_ROWS[call.name])
     ms = int(round((run.clock() - started) * 1000))
     run.seen.add(result)
     if result.draft is not None and result.error is None:

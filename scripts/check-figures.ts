@@ -38,6 +38,14 @@
  *    none though the uptake rises above the transfer, §8.R); it says what
  *    would fill it when there is no uptake to draw; it stands on the grammar,
  *    is exported from the index, and fermOS → Vessel draws with it.
+ * 10. OF-BLD-020 §5.3 (D14): PurityByStream draws one row per stream of a
+ *    train run, each the run's provenance; a stream that carries nothing has
+ *    no share, draws no bar and says why, and no cell holds NaN or Infinity;
+ *    rendered, it draws one bar per stream with a share and outlines exactly
+ *    the product stream the service named (none when it named none, never
+ *    one it picks); it says what would fill it when the run kept no stream;
+ *    it stands on the grammar, is exported from the index, and pureOS →
+ *    Builder draws with it.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -53,6 +61,13 @@ import { toTable as ledgerTable } from '../src/components/figures/IntervalLedger
 import { emptyOf as recoveryEmpty, noBar, toTable as recoveryTable } from '../src/components/figures/RecoveryByUnit';
 import { bars as waterfallBars, toTable as waterfallTable } from '../src/components/figures/CostWaterfall';
 import { OxygenBalance as OxygenBalanceFigure, emptyOf as oxygenEmpty, toTable as oxygenTable } from '../src/components/figures/OxygenBalance';
+import {
+  PurityByStream as PurityByStreamFigure,
+  emptyOf as purityEmpty,
+  noBar as purityNoBar,
+  toTable as purityTable,
+  type PurityByStreamProps,
+} from '../src/components/figures/PurityByStream';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { fmt } from '../src/engine/units';
@@ -342,6 +357,50 @@ ok.push('a demo mark is held out of the median, a ceiling keeps its provenance, 
   if (!/export \{ OxygenBalance,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export OxygenBalance');
   if (!/<OxygenBalance\b/.test(readFileSync('src/screens/FermOSVessel.tsx', 'utf8'))) problems.push('fermOS → Vessel does not draw the oxygen balance through the grammar');
   ok.push(`tables: oxygen balance ${rows.length}, one row per hour of uptake, the transfer the design's value, the short hours the service's; OxygenBalance stands on toTable, ENCODING and FigureFrame`);
+}
+
+// 10 — OF-BLD-020 §5.3: purity by stream, on the grammar.
+{
+  const stream = (id: string, massFlow: number, productFraction: number | null, other: [string, number][] = []) => ({
+    stream: id, massFlow, productFraction, impurities: other.map(([chemical, massFraction]) => ({ chemical, massFraction })),
+  });
+  const streams = [
+    stream('U1_in', 1000, 0.05, [['Water', 0.9], ['Yeast', 0.05]]),
+    stream('U1_0', 60, 0.01, [['Yeast', 0.8]]),
+    stream('U1_1', 940, 0.0526, [['Water', 0.94]]),
+    stream('U2_1', 0, null),
+    stream('U3_0', 940, 0.0526, [['Water', 0.94]]),
+  ];
+  const props: PurityByStreamProps = {
+    title: 't', product: 'Ethanol', productStream: 'U3_0', streams, provenance: 'demo', massUnit: 'kg/hr',
+    routes: { U1_in: { source: null, sink: 'U1' }, U1_0: { source: 'U1', sink: null }, U1_1: { source: 'U1', sink: 'U2' } },
+  };
+  const rows = purityTable(props).rows;
+  if (rows.length !== streams.length) problems.push(`PurityByStream's table has ${rows.length} rows for ${streams.length} streams`);
+  if (rows.some((r) => r[7] !== 'demo')) problems.push("a PurityByStream row loses the run's provenance");
+  if (rows.some((r) => r.some((c) => /NaN|Infinity/.test(String(c))))) problems.push('a PurityByStream cell holds NaN or Infinity');
+  if (rows.filter((r) => r[6] === 'yes').map((r) => r[0]).join() !== 'U3_0') problems.push('PurityByStream names a product stream the service did not');
+  if (rows[3][4] !== '—' || purityNoBar(streams[3]) == null || purityNoBar(streams[0]) != null) problems.push('PurityByStream gives a share to a stream that carries nothing, or none to one that carries the product');
+  if (rows[0][1] !== 'the inlet' || rows[1][2] !== 'leaves the train') problems.push("PurityByStream does not say a stream's route from the run's table");
+  const render = (p: PurityByStreamProps) => renderToStaticMarkup(createElement(PurityByStreamFigure, p));
+  const count = (html: string, pattern: RegExp) => (html.match(pattern) ?? []).length;
+  const drawn = render(props);
+  const bars = count(drawn, /data-testid="purity-bar"/g);
+  if (bars !== streams.filter((x) => x.productFraction != null).length) problems.push(`PurityByStream draws ${bars} bars for ${streams.filter((x) => x.productFraction != null).length} streams with a share`);
+  if (count(drawn, /data-testid="purity-row"/g) !== streams.length) problems.push('PurityByStream does not draw a row for every stream');
+  const outlined = [count(drawn, /data-testid="purity-product"/g), count(render({ ...props, productStream: null }), /data-testid="purity-product"/g), count(render({ ...props, productStream: 'U1_1' }), /data-product="true"/g)];
+  if (outlined.join() !== '1,0,1') problems.push(`PurityByStream outlines product streams the service did not name: ${outlined.join(', ')} where it named one, none and one`);
+  if (!/data-stream="U1_1" data-product="true"/.test(render({ ...props, productStream: 'U1_1' }))) problems.push('PurityByStream outlines another stream than the one the service named');
+  if (!purityEmpty({ ...props, streams: [] }) || purityEmpty(props) !== null) problems.push('PurityByStream draws a run with no streams, or calls a whole one empty');
+  const src = readFileSync('src/components/figures/PurityByStream.tsx', 'utf8');
+  if (!/export function toTable\(/.test(src)) problems.push('PurityByStream exports no toTable');
+  if (!/from '\.\/FigureFrame'/.test(src) || !/<FigureFrame\b/.test(src)) problems.push('PurityByStream is not framed by FigureFrame');
+  if (!/from '\.\/encoding'/.test(src) || !/\bENCODING\[/.test(src)) problems.push('PurityByStream does not take its marks from ENCODING');
+  if (/['"]recharts/.test(src)) problems.push('PurityByStream draws with recharts');
+  if (/massFlows|\/\s*s\.massFlow/.test(src)) problems.push('PurityByStream divides a share out of the stream table itself: the shares are the service\'s');
+  if (!/export \{ PurityByStream,/.test(readFileSync('src/components/figures/index.ts', 'utf8'))) problems.push('the figures index does not export PurityByStream');
+  if (!/<PurityByStream\b/.test(readFileSync('src/screens/PureOSBuilder.tsx', 'utf8'))) problems.push('pureOS → Builder does not draw purity by stream through the grammar');
+  ok.push(`tables: purity by stream ${rows.length}, one row per stream; ${bars} bars for the streams with a share, the product stream the service's alone; PurityByStream stands on toTable, ENCODING and FigureFrame`);
 }
 
 if (problems.length) {

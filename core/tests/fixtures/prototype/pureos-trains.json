@@ -13,7 +13,10 @@
       "unitCount": 3,
       "overallRecovery": 1.0,
       "runs": 1,
-      "note": null
+      "note": null,
+      "tool": "proforma.run",
+      "trainId": null,
+      "trainName": null
     }
   ]
 }

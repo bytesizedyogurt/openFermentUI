@@ -190,6 +190,9 @@
       "perUnit": "USD per unit of the price's basis"
     },
     "runs": 1,
-    "note": null
+    "note": null,
+    "tool": "proforma.run",
+    "trainId": null,
+    "trainName": null
   }
 }

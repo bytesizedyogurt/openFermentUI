@@ -17,6 +17,19 @@
 // `unitOperationIds`, `storageIds`, `regulatoryIds`, `pathwayIds`,
 // `clearanceState` and `scaleId` resolves against `vocabulary.ts`.
 // `scripts/check-seed.ts` holds both invariants.
+//
+// `sequence` (OF-BLD-020 §7.1) is the one-letter amino-acid sequence of a
+// product's own chain, with `sequenceSource` naming where it was read (a
+// UniProt accession and the residues). It is added only from such a source,
+// never invented, and no entry carries one yet: pureOS's proposer then says a
+// product's molecular weight and isoelectric point are missing.
+//
+// `location` (OF-BLD-020 §7.2) says whether the product is secreted into the
+// broth or held in the cells, the property pureOS's proposer splits a
+// protein's and a polymer's train on. No field said it before, and no entry
+// carries one yet (the PHA entries' tags say "intracellular granules" in free
+// words, which the proposer does not read as the property), so the proposer
+// names it missing rather than guessing. `category` is the class it reads.
 import type { Product, ProductCategory } from './types';
 
 export const PRODUCTS: Product[] = [

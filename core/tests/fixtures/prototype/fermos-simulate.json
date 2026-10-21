@@ -6575,7 +6575,7 @@
         "recordsByParam": {}
       },
       "body": {
-        "artifactId": "c8b79f33e34a5f8f",
+        "artifactId": "d2265dffe25ee653",
         "provenance": "demo",
         "family": "batch_v1",
         "title": "Batch",
@@ -8230,7 +8230,7 @@
         ],
         "basis": {
           "tool": "fermos.simulation",
-          "toolVersion": "kinetics batch_v1 1 · scipy 1.18.1",
+          "toolVersion": "kinetics batch_v1 2 · scipy 1.18.1",
           "inputs": [
             {
               "name": "family",
@@ -8684,7 +8684,7 @@
               }
             }
           ],
-          "artifactId": "c8b79f33e34a5f8f",
+          "artifactId": "d2265dffe25ee653",
           "at": "2026-09-15T09:00:00Z",
           "seed": null
         }
@@ -8692,7 +8692,7 @@
     },
     "simulations": [
       {
-        "artifactId": "c8b79f33e34a5f8f",
+        "artifactId": "d2265dffe25ee653",
         "family": "batch_v1",
         "title": "Batch",
         "strain": "s-cerevisiae-cenpk113-7d",
@@ -8702,6 +8702,100 @@
         "harvestH": 7.990398399908909,
         "createdAt": "2026-09-15T09:00:00Z",
         "provenance": "demo"
+      }
+    ],
+    "harvest": [
+      {
+        "request": {
+          "simulation": "d2265dffe25ee653",
+          "hour": null
+        },
+        "status": 200,
+        "body": {
+          "artifactId": "d2265dffe25ee653",
+          "family": "batch_v1",
+          "strain": "s-cerevisiae-cenpk113-7d",
+          "product": "ethanol",
+          "sugar": "glucose",
+          "provenance": "demo",
+          "asked": 7.990398399908909,
+          "hourSource": "the simulation's harvest hour",
+          "how": "the hour its sugar runs out",
+          "hour": 7.990398399908909,
+          "exact": true,
+          "read": "the kept point at 7.9904 h, as the simulation keeps it",
+          "harvestH": 7.990398399908909,
+          "runEndH": 7.990398399908909,
+          "states": [
+            {
+              "state": "X",
+              "value": 4.349692307692307,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "S",
+              "value": 0.05999999999999818,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "P",
+              "value": 8.299384615384612,
+              "unit": "g L⁻¹"
+            }
+          ],
+          "absent": "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."
+        }
+      },
+      {
+        "request": {
+          "simulation": "d2265dffe25ee653",
+          "hour": 3.995199199954455
+        },
+        "status": 200,
+        "body": {
+          "artifactId": "d2265dffe25ee653",
+          "family": "batch_v1",
+          "strain": "s-cerevisiae-cenpk113-7d",
+          "product": "ethanol",
+          "sugar": "glucose",
+          "provenance": "demo",
+          "asked": 3.995199199954455,
+          "hourSource": "a person's hour",
+          "how": "an hour a person named",
+          "hour": 3.995199199954455,
+          "exact": true,
+          "read": "the kept point at 3.9952 h, as the simulation keeps it",
+          "harvestH": 7.990398399908909,
+          "runEndH": 7.990398399908909,
+          "states": [
+            {
+              "state": "X",
+              "value": 0.9730369241480769,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "S",
+              "value": 48.833911095638896,
+              "unit": "g L⁻¹"
+            },
+            {
+              "state": "P",
+              "value": 1.5460738482961527,
+              "unit": "g L⁻¹"
+            }
+          ],
+          "absent": "By-products the family does not model (carbon dioxide, glycerol, acids) are absent."
+        }
+      },
+      {
+        "request": {
+          "simulation": "d2265dffe25ee653",
+          "hour": 15.980796799817819
+        },
+        "status": 422,
+        "body": {
+          "detail": "the hour 15.9808 h lies outside simulation d2265dffe25ee653, which keeps its broth from 0 to 7.9904 h"
+        }
       }
     ]
   }

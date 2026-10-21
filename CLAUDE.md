@@ -1099,7 +1099,7 @@ Mini, which serves `main` (D8).
   grammar: `CostWaterfall.tsx` and `Tornado.tsx`, each with its own
   `toTable`, `ENCODING` and `FigureFrame` (`check:figures` part 7). Home's
   pinned card says *Cost model v0* for an authored surface alone.
-- **pureOS reads the train, never types it.** `pureos.py` reads a
+- **pureOS reads the train, never types it.** `pureos/__init__.py` (was `pureos.py`, OF-BLD-020 §5.1) reads a
   `proforma.run` artifact through `tables_of` and simulates nothing; a
   `proforma.reference` run is not a train. `GET
   /api/pureos/trains?includeArchived=` (`TrainSummary`, the newest run of each

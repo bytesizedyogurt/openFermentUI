@@ -14,13 +14,35 @@
 // scenario" (through `ui.newScenarioOpen`); fermOS → Forecast's "Send to
 // Proforma" opens it with the fit to attach (OF-BLD-019 §5.1), and the new
 // scenario's page attaches it.
+//
+// NEW SCENARIO FROM A VESSEL AND A TRAIN (OF-BLD-020 §6.1, D11). A flowsheet
+// built from kept artifacts (`builtFrom`: `custom_train_v1`, a fermOS vessel
+// design and a pureOS train run) asks for both: a chooser over the vessel
+// designs the service keeps (`GET /api/fermos/vessels`) and one over its
+// train runs (`GET /api/pureos/train-runs`), the active program's unless the
+// switch shows archived ones. An empty list says why in words and where one
+// is made, and Make the scenario waits, saying what for; nothing is silent.
+// The scenario is filed in its train run's program and keeps both ids
+// (Durable `createdScenarios`). fermOS → Vessel's **Price this in Proforma**
+// opens this with its design chosen (`initialVessel`).
 import { useEffect, useMemo, useState } from 'react';
-import type { FlowsheetInfo, ProgramId } from '@/data/types';
+import type { FlowsheetInfo, ProgramId, TrainSummary, VesselSummary } from '@/data/types';
 import { PROGRAMS, PROGRAMS_SETTINGS_PATH } from '@/data/programs';
 import { activePrograms, useStore } from '@/store';
 import { href, navigate } from '@/router';
 import { Button, Modal } from './ui';
-import { ProformaDown, defaultProgram, programsFor, proformaShelf, sendFitPath } from '@/lib/proforma';
+import {
+  ProformaDown,
+  builtFromParts,
+  compositeTrainRuns,
+  compositeVessels,
+  defaultProgram,
+  programsFor,
+  proformaShelf,
+  sendFitPath,
+  trainRunWords,
+  vesselWords,
+} from '@/lib/proforma';
 
 /** The line a shelf with nothing to start a scenario from shows, here and on the index. */
 export function NoFlowsheetLine({ showArchived }: { showArchived: boolean }) {
@@ -46,6 +68,12 @@ export function NoFlowsheetLine({ showArchived }: { showArchived: boolean }) {
   );
 }
 
+/** What a flowsheet built from kept artifacts is built from, in words. */
+export const BUILT_FROM_WORDS: Record<string, string> = {
+  'fermos.vessel': 'a vessel design kept in fermOS',
+  'pureos.train_run': 'a train run kept in pureOS',
+};
+
 /** How one input of a flowsheet gets its value, in words. */
 export function inputSourceWords(i: FlowsheetInfo['inputs'][number]): string {
   if (i.fields.length > 0) return `binds to records of ${i.fields.join(' or ')}`;
@@ -58,6 +86,8 @@ export function NewScenarioDialog({
   onClose,
   initialFlowsheet = null,
   attachFit = null,
+  initialVessel = null,
+  initialTrainRun = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -65,6 +95,10 @@ export function NewScenarioDialog({
   initialFlowsheet?: string | null;
   /** A fermOS fit's artifact id the new scenario's page attaches when it opens (fermOS → Forecast, "Send to Proforma"). */
   attachFit?: string | null;
+  /** OF-BLD-020 §6.1: the vessel design chosen when it opens (fermOS → Vessel, "Price this in Proforma"). */
+  initialVessel?: string | null;
+  /** The train run chosen when it opens. */
+  initialTrainRun?: string | null;
 }) {
   const showArchived = useStore((s) => s.showArchived);
   const createScenario = useStore((s) => s.createScenario);
@@ -75,6 +109,12 @@ export function NewScenarioDialog({
   const [name, setName] = useState('');
   const [named, setNamed] = useState(false);
   const [program, setProgram] = useState<ProgramId | null>(null);
+  // OF-BLD-020 §6.1: the kept vessel designs and train runs a composite is made from, and the two chosen.
+  const [vessels, setVessels] = useState<VesselSummary[] | null>(null);
+  const [trainRuns, setTrainRuns] = useState<TrainSummary[] | null>(null);
+  const [partsProblem, setPartsProblem] = useState<string | null>(null);
+  const [vessel, setVessel] = useState<string | null>(initialVessel);
+  const [trainRun, setTrainRun] = useState<string | null>(initialTrainRun);
 
   useEffect(() => {
     if (!open) return;
@@ -94,20 +134,60 @@ export function NewScenarioDialog({
     if (!open) return;
     setChosen(initialFlowsheet);
     setNamed(false);
-  }, [open, initialFlowsheet]);
+    setVessel(initialVessel);
+    setTrainRun(initialTrainRun);
+  }, [open, initialFlowsheet, initialVessel, initialTrainRun]);
 
   const choices = useMemo(() => (shelf ?? []).filter((f) => !f.reference), [shelf]);
+  const composite = useMemo(() => choices.some((f) => builtFromParts(f)), [choices]);
+
+  // The kept parts, asked for when the shelf holds a flowsheet built from them.
+  useEffect(() => {
+    if (!open || !composite) return;
+    const ctrl = new AbortController();
+    setVessels(null);
+    setTrainRuns(null);
+    setPartsProblem(null);
+    const said = (e: unknown) =>
+      !ctrl.signal.aborted && setPartsProblem(e instanceof ProformaDown ? `${e.message} ${e.remedy ?? ''}`.trim() : String(e instanceof Error ? e.message : e));
+    compositeVessels(showArchived, ctrl.signal)
+      .then(setVessels)
+      .catch((e: unknown) => {
+        said(e);
+        if (!ctrl.signal.aborted) setVessels([]);
+      });
+    compositeTrainRuns(showArchived, ctrl.signal)
+      .then(setTrainRuns)
+      .catch((e: unknown) => {
+        said(e);
+        if (!ctrl.signal.aborted) setTrainRuns([]);
+      });
+    return () => ctrl.abort();
+  }, [open, composite, showArchived]);
   const offered = useMemo(
     () => PROGRAMS.filter((p) => p.status === 'active' || showArchived),
     [showArchived],
   );
   const flowsheet = choices.find((f) => f.id === chosen) ?? (choices.length === 1 ? choices[0] : null);
+  const needsParts = builtFromParts(flowsheet);
+  const chosenRun = (trainRuns ?? []).find((t) => t.artifactId === trainRun) ?? null;
   // A flowsheet that belongs to a program files its scenarios there alone
-  // (OF-BLD-019 §3.R, finding 3); a general one under any program offered.
+  // (OF-BLD-019 §3.R, finding 3); a general one under any program offered;
+  // a composite in its train run's program (OF-BLD-020 §6.1).
   const fileable = useMemo(() => {
-    const ids = programsFor(flowsheet, offered.map((p) => p.id));
+    const ids = programsFor(needsParts && chosenRun?.program ? { program: chosenRun.program } : flowsheet, offered.map((p) => p.id));
     return offered.filter((p) => ids.includes(p.id));
-  }, [flowsheet, offered]);
+  }, [flowsheet, offered, needsParts, chosenRun]);
+  // What a composite still waits for, in words (never a silent empty).
+  const partsWait = !needsParts
+    ? null
+    : vessels === null || trainRuns === null
+      ? 'Asking the service for its kept vessel designs and train runs…'
+      : (vessels.length === 0 && !vessel) || (trainRuns.length === 0 && !trainRun)
+        ? null
+        : !vessel || !trainRun
+          ? `Choose ${!vessel && !trainRun ? 'a vessel design and a train run' : !vessel ? 'a vessel design' : 'a train run'} to make the scenario from.`
+          : null;
 
   // The name follows the flowsheet until a person types one; the program is
   // the flowsheet's own when it is offered, else the active program.
@@ -118,9 +198,10 @@ export function NewScenarioDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowsheet?.id, open]);
 
+  const parts = needsParts && vessel && trainRun ? { vessel, trainRun } : null;
   const create = () => {
-    if (!flowsheet || !name.trim()) return;
-    const id = createScenario(flowsheet.id, name, fileable.some((p) => p.id === program) ? program : (fileable[0]?.id ?? program));
+    if (!flowsheet || !name.trim() || (needsParts && !parts)) return;
+    const id = createScenario(flowsheet.id, name, fileable.some((p) => p.id === program) ? program : (fileable[0]?.id ?? program), parts);
     onClose();
     navigate(attachFit ? sendFitPath(id, attachFit) : `/proforma/scenario/${id}`);
     toast({ text: `Scenario made on ${flowsheet.title}; it has not run yet`, kind: 'success' });
@@ -165,6 +246,7 @@ export function NewScenarioDialog({
                           <span className="font-num">{f.id}</span> · {f.source}
                           {f.program && <> · {PROGRAMS.find((p) => p.id === f.program)?.name ?? f.program}</>} ·{' '}
                           <span className="font-num">{f.inputs.length}</span> inputs
+                          {builtFromParts(f) && <> · built from {f.builtFrom.map((t) => BUILT_FROM_WORDS[t] ?? t).join(' and ')}</>}
                         </span>
                       </span>
                     </label>
@@ -172,6 +254,76 @@ export function NewScenarioDialog({
                 ))}
               </ul>
             </fieldset>
+            {needsParts && (
+              <fieldset className="mb-3 card p-3" data-testid="new-scenario-composite">
+                <legend className="text-caption uppercase tracking-wide text-ink-soft px-1">New scenario from a vessel and a train</legend>
+                <p className="text-caption text-ink-soft mb-2">
+                  The fermenter is rebuilt from a vessel design fermOS keeps, every design parameter as the design holds it, and the train&rsquo;s
+                  units follow it from a train run pureOS keeps, each with its values as that run held them. The train&rsquo;s own inlet is not an
+                  input: the fermenter&rsquo;s beer is.
+                </p>
+                {partsProblem && <p className="text-caption text-signal-warn mb-1">{partsProblem}</p>}
+                {vessels !== null && vessels.length === 0 && !vessel && (
+                  <p className="text-body mb-1" data-testid="new-scenario-composite-empty" data-part="vessel">
+                    No vessel design is kept on this service yet: <a className="text-accent underline underline-offset-2" href={href('/fermos/vessel')}>fermOS → Vessel</a>{' '}
+                    designs one for a kept simulation, and it is listed here.
+                  </p>
+                )}
+                {trainRuns !== null && trainRuns.length === 0 && !trainRun && (
+                  <p className="text-body mb-1" data-testid="new-scenario-composite-empty" data-part="train-run">
+                    No train run is kept on this service yet: <a className="text-accent underline underline-offset-2" href={href('/pureos')}>pureOS → New train</a>{' '}
+                    builds and runs one, and it is listed here.
+                  </p>
+                )}
+                <div className="grid grid-cols-1 gap-2">
+                  {vessels !== null && (vessels.length > 0 || vessel) && (
+                    <label className="text-caption text-ink-soft">
+                      <span className="block mb-0.5">Vessel design</span>
+                      <select
+                        className="input w-full min-h-[44px]"
+                        aria-label="Vessel design"
+                        data-testid="new-scenario-vessel"
+                        value={vessel ?? ''}
+                        onChange={(e) => setVessel(e.target.value || null)}
+                      >
+                        <option value="">Choose a kept vessel design</option>
+                        {vessel && !vessels.some((v) => v.artifactId === vessel) && <option value={vessel}>{`vessel design ${vessel}`}</option>}
+                        {vessels.map((v) => (
+                          <option key={v.artifactId} value={v.artifactId}>
+                            {vesselWords(v)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {trainRuns !== null && (trainRuns.length > 0 || trainRun) && (
+                    <label className="text-caption text-ink-soft">
+                      <span className="block mb-0.5">Train run</span>
+                      <select
+                        className="input w-full min-h-[44px]"
+                        aria-label="Train run"
+                        data-testid="new-scenario-train-run"
+                        value={trainRun ?? ''}
+                        onChange={(e) => setTrainRun(e.target.value || null)}
+                      >
+                        <option value="">Choose a kept train run</option>
+                        {trainRun && !trainRuns.some((t) => t.artifactId === trainRun) && <option value={trainRun}>{`train run ${trainRun}`}</option>}
+                        {trainRuns.map((t) => (
+                          <option key={t.artifactId} value={t.artifactId}>
+                            {trainRunWords(t)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                {(partsWait || (vessels !== null && trainRuns !== null && ((vessels.length === 0 && !vessel) || (trainRuns.length === 0 && !trainRun)))) && (
+                  <p className="text-caption text-signal-warn mt-2" data-testid="new-scenario-composite-waits">
+                    {partsWait ?? 'Make the scenario waits until a vessel design and a train run are kept.'}
+                  </p>
+                )}
+              </fieldset>
+            )}
             {flowsheet && (
               <ul className="text-caption text-ink-soft mb-3 list-disc pl-5" data-testid="new-scenario-inputs">
                 {flowsheet.inputs.map((i) => (
@@ -220,7 +372,7 @@ export function NewScenarioDialog({
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           {choices.length > 0 && (
-            <Button variant="primary" onClick={create} disabled={!flowsheet || !name.trim()} data-testid="new-scenario-create">
+            <Button variant="primary" onClick={create} disabled={!flowsheet || !name.trim() || (needsParts && !parts)} data-testid="new-scenario-create">
               Make the scenario
             </Button>
           )}

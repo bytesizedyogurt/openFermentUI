@@ -9,10 +9,10 @@ outside `k` and `limit` refuses the call, and every refusal is a result with
 `data` is emptied with it; a tool whose whole output is longer
 (`stream_table`) cuts its own summary, says how much it left out, and carries
 the whole in `ToolResult.data`, which the endpoint and the MCP server return
-and no model reads. The registry holds thirty-four names (OF-BLD-020 §3.4
-added `fermos_simulate` and §4.2 `fermos_vessel`); `test_tools.NAMES` is the
-one literal list of them in the tests, and every other count there is
-derived from `WHITELIST`.
+and no model reads. The registry holds thirty-six names (OF-BLD-020 §3.4
+added `fermos_simulate`, §4.2 `fermos_vessel`, §5.4 `pureos_build` and §7.2
+`pureos_propose`); `test_tools.NAMES` is the one literal list of them in the
+tests, and every other count there is derived from `WHITELIST`.
 
 The names below are the registry's. The build document writes `dominion.read`;
 the Messages API refuses a dot in a tool name, so the registry uses an
@@ -184,6 +184,132 @@ worker, and spends no model money; what it computes, and where BioSTEAM
 overruled the build document, are in README.md (*fermOS sizes the vessel on
 BioSTEAM*).
 
+## pureOS builds a train (OF-BLD-020 §5.4)
+
+| Tool | In | Out |
+|---|---|---|
+| `pureos_build` | `action` (`new`, `add_unit`, `remove_unit`, `set_from_record`, `run` or `propose`) and the fields that action takes, every one a string, a list of strings or a word: `product` (the product's id, `ethanol`; for `new` empty takes a simulation inlet's own product, for `propose` it is required) and `inletRef` for `new` (a simulation, a vessel design or a run's stream) and for `propose` (a simulation or a run's stream, or empty for none); `host` for `propose`; `trainId` for every other action; `unitType` (a catalogue unit type's id) and `afterUnitId` (`inlet` for the first place, empty for the end) for `add_unit`; `unitId` for `remove_unit` and `set_from_record`; `recordsByParam` (a parameter's key on the unit to the record ids that bind it, exactly those records) for `set_from_record` | `new`, `add_unit`, `remove_unit`, `set_from_record` and `propose`: the train as kept, in ids and words (its id, product, program, inlet, each unit's id, type, class and routing, how many records are named for each key, who made it, when) and `toRun`, what a run of it would refuse now in the run's own words (`train_spec.check_train`: the validation's refusals, then each value that waits and each need of a unit; empty when the run would go), with `toRunNote` saying the values were not checked, and why, when the Proforma simulator cannot answer. `run`: the run as one evidence id (the `pureos.train_run` artifact's id; its value the overall recovery of the product to the product stream), each unit's recovery and the overall to four significant digits, the product's share of the product stream, what bound each parameter counted by origin (never a value), the flags and notes cut; the whole run in `ToolResult.data`, which no model reads. A refusal is in the service's words |
+
+The inlet a model names for `new` (`inletRef`): a kept simulation's artifact
+id (its broth at harvest, D10; its broth flow then waits for a person's
+value), a kept vessel design's (the harvest of the simulation it was designed
+for, the broth flow read from the design), or a kept run's stream as
+`<artifact id>/<stream id>` (a `proforma.run`, `proforma.reference` or
+`pureos.train_run`; `stream_table` lists a Proforma run's streams). For
+`propose` it is what the proposer takes (OF-BLD-020 §5.R, findings 19 and
+32): a kept simulation's id or a run's stream, or empty for an inlet a person
+types; a vessel design's id is refused there, and `propose` names its
+product, never empty. The train
+belongs to its inlet's program, else to the one active program, said so; only
+the yeast program has a chemical set, and a product thermosteam's `CHEMICALS`
+does not name is refused. A unit a model adds takes the catalogue's own
+routing (its onward port on, every other outlet to waste) and an id of its
+type's first letter and the smallest free count (`C1`, `D2`). D13 names seven
+inputs; the tree adds `unitId`, the unit `remove_unit` and `set_from_record`
+act on, since `afterUnitId` names where a unit goes, and `host` for `propose`
+(the proposer reads where the product is made). A field the action does
+not take is refused in words.
+
+`set_from_record` binds a parameter of a unit to exactly the records named
+for it, through the run's own check (`pureos.train_spec.unit_scope`): each
+must be in the evidence pool the switch shows, a record of the field the
+parameter's source rule names, on the train's program's papers, kept by the
+aggregate gate, naming the unit's step where its field says nothing of one
+(`step_recovery`, `product_purity`), in a unit the parameter reads, and, for a
+per-component key, the product's own component; a record that cannot bind
+refuses the call, naming it and why, and nothing changes. The check reads the
+class's parameters in the Proforma worker with the store let go, and the train
+is kept only if it did not change meanwhile.
+
+`run` runs the train through `pureos.train_spec.run_train`, in the Proforma
+worker, with no person's value: the service holds none, so a value nothing
+binds (a flash's two settings, a column's keys, a broth flow) waits, and the
+call returns the run's refusal (the 422's words) naming each one; a person
+types it in pureOS → Builder. `propose` keeps the train OF-BLD-020 §7.2's
+rules propose (`pureos.propose`, for `product` made in `host`, a geneOS host
+id) under an id of its own, with the proposer's reasons; a proposal that
+proposes nothing is refused in the words naming each missing property.
+
+**Where a model's train lives.** A person's trains stay in their browser
+(D9). A model builds across tool calls, and an outside assistant over MCP has
+no ask to hold a draft, so the service keeps a model's train in
+`core/data/pureos-trains.json` (`KeptTrain`: the train as data, `agent:
+model`, `madeBy` the model id, `effort`, `askId`, `at`, `updatedAt`),
+gitignored, on this machine alone and not on the data branch, written through
+`pureos.kept.keep_train` alone: every read-modify-write under the store's
+thread lock and file lock, through `atomic.write_text`.
+`GET /api/pureos/trains-kept?includeArchived=` lists them, the most recently
+changed first, the switch honoured by the train's program. pureOS's index
+lists them under *Made by Postdoc* (name, product, units, the model, when,
+and the newest run joined by its `trainId`), and **Open a copy** opens one in
+the Builder as a new train of that browser (`/pureos/build/new?copy=<id>`):
+the kept train stays the model's (OF-BLD-020 §5.R).
+
+It is a free write: BioSTEAM's compute, no model money, **at no gate**
+(`gates.py` is unchanged), every action audited like every module write
+(`agent: model`, the model id, the effort, the ask id, `module: pureos`, the
+action as `new_train`, `add_unit`, `remove_unit`, `set_from_record`,
+`run_train` or `propose_train`, the train's id as target, the tool's name in
+`detail`). Each action is one function in `tools/writes.py`, the same one
+`pureos_write`'s action of that name calls (below), so `check:tools` reads the
+calls to `pureos.kept.keep_train` and `pureos.train_spec.run_train` there
+(both in `ALLOWED_WRITES`, `pureos.kept` and `pureos.train_spec` among the
+stores rule 2 polices). Rule 2b finds the kept store's writer from its file
+name (`KEPT_STORES`): every function of a module naming `pureos-trains.json`
+that writes through `atomic`, every function anywhere that writes through
+`atomic` and names the store by its module's path function or constant
+(`kept.path()`, `kept.FILE`; OF-BLD-020 §5.R, finding 18), and every function
+reaching one, which no tool file but `writes.py` may reach. A tool file
+writes no file itself: it may not reach `atomic.write_text` or `write_bytes`,
+nor call a path's or a handle's write, a dump, a file made, moved or taken
+away, or `open` with a mode that writes. Postdoc's loop never serves `pureos_build` or
+`pureos_write` from its per-question cache (`postdoc_agent.UNCACHED`): a
+train changes between calls, and its run is of the train as it stands. After
+either goes through, the question's reads read the kept trains and the
+artifacts afresh and no module read cached before it is served again
+(`postdoc_agent.CHANGES_ROWS`, `module_stores.Stores.forget`; OF-BLD-020
+§5.R, finding 21), so `pureos_read` finds the train and its run as they stand.
+
+A run is cited like any computed value: its `Evidence` id is the artifact's,
+so `SeenSet` keeps it, and a claim citing a run no tool returned in this
+conversation is dropped. A train run is a kept run (`validate.KEPT_RUNS` maps
+`pureos.train_run` to the `train-run` row): `SeenSet.runs` learns it from the
+`Evidence` and from `pureos_read`'s row, so a run a read returned only as a row
+is cited by its ref in `moduleRefs`, and a claim citing it by evidence id is
+dropped with words that say so. Postdoc's prompt (rule 17) says a train's
+numbers are read from its run's artifact and never stated.
+
+## pureOS proposes a train (OF-BLD-020 §7.2)
+
+| Tool | In | Out |
+|---|---|---|
+| `pureos_propose` | a product's id (`product`: a products seed entry, or a product thermosteam's library is asked about by name, ethanol); a host strain's id on geneOS's shelf (`host`); and optionally the train's inlet (`inletRef`: a kept fermOS simulation's artifact id, or a kept run's artifact id and one of its streams as `<artifact id>/<stream id>`; empty for none) | a train proposed by written rules (`pureos/proposer.py`): its units in order, catalogue types, each with the rule, the property it read and the artifact that holds it, in words with no number; every parameter left at its library default or waiting for a person; or nothing proposed and each missing property named. Each property read is its own evidence id (`<artifact id>:<property>`); the whole proposal is in `data` |
+
+Offered loose, as the module tools are; every field is a string, and E.4‴
+holds the schema to no numeric field. It is a read: it keeps nothing but the
+property artifacts it reads (`volatility` from thermosteam in the Proforma
+worker, `protparam` from Biopython's ProtParam on the sequence a products
+seed entry carries, OF-BLD-020 §7.1), writes no audit line and starts no run;
+the proposal goes to a person, who fills what waits in pureOS's Builder. The
+rules, each with its basis, are in `proposer.py`'s docstring: a small
+molecule lighter than water by thermosteam's boiling points is distilled
+(`distillation`), then dried on a `molecular-sieve` where thermosteam finds a
+minimum-boiling azeotrope with water; one heavier than water is extracted
+(`lle`); a secreted protein is clarified (`centrifugation`), concentrated
+(`uf-df`), captured and polished (`chromatography` twice, keyed on ProtParam's
+isoelectric point and molecular weight, the mode waiting while the inlet
+carries no pH) and spray-dried (`spray-dry`); an intracellular protein is
+harvested, disrupted and clarified first; an intracellular polymer is
+harvested, digested, washed and dried (`drying-drum`). The class is the
+products seed's `category`, or, for a product the seed holds no entry for,
+thermosteam's normal boiling point; whether a product is secreted is the
+entry's `location`, which no entry carries yet, so a protein says it is
+missing, as it says a sequence is. With the switch off a product or host of
+an archived program is refused like any archived target. `POST
+/api/pureos/propose` answers the same, and pureOS's **Propose a train** shows
+it with each unit's reason beside it and keeps it under a new train id, which
+the Builder opens.
+
 ## A person's value (OF-BLD-020 Phase 2)
 
 A number a person sets for a model reaches a run one way, and no tool is on it.
@@ -212,10 +338,11 @@ A number a person sets for a model reaches a run one way, and no tool is on it.
 
 No tool takes a person's value, and no tool input carries an override: tool
 inputs carry ids and words. `run_flowsheet`, `proforma_write`'s `run`,
-`fermos_simulate`, `fermos_write`'s `simulate`, `fermos_vessel` and
-`fermos_write`'s `design_vessel` run as the service binds the scenario, the
-simulation or the design, with no person's value, so an input that waits for
-one refuses the call, naming it. `proforma_write`'s `bind` is refused (the
+`fermos_simulate`, `fermos_write`'s `simulate`, `fermos_vessel`,
+`fermos_write`'s `design_vessel`, `pureos_build`'s `run` and `pureos_write`'s
+`run_train` run as the service binds the scenario, the simulation, the design
+or the train, with no person's value, so an input that waits for one refuses
+the call, naming it. `proforma_write`'s `bind` is refused (the
 table below).
 
 ## The read tools (OF-BLD-015 §7.2)
@@ -258,7 +385,16 @@ row's `detail` (product in and out, what is lost and to which outlet, the
 recovery, the cumulative share still on the path) is read by
 `pureos.train_of` from the run artifact's stream table, never typed and never
 simulated again; the row's mark is the run's, worked out as for any artifact
-row. This is a kind of the existing read, not a tool of its own. Proforma's
+row. This is a kind of the existing read, not a tool of its own. Since
+OF-BLD-020 §5.4 kind `train` also holds the trains a model built with
+`pureos_build` (`pureos/train/<train id>`, found by the train's id or a run's:
+its product, program, inlet, units and the keys records are named for, in ids
+and words, who made it and when, and its runs' ids; no mark, since a train is
+data), and kind `train-run` is one kept `pureos.train_run`
+(`pureos/train-run/<artifact id>`, found by its own id or its train's),
+labelled with its train's name and product, `open` and `computed`, its mark
+worked out from its inputs when it is read, and a `detail` of words, ids and
+flags alone: its numbers stay in the artifact. Proforma's
 rows list every scenario's runs and, since §6.1, the reference biorefineries'
 runs (`proforma.reference`). `GET /api/pureos/trains` and
 `GET /api/pureos/train/{key}` serve the same reading to the browser, the
@@ -278,7 +414,7 @@ word and never by a model:
 
 | State | Means | Computed from |
 |---|---|---|
-| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; an active person; a scheduled check |
+| `open` | free to use, read or make | a clearance of `clear-expired` or `clear-none`; a draft or running runbook; a host, pathway, model or unit operation in the catalogue; an artifact, a kept simulation, and a train or a unit of one read from a run; a train a model built, and a run of one; an active person; a scheduled check |
 | `fenced` | held back | a clearance of `watch-*`, `blocked` or `unknown` (Dominion's action for it is to run clearance first); a runbook `blocked_unverified`; a fetch that failed; a model not fetched |
 | `approved` | a person or a source stands behind it | a record `measured`, `gold`, `verified` or `curated`; a protocol's current version; a lesson; a paper fetched with full text |
 | `locked` | frozen for a test | a runbook with `lockedAt`; a check run |
@@ -293,8 +429,10 @@ modules it holds for.
 
 The thirtieth name, added by the build document's authority (OF-BLD-019
 Part C.8 and §4.2), before Proforma's two (§6.1), which brought the registry
-to thirty-two (OF-BLD-020 §3.4's `fermos_simulate` is the thirty-third and
-§4.2's `fermos_vessel` the thirty-fourth);
+to thirty-two (OF-BLD-020 §3.4's `fermos_simulate` is the thirty-third,
+§4.2's `fermos_vessel` the thirty-fourth, §5.4's `pureos_build` the
+thirty-fifth and §7.2's `pureos_propose` the
+thirty-sixth);
 `check:tools` (rule 5) fails when a name in `WHITELIST` has no tool registered
 or no mention here.
 
@@ -405,6 +543,7 @@ audited as `finding`.
 | `fermos_write` | `fit` | refused: a deposition's series lives in the browser | — |
 | `fermos_write` | `simulate` | simulates the model family named in `target` as the service binds it, the same run as `fermos_simulate` (`run_simulation`); `fields` carry `strain`, `product`, `sugar`, `fitArtifact`, `startFrom`, `durationPreset` and `records.<parameter key>` (record ids, separated by commas or spaces), any other field refused; refuses naming each parameter that waits | `fermos.simulate` |
 | `fermos_write` | `design_vessel` | designs the vessel a kept simulation (or, anaerobic, a kept fit) needs on BioSTEAM, the same design as `fermos_vessel` (`design_vessel`); fields `simulationArtifact` or `fitArtifact`, `vesselType`, `klaMethod`; refuses in words while no plant scale (or, aerated, one vessel's batch volume) is given, which only a named person types in fermOS → Vessel | `vessel.design` |
+| `pureos_write` | `new_train`, `add_unit`, `remove_unit`, `set_from_record`, `run_train` | builds and runs a train as `pureos_build`'s `new`, `add_unit`, `remove_unit`, `set_from_record` and `run` do, the same function an action; the train in `target` (empty for `new_train`), the rest in `fields`: `product` and `inletRef`; `unitType` and `afterUnitId`; `unitId`; `unitId` and `records.<parameter key>` (record ids, separated by commas or spaces); any other field refused; a run refuses naming what waits | `pureos.kept.keep_train`, `pureos.train_spec.run_train` |
 | `proforma_write` | `run` | runs the BioSTEAM scenario named in `target` as the service binds it, the same run as `run_flowsheet` (`run_scenario`); refuses naming what waits, an empty target, or a scenario the service does not hold | `proforma.run` |
 | `proforma_write` | `bind` | refused: an assumption is a named person's, typed into the parameter panel and kept in the browser's Durable tier (*A person's value*, above) | — |
 | `biorepo_write` | `candidate` | anchors a candidate to a sentence of a fetched paper, `unverified`, in the review queue; id `mw1-…`, kept in `candidates/hand/` apart from the extractor's file, so it never counts as an extraction; fields the action lists only, `negativeResult` and `isPrimary` as the word true or false | `extract.add_candidate` (§2.4's rules) |
@@ -416,7 +555,8 @@ audited as `finding`.
 | `runbooks_write` | `revise_protocol` | refused: protocols are seed, revised in the browser | — |
 | `guild_write` | `record_check` | refused: an assessor runs a check at the bench, criterion by criterion | — |
 | `guild_write`, `home_write`, `runbooks_write` | gated actions | a proposal (below) | `proposals.propose` |
-| `dominion_write`, `pureos_write`, `primer_write` | any | refused: curated seed, no write function | — |
+| `dominion_write`, `primer_write` | any | refused: curated seed, no write function | — |
+| `pureos_write` | any other | refused: the unit operations and the unit catalogue are curated (`src/data/vocabulary.ts`, `pureos/catalogue.py`), no write function | — |
 
 A refusal is a result Postdoc reports in `gaps`.
 
@@ -445,7 +585,9 @@ a simulation (OF-BLD-020 §3.4): `fermos_simulate` and `fermos_write`'s
 `simulate` keep one `fermos.simulation` artifact the same way. Nor a vessel
 design (§4.2): `fermos_vessel` and `fermos_write`'s `design_vessel` keep one
 `fermos.vessel` artifact the same way, and BioSTEAM's design spends no model
-money.
+money. Nor a train (§5.4): `pureos_build` and `pureos_write`'s train actions
+keep a model's train on the service and its runs as `pureos.train_run`
+artifacts, spending no model money.
 
 A proposal is carried out or dismissed by a named person (the reviewer name
 in Settings; placeholders are refused), and each carries their name and the
@@ -487,6 +629,6 @@ The rules a proposal holds to (OF-BLD-016 §1.R, as `proposals.propose`, `_held_
 `core/openferment_core/mcp_server.py` lists `tools.infos()` and calls
 `tools.run`, so every tool above, with its marks, refusals and gates, is what
 Claude Desktop or Claude Code sees, plus `ask_postdoc` and `get_artifact`:
-thirty-six in all. `test_mcp` counts them from `WHITELIST`, and holds
-`run_flowsheet`, `stream_table` and `fermos_simulate` to the registry's own
-descriptions and schemas.
+thirty-eight in all. `test_mcp` counts them from `WHITELIST`, and holds
+`run_flowsheet`, `stream_table`, `fermos_simulate` and `pureos_propose` to the
+registry's own descriptions and schemas.

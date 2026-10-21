@@ -64,6 +64,7 @@ import Architecture from '@/screens/Architecture';
 import GeneOS from '@/screens/GeneOS';
 import PureOS from '@/screens/PureOS';
 import PureOSTrain from '@/screens/PureOSTrain';
+import PureOSBuilder from '@/screens/PureOSBuilder';
 import FermOS from '@/screens/FermOS';
 import Dominion from '@/screens/Dominion';
 import Depositions from '@/screens/Depositions';
@@ -192,6 +193,10 @@ function Screen() {
       // the run Proforma priced, by scenario id or the run's artifact id. With
       // no id it is the front page, which lists the trains on file.
       if (b === 'train') return c ? <PureOSTrain scenarioId={c} /> : <PureOS />;
+      // OF-BLD-020 §5.3 — 'build' is reserved too: the Builder, a saved
+      // train by its id, `new` (or nothing) for a fresh one. Keyed by id, so
+      // a train opened over another starts from its own state.
+      if (b === 'build') return <PureOSBuilder key={c ?? 'new'} trainId={c ?? 'new'} />;
       return <PureOS />;
     case 'proforma':
       if (b === 'scenario' && c) return <ProformaScenario scenarioId={c} />;

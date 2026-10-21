@@ -237,7 +237,13 @@ const units = { table: U, aliases: ALIASES, si: SI_UNIT, refusals: REFUSALS };
 const strainAliases = STRAIN_ALIASES;
 const carbonSources = CARBON_SOURCES;
 // OF-BLD-014 §9.2 — the ids a drafted runbook's product and strain must resolve against.
-const products = PRODUCTS.map((p) => ({ id: p.id, name: p.name }));
+// OF-BLD-020 §7.1 — and a product's own chain with where it was read, when its
+// entry carries one, for Biopython's ProtParam (protparam.py). None does yet.
+const products = PRODUCTS.map((p) => ({
+  id: p.id,
+  name: p.name,
+  ...(p.sequence !== undefined ? { sequence: p.sequence, sequenceSource: p.sequenceSource ?? null } : {}),
+}));
 const strains = STRAINS.map((s) => ({ id: s.id, name: `${s.binomial} ${s.designation}`.trim() }));
 
 /**
@@ -321,6 +327,9 @@ const modulesProjection = {
       provenance: p.provenance,
       note: p.note,
       program: programOf('product', p.id),
+      // OF-BLD-020 §7.2 — secreted or intracellular, when the entry says so:
+      // pureOS's proposer splits a protein's and a polymer's train on it.
+      ...(p.location !== undefined ? { location: p.location } : {}),
     })),
     findings: CLEARANCE_FINDINGS.map((f) => ({
       productId: f.productId,

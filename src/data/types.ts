@@ -59,7 +59,8 @@ export type ParameterFamily =
  * Parameter ontology v1 (OF-COR-001 §17) — 24 fields in five families — the
  * polymer family OF-BLD-014 §2.1 adds, and the kinetics family the
  * yeast-ethanol program (thread Q) adds, with the oxygen and maintenance fields
- * fermOS's simulations read (OF-BLD-020 §3.2): forty-four fields in seven.
+ * fermOS's simulations read (OF-BLD-020 §3.2) and the downstream fields
+ * pureOS's unit catalogue reads (§5.1): forty-nine fields in seven.
  */
 export type FieldId =
   // Family 1 — expression performance
@@ -91,6 +92,12 @@ export type FieldId =
   | 'disruption_protein_yield'
   | 'disruption_energy'
   | 'minimum_selling_price'
+  // OF-BLD-020 §5.1: what pureOS's unit catalogue binds
+  | 'step_recovery'
+  | 'product_purity'
+  | 'partition_coefficient'
+  | 'sieving_coefficient'
+  | 'cake_moisture'
   // Family 6 — polymer (OF-BLD-014 §2.1)
   | 'pha_content_cdw'
   | 'pha_titre'
@@ -687,6 +694,14 @@ export interface Scenario {
   lastRunId?: string | null;
   /** When a person made the scenario here (ISO time); absent on a seeded one. */
   createdAt?: string;
+  /**
+   * OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
+   * from, kept with it in the Durable tier (`createdScenarios`) and sent with
+   * every binding and run: the kept `fermos.vessel` design (its artifact id)
+   * and the kept `pureos.train_run` (its artifact id). Absent on any other.
+   */
+  vessel?: string;
+  trainRun?: string;
 }
 
 export interface GridPointResult {
@@ -916,7 +931,10 @@ export type UnitOperationStage =
   | 'purification'
   | 'drying'
   | 'formulation'
-  | 'finishing';
+  | 'finishing'
+  // OF-BLD-020 §5.1: a pump, a tank, a heat exchanger, a mixer or a splitter
+  // serves a train without being a step of it.
+  | 'utility';
 
 export interface UnitOperation {
   id: string;
@@ -1096,6 +1114,24 @@ export interface Product {
    * is general and shows whatever programs are archived.
    */
   program?: ProgramId;
+  /**
+   * The one-letter amino-acid sequence of the product's own chain
+   * (OF-BLD-020 §7.1), from which Biopython's ProtParam computes its
+   * molecular weight, isoelectric point, extinction coefficients and GRAVY
+   * (`core/openferment_core/protparam.py`). Present only where it was read
+   * from a named source; never invented. No entry carries one yet, so every
+   * product's properties are missing and pureOS's proposer says so.
+   */
+  sequence?: string;
+  /** Where `sequence` was read, e.g. a UniProt accession and the chain's residues. Required beside a sequence. */
+  sequenceSource?: string;
+  /**
+   * Where the product is when the fermentation ends (OF-BLD-020 §7.2): secreted
+   * into the broth, or held in the cells. pureOS's proposer splits a protein's
+   * and a polymer's train on it. Present only where a named source says so;
+   * no entry carries one yet, so the proposer names it missing.
+   */
+  location?: 'secreted' | 'intracellular';
 }
 
 /**
@@ -2839,6 +2875,15 @@ export interface ProformaRunRequest {
    * (OF-BLD-019 §5.1, D10). The service computes each value from it.
    */
   fits?: Record<string, string>;
+  /**
+   * OF-BLD-020 §6.1 (D11): a scenario on `custom_train_v1` names the kept
+   * `fermos.vessel` design its fermenter is rebuilt from and the kept
+   * `pureos.train_run` whose units follow it; refused for any other flowsheet.
+   */
+  vessel?: string | null;
+  trainRun?: string | null;
+  /** The program switch, for those parts: one of an archived program is refused unless it is on. */
+  includeArchived?: boolean;
 }
 
 /**
@@ -3051,6 +3096,18 @@ export interface FlowsheetInfo {
   gridInputs: string[];
   /** A reference biorefinery's own regression test, cited as file::test; its values come from the installed file (PackageRegression). */
   packageTest: string | null;
+  /**
+   * OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
+   * names besides the flowsheet, by tool (`custom_train_v1`: a `fermos.vessel`
+   * design and a `pureos.train_run`); empty for a flowsheet whole on its own.
+   */
+  builtFrom: string[];
+  /**
+   * OF-BLD-020 §6.2 (D10): the stream the flowsheet names as its fermenter's
+   * broth (its beer), by the id its run's stream table gives it: what a
+   * train's inlet takes from a scenario's newest run. Null: it names none.
+   */
+  brothStream: string | null;
 }
 
 // OF-BLD-019 §2.2 (D3) — a reference biorefinery runs whole on its package's
@@ -3248,6 +3305,10 @@ export interface Train {
   /** How many runs of this scenario are on file; the newest is read. */
   runs: number;
   note: string | null;
+  /** OF-BLD-020 §5.2: the artifact read, `proforma.run` or `pureos.train_run`; for a train run, the train it ran. */
+  tool: string;
+  trainId: string | null;
+  trainName: string | null;
 }
 
 /** One train on file, for pureOS's index (`GET /api/pureos/trains`). */
@@ -3264,6 +3325,10 @@ export interface TrainSummary {
   overallRecovery: number | null;
   runs: number;
   note: string | null;
+  /** As Train's (OF-BLD-020 §5.2). */
+  tool: string;
+  trainId: string | null;
+  trainName: string | null;
 }
 
 // ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -3313,6 +3378,72 @@ export interface ThermoProps {
   /** A preset's solve: what was found, and how, in words. */
   solved: Record<string, unknown> | null;
   /** A property the library could not compute, with its reason; what the mixture leaves out. */
+  notes: string[];
+}
+
+// ── A product's properties (OF-BLD-020 §7.1, D12) ──────────────────────
+//
+// What pureOS's proposer reads about a product: from its sequence, through
+// Biopython's ProtParam (one `protparam` artifact), and from its
+// thermodynamics, through thermosteam in the Proforma worker (one
+// `volatility` artifact). A question names a product by id, never a sequence
+// or a number.
+
+/** `POST /api/protparam` and `POST /api/thermo/volatility`: the product, by its id. */
+export interface ProductPropertyRequest {
+  product: string;
+}
+
+/** What a `protparam` artifact holds: Biopython's ProtParam on one sequence, every number the library's. */
+export interface ProtParam {
+  /** "the sequence of product <id>", "the sequence of record <id>". */
+  subject: string;
+  product: string | null;
+  /** Where the sequence was read, in words. */
+  sequenceSource: string;
+  /** Residues in the chain. */
+  length: number;
+  /** "Biopython <version>". */
+  library: string;
+  molecularWeight: number;
+  isoelectricPoint: number;
+  /** At 280 nm: every cysteine reduced, and every pair of cysteines a cystine. */
+  extinctionReduced: number;
+  extinctionCystines: number;
+  gravy: number;
+  /** The unit of each key above ("" for none). */
+  units: Record<string, string>;
+  /** How the library computes each, in words. */
+  how: Record<string, string>;
+  notes: string[];
+}
+
+/** What a `volatility` artifact holds: thermosteam's boiling points and whether the pair has a minimum-boiling azeotrope. */
+export interface Volatility {
+  product: string;
+  /** The library's own name for the product, and the partner it is asked with (water). */
+  chemical: string;
+  partner: string;
+  subject: string;
+  /** "thermosteam <version>", read in the worker. */
+  library: string;
+  P: number;
+  /** "given", or "thermosteam's Stream default". */
+  PSource: string;
+  /** The library's normal boiling point (Tb) of each; null when it holds none. */
+  boilingPoint: number | null;
+  partnerBoilingPoint: number | null;
+  /** Which of the two boils lower, the one whose mole fraction is scanned. */
+  lighter: string | null;
+  /** true: found; false: none on the grid searched; null: not searched, or the library could not say. */
+  azeotrope: boolean | null;
+  azeotropeMoleFraction: number | null;
+  azeotropeMassFraction: number | null;
+  azeotropeT: number | null;
+  /** The grid searched: the lighter chemical's mole fraction from, to, the points, and the halvings. */
+  searched: Record<string, unknown> | null;
+  units: Record<string, string>;
+  how: string;
   notes: string[];
 }
 
@@ -3438,6 +3569,18 @@ export interface ParamResolveRequest {
   startFrom?: string | null;
   durationPreset?: 'until-sugar-runs-out' | 'fit-length' | null;
   includeArchived?: boolean;
+  /** pureOS's unit scope (OF-BLD-020 §5.1): the unit's catalogue type, when no train is sent. */
+  unitType?: string | null;
+  /**
+   * pureOS's unit scope (§5.2): the whole train, so per-component keys expand
+   * over its chemicals and records bind by its program and product; the scope
+   * `pureos:unit:<train id>:inlet` is its inlet. Its typed values are not laid
+   * on here: the resolve's `overrides` are.
+   */
+  train?: TrainSpec | null;
+  /** A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the vessel design and the train run it is built from. */
+  vessel?: string | null;
+  trainRun?: string | null;
 }
 
 export interface ParamResolveResult {
@@ -3758,4 +3901,416 @@ export interface SimulationSummary {
   harvestH: number | null;
   createdAt: string;
   provenance: Provenance;
+}
+
+// ── The harvest stream (OF-BLD-020 §6.2, D10) ───────────────────────────
+//
+// A kept simulation's broth at an hour, read from the series the artifact
+// keeps (`GET /api/fermos/harvest`): nothing is integrated again and nothing
+// is kept. A train's simulation inlet reads its composition through the
+// same read, so the broth that leaves fermOS is the stream that enters pureOS.
+
+/** Where the hour a harvest is read at comes from. */
+export type HarvestHourSource = "the simulation's harvest hour" | "a person's hour";
+
+/** One state of the simulation at the hour read, in the unit it keeps. */
+export interface HarvestState {
+  /** The family's state: X (cells), S (sugar), P (product), V, N, Q. */
+  state: string;
+  value: number;
+  unit: string;
+}
+
+/** `GET /api/fermos/harvest`: a kept simulation's broth at an hour. */
+export interface FermosHarvest {
+  artifactId: string;
+  family: string;
+  strain: string | null;
+  product: string | null;
+  sugar: string | null;
+  provenance: Provenance;
+  /** The hour asked: the simulation's own harvest hour, or a person's. */
+  asked: number;
+  hourSource: HarvestHourSource;
+  /** Why that hour, in words. */
+  how: string;
+  /** The kept point the states are read at, and whether it is the hour asked. */
+  hour: number;
+  exact: boolean;
+  /** How the states were read, in words (the kept point, or the nearest one, and why). */
+  read: string;
+  /** The simulation's own harvest hour, and the last hour it keeps. */
+  harvestH: number;
+  runEndH: number;
+  /** Every state the simulation keeps a series of, in its family's order. */
+  states: HarvestState[];
+  /** What the family does not model is absent from the broth, in words. */
+  absent: string;
+}
+
+// ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
+//
+// Each entry is one unit type a train can hold: a BioSTEAM class, or one of
+// the three in-house units BioSTEAM lacks, with every parameter its
+// constructor takes either a ParameterSpec or named as not offered, with why.
+// Its id is a `UNIT_OPERATIONS` id. Served by `GET /api/pureos/catalogue`
+// (from data, no simulator) and `GET /api/pureos/catalogue/{id}/specs`
+// (BioSTEAM's defaults, read in the Proforma worker).
+
+/** Where a unit sits in a train, fermenter to product. */
+export type UnitStage =
+  | 'harvest'
+  | 'disruption'
+  | 'clarification'
+  | 'concentration'
+  | 'capture'
+  | 'polish'
+  | 'formulation'
+  | 'drying'
+  | 'utility';
+
+/** One inlet or outlet of a catalogue unit, in words. */
+export interface UnitPort {
+  side: 'in' | 'out';
+  index: number;
+  name: string;
+  what: string;
+  /** An outlet the product goes on by, by default. */
+  onward: boolean;
+  /** An inlet's stream: from the unit before, one the train supplies beside the line, or one the unit sizes itself. */
+  source: 'upstream' | 'side' | 'unit' | null;
+  /** Takes any number of streams here, which the class mixes. */
+  many: boolean;
+}
+
+/** A constructor parameter the panel does not offer, and why. */
+export interface NotOffered {
+  name: string;
+  why: string;
+}
+
+/** What a unit needs set before it runs: one of the alternatives, each a list of keys that must all hold a value. */
+export interface UnitNeed {
+  alternatives: string[][];
+  why: string;
+}
+
+/** A catalogue entry without its specs. */
+export interface UnitType {
+  id: string;
+  name: string;
+  line: string;
+  stage: UnitStage;
+  biosteamClass: string | null;
+  inhouseClass: string | null;
+  insOuts: UnitPort[];
+  /** Whether BioSTEAM costs it; the in-house units have no cost model. */
+  costModel: boolean;
+  notes: string[];
+  notOffered: NotOffered[];
+  needs: UnitNeed[];
+  /** The vocabulary ids it stands for beside its own. */
+  maps: string[];
+  specCount: number;
+}
+
+/** A parameter's default as the class gives it, read from its code, and where. */
+export interface UnitDefault {
+  key: string;
+  value: number | string | null;
+  readFrom: string;
+}
+
+/** How one spec reaches the class; a template key is expanded per component or per effect. */
+export interface UnitParamMap {
+  key: string;
+  name: string;
+  via: 'argument' | 'attribute';
+  per: 'component' | 'effect' | null;
+  how: string | null;
+}
+
+/** An entry's specs with the choices and bounds its class gives, each default as read, and how each reaches it. */
+export interface UnitSpecs {
+  id: string;
+  biosteamClass: string | null;
+  inhouseClass: string | null;
+  specs: ParameterSpec[];
+  defaults: UnitDefault[];
+  params: UnitParamMap[];
+  notOffered: NotOffered[];
+  needs: UnitNeed[];
+  /** The chemicals a chemical-valued parameter chooses from: the yeast program's set, until a train names its own. */
+  chemicals: string[];
+  versions: Record<string, string>;
+  notes: string[];
+}
+
+// ── pureOS builds the train (OF-BLD-020 §5.2, D9, D10, E.2‴) ──────────
+//
+// A train is data: an inlet, then units in order, each a catalogue type with
+// what a person typed (Override-shaped, D3), the records named for a
+// parameter, each outlet's routing and optionally a shelf flowsheet's own unit
+// to read its values from. The worker builds and runs it; one
+// `pureos.train_run` artifact keeps it; `pureos.train_of` reads it.
+
+/** A value a person typed for one parameter of a train's unit or inlet: an Override without scope and key. */
+export interface TrainParam {
+  value: number | string;
+  low?: number | null;
+  high?: number | null;
+  by: string;
+  at: string;
+  note?: string | null;
+}
+
+/** Where a train's broth comes from (D10). */
+export interface TrainInlet {
+  kind: 'simulation' | 'run-stream' | 'typed';
+  /** A `fermos.simulation`, or a run (`proforma.run`, `proforma.reference`, `pureos.train_run`) whose stream it is; null when typed. */
+  ref?: string | null;
+  /** The run's stream (run-stream alone). */
+  streamId?: string | null;
+  /** A `fermos.vessel` design of the simulation, which gives the broth flow (simulation alone). */
+  vessel?: string | null;
+  /** The inlet's typed values by key (broth_flow, harvest_hour, conc.<chemical>, T, P). */
+  params?: Record<string, TrainParam>;
+}
+
+/** A shelf flowsheet's own unit whose values a train's unit takes, read in the worker, never typed. */
+export interface TrainUnitReadFrom {
+  flowsheet: string;
+  unit: string;
+}
+
+/** One unit of a train, in order (D9). */
+export interface TrainUnitSpec {
+  /** The BioSTEAM unit id: a letter, then letters, digits or underscores. */
+  id: string;
+  /** A catalogue id. */
+  type: string;
+  params?: Record<string, TrainParam>;
+  /** Outlet name → 'onward' | 'waste' | 'recycle:<earlier unit id>'; one not named takes the catalogue's default. */
+  outlets?: Record<string, string>;
+  /** Record ids named for a parameter, by key. */
+  records?: Record<string, string[]>;
+  readFrom?: TrainUnitReadFrom | null;
+}
+
+/** A train as data (D9), kept whole in this browser and sent with a run. */
+export interface TrainSpec {
+  id: string;
+  name: string;
+  program: string;
+  /** A product id; thermo's CHEMICALS names the library chemical it is. */
+  product: string;
+  inlet: TrainInlet;
+  units: TrainUnitSpec[];
+}
+
+/** `POST /api/pureos/train/validate`: every refusal at once; runs nothing. `POST /api/pureos/train/check` answers the same shape with everything a run would refuse (OF-BLD-020 §5.3). */
+export interface TrainValidation {
+  ok: boolean;
+  refusals: string[];
+  /** The same refusals by their place: a unit's id, `inlet`, or `train`. */
+  places: Record<string, string[]>;
+}
+
+/** `POST /api/pureos/train/run`. */
+export interface TrainRunRequest {
+  train: TrainSpec;
+  /** Overrides of `pureos:unit:<train id>:<unit id | inlet>`, each replacing the train's value of its key. */
+  overrides?: Override[];
+  by?: string | null;
+  includeArchived?: boolean;
+}
+
+export interface StreamImpurity {
+  chemical: string;
+  massFraction: number;
+}
+
+/** One stream of a train run: the product's mass share and its largest other components. */
+export interface StreamPurity {
+  stream: string;
+  massFlow: number;
+  productFraction: number | null;
+  impurities: StreamImpurity[];
+}
+
+export interface TrainPurity {
+  /** The chemical traced. */
+  product: string;
+  productStream: string | null;
+  productFraction: number | null;
+  streams: StreamPurity[];
+  /** How many of each stream's largest other components are named (a reading convention). */
+  impuritiesShown: number;
+  note: string;
+}
+
+/** One unit's cost as BioSTEAM gives it, or why there is none. */
+export interface TrainUnitCost {
+  unit: string;
+  type: string;
+  unitClass: string;
+  costModel: boolean;
+  purchaseCost: number | null;
+  installedCost: number | null;
+  /** BioSTEAM's purchase cost by item, USD. */
+  items: Record<string, number>;
+  note: string | null;
+}
+
+/** What a train run's inlet was and where it came from (D10). */
+export interface TrainInletRead {
+  kind: 'simulation' | 'run-stream' | 'typed';
+  ref: string | null;
+  refTool: string | null;
+  streamId: string | null;
+  vessel: string | null;
+  chemicals: string[];
+  /** g L⁻¹ by chemical, water aside (a simulation's harvest, or typed). */
+  concentrations: Record<string, number> | null;
+  /** kg/hr by chemical as the worker built the stream, water included. */
+  flows: Record<string, number>;
+  water: number | null;
+  waterNote: string | null;
+  /** m³/hr. */
+  brothFlow: number | null;
+  harvestHour: number | null;
+  T: number;
+  P: number;
+  phase: string;
+  absent: string | null;
+  notes: string[];
+}
+
+/** One unit's parameters as its run's basis holds them. */
+export interface TrainUnitParameters {
+  unit: string;
+  type: string;
+  unitClass: string;
+  values: ParameterValue[];
+}
+
+/** `POST /api/pureos/train/run`: the one `pureos.train_run` artifact, read. */
+export interface TrainRun {
+  artifactId: string;
+  provenance: Provenance;
+  createdAt: string;
+  spec: TrainSpec;
+  train: Train;
+  purity: TrainPurity;
+  costs: TrainUnitCost[];
+  inlet: TrainInletRead;
+  parameters: TrainUnitParameters[];
+  notes: string[];
+  flags: string[];
+  basis: ComputedBasis;
+  /** The run's own tables beside the train (OF-BLD-020 §5.3): the unit table, the utilities, the diagram or the words why not and the units in run order. */
+  units: UnitRow[];
+  utilities: UtilityDuties | null;
+  diagram: string | null;
+  diagramNote: string | null;
+  unitOrder: string[];
+}
+
+/** `POST /api/pureos/train/from-run` (OF-BLD-020 §5.3): a kept run's units read into a train. */
+export interface TrainFromRunRequest {
+  /** A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact. */
+  artifactId: string;
+  /** The id the train takes; by default `from-<artifact id>`. */
+  trainId?: string | null;
+  includeArchived?: boolean;
+}
+
+/** A unit of the run the train does not take, and why. */
+export interface TrainUnmapped {
+  unitId: string;
+  unitClass: string;
+  why: string;
+}
+
+/** A run's train as data, what it leaves out, what it says, and its structural refusals (validate's). */
+export interface TrainFromRun {
+  train: TrainSpec;
+  unmapped: TrainUnmapped[];
+  notes: string[];
+  refusals: string[];
+}
+
+/**
+ * A train a model built with `pureos_build` or `pureos_write` (OF-BLD-020
+ * §5.4), kept on the service in `core/data/pureos-trains.json`:
+ * `GET /api/pureos/trains-kept`. A person's trains stay in this browser.
+ */
+export interface KeptTrain {
+  spec: TrainSpec;
+  /** A model, always. */
+  agent: 'model';
+  /** The model id that made it. */
+  madeBy: string;
+  effort: string | null;
+  /** The ask that made it; null for a call from the endpoint or the MCP server. */
+  askId: string | null;
+  /** ISO 8601, UTC. */
+  at: string;
+  updatedAt: string;
+}
+
+/** `core/data/pureos-trains.json`. */
+export interface KeptTrains {
+  trains: KeptTrain[];
+}
+
+// ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
+
+/** `POST /api/pureos/propose`: ids and words, never a number. */
+export interface ProposeRequest {
+  /** A products seed id, or a product thermosteam's library is asked about by name (ethanol). */
+  product: string;
+  /** A geneOS host (strain) id: the cells the product is made in. */
+  host: string;
+  /** A kept fermOS simulation's id, or `<run artifact id>/<stream id>`; none, and the inlet is typed. */
+  inletRef?: string | null;
+  includeArchived?: boolean;
+}
+
+/** Why one unit of a proposal is there: its rule, the property it read and the artifact that holds it. */
+export interface ProposalReason {
+  unitId: string;
+  rule: string;
+  /** boilingPoint, azeotrope, molecularWeight, isoelectricPoint (an artifact's), or class, location (the products seed's). */
+  property: string;
+  /** Null when the products seed states the property. */
+  artifactId: string | null;
+  /** Words, with no number in them. */
+  words: string;
+}
+
+/** A property the rules needed and nothing holds, and why. */
+export interface ProposalMissing {
+  property: string;
+  why: string;
+}
+
+/**
+ * A train proposed by written rules, or none with what is missing. Named apart
+ * from `Proposal`, a write a model proposed at a gate (OF-BLD-015 §7.4).
+ */
+export interface TrainProposal {
+  product: string;
+  host: string;
+  program: string | null;
+  /** protein, small molecule, polymer; null when nothing states it. */
+  productClass: string | null;
+  /** Null when nothing is proposed; every unit's params and records are empty. */
+  train: TrainSpec | null;
+  /** One a unit, in the train's order. */
+  reasons: ProposalReason[];
+  missing: ProposalMissing[];
+  /** The property artifacts read (volatility, protparam), by id. */
+  artifacts: string[];
+  notes: string[];
 }

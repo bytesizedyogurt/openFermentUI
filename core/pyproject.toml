@@ -16,6 +16,11 @@ dependencies = [
     # Thread Q — Intake reads the text layer of an OSTI report's PDF, one
     # section per page. Pure Python; `pnpm intake:fetch` runs without extras.
     "pypdf>=5",
+    # OF-BLD-020 §7.1 — a protein product's molecular weight, isoelectric
+    # point, extinction coefficients and GRAVY from its sequence, through
+    # Biopython's ProtParam (protparam.py). Imported by the service itself,
+    # not a worker.
+    "biopython>=1.88",
 ]
 
 [project.optional-dependencies]

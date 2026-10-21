@@ -136,7 +136,7 @@
       "recordsByParam": {}
     },
     "body": {
-      "artifactId": "e137a9d1c39dc8b1",
+      "artifactId": "420a1dc13a09ac1a",
       "provenance": "demo",
       "family": "chemostat_v1",
       "title": "Chemostat",
@@ -1800,7 +1800,7 @@
       ],
       "basis": {
         "tool": "fermos.simulation",
-        "toolVersion": "kinetics chemostat_v1 1 · scipy 1.18.1",
+        "toolVersion": "kinetics chemostat_v1 2 · scipy 1.18.1",
         "inputs": [
           {
             "name": "family",
@@ -2122,7 +2122,7 @@
             }
           }
         ],
-        "artifactId": "e137a9d1c39dc8b1",
+        "artifactId": "420a1dc13a09ac1a",
         "at": "2026-09-15T09:00:00Z",
         "seed": null
       }

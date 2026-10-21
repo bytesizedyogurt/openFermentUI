@@ -13,19 +13,28 @@ Fails when:
    import may not;
 2b. a tool file other than `tools/writes.py` reaches what keeps a Proforma
    run, a simulation, a vessel or a train, or writes an audit line itself
-   (OF-BLD-019 §6.1, §6.R; OF-BLD-020 §3.4): `run_flowsheet` and
-   `fermos_simulate` are free, audited writes, and run through
-   `writes.run_scenario` and `writes.run_simulation`, so rule 2 reads their
-   one call to `proforma.run` and to `fermos.simulate`. What keeps a run is
-   found, not listed: every function of the service that calls
-   `artifacts.compute` for a `proforma.run`, `proforma.reference`,
-   `proforma_benchmark`, `fermos.simulation`, `fermos.vessel` or
-   `pureos.train_run` artifact (or for a tool it cannot name) or
-   `audit.append`, and every function that reaches one of those, to a fixed
-   point, each name followed through its import as rule 2 follows it. A tool
-   file may reach none of them but through writes.py, may not call
-   `artifacts.compute` for a run, and, as in rule 2, may not hand a store
-   module around bare or import by name at run time;
+   (OF-BLD-019 §6.1, §6.R; OF-BLD-020 §3.4, §5.4): `run_flowsheet`,
+   `fermos_simulate` and `pureos_build` are free, audited writes, and run
+   through `writes.run_scenario`, `writes.run_simulation` and writes.py's
+   train functions, so rule 2 reads their calls to `proforma.run`,
+   `fermos.simulate`, `pureos.kept.keep_train` and
+   `pureos.train_spec.run_train`. What keeps a run is found, not listed:
+   every function of the service that calls `artifacts.compute` for a
+   `proforma.run`, `proforma.reference`, `proforma_benchmark`,
+   `fermos.simulation`, `fermos.vessel` or `pureos.train_run` artifact (or for
+   a tool it cannot name) or `audit.append`, or that writes through `atomic`
+   in a module naming a store a model's write keeps (`KEPT_STORES`: the trains
+   a model built, `pureos-trains.json`, OF-BLD-020 §5.4), and every function
+   that reaches one of those, to a fixed point, each name followed through its
+   import as rule 2 follows it. A tool file may reach none of them but through
+   writes.py, may not call `artifacts.compute` for a run, and, as in rule 2,
+   may not hand a store module around bare or import by name at run time.
+   OF-BLD-020 §5.R (finding 18): a function that writes through `atomic` and
+   names a kept store's file by a function or constant of the module that
+   names it (`kept.path()`, `kept.FILE`) is a writer wherever it lives, and a
+   tool file writes no file itself: it may not reach `atomic.write_text` or
+   `write_bytes`, nor call a path's or a handle's write, a dump, a file made,
+   moved or taken away, or `open` with a mode that writes;
 3. a gated action can complete without a person's id on it: every (module,
    action) in `gates.GATES` comes back `proposed` with nothing written but
    the proposal, and carrying it out with no name, a placeholder or one
@@ -36,9 +45,9 @@ Fails when:
 5. the registry is not the closed list: a name in `WHITELIST` with no tool
    registered under it, or one `docs/TOOLS.md` never names in backticks
    (OF-BLD-019 §4.2 added the thirtieth, `thermo_props`, §6.1
-   `run_flowsheet` and `stream_table`, and OF-BLD-020 §3.4 `fermos_simulate`
-   and §4.2 `fermos_vessel`, by the build documents' authority; a name added
-   to the code alone is a tool nobody wrote down);
+   `run_flowsheet` and `stream_table`, and OF-BLD-020 §3.4 `fermos_simulate`,
+   §4.2 `fermos_vessel` and §5.4 `pureos_build`, by the build documents'
+   authority; a name added to the code alone is a tool nobody wrote down);
 6. a fermOS or pureOS tool's input schema holds a numeric field (E.4‴: a
    model's parameter is a source, never a value): `number` or `integer`
    anywhere in the schema of a tool named `fermos_*` or `pureos_*`, a
@@ -105,6 +114,11 @@ ALLOWED_WRITES = (
     # proforma_write's run and the registry's run_flowsheet alike, both through
     # writes.run_scenario (OF-BLD-019 §6.1; rule 2b).
     "proforma.run",
+    # pureos_write's train actions and the registry's pureos_build alike, both
+    # through writes.py's train functions (OF-BLD-020 §5.4; rule 2b): the one
+    # write to the store of the trains a model built, and a train's run.
+    "pureos.kept.keep_train",
+    "pureos.train_spec.run_train",
     "extract.add_candidate",
     "intake.fetch_paper",
     "extract.extract_paper",
@@ -114,7 +128,7 @@ ALLOWED_WRITES = (
 # The modules that keep a store: anything of theirs a write tool names is a
 # write function in ALLOWED_WRITES, an exception, or a constant.
 STORES = ("geneos", "fermos", "vessel", "proforma", "extract", "intake", "proposals", "audit", "checks", "guild",
-          "biorepo", "artifacts", "atomic")
+          "biorepo", "artifacts", "atomic", "pureos.kept", "pureos.train_spec")
 # What a write tool may never do itself.
 FORBIDDEN = ("write_text", "open(", "json.dump", ".write(", "atomic.", "_persist", "Path(", "write_bytes", "unlink(", "rename(")
 
@@ -293,6 +307,11 @@ RUN_KINDS = frozenset({_proforma_mod.RUN, _proforma_mod.REFERENCE, _proforma_mod
                        _vessel_mod.TOOL, TRAIN_RUN})
 COMPUTE = "openferment_core.artifacts.compute"
 APPEND = "openferment_core.audit.append"
+# The stores a model's free write keeps beside the artifacts, by file name
+# (OF-BLD-020 §5.4: the trains a model built). A function of a module that
+# names one and writes through `atomic` keeps it.
+KEPT_STORES = frozenset({"pureos-trains.json"})
+ATOMIC_WRITES = frozenset({"openferment_core.atomic.write_text", "openferment_core.atomic.write_bytes"})
 WRITES = f"{writes.__name__}."
 _UNKNOWN = object()
 
@@ -472,15 +491,60 @@ class _Module:
 
 service = [_Module(p) for p in sorted(PACKAGE_DIR.rglob("*.py"))
            if p.relative_to(PACKAGE_DIR).parts[0] not in WORKER_SIDE]
+# OF-BLD-020 §5.R (finding 18): the modules that name a kept store's file. A
+# function anywhere that writes through `atomic` and names that file, or
+# reaches a function of such a module (its `path()`, its `FILE` read as an
+# attribute), keeps the store as surely as one whose own module names it.
+STORE_MODULES = {mod.name for mod in service
+                 if any(isinstance(v, str) and v in KEPT_STORES for v in mod.consts.values())}
+
+
+def _names_store(mod: _Module, fn_refs: list) -> bool:
+    for _, r, a, _, t, lc in fn_refs:
+        key, obj = mod.resolve(r, a, t, lc)
+        if isinstance(obj, str) and obj in KEPT_STORES:
+            return True
+        if key and any(key.startswith(f"{m}.") for m in STORE_MODULES):
+            return True
+    return False
+
+
+# A tool file's own file writes past atomic (OF-BLD-020 §5.R, finding 18): a
+# path's or a handle's write, a dump into a handle, a file made, moved or
+# taken away, and a file opened to write. A tool file reads; it writes nothing.
+FILE_WRITES = frozenset({"write_text", "write_bytes", "write", "writelines", "dump", "touch", "mkdir", "unlink",
+                         "rename", "rmdir"})
+WRITE_MODES = frozenset("wax+")
+
+
+def _raw_writes(mod: _Module, refs: list) -> list[tuple[int, str]]:
+    found = []
+    for call in ast.walk(mod.tree):
+        if not isinstance(call, ast.Call):
+            continue
+        f = call.func
+        name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else None
+        if name in FILE_WRITES:
+            found.append((call.lineno, f".{name}()" if isinstance(f, ast.Attribute) else f"{name}()"))
+        elif name == "open":
+            mode = call.args[1 if isinstance(f, ast.Name) else 0] if len(call.args) > (1 if isinstance(f, ast.Name) else 0) \
+                else next((k.value for k in call.keywords if k.arg == "mode"), None)
+            if isinstance(mode, ast.Constant) and isinstance(mode.value, str) and set(mode.value) & WRITE_MODES:
+                found.append((call.lineno, f"open(…, {mode.value!r})"))
+    return found
+
+
 # What each function reaches, and the ones that keep a run or append to the audit log themselves.
 edges: dict[str, set[str]] = {}
 WRITERS: set[str] = {APPEND}
 for mod in service:
+    keeps_store = mod.name in STORE_MODULES
     for key, fn in mod.functions():
         fn_refs = mod.refs(fn)
         reached = {k for _, r, a, _, t, lc in fn_refs for k in [mod.resolve(r, a, t, lc)[0]] if k}
         edges[key] = {k for k in reached if not k.startswith(WRITES)}
-        if APPEND in reached or mod.run_computes(fn, fn_refs):
+        if APPEND in reached or mod.run_computes(fn, fn_refs) or (
+                reached & ATOMIC_WRITES and (keeps_store or _names_store(mod, fn_refs))):
             WRITERS.add(key)
 grew = True
 while grew:
@@ -490,9 +554,11 @@ while grew:
             WRITERS.add(key)
             grew = True
 if not {f"{_proforma_mod.__name__}.run", f"{_proforma_mod.__name__}.run_flowsheet", APPEND,
-        f"{_fermos_mod.__name__}.simulate", f"{_vessel_mod.__name__}.design"} <= WRITERS:
-    fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet, fermos.simulate, vessel.design and "
-         "audit.append among the writers: it has stopped reading the service")
+        f"{_fermos_mod.__name__}.simulate", f"{_vessel_mod.__name__}.design",
+        "openferment_core.pureos.kept.keep_train", "openferment_core.pureos.train_spec.run_train"} <= WRITERS:
+    fail("rule 2b no longer finds proforma.run, proforma.run_flowsheet, fermos.simulate, vessel.design, "
+         "pureos.kept.keep_train, pureos.train_spec.run_train and audit.append among the writers: it has stopped "
+         "reading the service")
 
 for mod in service:
     if mod.path.parent != TOOLS_DIR or mod.path.name == "writes.py":
@@ -520,13 +586,25 @@ for mod in service:
         if isinstance(obj, types.ModuleType) and obj.__name__ in _STORE_NAMES:
             fail(f"{where} line {line} hands the store module {_STORE_NAMES[obj.__name__]} around bare ({spelled}): "
                  "a tool file names what it reads of a store")
+        elif key in ATOMIC_WRITES:
+            # OF-BLD-020 §5.R (finding 18): a tool file never writes a file
+            # through atomic itself, whatever path it names: the store a
+            # model's write keeps (its own copy of the file's name, the
+            # store's path function, the data directory and the name) is
+            # written by its module's write function, through writes.py.
+            fail(f"{where} line {line} writes a file through {key} itself (as {spelled}): a tool file keeps "
+                 "nothing; a write goes through tools/writes.py to its module's write function, where rule 2 "
+                 "reads it")
         elif key in WRITERS and key not in own and not key.startswith(WRITES):
             fail(f"{where} line {line} reaches {key} (as {spelled}), which keeps a Proforma run, a simulation, a "
-                 "vessel or a train, or writes an audit line: a tool that does goes through tools/writes.py, where "
-                 "rule 2 reads it")
+                 "vessel, a train run or a train a model built, or writes an audit line: a tool that does goes through "
+                 "tools/writes.py, where rule 2 reads it")
     for line, kept in mod.run_computes(mod.tree, tool_refs):
         fail(f"{where} line {line} keeps {kept} through artifacts.compute itself: a tool that keeps a run goes "
              "through tools/writes.py, where rule 2 reads it")
+    for line, how in _raw_writes(mod, tool_refs):
+        fail(f"{where} line {line} writes a file itself ({how}): a tool file keeps nothing; a write goes through "
+             "tools/writes.py to its module's write function, where rule 2 reads it")
 
 # 3. a gated action completes only with a person's name on it
 data = Path(os.environ["OPENFERMENT_DATA_DIR"])
@@ -626,6 +704,6 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 print(f"✓ check:tools  {len(module_stores.MODULES)} modules with a read and a write tool; writes.py calls only "
-      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel or a train) or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
+      f"{len(ALLOWED_WRITES)} module write functions, and no other tool file reaches any of the {len(WRITERS)} functions that keep a run (Proforma's, a simulation, a vessel or a train), a train a model built, or write an audit line; {sum(len(g.actions) for g in gates.GATES)} gated actions need a person; "
       f"{len(coded)} gates in gates.py and docs/TOOLS.md alike; {len(tools.WHITELIST)} tools, each registered and "
       f"written down; no fermOS or pureOS tool takes a number")

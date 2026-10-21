@@ -66,3 +66,12 @@ export const FERMOS_TABS: OwnerTab[] = [
   { label: 'Vessel', to: '/fermos/vessel' },
   { label: 'Forecast', to: '/fermos/forecast' },
 ];
+
+// OF-BLD-020 §5.3 — pureOS's views: the trains on file (its front page), the
+// Builder (a train built unit by unit from the catalogue) and a train read
+// from a run, in the order a train is made and read.
+export const PUREOS_TABS: OwnerTab[] = [
+  { label: 'Trains', to: '/pureos' },
+  { label: 'Builder', to: '/pureos/build' },
+  { label: 'Train', to: '/pureos/train' },
+];

@@ -144,6 +144,8 @@ export function createServiceDouble({ dist, seedOnly = false }) {
    * scope that long, as a cold service's first read waits on BioSTEAM.
    */
   const flags = { fermosFitsOnFile: false, ceilingOnFile: false, pureosYeastOnFile: true, vesselSimulationsOnFile: false, vesselDelayMs: 0, vesselScopeDelayMs: 0 };
+  /** OF-BLD-020 §6.1: the vessel designs this double answered, newest first, as GET /api/fermos/vessels lists them. */
+  const vesselsKept = [];
   /** The ceiling checks the browser asked for (OF-BLD-019 §5.2): each query, as sent. */
   const ceilingChecks = [];
   /** Reference biorefineries the browser asked to run (OF-BLD-019 §2.2). */
@@ -158,6 +160,10 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   /** thermosteam's answers the browser asked for and got (OF-BLD-019 §4.2), by question. */
   const thermoKept = new Map();
   const thermoCalls = [];
+  /** pureOS's proposals the browser asked for (OF-BLD-020 §7.2): each POST /api/pureos/propose body, as sent. */
+  const pureosProposals = [];
+  /** OF-BLD-020 §5.R: each ask for the trains a model built (GET /api/pureos/trains-kept), by the switch it carried. */
+  const keptTrainAsks = [];
   /**
    * The parameter panel (OF-BLD-020 §2.2): each scope the browser asked for
    * (GET /api/params/{scope}, with its query) and each resolve it posted
@@ -183,6 +189,17 @@ export function createServiceDouble({ dist, seedOnly = false }) {
   const fermosBinds = [];
   const fermosSimulates = [];
   const fermosSimulationsOnFile = [];
+  /** OF-BLD-020 §6.2: each GET /api/fermos/harvest the browser made, `{ simulation, hour }` as sent (hour null for none). */
+  const harvestReads = [];
+  /**
+   * pureOS → Builder (OF-BLD-020 §5.3): every Builder call the browser made
+   * (catalogue specs, scopes, resolves, validate, check, run, from-run), each
+   * `{ path, body }` as sent; and the train runs the double holds, empty as a
+   * fresh install starts, the fixture's one (under the asked train's id,
+   * name and person) once the browser ran the train it recorded.
+   */
+  const builderCalls = [];
+  const trainRunsOnFile = [];
   /** The fixture's binding key for an ask: its family and strain (none: every strain). */
   const simKey = (ask) => `${ask.family}|${ask.strain ?? ''}`;
   /** Whether the double recorded this ask: ethanol on glucose from the records, until the sugar runs out. */
@@ -462,6 +479,32 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify([...fermosSimulationsOnFile, ...vessel.filter((s) => !seen.has(s.artifactId))]));
     }
+    // OF-BLD-020 §6.2 — a kept simulation's broth at an hour, as the real
+    // fermos.harvest read it from the fixture's simulation's kept series
+    // (fermos-simulate.json's `harvest`: its own hour, a person's mid-run
+    // kept point, and an hour past its end, refused in its words), once
+    // Simulate has kept that simulation; an hour the fixture holds no read
+    // of is the double's 422 in words, and a simulation not on file the
+    // service's 404.
+    if (url === '/api/fermos/harvest' && req.method === 'GET') {
+      const q = new URL(req.url ?? '/', 'http://double').searchParams;
+      const id = q.get('simulation') ?? '';
+      const hour = q.get('hour');
+      harvestReads.push({ simulation: id, hour: hour == null ? null : Number(hour) });
+      const answer = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      if (!fermosSimulationsOnFile.some((x) => x.artifactId === id))
+        return answer(404, { detail: `there is no kept simulation ${id} here: fermOS → Simulate keeps one` });
+      const reads = (await prototype('fermos-simulate.json')).harvest.filter((r) => r.request.simulation === id);
+      const entry = reads.find((r) => (hour == null ? r.request.hour == null : r.request.hour != null && Number(hour) === r.request.hour));
+      if (!entry) {
+        const held = reads.filter((r) => r.request.hour != null).map((r) => `${r.request.hour} h`);
+        return answer(422, { detail: `the double holds the broth of simulation ${id} at its own harvest hour and at ${held.join(' and ')}; it reads no other hour` });
+      }
+      return answer(entry.status, entry.body);
+    }
     // OF-BLD-019 §5.1 — the fits fermOS keeps, with what each can feed a
     // flowsheet, as the real code listed them over an empty store and over
     // the stand-in fit and forecast (flags.fermosFitsOnFile picks which);
@@ -498,6 +541,161 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     // on; one train by its scenario or its run's artifact id, either run's,
     // else the service's 404 in its words. With flags.pureosYeastOnFile off
     // the double holds no yeast run, so the empty list's words stay tested.
+    // OF-BLD-020 §5.3 — pureOS → Builder, from pureos-builder.json, which
+    // demo.py --prototype made by running the real code (the real Proforma
+    // worker on BioSTEAM where the sim extra is installed, else a stand-in
+    // worker; its `worker.kind` says which) over the three-unit train the
+    // browser tests build: the catalogue; each type's specs the train uses;
+    // each place's scope, served for a train of the same place and type under
+    // the asked train's id, and its resolve laying each override on as the
+    // service does; the validation and check at three moments (one unit,
+    // three units, every value typed), matched by what the train holds
+    // (`builderKey`, the same key demo.builder_key writes, never its id, name
+    // or who typed); the run of the train with every value typed; the train
+    // runs on file after it; the train read back from that run; and the
+    // refusal of a run whose classes no type holds. Anything else is answered
+    // in the double's own words, never as a result.
+    {
+      const fx = () => prototype('pureos-builder.json');
+      const sendJson = (status, body) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(body));
+      };
+      const readBody = async () => {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        return JSON.parse(raw || '{}');
+      };
+      const pairs = (o) => Object.entries(o ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      const canon = (v) =>
+        Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v;
+      const valuesOf = (ps) => pairs(ps).map(([k, v]) => [k, v?.value ?? null]);
+      const builderKey = (t) =>
+        JSON.stringify(
+          canon({
+            program: t.program,
+            product: t.product,
+            inlet: [t.inlet?.kind ?? null, t.inlet?.ref ?? null, t.inlet?.streamId ?? null, t.inlet?.vessel ?? null, valuesOf(t.inlet?.params)],
+            units: (t.units ?? []).map((u) => [u.id, u.type, valuesOf(u.params), pairs(u.outlets), u.readFrom ?? null, pairs(u.records)]),
+          }),
+        );
+      const recordedKey = (k) => JSON.stringify(canon(JSON.parse(k)));
+      const words = (x) => JSON.stringify(String(x)).slice(1, -1);
+      /** The fixture's answer under another train's id, name and person, as the service would have written it for them. */
+      const under = (value, f, train) => {
+        let text = JSON.stringify(value);
+        if (train?.id) text = text.split(words(f.trainId)).join(words(train.id));
+        if (train?.name) text = text.split(words(f.train.name)).join(words(train.name));
+        if (train?.by) text = text.split(words(f.by)).join(words(train.by));
+        return JSON.parse(text);
+      };
+      const NONE = "the double holds the answers for the three-unit train the browser tests build (a typed broth, a centrifuge, a tank and a pump, with the fixture's values); it cannot judge this train";
+      if (url === '/api/pureos/catalogue' && req.method === 'GET') return sendJson(200, (await fx()).catalogue);
+      const specsOf = /^\/api\/pureos\/catalogue\/([^/]+)\/specs$/.exec(url);
+      if (specsOf && req.method === 'GET') {
+        const f = await fx();
+        const id = specsOf[1];
+        builderCalls.push({ path: url, body: null });
+        if (f.specs[id]) return sendJson(200, f.specs[id]);
+        if (!f.catalogue.some((t) => t.id === id)) return sendJson(404, { detail: `there is no unit type ${id} in the catalogue` });
+        return sendJson(422, { detail: `the double holds the parameters of ${Object.keys(f.specs).join(', ')}; it cannot read ${id}'s class` });
+      }
+      const unitScope = /^\/api\/params\/pureos:unit:([A-Za-z0-9][A-Za-z0-9._-]{0,127}):([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
+      if (unitScope) {
+        const [, trainId, place, resolving] = unitScope;
+        if (Boolean(resolving) !== (req.method === 'POST')) return sendJson(405, { detail: 'Method Not Allowed' });
+        const scope = `pureos:unit:${trainId}:${place}`;
+        let ask;
+        if (resolving) ask = await readBody();
+        else {
+          const q = new URL(req.url ?? '/', 'http://double').searchParams;
+          ask = { unitType: q.get('unitType'), train: q.get('train') ? JSON.parse(q.get('train')) : null };
+        }
+        builderCalls.push({ path: url, body: ask });
+        (resolving ? paramResolves : paramScopes).push({ scope, ...ask });
+        const train = ask.train ?? null;
+        if (!train) return sendJson(404, { detail: `pureOS's train units are served with their train (?train=, OF-BLD-020 §5.2)` });
+        if (train.id !== trainId) return sendJson(422, { detail: `this scope names train ${trainId}; the train sent is ${train.id}` });
+        const f = await fx();
+        const unit = place === 'inlet' ? null : (train.units ?? []).find((u) => u.id === place);
+        if (place !== 'inlet' && !unit)
+          return sendJson(404, { detail: `train ${trainId} has no unit ${place}; its units are ${(train.units ?? []).map((u) => u.id).join(', ') || 'none'} and its inlet` });
+        if (unit && ask.unitType && ask.unitType !== unit.type) return sendJson(422, { detail: `unit ${place} of train ${trainId} is a ${unit.type}, not a ${ask.unitType}` });
+        const entry = f.scopes.find((sc) => sc.unit === place && (sc.type ?? null) === (unit ? unit.type : null));
+        const fits = entry && train.program === f.train.program && train.product === f.train.product && (place !== 'inlet' || train.inlet?.kind === 'typed');
+        if (!fits) return sendJson(422, { detail: `the double holds the scopes of a typed broth and of ${f.scopes.filter((sc) => sc.type).map((sc) => `${sc.unit} as a ${sc.type}`).join(', ')}, in a ${f.train.program} train of ${f.train.product}; it cannot bind this place` });
+        if (entry.status !== 200) return sendJson(entry.status, entry.body);
+        const served = { ...under(entry.body, f, { id: trainId }), scope };
+        if (!resolving) return sendJson(200, served);
+        const overrides = ask.overrides ?? [];
+        const why = overrideRefusal(scope, overrides, served.specs.map((sp) => sp.key));
+        if (why) return sendJson(422, { detail: why });
+        const specs = new Map(served.specs.map((sp) => [sp.key, sp]));
+        for (const o of overrides)
+          if (!specs.get(o.key).sourceRule.includes('assumption'))
+            return sendJson(422, { detail: `${o.key} is the library's own default, read from its code, and takes no person's value` });
+        const values = laidOn(served.values, overrides);
+        const basisInputs = values
+          .filter((v) => v.overriddenBy)
+          .flatMap((v) => [
+            { name: v.key, value: v.value, unit: specs.get(v.key).unit, source: v.source },
+            ...(v.low != null ? [{ name: `${v.key} low`, value: v.low, unit: specs.get(v.key).unit, source: v.source }] : []),
+            ...(v.high != null ? [{ name: `${v.key} high`, value: v.high, unit: specs.get(v.key).unit, source: v.source }] : []),
+          ]);
+        return sendJson(200, { scope, values, waiting: values.filter((v) => v.origin === 'waiting').map((v) => v.key), basisInputs, warnings: [], notes: served.notes });
+      }
+      if ((url === '/api/pureos/train/validate' || url === '/api/pureos/train/check') && req.method === 'POST') {
+        const asked = await readBody();
+        builderCalls.push({ path: url, body: asked });
+        const train = url.endsWith('/validate') ? asked : asked.train;
+        if (!train || !Array.isArray(train.units)) return sendJson(422, { detail: 'a train is sent whole: its id, name, program, product, inlet and units' });
+        const f = await fx();
+        const recorded = f[url.endsWith('/validate') ? 'validations' : 'checks'].find((c) => recordedKey(c.key) === builderKey(train));
+        if (recorded) return sendJson(recorded.status, under(recorded.body, f, { id: train.id, name: train.name }));
+        return sendJson(200, { ok: false, refusals: [NONE], places: { train: [NONE] } });
+      }
+      if (url === '/api/pureos/train/run' && req.method === 'POST') {
+        const asked = await readBody();
+        builderCalls.push({ path: url, body: asked });
+        const f = await fx();
+        const train = asked.train;
+        if (!train || builderKey(train) !== recordedKey(f.run.key)) return sendJson(422, { detail: `${NONE}, nor run it` });
+        const who = { id: train.id, name: train.name, by: String(asked.by ?? asked.overrides?.[0]?.by ?? '').trim() || null };
+        const body = { ...under(f.run.body, f, who), spec: train };
+        trainRunsOnFile.splice(0, trainRunsOnFile.length, { who, summaries: under(f.trainRuns, f, who), train: under(f.trainOf, f, who) });
+        return sendJson(200, body);
+      }
+      if (url === '/api/pureos/train-runs' && req.method === 'GET') return sendJson(200, trainRunsOnFile.flatMap((r) => r.summaries));
+      if (url.startsWith('/api/pureos/train/') && req.method === 'GET') {
+        const key = decodeURIComponent(url.slice('/api/pureos/train/'.length));
+        const held = trainRunsOnFile.find((r) => key === r.who.id || key === r.train.artifactId);
+        if (held) return sendJson(200, held.train);
+      }
+      if (url === '/api/pureos/train/from-run' && req.method === 'POST') {
+        const asked = await readBody();
+        builderCalls.push({ path: url, body: asked });
+        const f = await fx();
+        const entry = f.fromRun.find((e) => e.request.artifactId === asked.artifactId);
+        // The run's own artifact is on file only once the browser ran it, as the service keeps it then.
+        const ran = trainRunsOnFile.find((r) => r.train.artifactId === asked.artifactId);
+        if (!entry || (asked.artifactId === f.run.body.artifactId && !ran)) return sendJson(404, { detail: `no artifact ${asked.artifactId} is on file here` });
+        if (entry.status !== 200) return sendJson(entry.status, entry.body);
+        const read = ran ? under(entry.body, f, ran.who) : entry.body;
+        const id = asked.trainId ?? `from-${asked.artifactId}`;
+        return sendJson(200, JSON.parse(JSON.stringify(read).split(words(`from-${asked.artifactId}`)).join(words(id))));
+      }
+    }
+    // OF-BLD-020 §5.R — the trains a model built, kept on the service, as the
+    // real pureos.kept lists them (pureos-trains-kept.json, made by demo.py
+    // --prototype in a throwaway store): with the switch off, and, asked with
+    // ?includeArchived=true, on. Each ask is recorded.
+    if (url === '/api/pureos/trains-kept' && req.method === 'GET') {
+      const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
+      keptTrainAsks.push({ includeArchived: on });
+      const kept = await prototype('pureos-trains-kept.json');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(on ? kept.listedArchived : kept.listed));
+    }
     const yeastTrain = (t) => t.scenarioId === 'sc-yeast-1' || t.program === 'yeast';
     if (url === '/api/pureos/trains' && req.method === 'GET') {
       const on = new URL(req.url ?? '/', 'http://double').searchParams.get('includeArchived') === 'true';
@@ -517,6 +715,24 @@ export function createServiceDouble({ dist, seedOnly = false }) {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(train));
+    }
+    // OF-BLD-020 §7.2 — pureOS proposes a train: the answer the real proposer
+    // gave the same ask (product, host, inlet, switch) over the exported seed,
+    // with a stand-in for thermosteam's volatility (pureos-propose.json); an ask
+    // the fixture never made is a 404 that says so.
+    if (url === '/api/pureos/propose' && req.method === 'POST') {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const asked = JSON.parse(body || '{}');
+      pureosProposals.push(asked);
+      const keyOf = (q) => [q.product ?? '', q.host ?? '', q.inletRef ?? '', q.includeArchived ? 'on' : 'off'].join('|');
+      const entry = (await prototype('pureos-propose.json')).entries.find((e) => keyOf(e.request) === keyOf(asked));
+      if (!entry) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ detail: `the browser tests recorded no proposal for ${asked.product ?? 'no product'} in ${asked.host ?? 'no host'}` }));
+      }
+      res.writeHead(entry.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(entry.body));
     }
     // OF-BLD-019 §2.2 — a reference biorefinery: its shelf entry, a run made
     // through the real code with the stand-in in place of BioSTEAM, and the
@@ -581,7 +797,10 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         res.writeHead(status, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify(body));
       };
-      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, []);
+      // OF-BLD-020 §6.1: the designs kept are the ones this double answered
+      // (none on a fresh install), each as VesselSummary lists it, newest
+      // first, so New scenario from a vessel and a train lists what was designed.
+      if (url === '/api/fermos/vessels' && req.method === 'GET') return sendJson(200, vesselsKept);
       const vm = /^\/api\/params\/fermos:vessel:([A-Za-z0-9][A-Za-z0-9._-]{0,127})(\/resolve)?$/.exec(url);
       if (vm) {
         const id = vm[1];
@@ -656,6 +875,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           // The person's name laid on as the service lays it on: on each value they typed, and on its basis input.
           const named = (src, key) => (typed.has(key) && src?.kind === 'assumption' ? { ...src, by: String(typed.get(key).by).trim() } : src);
           const body = recorded.body;
+          const dr = body.designResults ?? {};
+          const summary = {
+            artifactId: body.artifactId, provenance: body.provenance, createdAt: body.createdAt, source: body.source,
+            sourceTool: body.sourceTool, unitClass: body.unitClass, vesselType: body.vesselType ?? null,
+            vessels: dr['Number of reactors'] ?? null, volume: dr['Reactor volume'] ?? null, installed: body.cost?.installed ?? null,
+          };
+          vesselsKept.splice(0, vesselsKept.length, summary, ...vesselsKept.filter((v) => v.artifactId !== summary.artifactId));
           return sendJson(200, {
             ...body,
             parameters: body.parameters.map((v) => (typed.has(v.key) ? { ...v, overriddenBy: String(typed.get(v.key).by).trim(), source: named(v.source, v.key) } : v)),
@@ -743,7 +969,7 @@ export function createServiceDouble({ dist, seedOnly = false }) {
           'fermos:family': "fermOS's model families",
           'fermos:vessel': "fermOS's vessel designs",
           'fermos:forecast': "fermOS's forecasts",
-          'pureos:unit': "pureOS's train units",
+          'pureos:unit': "pureOS's train units outside the Builder's recorded train",
         };
         const other = Object.keys(kinds).find((k) => scope.startsWith(`${k}:`));
         if (other) return send(404, { detail: `this service serves no parameters for ${kinds[other]} yet` });
@@ -1047,6 +1273,13 @@ export function createServiceDouble({ dist, seedOnly = false }) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(await readFile(OVERLAY_FIXTURE));
       }
+      // OF-BLD-020 §6.1: the train runs pureOS keeps, as a fresh install has
+      // them (none), for New scenario from a vessel and a train. Last in the
+      // chain, so a handler that serves kept train runs answers first.
+      if (url === '/api/pureos/train-runs' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end('[]');
+      }
       if (url.startsWith('/api/')) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ detail: 'not part of the smoke double' }));
@@ -1057,5 +1290,5 @@ export function createServiceDouble({ dist, seedOnly = false }) {
     }
   });
 
-  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, flags } };
+  return { server, state: { decisions, checks, guildLedger, guildPosts, practiceState, practicePosts, ragSearches, asks, geneosCalls, fermosCalls, proformaRuns, proformaBinds, proformaReferences, proformaRunsOnFile, proposalActs, thermoCalls, pureosProposals, ceilingChecks, paramScopes, paramResolves, vesselPosts, fermosBinds, fermosSimulates, fermosSimulationsOnFile, harvestReads, builderCalls, trainRunsOnFile, keptTrainAsks, flags } };
 }

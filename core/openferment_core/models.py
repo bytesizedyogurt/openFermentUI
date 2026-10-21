@@ -1624,6 +1624,18 @@ class ProformaRunRequest(BaseModel):
     # the artifact; a model never picks one. A fit that cannot feed an input
     # is refused in words naming the parameter.
     fits: dict[str, str] = Field(default_factory=dict)
+    # OF-BLD-020 §6.1 (D11): what a scenario on `custom_train_v1` is built
+    # from, as the scenario made in the browser keeps them: the kept
+    # `fermos.vessel` design its fermenter is rebuilt from, and the kept
+    # `pureos.train_run` whose units follow it. Both are needed for that
+    # flowsheet and refused for any other; each refused in words when it is
+    # not on file, is another tool's, is damaged, or is of another program.
+    vessel: str | None = None
+    trainRun: str | None = None
+    # The program switch, for the parts a run names (§6.1): a vessel design
+    # or a train run of an archived program is refused unless it is on. A
+    # run's records bind whatever it says (a person opened the scenario).
+    includeArchived: bool = False
 
 
 class HistogramBin(BaseModel):
@@ -1877,6 +1889,16 @@ class FlowsheetInfo(BaseModel):
     # ('biorefineries/tests/test_biorefineries.py::test_corn'); its values
     # are read from the installed file (PackageRegression), never retyped.
     packageTest: str | None = None
+    # OF-BLD-020 §6.1 (D11): the kept artifacts a scenario on this flowsheet
+    # names besides the flowsheet, by tool, in the order the flowsheet builds
+    # on them (`custom_train_v1`: a `fermos.vessel` design and a
+    # `pureos.train_run`); empty for a flowsheet that is whole on its own.
+    builtFrom: list[str] = Field(default_factory=list)
+    # OF-BLD-020 §6.2 (D10): the stream the flowsheet names as its fermenter's
+    # broth (its beer), by the id its run's stream table gives it: what a
+    # train's inlet takes from a scenario's newest run. None: it names none,
+    # and such an inlet names its stream.
+    brothStream: str | None = None
 
 
 # ── A reference biorefinery's run (OF-BLD-019 §2.2, D3) ──────────────────
@@ -2131,6 +2153,12 @@ class Train(BaseModel):
     # How many runs of this scenario are on file; the newest is read.
     runs: int = 1
     note: str | None = None
+    # OF-BLD-020 §5.2: the artifact a train is read from, a Proforma run or
+    # a `pureos.train_run`, and for a train run the train it ran (its id and
+    # name as the browser keeps it, D9); None for a Proforma run.
+    tool: str = "proforma.run"
+    trainId: str | None = None
+    trainName: str | None = None
 
 
 class TrainSummary(BaseModel):
@@ -2148,6 +2176,10 @@ class TrainSummary(BaseModel):
     overallRecovery: float | None = None
     runs: int = 1
     note: str | None = None
+    # As Train's (OF-BLD-020 §5.2).
+    tool: str = "proforma.run"
+    trainId: str | None = None
+    trainName: str | None = None
 
 
 # ── thermosteam answers property questions (OF-BLD-019 §4.2, D9) ───────
@@ -2206,6 +2238,89 @@ class ThermoProps(BaseModel):
     solved: dict[str, Any] | None = None
     # A property the library could not compute, with its reason; and what
     # the mixture leaves out.
+    notes: list[str] = Field(default_factory=list)
+
+
+# ── a product's properties (OF-BLD-020 §7.1, D12) ───────────────────────
+#
+# What pureOS's proposer reads about a product: from its sequence, through
+# Biopython's ProtParam (protparam.py, one `protparam` artifact), and from its
+# thermodynamics, through thermosteam in the Proforma worker (thermo.py, one
+# `volatility` artifact). A question names a product by id, never a sequence
+# or a number.
+
+
+class ProductPropertyRequest(BaseModel):
+    """`POST /api/protparam` and `POST /api/thermo/volatility`: the product,
+    by its id. Nothing else is taken, a sequence least of all."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product: str
+
+
+class ProtParam(BaseModel):
+    """What a `protparam` artifact holds (its `output`): Biopython's
+    ProtParam on one sequence, every number the library's."""
+
+    # "the sequence of product <id>", "the sequence of record <id>".
+    subject: str
+    product: str | None = None
+    # Where the sequence was read, in words (the product entry's
+    # sequenceSource, or the record).
+    sequenceSource: str
+    # Residues in the chain.
+    length: int
+    # "Biopython <version>".
+    library: str
+    molecularWeight: float
+    isoelectricPoint: float
+    # At 280 nm: every cysteine reduced, and every pair of cysteines a cystine.
+    extinctionReduced: float
+    extinctionCystines: float
+    gravy: float
+    # The unit of each key above ("" for none).
+    units: dict[str, str] = Field(default_factory=dict)
+    # How the library computes each, in words.
+    how: dict[str, str] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+class Volatility(BaseModel):
+    """What a `volatility` artifact holds (its `output`): thermosteam's
+    normal boiling points for a product's chemical and its partner (water),
+    and whether the library's own vapour-liquid equilibrium gives the pair a
+    minimum-boiling azeotrope, every number the library's."""
+
+    product: str
+    # The library's own name for the product, and the partner it is asked with.
+    chemical: str
+    partner: str
+    subject: str
+    # "thermosteam <version>", read in the worker.
+    library: str
+    P: float
+    # "given", or "thermosteam's Stream default".
+    PSource: str
+    # The library's normal boiling point (Tb) of each; null when it holds none.
+    boilingPoint: float | None = None
+    partnerBoilingPoint: float | None = None
+    # Which of the two boils lower, the one whose mole fraction is scanned.
+    lighter: str | None = None
+    # true: found; false: none on the grid `searched`; null: not searched, or
+    # the library could not say (the notes say why).
+    azeotrope: bool | None = None
+    # The azeotrope's liquid as the chemical's mole and mass fractions, and the
+    # temperature it boils at, at P.
+    azeotropeMoleFraction: float | None = None
+    azeotropeMassFraction: float | None = None
+    azeotropeT: float | None = None
+    # The grid searched: the lighter chemical's mole fraction from, to, the
+    # points, and the halvings that refine a bracket.
+    searched: dict[str, Any] | None = None
+    # The library's unit for each key above.
+    units: dict[str, str] = Field(default_factory=dict)
+    how: str = ""
     notes: list[str] = Field(default_factory=list)
 
 
@@ -2441,6 +2556,20 @@ class ParamResolveRequest(BaseModel):
     startFrom: str | None = None
     durationPreset: Literal["until-sugar-runs-out", "fit-length"] | None = None
     includeArchived: bool = False
+    # pureOS's unit scope (OF-BLD-020 §5.1): the catalogue id of the unit's
+    # type, when no train is sent; with a train it must agree with the unit's.
+    unitType: str | None = None
+    # pureOS's unit scope (§5.2): the whole train, as the browser keeps it
+    # (D9), so the unit's per-component keys expand over the train's
+    # chemicals and its records bind by the train's program and product; the
+    # scope `pureos:unit:<train id>:inlet` is the train's inlet. Its units'
+    # typed values are not laid on here: a resolve's `overrides` are.
+    train: TrainSpec | None = None
+    # A Proforma scenario on `custom_train_v1` (OF-BLD-020 §6.1): the kept
+    # vessel design and train run it is built from, as ProformaRunRequest
+    # carries them.
+    vessel: str | None = None
+    trainRun: str | None = None
 
 
 class ParamResolveResult(BaseModel):
@@ -2836,10 +2965,547 @@ class SimulationSummary(BaseModel):
     provenance: Provenance
 
 
+# ── The harvest stream (OF-BLD-020 §6.2, D10) ───────────────────────────
+#
+# A kept simulation's broth at an hour, read from the series the artifact
+# keeps (fermos.harvest): nothing is integrated again and nothing is kept.
+# The broth that leaves fermOS is the stream that enters pureOS: a train's
+# simulation inlet reads its composition through the same read.
+
+HarvestHourSource = Literal["the simulation's harvest hour", "a person's hour"]
+
+
+class HarvestState(BaseModel):
+    """One state of the simulation at the hour read, in the unit it keeps."""
+
+    # The family's state: X (cells), S (sugar), P (product), V, N, Q.
+    state: str
+    value: float
+    unit: str
+
+
+class FermosHarvest(BaseModel):
+    """GET /api/fermos/harvest: a kept simulation's broth at an hour."""
+
+    artifactId: str
+    family: str
+    strain: str | None = None
+    product: str | None = None
+    sugar: str | None = None
+    provenance: Provenance
+    # The hour asked: the simulation's own harvest hour, or a person's.
+    asked: float
+    hourSource: HarvestHourSource
+    # Why that hour, in words (the hour its sugar runs out, its run's end, an
+    # hour a person named).
+    how: str
+    # The kept point the states are read at, and whether it is the hour asked.
+    hour: float
+    exact: bool
+    # How the states were read, in words: the kept point at the hour, or the
+    # nearest kept point to it (the artifact keeps its series on a grid, not
+    # the solver's dense output, and nothing is integrated again).
+    read: str
+    # The simulation's own harvest hour, and the last hour it keeps.
+    harvestH: float
+    runEndH: float
+    # Every state the simulation keeps a series of, in its family's order.
+    states: list[HarvestState]
+    # What the family does not model is absent from the broth, in words.
+    absent: str
+
+
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1, D8) ──────────────────────
+#
+# Each entry is one unit type a train can hold: a BioSTEAM class, or one of
+# the three in-house `bst.Unit` subclasses BioSTEAM lacks, with every
+# parameter its constructor takes either declared as a ParameterSpec or named
+# as not offered, with why. Its id is the vocabulary's (src/data/vocabulary.ts
+# UNIT_OPERATIONS). pureos/catalogue.py holds the data; BioSTEAM's defaults
+# are read in the Proforma worker and never typed.
+
+# Where a unit sits in a train, fermenter to product.
+UnitStage = Literal["harvest", "disruption", "clarification", "concentration", "capture", "polish", "formulation",
+                    "drying", "utility"]
+
+
+class UnitPort(BaseModel):
+    """One inlet or outlet of a catalogue unit, in words."""
+
+    side: Literal["in", "out"]
+    index: int
+    name: str
+    what: str
+    # An outlet the product goes on by, by default; a train may route another.
+    onward: bool = False
+    # An inlet's stream: from the unit before ("upstream"), one the train
+    # supplies beside the line ("side": a solvent), or one the unit sizes
+    # itself ("unit": a buffer, air, fuel). None for an outlet.
+    source: Literal["upstream", "side", "unit"] | None = None
+    # Takes any number of streams here, which the class mixes.
+    many: bool = False
+
+
+class NotOffered(BaseModel):
+    """A parameter the class's constructor takes that the panel does not
+    offer, and why, in words."""
+
+    name: str
+    why: str
+
+
+class UnitNeed(BaseModel):
+    """What a unit needs set before it runs: one of `alternatives`, each a
+    list of keys that must all hold a value."""
+
+    alternatives: list[list[str]]
+    why: str
+
+
+class UnitType(BaseModel):
+    """A catalogue entry without its specs (GET /api/pureos/catalogue)."""
+
+    id: str
+    name: str
+    # What it does, in words.
+    line: str
+    stage: UnitStage
+    biosteamClass: str | None = None
+    inhouseClass: str | None = None
+    insOuts: list[UnitPort]
+    # Whether BioSTEAM costs it; the in-house units have no cost model.
+    costModel: bool
+    notes: list[str] = Field(default_factory=list)
+    notOffered: list[NotOffered] = Field(default_factory=list)
+    needs: list[UnitNeed] = Field(default_factory=list)
+    # The vocabulary ids it stands for beside its own (cell disruption:
+    # homogenisation and bead milling; chromatography: one per mode).
+    maps: list[str] = Field(default_factory=list)
+    specCount: int
+
+
+class UnitDefault(BaseModel):
+    """A parameter's default as the class gives it, read from its code in
+    the worker, and where it was read; None when the class gives none or
+    decides at run time."""
+
+    key: str
+    value: float | str | None = None
+    readFrom: str
+
+
+class UnitParamMap(BaseModel):
+    """How one spec reaches the class: under which of the class's own names,
+    as a constructor argument or an attribute set after construction, and
+    whether its key is a template expanded per component or per effect
+    (`split` → `split.<chemical>`, `P` → `P.<effect>`)."""
+
+    key: str
+    name: str
+    via: Literal["argument", "attribute"]
+    per: Literal["component", "effect"] | None = None
+    how: str | None = None
+
+
+class UnitSpecs(BaseModel):
+    """GET /api/pureos/catalogue/{id}/specs: an entry's ParameterSpecs with
+    the choices and bounds the class gives, each parameter's default read
+    from the class, and how each reaches it."""
+
+    id: str
+    biosteamClass: str | None = None
+    inhouseClass: str | None = None
+    specs: list[ParameterSpec]
+    defaults: list[UnitDefault]
+    params: list[UnitParamMap]
+    notOffered: list[NotOffered]
+    needs: list[UnitNeed]
+    # The chemicals a chemical-valued parameter chooses from: the yeast
+    # program's set, until a train names its own (§5.2).
+    chemicals: list[str] = Field(default_factory=list)
+    versions: dict[str, str] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
+
+# ── pureOS builds the train (OF-BLD-020 §5.2, D9, D10, E.2‴) ──────────
+#
+# A train is data: an inlet, then units in order, each a catalogue type with
+# the values a person typed (Override-shaped, D3), the records named for a
+# parameter, the routing of each outlet (onward, waste, or back to an earlier
+# unit), and optionally a shelf flowsheet's own unit whose values it reads.
+# pureos/train_spec.py validates it and resolves every parameter with its source;
+# the Proforma worker builds and runs it; one `pureos.train_run` artifact
+# keeps it, and pureos.train_of reads it as it reads a Proforma run.
+
+
+class TrainParam(BaseModel):
+    """A value a person typed for one parameter of a train's unit or inlet:
+    an Override without its scope and key, which its place in the train
+    names (D3, D9)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float | str
+    low: float | None = None
+    high: float | None = None
+    by: str
+    at: str
+    note: str | None = None
+
+    @field_validator("value", "low", "high", mode="before")
+    @classmethod
+    def _no_true_or_false(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("a typed value, low and high are numbers or words, never true or false")
+        return v
+
+
+class TrainInlet(BaseModel):
+    """Where the broth a train takes comes from (D10): a kept fermOS
+    simulation's harvest, a stream of a kept run, or a composition typed
+    under a person's name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["simulation", "run-stream", "typed"]
+    # The artifact: a `fermos.simulation`, or a `proforma.run`,
+    # `proforma.reference` or `pureos.train_run` whose stream is the inlet;
+    # None for a typed inlet.
+    ref: str | None = None
+    # The stream of that run (run-stream alone).
+    streamId: str | None = None
+    # A `fermos.vessel` design of the simulation, whose working volume, vessels
+    # and cycle time give the broth flow (simulation alone).
+    vessel: str | None = None
+    # The inlet's own values a person typed, by key (broth_flow,
+    # harvest_hour, conc.<chemical>, T, P): scope `pureos:unit:<train>:inlet`.
+    params: dict[str, TrainParam] = Field(default_factory=dict)
+
+
+class TrainUnitReadFrom(BaseModel):
+    """A shelf flowsheet's own unit whose values a train's unit takes, as
+    the flowsheet's package builds it: read from the built unit in the
+    worker, never typed."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    flowsheet: str
+    unit: str
+
+
+class TrainUnitSpec(BaseModel):
+    """One unit of a train, in order (D9)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # The BioSTEAM unit id it is built under: a letter, then letters, digits
+    # or underscores.
+    id: str
+    # A catalogue id (pureos/catalogue.py).
+    type: str
+    # What a person typed, by key: `split.<chemical>` and the other
+    # per-component and per-effect keys expanded (catalogue.expand), and a
+    # side inlet's `<port>.<chemical>` flows in kg/hr.
+    params: dict[str, TrainParam] = Field(default_factory=dict)
+    # Outlet name → `onward`, `waste` or `recycle:<an earlier unit's id>`;
+    # an outlet not named takes the catalogue's default (its onward port on,
+    # the rest to waste).
+    outlets: dict[str, str] = Field(default_factory=dict)
+    # Record ids named for a parameter, by key: they bind it, and no other
+    # record does.
+    records: dict[str, list[str]] = Field(default_factory=dict)
+    readFrom: TrainUnitReadFrom | None = None
+
+
+class TrainSpec(BaseModel):
+    """A train as data (D9): the browser keeps it whole and sends it with a
+    run; the service keeps the runs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    program: str
+    # A product id (thermo.CHEMICALS names the library's chemical it is).
+    product: str
+    inlet: TrainInlet
+    units: list[TrainUnitSpec] = Field(default_factory=list)
+
+
+class TrainValidation(BaseModel):
+    """POST /api/pureos/train/validate: every refusal at once, in words;
+    runs nothing. POST /api/pureos/train/check answers in the same shape
+    with everything the run would refuse (OF-BLD-020 §5.3)."""
+
+    ok: bool
+    refusals: list[str] = Field(default_factory=list)
+    # The same refusals by the place they belong to: a unit's id, `inlet`,
+    # or `train` for the train as a whole (§5.3: the Builder shows a unit's
+    # on its card).
+    places: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class TrainRunRequest(BaseModel):
+    """POST /api/pureos/train/run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    train: TrainSpec
+    # A person's changes in a unit's or the inlet's panel, each an Override
+    # of `pureos:unit:<train id>:<unit id | inlet>`: laid over the values the
+    # train carries, an override replacing the train's value of its key.
+    overrides: list[Override] = Field(default_factory=list)
+    # The person an override that names nobody is by.
+    by: str | None = None
+    includeArchived: bool = False
+
+
+class StreamImpurity(BaseModel):
+    chemical: str
+    massFraction: float
+
+
+class StreamPurity(BaseModel):
+    """One stream of a train run: the product's share of its mass, and its
+    largest other components by mass, read from the stream table."""
+
+    stream: str
+    massFlow: float
+    # None for a stream that carries nothing.
+    productFraction: float | None = None
+    impurities: list[StreamImpurity] = Field(default_factory=list)
+
+
+class TrainPurity(BaseModel):
+    # The chemical traced (the library's name for the train's product).
+    product: str
+    productStream: str | None = None
+    productFraction: float | None = None
+    streams: list[StreamPurity] = Field(default_factory=list)
+    # How many of each stream's largest other components are named (a
+    # reading convention).
+    impuritiesShown: int
+    note: str
+
+
+class TrainUnitCost(BaseModel):
+    """One unit's cost as BioSTEAM gives it, or why there is none."""
+
+    unit: str
+    type: str
+    unitClass: str
+    # Whether the catalogue's class carries a cost model (the in-house
+    # units do not).
+    costModel: bool
+    purchaseCost: float | None = None
+    installedCost: float | None = None
+    # BioSTEAM's purchase cost by item (Unit.purchase_costs), USD.
+    items: dict[str, float] = Field(default_factory=dict)
+    note: str | None = None
+
+
+class TrainInletRead(BaseModel):
+    """What a train run's inlet was and where it came from (D10)."""
+
+    kind: Literal["simulation", "run-stream", "typed"]
+    ref: str | None = None
+    refTool: str | None = None
+    streamId: str | None = None
+    vessel: str | None = None
+    chemicals: list[str] = Field(default_factory=list)
+    # g L⁻¹ by chemical (a simulation's harvest, or typed), water aside.
+    concentrations: dict[str, float] | None = None
+    # kg/hr by chemical as the worker built the stream, water included.
+    flows: dict[str, float] = Field(default_factory=dict)
+    # The water the balance gave, kg/hr, and how.
+    water: float | None = None
+    waterNote: str | None = None
+    # m³/hr.
+    brothFlow: float | None = None
+    harvestHour: float | None = None
+    T: float
+    P: float
+    phase: str
+    # What the simulation's family does not model, in words.
+    absent: str | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
+class TrainUnitParameters(BaseModel):
+    """One unit's parameters as its run's basis holds them, each with its
+    source."""
+
+    unit: str
+    type: str
+    unitClass: str
+    values: list[ParameterValue] = Field(default_factory=list)
+
+
+class TrainRun(BaseModel):
+    """POST /api/pureos/train/run: the one `pureos.train_run` artifact, read."""
+
+    artifactId: str
+    provenance: Provenance
+    createdAt: str
+    spec: TrainSpec
+    train: Train
+    purity: TrainPurity
+    costs: list[TrainUnitCost] = Field(default_factory=list)
+    inlet: TrainInletRead
+    parameters: list[TrainUnitParameters] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    flags: list[str] = Field(default_factory=list)
+    basis: ComputedBasis
+    # The run's own tables beside the train (OF-BLD-020 §5.3), as
+    # proforma.tables_of reads them: the unit table (duties and power), the
+    # utilities, the diagram (SVG text when Graphviz drew it) or the words
+    # why not and the units in run order.
+    units: list[UnitRow] = Field(default_factory=list)
+    utilities: UtilityDuties | None = None
+    diagram: str | None = None
+    diagramNote: str | None = None
+    unitOrder: list[str] = Field(default_factory=list)
+
+
+class TrainFromRunRequest(BaseModel):
+    """POST /api/pureos/train/from-run (OF-BLD-020 §5.3): a run's units read
+    into a train, each by its class."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # A `proforma.run`, `proforma.reference` or `pureos.train_run` artifact.
+    artifactId: str
+    # The id the train takes; by default `from-<artifact id>`.
+    trainId: str | None = None
+    includeArchived: bool = False
+
+
+class TrainUnmapped(BaseModel):
+    """A unit of the run the train does not take, and why, in words."""
+
+    unitId: str
+    unitClass: str
+    why: str
+
+
+class TrainFromRun(BaseModel):
+    """A run's train as data: every unit on the product's path whose class is
+    a catalogue type, in run order, each outlet routed as the run routed it;
+    the units it does not take; what it says of itself; and the refusals
+    its structure meets (validate's), which a person settles in the
+    Builder."""
+
+    train: TrainSpec
+    unmapped: list[TrainUnmapped] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    refusals: list[str] = Field(default_factory=list)
+
+
+# ── a train a model built (OF-BLD-020 §5.4) ──────────────────────────────
+#
+# A person's trains live in their browser (D9). A model building a train across
+# tool calls, and an outside assistant over MCP (which has no ask), needs the
+# service to hold its draft: `core/data/pureos-trains.json`, written through
+# `pureos.kept.keep_train` alone, gitignored, on this machine alone.
+
+
+class KeptTrain(BaseModel):
+    """A train a model built with `pureos_build` or `pureos_write`, kept by
+    the service with who made it and when: the train as data (D9). Its runs
+    are `pureos.train_run` artifacts, found by the train's id."""
+
+    spec: TrainSpec
+    # A model, always: a person's trains live in their browser.
+    agent: Literal["model"] = "model"
+    # The model that made it (the one answering the run, after any fallback).
+    madeBy: str
+    effort: str | None = None
+    # The ask that made it; None for a call from the endpoint or the MCP server.
+    askId: str | None = None
+    # When it was made and when it last changed, ISO 8601 in UTC.
+    at: str
+    updatedAt: str
+
+
+class KeptTrains(BaseModel):
+    """core/data/pureos-trains.json."""
+
+    trains: list[KeptTrain] = Field(default_factory=list)
+
+
+# ── pureOS proposes a train (OF-BLD-020 §7.2, D12) ──────────────────────
+#
+# pureos/proposer.py reads a product's class and the properties its class's
+# rule splits on (thermosteam's volatility, ProtParam on its sequence, where
+# the seed says it is), and proposes a TrainSpec whose units are catalogue
+# types in order, every parameter at its library default or waiting, each
+# unit with one reason naming the rule, the property and its artifact.
+
+
+class ProposeRequest(BaseModel):
+    """POST /api/pureos/propose: ids and words, never a number."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # A products seed id, or a product thermosteam's library is asked about by
+    # name (thermo.CHEMICALS: ethanol).
+    product: str
+    # A geneOS host (strain) id: the cells the product is made in.
+    host: str
+    # A kept fermOS simulation's artifact id, or a kept run's id and one of its
+    # streams as `<artifact id>/<stream id>`; none, and the inlet is typed.
+    inletRef: str | None = None
+    includeArchived: bool = False
+
+
+class ProposalReason(BaseModel):
+    """Why one unit of a proposal is there: the rule, the property it read,
+    the artifact that holds that property (None when the products seed
+    states it), and the words, which carry no number."""
+
+    unitId: str
+    rule: str
+    # A property name: `boilingPoint`, `azeotrope`, `molecularWeight`,
+    # `isoelectricPoint` (each an evidence key of its artifact), or `class`,
+    # `location` (the products seed's).
+    property: str
+    artifactId: str | None = None
+    words: str
+
+
+class ProposalMissing(BaseModel):
+    """A property the rules needed and nothing holds, and why."""
+
+    property: str
+    why: str
+
+
+class TrainProposal(BaseModel):
+    """POST /api/pureos/propose: a train proposed by the written rules, or
+    none, with what is missing. (Named apart from `Proposal`, a write a
+    model proposed at a gate, OF-BLD-015 §7.4.)"""
+
+    product: str
+    host: str
+    program: str | None = None
+    # protein, small molecule, polymer; None when nothing states it.
+    productClass: str | None = None
+    # Null when nothing is proposed. Every unit's params and records are empty.
+    train: TrainSpec | None = None
+    # One a unit, in the train's order.
+    reasons: list[ProposalReason] = Field(default_factory=list)
+    missing: list[ProposalMissing] = Field(default_factory=list)
+    # The property artifacts read (`volatility`, `protparam`), by id.
+    artifacts: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 # Claim and AnswerPlan name Passage and Evidence, which are defined further
 # down; resolve the names now that every model exists.
 Claim.model_rebuild()
 # ProformaRunRequest names Override, which is defined further down (OF-BLD-020 §2.2).
 ProformaRunRequest.model_rebuild()
+# ParamResolveRequest names TrainSpec, defined further down (OF-BLD-020 §5.2).
+ParamResolveRequest.model_rebuild()
 AnswerPlan.model_rebuild()
 ToolResult.model_rebuild()

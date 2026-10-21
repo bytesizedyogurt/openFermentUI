@@ -88,6 +88,10 @@ core/data/audit.jsonl.lock
 core/data/proposals.json
 core/data/proposals.json.lock
 core/data/spend.json.lock
+# OF-BLD-020 §5.4 — the trains a model built with pureos_build, kept on this
+# machine like the proposals; not on the data branch.
+core/data/pureos-trains.json
+core/data/pureos-trains.json.lock
 # OF-BLD-014 §2.3 — thread P as proposed, a list a person approves; the data branch keeps it.
 core/data/thread-p-proposed.tsv
 # Thread Q as proposed, the same way.

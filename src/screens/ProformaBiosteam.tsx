@@ -25,7 +25,7 @@ import { Card } from '@/components/ui';
 import { Tick } from '@/components/Provenance';
 import { CostWaterfall, Distribution, Tornado } from '@/components/figures';
 import {
-  INFEASIBLE_WORDS,
+  infeasibleWords,
   NO_DIAGRAM,
   asResultGrid,
   baseCaseRefusal,
@@ -266,7 +266,7 @@ export function PriceDistribution({ view, priceBasis, csvName }: { view: RunView
       quantiles={view.quantiles}
       provenance={view.provenance}
       samples={view.samples}
-      infeasible={Object.entries(view.infeasible).map(([reason, count]) => ({ reason: INFEASIBLE_WORDS[reason] ?? reason, count }))}
+      infeasible={Object.entries(view.infeasible).map(([reason, count]) => ({ reason: infeasibleWords(reason, view.flowsheet), count }))}
       basis={[view.basis]}
       notes={['The inputs are sampled independently; a real vessel links them, so the infeasible share is part of the result.']}
       csvName={`${csvName}-distribution`}
@@ -525,6 +525,13 @@ const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: (reference: bool
         : 'The settings the inputs leave to the package\u2019s finance model, to BioSTEAM\u2019s units or to a convention the basis names, read back after the base case ran; nobody typed these.',
   },
   {
+    // OF-BLD-020 §6.R (main-11/23): a value a named person set, as the run's basis names them.
+    origin: 'person',
+    title: () => 'What a named person set',
+    reads: () =>
+      'Each a named person\u2019s assumption, as the run\u2019s basis names it (a Finance value typed in this scenario\u2019s panel, or a vessel setting typed in fermOS \u2192 Vessel), read back after the base case ran.',
+  },
+  {
     origin: 'case',
     title: () => 'What this case gave',
     reads: () =>
@@ -538,7 +545,7 @@ const READ_BACK_GROUPS: { origin: ReadBackRow['origin']; title: (reference: bool
 ];
 
 export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: FlowsheetInfo | null }) {
-  const rows = readBackRows(view.readBack, flowsheet);
+  const rows = readBackRows(view.readBack, flowsheet, view.basis?.inputs ?? []);
   if (!rows.length) return null;
   const reference = !!flowsheet?.reference;
   return (
@@ -557,6 +564,7 @@ export function ReadBack({ view, flowsheet }: { view: RunView; flowsheet: Flowsh
                     <td className="py-0.5 pr-2">
                       {r.label}
                       {r.label !== r.key && <span className="font-num text-ink-soft"> ({r.key})</span>}
+                      {r.by && <span className="text-ink-soft"> · by {r.by}</span>}
                     </td>
                     <td className="py-0.5 px-1.5 text-right font-num">{typeof r.value === 'number' ? fmt(r.value, 4) : r.value}</td>
                     <td className="py-0.5 pl-1.5 font-num text-ink-soft">{r.unit}</td>

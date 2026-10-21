@@ -10,13 +10,13 @@
         "biorefineries": "2.35.1"
       }
     },
-    "aerobic": "d0415fc497aca19f",
-    "anaerobic": "0a131e039e37b30d",
+    "aerobic": "e8fee7b43f956028",
+    "anaerobic": "c5102f1719b331ee",
     "plantScale": 50000.0,
     "by": "openFerment test fixture",
     "simulations": [
       {
-        "artifactId": "d0415fc497aca19f",
+        "artifactId": "e8fee7b43f956028",
         "family": "batch_v1",
         "title": "Batch",
         "strain": null,
@@ -28,7 +28,7 @@
         "provenance": "demo"
       },
       {
-        "artifactId": "0a131e039e37b30d",
+        "artifactId": "c5102f1719b331ee",
         "family": "batch_v1",
         "title": "Batch",
         "strain": null,
@@ -42,13 +42,13 @@
     ],
     "scopes": [
       {
-        "simulation": "d0415fc497aca19f",
+        "simulation": "e8fee7b43f956028",
         "vesselType": null,
         "status": 200,
         "body": {
-          "scope": "fermos:vessel:d0415fc497aca19f",
+          "scope": "fermos:vessel:e8fee7b43f956028",
           "kind": "fermos-vessel",
-          "title": "Vessel for a simulation d0415fc497aca19f: AeratedBioreactor, stirred tank",
+          "title": "Vessel for a simulation e8fee7b43f956028: AeratedBioreactor, stirred tank",
           "specs": [
             {
               "key": "plant_scale",
@@ -816,7 +816,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -892,7 +892,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
@@ -911,7 +911,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                 "by": null
               },
@@ -1161,18 +1161,18 @@
             "Each default is AeratedBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
             "Not offered: batch, batch is held on: BioSTEAM's continuous mode divides the oxygen transfer by one hour where the batch time belongs (measured: a kLa off by the reacting time), and fermOS's simulations are batches; adiabatic, held off: the vessel's duty is what the design reads; tau_phases, BioSTEAM's own: the phases a residence time counts; reactions, built from what the simulation made; kLa_kwargs, BioSTEAM's correlation coefficients, its own.",
             "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design.",
-            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
+            "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
       {
-        "simulation": "d0415fc497aca19f",
+        "simulation": "e8fee7b43f956028",
         "vesselType": "bubble-column",
         "status": 200,
         "body": {
-          "scope": "fermos:vessel:d0415fc497aca19f",
+          "scope": "fermos:vessel:e8fee7b43f956028",
           "kind": "fermos-vessel",
-          "title": "Vessel for a simulation d0415fc497aca19f: AeratedBioreactor, bubble column",
+          "title": "Vessel for a simulation e8fee7b43f956028: AeratedBioreactor, bubble column",
           "specs": [
             {
               "key": "plant_scale",
@@ -1939,7 +1939,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -2015,7 +2015,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
@@ -2034,7 +2034,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                 "by": null
               },
@@ -2284,18 +2284,18 @@
             "Each default is AeratedBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
             "Not offered: batch, batch is held on: BioSTEAM's continuous mode divides the oxygen transfer by one hour where the batch time belongs (measured: a kLa off by the reacting time), and fermOS's simulations are batches; adiabatic, held off: the vessel's duty is what the design reads; tau_phases, BioSTEAM's own: the phases a residence time counts; reactions, built from what the simulation made; kLa_kwargs, BioSTEAM's correlation coefficients, its own.",
             "The air flow, its vvm and the gas velocity are BioSTEAM's to solve, and are read after the design.",
-            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
+            "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
       {
-        "simulation": "0a131e039e37b30d",
+        "simulation": "c5102f1719b331ee",
         "vesselType": null,
         "status": 200,
         "body": {
-          "scope": "fermos:vessel:0a131e039e37b30d",
+          "scope": "fermos:vessel:c5102f1719b331ee",
           "kind": "fermos-vessel",
-          "title": "Vessel for a simulation 0a131e039e37b30d: NRELAnaerobicBatchBioreactor",
+          "title": "Vessel for a simulation c5102f1719b331ee: NRELAnaerobicBatchBioreactor",
           "specs": [
             {
               "key": "plant_scale",
@@ -2566,7 +2566,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "0a131e039e37b30d",
+                "id": "c5102f1719b331ee",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -2662,7 +2662,7 @@
             "A plant scale is needed: it sizes the vessels for a year's product over the corn TEA's operating hours. BioSTEAM's NREL batch fermenter sizes two vessels or more, so a batch volume of one vessel is not offered.",
             "Each default is NRELAnaerobicBatchBioreactor's own in BioSTEAM 2.54.0, read from its code at import in the worker; a value a person types is a named assumption, and the design's basis names it.",
             "Not offered: reactions, built from what the simulation made; Nmin, stored by the NREL vessel and never used (measured: a large flow gave more vessels); Nmax, stored by the NREL vessel and never used (measured: a large flow gave more vessels).",
-            "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
+            "simulation c5102f1719b331ee names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ]
         }
       },
@@ -3056,7 +3056,7 @@
     "designs": [
       {
         "request": {
-          "simulation": "d0415fc497aca19f",
+          "simulation": "e8fee7b43f956028",
           "fit": null,
           "vesselType": null,
           "klaMethod": null,
@@ -3070,13 +3070,13 @@
       },
       {
         "request": {
-          "simulation": "d0415fc497aca19f",
+          "simulation": "e8fee7b43f956028",
           "fit": null,
           "vesselType": null,
           "klaMethod": null,
           "overrides": [
             {
-              "scope": "fermos:vessel:d0415fc497aca19f",
+              "scope": "fermos:vessel:e8fee7b43f956028",
               "key": "plant_scale",
               "value": 50000.0,
               "low": null,
@@ -3090,10 +3090,10 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "e751e3051a3b58f6",
+          "artifactId": "63cf3259c39a49ef",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
-          "source": "d0415fc497aca19f",
+          "source": "e8fee7b43f956028",
           "sourceTool": "fermos.simulation",
           "aerobic": true,
           "unitClass": "AeratedBioreactor",
@@ -3920,7 +3920,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -3996,7 +3996,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
@@ -4015,7 +4015,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                 "by": null
               },
@@ -4299,7 +4299,7 @@
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
-            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+            "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -4312,23 +4312,23 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "e751e3051a3b58f6",
-            "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
+            "id": "63cf3259c39a49ef",
+            "label": "Vessel design for fermos.simulation e8fee7b43f956028: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
             "interval": null,
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 3 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
-                  "value": "d0415fc497aca19f",
+                  "value": "e8fee7b43f956028",
                   "unit": "",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the fermos.simulation the vessel is designed for",
                     "by": null
                   }
@@ -4362,7 +4362,7 @@
                   "source": {
                     "kind": "convention",
                     "id": null,
-                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+                    "note": "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -4515,7 +4515,7 @@
                   "unit": "h",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulation's harvest hour",
                     "by": null
                   }
@@ -4548,7 +4548,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                     "by": null
                   }
@@ -4559,7 +4559,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                     "by": null
                   }
@@ -4686,7 +4686,7 @@
                   }
                 }
               ],
-              "artifactId": "e751e3051a3b58f6",
+              "artifactId": "63cf3259c39a49ef",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -4696,13 +4696,13 @@
       },
       {
         "request": {
-          "simulation": "d0415fc497aca19f",
+          "simulation": "e8fee7b43f956028",
           "fit": null,
           "vesselType": "bubble-column",
           "klaMethod": null,
           "overrides": [
             {
-              "scope": "fermos:vessel:d0415fc497aca19f",
+              "scope": "fermos:vessel:e8fee7b43f956028",
               "key": "design",
               "value": "Bubble column",
               "low": null,
@@ -4712,7 +4712,7 @@
               "note": null
             },
             {
-              "scope": "fermos:vessel:d0415fc497aca19f",
+              "scope": "fermos:vessel:e8fee7b43f956028",
               "key": "plant_scale",
               "value": 50000.0,
               "low": null,
@@ -4726,10 +4726,10 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "6f076f5647ddae39",
+          "artifactId": "3ac8e83001de6d3c",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
-          "source": "d0415fc497aca19f",
+          "source": "e8fee7b43f956028",
           "sourceTool": "fermos.simulation",
           "aerobic": true,
           "unitClass": "AeratedBioreactor",
@@ -5552,7 +5552,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -5628,7 +5628,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
@@ -5647,7 +5647,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                 "by": null
               },
@@ -5931,7 +5931,7 @@
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
-            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+            "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -5943,23 +5943,23 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "6f076f5647ddae39",
-            "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, bubble column, the number of vessels it sized (every other number is in the artifact)",
+            "id": "3ac8e83001de6d3c",
+            "label": "Vessel design for fermos.simulation e8fee7b43f956028: BioSTEAM's AeratedBioreactor, bubble column, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
             "interval": null,
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 3 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
-                  "value": "d0415fc497aca19f",
+                  "value": "e8fee7b43f956028",
                   "unit": "",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the fermos.simulation the vessel is designed for",
                     "by": null
                   }
@@ -5993,7 +5993,7 @@
                   "source": {
                     "kind": "convention",
                     "id": null,
-                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+                    "note": "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -6146,7 +6146,7 @@
                   "unit": "h",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulation's harvest hour",
                     "by": null
                   }
@@ -6179,7 +6179,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                     "by": null
                   }
@@ -6190,7 +6190,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                     "by": null
                   }
@@ -6317,7 +6317,7 @@
                   }
                 }
               ],
-              "artifactId": "6f076f5647ddae39",
+              "artifactId": "3ac8e83001de6d3c",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -6327,13 +6327,13 @@
       },
       {
         "request": {
-          "simulation": "0a131e039e37b30d",
+          "simulation": "c5102f1719b331ee",
           "fit": null,
           "vesselType": null,
           "klaMethod": null,
           "overrides": [
             {
-              "scope": "fermos:vessel:0a131e039e37b30d",
+              "scope": "fermos:vessel:c5102f1719b331ee",
               "key": "plant_scale",
               "value": 50000.0,
               "low": null,
@@ -6347,10 +6347,10 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "542ebfe70cd15063",
+          "artifactId": "a19baa1b5aa9dd51",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
-          "source": "0a131e039e37b30d",
+          "source": "c5102f1719b331ee",
           "sourceTool": "fermos.simulation",
           "aerobic": false,
           "unitClass": "NRELAnaerobicBatchBioreactor",
@@ -6568,7 +6568,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "0a131e039e37b30d",
+                "id": "c5102f1719b331ee",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -6681,7 +6681,7 @@
           },
           "flags": [
             "the batch used 62.54 g L⁻¹ more glucose than ethanol and cell formation take by their stoichiometry (maintenance and by-products the family does not model); in the vessel it stays in the broth unconverted, as the ethanol flowsheet leaves it",
-            "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
+            "simulation c5102f1719b331ee names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on"
           ],
           "versions": {
             "biosteam": "2.54.0",
@@ -6689,23 +6689,23 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "542ebfe70cd15063",
-            "label": "Vessel design for fermos.simulation 0a131e039e37b30d: BioSTEAM's NRELAnaerobicBatchBioreactor, the number of vessels it sized (every other number is in the artifact)",
+            "id": "a19baa1b5aa9dd51",
+            "label": "Vessel design for fermos.simulation c5102f1719b331ee: BioSTEAM's NRELAnaerobicBatchBioreactor, the number of vessels it sized (every other number is in the artifact)",
             "value": 3.0,
             "unit": "vessels",
             "interval": null,
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 3 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
-                  "value": "0a131e039e37b30d",
+                  "value": "c5102f1719b331ee",
                   "unit": "",
                   "source": {
                     "kind": "artifact",
-                    "id": "0a131e039e37b30d",
+                    "id": "c5102f1719b331ee",
                     "note": "the fermos.simulation the vessel is designed for",
                     "by": null
                   }
@@ -6739,7 +6739,7 @@
                   "source": {
                     "kind": "convention",
                     "id": null,
-                    "note": "simulation 0a131e039e37b30d names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+                    "note": "simulation c5102f1719b331ee names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -6815,7 +6815,7 @@
                   "unit": "h",
                   "source": {
                     "kind": "artifact",
-                    "id": "0a131e039e37b30d",
+                    "id": "c5102f1719b331ee",
                     "note": "the simulation's harvest hour",
                     "by": null
                   }
@@ -6854,7 +6854,7 @@
                   }
                 }
               ],
-              "artifactId": "542ebfe70cd15063",
+              "artifactId": "a19baa1b5aa9dd51",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },
@@ -6864,13 +6864,13 @@
       },
       {
         "request": {
-          "simulation": "d0415fc497aca19f",
+          "simulation": "e8fee7b43f956028",
           "fit": null,
           "vesselType": null,
           "klaMethod": null,
           "overrides": [
             {
-              "scope": "fermos:vessel:d0415fc497aca19f",
+              "scope": "fermos:vessel:e8fee7b43f956028",
               "key": "Q_O2_consumption",
               "value": -400000.0,
               "low": null,
@@ -6880,7 +6880,7 @@
               "note": "STAND-IN for the vessel fixture: invented kinetics and an invented plant scale; none is a result"
             },
             {
-              "scope": "fermos:vessel:d0415fc497aca19f",
+              "scope": "fermos:vessel:e8fee7b43f956028",
               "key": "plant_scale",
               "value": 50000.0,
               "low": null,
@@ -6894,10 +6894,10 @@
         },
         "status": 200,
         "body": {
-          "artifactId": "0c34e9f82967e2a3",
+          "artifactId": "c8f352a55cccde4e",
           "provenance": "demo",
           "createdAt": "2026-09-15T09:00:00Z",
-          "source": "d0415fc497aca19f",
+          "source": "e8fee7b43f956028",
           "sourceTool": "fermos.simulation",
           "aerobic": true,
           "unitClass": "AeratedBioreactor",
@@ -7724,7 +7724,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulation's harvest hour",
                 "by": null
               },
@@ -7800,7 +7800,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                 "by": null
               },
@@ -7819,7 +7819,7 @@
               "high": null,
               "source": {
                 "kind": "artifact",
-                "id": "d0415fc497aca19f",
+                "id": "e8fee7b43f956028",
                 "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                 "by": null
               },
@@ -8103,7 +8103,7 @@
             "impliedYxo": 0.10377599373199474
           },
           "flags": [
-            "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+            "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
             "the reaction consumes 0.2415 times the oxygen its yields balance, so BioSTEAM sizes the air for the simulation's peak uptake; the vessel's outlets carry that oxygen as consumed, and the broth at harvest is the simulation's end state",
             "the reaction's yields balance 950.6 kmol/hr of oxygen and the simulation took up 98.61 kmol/hr over the batch (0.104 times as much), apart by more than 0.1 of the reaction's, the stated tolerance: BioSTEAM's duty rests on the reaction (its heats of formation, or a forced heat per oxygen times the oxygen the scaled reaction consumes), the cross-check on what the simulation took up",
             "BioSTEAM warned: CostWarning: <AeratedBioreactor: R1> Vertical vessel length (51.72 ft) is out of bounds (12 to 40 ft) for cost correlation",
@@ -8116,23 +8116,23 @@
             "biorefineries": "2.35.1"
           },
           "evidence": {
-            "id": "0c34e9f82967e2a3",
-            "label": "Vessel design for fermos.simulation d0415fc497aca19f: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
+            "id": "c8f352a55cccde4e",
+            "label": "Vessel design for fermos.simulation e8fee7b43f956028: BioSTEAM's AeratedBioreactor, stirred tank, the number of vessels it sized (every other number is in the artifact)",
             "value": 22.0,
             "unit": "vessels",
             "interval": null,
             "provenance": "demo",
             "basis": {
               "tool": "fermos.vessel",
-              "toolVersion": "vessel 2 · biosteam 2.54.0 · thermosteam 0.54.2",
+              "toolVersion": "vessel 3 · biosteam 2.54.0 · thermosteam 0.54.2",
               "inputs": [
                 {
                   "name": "simulation",
-                  "value": "d0415fc497aca19f",
+                  "value": "e8fee7b43f956028",
                   "unit": "",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the fermos.simulation the vessel is designed for",
                     "by": null
                   }
@@ -8166,7 +8166,7 @@
                   "source": {
                     "kind": "convention",
                     "id": null,
-                    "note": "simulation d0415fc497aca19f names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
+                    "note": "simulation e8fee7b43f956028 names no strain: its cells are read as yeast (thermosteam's Yeast), the cells of the yeast program's chemicals the vessel is built on",
                     "by": null
                   }
                 },
@@ -8319,7 +8319,7 @@
                   "unit": "h",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulation's harvest hour",
                     "by": null
                   }
@@ -8352,7 +8352,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the peak oxygen uptake the simulation states, read on its solver's own steps (its our.peak, at 9.219 h), which its display grid lies under",
                     "by": null
                   }
@@ -8363,7 +8363,7 @@
                   "unit": "g O₂ L⁻¹ h⁻¹",
                   "source": {
                     "kind": "artifact",
-                    "id": "d0415fc497aca19f",
+                    "id": "e8fee7b43f956028",
                     "note": "the simulated oxygen uptake's average over the batch (the trapezoid integral over its span)",
                     "by": null
                   }
@@ -8501,7 +8501,7 @@
                   }
                 }
               ],
-              "artifactId": "0c34e9f82967e2a3",
+              "artifactId": "c8f352a55cccde4e",
               "at": "2026-09-15T09:00:00Z",
               "seed": null
             },

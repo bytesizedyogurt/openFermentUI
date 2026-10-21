@@ -15,6 +15,11 @@ on its package's own defaults (Rule 1; E.1).
     TEST_ONLY  the toy, a STAND-IN for tests: never on the shelf, never
                served, and refused wherever the shelf is asked unless the
                caller says `allow_toy` (as geneOS's toy network is)
+    brothStream   (OF-BLD-020 §6.2) the stream a scenario flowsheet names as
+               its fermenter's broth, by the id its own file gives the
+               fermenter's outlet (test_seam holds each to its file); a
+               train's inlet from a scenario takes it from the newest run.
+               A reference names none: its package names its streams.
     package_regression(id)
                a reference biorefinery's own test values (OF-BLD-019 §2.2),
                parsed from the installed package's test file (`ast`, no
@@ -174,6 +179,7 @@ _PHA = FlowsheetInfo(
     priceBasis=PHA_PRICE_BASIS,
     leavesOut=PHA_LEAVES_OUT,
     gridInputs=["titre", "yield", "sugarPrice"],
+    brothStream="broth",
 )
 
 # OF-BLD-019 §2.3: glucose to ethanol, ours. What it leaves out is
@@ -232,9 +238,79 @@ _ETHANOL = FlowsheetInfo(
     priceBasis=ETHANOL_PRICE_BASIS,
     leavesOut=ETHANOL_LEAVES_OUT,
     gridInputs=["titre", "yield", "glucose_price"],
+    brothStream="beer",
 )
 
-SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _PHA)}
+# OF-BLD-020 §6.1 (D11): a vessel and a train, priced. Its scenarios are made
+# in the browser alone (no seed scenario names it: check:seed holds a seed's
+# modelId to BIOSTEAM_FLOWSHEETS, which leaves it out), each naming the kept
+# vessel design and train run it is built from (`builtFrom`). Its program is
+# its train's; a train runs only on a program with a chemical set
+# (pureos/train_spec.PROGRAM_CHEMICALS, the yeast program's alone tonight), so
+# the entry is the yeast program's and a train of another program is refused
+# in words (test_custom_train holds the two equal).
+COMPOSITE = "custom_train_v1"
+COMPOSITE_BUILT_FROM = ["fermos.vessel", "pureos.train_run"]
+COMPOSITE_PRICE_BASIS = ("USD per kg of the product the train traces (ethanol, for the yeast program), contained in "
+                         "the train's product stream as it leaves the train's last unit")
+COMPOSITE_LEAVES_OUT = [
+    "where the glucose comes from: it arrives as clean glucose, priced as such",
+    "every outlet the train does not send on leaves the plant unpriced: no co-product credit and no waste treatment",
+    "by-products the vessel's reaction does not make, and the scrubber that would recover product from the fermenter's gas",
+    "wastewater treatment and the boiler",
+]
+
+_CUSTOM_TRAIN = FlowsheetInfo(
+    id=COMPOSITE,
+    title="A vessel and a train, priced",
+    description=(
+        "A glucose solution into the fermenter fermOS designed (a kept fermos.vessel design: BioSTEAM's "
+        "AeratedBioreactor or NREL batch fermenter, rebuilt as the same class with every design parameter as the "
+        "design holds it, running the reaction the design was built on), its beer through the units of a train pureOS "
+        "ran (a kept pureos.train_run: each unit the same catalogue type, class and values as that run held them), "
+        "priced with the dry-grind corn ethanol plant's TEA (biorefineries.corn.create_tea, ConventionalEthanolTEA), "
+        "its financial parameters in the panel's Finance group as the package's defaults until a person sets one. "
+        "A scenario on it names the vessel design and the train run. The train's own inlet is not an input: the "
+        "fermenter's beer is its inlet. Only the yeast program has a chemical set, so a vessel or a train of another "
+        "program is refused."
+    ),
+    source="this repository",
+    program="yeast",
+    reference=False,
+    builtFrom=COMPOSITE_BUILT_FROM,
+    inputs=[
+        FlowsheetInput(key="feed_glucose_conc", name="glucose in the fermenter's feed", dimension="massConc",
+                       unit="g L-1", fields=["medium_component_conc"], kind="process",
+                       note="records of a medium component whose carbon source is glucose; sets the water that "
+                            "dilutes the glucose, by thermosteam's volume of the solution"),
+        FlowsheetInput(key="titre", name="ethanol titre at harvest", dimension="massConc", unit="g L-1",
+                       fields=["ethanol_titre"], kind="process",
+                       note="with the productivity, sets the fermenter's batch time; the reacting time the vessel was "
+                            "designed for is named beside it in the run's basis"),
+        FlowsheetInput(key="yield", name="ethanol yield on glucose", dimension="yield", unit="g g-1",
+                       fields=["ethanol_yield_substrate"], kind="process",
+                       note="sets the conversion of the vessel's reaction: the yield over the ethanol that reaction "
+                            "makes of a gram of glucose; a case above it cannot run, and says so"),
+        FlowsheetInput(key="productivity", name="ethanol volumetric productivity", dimension="volProd",
+                       unit="g L-1 h-1", fields=["ethanol_productivity"], kind="process",
+                       note="the batch time is the titre divided by it"),
+        FlowsheetInput(key="plant_scale", name="ethanol fermented in a year", dimension="massFlow", unit="t yr-1",
+                       kind="economic",
+                       note="the vessel's scale: the plant scale its design names (the vessel design is its source); "
+                            "a design of one vessel's batch volume names none, and then it is a named person's "
+                            "assumption. With the yield it sets the glucose fed, so the plant's size"),
+        FlowsheetInput(key="glucose_price", name="price of glucose", dimension="costUSD", unit="USD kg-1",
+                       kind="economic", note="a named person's assumption; the glucose alone is priced, not its water"),
+    ],
+    outputs=["pricePerKgProduct", "productKgPerH", "costLines", "readBack"],
+    priceOutput="pricePerKgProduct",
+    priceBasis=COMPOSITE_PRICE_BASIS,
+    leavesOut=COMPOSITE_LEAVES_OUT,
+    gridInputs=["titre", "yield", "glucose_price"],
+    brothStream="beer",
+)
+
+SHELF: dict[str, FlowsheetInfo] = {f.id: f for f in (_CORNSTOVER, _CORN, _ETHANOL, _PHA, _CUSTOM_TRAIN)}
 
 # The package module each reference biorefinery runs (OF-BLD-019 §2.2).
 REFERENCE_MODULES = {"cornstover_benchmark": "biorefineries.cornstover", "corn_drygrind": "biorefineries.corn"}
@@ -316,6 +392,101 @@ def package_regression(flowsheet_id: str) -> PackageRegression | None:
             # numpy.allclose's own default when the test names none
             rtol=float(ast.literal_eval(rtol)) if rtol is not None else 1e-05))
     return PackageRegression(package=_pkg("biorefineries"), file=file, test=test, values=values)
+
+# The dry-grind corn plant's TEA parameters (OF-BLD-020 §6.1, Appendix 2 §D),
+# read from the installed package's own file without importing it, as the
+# package test is (`package_regression`): `custom_train_v1` prices with
+# `biorefineries.corn.create_tea`, and the parameter panel serves each of
+# these as the library's default until a person sets one. The worker builds
+# that TEA from the package's dict itself, and a sim test holds the two
+# equal. BioSTEAM's depreciation schedules are read the same way, from its
+# TEA class's `depreciation_schedules`.
+TEA_DEFAULTS_FILE = "biorefineries/corn/tea.py"
+TEA_DEFAULTS_NAME = "default_tea_parameters"
+TEA_CLASS_FILE = "biosteam/_tea.py"
+
+
+def _dist_file(dist: str, relative: str) -> Path | None:
+    try:
+        path = Path(str(distribution(dist).locate_file(relative)))
+    except PackageNotFoundError:
+        return None
+    return path if path.is_file() else None
+
+
+@lru_cache(maxsize=None)
+def package_tea_defaults() -> dict[str, object] | None:
+    """`biorefineries.corn.tea.default_tea_parameters` as the installed file
+    writes it (`dict(IRR=…, duration=(…), …)`), each value read with
+    `ast.literal_eval`; tuples become lists. None when the package or the
+    name is not found here."""
+    path = _dist_file("biorefineries", TEA_DEFAULTS_FILE)
+    if path is None:
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if not (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == TEA_DEFAULTS_NAME
+                                                     for t in node.targets)):
+            continue
+        call = node.value
+        if isinstance(call, ast.Call) and ast.unparse(call.func) == "dict" and not call.args:
+            out: dict[str, object] = {}
+            for k in call.keywords:
+                v = ast.literal_eval(k.value)
+                out[str(k.arg)] = list(v) if isinstance(v, tuple) else v
+            return out
+        if isinstance(call, ast.Dict):
+            return {str(ast.literal_eval(k)): (lambda v: list(v) if isinstance(v, tuple) else v)(ast.literal_eval(v))
+                    for k, v in zip(call.keys, call.values) if k is not None}
+    return None
+
+
+@lru_cache(maxsize=None)
+def depreciation_schedules() -> list[str] | None:
+    """The depreciation schedules BioSTEAM's TEA holds tables for, as its
+    `depreciation` takes them by name ('MACRS7'), read from the installed
+    class's `depreciation_schedules` keys. None when not found here."""
+    table = _depreciation_table()
+    return None if table is None else [name for name, _ in table]
+
+
+@lru_cache(maxsize=None)
+def depreciation_lengths() -> dict[str, int]:
+    """How many years each schedule BioSTEAM's TEA holds a table for writes
+    the capital off over: the length of its table's array, read from the
+    installed class's `depreciation_schedules` without importing it (a
+    MACRS schedule's table runs a year past its name, by the half-year
+    convention). BioSTEAM refuses a schedule longer than the plant's life
+    (its `_fill_depreciation_array`), so the panel says so before a run
+    (OF-BLD-020 §6.R, main-29). Empty when not found here; a table this
+    reader cannot count is left out."""
+    return {name: n for name, n in (_depreciation_table() or []) if n is not None}
+
+
+def _depreciation_table() -> list[tuple[str, int | None]] | None:
+    """Each schedule of BioSTEAM's TEA table by name, with its array's
+    length when the file writes it as `np.array([...])`; None when the class
+    or its table is not found here."""
+    path = _dist_file("biosteam", TEA_CLASS_FILE)
+    if path is None:
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    cls = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "TEA"), None)
+    if cls is None:
+        return None
+    for node in cls.body:
+        target = node.target if isinstance(node, ast.AnnAssign) else (node.targets[0] if isinstance(node, ast.Assign)
+                                                                       and len(node.targets) == 1 else None)
+        if isinstance(target, ast.Name) and target.id == "depreciation_schedules" and isinstance(node.value, ast.Dict):
+            out: list[tuple[str, int | None]] = []
+            for k, v in zip(node.value.keys, node.value.values):
+                key = ast.literal_eval(k) if k is not None else None
+                if isinstance(key, tuple) and all(isinstance(x, (str, int)) for x in key):
+                    arr = v.args[0] if isinstance(v, ast.Call) and len(v.args) == 1 else None
+                    out.append(("".join(str(x) for x in key), len(arr.elts) if isinstance(arr, ast.List) else None))
+            return out
+    return None
+
 
 TEST_ONLY: dict[str, FlowsheetInfo] = {
     "toy": FlowsheetInfo(

@@ -106,7 +106,8 @@ archived programs (above).
 | Simulation economics, BioSTEAM | **Simulated, from a shelf of four flowsheets** (OF-BLD-019 Phase 2). Two are published reference biorefineries run whole on their package's own defaults: the stored benchmark, `biorefineries.cornstover`, reproduces the NREL 2011 corn stover design at **1.9677** USD per gallon against 1.968 (2026-10-15), and `selling_price` cites it, as it cites the newest kept run of a seed BioSTEAM scenario the program switch shows; the dry-grind corn ethanol plant, `biorefineries.corn`, the yeast program's reference, matched all eleven values its package's own test asserts on this installation, the largest relative difference 1.8×10⁻⁵ against the test's 5 % (measured in the build, STATE.md §2.2). Two are ours: `sc-yeast-1` runs glucose to ethanol, three of its process inputs bound to thread Q records and its productivity, plant scale and glucose price waiting; `sc-pha-1` (archived with PHA) runs fermentation, harvest and drying of PHA. Each scenario run draws 500 seeded samples by default and is `demo` while any input rests on a named person's assumption. Kept on `openferment-data` since OF-BLD-019 §7.1: the corn plant's reference run (`1b2f2c463c872086`), the corn stover plant's through the reference endpoint (`42f80a77d306f673`, 1.967671122 USD per gallon, nine of its package test's eleven values within tolerance, the two misses the package's own on this lock), and one run of `sc-pha-1` (`23c3304c1c35e26d`, `demo`), made in §1.2 on stand-in assumptions under the reviewer name *OF-BLD-019 session* (a test entry), whose base case could not run; no run of `sc-yeast-1` is kept: three of its inputs wait for Sean |
 | Vessel designs | **Designed by BioSTEAM, from a kept simulation and a person's scale** (OF-BLD-020 Phase 4) — fermOS → Vessel sizes the vessels a kept batch simulation needs (or, anaerobic, a kept fit) with BioSTEAM's own fermenter classes, in the Proforma worker: how many, how large, the batch cycle, agitator and compressor power, cooling, the oxygen the vessel transfers against the uptake the simulation takes, and BioSTEAM's own cost. Every design parameter is in the parameter panel with its source. The scale is always a named person's assumption, so every design is `demo`. None is kept on `openferment-data` (2026-10-21 05:51 UTC): no simulation is kept yet, because its parameters wait for Sean (STATE.md §3.5), so no vessel has been designed outside the tests and the service double, which design on stand-in simulations (§4.3, run owed) |
 | Downstream trains | **Read from a simulated run, never typed** — pureOS reads the train of the newest Proforma run of each scenario from the one artifact that run kept (OF-BLD-019 Phase 4): unit by unit in run order, the mass in and out, the product in and out, the product each unit passes on toward the product stream and what it loses and to which outlet, its recovery and the share still on the path, and the overall recovery. Nothing is simulated again on read. A train exists once somebody runs a scenario. The one scenario run on `openferment-data`, `sc-pha-1`'s (archived), has a base case that could not run, so its train names no product and reads no recovery, and says why; no yeast train is on file, and pureOS says so and how to make one |
-| Physical properties | **Computed by thermosteam**, BioSTEAM's property engine, in the Proforma worker: density, heat capacity, viscosity, and bubble and dew points of a run's stream, or of a preset the service fills (the ethanol–water azeotrope, or water and ethanol at a titre record's value). Each answer is an artifact whose basis names the library and its version; a chemical the library lacks is refused in words. One is kept on `openferment-data`: §7.1's beer at a thread Q titre record (`cfdfdee7ec2bae37`, `unverified`, the record's mark) |
+| Physical properties | **Computed by thermosteam**, BioSTEAM's property engine, in the Proforma worker: density, heat capacity, viscosity, and bubble and dew points of a run's stream, or of a preset the service fills (the ethanol–water azeotrope, or water and ethanol at a titre record's value). Each answer is an artifact whose basis names the library and its version; a chemical the library lacks is refused in words. One is kept on `openferment-data`: §7.1's beer at a thread Q titre record (`cfdfdee7ec2bae37`, `unverified`, the record's mark). Since OF-BLD-020 §7.1 it also gives a product's volatility, its normal boiling point beside water's and whether the two form a minimum-boiling azeotrope, for the proposer below; ethanol is the one product it is asked about |
+| Proposed trains | **Proposed by written rules from computed properties, never typed** (OF-BLD-020 Phase 7) — pureOS proposes a train for a product made in a host: catalogue unit types in order, each with the rule, the property it read and the artifact that holds the property, every parameter at its library default or waiting for a person. It reads thermosteam's volatility for a small molecule, Biopython's ProtParam for a protein (molecular weight and isoelectric point from its sequence), and, for a protein or a polymer, whether the products seed says the product is secreted. Measured at OF-BLD-020 §7.T (2026-10-21): ethanol made in S288C proposes a beer column, then a molecular sieve, because thermosteam finds ethanol lighter than water and finds the minimum-boiling azeotrope. Each of the products seed's 119 entries (the archived programs' with the switch on) proposes nothing and names what is missing: the 95 proteins a sequence and a location, the 22 small molecules their volatility, the 2 polymers a location. No entry carries a sequence or a location, and none is invented. A proposal runs nothing and keeps nothing but the property artifacts it reads |
 | Agent answer prose | **Real model calls in a bounded loop** — Postdoc on the configured model (`claude-haiku-5-5` in this build), restarted once on the fallback on a refusal or an outage, through `openferment-core`. Code sweeps the eleven modules first; the loop reads them, searches the records and passages (at most 6 rounds, 12 tool calls, the per-question cost cap and 180 seconds), and answers with claims that carry no numbers of their own, each citing records, module rows, quoted sentences checked word for word against their passages, or computed values. There is no scripted mode: with the service down Postdoc says so, keeps the history, and offers nothing in its place. The eleven run-sheet questions, each asked twice on 2026-10-20, cost $0.1072 for the 22 and took 8–53 s each (`docs/DEMO.md`). The 13 authored flows are an evaluation set, graded against and never offered |
 
 The corpus is real literature, and since OF-BLD-016 nothing on screen is invented. `demo` is a
@@ -172,8 +173,9 @@ browser ──POST /api/ask/stream──▶ FastAPI
                                     ├─ the loop: the model calls its tools — search_records, search_passages,
                                     │    convert_units, yield_ceiling, growth_forecast, selling_price,
                                     │    draft_runbook, thermo_props, run_flowsheet, stream_table,
-                                    │    fermos_simulate, fermos_vessel, and a read and a write tool for
-                                    │    every module — each step streamed to the browser as it completes
+                                    │    fermos_simulate, fermos_vessel, pureos_build, pureos_propose,
+                                    │    and a read and a write tool for every module — each step
+                                    │    streamed to the browser as it completes
                                     ├─ budget spent (6 rounds, 12 calls, cost, 180 s): one last turn, no tools
                                     ├─ a refusal or outage: asked again once, on the fallback model
                                     ├─ validate_plan: no number, nothing cited that no tool returned,
@@ -312,6 +314,14 @@ nothing else. Now (OF-BLD-015 Phase 7, `docs/TOOLS.md`):
   simulation needs (*fermOS sizes the vessel on BioSTEAM*, below). `fermos_read` lists kept
   simulations (kind `simulation`) and designs (kind `vessel`), and Postdoc's prompt says a
   simulation's or a vessel's numbers are read from its artifact and never stated.
+- **Postdoc asks for a proposed train** (OF-BLD-020 Phase 7). `pureos_propose` takes a product's
+  id, a host strain's id and, optionally, an inlet: a kept simulation's artifact id, or a kept
+  run's id and one of its streams. Ids and words, never a number. It is a read: it runs the
+  proposer pureOS's index runs, keeps nothing but the property artifacts it reads, writes no
+  audit line and stands at no gate. Each property it read comes back as its own evidence id
+  (`<artifact id>:<property>`), whose label names the library and never its version, so a claim
+  that copies the label word for word holds no number; the whole proposal is in `data`.
+  `pureos_build`'s `propose` action calls the same proposer and keeps the train as the model's.
 
 `pnpm check:tools` holds its rules in `verify`: a read and a write tool for every module;
 `tools/writes.py`, read as parsed Python so a write function reached through an aliased import
@@ -330,9 +340,10 @@ from the same coverage call, so it could not miss.
 ### The same tools, from an assistant outside the app
 
 `core/openferment_core/mcp_server.py` is an MCP server over stdio. It lists the
-thirty-four tools Postdoc uses, with the registry's own schemas, and two more:
-`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`, thirty-six
-in all (`fermos_simulate` and `fermos_vessel`, OF-BLD-020, are the registry's newest). The
+thirty-six tools Postdoc uses, with the registry's own schemas, and two more:
+`ask_postdoc`, which runs the loop and returns the plan, and `get_artifact`, thirty-eight
+in all. OF-BLD-020 added four: `fermos_simulate` and `fermos_vessel` on night one, then
+`pureos_build` and `pureos_propose`, the registry's newest. The
 registry's rules hold there as everywhere: a number typed into an input is
 refused, a write goes through the module's own write function, and anything at
 a gate becomes a proposal a person carries out on Home. No tool signs for a
@@ -430,8 +441,9 @@ cd core && uv run python -m openferment_core.demo --prototype   # the prototype'
 
 The service also answers `GET /api/tools` (each tool's name, description and input schema) and
 `POST /api/tools/{name}`, the same registry Postdoc's loop calls: the seven OF-BLD-014 tools,
-a read and a write tool for every module, thermosteam's `thermo_props`, and Proforma's
-`run_flowsheet` and `stream_table` (`docs/TOOLS.md`). A tool input carries ids and words; a number typed into one refuses the call.
+a read and a write tool for every module, thermosteam's `thermo_props`, Proforma's
+`run_flowsheet` and `stream_table`, fermOS's `fermos_simulate` and `fermos_vessel`, and pureOS's
+`pureos_build` and `pureos_propose`, thirty-six in all (`docs/TOOLS.md`). A tool input carries ids and words; a number typed into one refuses the call.
 `pnpm check:tools` is the stage of `verify` that holds the write tools to their module's write
 functions and the gates to a named person; `pnpm eval:o` runs eval set O live.
 Every model call is charged to the UTC day's spend in `core/data/spend.json`, and `llm.py` refuses
@@ -531,7 +543,9 @@ export set together.
 ### The gate
 
 The counts below were measured at OF-BLD-020 §8.R (`8c81df4`, the code of night one's last
-commit), in the gate run of 2026-10-21 that ended green at 09:18 UTC.
+commit), in the gate run of 2026-10-21 that ended green at 09:18 UTC. Four were measured again
+at OF-BLD-020 §7.T on 2026-10-21, on the code of night two's Phase 7: test:core's and test:sim's
+counts, check:tools' line and the registry's thirty-six names.
 
 ```bash
 pnpm verify              # offline — no key, no service, no network — twenty-four stages, in order:
@@ -540,10 +554,10 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm check:plan        #   every Pydantic model matches its TypeScript mirror, field for field, and the
                          #   provenance ranking is one list on both sides
   pnpm check:reference   #   reference content is domain knowledge, never a result
-  pnpm test:core         #   the Python service, 1,930 tests (1 skipped): retrieval, units,
+  pnpm test:core         #   the Python service, 2,139 tests (1 skipped): retrieval, units,
                          #   anchoring, match_run, biorepo.write, the computed-value basis, the artifact store
                          #   and replay, llm.py's roles, cached tokens, tool turns and daily cap, the registry's
-                         #   thirty-four tools, its gates and the proposals they make, the coverage sweep, the
+                         #   thirty-six tools, its gates and the proposals they make, the coverage sweep, the
                          #   program switch on the pool, the passages, the module rows and the coverage map,
                          #   the worker runner, the geneOS worker on a toy network worked by hand and Appendix
                          #   2's bundled-model ceilings, fermOS's fits and forecast band on synthetic runs,
@@ -566,19 +580,25 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   and the Haldane culture, storage after the nutrient, the light socket refusing),
                          #   batch fits recovering their parameters, the X0 gauge, binding from records, fits and
                          #   kept simulations, fermos_simulate and every program rule; the vessel's request rules
-                         #   and its basis
+                         #   and its basis; Biopython's ProtParam on a sequence and each refusal of one,
+                         #   thermosteam's volatility against a stand-in worker, a property's label holding no
+                         #   number, and the train proposer: its rules, what it names missing, its refusals and
+                         #   status codes, pureos_propose, and a claim that copies a property's label kept
   pnpm test:sim          #   the real BioSTEAM worker answers: the corn plant run whole and read back, glucose to
                          #   ethanol converging on stand-in inputs, one result whatever the warm worker built
                          #   before, thermosteam's answers and the ethanol train read by pass among them, and
                          #   fermOS's vessels designed on BioSTEAM (aerated by Riet and Dewes, NREL's anaerobic
-                         #   batch, the peak sizing at every scale, the heat cross-check, the class's own refusals)
-                         #   (pytest marker sim; 34 tests)
-  pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current
-  pnpm check:tools       #   11 modules with a read and a write tool; writes.py calls only the 12 module write
+                         #   batch, the peak sizing at every scale, the heat cross-check, the class's own refusals);
+                         #   ethanol's volatility (lighter than water, the same azeotrope the preset finds) and the
+                         #   train proposed for it, a column then a molecular sieve (pytest marker sim; 101 tests)
+  pnpm check:licences    #   every dependency's licence against core/licences.toml; THIRD_PARTY.md current;
+                         #   Biopython's own licence among the allowed strings since OF-BLD-020 §7.1
+  pnpm check:tools       #   11 modules with a read and a write tool; writes.py calls only the 14 module write
                          #   functions it names, followed through every import and alias; no other tool file
-                         #   reaches any of the 34 functions it finds keeping a run or writing an audit line,
-                         #   sys.modules, vars() and globals() included (rule 2b); 12 gated actions need a
-                         #   person's name; the 7 gates in gates.py and docs/TOOLS.md alike; each of the 34
+                         #   reaches any of the 45 functions it finds keeping a run (Proforma's, a simulation, a
+                         #   vessel or a train), a train a model built, or writing an audit line, sys.modules,
+                         #   vars() and globals() included (rule 2b); 12 gated actions need a person's name; the
+                         #   7 gates in gates.py and docs/TOOLS.md alike; each of the 36
                          #   names in WHITELIST registered
                          #   and written down in docs/TOOLS.md; since OF-BLD-020 Phase 3, rule 2b also finds
                          #   what keeps a simulation, a vessel design or a train, and rule 6 (E.4‴) fails a
@@ -619,9 +639,9 @@ pnpm verify              # offline — no key, no service, no network — twenty
   pnpm test:deposition   #   a deposition on a tablet, glove-tolerant
   pnpm test:reconcile    #   a refuted prediction changes evidence, never a parameter
   pnpm test:smoke        #   74 routes headless with archived programs hidden, 30 redirects, the 6 reference
-                         #   shelves and 6 seeded subsystems, 4 requests outside dist/ refused, and fifteen flows:
-                         #   programs (Settings lists them, every list says what it hides, a deep link opens
-                         #   under its banner, the switch brings them back); Proforma's index, a scenario's page
+                         #   shelves and 6 seeded subsystems, 4 requests outside dist/ refused, and fifteen flows
+                         #   at §8.R: programs (Settings lists them, every list says what it hides, a deep link
+                         #   opens under its banner, the switch brings them back); Proforma's index, a scenario's page
                          #   (a seed and a made scenario run, every section read from the run), the reference
                          #   pages (each held to its package's own test) and Compare over BioSTEAM scenarios; a
                          #   fermOS fit feeding a scenario and the ceiling check, flagged and never clamped; the
@@ -635,7 +655,10 @@ pnpm verify              # offline — no key, no service, no network — twenty
                          #   (every input with its source, a change a named assumption the run carries, Reset
                          #   to source); fermOS → Vessel (every design parameter in the panel, a scale a named
                          #   assumption, the design and its oxygen balance); and fermOS → Simulate (a family
-                         #   from its sources, what waits typed under a name, the result read from the artifact)
+                         #   from its sources, what waits typed under a name, the result read from the artifact);
+                         #   since then, among others, pureOS's proposer (ethanol in S288C proposes a column then
+                         #   a molecular sieve, each reason beside its unit; a protein the seed gives no sequence
+                         #   and no location proposes nothing and names both)
   pnpm test:golden       #   34 checks, the switch turned on first: Postdoc down and back, its eleven questions
                          #   and no scripted mode, a live answer's steps, a replay labelled, the reader, the
                          #   review queue, Witness, scaling, Deposition, an authored cost surface's sweep
@@ -688,7 +711,7 @@ The prototype holds itself to nine conditions (design §11, and OF-BLD-016's eig
 | 1 | Corpus & Postdoc | Agentic RAG with visible retrieval | `/postdoc`, `/biorepo` |
 | 2 | Hosts & Protocols | Verified parameters become executable | `/geneos/hosts`, `/runbooks/protocols` |
 | 3 | Proforma | Parameters feed a flowsheet BioSTEAM runs and prices | `/proforma`, `/proforma/scenario`, `/proforma/reference`, `/biorepo/compare` |
-| — | pureOS | Recovery is read from the train BioSTEAM ran, never typed, and thermosteam answers for its streams | `/pureos`, `/pureos/train` |
+| — | pureOS | Recovery is read from the train BioSTEAM ran, never typed, and thermosteam answers for its streams; a train is proposed by written rules, each naming the property it read | `/pureos`, `/pureos/train` |
 | — | Dominion | What could be made, and who owns it | `/dominion` |
 | 4 | Primer | The platform doubles as curriculum | `/primer` |
 | 5 | Assay | A claim is tested, and the result comes back | `/runbooks`, `/runbooks/depositions` |
@@ -762,8 +785,9 @@ weakest of them: it is never a measurement. Kinetics (the fits), operating mode
 sized on BioSTEAM) are built; control is named and not built (*fermOS simulates
 on scipy* and *fermOS sizes the vessel on BioSTEAM*, below). **pureOS** has the
 unit-operation vocabulary and reads the train a BioSTEAM flowsheet ran (below); it
-has no process model of its own, chooses no train, and its four subsystems are
-named and not built. Both say so on the screen
+has no process model of its own, and its four subsystems are named and not built.
+It proposes a train by written rules, for a person to fill and run (OF-BLD-020
+Phase 7, *pureOS proposes a train*, below). Both say so on the screen
 rather than implying otherwise, and Home shows the current state of each of the
 eleven beside its name. Putting them in the rail from day one means that when
 the work arrives the question is what they do with it, not where it goes.
@@ -1048,7 +1072,7 @@ still clips a yield above the glucose ceiling (OF-BLD-014 §8.3).
 **pureOS → Train** (`/pureos/train/:scenarioId`, or a run's artifact id in
 place of the scenario's) reads the newest Proforma run of a scenario from the
 one `proforma.run` artifact that run kept (OF-BLD-019 D1), through
-`core/openferment_core/pureos.py`. It lists the units in the order the
+`core/openferment_core/pureos/__init__.py`. It lists the units in the order the
 flowsheet ran them, each with its inlets and outlets, mass in and out, the
 product in and out, the product it passes on toward the product stream, what
 it loses and to which outlet, its recovery, and the share still on the path
@@ -1236,8 +1260,9 @@ takes 13 to 20 milliseconds (STATE.md §3.1).
   parameter's value stays in the artifact. `fermos_read`'s kind `simulation` lists kept runs
   (`fermos/simulation/<artifact id>`), and a claim citing one that a read returned only as a row
   cites the row's ref. Postdoc's prompt (rule 15) says a simulation's numbers are read from its
-  artifact, never stated. The registry now holds thirty-four tools, and the MCP server lists
-  thirty-six. `check:tools` rule 2b holds every function that keeps a simulation to
+  artifact, never stated. It brought the registry to thirty-four tools and the MCP server to
+  thirty-six; night two's `pureos_build` and `pureos_propose` bring them to thirty-six and
+  thirty-eight. `check:tools` rule 2b holds every function that keeps a simulation to
   `tools/writes.py`, and rule 6 (E.4‴) fails any `fermos_*` or `pureos_*` tool whose input schema
   admits a number. Tonight's four live asks each called it and got the refusal naming the five
   parameters that wait for CEN.PK113-7D (`docs/DEMO.md` §7).
@@ -1372,6 +1397,126 @@ imports it; `core/openferment_core/flowsheets/vessel.py` is the worker's side.
 - **What waits for Sean.** No simulation is kept on `openferment-data`, because §3.5's parameters
   wait for him, so no vessel has been designed for the yeast program (§4.3, run owed). Once he
   simulates a batch, he types a plant scale on fermOS → Vessel and presses **Design**.
+
+### pureOS proposes a train (OF-BLD-020 Phase 7)
+
+pureOS's index has **Propose a train**. It answers one question: for this product, made in these
+cells, which separation steps come in what order, and why each? Written rules answer it, in
+`core/openferment_core/pureos/proposer.py`. Each rule names the property it read, and each
+property is computed by a library and kept as an artifact. A proposal types no value and runs
+nothing: a person fills what waits in the Builder and runs the train there.
+
+- **Two properties, each computed by a library** (OF-BLD-020 §7.1).
+  - *Volatility*, from thermosteam in the Proforma worker (`thermo.volatility`;
+    `POST /api/thermo/volatility` computes, `GET` only reads). It gives the product's normal boiling
+    point beside water's, which of the two boils first, and whether the library's own
+    vapour-liquid equilibrium gives the pair a minimum-boiling azeotrope at the library's default
+    pressure. The answer is one `volatility` artifact whose basis names thermosteam and its version.
+    The library is asked about a product by its own name for it (`thermo.CHEMICALS`), and that
+    list names ethanol alone: every other product's volatility is missing, never guessed from its
+    name. Measured on the real worker at §7.T: ethanol boils at 351.57 K and water at 373.12 K, and
+    the two form a minimum-boiling azeotrope at an ethanol mole fraction of 0.8939 (mass fraction
+    0.9556), boiling at 351.40 K, the same liquid the `ethanol-water-azeotrope` preset finds.
+  - *A protein's molecular weight and isoelectric point*, from Biopython's ProtParam
+    (`core/openferment_core/protparam.py`; `POST /api/protparam` computes, `GET` only reads).
+    Biopython is an open-source library of tools for biological sequences; its ProtParam module
+    computes a protein's molecular weight, isoelectric point, extinction coefficients at 280 nm and
+    hydropathy (GRAVY) from its one-letter amino-acid sequence. It reads the sequence a product's
+    entry in the products seed carries (`sequence`, with `sequenceSource` saying where it was
+    read). A sequence holding any letter outside the library's twenty standard codes is refused in
+    words naming each letter and its positions, and nothing is repaired. The answer is one
+    `protparam` artifact, versioned with Biopython 1.88. No entry carries a sequence, and none is
+    invented, so every protein's properties are missing.
+  - Each property is its own evidence (`<artifact id>:<property>`). Its label names the library
+    and never its version, which stays in the basis, so a claim that copies a label word for word
+    holds no number (OF-BLD-020 §7.R, review finding 33).
+- **What else a rule reads.** The product's class: the products seed's `category`, read as a word
+  (an enzyme, an antigen, and a food, sweet, structural, research or therapeutic protein is a
+  protein; a human milk oligosaccharide, a terpene and a glycoside are small molecules; a
+  biopolymer is a polymer). The seed holds no ethanol entry, so ethanol is a small molecule because
+  thermosteam gives it a normal boiling point. Where the product is made: the entry's `location`,
+  secreted or intracellular, added in §7.2 and carried by no entry yet. The inlet's pH, which with
+  the isoelectric point would choose the exchanger: no inlet carries one, so a capture step's mode
+  waits and its reason says why.
+- **The rules** (`RULES`, fifteen, each with its basis in words):
+  - a small molecule lighter than water is separated by boiling (`distillation`, the beer column; a
+    flash drum is named as a person's choice), and where thermosteam finds a minimum-boiling
+    azeotrope with water a `molecular-sieve` follows, because the column's top cannot pass the
+    azeotrope;
+  - a small molecule heavier than water is extracted into a solvent (`lle`; crystallisation is
+    named as the other step);
+  - a secreted protein is clarified (`centrifugation`), concentrated (`uf-df`, beside the molecular
+    weight), captured (`chromatography`, keyed on the isoelectric point against the inlet's pH),
+    polished (`chromatography` again, beside the molecular weight) and dried (`spray-dry`);
+  - an intracellular protein is harvested (`centrifugation`, the cake on), its cells broken
+    (`cell-disruption`) and the debris spun out (`centrifugation`), then treated as secreted from
+    concentration on;
+  - an intracellular polymer is harvested (`centrifugation`), its cells broken to free the granules
+    (`cell-disruption`), washed (`centrifugation`) and dried (`drying-drum`).
+
+  Two rules are left out because they would need a typed number: a membrane's cut-off chosen from
+  the molecular weight, and a polishing mode chosen from it. Their reasons say so, and those
+  parameters wait.
+- **What it writes.** A `TrainProposal`: the product, the host, the program, the class, a
+  `TrainSpec` (`proposed-<product>`; unit ids a type's letters and a count, such as D1, MS1, C1,
+  UF1, CH1), one reason per unit (the rule, the property, the artifact that holds the property,
+  and the rule's words), what is missing by property with why, the property artifacts read, and
+  notes. Every unit's parameters and records are empty: a parameter keeps its library default or
+  waits for a record or a person. Besides a unit's type, a rule writes only where an outlet goes,
+  as a word (a harvest's cake onward, its liquid to waste). Every proposal passes the train
+  validator. A class nobody states, or a missing deciding property, gives no train and names each
+  missing property.
+- **What it never does.** It types no number: `proposer.py` holds none (a test reads the file for
+  one), and no reason's words hold one. It runs no train. It keeps nothing but the property
+  artifacts.
+- **The program.** The train belongs to its product's program, or its host's (two that differ are
+  refused), else the one active program, said in a note. With the switch off, a product or a host
+  of an archived program is refused as hidden, naming the program and Settings → Programs
+  (OF-BLD-020 §7.R).
+- **The endpoint.** `POST /api/pureos/propose` takes a `ProposeRequest` (`product`, `host`,
+  `inletRef`, `includeArchived`; any other field is refused) and answers a `TrainProposal`.
+  `inletRef` is empty (the inlet is typed in the Builder), a kept simulation's artifact id (its
+  harvest), or a kept run's artifact id and one of its streams as `<artifact id>/<stream id>`. A
+  product that neither the seed nor thermosteam's list holds is a 404. A refusal is a 422 in
+  words: an unknown host, an archived program with the switch off, a product and a host of two
+  programs, an inlet that is not one, a sequence ProtParam cannot read, a chemical the library
+  lacks. A damaged property artifact is a 409, and a worker that cannot answer, or a corpus not
+  exported, a 503.
+- **On the screen.** pureOS's index, **Propose a train**: a product (ethanol, and PHB with the
+  switch on, then Dominion's catalogue as the switch shows it), a host (the strains of the programs
+  the switch shows) and an inlet (none, or a kept simulation's harvest). **Propose** posts ids and
+  words. The answer shows what the rules need and nothing holds, then each unit with its reason
+  beside it and a link to the property's artifact in BioRepo → Artifacts, then the notes. A train
+  proposed is kept in this browser's session (`proposedTrains`, not Durable) under a new train
+  id, and **Open it in the Builder** links to `/pureos/build/<train id>`. The service double
+  answers from a fixture the real proposer wrote over a stand-in for thermosteam
+  (`pureos-propose.json`), and the smoke's propose flow holds the screen to it.
+- **Postdoc** asks through `pureos_propose` (*Postdoc reaches every module*, above), and
+  `pureos_build`'s `propose` keeps the proposed train as the model's.
+- **Measured at §7.T** (2026-10-21). Ethanol made in S288C proposes D1 `distillation` (rule
+  `volatile-separate`, reading the boiling point) and MS1 `molecular-sieve` (rule
+  `azeotrope-dehydrate`, reading the azeotrope), both citing the volatility artifact
+  `d13905b95cfb80bf`, with nothing missing, in 22.8 s with the worker starting cold. Over the
+  products seed's 119 entries, with the switch on and a host of each entry's program, none
+  proposes a train: the 95 proteins name a sequence and a location missing, the 22 small molecules
+  their volatility, and the 2 polymers a location. The tests that hold this: `test_protparam`, 28
+  offline; `test_thermo`, thermosteam's answers with the volatility among them, 49 offline and 7
+  sim; `test_propose`, 36 offline and 1 sim.
+- **Where the tree overruled the build document.** The module is `pureos/proposer.py`, not
+  `propose.py`: the package re-exports the function `pureos.propose`, which would shadow a
+  submodule of that name. The answer is `TrainProposal`, because `Proposal` was already Home's
+  model of a write a model proposed at a gate. The products seed states a class only as
+  `category` and has no field for secreted or intracellular, so `location` was added, optional and
+  empty. The seed holds no ethanol entry, so the products thermosteam is asked about are listed in
+  `thermo.CHEMICALS`. Volatility is an artifact tool of its own, not a `thermo_props` preset, so
+  that tool's contract is unchanged. Biopython's licence string is
+  `LicenseRef-Biopython-License-Agreement`; it joined the allowed strings in
+  `core/licences.toml`, as PROMPT-020 Part C.2 names it permissive. Only a minimum-boiling
+  azeotrope is searched.
+- **What waits.** A protein proposes once its products seed entry carries a sequence, with its
+  source, and a location, and a polymer once its entry says the cells keep it: edits to the seed,
+  made by a person from a named source. A small molecule other than ethanol proposes once
+  `thermo.CHEMICALS` names its chemical in thermosteam's library.
 
 ## Architecture
 

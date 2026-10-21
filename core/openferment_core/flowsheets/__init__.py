@@ -35,7 +35,15 @@ and cornstover_benchmark keeps `run()`, the benchmark's own (§8.2).
 
 `vessel.py` is not a flowsheet on the shelf (it is not in KNOWN): it is
 fermOS's one vessel, designed afresh by the Proforma worker's `vessel_specs`
-and `vessel_design` ops (OF-BLD-020 §4.1), here because BioSTEAM is.
+and `vessel_design` ops (OF-BLD-020 §4.1), here because BioSTEAM is. Nor is
+`train.py`, pureOS's train (§5.2).
+
+A flowsheet built from a structure (OF-BLD-020 §6.1: `custom_train_v1`, a
+vessel design's fermenter and a train run's units, priced) sets
+`STRUCTURED = True` and exposes `build(structure, unit_class)` in place of
+`build()`: the worker hands it the structure the service read from the two
+kept artifacts, with its catalogue's class lookup, and keeps a built plant
+per structure; `evaluate` and `parts` are as above.
 
 A scenario flowsheet prices every case on BioSTEAM's own default utility
 prices and plant cost index, set at the start of the case

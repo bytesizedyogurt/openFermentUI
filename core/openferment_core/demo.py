@@ -460,8 +460,11 @@ def _rebuild_prototype(out: Path, real_worker: bool | None = None) -> list[Path]
         *prototype_ceiling_check().items(),
         *prototype_pureos().items(),
         *prototype_thermo().items(),
+        *prototype_propose().items(),
+        *prototype_kept_trains().items(),
         *prototype_proposals().items(),
         *prototype_vessel(real_worker).items(),
+        *prototype_builder(real_worker).items(),
     ):
         path = out / name
         if name.endswith(".jsonl"):
@@ -854,6 +857,7 @@ def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
                 result.basis.at = AT
                 art = artifacts.get(result.artifactId).model_copy(update={"createdAt": AT, "durationMs": 0})
                 listed = [x.model_copy(update={"createdAt": AT}).model_dump(mode="json") for x in fermos.simulations()]
+                harvests = prototype_harvests(result)
         finally:
             _intake.DATA_DIR = saved
     families = {"off": [f.model_dump(mode="json") for f in fermos.families(False)],
@@ -864,7 +868,26 @@ def prototype_fermos_simulate() -> tuple[dict[str, Any], list[Any]]:
                                       "boundTyped": with_typed,
                                       "simulate": {"request": request.model_dump(mode="json"),
                                                    "body": result.model_dump(mode="json")},
-                                      "simulations": listed}}, [art])
+                                      "simulations": listed, "harvest": harvests}}, [art])
+
+
+def prototype_harvests(result: Any) -> list[dict[str, Any]]:
+    """OF-BLD-020 §6.2: what `GET /api/fermos/harvest` answers for the
+    fixture's kept simulation, read by the real `fermos.harvest` from the
+    series it keeps: at its own harvest hour, at a person's hour (the kept
+    point mid-run, read from the series, not typed), and at an hour past its
+    end (the refusal, in its words). The double answers these alone."""
+    from . import fermos
+
+    t = result.series["t"]
+    out = []
+    for hour in (None, t[len(t) // 2], t[-1] * 2):
+        try:
+            entry = {"status": 200, "body": fermos.harvest(result.artifactId, hour).model_dump(mode="json")}
+        except fermos.SimulationRefused as e:
+            entry = {"status": 422, "body": {"detail": str(e)}}
+        out.append({"request": {"simulation": result.artifactId, "hour": hour}, **entry})
+    return out
 
 
 # OF-BLD-020 §3.R (finding 17): one chemostat_v1 simulation run by the real
@@ -1048,9 +1071,17 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
     # OF-BLD-019 §2.3: the glucose-to-ethanol flowsheet has a closed form of
     # its own; every other call is the PHA draft's, as before.
     flowsheet = args.get("flowsheet") or "pha_sugar_v0"
-    ethanol = flowsheet == "ethanol_glucose_v0"
+    # OF-BLD-020 §6.1: a vessel and a train, priced, answers as the ethanol
+    # flowsheet's closed form does, under its own output names (the stand-in
+    # reads no structure: it builds nothing).
+    composite = flowsheet == "custom_train_v1"
+    ethanol = flowsheet == "ethanol_glucose_v0" or composite
 
     def evaluate(v: dict[str, float]) -> dict[str, Any]:
+        if composite:
+            out = _standin_ethanol_evaluate(v)
+            return {"pricePerKgProduct": out["pricePerKgEthanol"], "productKgPerH": out["ethanolKgPerH"],
+                    "costLines": out["costLines"], "readBack": out["readBack"]}
         if ethanol:
             return _standin_ethanol_evaluate(v)
         if v["yield"] / v["content"] > 0.5:
@@ -1091,8 +1122,9 @@ def _standin_call(op: str, args: dict[str, Any]) -> Any:
         mc = _standin_call("montecarlo", {"flowsheet": flowsheet, "specs": args["specs"], "n": args["samples"],
                                           "seed": args["seed"], "base": args["base"]})
         tables = _standin_ethanol_tables if ethanol else _standin_tables
+        shaped = ({**base_out, "ethanolKgPerH": base_out["productKgPerH"]} if composite and base_out else base_out)
         return {"base": base_out, "baseInfeasible": base_infeasible,
-                "tables": tables(args["base"], base_out) if base_out else None, "grid": grid, "montecarlo": mc}
+                "tables": tables(args["base"], shaped) if base_out else None, "grid": grid, "montecarlo": mc}
     if op == "grid":
         keys = list(args["axes"])
         cells = []
@@ -1692,8 +1724,10 @@ def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
     from .workers import WorkerError
 
     table = _THERMO_STANDIN_CHEMICALS
+    if op == "volatility":  # OF-BLD-020 §7.2: the proposer's question, in the worker's shape
+        return _standin_volatility(args)
     if op != "thermo_props":
-        raise WorkerError(f"KeyError: the {THERMO_STANDIN} answers thermo_props alone, not {op!r}")
+        raise WorkerError(f"KeyError: the {THERMO_STANDIN} answers thermo_props and volatility alone, not {op!r}")
     solve = args.get("solve") or None
     if solve and solve["kind"] == "titre":
         w = solve["kgPerM3"] / table[solve["solvent"]][0]
@@ -1720,6 +1754,108 @@ def _standin_thermo_call(op: str, args: dict[str, Any]) -> Any:
                                        "vapourAtBubble": "mol/mol"},
         "solved": {"kind": solve["kind"], "how": THERMO_STANDIN} if solve else None, "notes": [THERMO_STANDIN],
     }
+
+
+def _standin_volatility(args: dict[str, Any]) -> dict[str, Any]:
+    """The worker's `volatility` answer from the STAND-IN's table: the two
+    invented boiling points decide which boils first, and the azeotrope is
+    said found with invented fractions, as thermosteam finds one for ethanol."""
+    from .workers import WorkerError
+
+    table = _THERMO_STANDIN_CHEMICALS
+    chem, partner = args["chemical"], args["partner"]
+    lacking = sorted(n for n in (chem, partner) if n not in table)
+    if lacking:
+        raise WorkerError(f"Refused: the {THERMO_STANDIN} holds {', '.join(sorted(table))} alone; it has no "
+                          f"{', '.join(lacking)}")
+    tb, tbp = table[chem][3], table[partner][3]
+    return {
+        "library": THERMO_STANDIN, "chemical": chem, "partner": partner, "P": args.get("P") or 101325.0,
+        "PSource": "given" if args.get("P") is not None else "thermosteam's Stream default", "boilingPoint": tb,
+        "partnerBoilingPoint": tbp, "lighter": chem if tb < tbp else partner, "azeotrope": True,
+        "azeotropeMoleFraction": 0.9, "azeotropeMassFraction": 0.95, "azeotropeT": min(tb, tbp) - 1.0,
+        "searched": {"of": chem if tb < tbp else partner, "from": 0.1, "to": 0.9, "points": 9, "halvings": 3},
+        "units": {"boilingPoint": "K", "partnerBoilingPoint": "K", "azeotropeT": "K", "P": "Pa",
+                  "azeotropeMoleFraction": "mol/mol", "azeotropeMassFraction": "kg/kg"},
+        "how": THERMO_STANDIN, "notes": [THERMO_STANDIN],
+    }
+
+
+# OF-BLD-020 §7.2: pureOS's proposals for the double, made by the real
+# proposer (pureos/proposer.py) over the exported products seed and hosts, in
+# a scratch store, with the STAND-IN above answering thermosteam's volatility
+# question: each ask the browser tests make, with the service's answer (200,
+# or the 404 or 422 in its words). The volatility artifact a proposal names
+# is the STAND-IN's, and its `library` says so.
+PROPOSE_ASKS = (
+    {"product": "ethanol", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "ethanol", "host": "s-cerevisiae-cenpk113-7d", "inletRef": None, "includeArchived": False},
+    {"product": "taq-dna-polymerase", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "nonesuch", "host": "s-cerevisiae-s288c", "inletRef": None, "includeArchived": False},
+    {"product": "phb", "host": "c-necator-h16", "inletRef": None, "includeArchived": False},
+)
+
+
+def prototype_propose() -> dict[str, Any]:
+    import tempfile
+
+    from . import proforma, pureos
+    from . import intake as _intake
+
+    entries: list[dict[str, Any]] = []
+    saved = (_intake.DATA_DIR, proforma.call)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            _intake.DATA_DIR = Path(tmp)
+            proforma.call = _standin_thermo_call
+            for ask in PROPOSE_ASKS:
+                try:
+                    body = pureos.propose(ask["product"], ask["host"], ask["inletRef"],
+                                          include_archived=ask["includeArchived"]).model_dump(mode="json")
+                    entries.append({"request": ask, "status": 200, "body": body})
+                except pureos.ProposeUnknown as e:
+                    entries.append({"request": ask, "status": 404, "body": {"detail": str(e)}})
+                except pureos.ProposeRefused as e:
+                    entries.append({"request": ask, "status": 422, "body": {"detail": str(e)}})
+        finally:
+            _intake.DATA_DIR, proforma.call = saved
+    return {"pureos-propose.json": {"entries": entries}}
+
+
+# OF-BLD-020 §5.R: the trains a model built, as GET /api/pureos/trains-kept
+# lists them, for pureOS's index (Made by Postdoc) and the Builder's copy. One
+# train a STAND-IN model built through the real code (pureos.build shapes it on
+# the stand-in yeast run's beer, pureos.kept keeps it) in a throwaway store,
+# listed with the switch off and on; its id and its times are the fixture's,
+# so a regeneration moves nothing.
+KEPT_TRAIN_ID = "tr-fixture-kept"
+KEPT_TRAIN_BY = "a STAND-IN model (openFerment test fixture)"
+KEPT_TRAIN_UNITS = ("distillation", "molecular-sieve")
+
+
+def prototype_kept_trains() -> dict[str, Any]:
+    from . import proforma
+    from .pureos import build, kept
+
+    out: dict[str, Any] = {}
+
+    def made(arts: list) -> None:
+        yeast = next(a for a in arts if any(i.name == "scenario" and i.value == proforma.YEAST_SCENARIO_ID
+                                            for i in a.inputs))
+        spec, _ = build.new_spec("ethanol", f"{yeast.id}{build.STREAM_SEP}beer")
+        spec = spec.model_copy(update={"id": KEPT_TRAIN_ID})
+        for type_id in KEPT_TRAIN_UNITS:
+            spec, _ = build.with_unit(spec, type_id)
+        kept.keep_train(None, lambda _: spec, KEPT_TRAIN_BY, ask_id="ask-fixture", effort="medium")
+
+        def stamped(k: Any) -> dict[str, Any]:
+            return k.model_dump(mode="json") | {"at": AT, "updatedAt": AT}
+
+        out["listed"] = [stamped(k) for k in kept.listed(False)]
+        out["listedArchived"] = [stamped(k) for k in kept.listed(True)]
+
+    _kept_standin_runs(then=made)
+    return {"pureos-trains-kept.json": out}
 
 
 def prototype_thermo() -> dict[str, Any]:
@@ -1987,6 +2123,210 @@ def prototype_vessel(real_worker: bool | None = None) -> dict[str, Any]:
     return {"fermos-vessel.json": {"worker": worker, "aerobic": ids["aerobic"], "anaerobic": ids["anaerobic"],
                                    "plantScale": VESSEL_PLANT_SCALE, "by": VESSEL_BY, "simulations": simulations,
                                    "scopes": scopes, "designs": designs}}
+
+
+# OF-BLD-020 §5.3: pureOS → Builder's fixtures for the double. One train the
+# browser tests build, as the Builder sends it: a broth typed under a name
+# (STAND-INs), a solids centrifuge whose split a person types, a storage tank
+# and a pump, each outlet routed as the catalogue routes it. Made through the
+# real code: the catalogue (data), each type's specs and every scope as the
+# panel asks for them, what a run would refuse at three moments of building
+# it (one unit, three units, every value typed), the validation of each, the
+# run, the train runs on file after it, the train read from the run, and the
+# train read back from the run (and the refusal of a run whose classes no
+# type holds, sc-yeast-1's stand-in run). With the sim extra installed the
+# real Proforma worker runs it on BioSTEAM (`worker.kind` "biosteam"), else a
+# stand-in worker; test:sim holds the committed numbers to the worker within
+# VESSEL_FIXTURE_RTOL, and test_demo holds it offline by what it asks.
+BUILDER_STANDIN = ("STAND-IN for the Builder's fixture: an invented broth and an invented split, typed to exercise the "
+                   "code; none is a result")
+BUILDER_TRAIN_ID = "tr-fixture-builder"
+BUILDER_NAME = "A train the browser tests build"
+BUILDER_AT = "2026-10-21T00:00:00Z"
+BUILDER_INLET = (("broth_flow", 1.0), ("conc.Yeast", 10.0), ("conc.Ethanol", 50.0))
+BUILDER_UNITS = (("U1", "centrifugation", (("split.Yeast", 0.9), ("split.Ethanol", 0.05))), ("U2", "tank", ()),
+                 ("U3", "pump", ()))
+# What the stand-in worker builds on, and the share of the product a stand-in
+# unit sends off its path: invented.
+BUILDER_CHEMICALS = ("Water", "Ethanol", "Glucose", "Yeast")
+BUILDER_LOSS = 0.1
+
+
+def _builder_typed(pairs, by: str = VESSEL_BY) -> dict[str, Any]:
+    return {k: {"value": v, "low": None, "high": None, "by": by, "at": BUILDER_AT, "note": BUILDER_STANDIN}
+            for k, v in pairs}
+
+
+def builder_spec(units: int = len(BUILDER_UNITS), typed: bool = True) -> Any:
+    """The fixture's train as the Builder sends it: its first `units` units,
+    the centrifuge's split typed or not. Every outlet is routed explicitly, as
+    the Builder routes it (the catalogue's default)."""
+    from .models import TrainSpec
+    from .pureos import catalogue
+
+    def unit(uid: str, type_id: str, pairs) -> dict[str, Any]:
+        e = catalogue.entry(type_id)
+        return {"id": uid, "type": type_id, "params": _builder_typed(pairs) if typed else {},
+                "outlets": {p.name: ("onward" if p.onward else "waste") for p in e.ports if p.side == "out"},
+                "records": {}, "readFrom": None}
+
+    return TrainSpec.model_validate({
+        "id": BUILDER_TRAIN_ID, "name": BUILDER_NAME, "program": "yeast", "product": "ethanol",
+        "inlet": {"kind": "typed", "ref": None, "streamId": None, "vessel": None, "params": _builder_typed(BUILDER_INLET)},
+        "units": [unit(uid, t, pairs) for uid, t, pairs in BUILDER_UNITS[:units]]})
+
+
+def _standin_train_call(op: str, args: dict[str, Any]) -> Any:
+    """The Proforma worker's `catalogue_specs`, `train_specs` and `train_run`
+    in the JSON contract's shape, for a machine without the sim extra: every
+    default a STAND-IN, each unit sending all on but BUILDER_LOSS of the
+    product. Nothing here is BioSTEAM's."""
+    from .pureos import catalogue
+
+    versions = {"biosteam": "stand-in", "thermosteam": "stand-in", "biorefineries": "stand-in"}
+    if op == "catalogue_specs":
+        e = catalogue.entry(args["type"])
+        needed = {k for alts, _ in e.needs for alt in alts for k in alt}
+        defaults = {p.key: {"value": (None if p.per or p.how or "library-default" not in p.rule or p.key in needed else
+                                      ("standin-word" if p.choices is not None else 0.5)), "from": BUILDER_STANDIN}
+                    for p in e.params}
+        choices = {p.key: ["standin-word", "another-standin-word"] for p in e.params if p.choices is not None}
+        return {"type": e.id, "unitClass": e.cls, "module": "stand-in", "signature": {}, "constructor": {},
+                "attributes": {}, "defaults": defaults, "choices": choices, "refuses": {},
+                "chemicals": list(BUILDER_CHEMICALS), "versions": versions}
+    if op == "train_specs":
+        return {"chemicals": list(BUILDER_CHEMICALS), "T": 298.15, "P": 101325.0, "phase": "l", "from": BUILDER_STANDIN,
+                "versions": versions}
+    if op != "train_run":
+        raise ValueError(f"the stand-in train worker has no op {op}")
+    inlet, product = args["inlet"], args["product"]
+    flows = dict(inlet["flows"] or {k: v * inlet["brothFlow"] for k, v in inlet["concentrations"].items()})
+    if inlet.get("balance"):
+        flows[inlet["balance"]] = 1000.0 * inlet["brothFlow"]
+    stream = lambda sid, source, sink, fl: {"id": sid, "source": source, "sink": sink, "phase": "l",  # noqa: E731
+                                           "T": inlet["T"], "P": inlet["P"], "massFlow": sum(fl.values()),
+                                           "massFlows": fl, "price": None}
+    streams = [stream("inlet", None, args["units"][0]["id"], flows)]
+    units, outlets, costs, current = [], {}, [], flows
+    for n, u in enumerate(args["units"]):
+        names = [p.name for p in catalogue.entry(u["type"]).ports if p.side == "out"]
+        onward = next(k for k, r in u["outlets"].items() if r == "onward")
+        ids = {k: f"{u['id']}_{k.replace('-', '_')}" for k in names}
+        nxt = args["units"][n + 1]["id"] if n + 1 < len(args["units"]) else None
+        on = {k: v * (1 - BUILDER_LOSS) if k == product else v for k, v in current.items()}
+        off = {product: current.get(product, 0.0) * BUILDER_LOSS}
+        lost = next((k for k in names if k != onward), None)
+        for k in names:
+            streams.append(stream(ids[k], u["id"], nxt if k == onward else None,
+                                  on if k == onward else off if k == lost else {}))
+        ins = ["inlet"] if n == 0 else [outlets[args["units"][n - 1]["id"]][next(
+            k for k, r in args["units"][n - 1]["outlets"].items() if r == "onward")]]
+        cls = catalogue.entry(u["type"]).cls
+        units.append({"id": u["id"], "unitClass": cls, "line": None, "order": n, "ins": ins,
+                      "outs": [ids[k] for k in names], "installedCost": 2.0, "purchaseCost": 1.0, "heatingDuty": None,
+                      "coolingDuty": None, "power": None})
+        outlets[u["id"]] = ids
+        costs.append({"unit": u["id"], "unitClass": cls, "purchaseCost": 1.0, "installedCost": 2.0,
+                      "items": {"STAND-IN item": 1.0}, "utilityCost": 0.0})
+        current = on if lost is not None else current
+    last = args["units"][-1]
+    return {"tablesSource": BUILDER_STANDIN, "streams": streams, "units": units, "utilities": None, "diagram": None,
+            "diagramNote": "not drawn: the stand-in worker draws nothing", "unitOrder": [u["id"] for u in args["units"]],
+            "tableUnits": {"massFlow": "kg/hr", "T": "K", "P": "Pa"},
+            "inlet": {"flows": flows, "water": flows.get(inlet.get("balance") or "", None), "waterNote": BUILDER_STANDIN,
+                      "T": inlet["T"], "P": inlet["P"], "phase": inlet["phase"], "volume": inlet["brothFlow"]},
+            "productStream": outlets[last["id"]][next(k for k, r in last["outlets"].items() if r == "onward")],
+            "outlets": outlets, "costs": costs, "utilitySettings": {}, "versions": versions}
+
+
+def builder_key(spec: Any) -> str:
+    """What the double matches an asked train by: its program, product, inlet
+    and units with their values, never its id, name, who typed a value or
+    when (scripts/lib/service-double.mjs writes the same key)."""
+    d = spec.model_dump(mode="json") if hasattr(spec, "model_dump") else spec
+    inlet = d["inlet"]
+    vals = lambda ps: sorted([k, (v or {}).get("value")] for k, v in (ps or {}).items())  # noqa: E731
+    return json.dumps({"program": d["program"], "product": d["product"],
+                       "inlet": [inlet["kind"], inlet.get("ref"), inlet.get("streamId"), inlet.get("vessel"),
+                                 vals(inlet.get("params"))],
+                       "units": [[u["id"], u["type"], vals(u.get("params")), sorted((u.get("outlets") or {}).items()),
+                                  u.get("readFrom"), sorted((u.get("records") or {}).items())]
+                                 for u in d["units"]]}, separators=(",", ":"))
+
+
+def prototype_builder(real_worker: bool | None = None) -> dict[str, Any]:
+    from . import params, proforma, pureos
+    from .models import ParamResolveRequest, TrainRunRequest
+    from .pureos import catalogue, train_spec
+
+    real = _biosteam_here() if real_worker is None else real_worker
+    real_call = proforma.call
+    out: dict[str, Any] = {}
+
+    def made(arts: list) -> None:
+        from .pureos.from_run import RunNotOnFile
+
+        saved = (proforma.call, dict(catalogue._SPECS), dict(train_spec._SPECS), dict(train_spec._UNITS),
+                 train_spec._pool)
+        try:
+            proforma.call = real_call if real else _standin_train_call
+            catalogue._SPECS.clear()
+            train_spec._SPECS.clear()
+            train_spec._UNITS.clear()
+            # No records bind: the fixture is the same wherever it is rebuilt.
+            train_spec._pool = lambda: None
+            final = builder_spec()
+            out["train"] = final.model_dump(mode="json")
+            out["catalogue"] = [u.model_dump(mode="json") for u in catalogue.listing()]
+            out["specs"] = {t: catalogue.specs_of(t).model_dump(mode="json") for _, t, _ in BUILDER_UNITS}
+            scopes = []
+            for place, type_id in (("inlet", None), *((uid, t) for uid, t, _ in BUILDER_UNITS)):
+                scope = f"pureos:unit:{BUILDER_TRAIN_ID}:{place}"
+                body = params.scope(scope, ParamResolveRequest(train=final, unitType=type_id)).model_dump(mode="json")
+                scopes.append({"unit": place, "type": type_id, "status": 200, "body": body})
+            out["scopes"] = scopes
+            moments = (("one unit", builder_spec(1, typed=False)), ("three units", builder_spec(typed=False)),
+                       ("every value typed", final))
+            out["checks"] = [{"moment": m, "key": builder_key(sp), "status": 200,
+                              "body": pureos.check_train(sp, by=VESSEL_BY).model_dump(mode="json")} for m, sp in moments]
+            out["validations"] = [{"moment": m, "key": builder_key(sp), "status": 200,
+                                   "body": pureos.validation(sp).model_dump(mode="json")} for m, sp in moments]
+            req = TrainRunRequest(train=final, by=VESSEL_BY)
+            run = pureos.run_train(final, by=VESSEL_BY)
+            # Stamped with the fixtures' date, so a regeneration moves no time.
+            body = run.model_dump(mode="json")
+            body = body | {"createdAt": AT, "train": body["train"] | {"createdAt": AT}, "basis": body["basis"] | {"at": AT}}
+            out["run"] = {"request": req.model_dump(mode="json"), "key": builder_key(final), "status": 200, "body": body}
+            out["trainRuns"] = [s.model_dump(mode="json") | {"createdAt": AT} for s in pureos.train_runs(True)]
+            out["trainOf"] = pureos.train(BUILDER_TRAIN_ID).model_dump(mode="json") | {"createdAt": AT}
+            back = pureos.from_run(run.artifactId)
+            out["fromRun"] = [{"request": {"artifactId": run.artifactId}, "status": 200,
+                               "body": back.model_dump(mode="json")}]
+            yeast = next(a for a in arts if any(i.name == "scenario" and i.value == proforma.YEAST_SCENARIO_ID
+                                                for i in a.inputs))
+            try:
+                pureos.from_run(yeast.id)
+                raise AssertionError("the stand-in yeast run's train was read; its classes are no catalogue type")
+            except (pureos.TrainRefused, RunNotOnFile) as e:
+                out["fromRun"].append({"request": {"artifactId": yeast.id}, "status": 422, "body": {"detail": str(e)}})
+            ws = train_spec.train_specs()
+        finally:
+            proforma.call = saved[0]
+            catalogue._SPECS.clear()
+            catalogue._SPECS.update(saved[1])
+            train_spec._SPECS.clear()
+            train_spec._SPECS.update(saved[2])
+            train_spec._UNITS.clear()
+            train_spec._UNITS.update(saved[3])
+            train_spec._pool = saved[4]
+        out["worker"] = {"kind": "biosteam" if real else "stand-in",
+                         "note": ("run by the real Proforma worker on BioSTEAM, on a STAND-IN broth and a STAND-IN split"
+                                  if real else BUILDER_STANDIN + "; the worker is a stand-in too, as the sim extra is not "
+                                                                 "installed here"),
+                         "versions": ws["versions"]}
+
+    _kept_standin_runs(then=made)
+    return {"pureos-builder.json": {"worker": out.pop("worker"), "by": VESSEL_BY, "trainId": BUILDER_TRAIN_ID, **out}}
 
 
 # §8.1: the fixtures that need BioSTEAM, which are the toy flowsheet's: one

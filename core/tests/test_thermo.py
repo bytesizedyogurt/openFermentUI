@@ -19,7 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openferment_core import artifacts, intake, proforma, thermo, tools
-from openferment_core.models import Artifact, BasisInput, BasisSource, ThermoProps, ThermoPropsRequest
+from openferment_core.models import Artifact, BasisInput, BasisSource, ThermoProps, ThermoPropsRequest, Volatility
 from openferment_core.validate import SeenSet, validate_plan
 from openferment_core.workers import WorkerError
 
@@ -55,9 +55,9 @@ class StandIn:
     """The worker's `thermo_props` op, in its shape, with invented numbers;
     `refuse` names chemicals to refuse as the worker refuses them."""
 
-    def __init__(self, refuse=()):
+    def __init__(self, refuse=(), library=STANDIN):
         self.calls: list[dict] = []
-        self.refuse = set(refuse)
+        self.refuse, self.library = set(refuse), library
 
     def __call__(self, op, args):
         assert op == "thermo_props"
@@ -68,7 +68,7 @@ class StandIn:
             raise WorkerError(f"Refused: thermosteam's chemical library has no chemical named {', '.join(lacking)}")
         if "boom" in names:
             raise WorkerError("RuntimeError: something else went wrong")
-        return {"library": STANDIN, "T": args.get("T") or 298.15, "P": args.get("P") or 101325.0,
+        return {"library": self.library, "T": args.get("T") or 298.15, "P": args.get("P") or 101325.0,
                 "phase": args.get("phase") or "l", "TSource": "given" if args.get("T") is not None else thermo.LIBRARY_DEFAULT,
                 "PSource": "given" if args.get("P") is not None else thermo.LIBRARY_DEFAULT,
                 "massFractions": {n: 1.0 / len(names) for n in names}, "density": 1.5, "Cp": 2.5, "viscosity": None,
@@ -422,3 +422,213 @@ def test_the_presets_through_the_service(warm, monkeypatch, tmp_path):
                                          pool=_titres(TITRE)))
     # The solved fraction holds the record's titre at the mixture's own density.
     assert beer.massFractions["Ethanol"] * beer.density == pytest.approx(80.0, rel=1e-9)
+
+
+# ── a product's volatility (OF-BLD-020 §7.1, D12) ────────────────────────
+
+
+class VolatilityStandIn:
+    """The worker's `volatility` op, in its shape, with invented numbers;
+    `refuse` names chemicals to refuse as the worker refuses them, and
+    `none` the chemicals it answers with no azeotrope."""
+
+    def __init__(self, refuse=(), none=(), library=STANDIN):
+        self.calls: list[dict] = []
+        self.refuse, self.none, self.library = set(refuse), set(none), library
+
+    def __call__(self, op, args):
+        assert op == "volatility"
+        self.calls.append(args)
+        if args["chemical"] in self.refuse:
+            raise WorkerError(f"Refused: thermosteam's chemical library has no chemical named {args['chemical']}")
+        if args["chemical"] == "boom":
+            raise WorkerError("RuntimeError: something else went wrong")
+        found = args["chemical"] not in self.none
+        return {"library": self.library, "chemical": args["chemical"], "partner": args["partner"], "P": 101325.0,
+                "PSource": thermo.LIBRARY_DEFAULT, "boilingPoint": 350.0, "partnerBoilingPoint": 370.0,
+                "lighter": args["chemical"], "azeotrope": found, "azeotropeMoleFraction": 0.9 if found else None,
+                "azeotropeMassFraction": 0.95 if found else None, "azeotropeT": 349.0 if found else None,
+                "searched": {"of": args["chemical"], "from": 0.1, "to": 0.9, "points": 9, "halvings": 3},
+                "units": {"boilingPoint": "K", "partnerBoilingPoint": "K", "azeotropeT": "K", "P": "Pa",
+                          "azeotropeMoleFraction": "mol/mol", "azeotropeMassFraction": "kg/kg"},
+                "how": STANDIN, "notes": [] if found else ["azeotrope: none found (a test's words)"]}
+
+
+@pytest.fixture()
+def vworker(monkeypatch):
+    w = VolatilityStandIn(refuse={"Unobtainium"}, none={"Methanol"})
+    monkeypatch.setattr(proforma, "call", w)
+    monkeypatch.setattr(thermo, "CHEMICALS", {**thermo.CHEMICALS, "unobtainium-product": "Unobtainium",
+                                              "methanol-product": "Methanol", "odd-product": "boom"})
+    return w
+
+
+def test_ethanols_volatility_asks_the_worker_by_the_librarys_name_and_is_kept(store, vworker):
+    art = thermo.volatility("ethanol")
+    [sent] = vworker.calls
+    # The library's own names and nothing of ours: the pressure is the library's default.
+    assert sent == {"chemical": "Ethanol", "partner": "Water", "P": None}
+    assert art.tool == "volatility" and art.toolVersion.startswith("thermo volatility 1 · thermosteam ")
+    named = {i.name: i for i in art.inputs}
+    assert named["product"].value == "ethanol" and named["chemical"].value == "Ethanol"
+    assert named["partner"].value == "Water" and named["P"].value == thermo.LIBRARY_DEFAULT
+    assert named["azeotrope search"].value == thermo.AZEOTROPE_SEARCH and named["azeotrope search"].source.kind == "convention"
+    assert named["library"].source.kind == "model" and named["library"].source.id.startswith("thermosteam@")
+    assert {i.source.kind for i in art.inputs} == {"convention", "model"} and art.provenance == "computed"
+    o = thermo.volatility_of(art)
+    assert o.product == "ethanol" and o.azeotrope is True and o.library == STANDIN
+    assert o.subject == "Ethanol (product ethanol) beside Water"
+    # Asked again, the stored answer comes back and the worker is not asked.
+    assert thermo.volatility("ethanol").id == art.id and len(vworker.calls) == 1
+    assert thermo.stored_volatility("ethanol").id == art.id and len(vworker.calls) == 1
+
+
+def test_stored_volatility_reads_without_asking_the_worker(store, vworker):
+    assert thermo.stored_volatility("ethanol") is None and vworker.calls == []
+
+
+@pytest.mark.parametrize("product, err, words", [
+    ("phb", thermo.VolatilityMissing, "product 'phb' names no chemical of thermosteam's library here"),
+    ("taq-dna-polymerase", thermo.VolatilityMissing, "ethanol → Ethanol"),
+    ("", thermo.ThermoRefused, "names a product by its id"),
+])
+def test_a_product_with_no_library_name_is_missing_before_the_worker(store, vworker, product, err, words):
+    with pytest.raises(err, match=words):
+        thermo.volatility(product)
+    with pytest.raises(err, match=words):
+        thermo.stored_volatility(product)
+    assert vworker.calls == [] and [a.tool for a in artifacts.all_artifacts()].count("volatility") == 0
+
+
+def test_a_missing_volatility_is_a_not_found_and_a_refusal_is_not():
+    assert issubclass(thermo.VolatilityMissing, thermo.ThermoNotFound)
+    assert not issubclass(thermo.VolatilityMissing, thermo.ThermoRefused)
+
+
+def test_a_chemical_the_library_lacks_is_refused_in_words_and_nothing_is_kept(store, vworker):
+    with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
+        thermo.volatility("unobtainium-product")
+    assert [a.tool for a in artifacts.all_artifacts()].count("volatility") == 0
+
+
+def test_none_found_is_an_answer_and_says_the_grid_it_searched(store, vworker):
+    o = thermo.volatility_of(thermo.volatility("methanol-product"))
+    assert o.azeotrope is False and o.azeotropeMoleFraction is None and o.searched["of"] == "Methanol"
+    assert any("none found" in n for n in o.notes)
+
+
+def test_a_worker_failure_that_is_no_refusal_stays_a_worker_error_for_volatility(store, vworker):
+    with pytest.raises(WorkerError, match="something else"):
+        thermo.volatility("odd-product")
+
+
+def test_each_volatility_property_is_its_own_evidence(store, vworker):
+    found = thermo.volatility("ethanol")
+    ev = {e.id.split(":")[1]: e for e in thermo.volatility_evidence(found)}
+    assert list(ev) == [k for k, _ in thermo.VOLATILITY_PROPERTIES]
+    assert ev["azeotrope"].value == "found" and ev["boilingPoint"].unit == "K" and ev["boilingPoint"].value == 350.0
+    assert all(e.basis.artifactId == found.id and e.provenance == "computed" for e in ev.values())
+    none = thermo.volatility_evidence(thermo.volatility("methanol-product"))
+    assert [e.id.split(":")[1] for e in none] == ["boilingPoint", "azeotrope"] and none[1].value == "none found"
+    # A label is words: the only digits are the library's version.
+    assert all(not any(c.isdigit() for c in e.label.replace(STANDIN, "")) for e in ev.values())
+
+
+def test_a_property_label_names_thermosteam_and_never_its_version(store, monkeypatch):
+    """OF-BLD-020 §7.R, finding 33: the worker answers with the library's
+    name and version (`thermosteam <v>`, as the real one does), and a label a
+    claim may copy word for word holds no number: the version is the basis's
+    `library` input, which every evidence carries."""
+    from importlib.metadata import version
+
+    from openferment_core.validate import find_number
+
+    words = f"thermosteam {version('thermosteam')}"
+    vol, props = VolatilityStandIn(none={"Methanol"}, library=words), StandIn(library=words)
+    monkeypatch.setattr(proforma, "call", lambda op, args: (vol if op == "volatility" else props)(op, args))
+    monkeypatch.setattr(thermo, "CHEMICALS", {**thermo.CHEMICALS, "methanol-product": "Methanol"})
+    found, none = thermo.volatility("ethanol"), thermo.volatility("methanol-product")
+    for e in thermo.volatility_evidence(found) + thermo.volatility_evidence(none):
+        assert not any(ch.isdigit() for ch in e.label), e.label
+        assert find_number(e.label) is None and e.label.endswith(", as thermosteam computes it"), e.label
+        assert {i.name: i.value for i in e.basis.inputs}["library"] == words
+    # thermo_props' evidence names the library the same way. (A run's stream
+    # names its run by id, which this run's id holds as an identifier.)
+    for req in (ThermoPropsRequest(preset="ethanol-water-azeotrope"), ThermoPropsRequest(artifactId=RUN_ID, streamId="beer")):
+        for e in thermo.evidence_of(thermo.props(req)):
+            assert find_number(e.label) is None and e.label.endswith(", as thermosteam computes it"), e.label
+            assert version("thermosteam") not in e.label
+
+
+def test_volatility_of_refuses_an_artifact_of_another_tool(store, worker):
+    with pytest.raises(thermo.ThermoRefused, match="not a volatility answer"):
+        thermo.volatility_of(thermo.props(ThermoPropsRequest(preset="ethanol-water-azeotrope")))
+
+
+def test_the_volatility_endpoints_answer_read_and_say_what_is_missing(store, vworker, client, monkeypatch):
+    assert client.get("/api/thermo/volatility", params={"product": "ethanol"}).json() == {"artifact": None}
+    made = client.post("/api/thermo/volatility", json={"product": "ethanol"})
+    assert made.status_code == 200 and made.json()["tool"] == "volatility"
+    Volatility.model_validate(made.json()["output"])
+    assert client.get("/api/thermo/volatility", params={"product": "ethanol"}).json()["artifact"]["id"] == made.json()["id"]
+    for r in (client.post("/api/thermo/volatility", json={"product": "phb"}),
+              client.get("/api/thermo/volatility", params={"product": "phb"})):
+        assert r.status_code == 404 and "names no chemical" in r.json()["detail"]
+    r = client.post("/api/thermo/volatility", json={"product": "unobtainium-product"})
+    assert r.status_code == 422 and "no chemical named Unobtainium" in r.json()["detail"]
+    r = client.post("/api/thermo/volatility", json={"product": "odd-product"})
+    assert r.status_code == 503 and "where thermosteam runs" in r.json()["detail"]
+    # A product by id, and nothing else: a number or a chemical name is refused.
+    assert client.post("/api/thermo/volatility", json={"product": "ethanol", "P": 5}).status_code == 422
+    assert client.post("/api/thermo/volatility", json={"product": "ethanol", "chemical": "Ethanol"}).status_code == 422
+    assert len(vworker.calls) == 3
+
+
+def test_a_damaged_volatility_is_a_409_in_words(store, vworker, client):
+    art = thermo.volatility("ethanol")
+    (artifacts.folder() / f"{art.id}.json").write_text("{trunc", encoding="utf-8")
+    for r in (client.get("/api/thermo/volatility", params={"product": "ethanol"}),
+              client.post("/api/thermo/volatility", json={"product": "ethanol"})):
+        assert r.status_code == 409 and f"{art.id} is damaged on disk" in r.json()["detail"], r.text
+
+
+@pytest.mark.sim
+def test_ethanols_volatility_finds_the_azeotrope_and_names_the_librarys_tb(warm, monkeypatch, tmp_path):
+    import thermosteam as tmo  # read here only to hold the worker's answer to the library's own
+
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    art = thermo.volatility("ethanol")
+    o = thermo.volatility_of(art)
+    assert o.boilingPoint == tmo.Chemical("Ethanol").Tb and o.partnerBoilingPoint == tmo.Chemical("Water").Tb
+    assert o.lighter == "Ethanol" and o.azeotrope is True and o.library == f"thermosteam {tmo.__version__}"
+    # Minimum-boiling: the azeotrope boils below both pure chemicals.
+    assert o.azeotropeT < o.boilingPoint and o.azeotropeT < o.partnerBoilingPoint
+    # The same search the preset runs, on the same pair, finds the same liquid.
+    az = thermo.output_of(thermo.props(ThermoPropsRequest(preset="ethanol-water-azeotrope")))
+    assert o.azeotropeMoleFraction == az.solved["moleFraction"]
+    assert o.azeotropeMassFraction == pytest.approx(az.massFractions["Ethanol"], rel=1e-12)
+    assert art.provenance == "computed" and o.searched["of"] == "Ethanol" and o.notes == []
+    # A label a claim may copy holds no number: the library is named, its version is in the basis (§7.R).
+    from openferment_core.validate import find_number
+
+    assert all(find_number(e.label) is None for e in thermo.volatility_evidence(art))
+
+
+@pytest.mark.sim
+def test_a_pair_with_no_azeotrope_says_so_with_the_grid_searched(warm):
+    # Methanol and water: the library's own equilibrium finds none, and says
+    # on which grid it looked.
+    out = warm.call("volatility", {"chemical": "Methanol", "partner": "Water"})
+    assert out["azeotrope"] is False and out["azeotropeMoleFraction"] is None and out["lighter"] == "Methanol"
+    assert out["searched"]["of"] == "Methanol" and out["searched"]["points"] > 0
+    assert any("none found" in n for n in out["notes"])
+
+
+@pytest.mark.sim
+def test_a_products_chemical_the_library_lacks_is_refused_in_words(warm, monkeypatch, tmp_path):
+    monkeypatch.setattr(intake, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(thermo, "CHEMICALS", {**thermo.CHEMICALS, "made-up": "Unobtainium"})
+    with pytest.raises(thermo.ThermoRefused, match="no chemical named Unobtainium"):
+        thermo.volatility("made-up")
+    with pytest.raises(thermo.VolatilityMissing, match="names no chemical"):
+        thermo.volatility("phb")

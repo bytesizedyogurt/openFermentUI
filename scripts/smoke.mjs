@@ -62,6 +62,9 @@ const ROUTES = [
   ['/pureos', 'pureOS'],
   // OF-BLD-019 §4.1 — the train of the run Proforma priced, by scenario; PHA's, so under its banner.
   ['/pureos/train/sc-pha-1', 'pureOS — train of a run, unit by unit'],
+  // OF-BLD-020 §5.3 — the Builder: a fresh train, and a train this browser never saved.
+  ['/pureos/build/new', 'pureOS — Builder, a fresh train'],
+  ['/pureos/build/tr-not-in-this-browser', 'pureOS — Builder (a train not saved here)'],
   ['/proforma', 'Proforma'],
   ['/proforma/scenario/sc-s1', 'Proforma — scenario S1'],
   ['/proforma/scenario/sc-s2', 'Proforma — scenario S2'],
@@ -303,7 +306,8 @@ async function main() {
   // working subsystem, which is the exact confusion the divider exists to stop.
   const SHELVES = [
     ['/geneos', 'geneOS subsystems', 'EC top-level classes'],
-    ['/pureos', 'pureOS subsystems', 'Loss mechanisms'],
+    // OF-BLD-020 §5.3 — pureOS's four subsystems are live, so its shelf is
+    // empty and their tables moved to the Builder (SEEDED below).
     // OF-BLD-020 §4.2 — transport is live, so its table moved to the Vessel
     // view (SEEDED below); control is still a stub on the shelf.
     ['/fermos', 'fermOS subsystems', 'Measured online'],
@@ -357,6 +361,11 @@ async function main() {
     ['/fermos/vessel', 'Scale-up criteria', 'Scale has no implementation'],
     // OF-BLD-020 §8.R (finding 7) — operating mode is live: its reference sits on fermOS → Simulate, where the mode is chosen.
     ['/fermos/simulate', 'Operating modes', 'Operating mode has no implementation'],
+    // OF-BLD-020 §5.3 (D15) — harvest, capture, polish and recovery are live: their reference sits on pureOS → Builder, where the units are chosen.
+    ['/pureos/build/new', 'Solid-liquid separation', 'Harvest has no implementation'],
+    ['/pureos/build/new', 'Chromatography modes', 'Capture has no implementation'],
+    ['/pureos/build/new', 'What has to be removed', 'Polish has no implementation'],
+    ['/pureos/build/new', 'Loss mechanisms', 'Recovery has no implementation'],
   ];
   let seededFails = 0;
   for (const [route, table, mustNotSay] of SEEDED) {
@@ -564,6 +573,23 @@ async function main() {
             await page.locator('[data-testid="new-scenario"]').click();
             await page.locator('[data-testid="new-scenario-dialog"]').waitFor({ timeout: 8000 }).catch(() => {});
           }
+          if ((off.find((f) => f.id === id)?.builtFrom ?? []).length > 0) {
+            // OF-BLD-020 §6.1: a flowsheet built from a vessel and a train
+            // asks for both; on a fresh install the service keeps neither, so
+            // each chooser says why it is empty and where one is made, and
+            // Make the scenario waits, saying so; nothing is made.
+            await page.locator(`[data-testid="new-scenario-flowsheet"][data-flowsheet="${id}"] input`).check();
+            const box = page.locator('[data-testid="new-scenario-composite"]');
+            await box.locator('[data-testid="new-scenario-composite-waits"]').waitFor({ timeout: 8000 }).catch(() => {});
+            const empty = await box.locator('[data-testid="new-scenario-composite-empty"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part')).join());
+            const said = await box.innerText().catch(() => '');
+            if (empty !== 'vessel,train-run') problems.push(`New scenario on ${id} does not say both lists are empty (${empty || 'neither'})`);
+            if (!/No vessel design is kept/.test(said) || !/fermOS → Vessel/.test(said) || !/No train run is kept/.test(said) || !/pureOS → New train/.test(said))
+              problems.push(`New scenario on ${id} does not say where a vessel design and a train run are made (${said.slice(0, 160)})`);
+            if (!(await page.locator('[data-testid="new-scenario-create"]').isDisabled().catch(() => false))) problems.push(`Make the scenario does not wait for a vessel and a train on ${id}`);
+            await page.getByRole('button', { name: 'Cancel' }).click();
+            continue;
+          }
           await make(id, `From the shelf: ${id}`);
         }
       }
@@ -630,7 +656,7 @@ async function main() {
       proformaFails++;
       console.log(`✗ proforma     ${problems.join('; ')}`);
     } else {
-      console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; the palette opens the same chooser');
+      console.log('✓ proforma     the index lists the shelf\u2019s reference runs with a run and a status line and its flowsheets with their inputs, says why a row is empty, disables nothing; New scenario makes a scenario that lands on its page saying it has not run, is listed as not run, and survives a reload; on a vessel and a train it says why each list is empty and waits; the palette opens the same chooser');
     }
     await page.close();
   }
@@ -2170,6 +2196,102 @@ async function main() {
     await page.close();
   }
 
+  // ── OF-BLD-020 §7.2 — pureOS proposes a train by rules that each name the
+  // property they read.
+  //
+  // Propose a train opens the chooser on pureOS's index: ethanol, the yeast
+  // program's product, made in S288C, no inlet. The double answers with what
+  // the real proposer gave the same ask (pureos-propose.json, thermosteam's
+  // volatility a stand-in there): a column then a molecular sieve, each unit's
+  // reason beside it naming its rule, the property it read (the boiling point,
+  // the azeotrope) and the volatility artifact that holds it, words with no
+  // number, and the train kept under a new id for the Builder. A protein the
+  // seed gives no sequence and no location proposes nothing and names both.
+  let proposeFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const recorded = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/pureos-propose.json'), 'utf8')).response.entries;
+    try {
+      // A reviewer name, so the proposal opened in the Builder can be saved (OF-BLD-020 §5.R).
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="pureos-propose-open"]').click();
+      await page.locator('[data-testid="pureos-propose-chooser"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const chosen = await page.locator('[data-testid="propose-product"]').inputValue().catch(() => '');
+      if (chosen !== 'ethanol') problems.push(`the chooser does not start on the program's product, ethanol (${chosen})`);
+      const hostIds = await page.locator('[data-testid="propose-host"] option').evaluateAll((els) => els.map((e) => e.getAttribute('value')));
+      if (!hostIds.includes('s-cerevisiae-s288c') || hostIds.includes('c-necator-h16')) problems.push(`the hosts are not the shown programs' strains: ${hostIds.join()}`);
+      await page.locator('[data-testid="propose-host"]').selectOption('s-cerevisiae-s288c');
+      const before = doubleState.pureosProposals.length;
+      await page.locator('[data-testid="propose-submit"]').click();
+      await page.locator('[data-testid="pureos-proposal"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const sent = doubleState.pureosProposals.slice(before);
+      if (sent.length !== 1 || JSON.stringify(sent[0]) !== JSON.stringify({ product: 'ethanol', host: 's-cerevisiae-s288c', inletRef: null, includeArchived: false }))
+        problems.push(`the chooser posted ${JSON.stringify(sent)}, not ids and words alone`);
+      const answer = recorded.find((e) => e.request.product === 'ethanol' && e.request.host === 's-cerevisiae-s288c').body;
+      const units = await page.locator('[data-testid="proposal-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (units !== 'D1:distillation,MS1:molecular-sieve') problems.push(`the proposed units are ${units}`);
+      const reasons = await page.locator('[data-testid="proposal-reason"]').evaluateAll((els) =>
+        els.map((e) => [e.getAttribute('data-unit'), e.getAttribute('data-rule'), e.getAttribute('data-property'), e.getAttribute('data-artifact')].join(':')).join());
+      const expected = answer.reasons.map((r) => [r.unitId, r.rule, r.property, r.artifactId].join(':')).join();
+      if (reasons !== expected) problems.push(`the reasons beside the units are ${reasons}, not the service's ${expected}`);
+      const [vol] = answer.artifacts;
+      if (!vol || answer.reasons.map((r) => r.property).join() !== 'boilingPoint,azeotrope') problems.push('the recorded proposal does not read the boiling point, then the azeotrope');
+      if ((await page.locator(`[data-testid="proposal-artifact"][href="#/biorepo/artifacts/${vol}"]`).count()) !== 2) problems.push('each reason does not link the volatility artifact it read');
+      const words = await page.locator('[data-testid="proposal-words"]').allInnerTexts();
+      if (words.length !== 2 || words.some((w) => /\d/.test(w))) problems.push(`a reason's words carry a number, or are missing: ${JSON.stringify(words)}`);
+      if (!/minimum-boiling azeotrope of Ethanol and Water/.test(words[1] ?? '')) problems.push("the sieve's reason does not say thermosteam finds the azeotrope");
+      if (await page.locator('[data-testid="proposal-missing"]').count()) problems.push('ethanol names a missing property');
+      const link = await page.locator('[data-testid="proposal-open-builder"]').getAttribute('href').catch(() => null);
+      const trainId = await page.locator('[data-testid="pureos-proposal"]').getAttribute('data-train').catch(() => null);
+      if (!trainId || !/^tr-/.test(trainId) || link !== `#/pureos/build/${encodeURIComponent(trainId)}`) problems.push(`the proposal does not open in the Builder under its new train id (${link}, ${trainId})`);
+      // OF-BLD-020 §5.R (findings 10, 31): the link opens the proposal in the
+      // Builder, read from this session's store: its units in order, each card
+      // with its reason beside it, what the rules miss above the steps; Save
+      // makes it a train of this browser, at the same address.
+      await page.locator('[data-testid="proposal-open-builder"]').click();
+      await page.locator('[data-testid="builder-unit"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if (await page.locator('[data-testid="builder-not-found"]').count()) problems.push('Open it in the Builder lands on no train');
+      const opened = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (opened !== 'D1:distillation,MS1:molecular-sieve') problems.push(`the Builder opens the proposal as ${opened || 'nothing'}`);
+      const beside = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) =>
+        els.map((e) => `${e.getAttribute('data-unit')}:${[...e.querySelectorAll('[data-testid="proposal-reason"]')].map((r) => `${r.getAttribute('data-unit')}/${r.getAttribute('data-rule')}`).join('+')}`).join());
+      const besideWant = answer.reasons.map((r) => `${r.unitId}:${r.unitId}/${r.rule}`).join();
+      if (beside !== besideWant) problems.push(`the reasons beside the Builder's unit cards are ${beside}, not the proposal's ${besideWant}`);
+      if (!(await page.locator('[data-testid="builder-proposal"]').count())) problems.push('the Builder does not say the train is a proposal');
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      if ((await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same' || !page.url().endsWith(`#/pureos/build/${trainId}`))
+        problems.push(`Save does not keep the proposal as a train of this browser (${page.url()})`);
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-built-row"][data-train="${trainId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="pureos-built-row"][data-train="${trainId}"]`).count())) problems.push('the saved proposal is not among the trains built here');
+      await page.locator('[data-testid="pureos-propose-open"]').click();
+      await page.locator('[data-testid="pureos-propose-chooser"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="propose-host"]').selectOption('s-cerevisiae-s288c');
+      // A protein the seed gives neither a sequence nor a location proposes nothing, and names both.
+      await page.locator('[data-testid="propose-product"]').selectOption('taq-dna-polymerase');
+      await page.locator('[data-testid="propose-submit"]').click();
+      await page.locator('[data-testid="proposal-none"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const missing = await page.locator('[data-testid="proposal-missing"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-property')).join());
+      if (missing !== 'location,sequence') problems.push(`a protein with no sequence names ${missing} missing`);
+      if (await page.locator('[data-testid="proposal-unit"], [data-testid="proposal-open-builder"]').count()) problems.push('a proposal of nothing shows units or a Builder link');
+    } catch (e) {
+      problems.push(String(e).slice(0, 160));
+    }
+    if (problems.length) {
+      proposeFails++;
+      console.log(`✗ propose      ${problems.join('; ')}`);
+    } else {
+      console.log('✓ propose      Propose a train for ethanol in S288C posts ids and words; a column then a molecular sieve, each reason beside its unit naming the rule, the property (boiling point, azeotrope) and the volatility artifact, words with no number; kept under a new train id, which opens in the Builder with each reason beside its unit card and saves as a train of this browser; a protein with no sequence or location proposes nothing and names both');
+    }
+    await page.close();
+  }
+
   // ── OF-BLD-019 §4.R — the fermOS Properties card answers the record it names.
   //
   // Two ethanol titre candidates on a thread Q paper join the overlay (TEST
@@ -2363,10 +2485,22 @@ async function main() {
       await page.locator('[data-testid="vessel-basis"] summary').click();
       const basis = await page.locator('[data-testid="vessel-basis"]').innerText().catch(() => '');
       if (!basis.includes(`plant_scale: ${fx.plantScale}`) || !basis.includes(`assumption by ${REVIEWER}`)) problems.push("the design's basis does not name the person's plant scale");
-      // Price this in Proforma: words, and nothing made.
-      await page.locator('[data-testid="vessel-price"]').click();
+      // OF-BLD-020 §6.1: Price this in Proforma opens New scenario on
+      // custom_train_v1 with this design chosen; the double keeps no train run,
+      // so the dialog says how one is made and nothing is made.
       const words = await page.locator('[data-testid="vessel-price-words"]').innerText().catch(() => '');
-      if (!/custom_train_v1/.test(words) || !/no scenario is created/.test(words)) problems.push(`Price this in Proforma does not say what Phase 6 adds (${words.slice(0, 120)})`);
+      if (!/custom_train_v1/.test(words) || !/pureOS → New train/.test(words)) problems.push(`Price this in Proforma does not say what it prices (${words.slice(0, 120)})`);
+      await page.locator('[data-testid="vessel-price"]').click();
+      await page.locator('[data-testid="new-scenario-dialog"] [data-testid="new-scenario-composite-waits"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const designed = (await page.locator('[data-testid="vessel-result"]').getAttribute('data-artifact').catch(() => null)) ?? '';
+      if (!(await page.locator('[data-testid="new-scenario-flowsheet"][data-flowsheet="custom_train_v1"] input').isChecked().catch(() => false)))
+        problems.push('Price this in Proforma does not open New scenario on custom_train_v1');
+      if (!designed || (await page.locator('[data-testid="new-scenario-vessel"]').inputValue().catch(() => '')) !== designed)
+        problems.push(`New scenario does not open with this design chosen (${designed})`);
+      const trainWords = await page.locator('[data-testid="new-scenario-composite-empty"][data-part="train-run"]').innerText().catch(() => '');
+      if (!/No train run is kept/.test(trainWords) || !/pureOS → New train/.test(trainWords)) problems.push(`with no train run kept, New scenario does not say how one is made (${trainWords.slice(0, 120)})`);
+      if (!(await page.locator('[data-testid="new-scenario-create"]').isDisabled().catch(() => false))) problems.push('Make the scenario does not wait for a train run');
+      await page.getByRole('button', { name: 'Cancel' }).click();
       if (!page.url().includes('/fermos/vessel')) problems.push('Price this in Proforma left the page');
 
       // §4.R (findings 2, 7, 13): a person's heat per oxygen forces BioSTEAM's duty, and the heat line says so.
@@ -2460,7 +2594,7 @@ async function main() {
       vesselFails++;
       console.log(`✗ vessel       ${problems.join('; ')}`);
     } else {
-      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma says what Phase 6 adds; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
+      console.log(`✓ vessel       fermOS → Vessel (${fx.worker.kind}): the kept simulations chosen; every design parameter in six groups with its source; the scale waits and Design says the service's words; a plant scale typed is the reviewer's assumption, posted signed; the design table, the oxygen balance as a rule and a curve, heat with how BioSTEAM found it and its convention on the simulated uptake, cost with BioSTEAM's index, the basis naming the person; Price this in Proforma opens New scenario on custom_train_v1 with the design chosen and says how a train run is made; a person's heat per oxygen said as forced; a vessel type changed clears the design; a bubble column chosen in the panel designs by Dewes; a design in flight dropped when the source changes; the anaerobic batch is the NREL fermenter with no compressor and asks for a plant scale alone; with no simulation kept a fit is chosen from a chooser that opens on no source`);
     }
     await page.close();
   }
@@ -2606,6 +2740,382 @@ async function main() {
   }
   // ── end §3.3
 
+  // ── OF-BLD-020 §5.3 — pureOS → Builder: a train built unit by unit.
+  //
+  // From the index's New train, a typed broth under the reviewer's name,
+  // three units from the palette (a centrifuge, a tank, a pump), what holds
+  // the run said on the card it belongs to with Run off, the centrifuge's
+  // split typed in its panel, then Run: the double answers with the run
+  // demo.py --prototype recorded (by the real Proforma worker on BioSTEAM
+  // where the sim extra was installed), under this train's id and the
+  // reviewer's name. Purity by stream and recovery by unit are the
+  // artifact's; the basis names the reviewer. Save keeps it, a reload finds
+  // it, the index lists it with its run, the train page links back, a run's
+  // units read into a fresh train, and a run whose classes no type holds is
+  // refused in the service's words. Price this in Proforma (OF-BLD-020 §6.2)
+  // says what it needs with no vessel kept and makes nothing; with one kept,
+  // it makes the custom_train_v1 scenario from the run on the page and opens it.
+  let builderFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fx = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/pureos-builder.json'), 'utf8')).response;
+    const run = fx.run.body;
+    const inletBox = page.locator('[data-testid="builder-inlet"]');
+    const card = (id) => page.locator(`[data-testid="builder-unit"][data-unit="${id}"]`);
+    const typeIn = async (box, key, value) => {
+      const row = box.locator(`[data-testid="param-row"][data-key="${key}"]`);
+      await row.waitFor({ timeout: 10000 }).catch(() => {});
+      await row.locator('[data-testid="param-value-input"]').fill(String(value));
+      await page.waitForTimeout(200);
+    };
+    const calls = (path) => doubleState.builderCalls.filter((c) => c.path === path);
+    try {
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="pureos-built-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="pureos-built-empty"]').count())) problems.push('the index does not say no train is saved in this browser yet');
+      await page.locator('[data-testid="pureos-train-runs-empty"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="pureos-train-runs-empty"]').count())) problems.push('the index does not say no train has run on the service yet');
+      // Propose a train is §7.2's section on the index (its own flow is the propose flow).
+      if (!(await page.locator('[data-testid="pureos-propose-open"]').count())) problems.push('the index offers no Propose a train');
+      await page.locator('[data-testid="pureos-new-train"]').click();
+      await page.locator('[data-testid="pureos-builder"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!page.url().endsWith('#/pureos/build/new')) problems.push(`New train lands on ${page.url()}`);
+      // The palette: the service's catalogue by stage, no cost model said.
+      await page.locator('[data-testid="palette-type"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="palette-type"]').count()) !== fx.catalogue.length) problems.push('the palette is not the catalogue the service serves');
+      const stages = await page.locator('[data-testid="palette-stage"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stage')));
+      if (stages.join() !== [...new Set(fx.catalogue.map((t) => t.stage))].join()) problems.push(`the palette's stages are ${stages.join()}`);
+      for (const t of fx.catalogue.filter((x) => !x.costModel))
+        if (!/no cost model/.test(await page.locator(`[data-testid="palette-type"][data-type="${t.id}"]`).innerText().catch(() => ''))) problems.push(`${t.id} does not say it has no cost model`);
+      // The broth, typed under the reviewer's name in the inlet's panel.
+      if ((await inletBox.getAttribute('data-kind').catch(() => null)) !== 'typed') problems.push('a fresh train does not start from a typed broth');
+      const [[, flow], [, yeast], [, ethanol]] = [['broth_flow', 1], ['conc.Yeast', 10], ['conc.Ethanol', 50]].map(([k]) => [k, fx.train.inlet.params[k].value]);
+      await typeIn(inletBox, 'broth_flow', flow);
+      await typeIn(inletBox, 'conc.Yeast', yeast);
+      await typeIn(inletBox, 'conc.Ethanol', ethanol);
+      // Three units from the palette.
+      for (const t of ['centrifugation', 'tank', 'pump']) {
+        await page.locator(`[data-testid="palette-add"][data-type="${t}"]`).click();
+        await page.waitForTimeout(250);
+      }
+      const added = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (added !== 'U1:centrifugation,U2:tank,U3:pump') problems.push(`the units added are ${added}`);
+      const u1Routes = await card('U1').locator('[data-testid="unit-route"]').first().locator('option').evaluateAll((els) => els.map((e) => e.value).join());
+      const u2Routes = await card('U2').locator('[data-testid="unit-route"]').first().locator('option').evaluateAll((els) => els.map((e) => e.value).join());
+      if (u1Routes !== 'onward,waste' || u2Routes !== 'onward,waste,recycle:U1') problems.push(`an outlet is offered a later unit (U1: ${u1Routes}; U2: ${u2Routes})`);
+      // What holds the run, said on the card it belongs to, and Run off.
+      await card('U1').locator('[data-testid="unit-needs"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const needs = await card('U1').locator('[data-testid="unit-needs"]').innerText().catch(() => '');
+      const held = fx.checks.find((c) => c.moment === 'three units').body.places.U1[0];
+      if (!needs.includes(held)) problems.push(`the centrifuge's card does not say what holds the run in the service's words (${needs})`);
+      if (!(await page.locator('[data-testid="builder-waiting"]').count()) || !(await page.locator('[data-testid="builder-run-button"]').isDisabled())) problems.push('Run is on while a value waits');
+      // The split, typed in the centrifuge's panel.
+      for (const [k, v] of Object.entries(fx.train.units[0].params)) await typeIn(card('U1'), k, v.value);
+      await page.locator('[data-testid="builder-ready"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="builder-ready"]').count())) problems.push('the train with every value typed is still held');
+      if (await page.locator('[data-testid="builder-run-button"]').isDisabled().catch(() => true)) problems.push('Run stays off with nothing holding the run');
+      const chip = await card('U1').locator('[data-testid="param-row"][data-key="split.Yeast"] [data-testid="param-chip"]').innerText().catch(() => '');
+      if (!chip.includes(`assumption by ${REVIEWER}`)) problems.push(`the typed split's chip does not say assumption by ${REVIEWER} (${chip})`);
+      await page.locator('[data-testid="builder-run-button"]').click();
+      await page.locator('[data-testid="builder-result"]').waitFor({ timeout: 10000 }).catch(() => {});
+      const posted = calls('/api/pureos/train/run').at(-1)?.body;
+      const id = posted?.train?.id ?? '';
+      if (!/^tr-/.test(id) || posted.by !== REVIEWER || posted.train.units.length !== 3) problems.push(`the run did not post the train whole under the reviewer's name: ${JSON.stringify(posted).slice(0, 200)}`);
+      const sent = (posted?.overrides ?? []).map((o) => `${o.scope.split(':').at(-1)}/${o.key}`).sort().join();
+      if (sent !== 'U1/split.Ethanol,U1/split.Yeast,inlet/broth_flow,inlet/conc.Ethanol,inlet/conc.Yeast' || posted.overrides.some((o) => o.by !== REVIEWER || !o.scope.startsWith(`pureos:unit:${id}:`)))
+        problems.push(`the run carried the overrides ${sent}`);
+      if ((await page.locator('[data-testid="builder-result"]').getAttribute('data-artifact').catch(() => null)) !== run.artifactId) problems.push('the result is not the kept artifact');
+      if (await page.locator('[data-testid="builder-result-stale"]').count()) problems.push('the run just made is said to be of another train');
+      const purity = await page.locator('[data-testid="purity-row"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-stream')}:${e.getAttribute('data-product')}`).join());
+      const want = run.purity.streams.map((x) => `${x.stream}:${x.stream === run.purity.productStream}`).join();
+      if (purity !== want) problems.push(`purity by stream draws ${purity}, not the run's ${want}`);
+      const recovery = await page.locator('[data-testid="builder-recovery"] [data-testid="recovery-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-unit')).join());
+      if (recovery !== 'U1,U2,U3') problems.push(`recovery by unit draws ${recovery}`);
+      const body = await page.locator('[data-testid="builder-result"]').innerText().catch(() => '');
+      const pct = (v, d) => `${(v * 100).toFixed(d)}%`;
+      if (!body.includes(pct(run.purity.productFraction, 2)) || !body.includes(pct(run.train.overallRecovery, 1))) problems.push("the purity or the overall recovery is not the run's");
+      if ((await page.locator('[data-testid="builder-unit-row"]').count()) !== 3) problems.push('the unit table does not hold the three units');
+      // OF-BLD-020 §5.R (finding 16): the duties and the power name their units, read from the run's table units.
+      const unitHead = await page.locator('[data-testid="builder-unit-table"] thead').innerText().catch(() => '');
+      const tu = run.train.tableUnits;
+      if (!tu.duty || !tu.power || !unitHead.includes(`Heating duty (${tu.duty})`) || !unitHead.includes(`Cooling duty (${tu.duty})`) || !unitHead.includes(`Power (${tu.power})`))
+        problems.push(`the unit table's duties and power do not name the run's units (${unitHead.replace(/\s+/g, ' ')})`);
+      if (!(await page.locator(`[data-testid="builder-basis-input"][data-by="${REVIEWER}"]`).count())) problems.push("the basis does not name the reviewer's values");
+      if (!run.diagram && (await page.locator('[data-testid="builder-unit-order"] li').allInnerTexts()).join() !== 'U1,U2,U3') problems.push('with no diagram the units are not listed in run order');
+      // A rename changes the train: the run is said to be of the train as it was.
+      await page.locator('[data-testid="builder-name"]').fill('Sam’s first train');
+      await page.locator('[data-testid="builder-result-stale"]').waitFor({ timeout: 4000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="builder-result-stale"]').count())) problems.push('a changed train does not say the run shown is of the train as it was');
+      // Price this in Proforma (OF-BLD-020 §6.2): with the run on the page and
+      // no vessel design kept, it says what it needs and how one is made, and
+      // makes nothing.
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [] }));
+      const proformaBefore = doubleState.proformaRuns.length;
+      await page.locator('[data-testid="builder-price"]').click();
+      await page.locator('[data-testid="builder-price-no-vessel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const priceNeeds = await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null);
+      const noVessel = await page.locator('[data-testid="builder-price-no-vessel"]').innerText().catch(() => '');
+      if (priceNeeds !== 'vessel' || !/fermOS → Vessel/.test(noVessel) || (await page.locator('[data-testid="builder-price-make"]').count()) ||
+          doubleState.proformaRuns.length !== proformaBefore || !page.url().includes('#/pureos/build/'))
+        problems.push(`Price this in Proforma with a run and no vessel kept does not say what it needs (${priceNeeds}: ${noVessel.slice(0, 80)}), or makes something`);
+      if ((await page.locator('[data-testid="builder-price-run"]').getAttribute('data-run').catch(() => null)) !== run.artifactId) problems.push('Price this in Proforma does not name the run it prices');
+      await page.unroute('**/api/fermos/vessels*');
+      // Save, then a reload finds the train, its values with it.
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      if (!page.url().endsWith(`#/pureos/build/${id}`)) problems.push(`a saved train does not open at its own address (${page.url()})`);
+      if ((await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same') problems.push('Save does not say the train is kept');
+      // OF-BLD-020 §5.R (finding 13): Save moves a new train to its own address, and the run on the page stays.
+      if (!(await page.locator(`[data-testid="builder-result"][data-artifact="${run.artifactId}"]`).count())) problems.push('Save drops the run the page showed');
+      if (!(await page.locator('[data-testid="builder-price-panel"]').count())) problems.push('Save drops what Price this in Proforma said');
+      await page.reload({ waitUntil: 'networkidle' });
+      await card('U3').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="builder-name"]').inputValue().catch(() => '')) !== 'Sam’s first train' || (await page.locator('[data-testid="builder-unit"]').count()) !== 3)
+        problems.push('a reload does not find the saved train');
+      const kept = await card('U1').locator('[data-testid="param-row"][data-key="split.Yeast"] [data-testid="param-chip"]').innerText({ timeout: 8000 }).catch(() => '');
+      if (!kept.includes(`assumption by ${REVIEWER}`)) problems.push(`the typed split did not survive a reload (${kept})`);
+      // The index lists it, and its run on the service.
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-built-row"][data-train="${id}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      // The row is drawn from this browser at once; its run arrives from the service.
+      await page
+        .waitForFunction((t) => /recovered|no run on the service/.test(document.querySelector(`[data-testid="pureos-built-row"][data-train="${t}"]`)?.textContent ?? ''), id, { timeout: 8000 })
+        .catch(() => {});
+      const builtRow = await page.locator(`[data-testid="pureos-built-row"][data-train="${id}"]`).innerText().catch(() => '');
+      if (!builtRow.includes('Sam’s first train') || !builtRow.includes(`by ${REVIEWER}`) || !builtRow.includes(`${pct(run.train.overallRecovery, 1)} recovered`)) problems.push(`the index does not list the saved train with its run (${builtRow})`);
+      if (!(await page.locator(`[data-testid="pureos-train-run-row"][data-train="${id}"]`).count())) problems.push("the train's run is not listed among the service's train runs");
+      // The train page reads the run and links back to the Builder.
+      await page.goto(`http://localhost:${PORT}/#/pureos/train/${id}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="train-open-builder"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="train-open-builder"]').getAttribute('href').catch(() => null)) !== `#/pureos/build/${id}`) problems.push('the train page does not link back to the Builder');
+      // A run's units read into a fresh train, and a run no type holds refused in words.
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/new?from=${run.artifactId}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-from-run"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const read = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      if (read !== 'U1:centrifugation,U2:tank,U3:pump') problems.push(`the run's units read into ${read}`);
+      const refused = fx.fromRun.find((f) => f.status === 422);
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/new?from=${refused.request.artifactId}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-from-run-refused"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator('[data-testid="builder-from-run-refused"]').innerText().catch(() => '')).includes(refused.body.detail.slice(0, 60))) problems.push('a run no catalogue type holds is not refused in the service\u2019s words');
+      // OF-BLD-020 §6.2: with a vessel design kept (the vessel fixture's, as
+      // GET /api/fermos/vessels lists one), Price this in Proforma makes the
+      // custom_train_v1 scenario through §6.1's helper from the run kept on the
+      // page and the vessel chosen, and opens it, naming both.
+      const vfx = JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype/fermos-vessel.json'), 'utf8')).response;
+      const design = vfx.designs.find((d) => d.status === 200).body;
+      const keptVessel = { artifactId: design.artifactId, provenance: design.provenance, createdAt: design.createdAt, source: design.source, sourceTool: design.sourceTool, unitClass: design.unitClass, vesselType: design.vesselType ?? null, vessels: null, volume: null, installed: null };
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [keptVessel] }));
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/${id}`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-ready"]').waitFor({ timeout: 10000 }).catch(() => {});
+      await page.locator('[data-testid="builder-price"]').click();
+      await page.locator('[data-testid="builder-price-panel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null)) !== 'run' || (await page.locator('[data-testid="builder-price-make"]').isEnabled().catch(() => true)))
+        problems.push('Price this in Proforma with no run on the page does not say it needs one, or offers to make the scenario');
+      await page.locator('[data-testid="builder-run-button"]').click();
+      await page.locator('[data-testid="builder-result"]').waitFor({ timeout: 10000 }).catch(() => {});
+      await page.locator('[data-testid="builder-price-vessel"]').selectOption(design.artifactId).catch(() => {});
+      await page.locator('[data-testid="builder-price-make"]').click({ timeout: 8000 }).catch(() => {});
+      await page.waitForURL(/#\/proforma\/scenario\/sc-/, { timeout: 8000 }).catch(() => {});
+      const parts = page.locator('[data-testid="scenario-parts"]');
+      await parts.waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/#\/proforma\/scenario\/sc-/.test(page.url()) || (await parts.getAttribute('data-vessel').catch(() => null)) !== design.artifactId ||
+          (await parts.getAttribute('data-train-run').catch(() => null)) !== run.artifactId)
+        problems.push(`Price this in Proforma did not make and open the scenario of the vessel chosen and the run kept (${page.url()})`);
+      await page.unroute('**/api/fermos/vessels*');
+      // OF-BLD-020 §5.R (finding 17): a train saved in an archived program,
+      // opened by its address with the switch off, opens under the banner
+      // naming the program, as every archived entity a link opens does.
+      await setShowArchived(page, true);
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/new`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="builder-program"]').selectOption('pha').catch(() => {});
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      const phaTrain = decodeURIComponent(page.url().split('#/pureos/build/')[1] ?? '');
+      await setShowArchived(page, false);
+      await page.goto(`http://localhost:${PORT}/#/pureos/build/${phaTrain}`, { waitUntil: 'networkidle' });
+      const banner = page.locator('[data-testid="pureos-builder"] [role="note"][data-archived-program="pha"]');
+      await banner.waitFor({ timeout: 8000 }).catch(() => {});
+      if (!/^tr-/.test(phaTrain) || !(await banner.count()) || !/PHA/.test(await banner.innerText().catch(() => '')))
+        problems.push(`a PHA train opened by its address with the switch off shows no banner naming its program (${phaTrain})`);
+      if (!/PHA/.test(await page.locator('[data-testid="builder-program"] option:checked').innerText().catch(() => '')))
+        problems.push('the archived train’s program is not named by its name');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      builderFails++;
+      console.log(`✗ builder      ${problems.join('; ')}`);
+    } else {
+      console.log(`✓ builder      New train from the index; the palette is the service's catalogue by stage, no cost model said; a broth typed under ${REVIEWER}'s name; three units from the palette, an outlet never offered a later unit; what holds the run on the centrifuge's card and Run off; the split typed, Run on; the run posted whole with every override, its purity by stream and recovery by unit the artifact's (worker: ${fx.worker.kind}), the unit table's duties and power in the run's units, the basis naming the reviewer; a rename says the run is of the train as it was; Price this in Proforma says it needs a vessel and how one is made; Save keeps the run on the page, a reload finds the train with its values; the index lists it with its run; the train page links back; a run's units read into a train, and one no type holds refused in words; with a vessel kept, Price this in Proforma makes the custom_train_v1 scenario from the run and opens it; a PHA train opened by its address with the switch off opens under the banner naming PHA`);
+    }
+    await page.close();
+  }
+  // ── end §5.3
+
+  // ── OF-BLD-020 §6.2 — the broth that leaves fermOS is the stream that enters pureOS.
+  //
+  // With a reviewer name, fermOS → Simulate runs the double's recorded
+  // simulation (the fixture's STAND-IN values typed); its result offers Use as
+  // a train's inlet, which lands on a new train in the Builder with that
+  // simulation as its inlet; the inlet shows its broth at the simulation's own
+  // harvest hour, every state with its unit, as the real fermos.harvest read
+  // it from the kept series (GET /api/fermos/harvest, the double answering
+  // from fermos-simulate.json), and lists the simulation with its broth.
+  // Price this in Proforma, with no run on the page and no vessel design
+  // kept, says it needs both and how a vessel is made, and makes nothing.
+  let seamFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const sim = fixture('fermos-simulate.json');
+    const want = sim.simulate.request;
+    const result = sim.simulate.body;
+    const own = sim.harvest.find((h) => h.request.hour == null).body;
+    try {
+      if (!(await setShowArchived(page, false))) problems.push('the archive switch is not off');
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.goto(`http://localhost:${PORT}/#/fermos/simulate`, { waitUntil: 'networkidle' });
+      await page.locator('[data-testid="simulate-strain"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="simulate-strain"]').selectOption(want.strain);
+      await page.locator('[data-testid="simulate-panel"] [data-testid="param-row"][data-key="mu_max"]').waitFor({ timeout: 8000 }).catch(() => {});
+      for (const o of sim.typed) await typeParam(page, o.key, o.value);
+      await page.locator('[data-testid="simulate-ready"]').waitFor({ timeout: 8000 }).catch(() => {});
+      await page.locator('[data-testid="simulate-button"]').click();
+      await page.locator('[data-testid="simulation-result"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const link = page.locator('[data-testid="simulation-train-inlet"]');
+      if ((await link.getAttribute('href').catch(() => null)) !== `#/pureos/build/new?inlet=simulation:${result.artifactId}`)
+        problems.push(`Use as a train's inlet does not name the simulation (${await link.getAttribute('href').catch(() => null)})`);
+      await link.click();
+      await page.locator('[data-testid="pureos-builder"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const inletBox = page.locator('[data-testid="builder-inlet"]');
+      if ((await inletBox.getAttribute('data-kind').catch(() => null)) !== 'simulation') problems.push('the Builder does not open with a simulation inlet');
+      await page.locator('[data-testid="builder-inlet-simulation"]').waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await page.locator('[data-testid="builder-inlet-simulation"]').inputValue().catch(() => '')) !== result.artifactId) problems.push('the Builder does not open with the simulation chosen');
+      const harvest = page.locator('[data-testid="builder-inlet-harvest"]');
+      await harvest.waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await harvest.getAttribute('data-hour-source').catch(() => null)) !== own.hourSource || Number(await harvest.getAttribute('data-hour').catch(() => NaN)) !== own.hour)
+        problems.push("the inlet's broth is not read at the simulation's own harvest hour as the service read it");
+      const shownStates = await harvest
+        .locator('[data-testid="builder-inlet-harvest-state"]')
+        .evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}=${e.getAttribute('data-value')} ${e.getAttribute('data-unit')}`).join());
+      const wantStates = own.states.map((x) => `${x.state}=${x.value} ${x.unit}`).join();
+      if (shownStates !== wantStates) problems.push(`the inlet's broth shows ${shownStates}, not the service's ${wantStates}`);
+      const option = await page.locator(`[data-testid="builder-inlet-simulation"] option[value="${result.artifactId}"]`).innerText().catch(() => '');
+      if (!own.states.every((x) => option.includes(`${x.state} `) && option.includes(x.unit))) problems.push(`the chooser does not list the simulation with its broth (${option})`);
+      const asked = doubleState.harvestReads.filter((r) => r.simulation === result.artifactId);
+      if (!asked.length || asked.some((r) => r.hour !== null)) problems.push('the Builder did not ask the service for the broth at the simulation\u2019s own hour, or sent an hour nobody typed');
+      // Price this in Proforma: no run here, and no vessel design kept.
+      await page.route('**/api/fermos/vessels*', (route) => route.fulfill({ json: [] }));
+      await page.locator('[data-testid="builder-price"]').click();
+      await page.locator('[data-testid="builder-price-no-vessel"]').waitFor({ timeout: 8000 }).catch(() => {});
+      const needs = await page.locator('[data-testid="builder-price-panel"]').getAttribute('data-needs').catch(() => null);
+      if (needs !== 'run,vessel' || !/fermOS → Vessel/.test(await page.locator('[data-testid="builder-price-no-vessel"]').innerText().catch(() => '')) || !page.url().includes('#/pureos/build/new'))
+        problems.push(`Price this in Proforma does not say it needs a run and a vessel, and how one is made (${needs})`);
+      await page.unroute('**/api/fermos/vessels*');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      seamFails++;
+      console.log(`✗ seam         ${problems.join('; ')}`);
+    } else {
+      console.log("✓ seam         Simulate's result offers Use as a train's inlet, which opens a new train in the Builder with the simulation as its inlet; its broth at the simulation's own harvest hour is the service's read of the kept series, every state with its unit, and the chooser lists it with its broth; Price this in Proforma says it needs a run and a vessel design and how one is made, and makes nothing");
+    }
+    await page.close();
+  }
+  // ── end §6.2
+
+  // ── OF-BLD-020 §5.R — the trains a model built, listed on pureOS's index.
+  //
+  // The double answers GET /api/pureos/trains-kept from pureos-trains-kept.json,
+  // which demo.py --prototype made through the real pureos.kept in a throwaway
+  // store (a STAND-IN model's train on the stand-in yeast run's beer). The
+  // index lists it under Made by Postdoc with its name, product, units, the
+  // model that made it and when, and its newest run joined by the run's
+  // trainId; Open a copy opens it in the Builder as a new train of this
+  // browser naming the kept train it copies, and Save keeps the copy here
+  // under the reviewer's name while the kept train stays the model's. A model's
+  // train of an archived program is hidden with the switch off, and said so.
+  let keptFails = 0;
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const problems = [];
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
+    const fixture = (name) => JSON.parse(readFileSync(join(process.cwd(), 'core/tests/fixtures/prototype', name), 'utf8')).response;
+    const keptList = fixture('pureos-trains-kept.json').listedArchived;
+    const [k] = keptList;
+    const fx = fixture('pureos-builder.json');
+    const joined = { ...fx.trainRuns[0], trainId: k?.spec.id, trainName: k?.spec.name };
+    const pct = (v, d) => `${(v * 100).toFixed(d)}%`;
+    try {
+      if (keptList.length !== 1 || k.agent !== 'model' || !k.madeBy) problems.push('the kept-train fixture is not one train a model made');
+      const asksBefore = doubleState.keptTrainAsks.length;
+      await page.goto(`http://localhost:${PORT}/#/settings/corpus`, { waitUntil: 'networkidle' });
+      await page.locator('input[aria-label="Reviewer name"]').fill(REVIEWER);
+      await page.waitForTimeout(400);
+      await page.route('**/api/pureos/train-runs*', (route) => route.fulfill({ json: [joined] }));
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      const row = page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`);
+      await row.waitFor({ timeout: 8000 }).catch(() => {});
+      await page
+        .waitForFunction((t) => /recovered|no run on the service/.test(document.querySelector(`[data-testid="pureos-kept-row"][data-train="${t}"]`)?.textContent ?? ''), k.spec.id, { timeout: 8000 })
+        .catch(() => {});
+      const text = await row.innerText().catch(() => '');
+      if (!doubleState.keptTrainAsks.slice(asksBefore).some((a) => a.includeArchived)) problems.push('the index did not ask the service for the trains a model built, every program\u2019s, to filter them itself');
+      for (const want of [k.spec.name, k.spec.product, k.madeBy, ...k.spec.units.map((u) => u.id)])
+        if (!text.includes(want)) problems.push(`the kept train's row does not say ${want} (${text.replace(/\s+/g, ' ').slice(0, 160)})`);
+      if (!text.includes(`${pct(joined.overallRecovery, 1)} recovered`)) problems.push('the kept train’s row does not show its run, joined by the run’s trainId');
+      const copy = row.locator('[data-testid="pureos-kept-copy"]');
+      if ((await copy.getAttribute('href').catch(() => null)) !== `#/pureos/build/new?copy=${k.spec.id}`) problems.push('Open a copy does not name the kept train');
+      await page.unroute('**/api/pureos/train-runs*');
+      await copy.click();
+      const note = page.locator('[data-testid="builder-copy-of"]');
+      await note.waitFor({ timeout: 8000 }).catch(() => {});
+      if ((await note.getAttribute('data-kept').catch(() => null)) !== k.spec.id) problems.push('the Builder does not name the kept train it copies');
+      const units = await page.locator('[data-testid="builder-unit"]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-unit')}:${e.getAttribute('data-type')}`).join());
+      const want = k.spec.units.map((u) => `${u.id}:${u.type}`).join();
+      if (units !== want) problems.push(`the copy's units are ${units}, not the kept train's ${want}`);
+      const copyId = await page.locator('[data-testid="pureos-builder"]').getAttribute('data-train').catch(() => null);
+      if (!copyId || copyId === k.spec.id || !/^tr-/.test(copyId)) problems.push(`the copy is not a new train of this browser (${copyId})`);
+      await page.locator('[data-testid="builder-save"]').click();
+      await page.waitForTimeout(900);
+      if (!page.url().endsWith(`#/pureos/build/${copyId}`) || (await page.locator('[data-testid="builder-saved"]').getAttribute('data-saved').catch(() => null)) !== 'same')
+        problems.push(`Save does not keep the copy in this browser at its own address (${page.url()})`);
+      if ((await page.locator('[data-testid="builder-copy-of"]').getAttribute('data-kept').catch(() => null)) !== k.spec.id) problems.push('Save drops what the copy says it copies');
+      await page.goto(`http://localhost:${PORT}/#/pureos`, { waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-built-row"][data-train="${copyId}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (!(await page.locator(`[data-testid="pureos-built-row"][data-train="${copyId}"]`).count())) problems.push('the saved copy is not among the trains built here');
+      if (!(await page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`).count())) problems.push('the kept train left Made by Postdoc when its copy was saved');
+      // A model's train of an archived program: hidden with the switch off, and said so.
+      const archived = { ...k, spec: { ...k.spec, id: 'tr-kept-archived', name: 'A train a model built for PHA', program: 'pha' } };
+      await page.route('**/api/pureos/trains-kept*', (route) => route.fulfill({ json: [k, archived] }));
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.locator(`[data-testid="pureos-kept-row"][data-train="${k.spec.id}"]`).waitFor({ timeout: 8000 }).catch(() => {});
+      if (await page.locator('[data-testid="pureos-kept-row"][data-train="tr-kept-archived"]').count()) problems.push('a model’s train of an archived program shows with the switch off');
+      if (!/PHA/.test(await page.locator('[data-testid="pureos-kept"]').innerText().catch(() => ''))) problems.push('the hidden model’s train is not said to be hidden, and whose');
+      await page.unroute('**/api/pureos/trains-kept*');
+    } catch (e) {
+      problems.push(String(e).slice(0, 200));
+    }
+    if (problems.length) {
+      keptFails++;
+      console.log(`✗ kept         ${problems.join('; ')}`);
+    } else {
+      console.log('✓ kept         Made by Postdoc lists the train a model built (name, product, units, the model, when) with its run joined by trainId; Open a copy opens it in the Builder as a new train of this browser naming the kept train, and Save keeps the copy here while the kept train stays listed; a model’s train of an archived program is hidden with the switch off and said so');
+    }
+    await page.close();
+  }
+  // ── end §5.R (kept trains)
+
   await browser.close();
   server.close();
 
@@ -2626,10 +3136,14 @@ async function main() {
   console.log(`${1 - guildFails}/1 Guild ledger flow — empty ledger, My path, practice on nobody's record, first person, reload`);
   console.log(`${1 - emptyFails}/1 empty states — Witness, fermOS and Guild name the next step with the service down`);
   console.log(`${1 - trainFails}/1 pureOS train — read from the run, unit by unit, a click cuts the streams`);
+  console.log(`${1 - proposeFails}/1 pureOS propose — a train proposed by rules, each reason naming the property it read`);
   console.log(`${1 - brothFails}/1 fermOS Properties — the card answers the record it names, and asks again after a 503`);
   console.log(`${1 - vesselFails}/1 fermOS Vessel — every design parameter in the panel, a scale a named assumption, the design and its oxygen balance read from the service`);
   console.log(`${1 - simulateFails}/1 fermOS Simulate — a family simulated from its sources, what waits typed under a name, the result read from the artifact`);
-  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || brothFails || ceilingFails || vesselFails || simulateFails) process.exit(1);
+  console.log(`${1 - builderFails}/1 pureOS Builder — a train built unit by unit, every value typed under a name, run, saved and found again`);
+  console.log(`${1 - seamFails}/1 the seam — a simulation's harvest becomes a train's inlet, its broth the service's read of the kept series`);
+  console.log(`${1 - keptFails}/1 pureOS Made by Postdoc — a model's trains listed with their runs, each opened in the Builder as a copy a person keeps`);
+  if (failures.length || redirectFails || shelfFails || seededFails || programFails || proformaFails || scenarioPageFails || panelFails || referenceFails || compareFails || fitFails || overlayFails || confineFails || guildFails || emptyFails || trainFails || proposeFails || brothFails || ceilingFails || vesselFails || simulateFails || builderFails || seamFails || keptFails) process.exit(1);
 }
 
 main();

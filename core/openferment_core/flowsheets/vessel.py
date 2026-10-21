@@ -433,32 +433,43 @@ def _short(ts: list[float], ys: list[float], level: float) -> list[list[float]]:
     return out
 
 
-def _build(cls: Any, spec: dict[str, Any], chems: Any, rxn: Any, F_vol: float) -> Any:
-    _fresh_flowsheet()
-    bst.settings.set_thermo(chems)
-    params = dict(spec.get("params") or {})
-    T = params.get("T", _T_default(cls))
-    feed = _feed(spec["start"], F_vol, T)
+def make_unit(cls: Any, unit_id: str, feed: Any, tau: float, rxn: Any, params: dict[str, Any], design: str | None,
+              one: bool, outs: tuple[str, str] = ("vent", "broth")) -> Any:
+    """The vessel unit as a design builds it: `cls` with the design's
+    parameters (`params`, a value whose source is the class's own default
+    left out), the feed (and, aerated, an air inlet the class sizes), the
+    reacting time and the reaction; one vessel when `one` (a batch volume).
+    `custom_train_v1` rebuilds a kept design's fermenter through this same
+    function (OF-BLD-020 §6.1), so the two build alike."""
+    params = dict(params)
     N = params.pop("N", None)
-    one = spec["scale"].get("batchVolume") is not None
     kwargs = {k: v for k, v in params.items()}
     if cls is bst.NRELAnaerobicBatchBioreactor:
         if N is not None:
             kwargs["N"] = N
         else:
             kwargs.setdefault("V_max", bst.AnaerobicBioreactor.V_max_default)
-        R = cls(UNIT_ID, ins=feed, outs=("vent", "broth"), tau=spec["tau"], reactions=rxn, **kwargs)
+        R = cls(unit_id, ins=feed, outs=outs, tau=tau, reactions=rxn, **kwargs)
     else:
-        if spec.get("design") is not None:
-            kwargs["design"] = spec["design"]
+        if design is not None:
+            kwargs["design"] = design
         if kwargs.get("design") == BUBBLE and "kW_per_m3" not in kwargs:
             kwargs["kW_per_m3"] = 0  # else a bubble column still costs an agitator
-        R = cls(UNIT_ID, ins=[feed, bst.Stream("air", phase="g")], outs=("vent", "broth"), tau=spec["tau"],
-                reactions=rxn, **kwargs)
+        R = cls(unit_id, ins=[feed, bst.Stream("air", phase="g")], outs=outs, tau=tau, reactions=rxn, **kwargs)
         if N is not None or one:
             R.V_max = None  # the constructor re-applies V_max_default, and N cannot stand beside it
             R.N = 1 if one else N
     return R
+
+
+def _build(cls: Any, spec: dict[str, Any], chems: Any, rxn: Any, F_vol: float) -> Any:
+    _fresh_flowsheet()
+    bst.settings.set_thermo(chems)
+    params = dict(spec.get("params") or {})
+    T = params.get("T", _T_default(cls))
+    feed = _feed(spec["start"], F_vol, T)
+    one = spec["scale"].get("batchVolume") is not None
+    return make_unit(cls, UNIT_ID, feed, spec["tau"], rxn, params, spec.get("design"), one)
 
 
 def _scale(spec: dict[str, Any], cls: Any, params: dict[str, Any]) -> tuple[float, dict[str, Any]]:

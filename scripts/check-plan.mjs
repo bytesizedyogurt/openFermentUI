@@ -217,6 +217,10 @@ const PAIRS = [
   // OF-BLD-019 §4.2 — thermosteam answers property questions.
   ['ThermoPropsRequest', 'ThermoPropsRequest'],
   ['ThermoProps', 'ThermoProps'],
+  // OF-BLD-020 §7.1 — a product's properties: ProtParam on its sequence, its volatility by thermosteam.
+  ['ProductPropertyRequest', 'ProductPropertyRequest'],
+  ['ProtParam', 'ProtParam'],
+  ['Volatility', 'Volatility'],
   // OF-BLD-020 §2.1 — one parameter panel: a parameter declared once,
   // resolved with its source, and a person's change a named assumption.
   ['ParameterSpec', 'ParameterSpec'],
@@ -246,6 +250,45 @@ const PAIRS = [
   ['SimulationSummary', 'SimulationSummary'],
   // OF-BLD-020 §3.2 — a family's parameters bound from a fit, the records, a kept simulation.
   ['FermosBinding', 'FermosBinding'],
+  // OF-BLD-020 §6.2 — a kept simulation's broth at an hour, read from its kept series.
+  ['HarvestState', 'HarvestState'],
+  ['FermosHarvest', 'FermosHarvest'],
+  // OF-BLD-020 §5.1 — pureOS's unit catalogue: each entry a BioSTEAM class
+  // or an in-house unit, with its parameters and their sources.
+  ['UnitPort', 'UnitPort'],
+  ['NotOffered', 'NotOffered'],
+  ['UnitNeed', 'UnitNeed'],
+  ['UnitType', 'UnitType'],
+  ['UnitDefault', 'UnitDefault'],
+  ['UnitParamMap', 'UnitParamMap'],
+  ['UnitSpecs', 'UnitSpecs'],
+  // OF-BLD-020 §5.2 — a train is data; the worker runs it; one artifact keeps it.
+  ['TrainParam', 'TrainParam'],
+  ['TrainInlet', 'TrainInlet'],
+  ['TrainUnitReadFrom', 'TrainUnitReadFrom'],
+  ['TrainUnitSpec', 'TrainUnitSpec'],
+  ['TrainSpec', 'TrainSpec'],
+  ['TrainValidation', 'TrainValidation'],
+  ['TrainRunRequest', 'TrainRunRequest'],
+  ['StreamImpurity', 'StreamImpurity'],
+  ['StreamPurity', 'StreamPurity'],
+  ['TrainPurity', 'TrainPurity'],
+  ['TrainUnitCost', 'TrainUnitCost'],
+  ['TrainInletRead', 'TrainInletRead'],
+  ['TrainUnitParameters', 'TrainUnitParameters'],
+  ['TrainRun', 'TrainRun'],
+  // OF-BLD-020 §5.4 — a train a model built, kept on the service.
+  ['KeptTrain', 'KeptTrain'],
+  ['KeptTrains', 'KeptTrains'],
+  // OF-BLD-020 §7.2 — a train proposed by rules that each name the property they read.
+  ['ProposeRequest', 'ProposeRequest'],
+  ['ProposalReason', 'ProposalReason'],
+  ['ProposalMissing', 'ProposalMissing'],
+  ['TrainProposal', 'TrainProposal'],
+  // OF-BLD-020 §5.3 — a run's units read into a train for the Builder.
+  ['TrainFromRunRequest', 'TrainFromRunRequest'],
+  ['TrainUnmapped', 'TrainUnmapped'],
+  ['TrainFromRun', 'TrainFromRun'],
 ];
 
 let compared = 0;

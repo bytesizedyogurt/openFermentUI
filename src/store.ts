@@ -32,6 +32,10 @@ import type {
   Runbook,
   SeriesRole,
   FermosFitResponse,
+  TrainProposal,
+  TrainFromRun,
+  TrainRun,
+  KeptTrain,
   RunbookStage,
   RunOutput,
   RunState,
@@ -54,6 +58,7 @@ import type {
   Checks,
   Program,
   ProgramId,
+  TrainSpec,
 } from '@/data/types';
 import { PAPERS } from '@/data/papers';
 import { RECORDS } from '@/data/records';
@@ -79,6 +84,7 @@ import {
   loadDurable,
   saveDurable,
   type DurableSnapshot,
+  type TrainMade,
 } from '@/lib/durable';
 import { DecisionRefused, IntakeDown, extractPaper, fetchPaper, loadOverlay, postDecision } from '@/lib/intake';
 import { blocks, carryOverSpan, isNewCandidate, spanChangesNumber, writeRefusal, type ReviewAction } from '@/lib/review';
@@ -364,6 +370,16 @@ export interface OFState {
   setProformaFits: (scenarioId: string, fits: Record<string, string>) => void;
   /** Stop using a fermOS fit for one input of a scenario, or for every input when no key is named. */
   clearProformaFit: (scenarioId: string, key?: string) => void;
+  /**
+   * pureOS's trains built here, by train id (OF-BLD-020 §5.3, D9): each saved
+   * whole as data, with when and by whom. Durable; the service keeps the
+   * train runs and no train. The values typed into a train's panels live in
+   * `parameterOverrides` under its scopes, and a saved train carries them as
+   * they stood when it was saved.
+   */
+  trainsMade: Record<string, TrainMade>;
+  /** Save a train built in the Builder under a reviewer name, replacing the one saved by its id. */
+  saveTrain: (train: TrainSpec, by: string) => void;
   checkpointAnswers: Record<string, boolean>;
   exports: { name: string; at: string; rows: number }[];
 
@@ -474,7 +490,16 @@ export interface OFState {
    * its program (null for a general one), no inputs of its own, not run.
    * Durable, under a time-based id; returns the id.
    */
-  createScenario: (flowsheetId: string, name: string, program: ProgramId | null) => string;
+  /**
+   * OF-BLD-020 §6.1: `parts` names the vessel design and the train run a
+   * scenario on `custom_train_v1` is built from; kept with it (Durable).
+   */
+  createScenario: (
+    flowsheetId: string,
+    name: string,
+    program: ProgramId | null,
+    parts?: { vessel: string; trainRun: string } | null,
+  ) => string;
   /** The newest run artifact of a scenario, as a run on its page returned it (D6). */
   recordScenarioRun: (id: string, artifactId: string) => void;
 
@@ -621,6 +646,29 @@ export interface OFState {
    */
   fermosFits: Record<string, FermosFitResponse>;
   keepFermosFit: (fit: FermosFitResponse) => void;
+  /**
+   * OF-BLD-020 §7.2 — the trains pureOS's proposer proposed in this session,
+   * by the train id this browser gave each (time-based, `tr-…`): the service's
+   * proposal whole, its train carrying that id, its reasons and what is
+   * missing. pureOS's Builder opens one at /pureos/build/<id>. Ephemeral: the
+   * proposal is the service's, and a person keeps a train by saving it from
+   * the Builder.
+   */
+  proposedTrains: Record<string, TrainProposal>;
+  /** Keep a proposal that proposed a train under a new train id, and return the id; null when it proposed none. */
+  keepProposedTrain: (proposal: TrainProposal) => string | null;
+  /**
+   * OF-BLD-020 §5.R (finding 13) — what pureOS's Builder shows of a train in
+   * this session, by the train's id: the newest run made on the page, what
+   * the service said reading the train from a run (`?from=`), the train a
+   * model built that it copies (`?copy=`), and whether Price this in Proforma
+   * is open. Save moves a new train to its own address, which mounts the page
+   * afresh; the page reads these back, so nothing it showed is lost.
+   * Ephemeral: the run is the service's artifact, and the train is kept by
+   * Save.
+   */
+  builderShown: Record<string, BuilderShown>;
+  showInBuilder: (trainId: string, shown: Partial<BuilderShown>) => void;
   /** Whether the Durable tier's copy of the ledger has been read this session. */
   guildHydrated: boolean;
   /**
@@ -831,6 +879,7 @@ const seedState = () => ({
   proformaAssumptions: {} as Record<string, InputAssumption[]>,
   parameterOverrides: {} as Record<string, Override[]>,
   proformaFits: {} as Record<string, Record<string, string>>,
+  trainsMade: {} as Record<string, TrainMade>,
   adoptedRunbookIds: [] as string[],
   createdScenarioIds: [] as string[],
   checkpointAnswers: {} as Record<string, boolean>,
@@ -897,6 +946,19 @@ export const useStore = create<OFState>()((set, get) => ({
       const key = model === 'logistic_v0' ? fit.depositionId : `${fit.depositionId} · ${model}`;
       return { fermosFits: { ...s.fermosFits, [key]: fit } };
     }),
+  proposedTrains: {} as Record<string, TrainProposal>,
+  // OF-BLD-020 §7.2: a new id (as a made scenario's, `nextId` restarting on a
+  // reload); the service's train, reasons and missing list kept as it sent them.
+  keepProposedTrain: (proposal: TrainProposal) => {
+    if (!proposal.train) return null;
+    const id = timeId('tr');
+    const train = { ...proposal.train, id };
+    set((s) => ({ proposedTrains: { ...s.proposedTrains, [id]: { ...proposal, train } } }));
+    return id;
+  },
+  builderShown: {} as Record<string, BuilderShown>,
+  showInBuilder: (trainId: string, shown: Partial<BuilderShown>) =>
+    set((s) => ({ builderShown: { ...s.builderShown, [trainId]: { ...(s.builderShown[trainId] ?? {}), ...shown } } })),
   guildHydrated: false,
   practice: null as Practice | null,
   checks: null as Checks | null,
@@ -2269,7 +2331,12 @@ export const useStore = create<OFState>()((set, get) => ({
     // A copy of a scenario on a shelf flowsheet is a scenario a person made:
     // Durable, time-based id, not run (OF-BLD-019 D6).
     if (src.kind === 'biosteam' && src.flowsheetId)
-      return get().createScenario(src.flowsheetId, `${src.name} (copy)`, src.program ?? null);
+      return get().createScenario(
+        src.flowsheetId,
+        `${src.name} (copy)`,
+        src.program ?? null,
+        src.vessel && src.trainRun ? { vessel: src.vessel, trainRun: src.trainRun } : null,
+      );
     const copy: Scenario = {
       ...structuredClone(src),
       id: nextId('sc'),
@@ -2285,7 +2352,7 @@ export const useStore = create<OFState>()((set, get) => ({
   // and this outlives one (as adopted runbooks and Live conversations do).
   // It holds no input value: the service binds records, and a named person
   // types an assumption on its page, kept in proformaAssumptions under its id.
-  createScenario: (flowsheetId, name, program) => {
+  createScenario: (flowsheetId, name, program, parts) => {
     const id = timeId('sc');
     const made: Scenario = {
       id,
@@ -2300,6 +2367,8 @@ export const useStore = create<OFState>()((set, get) => ({
       assumptions: [],
       pinned: false,
       ...(program ? { program } : {}),
+      // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
+      ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun } : {}),
       lastRunId: null,
       createdAt: new Date().toISOString(),
     };
@@ -2390,6 +2459,12 @@ export const useStore = create<OFState>()((set, get) => ({
       };
       return { parameterOverrides, proformaAssumptions: assumptionsFromOverrides(parameterOverrides) };
     }),
+
+  // ── pureOS's trains built here (OF-BLD-020 §5.3, D9) ───────────────────
+  // Saved whole, by id, with when and by whom; the Builder sends the train
+  // with every value its panels hold laid in (lib/pureos.trainSpecOf).
+  saveTrain: (train, by) =>
+    set((s) => ({ trainsMade: { ...s.trainsMade, [train.id]: { train: structuredClone(train), savedAt: new Date().toISOString(), by } } })),
 
   // ── Proforma's fermOS fits (OF-BLD-019 §5.1, D10) ─────────────────────
   // A person picks the fit; the browser keeps which artifact feeds which
@@ -2590,6 +2665,8 @@ export const useStore = create<OFState>()((set, get) => ({
         // OF-BLD-019 §5.1 — the fermOS fits chosen here; a scenario's choice
         // made since load wins over the snapshot's.
         proformaFits: { ...(snap.proformaFits ?? {}), ...s.proformaFits },
+        // OF-BLD-020 §5.3 — the trains built here; one saved since load wins by id.
+        trainsMade: { ...(snap.trainsMade ?? {}), ...s.trainsMade },
         adoptedRunbookIds: [...new Set([...adopted.map((r) => r.id), ...s.adoptedRunbookIds])],
         // Postdoc's Live conversations. A turn still running when the page
         // went away has no stream to finish it, and says so.
@@ -3323,7 +3400,7 @@ export const useStore = create<OFState>()((set, get) => ({
     });
     if (serviceUp) void get().syncGuild();
     get().toast({
-      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
+      text: 'This browser’s data is cleared: depositions, review decisions, runbook locks, lessons finished, conversations, Proforma scenarios, the trains built here and the parameters changed here are gone, archived programs are hidden again, and the corpus is as it shipped',
       kind: 'info',
     });
   },
@@ -3589,6 +3666,8 @@ export function snapshotOf(s: OFState): DurableSnapshot {
     ),
     // OF-BLD-019 §3.3 (D6) — the seeded scenarios pinned to compare here.
     pinnedScenarios: s.scenarios.filter((sc) => !s.createdScenarioIds.includes(sc.id) && sc.pinned).map((sc) => sc.id),
+    // OF-BLD-020 §5.3 — pureOS's trains built here, whole, by id.
+    trainsMade: s.trainsMade,
   };
 }
 
@@ -3625,6 +3704,7 @@ if (durableAvailable()) {
       s.proformaAssumptions === prev.proformaAssumptions &&
       s.parameterOverrides === prev.parameterOverrides &&
       s.proformaFits === prev.proformaFits &&
+      s.trainsMade === prev.trainsMade &&
       s.adoptedRunbookIds === prev.adoptedRunbookIds &&
       s.liveConversations === prev.liveConversations &&
       s.scenarios === prev.scenarios &&
@@ -3646,6 +3726,21 @@ if (durableAvailable()) {
 // the same of corpus.json and modules.json through `programs.py`.
 
 /** What `programOf` can be asked about. */
+/**
+ * OF-BLD-020 §5.R — what pureOS's Builder showed of one train this session
+ * (`builderShown`): each part absent until the page has shown it.
+ */
+export interface BuilderShown {
+  /** The newest run made on the page, as the service returned it. */
+  run?: TrainRun | null;
+  /** What the service said reading the train from a kept run's units. */
+  fromRun?: { artifactId: string; answer: TrainFromRun | null; problem: string | null } | null;
+  /** The train a model built that this train copies, as the service listed it. */
+  copyOf?: KeptTrain | null;
+  /** Whether Price this in Proforma is open. */
+  pricing?: boolean;
+}
+
 export type ProgramEntityKind =
   | 'paper'
   | 'record'

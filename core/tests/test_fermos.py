@@ -328,7 +328,7 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     r = fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED)))
     art = artifacts.get(r.artifactId)
     assert art.tool == fermos.SIMULATION and set(art.output) == OUTPUT_KEYS
-    assert art.toolVersion == f"kinetics {BATCH} 1 · scipy {kinetics.versions()['scipy']}"
+    assert art.toolVersion == f"kinetics {BATCH} {fermos.SIMULATION_RUN} · scipy {kinetics.versions()['scipy']}"
     # An override is a named person's assumption, so the simulation is demo.
     assert r.provenance == "demo" == art.provenance
     by_name = {i.name: i for i in art.inputs}
@@ -349,9 +349,11 @@ def test_a_simulation_is_kept_with_every_parameter_and_override_named(store):
     # The same request again is the same artifact.
     assert fermos.simulate(SimulationRequest(family=BATCH, overrides=typed(**STANDIN_TYPED))).artifactId == r.artifactId
     assert artifacts.replay(r.artifactId).identical
+    # OF-BLD-020 §6.2: the harvest is read from the kept series, its own hour a kept point.
     h = fermos.harvest(r.artifactId)
-    assert h["hour"] == pytest.approx(r.harvestH) and h["state"]["P"] == pytest.approx(r.finalTitre)
-    assert fermos.harvest(r.artifactId, 4.0)["how"] == "an hour a person set"
+    assert h.hour == pytest.approx(r.harvestH) and h.exact and h.hourSource == fermos.HARVEST_HOUR
+    assert {x.state: x.value for x in h.states}["P"] == pytest.approx(r.finalTitre)
+    assert fermos.harvest(r.artifactId, 4.0).how == "an hour a person named"
     assert [s.artifactId for s in fermos.simulations()] == [r.artifactId]
 
 

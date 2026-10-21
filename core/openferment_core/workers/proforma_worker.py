@@ -15,7 +15,11 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
     run         one whole run (OF-BLD-019 §2.1): the base case, the tables
                 read from BioSTEAM's objects right after it (TEA breakdown,
                 streams, units, utility duties, the diagram), the grid and
-                the samples; proforma.py keeps it as one artifact (D1)
+                the samples; proforma.py keeps it as one artifact (D1). A
+                flowsheet built from a structure (OF-BLD-020 §6.1,
+                `custom_train_v1`: a vessel design's fermenter, a train run's
+                units and the TEA's finance) takes it as `structure`, and the
+                worker keeps a built plant per structure (STRUCTURES_KEPT)
     reference   a published reference biorefinery run whole on its
                 package's defaults (OF-BLD-019 §2.2): built afresh inside
                 `package_defaults()`, as the package's own test builds it;
@@ -27,6 +31,12 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 a Stream on the library's own chemicals at T and P, and its
                 density, heat capacity, viscosity, bubble and dew points;
                 thermo.py keeps it as one artifact
+    volatility  a chemical's volatility beside a partner (OF-BLD-020 §7.1,
+                D12): each one's normal boiling point as the library holds
+                it, and whether the library's own vapour-liquid equilibrium
+                gives the pair a minimum-boiling azeotrope at its default
+                pressure, by the preset's search; thermo.py keeps it as one
+                `volatility` artifact
     vessel_specs  what fermOS's vessel class takes and its own defaults,
                 read from BioSTEAM at import (OF-BLD-020 §4.1, E.3‴):
                 `flowsheets/vessel.py`'s `specs`
@@ -34,6 +44,23 @@ its inputs on the built objects and re-simulates (Appendix 3, trap 3).
                 `AeratedBioreactor` or `NRELAnaerobicBatchBioreactor`, built
                 afresh inside `package_defaults()`, its design, costs and the
                 oxygen balance read; vessel.py keeps it as one artifact
+    catalogue_specs  what one of pureOS's unit types takes and its class's
+                own defaults, choices and refusals, read from its code at
+                import on the yeast program's chemicals (OF-BLD-020 §5.1):
+                `pureos/catalogue.py`'s `read_class`, handed the class
+                (BioSTEAM's, or the in-house one) and the chemical IDs
+    catalogue_unit_check  one unit of a type built alone on given inlets
+                and values (catalogue keys), simulated, and read: its streams,
+                design, costs and the attributes it holds (`build_unit`,
+                `unit_report`); the catalogue's sim test runs every type so
+    train_specs   what a train builds on (OF-BLD-020 §5.2): the yeast
+                program's chemical IDs and thermosteam's Stream defaults
+    flowsheet_unit_values  a shelf flowsheet's own units read by catalogue
+                key, as its package builds them (a train's `readFrom`)
+    train_run   one pureOS train built from its plain spec
+                (`flowsheets/train.py`), simulated whole with its recycles,
+                and read: stream, unit and utility tables, the diagram or
+                the unit list, each unit's costs, the inlet as built
 
 NO WORKER STOPS IN A DEBUGGER. BioSTEAM 2.54.0's AeratedBioreactor answers a
 failure of its bubble-column correlation with a bare `breakpoint()`, which
@@ -106,7 +133,21 @@ class Refused(ValueError):
     """The request cannot be computed, in words."""
 
 
-def built(name: str) -> tuple[Any, Any]:
+# How many plants built from a structure (OF-BLD-020 §6.1: custom_train_v1,
+# one per vessel design, train run and finance) the worker keeps warm; the
+# oldest is let go past it. A setting, not a measurement.
+STRUCTURES_KEPT = 4
+
+
+def _structure_key(name: str, structure: dict[str, Any]) -> str:
+    import hashlib
+    import json
+
+    text = json.dumps(structure, sort_keys=True, separators=(",", ":"), default=str)
+    return f"{name}:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+
+
+def built(name: str, structure: dict[str, Any] | None = None) -> tuple[Any, Any]:
     try:
         module = flowsheets.load(name)
     except KeyError as e:
@@ -114,19 +155,28 @@ def built(name: str) -> tuple[Any, Any]:
     if not hasattr(module, "build"):
         raise Refused(f"{name} is a reference biorefinery: it runs whole on its package's own defaults, "
                       "through its reference run, not case by case")
-    if name not in _BUILT:
+    takes = bool(getattr(module, "STRUCTURED", False))
+    if takes and structure is None:
+        raise Refused(f"{name} is built from a vessel design and a train run, which this request does not name")
+    if not takes and structure is not None:
+        raise Refused(f"{name} is built once, whole, and takes no structure")
+    key = name if structure is None else _structure_key(name, structure)
+    if key not in _BUILT:
         # Built as it would be in a worker that had built nothing before
         # (OF-BLD-019 §2.R): BioSTEAM's tickets start at one, so the streams a
         # package leaves unnamed take the same ids whichever plant this worker
         # built first; and every chemical comes from fresh caches, so nothing
         # this plant changes reaches a plant built later, nor the other way.
         with package_defaults():
-            _BUILT[name] = module.build()
-    return module, _BUILT[name]
+            _BUILT[key] = module.build(structure, unit_class) if takes else module.build()
+        made = [k for k in _BUILT if ":" in k]
+        for old in made[:-STRUCTURES_KEPT]:
+            del _BUILT[old]
+    return module, _BUILT[key]
 
 
-def evaluate(name: str, values: dict[str, float]) -> dict[str, float]:
-    module, system = built(name)
+def evaluate(name: str, values: dict[str, float], structure: dict[str, Any] | None = None) -> dict[str, float]:
+    module, system = built(name, structure)
     unknown = sorted(set(values) - set(module.INPUTS))
     if unknown:
         raise Refused(f"{name} has no input {', '.join(unknown)}; it takes {', '.join(module.INPUTS)}")
@@ -136,14 +186,15 @@ def evaluate(name: str, values: dict[str, float]) -> dict[str, float]:
         raise Refused(str(e)) from e
 
 
-def grid(name: str, axes: dict[str, list[float]], base: dict[str, float]) -> dict[str, Any]:
+def grid(name: str, axes: dict[str, list[float]], base: dict[str, float],
+         structure: dict[str, Any] | None = None) -> dict[str, Any]:
     if not 1 <= len(axes) <= 3:
         raise Refused("a grid runs over one to three inputs")
     keys = list(axes)
     cells = []
     for combo in itertools.product(*(axes[k] for k in keys)):
         values = {**base, **dict(zip(keys, combo))}
-        outputs, reason = _attempt(name, values)
+        outputs, reason = _attempt(name, values, structure)
         cells.append({"at": dict(zip(keys, combo)), "outputs": outputs, "infeasible": reason})
     return {"axes": axes, "base": base, "cells": cells}
 
@@ -164,11 +215,12 @@ def _sample(spec: dict[str, Any], u: float) -> float:
     raise Refused(f"there is no distribution {kind}")
 
 
-def _attempt(name: str, values: dict[str, float]) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+def _attempt(name: str, values: dict[str, float],
+             structure: dict[str, Any] | None = None) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     """One case. A case the flowsheet cannot hold is a result, named: its
     reason key (a flowsheet's `Infeasible.reason`, else `error`) and words."""
     try:
-        return evaluate(name, values), None
+        return evaluate(name, values, structure), None
     except Refused:
         raise
     except Exception as e:
@@ -176,13 +228,14 @@ def _attempt(name: str, values: dict[str, float]) -> tuple[dict[str, Any] | None
         return None, {"reason": str(reason), "detail": str(e) if reason != "error" else f"{type(e).__name__}: {e}"}
 
 
-def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, base: dict[str, float]) -> dict[str, Any]:
+def montecarlo(name: str, specs: dict[str, dict[str, Any]], n: int, seed: int, base: dict[str, float],
+               structure: dict[str, Any] | None = None) -> dict[str, Any]:
     keys = list(specs)
     lhs = qmc.LatinHypercube(d=max(1, len(keys)), seed=seed).random(n)
     samples = []
     for row in lhs:
         values = {**base, **{k: _sample(specs[k], float(row[i])) for i, k in enumerate(keys)}}
-        outputs, reason = _attempt(name, values)
+        outputs, reason = _attempt(name, values, structure)
         samples.append({"inputs": values, "outputs": outputs, "infeasible": reason})
     return {"n": n, "seed": seed, "samples": samples}
 
@@ -410,20 +463,24 @@ def tables(module: Any, b: Any, draw: bool | None = None) -> dict[str, Any]:
 
 
 def run(name: str, base: dict[str, float], specs: dict[str, dict[str, Any]], samples: int, seed: int,
-        axes: dict[str, list[float]] | None = None, draw: bool | None = None) -> dict[str, Any]:
+        axes: dict[str, list[float]] | None = None, draw: bool | None = None,
+        structure: dict[str, Any] | None = None) -> dict[str, Any]:
     """One whole run: the base case and its tables, read before any other
     case moves the objects; then the grid, when one is asked; then the
-    samples, Latin hypercube and seeded, as `montecarlo`."""
-    module, b = built(name)
+    samples, Latin hypercube and seeded, as `montecarlo`. A flowsheet built
+    from a structure (OF-BLD-020 §6.1, custom_train_v1) takes it here, and
+    every case of the run is of the one plant it builds."""
+    module, b = built(name, structure)
     try:
-        base_out, base_infeasible = evaluate(name, base), None
+        base_out, base_infeasible = evaluate(name, base, structure), None
     except Refused:
         raise
     except Exception as e:  # the base case cannot be held: said as the service says a worker error
         base_out, base_infeasible = None, f"{type(e).__name__}: {e}"
     out_tables = tables(module, b, draw) if base_out is not None else None
-    out_grid = grid(name, axes, base) if axes else None
-    mc = montecarlo(name, specs, samples, seed, base) if samples else {"n": 0, "seed": seed, "samples": []}
+    out_grid = grid(name, axes, base, structure) if axes else None
+    mc = (montecarlo(name, specs, samples, seed, base, structure) if samples
+          else {"n": 0, "seed": seed, "samples": []})
     return {"base": base_out, "baseInfeasible": base_infeasible, "tables": out_tables, "grid": out_grid, "montecarlo": mc}
 
 
@@ -680,25 +737,43 @@ def _titre(th: Any, solute: str, solvent: str, kg_m3: float, T: float, P: float,
     raise Refused(f"the mass fraction for a titre of {kg_m3:g} kg/m^3 did not settle in {TITRE_ITERATIONS} steps")
 
 
-def _azeotrope(th: Any, light: str, heavy: str, T: float, P: float) -> tuple[float, dict]:
-    """The liquid whose first bubble, by thermosteam's own vapour-liquid
-    equilibrium at P, has the liquid's own composition: where y(x) - x for the
-    light chemical turns from positive to not, scanned and then halved."""
+def _azeotrope_grid() -> list[float]:
+    """The light chemical's mole fractions the azeotrope search scans: the
+    grid between the two pure chemicals, both pure ends left out."""
+    return [i / AZEOTROPE_SCAN for i in range(1, AZEOTROPE_SCAN)]
+
+
+def _minimum_boiling(th: Any, light: str, heavy: str, T: float, P: float) -> float | None:
+    """The light chemical's mole fraction in the liquid whose first bubble, by
+    thermosteam's own vapour-liquid equilibrium at P, has the liquid's own
+    composition, where y(x) - x for the light chemical turns from positive to
+    not (a minimum-boiling azeotrope): scanned on `_azeotrope_grid`, then
+    halved. None when it never turns on the grid (OF-BLD-020 §7.1 generalised
+    the ethanol–water preset's search to any two chemicals)."""
 
     def gap(x: float) -> float:
         b = _mixture(th, {light: x, heavy: 1.0 - x}, T, P, "l", by="mol").bubble_point_at_P(P)
         return float(dict(zip(b.IDs, b.y))[light]) - x
 
-    xs = [i / AZEOTROPE_SCAN for i in range(1, AZEOTROPE_SCAN)]
+    xs = _azeotrope_grid()
     gaps = [gap(x) for x in xs]
     bracket = next(((xs[i], xs[i + 1]) for i in range(len(xs) - 1) if gaps[i] > 0 >= gaps[i + 1]), None)
     if bracket is None:
-        raise Refused(f"thermosteam's own vapour-liquid equilibrium gives {light} and {heavy} no azeotrope at {P:g} Pa")
+        return None
     lo, hi = bracket
     for _ in range(AZEOTROPE_HALVINGS):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if gap(mid) > 0 else (lo, mid)
-    x = (lo + hi) / 2
+    return (lo + hi) / 2
+
+
+def _azeotrope(th: Any, light: str, heavy: str, T: float, P: float) -> tuple[float, dict]:
+    """The liquid whose first bubble, by thermosteam's own vapour-liquid
+    equilibrium at P, has the liquid's own composition: where y(x) - x for the
+    light chemical turns from positive to not, scanned and then halved."""
+    x = _minimum_boiling(th, light, heavy, T, P)
+    if x is None:
+        raise Refused(f"thermosteam's own vapour-liquid equilibrium gives {light} and {heavy} no azeotrope at {P:g} Pa")
     return x, {"kind": "azeotrope", "light": light, "heavy": heavy, "moleFraction": x, "P": P,
                "how": "the liquid whose first bubble, by thermosteam's own vapour-liquid equilibrium at this pressure, "
                       "has the liquid's own composition: y - x of the lighter chemical scanned for its change of sign, "
@@ -762,13 +837,89 @@ def _op_thermo_props(args):
                         args.get("solve") or None)
 
 
+# ── a product's volatility (OF-BLD-020 §7.1, D12) ──────────────────────
+
+VOLATILITY_HOW = ("each chemical's normal boiling point is the library's own Tb; the azeotrope is the liquid whose first "
+                  "bubble, by the library's own vapour-liquid equilibrium at this pressure, has the liquid's own "
+                  "composition, where y - x of the lower-boiling chemical turns from positive to not (a minimum-boiling "
+                  "azeotrope), scanned on the grid `searched` names and then halved")
+
+
+def _boiling_point(th: Any, name: str, notes: list[str]) -> float | None:
+    tb = getattr(th.chemicals[name], "Tb", None)
+    if tb is None or not math.isfinite(float(tb)):
+        notes.append(f"Tb of {name}: thermosteam's library holds no normal boiling point for it")
+        return None
+    return float(tb)
+
+
+def volatility(chemical: str, partner: str, P: float | None = None) -> dict[str, Any]:
+    """D12's volatility, in thermosteam's words: each chemical's normal
+    boiling point as the library holds it (`Chemical.Tb`), which of the two
+    boils lower, and whether the library's own vapour-liquid equilibrium gives
+    the pair a minimum-boiling azeotrope at P (the library's Stream default
+    when not given): `_minimum_boiling` on the lower-boiling chemical, the
+    search the `ethanol-water-azeotrope` preset runs. One found is the
+    composition and the temperature the library gives; none found is said
+    with the grid searched; a search the library cannot carry out is left
+    unanswered with its reason, never guessed."""
+    T0, P0, _ = stream_defaults()
+    P_from = "given" if P is not None else "thermosteam's Stream default"
+    P = float(P if P is not None else P0)
+    if not chemical or not partner or chemical == partner:
+        raise Refused("a volatility names a chemical and a partner: two different chemicals of the library")
+    th = thermo_of([chemical, partner])
+    notes: list[str] = []
+    tb = {n: _boiling_point(th, n, notes) for n in (chemical, partner)}
+    su = library_units()
+    out: dict[str, Any] = {
+        "library": f"thermosteam {version('thermosteam')}", "chemical": chemical, "partner": partner, "P": P,
+        "PSource": P_from, "boilingPoint": tb[chemical], "partnerBoilingPoint": tb[partner], "lighter": None,
+        "azeotrope": None, "azeotropeMoleFraction": None, "azeotropeMassFraction": None, "azeotropeT": None,
+        "searched": None, "how": VOLATILITY_HOW, "notes": notes,
+        "units": {"boilingPoint": su["T"], "partnerBoilingPoint": su["T"], "azeotropeT": su["T"], "P": su["P"],
+                  "azeotropeMoleFraction": "mol/mol", "azeotropeMassFraction": "kg/kg", "searched": "mol/mol"},
+    }
+    if tb[chemical] is None or tb[partner] is None:
+        notes.append("azeotrope: not searched, since without both normal boiling points which chemical boils lower "
+                     "is not known")
+        return out
+    light, heavy = sorted((chemical, partner), key=lambda n: tb[n])
+    xs = _azeotrope_grid()
+    out.update(lighter=light, searched={"of": light, "from": xs[0], "to": xs[-1], "points": len(xs),
+                                        "halvings": AZEOTROPE_HALVINGS})
+    try:
+        x = _minimum_boiling(th, light, heavy, T0, P)
+    except Exception as e:  # the library could not give a bubble point the search reads
+        notes.append(f"azeotrope: thermosteam could not compute the bubble points the search reads for {light} and "
+                     f"{heavy} ({type(e).__name__}: {e})")
+        return out
+    if x is None:
+        out["azeotrope"] = False
+        notes.append(f"azeotrope: none found. The library's own vapour-liquid equilibrium at {P:g} Pa never turns "
+                     f"{light}'s vapour mole fraction from above its liquid's to not, on {len(xs)} {light} mole "
+                     f"fractions from {xs[0]:g} to {xs[-1]:g}")
+        return out
+    s = _mixture(th, {light: x, heavy: 1.0 - x}, T0, P, "l", by="mol")
+    mass = dict(zip(s.chemicals.IDs, (float(m) for m in s.mass)))
+    out.update(azeotrope=True, azeotropeMoleFraction=x if light == chemical else 1.0 - x,
+               azeotropeMassFraction=mass[chemical] / float(s.F_mass),
+               azeotropeT=_finite("azeotropeT", lambda: s.bubble_point_at_P(P).T, notes))
+    return out
+
+
+def _op_volatility(args):
+    return volatility(str(args.get("chemical") or ""), str(args.get("partner") or ""), args.get("P"))
+
+
 def _op_run(args):
     return run(str(args["flowsheet"]), dict(args.get("base") or {}), dict(args.get("specs") or {}),
-               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"))
+               int(args.get("samples", 0)), int(args.get("seed", 0)), args.get("axes") or None, args.get("diagram"),
+               args.get("structure"))
 
 
 def _op_evaluate(args):
-    return evaluate(str(args["flowsheet"]), dict(args.get("values") or {}))
+    return evaluate(str(args["flowsheet"]), dict(args.get("values") or {}), args.get("structure"))
 
 
 def _op_grid(args):
@@ -803,9 +954,174 @@ def _op_vessel_design(args):
     return vessel.design(dict(args))
 
 
+# ── pureOS's unit catalogue (OF-BLD-020 §5.1) ──────────────────────────
+
+
+def unit_class(type_id: str) -> tuple[Any, Any]:
+    """A catalogue entry and its class: BioSTEAM's by name, or the in-house
+    one, which only this worker imports (E.3‴)."""
+    from ..pureos import catalogue, inhouse
+
+    e = catalogue.entry(type_id)
+    if e.inhouse:
+        return e, getattr(inhouse, e.inhouse)
+    return e, getattr(bst, e.biosteam)
+
+
+def yeast_chemicals() -> Any:
+    """The yeast program's chemicals, as the ethanol flowsheet builds on them."""
+    from ..flowsheets.ethanol_glucose_v0 import create_chemicals
+
+    return create_chemicals()
+
+
+def _op_catalogue_specs(args):
+    from ..pureos import catalogue
+
+    e, cls = unit_class(str(args.get("type") or ""))
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        return catalogue.read_class(e.id, cls, list(chems.IDs))
+
+
+def _inlet(chems: Any, spec: dict[str, Any], n: int) -> Any:
+    """A stand-in or a train's inlet as the request gives it: kg/hr by
+    chemical, its phase (or, multi-phase, kg/hr by phase and chemical), and
+    its temperature and pressure where given; an empty dict is an empty
+    inlet the unit may fill."""
+    flows = dict(spec.get("flows") or {})
+    by_phase = dict(spec.get("byPhase") or {})
+    kw = {k: float(spec[k]) for k in ("T", "P") if spec.get(k) is not None}
+    if by_phase:
+        s = tmo.MultiStream(f"in{n}", thermo=chems, phases=tuple(sorted(by_phase)), **kw)
+        for phase, got in by_phase.items():
+            for chem, kg in got.items():
+                s.imass[phase, chem] = float(kg)
+        return s
+    s = bst.Stream(f"in{n}", thermo=chems, phase=str(spec.get("phase") or "l"), units="kg/hr", **kw)
+    for chem, kg in flows.items():
+        s.imass[chem] = float(kg)
+    return s
+
+
+def _op_catalogue_unit_check(args):
+    """One unit of a type built alone on the request's inlets and values,
+    inside `package_defaults()` on BioSTEAM's default utility prices and cost
+    index, simulated, and read. A failure is BioSTEAM's own words."""
+    from ..pureos import catalogue
+
+    e, cls = unit_class(str(args.get("type") or ""))
+    values = dict(args.get("values") or {})
+    keys = list(args.get("hold") or [])
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        bst.process_tools.default_utilities()
+        bst.process_tools.default_CEPCI()
+        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(f"pureos_check_{e.id.replace('-', '_')}"))
+        ins = [_inlet(chems, spec, n) for n, spec in enumerate(args.get("ins") or [])]
+        n_out = len([p for p in e.ports if p.side == "out"])
+        outs = [f"out{n}" for n in range(n_out)]
+        unit = catalogue.build_unit(e.id, cls, "U1", ins, outs, values)
+        unit.simulate()
+        return catalogue.unit_report(unit, keys)
+
+
+# ── pureOS's train (OF-BLD-020 §5.2, D9, D10) ─────────────────────────
+
+
+def _versions() -> dict[str, str]:
+    return {"biosteam": version("biosteam"), "thermosteam": version("thermosteam"),
+            "biorefineries": version("biorefineries")}
+
+
+def _op_train_specs(args):
+    """What a train builds on, read here: the yeast program's chemical IDs,
+    and the temperature, pressure and phase thermosteam gives a Stream nobody
+    set them on (an inlet's library default)."""
+    T, P, phase = stream_defaults()
+    with package_defaults():
+        chems = yeast_chemicals()
+        ids = list(chems.IDs)
+    return {"chemicals": ids, "T": T, "P": P, "phase": phase,
+            "from": "thermosteam's Stream signature (its T, P and phase defaults)", "versions": _versions()}
+
+
+def _op_flowsheet_unit_values(args):
+    """The values of a shelf flowsheet's own units by catalogue key, as its
+    package builds them (§5.2, `TrainUnitReadFrom`): the flowsheet built once
+    and kept, each unit found by its ID and held to the catalogue type's
+    class, and read (`flowsheets/train.read_unit`). Read, never simulated: a
+    unit's design values are set when it is built."""
+    from ..flowsheets import train as train_fs
+
+    name = str(args.get("flowsheet") or "")
+    if getattr(flowsheets.load(name) if name in flowsheets.KNOWN else None, "STRUCTURED", False):
+        raise Refused(f"{name} is built from a vessel design and a train run: its units are the fermenter and that "
+                      "train's own, read from the train run")
+    _, b = built(name)
+    system = b.system if hasattr(b, "system") else b
+    by_id = {u.ID: u for u in system.units}
+    out = {}
+    for want in args.get("units") or []:
+        uid, type_id = str(want.get("unit") or ""), str(want.get("type") or "")
+        e, cls = unit_class(type_id)
+        unit = by_id.get(uid)
+        if unit is None:
+            raise Refused(f"{name} has no unit {uid}; its units are {', '.join(by_id)}")
+        if type(unit) is not cls and not isinstance(unit, cls):
+            raise Refused(f"unit {uid} of {name} is a {type(unit).__name__}, not the {cls.__name__} of the catalogue's "
+                          f"{e.id}: a train's unit reads a flowsheet's unit of its own class")
+        values, unread = train_fs.read_unit(e.id, unit)
+        out[uid] = {"unitClass": type(unit).__name__, "values": values, "unread": unread}
+    return {"flowsheet": name, "units": out, "versions": _versions()}
+
+
+def _op_train_run(args):
+    """One train built and run (OF-BLD-020 §5.2): inside `package_defaults()`
+    on the yeast program's chemicals, BioSTEAM's default utility prices and
+    cost index set as every scenario flowsheet sets them, a fresh flowsheet;
+    the train built by `flowsheets/train.Built` and simulated whole; then its
+    tables read with this worker's own readers (no TEA: a train is not priced
+    here) and each unit's costs. A train that cannot be built or run is the
+    module's refusal, in words naming the unit and BioSTEAM's error."""
+    from ..flowsheets import train as train_fs
+
+    with package_defaults():
+        chems = yeast_chemicals()
+        bst.settings.set_thermo(chems)
+        bst.process_tools.default_utilities()
+        bst.process_tools.default_CEPCI()
+        bst.main_flowsheet.set_flowsheet(bst.Flowsheet(str(args["system"])))
+        b = train_fs.Built(dict(args), unit_class, chems)
+        b.simulate()
+        system = b.system
+        return {
+            "tablesSource": f"BioSTEAM {version('biosteam')}, thermosteam {version('thermosteam')}",
+            "streams": stream_table(system),
+            "units": unit_table(system),
+            "utilities": utility_duties(system.units, "every unit of the train"),
+            **diagram(system, args.get("diagram")),
+            "unitOrder": [u.ID for u in system.units],
+            "tableUnits": TABLE_UNITS,
+            "inlet": b.inlet_built,
+            "productStream": b.product.ID,
+            "outlets": b.outlet_ids(),
+            "costs": b.costs(),
+            "utilitySettings": flowsheets.utility_settings(system.units),
+            "versions": _versions(),
+        }
+
+
 HANDLERS = {"evaluate": _op_evaluate, "grid": _op_grid, "montecarlo": _op_montecarlo, "benchmark": _op_benchmark,
             "run": _op_run, "reference": _op_reference, "thermo_props": _op_thermo_props,
-            "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design}
+            "vessel_specs": _op_vessel_specs, "vessel_design": _op_vessel_design,
+            "catalogue_specs": _op_catalogue_specs, "catalogue_unit_check": _op_catalogue_unit_check}
+
+HANDLERS["volatility"] = _op_volatility  # OF-BLD-020 §7.1
+HANDLERS.update(train_specs=_op_train_specs, flowsheet_unit_values=_op_flowsheet_unit_values,
+                train_run=_op_train_run)  # OF-BLD-020 §5.2
 
 if __name__ == "__main__":
     serve(HANDLERS, name="proforma")

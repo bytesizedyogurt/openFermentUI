@@ -44,9 +44,9 @@ import { RECORDS } from '../src/data/records';
 import { PRODUCTS } from '../src/data/products';
 import { lockIntact } from '../src/engine/lock';
 import { placeRow, seriesOf } from '../src/engine/series';
-import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario } from '../src/data/types';
+import type { Artifact, BasisSource, Candidate, FlowsheetInfo, Overlay, Override, ProformaScenarioInfo, Scenario, TrainSpec } from '../src/data/types';
 import { visibleArtifacts } from '../src/lib/artifacts';
-import { inputCounts, referencePrice, runBody, runOverrides } from '../src/lib/proforma';
+import { COMPOSITE_FLOWSHEET, inputCounts, partsOf, referencePrice, runBody, runOverrides, scenarioFromVesselAndTrain } from '../src/lib/proforma';
 import { resolveRequest } from '../src/lib/params';
 import * as ts from 'typescript';
 import { readdirSync, statSync } from 'node:fs';
@@ -642,6 +642,45 @@ check('and the published sentence with it', back.quote === fresh.original?.quote
   const pha = st().createScenario('pha_sugar_v0', 'PHA, made with the switch on', 'pha');
   check('a scenario made in an archived program hides with the switch off and its link still names the program',
     !programVisible('scenario', pha, st()) && programOf('scenario', pha, st()) === 'pha');
+  // OF-BLD-020 §6.1 (D11): a scenario on custom_train_v1 keeps the vessel
+  // design and the train run it is built from, through a reload, a copy and
+  // the helper pureOS's Builder calls; a scenario on any other flowsheet keeps
+  // neither, and clearing this browser's data drops it with the rest.
+  const vesselId = 'a1a1a1a1a1a1a1a1';
+  const trainRunId = 'b2b2b2b2b2b2b2b2';
+  const seam = st().createScenario(COMPOSITE_FLOWSHEET, 'A vessel and a train', 'yeast', { vessel: vesselId, trainRun: trainRunId });
+  const seamSnap = snapshotOf(st());
+  const keptSeam = seamSnap.createdScenarios?.[seam];
+  check('the snapshot keeps a composite scenario with its vessel design and train run',
+    keptSeam?.flowsheetId === COMPOSITE_FLOWSHEET && keptSeam.vessel === vesselId && keptSeam.trainRun === trainRunId &&
+      seamSnap.createdScenarios?.[id]?.vessel === undefined, keptSeam);
+  useStore.setState((s) => ({ scenarios: s.scenarios.filter((x) => x.id !== seam), createdScenarioIds: s.createdScenarioIds.filter((x) => x !== seam) }));
+  st().applyDurable(seamSnap);
+  const seamBack = st().scenarios.find((x) => x.id === seam);
+  check('after a reload the composite scenario is back with both parts, and partsOf reads them',
+    JSON.stringify(partsOf(seamBack)) === JSON.stringify({ vessel: vesselId, trainRun: trainRunId }) && partsOf(st().scenarios.find((x) => x.id === id)) === null);
+  const seamCopyId = st().duplicateScenario(seam);
+  const seamCopy = st().scenarios.find((x) => x.id === seamCopyId);
+  check('a copy of a composite scenario keeps its parts', seamCopy?.vessel === vesselId && seamCopy?.trainRun === trainRunId && seamCopy.id !== seam);
+  const helpedId = scenarioFromVesselAndTrain(vesselId, trainRunId, 'yeast');
+  const helped = st().scenarios.find((x) => x.id === helpedId);
+  check('scenarioFromVesselAndTrain makes a Durable composite scenario in the train run\u2019s program, not run',
+    helped?.flowsheetId === COMPOSITE_FLOWSHEET && helped.vessel === vesselId && helped.trainRun === trainRunId && helped.program === 'yeast' &&
+      helped.lastRunId === null && st().createdScenarioIds.includes(helped.id));
+  const seamBody = runBody({ scenarioId: seam, flowsheet: COMPOSITE_FLOWSHEET, overrides: [], host: null, vessel: vesselId, trainRun: trainRunId, includeArchived: false });
+  check('a composite run carries its parts and the switch, and a run of any other flowsheet carries neither',
+    seamBody.vessel === vesselId && seamBody.trainRun === trainRunId && seamBody.includeArchived === false &&
+      !('vessel' in runBody({ scenarioId: id, flowsheet: 'ethanol_glucose_v0', overrides: [], host: null })));
+  const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('a composite scenario\u2019s page sends its parts with every binding, panel read and run, names them with links, and shows Finance',
+    /partsOf\(scenario\)/.test(page) && /vessel: vesselId, trainRun: trainRunId/.test(page) && /data-testid="scenario-parts"/.test(page) &&
+      /vesselDesignPath\(parts\.vessel\)/.test(page) && /trainRunPath\(parts\.trainRun\)/.test(page) &&
+      /const PROFORMA_GROUPS = \[[^\]]*'Finance'\]/.test(page) && /sp\.group === 'Finance'/.test(page));
+  const dialog = readFileSync(new URL('../src/components/NewScenarioDialog.tsx', import.meta.url), 'utf8');
+  check('New scenario reads the kept vessel designs and train runs for a flowsheet built from them, and says why a list is empty',
+    /compositeVessels\(/.test(dialog) && /compositeTrainRuns\(/.test(dialog) && /No vessel design is kept on this service yet/.test(dialog) &&
+      /No train run is kept on this service yet/.test(dialog) && /pureOS → New train/.test(dialog) &&
+      /disabled=\{[^}]*\(needsParts && !parts\)\} data-testid="new-scenario-create"/.test(dialog));
   st().clearBrowserData();
   check('Clearing this browser\u2019s data drops the scenarios made here, their newest runs and every pin',
     !st().scenarios.some((x) => x.createdAt) && st().createdScenarioIds.length === 0 && !st().scenarios.some((x) => x.lastRunId) &&
@@ -1047,7 +1086,8 @@ await (async () => {
   const page = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
   check('the scenario page\u2019s inputs are the parameter panel over its scope, and Keep assumption is gone',
     /<ParameterPanel[\s\S]*?scope=\{scope\}/.test(page) && /proformaScope\(scenario\.id\)/.test(page) && !/Keep assumption/.test(page) && !/AssumptionForm/.test(page));
-  check('the scenario page runs with the scope\u2019s overrides', /runOverrides\(overrides,/.test(page) && /overrides: sent/.test(page));
+  // OF-BLD-020 §6.R (main-15/26): through scenarioRunOverrides, which keeps runOverrides for a flowsheet that is not a composite.
+  check('the scenario page runs with the scope\u2019s overrides', /scenarioRunOverrides\(overrides,/.test(page) && /overrides: sent/.test(page));
   const lib = readFileSync(new URL('../src/lib/proforma.ts', import.meta.url), 'utf8');
   check('runProformaScenario posts what runBody makes', /const body = runBody\(ask\)/.test(lib));
   // Nothing reads the older field but the store's migration (and this check's own tests of it).
@@ -1233,6 +1273,194 @@ await (async () => {
   check('fermOS \u2192 Vessel says it is asking (BioSTEAM starting) until the panel answers, and holds Design and Scale until then',
     /data-testid="vessel-panel-asking"/.test(vessel) && /\{!panel && !panelProblem && \(/.test(vessel) && /proformaStatus\(ctrl\.signal\)/.test(vessel) &&
       /\{panel && \(\s*<div className="flex flex-wrap items-center gap-3">\s*<p className="text-body" data-testid="vessel-scale"/.test(vessel));
+})();
+
+// OF-BLD-020 §5.3 — a train built in pureOS → Builder is kept in this
+// browser: `trainsMade` holds each train whole by its id, with when and by
+// whom it was saved, round-trips through the Durable tier (a train made since
+// the page loaded wins over the snapshot's copy), and goes with Clear this
+// browser's data. The values typed into its panels are overrides of its
+// places' scopes, laid into the train's params as it is sent (`trainSpecOf`),
+// so the panel and the run read one set; a run carries those overrides and no
+// other scope's. A recycle is offered only to an earlier unit.
+await (async () => {
+  const st = () => useStore.getState();
+  const pu = await import('../src/lib/pureos');
+  // OF-BLD-020 §6.2: a link names a new train's inlet, a simulation's harvest or a scenario's newest run, and nothing else.
+  const fromSim = pu.inletOfQuery('simulation:c8b79f33e34a5f8f');
+  const fromScenario = pu.inletOfQuery('scenario:sc-yeast-1');
+  check('?inlet=simulation:<id> and ?inlet=scenario:<id> set a new train’s inlet, and anything else sets none',
+    fromSim?.kind === 'simulation' && fromSim.ref === 'c8b79f33e34a5f8f' && fromSim.streamId === null &&
+      fromScenario?.kind === 'run-stream' && fromScenario.ref === 'sc-yeast-1' && fromScenario.streamId === null &&
+      pu.inletOfQuery('typed:x') === null && pu.inletOfQuery('simulation:') === null && pu.inletOfQuery(null) === null &&
+      pu.builderInletPath({ kind: 'simulation', id: 'c8b79f33e34a5f8f' }) === '/pureos/build/new?inlet=simulation:c8b79f33e34a5f8f');
+  useStore.setState({ parameterOverrides: {}, trainsMade: {} });
+  const train: TrainSpec = {
+    id: 'tr-check-store', name: 'A check-store train', program: 'yeast', product: 'ethanol',
+    inlet: { kind: 'typed', ref: null, streamId: null, vessel: null, params: {} },
+    units: [
+      { id: 'U1', type: 'centrifugation', params: {}, outlets: { '0': 'waste', '1': 'onward' }, records: {}, readFrom: null },
+      { id: 'U2', type: 'tank', params: {}, outlets: { '0': 'onward' }, records: {}, readFrom: null },
+    ],
+  };
+  const at = '2026-10-21T15:00:00Z';
+  const typed = (place: string, key: string, value: number | string): Override =>
+    ({ scope: pu.unitScope(train.id, place), key, value, low: null, high: null, by: 'Sean Creighton', at, note: null });
+  st().setOverride(typed(pu.INLET, 'broth_flow', 1));
+  st().setOverride(typed('U1', 'split.Yeast', 0.9));
+  st().setOverride({ ...typed('U1', 'split.Ethanol', 0.05), low: 0.04, high: 0.06 });
+  st().setOverride(typed('U9', 'split.Yeast', 0.5)); // a place the train no longer has
+  st().setOverride({ ...typed('U1', 'split.Yeast', 0.5), scope: pu.unitScope('tr-another', 'U1') });
+  const sent = pu.trainSpecOf(train, st().parameterOverrides);
+  check('a train as sent carries each place’s overrides as its params, by key, with the person',
+    sent.inlet.params?.broth_flow?.value === 1 && sent.units[0].params?.['split.Yeast']?.value === 0.9 &&
+      sent.units[0].params?.['split.Ethanol']?.low === 0.04 && sent.units[0].params?.['split.Ethanol']?.by === 'Sean Creighton' &&
+      Object.keys(sent.units[1].params ?? {}).length === 0, sent);
+  const carried = pu.trainOverrides(train, st().parameterOverrides);
+  check('a train’s run carries the overrides of its own places and no other scope’s (not a removed unit’s, not another train’s)',
+    carried.map((o) => `${o.scope.split(':').slice(-1)[0]}/${o.key}`).sort().join() === 'U1/split.Ethanol,U1/split.Yeast,inlet/broth_flow', carried);
+  check('a unit’s outlet may go back only to an earlier unit, never a later one or itself',
+    JSON.stringify(pu.routeChoices(train.units, 0)) === JSON.stringify(['onward', 'waste']) &&
+      JSON.stringify(pu.routeChoices(train.units, 1)) === JSON.stringify(['onward', 'waste', 'recycle:U1']));
+  check('the next unit added takes the next free U-number', pu.nextUnitId(train.units) === 'U3' && pu.nextUnitId([]) === 'U1');
+  // The service echoes the train it ran in its own field order, an absent optional field as null: still the same train.
+  const echoed = JSON.parse(JSON.stringify({ units: sent.units.map(({ readFrom: _r, ...u }) => ({ ...u, readFrom: null })), inlet: { params: sent.inlet.params, kind: 'typed' }, product: sent.product, program: sent.program, name: sent.name, id: sent.id }));
+  check('a train the service echoes in its own order is the same train, and one changed is not',
+    pu.sameTrain(sent, echoed) && !pu.sameTrain(sent, { ...echoed, units: echoed.units.slice(0, 1) }));
+  st().saveTrain(sent, 'Sean Creighton');
+  const kept = st().trainsMade[train.id];
+  check('Save keeps the train whole under its id, with when and by whom',
+    !!kept && kept.by === 'Sean Creighton' && !Number.isNaN(Date.parse(kept.savedAt)) &&
+      JSON.stringify(kept.train) === JSON.stringify(sent) && kept.train !== sent, kept);
+  const snap = snapshotOf(st());
+  check('the snapshot keeps every saved train', snap.trainsMade?.[train.id]?.train.units.length === 2, snap.trainsMade);
+  useStore.setState({ trainsMade: {} });
+  st().applyDurable(snap);
+  check('after a reload the saved train is back, its typed values with it',
+    st().trainsMade[train.id]?.train.units[0].params?.['split.Yeast']?.value === 0.9 && st().trainsMade[train.id]?.by === 'Sean Creighton');
+  // A train saved since the page loaded wins over the snapshot's older copy.
+  st().saveTrain({ ...sent, name: 'Renamed since the load' }, 'Sam Okonkwo');
+  st().applyDurable(snap);
+  check('a train saved since the page loaded wins over the snapshot’s copy',
+    st().trainsMade[train.id]?.train.name === 'Renamed since the load' && st().trainsMade[train.id]?.by === 'Sam Okonkwo');
+  st().clearBrowserData();
+  check('Clearing this browser’s data drops every saved train and its typed values',
+    Object.keys(st().trainsMade).length === 0 && Object.keys(st().parameterOverrides).length === 0 && Object.keys(snapshotOf(st()).trainsMade ?? {}).length === 0);
+  const durable = readFileSync(new URL('../src/lib/durable.ts', import.meta.url), 'utf8');
+  check('the Durable snapshot names trainsMade as saved trains by id, each with when and by whom',
+    /trainsMade\?: Record<string, TrainMade>/.test(durable) && /export interface TrainMade \{[^}]*\btrain: TrainSpec;[^}]*\bsavedAt: string;[^}]*\bby: string;[^}]*\}/.test(durable));
+  const store = readFileSync(new URL('../src/store.ts', import.meta.url), 'utf8');
+  check('the store saves when trainsMade changes', /s\.trainsMade === prev\.trainsMade/.test(store));
+  const page = readFileSync(new URL('../src/screens/PureOSBuilder.tsx', import.meta.url), 'utf8');
+  check('the Builder sends the train as trainSpecOf lays it and the overrides of its places, and computes nothing it shows',
+    /trainSpecOf\(draft, mine\)/.test(page) && /trainOverrides\(spec, mine\)/.test(page) && /runTrain\(\{ train: spec, overrides,/.test(page) &&
+      /checkTrain\(\{ train: spec, overrides,/.test(page));
+  check('the Builder saves under the reviewer name and never without one', /saveTrain\(spec, reviewer\)/.test(page) && /disabled=\{!reviewer\}/.test(page));
+  check('removing a unit drops the values typed for it', /clearScope\(draft\.units\[i\]\.id\)/.test(page));
+  // OF-BLD-020 §6.2: Price this in Proforma makes the scenario through §6.1's one helper, from the run kept on the
+  // page and the vessel chosen, says what it needs while either is missing, and makes nothing of its own.
+  check('Price this in Proforma makes a custom_train_v1 scenario through scenarioFromVesselAndTrain from the run kept here and the vessel chosen',
+    /scenarioFromVesselAndTrain\(vessel, run\.artifactId,/.test(page) && !/createScenario/.test(page) &&
+      /if \(!run \|\| !vessel\) return;/.test(page));
+  check('Price this in Proforma says what it needs while no run or no vessel is kept, and how one is made',
+    /\{!run && <li data-need="run">\{PRICE_NEEDS_RUN\}/.test(page) && /\{PRICE_NEEDS_VESSEL\}/.test(page) && /fermOS → Vessel/.test(page));
+  // OF-BLD-020 §6.2: the inlet chooser shows each simulation's broth as the service read it, and computes none.
+  check('the Builder reads each simulation’s broth from GET /api/fermos/harvest, the chosen one at the inlet’s hour',
+    /fermosHarvest\(sim\.artifactId, null, showArchived/.test(page) && /fermosHarvest\(inlet\.ref, hour, showArchived/.test(page));
+})();
+
+// OF-BLD-020 §5.R (finding 12) — the Builder's run chooser (its run-stream
+// inlet, Start from a run's train) goes through the program switch like every
+// list: with it off, a train run of an archived program and the newest run of
+// a scenario made here in an archived program are not offered; with it on,
+// they are. Driven with a stubbed service, STAND-IN runs with no number of a
+// paper's.
+await (async () => {
+  const pu = await import('../src/lib/pureos');
+  const runSummary = (artifactId: string, program: string, trainId: string) => ({
+    scenarioId: null, scenarioName: null, artifactId, flowsheet: null, createdAt: '2026-10-21T00:00:00Z', provenance: 'demo',
+    program, product: 'ethanol', unitCount: 1, overallRecovery: null, runs: 1, note: null, tool: 'pureos.train_run', trainId, trainName: trainId,
+  });
+  (globalThis as any).fetch = async (url: string) => {
+    const u = String(url);
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+    if (u.startsWith('/api/pureos/train-runs')) return ok([runSummary('00000000000000a1', 'pha', 'tr-on-pha'), runSummary('00000000000000b1', 'yeast', 'tr-on-yeast')]);
+    if (u.startsWith('/api/pureos/train/')) return ok({ streams: [] });
+    if (u.startsWith('/api/proforma/shelf') || u.startsWith('/api/proforma/scenarios')) return ok([]);
+    const runs = /^\/api\/proforma\/runs\?scenarioId=(.+)$/.exec(u);
+    if (runs) return ok({ artifact: { id: runs[1] === 'sc-made-pha' ? '00000000000000a2' : '00000000000000b2', tool: 'proforma.run', output: {}, inputs: [], createdAt: '2026-10-21T00:00:00Z' } });
+    throw new Error(`no stub for ${u}`);
+  };
+  const made = [
+    { id: 'sc-made-pha', name: 'A PHA scenario made here', program: 'pha' },
+    { id: 'sc-made-yeast', name: 'A yeast scenario made here', program: 'yeast' },
+  ];
+  const offered = (r: { choices: { ref: string; program: string | null }[] }) => r.choices.map((c) => `${c.ref}:${c.program ?? 'none'}`).sort().join();
+  const off = await pu.runChoices(false, made);
+  check('with the switch off the Builder’s run chooser offers no archived program’s train run or made scenario',
+    offered(off) === '00000000000000b1:yeast,sc-made-yeast:yeast' && off.problems.length === 0, { offered: offered(off), problems: off.problems });
+  const on = await pu.runChoices(true, made);
+  check('with it on, the archived program’s runs are offered too, each with its program',
+    offered(on) === '00000000000000a1:pha,00000000000000b1:yeast,sc-made-pha:pha,sc-made-yeast:yeast', offered(on));
+  const page = readFileSync(new URL('../src/screens/PureOSBuilder.tsx', import.meta.url), 'utf8');
+  check('the Builder hands the chooser its made scenarios with their programs, through the program filter',
+    /shows\('scenario', sc\.id\)/.test(page) && /program: sc\.program \?\? null/.test(page));
+})();
+
+// OF-BLD-020 §6.R (part a) — a composite run's read-back credits a value a
+// person typed to them, a Finance value in the scenario's panel or a vessel
+// setting in fermOS → Vessel, from the run's own basis, never to the
+// package (main-11/23); and a composite's run carries every override of its
+// scope whether or not the panel has answered, so a person's Finance value
+// is never dropped while the scope loads or after it failed (main-15/26).
+// Namespace imports, so a function the tree lacks fails its own check.
+await (async () => {
+  const pf = (await import('../src/lib/proforma')) as unknown as Record<string, any>;
+  const sean = 'Sean Creighton';
+  const flowsheet = { id: COMPOSITE_FLOWSHEET, reference: false, inputs: [] } as unknown as FlowsheetInfo;
+  const source = (kind: string, by: string | null, id: string | null = null) => ({ kind, id, note: 'a check-store stand-in', by });
+  const basis = [
+    { name: 'finance.IRR', value: 0.12, unit: '', source: source('assumption', sean) },
+    { name: 'finance.income_tax', value: 0.35, unit: '', source: source('model', null, 'biorefineries@x') },
+    { name: 'fermenter.V_wf', value: 0.8, unit: '', source: source('artifact', sean, 'a1a1a1a1a1a1a1a1') },
+    { name: 'fermenter.tau_0', value: 3, unit: 'h', source: source('artifact', null, 'a1a1a1a1a1a1a1a1') },
+  ];
+  const readBack = { 'finance.IRR': 0.12, 'finance.income_tax': 0.35, workingVolumeFraction: 0.8, cleaningTimeH: 3, reactors: 2 };
+  let rows: { key: string; origin: string; by?: string | null }[] = [];
+  try {
+    rows = pf.readBackRows(readBack, flowsheet, basis) ?? [];
+  } catch (e) {
+    check('readBackRows takes the run’s basis', false, String(e));
+  }
+  const row = (k: string) => rows.find((r) => r.key === k);
+  check('a composite run’s read-back credits a Finance value a person typed to them, by name, never to the package',
+    row('finance.IRR')?.origin === 'person' && row('finance.IRR')?.by === sean, rows);
+  check('a vessel setting a person typed in fermOS → Vessel is credited to them in the composite’s read-back',
+    row('workingVolumeFraction')?.origin === 'person' && row('workingVolumeFraction')?.by === sean, rows);
+  check('the package’s finance and the design’s own defaults stay the package’s, and the case’s stays the case’s',
+    row('finance.income_tax')?.origin === 'setting' && row('cleaningTimeH')?.origin === 'setting' && row('reactors')?.origin === 'case', rows);
+  const biosteamPage = readFileSync(new URL('../src/screens/ProformaBiosteam.tsx', import.meta.url), 'utf8');
+  check('the read-back card reads the run’s basis and shows a named person’s values in a group of their own',
+    /readBackRows\(view\.readBack, flowsheet, view\.basis/.test(biosteamPage) && /origin: 'person'/.test(biosteamPage) &&
+      /r\.by/.test(biosteamPage));
+  const over = (key: string, value: number): Override =>
+    ({ scope: 'proforma:sc-check', key, value, low: null, high: null, by: sean, at: '2026-10-21T00:00:00Z', note: 'a check-store stand-in' });
+  const keys = (os: Override[] | undefined) => JSON.stringify((os ?? []).map((o) => o.key).sort());
+  let early: Override[] | undefined;
+  let other: Override[] | undefined;
+  try {
+    // The panel has not answered: no Finance key is known to the page.
+    early = pf.scenarioRunOverrides([over('IRR', 0.1), over('plant_scale', 50000)], { inputs: ['plant_scale', 'titre'], finance: [], composite: true });
+    other = pf.scenarioRunOverrides([over('IRR', 0.1), over('titre', 50)], { inputs: ['titre'], finance: [], composite: false });
+  } catch (e) {
+    check('scenarioRunOverrides is the one place a run’s overrides are chosen', false, String(e));
+  }
+  check('a composite run carries every override of its scope while its panel has not answered, Finance included',
+    keys(early) === '["IRR","plant_scale"]', early);
+  check('a run of any other flowsheet carries the overrides of the inputs it takes, as before', keys(other) === '["titre"]', other);
+  const scenarioPage = readFileSync(new URL('../src/screens/ProformaScenario.tsx', import.meta.url), 'utf8');
+  check('the scenario page chooses its run’s overrides through scenarioRunOverrides, never from the panel alone',
+    /scenarioRunOverrides\(overrides, \{/.test(scenarioPage) && !/runOverrides\(overrides, \[\.\.\.bound\.inputs/.test(scenarioPage));
 })();
 
 console.log(fails === 0 ? '\nTHE STORE KEEPS ITS CONTRACTS' : `\n${fails} failures`);

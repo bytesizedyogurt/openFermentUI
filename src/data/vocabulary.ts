@@ -349,7 +349,6 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
       'LLESettler',
       'LLECentrifuge',
       'MixerSettler',
-      'MultiStageMixerSettlers',
       'LiquidsSettler',
       'LiquidsSplitSettler',
       'LiquidsPartitionSettler',
@@ -360,7 +359,7 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     label: 'Distillation / rectification',
     stage: 'purification',
     note: 'terpene finishing; the beer column and rectifier of an ethanol plant',
-    biosteamClasses: ['Distillation', 'BinaryDistillation', 'ShortcutColumn', 'MESHDistillation', 'AdiabaticMultiStageVLEColumn'],
+    biosteamClasses: ['Distillation', 'BinaryDistillation', 'MESHDistillation', 'AdiabaticMultiStageVLEColumn'],
   },
   {
     // OF-BLD-019 §4.1 — the step after the rectifier in every fuel-ethanol
@@ -406,6 +405,128 @@ export const UNIT_OPERATIONS: UnitOperation[] = [
     label: 'Nuclease/residual-DNA clearance',
     stage: 'polish',
     note: 'defining step for molecular-biology enzyme grade',
+  },
+  // OF-BLD-020 §5.1 — the steps pureOS's unit catalogue builds a train from
+  // (core/openferment_core/pureos/catalogue.py), each a catalogue id. The
+  // vocabulary carries no number; a class is one step (check:seed), so the
+  // shortcut column and the counter-current extractor left `distillation` and
+  // `lle` for entries of their own.
+  {
+    id: 'pressure-filtration',
+    label: 'Pressure filtration',
+    stage: 'clarification',
+    note: 'a filter press: solids stay as a cake, the filtrate passes',
+    biosteamClasses: ['PressureFilter'],
+  },
+  {
+    id: 'rotary-vacuum-filtration',
+    label: 'Rotary vacuum filtration',
+    stage: 'clarification',
+    note: 'a turning drum under vacuum: the cake stays on the drum',
+    biosteamClasses: ['RotaryVacuumFilter'],
+  },
+  {
+    id: 'clarifier',
+    label: 'Clarifier',
+    stage: 'clarification',
+    note: 'solids settle; the clear liquid overflows',
+    biosteamClasses: ['Clarifier'],
+  },
+  {
+    id: 'flash',
+    label: 'Flash',
+    stage: 'concentration',
+    note: 'part of the broth boils at a set pressure or temperature; vapour and liquid leave at equilibrium',
+    biosteamClasses: ['Flash'],
+  },
+  {
+    id: 'distillation-shortcut',
+    label: 'Distillation, shortcut column',
+    stage: 'purification',
+    note: 'stages by the Fenske–Underwood–Gilliland shortcut',
+    biosteamClasses: ['ShortcutColumn'],
+  },
+  {
+    id: 'evaporation',
+    label: 'Multi-effect evaporation',
+    stage: 'concentration',
+    note: 'water boiled off in effects at falling pressures',
+    biosteamClasses: ['MultiEffectEvaporator'],
+  },
+  {
+    id: 'lle-multistage',
+    label: 'Counter-current extraction',
+    stage: 'recovery',
+    note: 'mixer-settlers in series, the solvent against the broth',
+    biosteamClasses: ['MultiStageMixerSettlers'],
+  },
+  {
+    id: 'adsorption',
+    label: 'Adsorption column',
+    stage: 'purification',
+    note: 'a lead, guard and standby column swap as the bed loads',
+    biosteamClasses: ['SingleComponentAdsorptionColumn'],
+  },
+  {
+    id: 'drying-drum',
+    label: 'Drum drying',
+    stage: 'drying',
+    note: 'hot gas through a turning drum, the gas heated by burning fuel',
+    biosteamClasses: ['DrumDryer'],
+  },
+  {
+    id: 'cell-disruption',
+    label: 'Cell disruption',
+    stage: 'cell disruption',
+    note: 'homogeniser or bead mill: the product the cells hold moves into the liquid',
+  },
+  {
+    id: 'chromatography',
+    label: 'Chromatography',
+    stage: 'capture/polish',
+    note: 'a column step by its mode, with declared recovery and purity until a column model computes them',
+  },
+  {
+    id: 'heat-exchange',
+    label: 'Heat exchange',
+    stage: 'utility',
+    note: 'heats or cools a stream with a utility',
+    biosteamClasses: ['HXutility'],
+  },
+  {
+    id: 'tank',
+    label: 'Storage tank',
+    stage: 'utility',
+    note: 'holds a stream for a residence time',
+    biosteamClasses: ['StorageTank'],
+  },
+  {
+    id: 'mix-tank',
+    label: 'Mix tank',
+    stage: 'utility',
+    note: 'mixes streams in a stirred tank',
+    biosteamClasses: ['MixTank'],
+  },
+  {
+    id: 'pump',
+    label: 'Pump',
+    stage: 'utility',
+    note: 'raises a stream\'s pressure',
+    biosteamClasses: ['Pump'],
+  },
+  {
+    id: 'mixer',
+    label: 'Mixer',
+    stage: 'utility',
+    note: 'joins streams into one',
+    biosteamClasses: ['Mixer'],
+  },
+  {
+    id: 'splitter',
+    label: 'Splitter',
+    stage: 'utility',
+    note: 'divides a stream by each component\'s split',
+    biosteamClasses: ['Splitter'],
   },
 ];
 
@@ -675,6 +796,7 @@ export const UNIT_OP_STAGE_ORDER: UnitOperationStage[] = [
   'drying',
   'formulation',
   'finishing',
+  'utility',
 ];
 
 /** Lower is safer. Orders clearance chips and sorts a risk column. */

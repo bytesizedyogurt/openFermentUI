@@ -45,6 +45,7 @@ import {
   fitsFrom,
   modellerQuestions,
   newestRunId,
+  partsOf,
   proformaArtifact,
   proformaNewestRun,
   proformaBind,
@@ -52,11 +53,13 @@ import {
   proformaShelf,
   proformaStatus,
   questionsText,
-  runOverrides,
+  scenarioRunOverrides,
   runProformaScenario,
   runViewOfArtifact,
   runViewOfResult,
   stamp,
+  trainRunPath,
+  vesselDesignPath,
   type RunView,
   type SimulatorStatus,
 } from '@/lib/proforma';
@@ -668,6 +671,13 @@ function AuthoredScenario({ scenarioId }: { scenarioId: string }) {
 //                   one thing a run carries of a person (`overrides`), and it
 //                   wins over the records and any fermOS fit for its input,
 //                   here and in the service alike;
+//   the parts       OF-BLD-020 §6.1: a scenario on `custom_train_v1` names
+//                   the vessel design and the train run it is built from
+//                   (`partsOf`), sent with every binding, panel read and run,
+//                   and named here with links (the design's artifact, the
+//                   train run in pureOS); its panel adds the group Finance,
+//                   the TEA's parameters, each the package's own default
+//                   until a person sets one;
 //   the run         POST /api/proforma/run, one `proforma.run` artifact
 //                   (D1); after a run the store keeps its id
 //                   (recordScenarioRun), and on load the page reads the newest
@@ -1149,6 +1159,10 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
   const ownArchived = archivedProgramOf('scenario', scenario.id, lookup) !== null;
   const includeArchived = showArchived || ownArchived;
   const flowsheetId = scenario.flowsheetId ?? scenario.modelId;
+  // OF-BLD-020 §6.1: what a scenario on custom_train_v1 is built from.
+  const parts = partsOf(scenario);
+  const vesselId = parts?.vessel ?? null;
+  const trainRunId = parts?.trainRun ?? null;
 
   const [shelf, setShelf] = useState<FlowsheetInfo[] | null>(null);
   const [shelfProblem, setShelfProblem] = useState<string | null>(null);
@@ -1198,7 +1212,7 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     const ask = { host, includeArchived };
     const bound =
       madeHere || Object.keys(fits).length > 0
-        ? proformaBind(flowsheetId, { ...ask, fits }, ctrl.signal)
+        ? proformaBind(flowsheetId, { ...ask, fits, vessel: vesselId, trainRun: trainRunId }, ctrl.signal)
         : proformaScenarios(ask, ctrl.signal).then((all) => {
             const found = all.find((x) => x.id === scenario.id);
             if (!found) throw new Error(`The service binds no scenario ${scenario.id}: it is not among the BioSTEAM scenarios this service holds.`);
@@ -1206,14 +1220,20 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
           });
     bound.then(setInfo).catch((e: unknown) => !ctrl.signal.aborted && setBindProblem(problemOf(e)));
     return () => ctrl.abort();
-  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey]);
+  }, [madeHere, flowsheetId, scenario.id, host, includeArchived, fitsKey, vesselId, trainRunId]);
 
   // The inputs as the parameter panel shows them (OF-BLD-020 §2.2): the
   // scenario's scope, bound by the service as a run binds it, a scenario made
   // here naming its flowsheet, with the host and the fits chosen.
   const ask = useMemo(
-    () => ({ flowsheet: madeHere ? flowsheetId : null, host, fits: Object.fromEntries(JSON.parse(fitsKey) as [string, string][]) }),
-    [madeHere, flowsheetId, host, fitsKey],
+    () => ({
+      flowsheet: madeHere ? flowsheetId : null,
+      host,
+      fits: Object.fromEntries(JSON.parse(fitsKey) as [string, string][]),
+      // A composite's parts, held to the program switch as the run holds them (OF-BLD-020 §6.1).
+      ...(vesselId || trainRunId ? { vessel: vesselId, trainRun: trainRunId, includeArchived } : {}),
+    }),
+    [madeHere, flowsheetId, host, fitsKey, vesselId, trainRunId, includeArchived],
   );
   useEffect(() => {
     const ctrl = new AbortController();
@@ -1351,9 +1371,21 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
     setRunProblem(null);
     // The run carries the scope's overrides of the inputs its flowsheet
     // takes, and the fits of the inputs no override names (OF-BLD-020 D3).
-    const sent = runOverrides(overrides, bound.inputs.map((i) => i.key));
+    // A composite's Finance group is the scope's too (OF-BLD-020 §6.1): its
+    // run carries every override of its scope, whether or not the panel has
+    // answered, so a Finance value is never dropped while the scope loads or
+    // after it failed (§6.R, main-15/26); the service splits and checks them.
+    const finance = (panel?.specs ?? []).filter((sp) => sp.group === 'Finance').map((sp) => sp.key);
+    const sent = scenarioRunOverrides(overrides, { inputs: bound.inputs.map((i) => i.key), finance, composite: !!parts });
     const fits = Object.fromEntries(Object.entries(chosenFits).filter(([k]) => bound.inputs.find((i) => i.key === k)?.binding === 'artifact'));
-    runProformaScenario({ scenarioId: scenario.id, flowsheet: madeHere ? flowsheetId : null, overrides: sent, host, fits })
+    runProformaScenario({
+      scenarioId: scenario.id,
+      flowsheet: madeHere ? flowsheetId : null,
+      overrides: sent,
+      host,
+      fits,
+      ...(parts ? { vessel: parts.vessel, trainRun: parts.trainRun, includeArchived } : {}),
+    })
       .then((r) => {
         setView(runViewOfResult(r));
         // The index and this page read the newest run from its artifact (D6).
@@ -1405,6 +1437,19 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
         <span>· {madeHere ? `made in this browser${scenario.createdAt ? ` ${stamp(scenario.createdAt)}` : ''}` : 'shipped with openFerment'}</span>
         {view ? <ProvenanceBadge p={view.provenance} /> : <span className="chip">not run yet</span>}
       </div>
+      {parts && (
+        <p className="mb-4 text-caption text-ink-soft" data-testid="scenario-parts" data-vessel={parts.vessel} data-train-run={parts.trainRun}>
+          Built from a vessel and a train: the fermenter is vessel design{' '}
+          <a className="font-num text-accent hover:underline" href={href(vesselDesignPath(parts.vessel))} data-testid="scenario-vessel-link">
+            {parts.vessel}
+          </a>
+          , rebuilt as BioSTEAM&rsquo;s same class with every design parameter as the design holds it; the train is train run{' '}
+          <a className="font-num text-accent hover:underline" href={href(trainRunPath(parts.trainRun))} data-testid="scenario-train-link">
+            {parts.trainRun}
+          </a>
+          , its units with the values that run held, on the fermenter&rsquo;s beer (the train&rsquo;s own inlet is not an input).
+        </p>
+      )}
 
       {(shelfProblem || (shelf && !flowsheet)) && (
         <div className="mb-4">
@@ -1624,7 +1669,8 @@ function BiosteamScenario({ scenario, madeHere }: { scenario: Scenario; madeHere
 }
 
 /** The order the panel shows a scenario's inputs in: the shelf's kinds (params._GROUPS). */
-const PROFORMA_GROUPS = ['Process', 'Economics', 'Conventions'];
+// OF-BLD-020 §6.1: a composite's TEA parameters follow, as the group Finance.
+const PROFORMA_GROUPS = ['Process', 'Economics', 'Conventions', 'Finance'];
 const EMPTY_FITS: Record<string, string> = {};
 /** The inputs a fermOS fit can feed (proforma.FIT_KEYS). */
 const FIT_INPUTS = ['titre', 'yield', 'productivity'];

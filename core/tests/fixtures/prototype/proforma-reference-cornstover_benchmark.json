@@ -20,7 +20,9 @@
       "priceBasis": "USD per gallon of ethanol, at the package's own ethanol density",
       "leavesOut": [],
       "gridInputs": [],
-      "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover"
+      "packageTest": "biorefineries/tests/test_biorefineries.py::test_cornstover",
+      "builtFrom": [],
+      "brothStream": null
     },
     "artifact": {
       "id": "42f80a77d306f673",

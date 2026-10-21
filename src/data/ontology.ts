@@ -2,8 +2,9 @@
 // replacing the 16-field synthetic ontology of OF-DES-001 Appendix C — the
 // polymer family OF-BLD-014 §2.1 adds for thread P, and the kinetics family
 // the yeast-ethanol program adds for thread Q, with the four oxygen and
-// maintenance fields OF-BLD-020 §3.2 adds to it for fermOS's simulations: 44
-// fields in seven.
+// maintenance fields OF-BLD-020 §3.2 adds to it for fermOS's simulations and
+// the five downstream fields §5.1 adds for pureOS's unit catalogue: 49 fields
+// in seven.
 //
 // Two rules this literature forces and the synthetic version did not:
 //
@@ -51,6 +52,16 @@ const Y1_RANGE_NOTE =
  */
 const F1_RANGE_NOTE =
   'Validation range proposed on 2026-10-21 by OF-BLD-020 (§3.2, Appendix 2) as a convention, awaiting acceptance by Sean Creighton. It rejects implausible extractions and states nothing about what has been achieved.';
+
+/**
+ * The same, for the downstream fields OF-BLD-020 §5.1 adds so a record can
+ * bind a parameter of pureOS's unit catalogue (its Appendix 2 §B): a
+ * convention written under its decision D4, awaiting Sean Creighton's
+ * acceptance. A share runs from none to the whole by its nature; a partition
+ * coefficient's span is the widest a solvent system plausibly reports.
+ */
+const U1_RANGE_NOTE =
+  'Validation range proposed on 2026-10-21 by OF-BLD-020 (§5.1, Appendix 2 §B) as a convention, awaiting acceptance by Sean Creighton. It rejects implausible extractions and states nothing about what has been achieved.';
 
 export const ONTOLOGY: ParameterDef[] = [
   // ── Family 1 — expression performance ───────────────────────────────
@@ -331,6 +342,64 @@ export const ONTOLOGY: ParameterDef[] = [
     notes:
       'Crude FDH 75–2,300; purified 970–99,000; biomass-fermentation protein 4–6. Currency is not auto-converted.',
     requiresMethod: true,
+  },
+  // OF-BLD-020 §5.1: what pureOS's unit catalogue names and no field held
+  // (its Appendix 2 §B). A record of the first binds a centrifuge's, a
+  // filter's or a column's split of the product, the second a column's
+  // purity, the third and fourth an extraction's and a membrane's
+  // per-component coefficients, the last a cake's moisture. A share is held
+  // in percent, as papers write one and as secreted_fraction is; a coefficient
+  // is a ratio with no unit. Each definition names what it must not be
+  // mistaken for and carries no number.
+  {
+    id: 'step_recovery',
+    family: 'downstream',
+    name: 'Step recovery',
+    definition:
+      'The share of the product entering one named downstream step that leaves it in the stream carried on, by mass: a centrifuge, a filter, a membrane or a column. Not an overall yield over several steps, not a purity (product_purity), and not a yield on substrate.',
+    canonicalUnit: '%',
+    range: [0, 100],
+    notes: U1_RANGE_NOTE,
+  },
+  {
+    id: 'product_purity',
+    family: 'downstream',
+    name: 'Product purity',
+    definition:
+      'The product\'s share of what a step delivers, by the measure the paper names (of total protein, or of dry matter). Not a recovery (step_recovery), and not a concentration such as a titre.',
+    canonicalUnit: '%',
+    range: [0, 100],
+    notes: U1_RANGE_NOTE,
+  },
+  {
+    id: 'partition_coefficient',
+    family: 'downstream',
+    name: 'Partition coefficient',
+    definition:
+      'A solute\'s concentration in the extract phase over its concentration in the raffinate phase at equilibrium, for a named solvent system: a ratio with no unit. Not a recovery over a step (step_recovery), and not a sieving coefficient (sieving_coefficient), which is a membrane\'s.',
+    canonicalUnit: '',
+    range: [0.0001, 10000],
+    notes: U1_RANGE_NOTE,
+  },
+  {
+    id: 'sieving_coefficient',
+    family: 'downstream',
+    name: 'Sieving coefficient',
+    definition:
+      'The share of a solute\'s concentration that passes a named membrane into the permeate, permeate over retentate concentration: one less the rejection, a ratio with no unit. Not a recovery over a whole step (step_recovery), and not a partition coefficient (partition_coefficient).',
+    canonicalUnit: '',
+    range: [0, 1],
+    notes: U1_RANGE_NOTE,
+  },
+  {
+    id: 'cake_moisture',
+    family: 'downstream',
+    name: 'Cake moisture',
+    definition:
+      'Water as a share of a filter or centrifuge cake\'s mass as it is discharged, wet basis. Not a dried product\'s moisture, and not the solids content of a broth.',
+    canonicalUnit: '%',
+    range: [0, 100],
+    notes: U1_RANGE_NOTE,
   },
 
   // ── Family 6 — polymer (OF-BLD-014 §2.1) ────────────────────────────

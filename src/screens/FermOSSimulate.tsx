@@ -29,9 +29,11 @@
 // beside each geneOS ceiling the service read for the strain's host models:
 // flagged when above, never clamped, D11), the parameters with their sources
 // and intervals, and the basis. From there: Fit this family to a deposition
-// (Fits, with the family chosen), Design the vessel (fermOS → Vessel), and
-// Send to Proforma (the OF-BLD-019 §5.1 bridge, which reads a simulation's
-// end state as it reads a fit's forecast).
+// (Fits, with the family chosen), Design the vessel (fermOS → Vessel), Use as
+// a train's inlet (OF-BLD-020 §6.2: pureOS → Builder opens a new train whose
+// inlet is this simulation's broth at harvest, which the service reads from
+// the kept series), and Send to Proforma (the OF-BLD-019 §5.1 bridge, which
+// reads a simulation's end state as it reads a fit's forecast).
 //
 // THE SCREEN COMPUTES NOTHING. Every number here is the service's answer or
 // the person's override; the CSVs export the artifact's own numbers. No
@@ -68,6 +70,7 @@ import {
   vesselPath,
   type SimulateAsk,
 } from '@/lib/fermos';
+import { builderInletPath } from '@/lib/pureos';
 import { SendToProforma } from './FermOSForecast';
 
 /** The panel's groups, in the order Appendix 2 §A lists them. */
@@ -679,6 +682,10 @@ export default function FermOSSimulate() {
             )}
             <a className="btn" href={href(vesselPath(result.artifactId))} data-testid="simulation-vessel-link">
               Design the vessel
+            </a>
+            {/* OF-BLD-020 §6.2: the broth that leaves fermOS is the stream that enters pureOS. */}
+            <a className="btn" href={href(builderInletPath({ kind: 'simulation', id: result.artifactId }))} data-testid="simulation-train-inlet">
+              Use as a train&rsquo;s inlet
             </a>
           </div>
           <SendToProforma artifactId={result.artifactId} tool="fermos.simulation" />
